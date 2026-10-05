@@ -319,7 +319,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   #422 carries it wherever the deal is summarized:
   - the pipeline row's tag and its CSV, the deal header and the internal
     comps (`interestTag(ex, asOf)`): "Leasehold, 45 yrs left", whole years
-    down, and "Leased fee, reverts in 45 yrs";
+    down, and "Leased fee, reverts in 45 yrs" — "up to 45 yrs left" and
+    "reverts within 45 yrs" where the term is a count of years counted from
+    today, whose memorandum is dated earlier, or already counts its options
+    (a single tenant's tag and a master lease's alike);
   - the memo's header and the workbook cover's "What is being sold"
     (`interestShortLine`'s clause): "…; the lease ends Dec 2071, 45.3
     years from today";
@@ -1059,6 +1062,67 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   last Q2 2028" in the read, the tag "Forward, 3 takedowns to Q2 2028",
   and a lighter tick on the panel for each takedown
   (`data-bar="fwd-phase"`). The model still runs one closing and says so.
+- **Figures no building could have** (research pass 38, 2026-10-05). A
+  figure no building could earn is refused, or said as what it is, never
+  printed as a return. The model's arithmetic is unchanged throughout;
+  what each figure should be is the owner's (WILL_TODO).
+  - **A price row whose value is no price** (`priceRefusal` in
+    lib/criteria, read by the one price reader, so by every reader of an
+    ask): a percentage, a share of a loan's balance ("75% of UPB"), a
+    multiple, or a figure per unit, foot, acre or year is refused. The deal
+    reads as unpriced and the row stays in the key terms as written; a
+    dollar price with its cap or share in words after it reads as before.
+  - **An unpriced deal** runs on the $10,000,000 placeholder, and the
+    memorandum's NOI is never judged against it ("cannot be set against
+    the $10,000,000 placeholder price, which no memorandum stated — enter
+    the price"). Where only a cap is stated, the placeholder × the cap is
+    an assumption, so a typed price never shows returns on it; the workbook
+    leaves its per-unit, per-SF and all-in rows out on a placeholder.
+  - **One gate on the model's reads** (`modelReadsWithheld` in
+    lib/underwrite/report-grid): on a placeholder price or an assumed
+    year-1 NOI, the report, the deal page (the assumable loan, the seller's
+    note, the leasehold exit, the sale panel's ceiling, every panel's model
+    line) and the workbook's cover print the memorandum's terms and none of
+    the model's reads. A finding against the returns (an implied going-in
+    cap under 2% on a deal read as stabilized, a building run 90% vacant or
+    more, any high finding) withholds the playground's tiles and max bid
+    and the report's grids and max bid under one sentence, while the
+    model's reads of the terms stand (`readsStand`).
+  - **The playground rests on the model's own vacancy** (its lever reaches
+    99%), and an assumed NOI's cap reads "n/a — assumed NOI".
+  - **A yield on cost at or past 25%** is struck nowhere (`yieldWithheld`,
+    "n/a — figures don't tie"), the first-draft model's included; a plan
+    basis outside the band any market delivers at is struck nowhere
+    (`planWithBasisChecked`, `basisWithheld`); a works budget under about
+    $1,000 a unit, or 1% of the price, is a finding.
+  - **A note under water** (its balance over the collateral's stated
+    value, or with a stated senior loan the two together: `noteUnderWater`
+    in lib/note-yield) reads "n/a — under water" in every cap slot, and its
+    sentence says the contract yield assumes a repayment the collateral
+    does not cover.
+  - **A seller's loan or note at or over the price** prices nothing ("check
+    the balance"), and a gap that does not solve is said as none, never
+    "0 points".
+  - **A levered IRR that does not solve says why** (lib/underwrite/no-irr:
+    the sale does not repay the loan, the equity gets none of its cash
+    back, or no rate solves), on the tiles, the report and, live, the
+    workbook.
+  - **The default exit beside the model's own entry**
+    (`defaultExitGap`, lib/underwrite/cost-note): where the memorandum
+    states no cap, the exit's note and a line under the playground name the
+    model's year-1 NOI over its price and the compression or expansion
+    riding in the returns. A cap stated as a range runs at its low end, and
+    every note says so.
+  - **Words:** a duplex, triplex or fourplex files as multifamily; a
+    student building counted in units says 350 SF is a bed's typical size;
+    the class's expense ratio on a mostly empty building says its taxes and
+    insurance do not fall with occupancy; the workbook's breakeven
+    occupancy past 100% reads "not reached at full occupancy" and is left
+    out at 90% vacancy; a development's land price a unit is "Land cost /
+    Unit"; a bulk condominium's price divides by the units offered
+    (lib/condo-units); a leased fee's NOI read off its row and equal to its
+    ground rent says so, and its cap prints in the workbook as on the page,
+    "on the Land's Price"; /tools' sized loan past the price says why.
 - **A tenancy in common, a DST and a share of a share** (research pass
   37). A TIC is title to the property: its own label, lead, caveat and
   short line, TIC traps (a)–(e) in place of the partial interest's, the
@@ -1821,7 +1885,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  One hundred and eighty-nine are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Two hundred and two are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1922,7 +1986,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   named for the metro area: the 2023 delineation puts Calvert County in
   it) from a one-market run each (37288646346, 37288750601 and
   37288974243); Ponce's and Aguadilla's are U.S. Army Corps of Engineers
-  film scans about 1500px wide, served at their own width as Erie's is),
+  film scans about 1500px wide, served at their own width as Erie's is;
+  then round 14: Beckley (the New River Gorge Bridge, named for the
+  metro area), Twin Falls (Shoshone Falls, named for the metro area),
+  Altoona (the city from a hill), Wheeling (downtown across the Ohio,
+  "Wheeling, WV") and Sandusky (Cedar Point from the air) — run
+  37313470791 — Mount Vernon-Anacortes (the Skagit Valley's tulip fields),
+  Wenatchee-East Wenatchee (Lake Chelan in winter, named for the metro
+  area as Glens Falls' Lake George is) and Farmington (Shiprock, its
+  credit the name inside the "Dave Bunnell redirect" the runner printed,
+  which is the file page's Author field whole, an account with no user
+  page: zori probe_url run 37329561789) — run 37313645151 — Michigan
+  City-La Porte (the pierhead lighthouse at dusk), Muskegon-Norton Shores
+  (downtown across Muskegon Lake) and Johnstown (the city from the
+  Inclined Plane) — run 37314140256 — with Lawton (the Wichitas at a
+  winter sunrise, from the Wildlife Refuge's category) and Homosassa
+  Springs (Three Sisters Springs) from a one-market run each (37321853635
+  and 37321374937)),
   each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
@@ -1970,9 +2050,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (Illinois; every Capitol frame behind cars and wires or cut at 21:9,
   one-market run 37289191720), St. Cloud, Joplin (its sheet the 2011
   tornado's cleanup), Warner Robins and Florence (South Carolina; a
-  big-box centre's parking) on the drawn cover. A one-state
+  big-box centre's parking) on the drawn cover. Round 14 left Columbus
+  (Indiana; the Miller House and two postcards, its architecture
+  categories never reached), Grand Island (a crane sunrise that names no
+  place on the river), Walla Walla, Sioux City (its skyline under the
+  words, one-market run 37321660533) and Lewiston (the confluence a film
+  scan with a scanner's line down it) on the drawn cover. A one-state
   title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); 35 of the 173
+  truncates a long one and the deal page shows it in full); 35 of the 185
   are cut, most to their first city, three to the city the place is known
   by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
   name (Boise, Honolulu). A two-state title is cut to

@@ -576,6 +576,28 @@ Four choices are yours to overrule:
 4. **Kenosha**'s credit reads "Wrongdave at English Wikipedia" as printed,
    like Bangor's.
 
+**Photographs, round 14.** Thirteen more: Beckley, Twin Falls, Altoona,
+Wheeling, Sandusky, Mount Vernon-Anacortes, Wenatchee-East Wenatchee,
+Farmington, Lawton, Homosassa Springs, Michigan City-La Porte,
+Muskegon-Norton Shores and Johnstown. Columbus (Indiana), Grand Island,
+Walla Walla, Sioux City and Lewiston keep the drawn cover. Four choices are
+yours to overrule:
+1. **Three modest picks**: Wheeling (an overcast frame), Wenatchee (Lake
+   Chelan, in the metro area's county but about 40 miles from the city) and
+   Muskegon (a willow fills a third of the frame). The drawn cover is the
+   alternative for each.
+2. **Farmington's credit reads "Dave Bunnell".** The file page's Author
+   field is the account name "Dave Bunnell redirect", which has no user
+   page; the credit takes the name inside it, as Duluth's did. Say if you
+   would rather print the account name whole.
+3. **Seven picks show a landmark of the metro area rather than its city**
+   (the New River Gorge Bridge, Shoshone Falls, the Skagit Valley's tulip
+   fields, Lake Chelan, Shiprock, the Wichita Mountains, Three Sisters
+   Springs), each named for the metro area, as Belton's is.
+4. **Four hyphenated titles are kept whole** ("Mount Vernon-Anacortes, WA",
+   "Wenatchee-East Wenatchee, WA", "Michigan City-La Porte, IN",
+   "Muskegon-Norton Shores, MI"); cutting each to its first city is yours.
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**
