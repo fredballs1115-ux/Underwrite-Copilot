@@ -31,7 +31,7 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
-import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, planWithBasisChecked, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { dealTypeLabel, interestOf, interestShortLine, isWholeShare, readInterest } from "@/lib/interest";
@@ -133,7 +133,7 @@ export const STATUS_WORD: Record<(typeof STATUS_ORDER)[number], string> = {
  */
 function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStrategy, cls: string): string {
   if (strategy.kind === "unknown" || strategy.kind === "stabilized") return "";
-  const plan = planSummary(extraction, strategy);
+  const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   // Whose strategy it is on a note or a leased fee, as the deal header says
   // it (lib/interest `dealTypeLabel`): the collateral's, or the building
   // someone else owns on the land.

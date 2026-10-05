@@ -14,6 +14,7 @@ import {
   isOutdoorStorageYard,
   isPlanDeal,
   planSummary,
+  planWithBasisChecked,
   plausibilityNote,
   unitCountFromMetrics,
   type DealStrategy,
@@ -183,10 +184,15 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   if (isPlanDeal(strategy.kind)) {
     // A plan deal's basis is its total cost; the shell's or the land's price
     // over units that do not exist yet is no basis at all.
-    const plan = planSummary(ex, strategy);
+    // No all-in basis is handed on where the plausibility check finds it
+    // outside the band (research pass 38: "$243 per planned unit").
+    const plan = planWithBasisChecked(ex, strategy, planSummary(ex, strategy));
     const deal = strategy.label.toLowerCase();
     const never = strategy.kind === "development" ? "the land's price" : "the price alone";
     const priceAlone = tag ? ` The price alone is ${tag}, before the works.` : "";
+    if (plan?.basisWithheld) {
+      return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, and none is handed on. ${plan.basisWithheld} No basis range is built on it.${priceAlone}`;
+    }
     if (plan?.costPerUnit != null && plan.units != null && plan.totalCost != null) {
       return `THE BUILDING'S BASIS, computed in code: on this ${deal} deal it is total cost — ${compact(plan.totalCost)} over ${plan.units.toLocaleString("en-US")} planned ${noun.many} is ${compact(plan.costPerUnit)} per planned ${noun.one}, never ${never} over them.${priceAlone}`;
     }

@@ -15,7 +15,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { countNounOf, screenYearOf } from "@/lib/criteria";
-import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { askingPriceOf, inferStrategy, planSummary, planWithBasisChecked } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { sellerFinancingDocLine } from "@/lib/seller-financing";
@@ -339,7 +339,7 @@ export function ShareView({
     ? { ...extraction, metrics: extraction.metrics ?? [] }
     : null;
   const strategy = inferStrategy(safeExtraction, firstSignal);
-  const plan = planSummary(safeExtraction, strategy);
+  const plan = planWithBasisChecked(safeExtraction, strategy, planSummary(safeExtraction, strategy));
   // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
   // Its price row is read against the year the screen read the memorandum.
   const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, screenYearOf(safeExtraction), 8, interestOf(safeExtraction).kind);

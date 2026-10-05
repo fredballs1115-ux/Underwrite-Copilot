@@ -20,6 +20,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import {
   inferStrategy,
   planSummary,
+  planWithBasisChecked,
   type PlanSummary,
   type StrategyKind,
 } from "./deal-strategy";
@@ -212,7 +213,7 @@ export function buildPlanReport(
 ): PlanReport | null {
   if (!extraction || !refCap) return null;
   const strategy = inferStrategy(extraction, signal ?? null);
-  const plan = planSummary(extraction, strategy);
+  const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   const grid = buildYieldOnCostGrid(plan, refCap.pct);
   const breakevens = planBreakevens(plan, refCap.pct);
   if (!plan || !grid || !breakevens) return null;

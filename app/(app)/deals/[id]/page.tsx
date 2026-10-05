@@ -143,6 +143,7 @@ import {
   isPlanDeal,
   buildsSomething,
   planSummary,
+  planWithBasisChecked,
   signalAskPrice,
   unitCountRow,
 } from "@/lib/deal-strategy";
@@ -704,7 +705,9 @@ export default async function DealPage({
   // every number built on it. Read first: the actuals check, the summary
   // bar and every panel below take the kind from here.
   const strategy = inferStrategy(extraction, firstSignal);
-  const plan = planSummary(extraction, strategy);
+  // The plan's all-in basis only where the plausibility check does not find
+  // it outside the band (lib/deal-strategy `planWithBasisChecked`).
+  const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   const plausibility = assessPlausibility(extraction, strategy);
   // Today on the reader's own calendar (their browser's zone, from its
   // cookie — lib/reader-day), read once here and handed to what the page

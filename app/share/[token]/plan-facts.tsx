@@ -47,6 +47,7 @@ export function SharePlan({
         {plan.yieldWithheld ? ` ${plan.yieldWithheld}` : ""}
         {plan.costWithheld ? ` ${plan.costWithheld}` : ""}
         {plan.costPerUnitWithheld ? ` ${plan.costPerUnitWithheld}` : ""}
+        {plan.basisWithheld ? ` ${plan.basisWithheld}` : ""}
       </p>
     </section>
   );

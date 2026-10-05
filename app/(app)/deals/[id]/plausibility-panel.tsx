@@ -51,7 +51,8 @@ export function PlanStrip({
         on total cost — never on a cap rate against the acquisition price.
         {plan.yieldWithheld ? ` ${plan.yieldWithheld}` : ""}
         {plan.costWithheld ? ` ${plan.costWithheld}` : ""}
-        {plan.costPerUnitWithheld ? ` ${plan.costPerUnitWithheld}` : ""}{" "}
+        {plan.costPerUnitWithheld ? ` ${plan.costPerUnitWithheld}` : ""}
+        {plan.basisWithheld ? ` ${plan.basisWithheld}` : ""}{" "}
         The challenger below tests whether it is as conservative as the OM presents it.
       </p>
     </section>

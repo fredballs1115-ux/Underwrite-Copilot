@@ -1041,6 +1041,12 @@ export interface PlanSummary {
    *  building's cost is that plus the entity's loan, which the model does
    *  not add; null otherwise */
   costWithheld?: string | null;
+  /** why no all-in basis per planned unit is struck where the plausibility
+   *  check finds the plan's basis outside the band any market delivers at
+   *  (`planWithBasisChecked`, research pass 38) — one sentence, said under
+   *  the plan's facts, that never prints the misread figure; null or absent
+   *  otherwise */
+  basisWithheld?: string | null;
   /** the finished product's unit count, when the OM states one — on a
    *  conversion or a development only a count it labels proposed or planned
    *  (lib/criteria `planCountRow`), never today's building's */
@@ -1571,6 +1577,43 @@ export function assessPlausibility(
     .map((f) => (wholeNote && f.code !== "no_income_in_place" ? { ...f, detail: `${f.detail}${wholeNote}` } : f))
     .filter((f) => (seen.has(f.code) ? false : (seen.add(f.code), true)))
     .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "high" ? -1 : 1));
+}
+
+/**
+ * The plan as every surface that prints its all-in basis reads it — the plan
+ * strip, the shared screen, the report's plan page, the memo, the deal
+ * context and the verdict's basis line. Where the plausibility check finds
+ * the plan's basis outside the band any market delivers at (rule 4's
+ * `basis_out_of_band`: a total cost stated in thousands over 200 planned
+ * units), no basis per planned unit is struck and `basisWithheld` says why in
+ * one sentence that never prints the misread figure (research pass 38: "$243
+ * per planned unit" reached every Claude step and the plan strip beside the
+ * check's own finding). The plan as it is otherwise.
+ */
+export function planWithBasisChecked(
+  extraction: ExtractionResult | null,
+  strategy: DealStrategy,
+  plan: PlanSummary | null,
+): PlanSummary | null {
+  if (!plan || !extraction || plan.totalCost == null) return plan;
+  if (!assessPlausibility(extraction, strategy).some((f) => f.code === "basis_out_of_band")) return plan;
+  const words = assetWords((extraction.assetClass ?? "").toLowerCase());
+  const noun = words.noun ?? { one: "unit", many: "units" };
+  const sf = words.basis === "sf" ? buildingSfFromMetrics(extraction.metrics ?? []) : null;
+  // "Planned" only where the building is still to be delivered: a
+  // value-add's units stand.
+  const planned = notYetDelivered(plan.kind) ? "planned " : "";
+  const over =
+    sf != null
+      ? `the building's ${Math.round(sf).toLocaleString("en-US")} SF`
+      : plan.units != null
+        ? `the ${plan.units.toLocaleString("en-US")} ${planned}${plan.units === 1 ? noun.one : noun.many}`
+        : `its ${planned}${noun.many}`;
+  return {
+    ...plan,
+    costPerUnit: null,
+    basisWithheld: `No all-in basis is struck: the ${money(plan.totalCost)} total cost over ${over} is outside the band any market delivers at, so the total cost or the ${sf != null ? "area" : "count"} was most likely misread.`,
+  };
 }
 
 /** The plan's figures as one sentence for the brief — what is stated, and

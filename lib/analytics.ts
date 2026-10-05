@@ -5,6 +5,7 @@ import {
   findPriceMetric,
   inferStrategy,
   planSummary,
+  planWithBasisChecked,
   statedBasisIsBuildings,
   unitCountFromMetrics,
   type StrategyKind,
@@ -78,7 +79,7 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     // alone, a value-add the signal names was plotted as a stabilized cap.
     const signal = (r.first_signal as FirstSignal | null | undefined) ?? null;
     const strategy = inferStrategy(extraction, signal);
-    const plan = planSummary(extraction, strategy);
+    const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
 
     // The cap the deal's own header prints (lib/compare-interest
     // `statedCapRead`): the memorandum's going-in cap, else its first

@@ -2,7 +2,7 @@ import { compactUsd } from "@/lib/money";
 import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
-import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type StrategyKind } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, planWithBasisChecked, type StrategyKind } from "@/lib/deal-strategy";
 import { priceRange, priceRangeShort, screenYearOf } from "@/lib/criteria";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
@@ -192,7 +192,9 @@ export function dealContextFor(
   ];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];
   if (strategy.kind === "unknown") return head.length || tail.length ? [...head, ...tail].join(" ") : null;
-  const plan = planSummary(extraction, strategy);
+  // No all-in basis where the plausibility check finds it outside the band:
+  // its sentence goes to every step in its place (research pass 38).
+  const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   // Whose strategy it is on a note or a leased fee (the deal header's own
   // label): the steps read the type as the collateral's, never the price's.
   const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
@@ -226,6 +228,9 @@ export function dealContextFor(
   // A conversion or a development whose memorandum labels no count proposed
   // or planned: no basis per unit, and why.
   if (plan?.costPerUnitWithheld) lines.push(plan.costPerUnitWithheld);
+  // A basis outside the band any market delivers at: none, and why
+  // (lib/deal-strategy `planWithBasisChecked`).
+  if (plan?.basisWithheld) lines.push(plan.basisWithheld);
   if (plan?.costPerUnit != null && plan.units != null) {
     // The basis a comp or a per-unit norm is held against on a plan deal:
     // what a finished unit costs all-in — never the shell's or the land's

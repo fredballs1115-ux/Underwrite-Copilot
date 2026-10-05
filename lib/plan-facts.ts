@@ -129,9 +129,12 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
     ["Yield on cost", plan.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : plan.yieldWithheld ? YOC_WITHHELD : "—"],
     // The basis a comp is held against on a plan deal — what a finished
     // unit costs all-in, in the class's own noun (a hotel's per key). Only
-    // when the OM states the planned count.
+    // when the OM states the planned count; none outside the band any
+    // market delivers at, its sentence under the facts (`basisWithheld`).
     ...(plan.costPerUnit != null
       ? [[`Basis per ${noun} (all-in)`, moneyCompact(plan.costPerUnit)] as [string, string]]
-      : []),
+      : plan.basisWithheld
+        ? [[`Basis per ${noun} (all-in)`, YOC_WITHHELD] as [string, string]]
+        : []),
   ];
 }

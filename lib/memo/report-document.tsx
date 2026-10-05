@@ -2111,11 +2111,15 @@ export function ReportDocument({
                   ? // "planned" only where the building is still to be
                     // delivered: a value-add's or a lease-up's units stand.
                     ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} ${notYetDelivered(plan.kind) ? "planned " : ""}${planCount.many}.`
-                  : plan.plan.costPerUnitWithheld
-                    ? // A conversion or a development whose memorandum labels
+                  : `${
+                      // A conversion or a development whose memorandum labels
                       // no count proposed or planned: no basis per unit, and why.
-                      ` ${plan.plan.costPerUnitWithheld}`
-                    : ""
+                      plan.plan.costPerUnitWithheld ? ` ${plan.plan.costPerUnitWithheld}` : ""
+                    }${
+                      // None outside the band any market delivers at, and why
+                      // (lib/deal-strategy `planWithBasisChecked`).
+                      plan.plan.basisWithheld ? ` ${plan.plan.basisWithheld}` : ""
+                    }`
               }`,
             )}
           </Text>
