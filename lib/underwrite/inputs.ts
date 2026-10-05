@@ -119,8 +119,10 @@ export interface InputSource {
   doc?: string;
   /** a figure the memorandum states for this input that the model does not
    *  run in its place — a leased fee's ground rent, which is the deal's
-   *  income (#415) while the model reads its NOI as a building's — named so
-   *  a surface that withholds the returns never says no income was read */
+   *  income (#415) while the model reads its NOI as a building's, or an NOI
+   *  of zero or less beside which the model runs the price × the stated cap
+   *  (research pass 38) — named so a surface that withholds the returns
+   *  never says no income was read */
   notRun?: { label: string; value: number };
 }
 
@@ -834,7 +836,10 @@ export function deriveUnderwriteInputs(
   // stabilized figure is the finished project's; a figure past the cap
   // ceiling on an operating asset cannot be year-1 income on this price.
   const implausible = (f: { label: string; value: number }) => {
-    const amount = `$${Math.round(f.value).toLocaleString("en-US")}`;
+    // A loss is written with its minus outside the dollar, as every surface
+    // writes one: "−$310,000", never "$-310,000" (research pass 38).
+    const whole = Math.round(f.value);
+    const amount = `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}`;
     if (!(f.value > 0)) return `The OM's ${f.label} is ${amount} — no income in place to anchor year 1 on`;
     return isPlanDeal(strategy.kind)
       ? `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the finished project's stabilized figure on ${withArticle(strategy.label.toLowerCase())} deal, not year-1 income, so it does not anchor year 1 here`
@@ -878,13 +883,23 @@ export function deriveUnderwriteInputs(
     noi = price * capPct;
     noiRead = "this price × the stated going-in cap";
     const skipped = goingFig ?? stabilizedFig;
+    // Beside a stated NOI of zero or less, the price × the stated cap is not
+    // the building's income: the model runs it unchanged, but it is marked
+    // an assumption, so the returns are withheld on it and the debt sizer
+    // seeds no loan from it, and the memorandum's own figure is named as the
+    // one not run (research pass 38: an OM's −$310,000 ran as $616,250, a
+    // 13.31% IRR with a sizer seeded from it, the finding in another card).
+    const noIncome = skipped != null && !(skipped.value > 0);
     mark(
       "inPlaceRentAnnual",
-      "derived",
+      noIncome ? "assumption" : "derived",
       skipped
         ? `${implausible(skipped)}. Year-1 NOI set from price × the stated going-in cap instead`
         : "From price × going-in cap, at an assumed expense ratio",
     );
+    if (noIncome && skipped && sources.inPlaceRentAnnual) {
+      sources.inPlaceRentAnnual = { ...sources.inPlaceRentAnnual, notRun: { label: skipped.label, value: skipped.value } };
+    }
   } else {
     noi = price * 0.06;
     noiRead = "an assumed 6% of this price";

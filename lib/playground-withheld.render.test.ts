@@ -11,6 +11,7 @@ import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { computeUnderwrite } from "@/lib/underwrite/engine";
 import { buildSensitivityData, maxBidSentence, nearlyVacantReason } from "@/lib/underwrite/report-grid";
 import { SensitivityPlayground, type PlaygroundData } from "@/app/(app)/deals/[id]/sensitivity-playground";
+import { DebtSizer } from "@/app/(app)/deals/[id]/debt-sizer";
 import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { a11yIssues, gluedWords, visibleText as textOf } from "./render-lint";
@@ -126,5 +127,72 @@ describe("the cap field never strikes a cap on an assumed NOI (research pass 38,
     // One sentence: the assumed NOI's, the more basic reason.
     expect(text).toContain("The returns and the max bid are withheld: no year-1 NOI the model could run on was read from the memorandum");
     expect(text).not.toContain("the cap on year-1 NOI and the max bid are withheld");
+  });
+});
+
+describe("an NOI of zero or less beside a stated cap: the price × the cap is an assumption (research pass 38, item 8)", () => {
+  // The pass's fixture: a 3%-occupied office whose memorandum states an NOI
+  // of −$310,000 and a 7.25% cap. The model runs the price × the cap,
+  // $616,250 — unchanged — and the report had printed a 13.31% IRR on it,
+  // the debt sizer a loan, the finding in another card.
+  const OCC3_NEG_CAP = deal("Office", [
+    ["Asking price", "8,500,000"],
+    ["Total SF", "42,000 SF"],
+    ["Occupancy", "3%", "in_place"],
+    ["NOI (in-place)", "(310,000)", "in_place"],
+    ["Cap rate", "7.25%"],
+  ]);
+  // …and the same building with no occupancy stated, so nothing else withholds.
+  const NEG_CAP = { ...OCC3_NEG_CAP, metrics: OCC3_NEG_CAP.metrics.filter((m) => m.label !== "Occupancy") };
+  const REASON =
+    "the model does not run the memorandum's −$310,000 NOI (in-place) as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.";
+
+  it("runs the model unchanged, and names the memorandum's figure with its minus outside the dollar", () => {
+    for (const ex of [OCC3_NEG_CAP, NEG_CAP]) {
+      const d = deriveUnderwriteInputs(ex, "x");
+      const r = computeUnderwrite(d.inputs);
+      expect(r.cashFlow[0].noi).toBeCloseTo(616_250, 4);
+      expect(r.returns.leveredIrrPct).toBeCloseTo(0.13312635, 6);
+      expect(d.sources.inPlaceRentAnnual).toEqual({
+        provenance: "assumption",
+        note: "The OM's NOI (in-place) is −$310,000 — no income in place to anchor year 1 on. Year-1 NOI set from price × the stated going-in cap instead",
+        notRun: { label: "NOI (in-place)", value: -310_000 },
+      });
+    }
+    // A stated NOI the price cannot support, above the ceiling, is a misread
+    // the cap stands in for: still derived, its returns standing.
+    const high = deriveUnderwriteInputs(deal("Office", [["Asking price", "8,500,000"], ["NOI (in-place)", "3,400,000", "in_place"], ["Cap rate", "7.25%"]]), "x");
+    expect(high.sources.inPlaceRentAnnual?.provenance).toBe("derived");
+    expect(buildSensitivityData(high.inputs, null, { sources: high.sources }).withheld).toBeNull();
+  });
+
+  it("withholds the page's tiles, the cap field and the report's grids with one reason — where both had printed 13.31%", () => {
+    for (const ex of [OCC3_NEG_CAP, NEG_CAP]) {
+      const { d, html, text } = drawn(ex);
+      expect(text).toContain(`The returns and the max bid are withheld: ${REASON}`);
+      expect(text.match(/n\/a — assumed NOI/g)?.length).toBe(4);
+      expect(capField(html)).toBe("n/a — assumed NOI");
+      // The pass's report base case: 13.31% IRR, DSCR 1.66x, CoC 6.31%.
+      for (const figure of ["13.3%", "1.66x", "6.3%"]) expect(text, figure).not.toContain(figure);
+      expect(text).not.toContain("$-310,000");
+      const report = buildSensitivityData(d.inputs, 15, { sources: d.sources, occupancyPct: d.meta.occupancyPct });
+      expect(report.withheld).toBe(`The IRR grids and the max bid are left out: ${REASON}`);
+      expect(a11yIssues(html)).toEqual([]);
+      expect(gluedWords(text)).toEqual([]);
+    }
+  });
+
+  it("seeds the debt sizer no NOI from it", () => {
+    for (const ex of [OCC3_NEG_CAP, NEG_CAP]) {
+      const d = deriveUnderwriteInputs(ex, "x");
+      const html = renderToStaticMarkup(
+        React.createElement(DebtSizer, { model: null, extraction: ex, underwrite: d.inputs, underwriteSources: d.sources, rateSeeds: null }),
+      );
+      const noiField = html.match(/<input[^>]*aria-label="Year-1 NOI"[^>]*>/)?.[0] ?? "";
+      expect(noiField).not.toBe("");
+      expect(noiField.match(/value="([^"]*)"/)?.[1]).toBe("");
+      expect(html).not.toContain("$616,250");
+      expect(textOf(html)).not.toContain("NOI from the screening model");
+    }
   });
 });

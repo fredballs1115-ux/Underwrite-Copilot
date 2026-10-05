@@ -480,7 +480,12 @@ export interface SensitivityOptions {
   occupancyPct?: number | null;
 }
 
-const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+// Whole dollars, a loss's minus outside the dollar: "−$310,000" (research
+// pass 38) — a memorandum's NOI of less than nothing is named as not run.
+const usd0 = (n: number) => {
+  const whole = Math.round(n);
+  return `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}`;
+};
 
 /**
  * Why the report leaves the model's returns out, or null where it may print
@@ -491,7 +496,8 @@ const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
  * deal's grids, "$10M (ask)" read as the ask. Said from the sources alone:
  * an assumed price means no price was read from the memorandum, which is all
  * this line claims. A figure the memorandum states that the model does not
- * run (`InputSource.notRun`: a leased fee's ground rent, its income) is
+ * run (`InputSource.notRun`: a leased fee's ground rent, its income, or an
+ * NOI of zero or less beside which it runs the price × the stated cap) is
  * named, never said to be unread.
  */
 export function placeholderReturnsLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
