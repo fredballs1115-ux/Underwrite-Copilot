@@ -1228,6 +1228,10 @@ jobs:
           mark "#505 the market page, quicker" grep -q "The market page, quicker" p_whats-new.html
           mark "#506 flood insurance, as the law reaches it" grep -q "Flood insurance, as the law reaches it" p_whats-new.html
           mark "#507 a first hour without surprises" grep -q "A first hour without surprises" p_whats-new.html
+          mark "#508 every page, by keyboard and screen reader" grep -q "Every page, by keyboard and screen reader" p_whats-new.html
+          mark "#509 sandwich positions, read as the spread" grep -q "Sandwich positions, read as the spread" p_whats-new.html
+          mark "#510 your 1031 clock, beside every deal" grep -q "Your 1031 clock, beside every deal" p_whats-new.html
+          mark "#511 credits that follow the data" grep -q "Credits that follow the data, and messages that hold up" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
