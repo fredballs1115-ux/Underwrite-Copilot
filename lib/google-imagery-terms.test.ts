@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import TermsPage from "@/app/terms/page";
 import { withoutGoogleContent, type DealVisualCache } from "./deal-location";
 import { GOOGLE_NO_STORE, isGoogleImage } from "./imagery";
 
@@ -68,5 +70,29 @@ describe("Google's imagery is never kept", () => {
     const body = src.slice(src.indexOf("export async function fetchStreetViewImage"), src.indexOf("export async function fetchGoogleSatelliteImage"));
     expect(body.length).toBeGreaterThan(200);
     expect(body).not.toMatch(/writeCache|\.update\(|panoLat|checkedAt/);
+  });
+});
+
+// Google Maps Platform's terms, as the runner printed them (zori probe run
+// 37262665824): the site's terms must "notify users that the Customer
+// Application includes Google Maps features and content" and "state that use
+// of Google Maps features and content is subject to the then-current versions
+// of the: (1) Google Maps End User Additional Terms of Service at
+// https://maps.google.com/help/terms_maps/ ; and (2) Google Privacy Policy at
+// https://policies.google.com/privacy".
+describe("the terms page names Google's terms only where the site uses Google", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("says nothing of Google without the key, since the site then shows no Google content", () => {
+    vi.stubEnv("GOOGLE_MAPS_API_KEY", "");
+    expect(renderToStaticMarkup(TermsPage())).not.toContain("Google Maps");
+  });
+
+  it("states the two documents, linked, the day the key is set", () => {
+    vi.stubEnv("GOOGLE_MAPS_API_KEY", "test-key");
+    const html = renderToStaticMarkup(TermsPage());
+    expect(html).toContain("This service includes Google Maps features and content.");
+    expect(html).toContain('href="https://maps.google.com/help/terms_maps/"');
+    expect(html).toContain('href="https://policies.google.com/privacy"');
   });
 });
