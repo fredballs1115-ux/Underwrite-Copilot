@@ -1214,7 +1214,12 @@ export default async function DealPage({
               dealId={id}
               label={dealAddress?.label ?? (deal.name as string)}
               hasStreetAddress={!!dealAddress?.street}
-              googleEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
+              // Never Google's: the visual draws USGS's aerial, FEMA's flood
+              // map and an OpenStreetMap view beside its pictures, and Google's
+              // Maps Platform terms (zori probe run 37266021924) forbid its
+              // services "with or near a non-Google Map" — Street View "and
+              // non-Google Maps on the same screen" by name.
+              googleEnabled={false}
               hasAddress={!!dealAddress?.label}
               picture={
                 picture

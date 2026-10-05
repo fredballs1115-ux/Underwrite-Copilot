@@ -334,7 +334,10 @@ export default async function ComparePage({
       boxByScope.get(scopeKey(d)) ?? null,
       bench30?.value ?? null,
       tenYearPct,
-      !!process.env.GOOGLE_MAPS_API_KEY,
+      // Never Google's: the columns draw USGS aerials beside each other, and
+      // Google's terms forbid Street View beside a non-Google map (zori probe
+      // run 37266021924).
+      false,
       jobByDeal.get(d.id) ?? null,
       todayIso,
     ),

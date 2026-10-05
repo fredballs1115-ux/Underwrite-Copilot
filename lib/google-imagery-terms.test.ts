@@ -96,3 +96,25 @@ describe("the terms page names Google's terms only where the site uses Google", 
     expect(html).toContain('href="https://policies.google.com/privacy"');
   });
 });
+
+// Google's Maps Platform terms, as the runner printed them (zori probe run
+// 37266021924): "Customer will not use the Google Maps Core Services with or
+// near a non-Google Map in a Customer Application. For example, Customer will
+// not … (ii) display Street View imagery and non-Google Maps on the same
+// screen". The site's maps are USGS, FEMA and OpenStreetMap tiles.
+describe("no Google picture on a surface that draws a non-Google map", () => {
+  const read = (rel: string) => readFileSync(join(root, rel), "utf8");
+
+  it("the deal page's visual and the compare columns are held off Google, whatever the key", () => {
+    // The visual draws the aerial, the flood map and a map view beside its
+    // pictures; the compare columns draw aerials beside each other.
+    expect(read("app/(app)/deals/[id]/page.tsx")).toContain("googleEnabled={false}");
+    expect(read("app/(app)/deals/[id]/page.tsx")).not.toMatch(/googleEnabled=\{!!process\.env\.GOOGLE_MAPS_API_KEY\}/);
+    expect(read("app/(app)/deals/compare/page.tsx")).not.toMatch(/toCol\([\s\S]{0,200}!!process\.env\.GOOGLE_MAPS_API_KEY/);
+  });
+
+  it("the pipeline map's hover card and every deal avatar ask the image route for no Google source", () => {
+    expect(read("lib/pipeline-map.ts")).toContain("google=0");
+    expect(read("app/(app)/deal-avatar.tsx")).toContain("google=0");
+  });
+});
