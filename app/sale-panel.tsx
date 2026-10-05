@@ -19,7 +19,10 @@ import type { SaleRead } from "@/lib/sale-terms";
  */
 
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
-const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
+// Every figure on the bid's picture is drawn, so one compact writer, a
+// thousand as "k": the key had read "$125,000 — $2.63M all-in" (research
+// pass 36). Millions as the reader's sentences write them ("$2.63M").
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
 
 const METHOD_CHIP: Record<SaleRead["method"], string> = {
   auction: "Auction",

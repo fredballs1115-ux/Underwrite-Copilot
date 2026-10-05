@@ -25,6 +25,9 @@ import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick } from "@/app
  */
 
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
+// The panel's figures are a premium a month: the one priced on and the one
+// achieved are the memorandum's own terms, and the break-even beside them is
+// to the cent as the model's line says it ("$68.75") — never written short.
 const dollars = (n: number) => (Number.isInteger(Math.round(n * 100) / 100) ? `$${Math.round(n).toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
 
 export function ValueAddPanel({

@@ -32,6 +32,9 @@ const TONE: Record<Tone, string> = {
 };
 
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
+// The panel's one dollar figure is the PCA's immediate repairs, the report's
+// own stated total, which a reader checks against it: whole dollars, as the
+// model's line says them ("$630,000"), never written short.
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 /** A stated sentence cut to a tile: its first clause. */

@@ -72,6 +72,8 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
     r.leaseType ? { k: "Lease type", v: r.leaseType } : null,
     r.landlordObligations ? { k: "Landlord's obligations", v: r.landlordObligations } : null,
     r.tenantRights ? { k: "Tenant's rights", v: r.tenantRights } : null,
+    // The lease's base rent is one of its terms, checked against the
+    // memorandum: whole dollars, as stated, never written short.
     r.rent != null ? { k: "Annual base rent", v: `$${r.rent.toLocaleString("en-US")}` } : null,
   ].filter((f): f is { k: string; v: string } => f != null);
 

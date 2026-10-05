@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { ManufacturedHousingRead } from "@/lib/manufactured-housing";
 import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
@@ -25,8 +26,11 @@ import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-
  */
 
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
-const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-const rent = (n: number) => (Number.isInteger(n) ? usd(n) : `$${n.toFixed(2)}`);
+// The price a pad is a figure the panel works out and draws, compact as the
+// pipeline card's basis says it ("$62k"). The lot rents and a home's rent
+// are the memorandum's own terms, a month's, to the cent as it states them.
+const money = (n: number) => compactUsd(n);
+const rent = (n: number) => (Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
 const count = (n: number) => n.toLocaleString("en-US");
 const clamp = (n: number) => `${Math.max(0, Math.min(100, n))}%`;
 
@@ -55,7 +59,7 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
   const at = (n: number) => (scale > 0 ? (n / scale) * 100 : 0);
 
   const tiles: { key: string; label: string; value: string; sub: string; tone: Tone }[] = [];
-  if (r.pricePerPad != null) tiles.push({ key: "price-pad", label: "Price a pad", value: usd(r.pricePerPad), sub: "At the asking price", tone: "neutral" });
+  if (r.pricePerPad != null) tiles.push({ key: "price-pad", label: "Price a pad", value: money(r.pricePerPad), sub: "At the asking price", tone: "neutral" });
   if (u?.label) {
     tiles.push({
       key: "utilities",

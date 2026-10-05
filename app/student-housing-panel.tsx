@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { StudentHousingRead } from "@/lib/student-housing";
 import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
@@ -20,6 +21,10 @@ import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-
  */
 
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
+// The price a bed is a figure the panel works out and draws, compact as the
+// pipeline card's basis says it ("$100k"); the rent a bed is the
+// memorandum's own term, a month's, to the dollar as it states it.
+const money = (n: number) => compactUsd(n);
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const clamp = (n: number) => `${Math.max(0, Math.min(100, n))}%`;
 
@@ -57,7 +62,7 @@ export function StudentHousingPanel({
       tone: "neutral",
     });
   }
-  if (r.pricePerBed != null) tiles.push({ key: "price-bed", label: "Price a bed", value: usd(r.pricePerBed), sub: "At the asking price", tone: "neutral" });
+  if (r.pricePerBed != null) tiles.push({ key: "price-bed", label: "Price a bed", value: money(r.pricePerBed), sub: "At the asking price", tone: "neutral" });
   if (r.rentPerBed != null) tiles.push({ key: "rent-bed", label: "Rent a bed", value: usd(r.rentPerBed), sub: "A month, as stated", tone: "neutral" });
   if (r.walk) {
     tiles.push({

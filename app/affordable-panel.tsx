@@ -27,7 +27,9 @@ import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-p
  * so every surface says the same thing.
  */
 
-// The rent a month, whole dollars.
+// The rent a month, whole dollars: each tier's rent and its limit are the
+// memorandum's own terms, as its rent schedule states them, which a reader
+// checks line by line — never written short.
 const rent = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const count = (n: number) => n.toLocaleString("en-US");
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;

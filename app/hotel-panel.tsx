@@ -26,6 +26,9 @@ import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-p
  */
 
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
+// The basis a key is drawn, in thousands ("$216.7k"); ADR and RevPAR are the
+// memorandum's own operating figures, checked against its STR pages, so
+// they stay to the cent.
 const k = (n: number) => compactUsd(n, { thousandsFrom: 0, thousandsPlaces: 1 });
 const dollars = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 

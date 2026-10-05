@@ -8160,7 +8160,9 @@ describe("SalePanel — how the property is sold, drawn", () => {
     expect(html.match(/data-bar="sale-premium"/g)).toHaveLength(1);
     expect(html.match(/data-bar="sale-ceiling"/g)).toHaveLength(1);
     expect(text).toContain("Starting bid, $2.5M");
-    expect(text).toContain("Buyer's premium, $125,000 — $2.63M all-in");
+    // One writer for the picture's figures (research pass 36): the key had
+    // read "$125,000 — $2.63M all-in".
+    expect(text).toContain("Buyer's premium, $125k — $2.63M all-in");
     expect(text).toContain("The model's ceiling at 15%, $3.15M all-in");
     expect(text).toContain("At a 15% levered IRR the model pays at most $3.15M all-in — a hammer price of $3M with the 5% premium on top");
     expect(text).toContain("The sale's terms as stated: Online auction; 10% non-refundable deposit; 30-day close");
@@ -8483,15 +8485,21 @@ describe("TaxAbatementPanel — the clock against the sale, the bill, and the NO
     expect(html.match(/data-bar="abate-sale"/g)).toHaveLength(1);
     expect(text).toContain("Ends 2029");
     expect(text).toContain("The model's sale, year 5");
-    // The bill: today's against the full one, on one scale.
+    // The bill: today's against the full one, on one scale — and on tracks
+    // of one length, the figure's column one width (research pass 36: each
+    // row had sized its own, and the two bars were drawn 5% apart).
     expect(html.match(/data-bar="abate-now"/g)).toHaveLength(1);
     expect(html.match(/data-bar="abate-full"/g)).toHaveLength(1);
-    expect(text).toContain("$70,000");
-    expect(text).toContain("$520,000");
+    const bill = html.slice(html.indexOf('data-qa="tax-abatement-bill"'), html.indexOf('data-qa="tax-abatement-noi"'));
+    expect(bill.match(/@sm\/bars:grid-cols-\[9rem_minmax\(0,1fr\)_4rem\]/g)).toHaveLength(2);
+    // Every figure the panel draws in one compact writer: the NOI's bar had
+    // read "$3,000,000" beside the model's "$8.18M".
+    expect(visibleText(bill)).toMatch(/Paid today\s+\$70k\s+Full bill\s+\$520k/);
     // The NOI: the step-up's share marked.
     expect(html.match(/data-bar="abate-noi"/g)).toHaveLength(1);
     expect(html.match(/data-bar="abate-step"/g)).toHaveLength(1);
-    expect(text).toContain("15% goes to taxes when it ends: $450,000 a year");
+    expect(text).toMatch(/The in-place NOI\s+\$3M/);
+    expect(text).toContain("15% goes to taxes when it ends: $450k a year");
     expect(text).toContain("its exit is struck on a NOI the building no longer earns");
     expect(a11yIssues(html), "tax abatement panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
@@ -8830,7 +8838,10 @@ describe("StudentHousingPanel (#468) — the pre-leasing against last year's and
     expect(text).toContain("The model runs at 95%");
     for (const key of ["beds", "price-bed", "rent-bed", "walk", "guarantees"]) expect(html).toContain(`data-student="${key}"`);
     expect(text).toContain("Pedestrian");
-    expect(text).toContain("$100,000");
+    // The price a bed is worked out and drawn, compact; the rent a bed is the
+    // memorandum's own term, to the dollar (research pass 36).
+    expect(text).toMatch(/Price a bed\s+\$100k/);
+    expect(text).toMatch(/Rent a bed\s+\$1,085/);
     expect(text).toContain("8 points of the fall's leasing is still to sign");
     expect(a11yIssues(html), "student housing panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);

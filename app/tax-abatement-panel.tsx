@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { abatementEndLabel, abatementEnded, type TaxAbatementRead } from "@/lib/tax-abatement";
 import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
@@ -22,7 +23,11 @@ import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick } from "@/app
  */
 
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
-const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+// Every figure the panel draws — the bills on their bars, the NOI over its
+// bar, the step-up in its key — in one compact writer: the NOI's bar had read
+// "$3,000,000" beside the model's "$8.18M" (research pass 36). Millions as
+// the model's line writes them.
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
 const years1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)} ${Math.round(n * 10) === 10 ? "year" : "years"}`;
 
 export function TaxAbatementPanel({
@@ -103,7 +108,7 @@ export function TaxAbatementPanel({
             { key: "abate-now", label: "Paid today", value: r.abatedTaxes, tone: "bg-brand/70" },
             { key: "abate-full", label: "Full bill", value: r.unabatedTaxes, tone: "bg-caution/70" },
           ].map((b) => (
-            <BarRow key={b.key} label={b.label} figure={dollars(b.value)}>
+            <BarRow key={b.key} label={b.label} figure={money(b.value)}>
               <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, r.unabatedTaxes!) }} />
             </BarRow>
           ))}
@@ -114,14 +119,14 @@ export function TaxAbatementPanel({
         <div className="mt-3 text-[11px]" data-qa="tax-abatement-noi">
           <div className="flex items-baseline justify-between gap-x-3">
             <span className="font-medium text-ink">The in-place NOI</span>
-            <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-muted">{dollars(r.noi)}</span>
+            <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-muted">{money(r.noi)}</span>
           </div>
           <div className="mt-0.5 flex h-3 overflow-hidden rounded-full bg-faint" aria-hidden>
             <div className="h-full bg-brand/40" data-bar="abate-noi" style={{ width: pctOf(r.noi - r.stepUp, r.noi) }} />
             <div className="h-full bg-caution/70" data-bar="abate-step" style={{ width: pctOf(r.stepUp, r.noi) }} />
           </div>
           <Key className="mt-1">
-            <KeyItem mark="swatch" tone="bg-caution/70">{`${Math.round(r.stepUpPctOfNoi!)}% goes to taxes when it ends: ${dollars(r.stepUp)} a year`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-caution/70">{`${Math.round(r.stepUpPctOfNoi!)}% goes to taxes when it ends: ${money(r.stepUp)} a year`}</KeyItem>
           </Key>
         </div>
       )}
