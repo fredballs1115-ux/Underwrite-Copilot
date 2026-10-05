@@ -54,6 +54,7 @@ import { buildPipelineWorkbook } from "@/lib/pipeline-workbook";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
 import { PlanSensitivity } from "@/app/(app)/deals/[id]/plan-sensitivity";
+import { ConstructionDebtPanel } from "@/app/(app)/deals/[id]/construction-debt-panel";
 import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
@@ -97,6 +98,27 @@ describe("a yield on cost no project earns is refused on every surface, in one s
       expect(gluedWords(text), name).toEqual([]);
       expect(a11yIssues(html), name).toEqual([]);
     }
+  });
+
+  it("the construction-debt panel starts from the plan's sentence, never a yield or a sizing struck on the two figures (part 1's leftover d)", () => {
+    const props = { plan, planLabel: "Development", exitCapPct: 6, takeOutRatePct: 6.25, amortYears: 30, minDscr: 1.25, minDebtYieldPct: 8, maxLtvPct: 65, numCls: "input" };
+    const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, props));
+    const text = visibleText(html);
+    expect(text).toContain(`Yield on total cost with the carry inside it: ${YOC_WITHHELD}. ${REFUSED}`);
+    expect(text).toContain("Enter the works budget and the stabilized NOI you underwrite above and the construction sizing appears here.");
+    expect(text).not.toMatch(/carry inside it:\s*[\d,]+\.\d\d%/);
+    expect(text).not.toContain("Construction loan");
+    expect(html).not.toMatch(NO_FIGURE);
+    // The memorandum's figures stay in the fields, editable.
+    expect(html).toContain('value="$48,500"');
+    expect(html).toContain('value="$3,200,000"');
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    // A plan whose yield stands sizes as before.
+    const sound = { ...devTotalThousands, metrics: [metric("Total project cost", "48,500,000"), ...devTotalThousands.metrics.slice(1)] } as ExtractionResult;
+    const soundHtml = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, plan: planSummary(sound, inferStrategy(sound))! }));
+    expect(visibleText(soundHtml)).toMatch(/carry inside it: \d+\.\d\d%/);
+    expect(soundHtml).not.toContain('data-qa="construction-refused"');
   });
 
   it("no grid and no breakevens are drawn on it — the deal page's and the report's plan page alike", () => {

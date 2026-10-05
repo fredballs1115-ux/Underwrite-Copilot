@@ -16,7 +16,7 @@ import {
   sizeConstructionDebt,
   worksYearsFromTimeline,
 } from "@/lib/construction-debt";
-import { yieldOnCostText } from "@/lib/plan-facts";
+import { YOC_WITHHELD, yieldOnCostText } from "@/lib/plan-facts";
 
 const fmtUsd = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const fmtInput = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -65,8 +65,15 @@ export function ConstructionDebtPanel({
   rateSeed?: RateSeed | null;
 }) {
   const seededYears = worksYearsFromTimeline(plan.timeline);
-  const [budgetRaw, setBudgetRaw] = useState(plan.budget ? fmtInput(plan.budget.budget) : "");
-  const [noiRaw, setNoiRaw] = useState(plan.stabilizedNoi ? fmtInput(plan.stabilizedNoi.value) : "");
+  const budgetSeed = plan.budget ? fmtInput(plan.budget.budget) : "";
+  const noiSeed = plan.stabilizedNoi ? fmtInput(plan.stabilizedNoi.value) : "";
+  const [budgetRaw, setBudgetRaw] = useState(budgetSeed);
+  const [noiRaw, setNoiRaw] = useState(noiSeed);
+  // A yield on cost the plan refuses (past the ceiling no project earns,
+  // research pass 38) is not struck here either while the two figures it
+  // would be struck on stand as the memorandum's: the panel starts from the
+  // plan's own sentence, and sizes the figures a reader enters in their place.
+  const refusedAtSeed = plan.yieldWithheld && budgetRaw === budgetSeed && noiRaw === noiSeed ? plan.yieldWithheld : null;
   const [worksYears, setWorksYears] = useState(seededYears ?? DEFAULT_WORKS_YEARS);
   // The construction rate starts from the day's index plus a spread, never
   // from a flat figure, wherever the rates table could seed one. Every
@@ -168,7 +175,11 @@ export function ConstructionDebtPanel({
         </p>
       )}
 
-      {r ? (
+      {refusedAtSeed ? (
+        <p className="mt-3 text-xs leading-relaxed text-muted" data-qa="construction-refused">
+          {`Yield on total cost with the carry inside it: ${YOC_WITHHELD}. ${refusedAtSeed} Enter the works budget and the stabilized NOI you underwrite above and the construction sizing appears here.`}
+        </p>
+      ) : r ? (
         <>
           <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(
