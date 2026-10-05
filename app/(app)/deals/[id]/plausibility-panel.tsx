@@ -50,7 +50,8 @@ export function PlanStrip({
         The stabilized NOI is the finished project&apos;s figure, judged on yield
         on total cost — never on a cap rate against the acquisition price.
         {plan.yieldWithheld ? ` ${plan.yieldWithheld}` : ""}
-        {plan.costWithheld ? ` ${plan.costWithheld}` : ""}{" "}
+        {plan.costWithheld ? ` ${plan.costWithheld}` : ""}
+        {plan.costPerUnitWithheld ? ` ${plan.costPerUnitWithheld}` : ""}{" "}
         The challenger below tests whether it is as conservative as the OM presents it.
       </p>
     </section>

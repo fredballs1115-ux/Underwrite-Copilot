@@ -1517,7 +1517,7 @@ export default async function DealPage({
             that genuinely does not tie. Its basis is per the counting row's
             own noun (a hotel counting "Rooms" is per room), as the Size
             slot, the card and the workbook say it — else the class's. */}
-        <PlanStrip strategy={strategy} plan={plan} noun={countNounOf(metrics, shownClass).one} />
+        <PlanStrip strategy={strategy} plan={plan} noun={countNounOf(metrics, shownClass, strategy.kind).one} />
         {/* What is being sold (#414): a note, a share, a leasehold — said
             before any figure is believed, since it changes what the price
             buys (lib/interest). Nothing for a plain fee simple. */}

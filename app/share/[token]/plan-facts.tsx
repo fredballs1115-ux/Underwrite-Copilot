@@ -46,6 +46,7 @@ export function SharePlan({
         {planReadLine(strategy.kind, strategy.label, plan.priceLabel === "Land cost")}
         {plan.yieldWithheld ? ` ${plan.yieldWithheld}` : ""}
         {plan.costWithheld ? ` ${plan.costWithheld}` : ""}
+        {plan.costPerUnitWithheld ? ` ${plan.costPerUnitWithheld}` : ""}
       </p>
     </section>
   );

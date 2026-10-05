@@ -97,6 +97,11 @@ function deriveBasis(
   /** the price over the building's feet is a basis — false for an
    *  outdoor-storage yard, which trades by the usable acre */
   perSfBasis = true,
+  /** the count a plan's all-in cost divides by: the plan's own
+   *  (lib/deal-strategy `planSummary`'s units — on a conversion or a
+   *  development its proposed count, never today's building's); absent,
+   *  the memorandum's count row */
+  count?: number | null,
 ): string | null {
   const suffix = allIn ? " all-in" : "";
 
@@ -116,8 +121,9 @@ function deriveBasis(
     }
     if (price == null) return null;
     // The shared count reader: "312 units" parses, a "Unit mix" row ahead
-    // of "Units" never shadows it — and "212 keys" counts the same way.
-    const n = unitCountFromMetrics(metrics);
+    // of "Units" never shadows it — and "212 keys" counts the same way. A
+    // plan's all-in cost divides by the plan's own count.
+    const n = count !== undefined ? count : unitCountFromMetrics(metrics);
     if (n != null && n > 0) return `${fmtCompact(price / n)}${perSuffix(words)}${suffix}`;
     return null;
   }
@@ -214,7 +220,7 @@ export function deriveInternalComps(
       capLabel: capNum != null ? cap!.text : null,
       basisLabel: plan
         ? plan.totalCost != null
-          ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis)
+          ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis, plan.units)
           : null
         : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis),
       kind: strategy.kind,

@@ -222,6 +222,9 @@ export function dealContextFor(
   // A share's price grossed up beside its entity's loan is the equity's
   // whole: the plan strikes no total cost on it, and says why.
   if (plan?.costWithheld) lines.push(plan.costWithheld);
+  // A conversion or a development whose memorandum labels no count proposed
+  // or planned: no basis per unit, and why.
+  if (plan?.costPerUnitWithheld) lines.push(plan.costPerUnitWithheld);
   if (plan?.costPerUnit != null && plan.units != null) {
     // The basis a comp or a per-unit norm is held against on a plan deal:
     // what a finished unit costs all-in — never the shell's or the land's

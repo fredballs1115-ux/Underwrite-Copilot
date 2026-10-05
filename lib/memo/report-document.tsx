@@ -1964,10 +1964,13 @@ export function ReportDocument({
   // The plan's finished product in the counting row's own noun
   // (`countNounOf`): a hotel counting "Rooms" is costed per room, as the
   // deal page's plan strip, the pipeline card and the workbook say it — else
-  // the class's (research pass 34: this page said "key" beside them).
+  // the class's (research pass 34: this page said "key" beside them). On a
+  // conversion or a development, the proposed row the plan's basis divides
+  // by (lib/criteria `planCountRow`), never today's building's.
   const planCount = countNounOf(
     metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
     memo.assetClass,
+    plan?.kind ?? null,
   );
   const chList = list(challenges?.challenges) as NonNullable<
     ChallengerResult["challenges"]
@@ -2097,7 +2100,11 @@ export function ReportDocument({
                   ? // "planned" only where the building is still to be
                     // delivered: a value-add's or a lease-up's units stand.
                     ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} ${notYetDelivered(plan.kind) ? "planned " : ""}${planCount.many}.`
-                  : ""
+                  : plan.plan.costPerUnitWithheld
+                    ? // A conversion or a development whose memorandum labels
+                      // no count proposed or planned: no basis per unit, and why.
+                      ` ${plan.plan.costPerUnitWithheld}`
+                    : ""
               }`,
             )}
           </Text>

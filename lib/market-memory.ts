@@ -14,6 +14,7 @@ import {
   findMetric,
   parseMoney,
   parsePrice,
+  planCountRow,
   METRIC_FIND,
   screenYearOf,
 } from "@/lib/criteria";
@@ -135,6 +136,11 @@ function deriveBasis(
    *  outdoor-storage yard, which trades by the usable acre, so a yard's shop
    *  building never puts a per-SF figure into the memory */
   perSfBasis = true,
+  /** the count a plan's all-in cost divides by: the plan's own
+   *  (lib/deal-strategy `planSummary`'s units — on a conversion or a
+   *  development its proposed count, never today's building's); absent,
+   *  the memorandum's count row */
+  count?: number | null,
 ): { value: number; basis: "unit" | "sf" } | null {
   // The class says the basis (lib/asset-words): apartments, hotels, parks,
   // student beds and garages trade per unit, key, pad, bed or space — one
@@ -150,8 +156,9 @@ function deriveBasis(
     }
     if (price == null) return null;
     // The shared count reader: "312 units" parses, a "Unit mix" row ahead
-    // of "Units" never shadows it — and "212 keys" counts the same way.
-    const n = unitCountFromMetrics(metrics);
+    // of "Units" never shadows it — and "212 keys" counts the same way. A
+    // plan's all-in cost divides by the plan's own count.
+    const n = count !== undefined ? count : unitCountFromMetrics(metrics);
     if (n != null && n > 0) return { value: price / n, basis: "unit" };
     return null;
   }
@@ -222,7 +229,7 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const perSfBasis = !isOutdoorStorageYard(extraction?.assetClass) && !isOutdoorStorageYard(row.asset_class);
     const basis = plan
       ? plan.totalCost != null
-        ? deriveBasis(metrics, assetClass, plan.totalCost, true, true, perSfBasis)
+        ? deriveBasis(metrics, assetClass, plan.totalCost, true, true, perSfBasis, plan.units)
         : null
       : deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext), perSfBasis);
 
@@ -244,7 +251,9 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
       // The memorandum's own noun wins where it counted in one ("212
       // keys", "Pads"); the class's stands in for a bare count.
       perUnitNoun:
-        basis?.basis === "unit" ? countNoun(unitCountRow(metrics)?.label, assetClass).replace(/s$/, "") : null,
+        basis?.basis === "unit"
+          ? countNoun((plan ? planCountRow(metrics, strategy.kind) : unitCountRow(metrics))?.label, assetClass).replace(/s$/, "")
+          : null,
       allIn: plan != null && basis != null,
     });
   }

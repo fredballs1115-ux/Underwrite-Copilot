@@ -570,8 +570,8 @@ export function ShareView({
 
       {/* The basis per the counting row's own noun (a hotel counting "Rooms"
           is per room), as the deal page's plan strip says it — else the
-          class's. */}
-      <SharePlan strategy={strategy} plan={plan} noun={countNounOf(safeExtraction?.metrics ?? [], assetClass).one} />
+          class's; on a conversion or a development the proposed row's. */}
+      <SharePlan strategy={strategy} plan={plan} noun={countNounOf(safeExtraction?.metrics ?? [], assetClass, strategy.kind).one} />
 
       {ranges.length > 0 && (
         <section className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">

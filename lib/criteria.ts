@@ -1041,14 +1041,42 @@ export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
   return row ? parseCount(row.value) : null;
 }
 
+/** A count row that names the finished product: "Units (proposed)", "Keys
+ *  (proposed)" — the extraction's own label for a plan's count — "Proposed
+ *  units", "Planned keys". */
+const PLANNED_COUNT = /\b(?:proposed|planned)\b/i;
+
+/**
+ * The row that counts what a plan's total cost buys. On a conversion or a
+ * development — whose building is not yet the finished product — only a
+ * count row the memorandum labels proposed or planned, in that row's own
+ * noun: a count of today's building ("Units 40" beside "Keys (proposed)
+ * 160" on an office-to-hotel conversion) is no count of the finished
+ * product, and the all-in cost over it had read $1.5M a unit where the key
+ * costs $375k (the audit of 2026-10-05). Null where it states none. On any
+ * other kind the count row (`unitCountRow`): a value-add's or a lease-up's
+ * units stand.
+ */
+export function planCountRow<M extends MetricLike>(metrics: readonly M[], kind: string | null | undefined): M | null {
+  if (kind !== "conversion" && kind !== "development") return unitCountRow(metrics);
+  return unitCountRow(metrics.filter((m) => PLANNED_COUNT.test(m.label)));
+}
+
 /** What one of what that count counts is called, singular and plural: the
  *  counting row's own noun (`countNoun` — a hotel counting "Rooms" is per
  *  room), else the class's, else units. The plan's basis on the deal page,
  *  the shared screen and the report reads it, as the workbook's and the
  *  pipeline card's per-unit figures do (research pass 34: the plan said
- *  "key" beside their "room"). */
-export function countNounOf(metrics: readonly MetricLike[], cls: string | null | undefined): { one: string; many: string } {
-  const many = countNoun(unitCountRow(metrics)?.label, cls);
+ *  "key" beside their "room"). Given the deal's kind, the row the plan's
+ *  basis divides by (`planCountRow`): on a conversion, the proposed keys'
+ *  noun, never today's units'. */
+export function countNounOf(
+  metrics: readonly MetricLike[],
+  cls: string | null | undefined,
+  kind?: string | null,
+): { one: string; many: string } {
+  const row = kind === undefined ? unitCountRow(metrics) : (planCountRow(metrics, kind) ?? unitCountRow(metrics));
+  const many = countNoun(row?.label, cls);
   return { one: many.replace(/s$/, ""), many };
 }
 

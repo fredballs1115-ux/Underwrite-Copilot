@@ -35,6 +35,7 @@ import {
   LATER_YEAR,
   METRIC_FIND,
   buildingSfFromMetrics,
+  countNounOf,
   findGoingInCap,
   findMetric,
   findPriceRow,
@@ -43,6 +44,7 @@ import {
   parseMoney,
   parsePct,
   parsePrice,
+  planCountRow,
   screenYearOf,
   unitCountFromMetrics,
   unitCountRow,
@@ -955,11 +957,17 @@ export interface PlanSummary {
    *  building's cost is that plus the entity's loan, which the model does
    *  not add; null otherwise */
   costWithheld?: string | null;
-  /** the finished product's unit count, when the OM states one */
+  /** the finished product's unit count, when the OM states one — on a
+   *  conversion or a development only a count it labels proposed or planned
+   *  (lib/criteria `planCountRow`), never today's building's */
   units: number | null;
   /** total cost over the planned units — the basis a comp or a per-unit
    *  norm is held against on a plan deal; null when either is unknown */
   costPerUnit: number | null;
+  /** why no basis per unit is struck where, on a conversion or a
+   *  development, the memorandum labels no count proposed or planned, in
+   *  one plain sentence; null or absent otherwise */
+  costPerUnitWithheld?: string | null;
   /** construction / downtime / lease-up timing as the OM states it ("" if none) */
   timeline: string;
   /** the budget as the OM words it ("" if none) */
@@ -1048,7 +1056,23 @@ export function planSummary(
         : `No yield on cost is struck: the ${money(stabilizedNoi.value)} stabilized NOI is ${pct(IMPLIED_CAP_CEILING, 0)} or more of the ${money(totalCost)} total cost, a yield no project earns, so the total cost or the NOI was most likely misread.`
       : null;
   const yieldOnCost = yieldWithheld ? null : rawYield;
-  const units = unitCountFromMetrics(metrics);
+  // The finished product's count (lib/criteria `planCountRow`): on a
+  // conversion or a development only a row the memorandum labels proposed
+  // or planned — today's building's count is no count of what the total
+  // cost buys (the audit of 2026-10-05: an office-to-hotel conversion's
+  // $60M over its 40 suites read $1.5M a unit, where a proposed key costs
+  // $375k). Where the memorandum labels no count proposed or planned, no
+  // basis per unit is struck, and the plan says why: an unlabelled count may
+  // be the building as it stands, and is not read as the finished project's.
+  const countRow = planCountRow(metrics, strategy.kind);
+  const units = countRow ? parseCount(countRow.value) : null;
+  const unlabelled = units == null && totalCost != null && notYetDelivered(strategy.kind) ? unitCountRow(metrics) : null;
+  const unlabelledCount = unlabelled ? parseCount(unlabelled.value) : null;
+  const unlabelledNoun = unlabelled ? countNounOf([unlabelled], extraction.assetClass) : null;
+  const costPerUnitWithheld =
+    unlabelledCount != null && unlabelledNoun
+      ? `No basis per ${unlabelledNoun.one} (all-in) is struck: the memorandum labels no count proposed or planned, so its ${unlabelledCount.toLocaleString("en-US")} ${unlabelledCount === 1 ? `${unlabelledNoun.one} is` : `${unlabelledNoun.many} are`} not read as the finished project's.`
+      : null;
   // Beside the loan the entity carries, a share's price grosses up to the
   // equity's whole, not the asset's: the label says so on every surface
   // that prints the plan's facts, as the others do (research pass 23), and
@@ -1087,6 +1111,7 @@ export function planSummary(
         : null,
     units,
     costPerUnit: totalCost != null && units != null ? totalCost / units : null,
+    costPerUnitWithheld,
     // The strategy's own words first; else the metric rows the extraction
     // was asked to capture on a plan deal (construction period, lease-up,
     // the year the plan stabilizes), joined as "label: value".

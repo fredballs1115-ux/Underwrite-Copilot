@@ -147,7 +147,8 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   // where the building is still to be delivered: a value-add's units stand
   // (research pass 35: "$195,000 per planned unit all-in" on 240 existing
   // units).
-  const noun = countNounOf(extraction?.metrics ?? [], cls).one;
+  // On a conversion or a development, the proposed row the basis divides by.
+  const noun = countNounOf(extraction?.metrics ?? [], cls, strategy.kind).one;
   const per = `per ${notYetDelivered(strategy.kind) ? "planned " : ""}${noun}`;
   if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
     return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
