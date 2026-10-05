@@ -395,6 +395,40 @@ export function entityLoanOf(ex: ExtractionResult | null | undefined): number | 
   return interestOf(ex).entityLoan;
 }
 
+/**
+ * Who holds the property — its contracts, its capital, its votes, its
+ * tenants — on this deal, by what the price buys (research pass 41). The
+ * buyer itself on a fee simple, a leasehold or an interest the memorandum
+ * does not name; the borrower on a note, whose buyer holds the loan the
+ * property secures; the owning entity on a preferred equity position and a
+ * share of it (a share's buyer buys into the owner, a position's lends to
+ * it); the co-owners on an undivided interest held as a tenant in common,
+ * the buyer among them; and the leaseholder on a leased fee, whose buyer
+ * owns the land under the building. The class readers said "the buyer"
+ * keeps the manager, funds the PIP or becomes one owner in an association
+ * on every one of them, which only the first does.
+ */
+export type PropertyHolder = "buyer" | "borrower" | "entity" | "co_owners" | "leaseholder";
+
+export function propertyHolderOf(ex: ExtractionResult | null | undefined): PropertyHolder {
+  const { kind } = interestOf(ex);
+  if (kind === "note") return "borrower";
+  if (kind === "preferred_equity") return "entity";
+  if (kind === "leased_fee") return "leaseholder";
+  if (kind === "partial_interest") return isTenancyInCommon(ex) ? "co_owners" : "entity";
+  return "buyer";
+}
+
+/** The holder as a sentence names it: who, whose, and whether its verb is
+ *  plural ("the co-owners keep"). */
+export const PROPERTY_HOLDER_WORDS: Record<PropertyHolder, { who: string; whose: string; plural: boolean }> = {
+  buyer: { who: "the buyer", whose: "the buyer's", plural: false },
+  borrower: { who: "the borrower", whose: "the borrower's", plural: false },
+  entity: { who: "the owning entity", whose: "the owning entity's", plural: false },
+  co_owners: { who: "the co-owners", whose: "the co-owners'", plural: true },
+  leaseholder: { who: "the leaseholder", whose: "the leaseholder's", plural: false },
+};
+
 // The plan's total row — the whole project's cost, the price inside it — in
 // lib/deal-strategy's own words (its TOTAL_ROW, and the rates, reserves and
 // annual figures its BUDGET_EXCLUDE refuses), read here because that module

@@ -16,7 +16,10 @@
 // THE UNITS ARE A SHARE OF AN ASSOCIATION. The units offered over the units
 // in the condominium is the buyer's share of the votes and of the common
 // costs (where the declaration weighs each unit alike); the declaration's
-// thresholds are said only as stated.
+// thresholds are said only as stated. Where the price buys no units — a
+// note they secure, a position, a share — the share is its holder's (lib/
+// interest `propertyHolderOf`), and a note's says what a lender that takes
+// the units would step into.
 //
 // DUES ARE AN EXPENSE. The bulk owner pays every one of its units' dues to
 // the association: a unit's monthly dues times the units offered times
@@ -38,6 +41,7 @@ import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import agencyRules from "@/data/research/agency_rules.json";
 import { parseCount, parseMoney } from "@/lib/criteria";
+import { PROPERTY_HOLDER_WORDS, propertyHolderOf, type PropertyHolder } from "@/lib/interest";
 import { researchAge, staleMark } from "@/lib/research-age";
 import {
   CONDO_NOT_STATED,
@@ -87,6 +91,10 @@ export const STATED_ROWS: ReadonlyArray<readonly [string, RegExp]> = [
 ];
 
 export interface CondoRead {
+  /** who owns the units on this deal, by what the price buys (lib/interest
+   *  `propertyHolderOf`): the buyer on a bulk purchase, the borrower on a
+   *  note they secure, the owning entity on a position or a share */
+  holder: PropertyHolder;
   unitsOffered: number | null;
   unitsInCondominium: number | null;
   /** the units offered over the units in the condominium, a percent */
@@ -258,6 +266,7 @@ export function readCondo(ex: ExtractionResult | null | undefined, asOf: Date = 
     return r ? [{ label, value: r.value.trim() }] : [];
   });
   const read: Omit<CondoRead, "sentences" | "headline"> = {
+    holder: propertyHolderOf(ex),
     unitsOffered,
     unitsInCondominium,
     // More units offered than the condominium holds is two rows that cannot
@@ -310,16 +319,40 @@ export function readCondo(ex: ExtractionResult | null | undefined, asOf: Date = 
 
 function sentencesOf(r: Omit<CondoRead, "sentences" | "headline">): string[] {
   const out: string[] = [];
+  // Whose the units are (lib/interest `propertyHolderOf`): the buyer's on a
+  // bulk purchase; on a note, the borrower's, and the collateral a lender
+  // would take; on a position or a share, the owning entity's, which the
+  // price does not buy.
+  const h = r.holder;
+  const w = PROPERTY_HOLDER_WORDS[h];
+  const who = `${w.who[0].toUpperCase()}${w.who.slice(1)}`;
+  const hold = w.plural ? "hold" : "holds";
   if (r.unitsOffered != null && r.unitsInCondominium != null && r.sharePct != null) {
+    const all = r.unitsOffered === r.unitsInCondominium;
+    const of = `${r.unitsOffered} of the condominium's ${r.unitsInCondominium} units, ${pct1(r.sharePct)}`;
+    const oneOwner = "one owner in an association whose declaration governs the building, with that share of its votes and its common costs where each unit counts alike";
     out.push(
-      r.unitsOffered === r.unitsInCondominium
-        ? `The memorandum offers all ${r.unitsInCondominium} units of the condominium: the buyer holds every vote in its association and pays every unit's share of its costs.`
-        : `The memorandum offers ${r.unitsOffered} of the condominium's ${r.unitsInCondominium} units, ${pct1(
-            r.sharePct,
-          )}: the buyer becomes one owner in an association whose declaration governs the building, with that share of its votes and its common costs where each unit counts alike.`,
+      h === "buyer"
+        ? all
+          ? `The memorandum offers all ${r.unitsInCondominium} units of the condominium: the buyer holds every vote in its association and pays every unit's share of its costs.`
+          : `The memorandum offers ${of}: the buyer becomes ${oneOwner}.`
+        : h === "borrower"
+          ? all
+            ? `The note is secured by all ${r.unitsInCondominium} units of the condominium: the borrower holds every vote in its association and pays every unit's share of its costs, and a lender that takes the units in a foreclosure would step into both.`
+            : `The note is secured by ${of}: the borrower is ${oneOwner}, and a lender that takes the units in a foreclosure would step into that share.`
+          : all
+            ? `${who} ${hold} all ${r.unitsInCondominium} units of the condominium: every vote in its association and every unit's share of its costs.`
+            : `${who} ${hold} ${of}: ${w.plural ? "together they are" : "it is"} ${oneOwner}.`,
     );
   } else if (r.unitsOffered != null) {
-    out.push(`The memorandum offers ${r.unitsOffered} condominium units and states no count for the whole condominium, so the buyer's share of the association is not read.`);
+    const noCount = `the memorandum states no count for the whole condominium, so ${w.whose} share of the association is not read.`;
+    out.push(
+      h === "buyer"
+        ? `The memorandum offers ${r.unitsOffered} condominium units and states no count for the whole condominium, so the buyer's share of the association is not read.`
+        : h === "borrower"
+          ? `The note is secured by ${r.unitsOffered} condominium units, and ${noCount}`
+          : `${who} ${hold} ${r.unitsOffered} condominium units, and ${noCount}`,
+    );
   }
   if (r.annualDues != null && r.monthlyDues != null && r.unitsOffered != null) {
     out.push(
@@ -338,11 +371,16 @@ function sentencesOf(r: Omit<CondoRead, "sentences" | "headline">): string[] {
   if (r.agencyLimit && r.sharePct != null) {
     const a = r.agencyLimit;
     const beyond = r.sharePct > a.exceptionPct;
+    const owner = h === "buyer" ? "the buyer would be" : `${w.who}${w.plural ? ", together, are" : " is"}`;
+    const theirs = h === "buyer" ? "this purchase's" : h === "borrower" ? "the borrower's" : w.plural ? "their" : "its";
+    // On a note the lender's rule narrows what the collateral sells for,
+    // a unit at a time.
+    const exit = h === "borrower" ? ", which narrows the collateral's retail exit, the units sold one by one," : ",";
     out.push(
-      `Owning ${pct1(r.sharePct)} of a project of ${r.unitsInCondominium} units, the buyer would be a single entity over the ${a.pct}% that ${a.lender}'s Selling Guide allows in a project of ${a.minUnits} or more units (${a.section.replace(/^Selling Guide /, "")}, its ${dayText(a.version)} version, read ${dayText(a.readOn)}${
+      `Owning ${pct1(r.sharePct)} of a project of ${r.unitsInCondominium} units, ${owner} a single entity over the ${a.pct}% that ${a.lender}'s Selling Guide allows in a project of ${a.minUnits} or more units (${a.section.replace(/^Selling Guide /, "")}, its ${dayText(a.version)} version, read ${dayText(a.readOn)}${
         a.stale ? `; ${a.stale}` : ""
-      }): such a project is ineligible for ${a.lender}'s loans on its units unless the section's exceptions hold, and the one it lists for a larger owner reaches ${a.exceptionPct}% of the units${
-        beyond ? `, short of this purchase's ${pct1(r.sharePct)}` : ""
+      }): such a project is ineligible for ${a.lender}'s loans on its units unless the section's exceptions hold${exit} and the one it lists for a larger owner reaches ${a.exceptionPct}% of the units${
+        beyond ? `, short of ${theirs} ${pct1(r.sharePct)}` : ""
       }, on conditions that include the owner marketing units for sale to bring its share to ${a.pct}% or less and being current on its assessments.`,
     );
   }
@@ -393,12 +431,14 @@ export function condoContextLine(r: CondoRead): string {
   return `Condominium units: ${r.headline}`;
 }
 
-const TRAPS =
-  "CONDO TRAPS, checked by name where the OM gives the inputs: (a) CONTROL AND THE VOTES — the buyer's share of the association's votes, the declaration's thresholds for amending it, and who controls the board; (b) DUES, ASSESSMENTS AND RESERVES — the budget, the reserve study and any special assessment, and a state's structural-reserve law where it has one; (c) RENTAL RESTRICTIONS — whether the declaration limits leasing, and how many units may be let; (d) THE RETAIL EXIT — whether the project's ownership lets a buyer's lender lend on a unit, and what a single owner's share does to that; (e) THE DEVELOPER'S LIABILITIES — what a bulk buyer inherits from the declarant, as the state's law and the deed say; (f) TERMINATION — the declaration's and the state's thresholds, as a question.";
+/** The traps by name — the votes read as their holder's (`CondoRead.holder`):
+ *  the buyer's on a bulk purchase, the borrower's on a note. */
+const traps = (whose: string) =>
+  `CONDO TRAPS, checked by name where the OM gives the inputs: (a) CONTROL AND THE VOTES — ${whose} share of the association's votes, the declaration's thresholds for amending it, and who controls the board; (b) DUES, ASSESSMENTS AND RESERVES — the budget, the reserve study and any special assessment, and a state's structural-reserve law where it has one; (c) RENTAL RESTRICTIONS — whether the declaration limits leasing, and how many units may be let; (d) THE RETAIL EXIT — whether the project's ownership lets a buyer's lender lend on a unit, and what a single owner's share does to that; (e) THE DEVELOPER'S LIABILITIES — what a bulk buyer inherits from the declarant, as the state's law and the deed say; (f) TERMINATION — the declaration's and the state's thresholds, as a question.`;
 
 /** The facts, then the traps by name, for the assumption review. */
 export function condoNote(r: CondoRead): string {
-  return `CONDOMINIUM UNITS AS STATED: ${r.headline} ${TRAPS}`;
+  return `CONDOMINIUM UNITS AS STATED: ${r.headline} ${traps(PROPERTY_HOLDER_WORDS[r.holder].whose)}`;
 }
 
 /** The rows a key-terms block leads with, each only where stated. */

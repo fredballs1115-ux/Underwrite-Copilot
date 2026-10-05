@@ -49,6 +49,7 @@ import { datedEnd, endLabel, type DatedEnd } from "@/lib/affordable";
 import { assetClassKey } from "@/lib/asset-words";
 import { buildingSfRow, parseSf } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
+import { PROPERTY_HOLDER_WORDS, propertyHolderOf, type PropertyHolder } from "@/lib/interest";
 import { parseUsd } from "@/lib/money";
 import { readRollover, rollYearOf, type LeaseRow, type RollResult } from "@/lib/tools/rollover";
 import { readSingleTenant } from "@/lib/single-tenant";
@@ -205,6 +206,11 @@ export interface RosterYear {
 }
 
 export interface RosterRead {
+  /** who holds the property and its leases on this deal, by what the price
+   *  buys (lib/interest `propertyHolderOf`): the buyer where it is sold, the
+   *  borrower on a note it secures, the owning entity on a position or a
+   *  share */
+  holder: PropertyHolder;
   /** the tenants whose space is part of the sale (or not said), largest first */
   tenants: RosterTenant[];
   /** anchors the memorandum says are NOT part of the offering */
@@ -344,6 +350,7 @@ export function readRoster(ex: ExtractionResult | null | undefined, asOf: Date =
 
   const stated = statedWaltYears(ex);
   const read: Omit<RosterRead, "headline" | "sentences"> = {
+    holder: propertyHolderOf(ex),
     tenants,
     shadow,
     listedSf,
@@ -412,7 +419,20 @@ function shadowSentence(r: Omit<RosterRead, "headline" | "sentences">): string {
   if (!r.shadow.length) return "";
   const names = r.shadow.map((t) => t.name);
   const one = names.length === 1;
-  return `${listOf(names)} ${one ? "anchors" : "anchor"} the property but ${one ? "is" : "are"} not part of the offering, as stated: the buyer buys the traffic ${one ? "it draws" : "they draw"}, not ${one ? "its" : "their"} rent, and ${one ? "it" : "each"} can close, sell or redevelop without the buyer's say.`;
+  const head = `${listOf(names)} ${one ? "anchors" : "anchor"} the property but ${one ? "is" : "are"} not part of`;
+  const draws = one ? "it draws" : "they draw";
+  const theirs = one ? "its" : "their";
+  const each = one ? "it" : "each";
+  // Whose the traffic is (lib/interest `propertyHolderOf`): the buyer buys
+  // it only where the price buys the property; a note's collateral has it.
+  if (r.holder === "buyer") {
+    return `${head} the offering, as stated: the buyer buys the traffic ${draws}, not ${theirs} rent, and ${each} can close, sell or redevelop without the buyer's say.`;
+  }
+  if (r.holder === "borrower") {
+    return `${head} the collateral, as stated: the collateral has the traffic ${draws}, not ${theirs} rent, and ${each} can close, sell or redevelop without the borrower's say — the collateral's value with it.`;
+  }
+  const w = PROPERTY_HOLDER_WORDS[r.holder];
+  return `${head} ${w.whose} property, as stated: ${w.who} ${w.plural ? "have" : "has"} the traffic ${draws}, not ${theirs} rent, and ${each} can close, sell or redevelop without ${w.whose} say.`;
 }
 
 function coTenancySentence(r: Omit<RosterRead, "headline" | "sentences">): string {

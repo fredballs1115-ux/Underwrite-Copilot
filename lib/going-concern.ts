@@ -47,6 +47,7 @@ import { withArticle } from "@/lib/article";
 import { assetClassKey } from "@/lib/asset-words";
 import { parseMoney } from "@/lib/criteria";
 import { ebitdaFigure, type EbitdaFigure } from "@/lib/deal-strategy";
+import { PROPERTY_HOLDER_WORDS, propertyHolderOf, type PropertyHolder } from "@/lib/interest";
 import { FINDING_WORDS, readSiteReports } from "@/lib/site-reports";
 import { readSingleTenant } from "@/lib/single-tenant";
 
@@ -159,6 +160,11 @@ export interface GoingConcernRead {
   /** what is sold: the business with the real estate, the real estate
    *  leased to the operator, or not said */
   branch: "going_concern" | "operator_lease" | "unstated";
+  /** who holds the property and the operation on this deal, by what the
+   *  price buys (lib/interest `propertyHolderOf`): the buyer where the
+   *  memorandum sells them, the borrower on a note they secure, the owning
+   *  entity on a position or a share */
+  holder: PropertyHolder;
   /** the operator's earnings as stated (lib/deal-strategy `ebitdaFigure`) */
   ebitda: EbitdaFigure | null;
   /** an EBITDAR or EBITDARM — before rent — as stated */
@@ -294,6 +300,7 @@ export function readGoingConcern(ex: ExtractionResult | null | undefined, asOf: 
   const read: Omit<GoingConcernRead, "sentences" | "headline"> = {
     business,
     branch,
+    holder: propertyHolderOf(ex),
     ebitda,
     beforeRent,
     rent,
@@ -307,17 +314,48 @@ export function readGoingConcern(ex: ExtractionResult | null | undefined, asOf: 
   return { ...read, sentences, headline: sentences.join(" ") };
 }
 
+/** What the memorandum's split of figures is a split of: the price where
+ *  the price buys the property, the collateral's value on a note, and the
+ *  property's value on a position, a share or the land under it — the price
+ *  of each of those is no property's. */
+export function splitSubject(r: Pick<GoingConcernRead, "holder">): string {
+  return r.holder === "buyer" ? "the price" : r.holder === "borrower" ? "the collateral's value" : "the property's value";
+}
+
 function sentencesOf(r: Omit<GoingConcernRead, "sentences" | "headline">): string[] {
   const out: string[] = [];
   const what = r.business ? BUSINESS_NAME[r.business] : "an operating business";
+  // Who holds the operation (lib/interest `propertyHolderOf`): the
+  // memorandum sells it only where the price buys the property; a note's is
+  // its collateral, and what a lender that took it would hold.
+  const h = r.holder;
+  const w = PROPERTY_HOLDER_WORDS[h];
+  const who = `${w.who[0].toUpperCase()}${w.who.slice(1)}`;
+  const hold = w.plural ? "hold" : "holds";
   if (r.branch === "going_concern") {
     out.push(
-      `The memorandum sells ${what} with its real estate: its earnings are the operation's, and a real estate cap struck on them prices the business as if it were rent.`,
+      h === "buyer"
+        ? `The memorandum sells ${what} with its real estate: its earnings are the operation's, and a real estate cap struck on them prices the business as if it were rent.`
+        : h === "borrower"
+          ? `The note's collateral is ${what} with its real estate, the business with it: its earnings are the operation's, a real estate cap struck on them prices the business as if it were rent, and a lender that takes the collateral in a foreclosure takes an operation to run or sell.`
+          : `${who} ${hold} ${what} with its real estate, the business with it: its earnings are the operation's, and a real estate cap struck on them prices the business as if it were rent.`,
     );
   } else if (r.branch === "operator_lease") {
-    out.push(`The memorandum sells the real estate under ${what}, leased to its operator: the rent is the landlord's income, and the operator's earnings are its credit.`);
+    out.push(
+      h === "buyer"
+        ? `The memorandum sells the real estate under ${what}, leased to its operator: the rent is the landlord's income, and the operator's earnings are its credit.`
+        : h === "borrower"
+          ? `The note's collateral is the real estate under ${what}, leased to its operator: the rent is the borrower's income and what services the note, and the operator's earnings are its credit.`
+          : `${who} ${hold} the real estate under ${what}, leased to its operator: the rent is the landlord's income, and the operator's earnings are its credit.`,
+    );
   } else {
-    out.push(`The property is ${what}; the memorandum does not say whether the business is sold with it or leased from it, and the two are priced differently.`);
+    out.push(
+      h === "buyer"
+        ? `The property is ${what}; the memorandum does not say whether the business is sold with it or leased from it, and the two are priced differently.`
+        : h === "borrower"
+          ? `The collateral is ${what}; the memorandum does not say whether the business goes with it or leases it, and the two are worth different things as collateral.`
+          : `The property is ${what}; the memorandum does not say whether the business is held with it or leases it, and the two are valued differently.`,
+    );
   }
   if (r.ebitda) {
     out.push(
@@ -344,7 +382,7 @@ function sentencesOf(r: Omit<GoingConcernRead, "sentences" | "headline">): strin
       r.allocation.ffe != null ? `fixtures and equipment ${money(r.allocation.ffe)}` : "",
       r.allocation.business != null ? `business ${money(r.allocation.business)}` : "",
     ].filter(Boolean);
-    out.push(`The memorandum splits the price: ${parts.join(", ")}.`);
+    out.push(`The memorandum splits ${splitSubject(r)}: ${parts.join(", ")}.`);
   } else if (r.branch === "going_concern") {
     out.push("It states no split between the real estate, the fixtures and the business.");
   }
@@ -386,8 +424,18 @@ export function goingConcernTag(ex: ExtractionResult | null | undefined, asOf: D
 /** The read in one line, for the memo, the workbook's cover and the
  *  report. */
 export function goingConcernShortLine(r: GoingConcernRead): string {
+  // Sold only where the price buys the property (`holder`).
+  const sold = r.holder === "buyer";
   const parts = [
-    r.branch === "going_concern" ? "sold with the business" : r.branch === "operator_lease" ? "leased to the operator" : "sale of the business not stated",
+    r.branch === "going_concern"
+      ? sold
+        ? "sold with the business"
+        : "held with the business"
+      : r.branch === "operator_lease"
+        ? "leased to the operator"
+        : sold
+          ? "sale of the business not stated"
+          : "whether the business goes with it not stated",
     r.ebitda ? `${r.ebitda.label} ${money(r.ebitda.value)}` : "",
     r.coverage ? `rent covered ${times(r.coverage.times)}` : "",
   ].filter(Boolean);
@@ -411,15 +459,31 @@ const trapsFor = (business: OperatingBusiness | null) =>
   } (e) THE COVERAGE — on a lease, the unit's EBITDAR over the rent and its trend, and the tenant's reporting; (f) THE EXIT — a buyer of a business pays a multiple of its earnings and a buyer of real estate a cap on its rent: which one is the exit.`;
 
 // A care operation's own questions, after the six (round 6): each a
-// question to ask, never a figure or a claim of law.
-const CARE_TRAPS =
-  "CARE-OPERATION TRAPS: (g) THE STRUCTURE — a lease to an operator (the rent, its coverage and the operator's credit), a management contract (census, labour and the payor mix are the owner's) or owner-operated, and whether the stated NOI is before or after a management fee; (h) THE CHANGE OF OWNERSHIP — ask whether the buyer takes the Medicare provider agreement and with it the seller's overpayments and penalties, and how the licence and any certificate of need move under the state's process; (i) THE PAYOR MIX — each payor's share as stated, and the state's Medicaid rate behind its share; (j) SURVEYS AND STARS — the survey history and the CMS star rating, which are public; (k) LICENSED AND OPERATING BEDS — the beds in service against the beds licensed.";
+// question to ask, never a figure or a claim of law. The change of
+// ownership is asked of whoever's ownership changes (`holder`): the buyer's
+// on a sale; on a note, a lender that takes the property; on a position or
+// a share, an interest in the owning entity changing hands; on the land
+// under it, the leaseholder's, if the lease ended.
+const CHANGE_OF_OWNERSHIP: Record<PropertyHolder, string> = {
+  buyer:
+    "ask whether the buyer takes the Medicare provider agreement and with it the seller's overpayments and penalties, and how the licence and any certificate of need move under the state's process",
+  co_owners:
+    "ask whether the buyer takes the Medicare provider agreement and with it the seller's overpayments and penalties, and how the licence and any certificate of need move under the state's process",
+  borrower:
+    "ask whether a lender that takes the property in a foreclosure takes the Medicare provider agreement and with it the operator's overpayments and penalties, and how the licence and any certificate of need move under the state's process",
+  entity:
+    "ask whether a sale of an interest in the owning entity is a change of ownership for the Medicare provider agreement, the licence and any certificate of need, under the program's rules and the state's process",
+  leaseholder:
+    "the operation is the leaseholder's: ask how its Medicare provider agreement, its licence and any certificate of need would move if the ground lease ended",
+};
+const careTraps = (holder: PropertyHolder) =>
+  `CARE-OPERATION TRAPS: (g) THE STRUCTURE — a lease to an operator (the rent, its coverage and the operator's credit), a management contract (census, labour and the payor mix are the owner's) or owner-operated, and whether the stated NOI is before or after a management fee; (h) THE CHANGE OF OWNERSHIP — ${CHANGE_OF_OWNERSHIP[holder]}; (i) THE PAYOR MIX — each payor's share as stated, and the state's Medicaid rate behind its share; (j) SURVEYS AND STARS — the survey history and the CMS star rating, which are public; (k) LICENSED AND OPERATING BEDS — the beds in service against the beds licensed.`;
 
 /** The facts, then the traps by name, for the assumption review — a care
  *  operation's own after the six. */
 export function goingConcernNote(r: GoingConcernRead): string {
   const care = r.business === "snf" || r.business === "senior_care";
-  return `OPERATING BUSINESS AS STATED: ${r.headline} ${trapsFor(r.business)}${care ? ` ${CARE_TRAPS}` : ""}`;
+  return `OPERATING BUSINESS AS STATED: ${r.headline} ${trapsFor(r.business)}${care ? ` ${careTraps(r.holder)}` : ""}`;
 }
 
 /** The rows a key-terms block leads with, each only where stated: the

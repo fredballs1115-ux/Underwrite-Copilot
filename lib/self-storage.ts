@@ -46,6 +46,7 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey } from "@/lib/asset-words";
 import { parsePct } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
+import { PROPERTY_HOLDER_WORDS, propertyHolderOf, type PropertyHolder } from "@/lib/interest";
 
 type Row = { label: string; value: string; page?: string };
 const isRow = (m: unknown): m is Row =>
@@ -115,6 +116,10 @@ function onOneFooting(inPlace: StorageRate, street: StorageRate): { inPlace: num
 }
 
 export interface SelfStorageRead {
+  /** who holds the facility on this deal, by what the price buys (lib/
+   *  interest `propertyHolderOf`): the buyer where it is sold, the borrower
+   *  on a note it secures, the owning entity on a position or a share */
+  holder: PropertyHolder;
   /** the share of units let, % */
   physicalPct: number | null;
   /** the share of rentable area let, % */
@@ -213,6 +218,7 @@ export function readSelfStorage(ex: ExtractionResult | null | undefined): SelfSt
     : null;
 
   const read: Omit<SelfStorageRead, "sentences" | "headline"> = {
+    holder: propertyHolderOf(ex),
     physicalPct,
     sfPct,
     economicPct,
@@ -298,13 +304,30 @@ function sentencesOf(r: Omit<SelfStorageRead, "sentences" | "headline">): string
   }
 
   if (r.climatePct != null) out.push(`${pct1(r.climatePct)} of it is climate-controlled, as stated.`);
+  // A buyer of the facility keeps the platform's income only by running one;
+  // where the price buys no facility (lib/interest `propertyHolderOf`), the
+  // income is its holder's while it runs one — and on a note, the collateral
+  // earns it only so long, a lender that took the facility no differently.
+  const holder = PROPERTY_HOLDER_WORDS[r.holder];
   if (r.tenantInsurance) {
-    out.push(`Tenant insurance, as stated: ${r.tenantInsurance}. It is the operator's program, and a buyer keeps its income only by running one.`);
+    const keeps =
+      r.holder === "buyer"
+        ? "a buyer keeps its income only by running one."
+        : r.holder === "borrower"
+          ? "the collateral earns its income only while one runs, and a lender that takes the facility in a foreclosure keeps it only by running one."
+          : `${holder.who} ${holder.plural ? "keep" : "keeps"} its income only while ${holder.plural ? "they run" : "it runs"} one.`;
+    out.push(`Tenant insurance, as stated: ${r.tenantInsurance}. It is the operator's program, ${r.holder === "borrower" ? "so " : "and "}${keeps}`);
   }
   if (r.management) {
+    const move =
+      r.holder === "buyer"
+        ? "a buyer on another platform changes the brand and the pricing system that sets the street rates."
+        : r.holder === "borrower"
+          ? "a lender that took the facility onto another platform would change the brand and the pricing system that sets the street rates."
+          : "a move to another platform would change the brand and the pricing system that sets the street rates.";
     out.push(
       r.management.thirdParty
-        ? `It is managed by a third party, as stated (${r.management.stated}): the fee belongs in the expenses, and a buyer on another platform changes the brand and the pricing system that sets the street rates.`
+        ? `It is managed by a third party, as stated (${r.management.stated}): the fee belongs in the expenses, and ${move}`
         : `Its management, as stated: ${r.management.stated}.`,
     );
   }

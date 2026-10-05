@@ -47,6 +47,7 @@ import type { AffordableProgram, AffordableTierStated, ExtractionResult } from "
 import { countNoun } from "@/lib/asset-words";
 import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
+import { PROPERTY_HOLDER_WORDS, propertyHolderOf } from "@/lib/interest";
 import { endHasPassed, fromToday } from "@/lib/ground-lease-term";
 import { compactUsd, parseUsd } from "@/lib/money";
 import { monthsBetween, readStatedDate, sameMonth, sameYear, yearsBetween } from "@/lib/note-yield";
@@ -435,6 +436,15 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
   const limits = programs.some((p) => p === "lihtc" || p === "bond")
     ? "move with HUD's published income limits"
     : "move with the area median income the covenant sets them from";
+  // Whose the gap to market becomes when the restriction ends: the buyer's
+  // where the price buys the building; its holder's where it buys none
+  // (lib/interest `propertyHolderOf`), and on a note the collateral earns
+  // the restricted rents until then.
+  const holder = propertyHolderOf(ex);
+  const gapIsWhose =
+    holder === "borrower"
+      ? "it is the borrower's only when the restriction ends: the collateral earns the restricted rents until then."
+      : `it is ${PROPERTY_HOLDER_WORDS[holder].whose} only when the restriction ends.`;
   if (!hapOnly && (restriction || restrictedUnits != null)) {
     const under = restriction ? ` under ${restriction}` : "";
     const who = everyUnit
@@ -446,7 +456,7 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
           : `Some of the ${noun.many} are rent-restricted — the memorandum states no count of them —`;
     lines.push(
       `This is an affordable-housing deal: ${who}${under}${untilClause(restrictionEnds, rows.restrictionEndRow && !restrictionEnds ? rows.restrictionEndRow.value.trim() : null)}.`,
-      `Their rents are capped at the program's limits and ${limits}, not with the market — the gap to market on those ${noun.many} is the restriction's cost, not loss to lease, and it is the buyer's only when the restriction ends.`,
+      `Their rents are capped at the program's limits and ${limits}, not with the market — the gap to market on those ${noun.many} is the restriction's cost, not loss to lease, and ${gapIsWhose}`,
     );
   }
   if (countsDisagree) {

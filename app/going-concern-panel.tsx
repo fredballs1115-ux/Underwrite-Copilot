@@ -1,6 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import { Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
-import { goingConcernShortLine, type GoingConcernRead } from "@/lib/going-concern";
+import { goingConcernShortLine, splitSubject, type GoingConcernRead } from "@/lib/going-concern";
 
 /**
  * An operating business on its real estate — the pure panel for
@@ -16,7 +16,8 @@ import { goingConcernShortLine, type GoingConcernRead } from "@/lib/going-concer
  *     never from an EBITDA, which is after the rent.
  *   - THE SPLIT: the price as the memorandum allocates it between the real
  *     estate, the fixtures and the business (`gc-split`, a segment each),
- *     only as stated.
+ *     only as stated — the collateral's or the property's value where the
+ *     price buys no property (`splitSubject`).
  *
  * Then a tile each for the market rent, the contracts, the beds, the payor
  * mix and the Phase I's finding, each as stated; the read's first sentence,
@@ -98,7 +99,7 @@ export function GoingConcernPanel({ goingConcern, modelLine = "" }: { goingConce
             {parts.map((p) => (
               <KeyItem key={p.key} mark="swatch" tone={p.cls}>{`${p.label} ${money(p.value)}`}</KeyItem>
             ))}
-            <KeyItem>The price as the memorandum splits it</KeyItem>
+            <KeyItem>{`${splitSubject(r).replace(/^t/, "T")} as the memorandum splits it`}</KeyItem>
           </Key>
         </div>
       )}
