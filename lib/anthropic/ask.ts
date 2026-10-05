@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { structured } from "./failure";
@@ -155,7 +155,7 @@ export async function askDealQuestion(
               ],
             },
           ],
-          output_config: { format: zodOutputFormat(AskSchema) },
+          output_config: { format: screenOutputFormat(AskSchema) },
         }, omRequestOptions(om)),
       ),
     );

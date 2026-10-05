@@ -12,7 +12,11 @@
  */
 import { recordUsage, usageOfResponse } from "./usage";
 import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE } from "./operator-failures";
-import { REJECTED_FAILURE, STORAGE_MISSING_FAILURE, TOO_LARGE_FAILURE, refusalFailure } from "./document-failures";
+import { EXTRACTION_TOO_LONG_FAILURE, REJECTED_FAILURE, STORAGE_MISSING_FAILURE, TOO_LARGE_FAILURE, refusalFailure } from "./document-failures";
+
+/** The extraction's name as `structured` below is handed it (./extract):
+ *  its cut-off is the memorandum's, not a passing fault. */
+export const EXTRACTION_STEP = "Extraction";
 
 /** An error whose message was written for the analyst and shows as it is. */
 export class ScreenError extends Error {
@@ -176,17 +180,51 @@ export interface StructuredResponse<T> {
   } | null;
 }
 
+// The mark a structured-output format's parse leaves where the model's text
+// did not parse (./output-format `screenOutputFormat`): the SDK then hands
+// back the whole response, its meters and its stop reason with it, where
+// its own parse threw them away with the error.
+const UNPARSED = Symbol.for("underwrite-copilot.unparsed-output");
+
+/** A model's answer that did not parse, with the parser's words. */
+export interface UnparsedOutput {
+  readonly [UNPARSED]: string;
+}
+
+/** The mark for an answer whose text did not parse — the parser's words kept
+ *  for the log. */
+export function unparsedOutput(err: unknown): UnparsedOutput {
+  return { [UNPARSED]: failureDetail(err) };
+}
+
+function isUnparsedOutput(v: unknown): v is UnparsedOutput {
+  return typeof v === "object" && v !== null && UNPARSED in v;
+}
+
+/** A cut-off at the step named. The extraction's is the memorandum's (its
+ *  answer runs as long as the deck makes it, and the same deck makes it
+ *  again: ./document-failures), every other step's a passing fault. */
+function cutOffFailure(what: string): string {
+  return what === EXTRACTION_STEP ? EXTRACTION_TOO_LONG_FAILURE : `${what} was cut off before it finished — try again.`;
+}
+
 /**
  * Read a structured-output response, naming the failures the SDK leaves
  * indistinguishable: the answer ran past `max_tokens` (a cut-off, not
- * nonsense), the model declined, or no parsed block came back at all.
+ * nonsense), the model declined, the answer did not parse, or no parsed
+ * block came back at all.
  */
 export function structuredOutput<T>(response: StructuredResponse<T>, what: string): T {
+  const parsed: unknown = response.parsed_output;
+  const parserWords = isUnparsedOutput(parsed) ? parsed[UNPARSED] : undefined;
   if (response.stop_reason === "max_tokens") {
-    throw new ScreenError(`${what} was cut off before it finished — try again.`);
+    throw new ScreenError(cutOffFailure(what), parserWords);
   }
   if (response.stop_reason === "refusal") {
     throw new ScreenError(refusalFailure(what));
+  }
+  if (parserWords !== undefined) {
+    throw new ScreenError(`${what} came back unreadable — the answer was malformed. Try again.`, parserWords);
   }
   if (response.parsed_output == null) {
     throw new ScreenError(`${what} did not return structured output.`);
@@ -195,11 +233,14 @@ export function structuredOutput<T>(response: StructuredResponse<T>, what: strin
 }
 
 /**
- * Run one structured-output call and read its result. The SDK parses the
- * model's text while building the response and throws its own
- * "Failed to parse structured output: … Unterminated string in JSON at
- * position 62" on a cut-off or malformed answer — here that becomes a
- * sentence, with the parser's text kept as the detail for the log.
+ * Run one structured-output call and read its result. A format from
+ * ./output-format leaves an answer that did not parse in the response as a
+ * mark, so the response comes back whole: its meters are recorded and its
+ * stop reason says whether it was cut off. A format that throws instead
+ * (the SDK's own `zodOutputFormat`: "Failed to parse structured output: …
+ * Unterminated string in JSON at position 62") leaves no response — that
+ * becomes a sentence, with the parser's text kept as the detail for the log,
+ * and an extraction's is named as the cut-off it almost always is.
  */
 export async function structured<T>(
   what: string,
@@ -212,14 +253,17 @@ export async function structured<T>(
   } catch (err) {
     if (isStructuredParseFailure(err)) {
       throw new ScreenError(
-        `${what} came back unreadable — the answer was cut off or malformed. Try again.`,
+        what === EXTRACTION_STEP
+          ? EXTRACTION_TOO_LONG_FAILURE
+          : `${what} came back unreadable — the answer was cut off or malformed. Try again.`,
         failureDetail(err),
       );
     }
     throw err;
   }
-  // The meters are recorded before the guards below run: a cut-off or a
-  // refusal still spent the tokens, and the ledger should say so.
+  // The meters are recorded before the guards below run: a cut-off, a
+  // refusal or an answer that did not parse still spent the tokens, and the
+  // ledger should say so.
   const used = usageOfResponse(what, response, Date.now() - started);
   if (used) recordUsage(used);
   return structuredOutput(response, what);

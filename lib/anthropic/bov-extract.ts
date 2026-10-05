@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
@@ -106,7 +106,7 @@ export async function extractBov(source: OmSource): Promise<BovExtraction> {
           content: [omDocument(source), { type: "text", text: INSTRUCTION }, { type: "text", text: todayLine() }],
         },
       ],
-      output_config: { format: zodOutputFormat(BovSchema) },
+      output_config: { format: screenOutputFormat(BovSchema) },
     },
     omRequestOptions(source),
   ));

@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -65,7 +65,7 @@ export async function challengeAssumptions(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(ChallengerSchema) },
+    output_config: { format: screenOutputFormat(ChallengerSchema) },
   }, omRequestOptions(om)));
   return out;
 }

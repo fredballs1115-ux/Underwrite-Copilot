@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import {
@@ -85,7 +85,7 @@ export async function reconcileModel(
         max_tokens: MAX_TOKENS.analysis,
         system: ANALYST_SYSTEM,
         messages,
-        output_config: { format: zodOutputFormat(ReconciliationSchema) },
+        output_config: { format: screenOutputFormat(ReconciliationSchema) },
       }, anyOmRequestOptions(om, modelOm)),
     );
   } finally {

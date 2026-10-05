@@ -56,6 +56,14 @@ export function pageCapFailure(pages: number): string {
 }
 
 
+/** The extraction's answer for this memorandum ran past the length one
+ *  answer may run to and was cut off (research pass 41): the same file reads
+ *  the same way and is cut off again, so the way on is a shorter copy — the
+ *  sections that hold the deal's terms — never a retry. The cap is not
+ *  raised here; that is the owner's (lib/anthropic/models `MAX_TOKENS`). */
+export const EXTRACTION_TOO_LONG_FAILURE =
+  "This memorandum's terms ran too long to read in one go — the extraction was cut off before it finished, and the same file would be cut off again. Upload the sections that hold the deal's terms with Replace OM, without appendices such as a rent roll or a property tape.";
+
 /** The model declined to read the document at the step named. A refusal is
  *  not the file's fixed property — a second read may go through — so the
  *  banner offers the retry beside Replace OM (the batch-2 audit). */
@@ -82,7 +90,7 @@ export function documentFailure(message: string | null | undefined): DocumentRem
   if (!m) return null;
   if (m === NO_OM_FAILURE) return "attach";
   if (m === REJECTED_FAILURE || REFUSAL.test(m)) return "replace_or_retry";
-  if (m === NO_FIGURES_FAILURE || m === STORAGE_MISSING_FAILURE || TOO_LARGE.test(m) || PAGE_CAP.test(m)) {
+  if (m === NO_FIGURES_FAILURE || m === STORAGE_MISSING_FAILURE || m === EXTRACTION_TOO_LONG_FAILURE || TOO_LARGE.test(m) || PAGE_CAP.test(m)) {
     return "replace";
   }
   return null;

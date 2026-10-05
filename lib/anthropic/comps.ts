@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -64,7 +64,7 @@ export async function scrutinizeComps(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(BrokerCompsSchema) },
+    output_config: { format: screenOutputFormat(BrokerCompsSchema) },
   }, omRequestOptions(om)));
   return out;
 }

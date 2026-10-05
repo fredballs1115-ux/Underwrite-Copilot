@@ -1,7 +1,7 @@
 import "server-only";
 import { compactUsd } from "@/lib/money";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
@@ -549,7 +549,7 @@ export async function synthesizeVerdict(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(VerdictSchema) },
+    output_config: { format: screenOutputFormat(VerdictSchema) },
   }));
   return out;
 }

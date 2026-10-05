@@ -1,8 +1,8 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
-import { structured } from "./failure";
+import { EXTRACTION_STEP, structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, extractionInstruction } from "./prompts";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -10,9 +10,12 @@ import { todayLine } from "./today";
 import type { AssetClass, ExtractionResult } from "./types";
 import { SALE_METHODS } from "@/lib/sale-terms";
 
-// The schema Claude must fill. `zodOutputFormat` turns this into a strict
-// JSON-schema the model is FORCED to match, so the result is always valid —
-// no "please respond with JSON" guesswork, no parsing failures.
+// The schema Claude must fill. `screenOutputFormat` (the SDK's
+// `zodOutputFormat`) turns this into a strict JSON-schema the model is
+// FORCED to match, so a finished answer is always valid — no "please respond
+// with JSON" guesswork. An answer cut off at `MAX_TOKENS.extraction` is
+// not: it comes back as ./failure's mark, its spend recorded, and is named
+// as the memorandum's (./document-failures `EXTRACTION_TOO_LONG_FAILURE`).
 const ExtractionSchema = z.object({
   dealName: z.string(),
   assetClass: z.string(),
@@ -172,7 +175,7 @@ export async function extractTerms(
 ): Promise<ExtractionResult> {
   const client = getAnthropic();
 
-  const out = await structured("Extraction", () => client.messages.parse({
+  const out = await structured(EXTRACTION_STEP, () => client.messages.parse({
     model: MODELS.extraction,
     max_tokens: MAX_TOKENS.extraction,
     system: ANALYST_SYSTEM,
@@ -195,7 +198,7 @@ export async function extractTerms(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(ExtractionSchema) },
+    output_config: { format: screenOutputFormat(ExtractionSchema) },
   }, omRequestOptions(om)));
 
   return {

@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ScreenError, describeRunFailure, structuredOutput } from "./failure";
 import {
+  EXTRACTION_TOO_LONG_FAILURE,
   NO_FIGURES_FAILURE,
   NO_OM_FAILURE,
   REJECTED_FAILURE,
@@ -72,6 +73,15 @@ describe("documentFailure — the failures a retry of the same file cannot fix",
     expect(documentFailure(f.message)).toBe("replace_or_retry");
   });
 
+  it("an extraction cut off at its length is the memorandum's: another copy, never Try again (research pass 41)", () => {
+    const cut = thrown(() => structuredOutput({ parsed_output: { a: 1 }, stop_reason: "max_tokens" }, "Extraction"));
+    expect((cut as Error).message).toBe(EXTRACTION_TOO_LONG_FAILURE);
+    expect(documentFailure(describeRunFailure(cut).message)).toBe("replace");
+    expect(EXTRACTION_TOO_LONG_FAILURE).toContain("Replace OM");
+    expect(EXTRACTION_TOO_LONG_FAILURE).not.toMatch(/try again/i);
+    expect(needsOperator(EXTRACTION_TOO_LONG_FAILURE)).toBe(false);
+  });
+
   it("a deal with no OM is offered one, and an OM gone from storage is uploaded again", () => {
     expect(documentFailure(NO_OM_FAILURE)).toBe("attach");
     expect(documentFailure(describeRunFailure(new Error("Storage download failed: Object not found")).message)).toBe("replace");
@@ -92,7 +102,9 @@ describe("documentFailure — the failures a retry of the same file cannot fix",
       const m = describeRunFailure(err).message;
       expect(documentFailure(m), m).toBeNull();
     }
-    const cut = thrown(() => structuredOutput({ parsed_output: { a: 1 }, stop_reason: "max_tokens" }, "Extraction"));
+    // Another step's cut-off may pass on a second read; the extraction's is
+    // the memorandum's (below).
+    const cut = thrown(() => structuredOutput({ parsed_output: { a: 1 }, stop_reason: "max_tokens" }, "The challenger"));
     expect(documentFailure((cut as Error).message)).toBeNull();
     expect(documentFailure(null)).toBeNull();
     expect(documentFailure("")).toBeNull();
