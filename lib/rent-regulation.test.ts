@@ -227,10 +227,43 @@ describe("a stated none is no claim", () => {
     expect(none.regimes[0].outcome).toBe("applies");
     expect(none.stated).toBeNull();
     expect(none.headline).not.toContain("It names the regime as None");
-    // A regulated count of 0 is no count (lib/criteria `parseCount`), so it
-    // is no claim either.
+    // A regulated count of 0 is a stated zero, so it is no claim either.
     const austin = { address: { state: "TX", city: "Austin" }, classKey: "multifamily" };
     expect(readRegulation(ex([row("Units", "120"), row("Rent-regulated units", "0")]), austin, "2026-10-05")).toBeNull();
+  });
+});
+
+// The audit of 2026-10-05: a regulated count the reader could not take —
+// "41 of 48", "All", "41 RS / 7 FM", and "0", which the count reader
+// refuses — was said as "no count of regulated units", beside key terms
+// printing the row.
+describe("the regulated count as the memorandum states it", () => {
+  it("says words it takes no count from as stated, and a stated zero as none", () => {
+    for (const words of ["41 of 48", "All", "41 RS / 7 FM"]) {
+      const r = readRegulation(walkUp([row("Rent-stabilized units", words)]), BROOKLYN, "2026-10-05")!;
+      expect(r.regulatedUnits, words).toBeNull();
+      expect(r.regulatedUnitsStated, words).toBe(words);
+      expect(r.sharePct, words).toBeNull();
+      expect(r.headline, words).toContain(`The memorandum states the regulated units as: ${words}; no share is read.`);
+      expect(r.headline, words).not.toContain("no count of regulated units");
+    }
+    for (const zero of ["0", "None", "Zero"]) {
+      const r = readRegulation(walkUp([row("Rent-stabilized units", zero)]), BROOKLYN, "2026-10-05")!;
+      expect(r.regulatedUnits, zero).toBe(0);
+      expect(r.headline, zero).toContain("The memorandum states none of the 48 units are rent-regulated.");
+      expect(r.headline, zero).not.toContain("no count of regulated units");
+      expect(regulationTag(r), zero).toBe("Rent-stabilized, 0 of 48");
+      expect(regulationShortLine(r), zero).toContain("none of the 48 units rent-regulated as stated");
+      expect(regulationModelLine(r, 3), zero).toContain("and none of the 48 units are regulated as the memorandum states");
+    }
+    // A row that states nothing is no row.
+    const blank = readRegulation(walkUp([row("Rent-stabilized units", "N/A")]), BROOKLYN, "2026-10-05")!;
+    expect(blank.regulatedUnitsStated).toBeNull();
+    expect(blank.headline).toContain("The memorandum states no count of regulated units, so no share of the building is read.");
+    // Words naming regulated units are the memorandum's claim where no rule reaches.
+    const austin = readRegulation(ex([row("Units", "48"), row("Rent-regulated units", "41 of 48")]), { address: { state: "TX", city: "Austin" }, classKey: "multifamily" }, "2026-10-05")!;
+    expect(austin.claimOnly).toBe(true);
+    expect(austin.headline).toContain("The memorandum states the regulated units as: 41 of 48; no share is read.");
   });
 });
 

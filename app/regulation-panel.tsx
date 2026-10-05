@@ -163,7 +163,9 @@ export function RegulationPanel({
             <div className="h-full rounded-full bg-caution/60" data-bar="reg-units" style={{ width: clamp(r.sharePct) }} />
           </div>
           <p className="mt-1.5 text-muted">
-            {`${count(r.regulatedUnits)} of the ${count(r.totalUnits)} ${r.noun.many} rent-regulated, as the memorandum states (${shareText(r.sharePct)})`}
+            {r.regulatedUnits === 0
+              ? `None of the ${count(r.totalUnits)} ${r.noun.many} rent-regulated, as the memorandum states`
+              : `${count(r.regulatedUnits)} of the ${count(r.totalUnits)} ${r.noun.many} rent-regulated, as the memorandum states (${shareText(r.sharePct)})`}
           </p>
         </div>
       )}

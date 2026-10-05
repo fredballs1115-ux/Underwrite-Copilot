@@ -144,6 +144,10 @@ export const LEGAL_RENT_ROW = /^\s*(?:average\s+)?legal\s+(?:regulated\s+)?rents
 export const PREFERENTIAL_RENT_ROW = /^\s*(?:average\s+)?preferential\s+rents?\b/i;
 
 const NOT_A_COUNT = /%|percent|\bshare\b|\$|expir|\bdate\b/i;
+/** A count row that states nothing: no row at all. */
+const BLANK_COUNT = /^(?:n\/?a|not\s+(?:applicable|stated|provided|available|disclosed)|unknown|tbd|[-–—])\.?$/i;
+/** A count row that states none are regulated: a stated zero. */
+const ZERO_COUNT = /^(?:0|zero|no\s+units?)\.?$/i;
 
 /** A row whose words state none — "None", "No rent control", "N/A",
  *  "Not subject to rent control", "Exempt", "Market rate", "Non-regulated",
@@ -202,7 +206,12 @@ export interface RegulationRead {
   /** the regime row's words where they say the building is regulated and
    *  name no regime ("Yes", "Yes — city caps lot rent at CPI") */
   statedYes: string | null;
+  /** the regulated units as the memorandum counts them — 0 where it states
+   *  none ("0", "None") */
   regulatedUnits: number | null;
+  /** the regulated-units row's own words where they state no count the
+   *  reader can take ("41 of 48", "All"): said as stated, no share read */
+  regulatedUnitsStated: string | null;
   totalUnits: number | null;
   /** regulated over the count, where both are stated and agree */
   sharePct: number | null;
@@ -316,9 +325,25 @@ export function readRegulation(
   const statedWords = statedRow?.value.trim() ?? "";
   const statedYes = statedWords && STATES_YES.test(statedWords) ? statedWords : null;
   const stated = statedWords && !STATES_NONE.test(statedWords) && !statedYes ? statedWords : null;
-  const regulatedUnits = unitsRow ? parseCount(unitsRow.value) : null;
+  // The regulated count as stated: a count, a stated zero ("0", "None"), or
+  // words no count is read from ("41 of 48", "All"), said as stated — never
+  // "no count", which the key terms printing the row beside it contradicted
+  // (the audit of 2026-10-05). A row that states nothing is no row.
+  const unitsWords = unitsRow?.value.trim() ?? "";
+  const unitsBlank = unitsWords === "" || BLANK_COUNT.test(unitsWords);
+  const unitsZero = !unitsBlank && (ZERO_COUNT.test(unitsWords) || STATES_NONE.test(unitsWords));
+  const counted = unitsBlank || unitsZero ? null : parseCount(unitsWords);
+  const regulatedUnits = unitsZero ? 0 : counted;
+  const regulatedUnitsStated = unitsBlank || unitsZero || counted != null ? null : unitsWords;
   const totalUnits = unitCountFromMetrics(metrics);
-  const memoSays = stated != null || statedYes != null || regulatedUnits != null || legalRow != null || preferentialRow != null;
+  // A stated zero is no claim of regulation.
+  const memoSays =
+    stated != null ||
+    statedYes != null ||
+    (regulatedUnits != null && regulatedUnits > 0) ||
+    regulatedUnitsStated != null ||
+    legalRow != null ||
+    preferentialRow != null;
 
   const residential = input.classKey ? assetWords(input.classKey).residential : undefined;
   let regimes: RegimeRead[] = [];
@@ -382,7 +407,9 @@ export function readRegulation(
       }; no rent rule the site holds reaches this address, so that is the memorandum's claim.`,
     );
   }
-  if (regulatedUnits != null) {
+  if (regulatedUnits === 0) {
+    parts.push(`The memorandum states none of ${totalUnits != null ? `the ${count(totalUnits)}` : "its"} ${noun.many} are rent-regulated.`);
+  } else if (regulatedUnits != null) {
     parts.push(
       totalUnits != null && sharePct != null
         ? `The memorandum states ${count(regulatedUnits)} of the ${count(totalUnits)} ${noun.many} are rent-regulated (${sharePctText(sharePct)}).`
@@ -390,6 +417,8 @@ export function readRegulation(
           ? `The memorandum states ${count(regulatedUnits)} rent-regulated ${noun.many}, more than the ${count(totalUnits!)} it counts in the building; no share is read.`
           : `The memorandum states ${count(regulatedUnits)} rent-regulated ${regulatedUnits === 1 ? noun.one : noun.many}.`,
     );
+  } else if (regulatedUnitsStated) {
+    parts.push(`The memorandum states the regulated ${noun.many} as: ${regulatedUnitsStated.replace(/\.$/, "")}; no share is read.`);
   } else if (regimes.length) {
     parts.push(`The memorandum states no count of regulated ${noun.many}, so no share of the building is read.`);
   }
@@ -406,6 +435,7 @@ export function readRegulation(
     stated,
     statedYes,
     regulatedUnits,
+    regulatedUnitsStated,
     totalUnits,
     sharePct,
     countsDisagree,
@@ -484,7 +514,9 @@ export function regulationShortLine(r: RegulationRead): string {
   } else {
     bits.push(r.regimes.map((g) => (g.outcome === "applies" ? `${g.name} applies` : `${g.name} possibly applies`)).join("; "));
   }
-  if (r.regulatedUnits != null && r.totalUnits != null && r.sharePct != null) {
+  if (r.regulatedUnits === 0 && r.totalUnits != null) {
+    bits.push(`none of the ${count(r.totalUnits)} ${r.noun.many} rent-regulated as stated`);
+  } else if (r.regulatedUnits != null && r.totalUnits != null && r.sharePct != null) {
     bits.push(`${count(r.regulatedUnits)} of the ${count(r.totalUnits)} ${r.noun.many} rent-regulated as stated (${sharePctText(r.sharePct)})`);
   }
   const low = lowestCurrent(r);
@@ -510,7 +542,7 @@ export function regulationModelLine(r: RegulationRead | null, rentGrowthPct: num
   const growth = rentGrowthPct != null && Number.isFinite(rentGrowthPct) ? `grows every rent ${pctText(Number(rentGrowthPct.toFixed(2)))} a year` : "grows every rent at one rate";
   const share =
     r.regulatedUnits != null && r.totalUnits != null && r.sharePct != null
-      ? `, and ${count(r.regulatedUnits)} of the ${count(r.totalUnits)} ${r.noun.many} are regulated as the memorandum states`
+      ? `, and ${r.regulatedUnits === 0 ? "none" : count(r.regulatedUnits)} of the ${count(r.totalUnits)} ${r.noun.many} are regulated as the memorandum states`
       : "";
   const low = lowestCurrent(r);
   if (low) {
