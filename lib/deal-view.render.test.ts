@@ -929,7 +929,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     // The figures are at the ask — struck on the memoranda's asking prices,
     // never trades — and the sentence says so.
     expect(text).toMatch(
-      /You've screened\s+3\s+other Philadelphia, PA Multifamily\s+deals with a cap or basis on file: going-in cap 5\.2–5\.6% · basis \$240–262k\/unit\s*, at the ask\s*\./,
+      /You've screened\s+3\s+other Philadelphia, PA Multifamily\s+deals with a cap or basis on file: going-in cap 5\.20–5\.60% · basis \$240–262k\/unit\s*, at the ask\s*\./,
     );
     // A hotel's basis is per key (lib/market-memory's group noun).
     const hotel = textOf(
