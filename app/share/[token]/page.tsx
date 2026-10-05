@@ -106,13 +106,17 @@ export default async function SharePage({
           },
         ]
       : []),
-    // The one frame the aerial route draws (lib/image-frames).
+    // The one frame the aerial route draws (lib/image-frames), around the
+    // address the route reads. A street address's building is ringed at its
+    // centre, the deal page's rule (`hasStreetAddress`); a neighbourhood
+    // placement's centre is a district's, and is not.
     ...(address?.label
       ? [
           {
             kind: "aerial" as const,
             src: `/api/share/${token}/aerial?w=${SHARE_AERIAL.w}&h=${SHARE_AERIAL.h}`,
             credit: SHARE_AERIAL_CREDIT,
+            ring: !!address.street?.trim(),
           },
         ]
       : []),

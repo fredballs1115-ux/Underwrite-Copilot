@@ -2305,8 +2305,61 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(aerialOnly).toContain('alt="Aerial view of Brewerytown, Philadelphia, PA"');
     expect(visibleText(aerialOnly)).toContain("USGS The National Map");
     expect(aerialOnly).not.toContain("/picture?size=hero");
+    // A neighbourhood placement's centre is a district's: nothing is ringed.
+    expect(aerialOnly).not.toContain('data-picture="aerial-pin"');
     const none = renderToStaticMarkup(React.createElement(ShareView, { ...base, picture: null }));
     expect(none).not.toContain("data-share-picture");
+  });
+
+  it("rings the building on a street address's aerial, as the deal page does, and never over the photograph (research pass 29)", () => {
+    const base = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      extraction: SAMPLE_DEAL.extraction,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const aerial = {
+      kind: "aerial" as const,
+      src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial?w=960&h=400",
+      credit: "aerial imagery: USGS The National Map (public domain)",
+      ring: true,
+    };
+    const ringed = renderToStaticMarkup(
+      React.createElement(ShareView, { ...base, picture: { sources: [aerial], place: "1200 N 31st St, Philadelphia, PA" } }),
+    );
+    dumpView("share-aerial-ringed", ringed);
+    expect(a11yIssues(ringed), "a11y share ringed aerial").toEqual([]);
+    expect(gluedWords(visibleText(ringed))).toEqual([]);
+    expect(ringed).toContain('data-share-picture="aerial"');
+    // The ring sits over the picture, centred in the picture's own box, and
+    // says nothing to a screen reader.
+    const figure = /<figure[^>]*data-share-picture="aerial"[\s\S]*?<\/figure>/.exec(ringed)?.[0] ?? "";
+    expect(figure).toMatch(/<div class="relative"><img [^>]*><span aria-hidden="true" data-picture="aerial-pin" class="[^"]*\babsolute left-1\/2 top-1\/2\b/);
+    // The photograph is never ringed, whatever its source says, and the
+    // aerial behind it waits unrendered.
+    const photo = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        ...base,
+        picture: {
+          sources: [
+            { kind: "photo" as const, src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/picture?size=hero", credit: "From the offering memorandum", ring: true },
+            aerial,
+          ],
+          place: "1200 N 31st St, Philadelphia, PA",
+        },
+      }),
+    );
+    expect(photo).toContain('data-share-picture="photo"');
+    expect(photo).not.toContain('data-picture="aerial-pin"');
+    // The loader rings the aerial where — and only where — the address it is
+    // drawn around has a street, the deal page's `hasStreetAddress`.
+    const loader = readSource(joinPath(process.cwd(), "app/share/[token]/page.tsx"), "utf8");
+    expect(loader).toMatch(/kind: "aerial" as const,[\s\S]*?ring: !!address\.street\?\.trim\(\),/);
+    expect(readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/page.tsx"), "utf8")).toContain("hasStreetAddress={!!dealAddress?.street}");
   });
 
   it("says FEMA's flood zone under the title where the building sits in one, and nothing without a line (#426)", () => {
