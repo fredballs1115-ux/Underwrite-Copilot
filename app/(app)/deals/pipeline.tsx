@@ -46,6 +46,7 @@ import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
 import { FOLD_WORD, checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { DEAL_NAME_MAX, nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
+import { COMPARE_MAX } from "@/lib/link-limits";
 import {
   STAGES,
   STAGE_LABEL,
@@ -493,7 +494,6 @@ export function Pipeline({
     return () => window.removeEventListener("keydown", onKey);
   }, [atLimitRef]);
 
-  const COMPARE_MAX = 4;
   // Stable identity so memoized rows don't re-render on unrelated changes.
   const toggleSelected = useCallback((id: string) => {
     setSelected((prev) => {
@@ -934,7 +934,7 @@ export function Pipeline({
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
           <p className="text-sm font-medium">
             {selected.size === 0
-              ? "Select 2–4 deals to compare."
+              ? `Select 2–${COMPARE_MAX} deals to compare.`
               : selected.size >= COMPARE_MAX
                 ? `${selected.size} of ${COMPARE_MAX} selected`
                 : `${selected.size} selected`}

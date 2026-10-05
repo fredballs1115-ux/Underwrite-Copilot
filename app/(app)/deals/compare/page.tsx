@@ -54,6 +54,7 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { screenedOn, verdictBehind, type JobLike } from "@/lib/screen-run";
+import { COMPARE_MAX } from "@/lib/link-limits";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -305,7 +306,7 @@ export default async function ComparePage({
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, COMPARE_MAX);
 
   const supabase = await createSupabaseServerClient();
   const { data } = ids.length

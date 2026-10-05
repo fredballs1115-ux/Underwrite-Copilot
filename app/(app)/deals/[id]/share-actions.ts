@@ -3,10 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { SHARE_LINK_DAYS } from "@/lib/link-limits";
 
 // Share links expire on their own — a forwarded screen shouldn't be readable
-// forever. 30 days covers a deal's live window; revoke kills it sooner.
-const SHARE_DAYS = 30;
+// forever. Thirty days (lib/link-limits, the span migration 0036 clamps an
+// expiry to) covers a deal's live window; revoke kills it sooner.
+const SHARE_DAYS = SHARE_LINK_DAYS;
 
 /**
  * Mint a read-only share link for a deal. The token is the row's uuid —

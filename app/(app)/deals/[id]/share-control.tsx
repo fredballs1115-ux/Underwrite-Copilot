@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createShareLink, revokeShareLink } from "./share-actions";
+import { SHARE_LINK_DAYS } from "@/lib/link-limits";
 
 const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -106,7 +107,7 @@ export function ShareControl({
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             A read-only page — verdict, ranges, and key terms. No sign-in
-            needed, expires after 30 days, revocable here anytime.
+            needed, expires after {SHARE_LINK_DAYS} days, revocable here anytime.
           </p>
           {/* The verdict's own words go with it, and the verdict is handed
               the buy box (research pass 39): said before a link is made. */}
