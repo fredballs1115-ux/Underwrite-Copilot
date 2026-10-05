@@ -54,7 +54,7 @@ import { withArticle } from "@/lib/article";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
-import { compactUsd, parseUsd } from "@/lib/money";
+import { SCALE_WORDS, compactUsd, parseUsd } from "@/lib/money";
 import { daysBetween, monthsBetween, readStatedDate, sameMonth } from "@/lib/note-yield";
 import { readAssumption, type AssumptionRead } from "@/lib/tools/loan-assumption";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -269,9 +269,10 @@ const says = (row: { value: string } | null | undefined): row is { value: string
 
 /** The index a floating rate is quoted over, as the memorandum names it:
  *  SOFR in its forms ("Term SOFR", "30-day average SOFR"), LIBOR, prime, a
- *  Treasury. */
+ *  Treasury. Prime only as a rate — "prime rate", "WSJ prime", or prime
+ *  with a spread on it — never the bare word ("prime location", audit C3a). */
 const INDEX =
-  /(?:\b(?:one|1|three|3|six|6)[- ]month\s+)?(?:\b(?:30|90|180)[- ]day\s+(?:average\s+)?)?(?:\b(?:term|compounded|daily|simple)\s+)?\bSOFR\b|(?:\b(?:one|1|three|3)[- ]month\s+)?(?:\bUSD\s+)?\bLIBOR\b|(?:\b(?:WSJ|wall\s+street\s+journal)\s+)?\bprime(?:\s+rate)?\b|(?:\b\d{1,2}[- ](?:year|yr)\s+)?(?:\bU\.?S\.?\s+)?\btreasur(?:y|ies)\b|(?:\b\d{1,2}[- ](?:year|yr)\s+)?\bUST\b/i;
+  /(?:\b(?:one|1|three|3|six|6)[- ]month\s+)?(?:\b(?:30|90|180)[- ]day\s+(?:average\s+)?)?(?:\b(?:term|compounded|daily|simple)\s+)?\bSOFR\b|(?:\b(?:one|1|three|3)[- ]month\s+)?(?:\bUSD\s+)?\bLIBOR\b|\b(?:WSJ|wall\s+street\s+journal)\s+prime(?:\s+rate)?\b|\bprime\s+rate\b|\bprime\b(?=\s*(?:\+|plus\b))|(?<=\b(?:over|above)\s+(?:the\s+)?)prime\b|(?:\b\d{1,2}[- ](?:year|yr)\s+)?(?:\bU\.?S\.?\s+)?\btreasur(?:y|ies)\b|(?:\b\d{1,2}[- ](?:year|yr)\s+)?\bUST\b/i;
 /** Words that say the rate moves. */
 const FLOATS = /\bfloat(?:ing|s)?\b|\bvariable\b|\badjustable\b|\bswap(?:s|ped)?\b/i;
 /** A coupon stated fixed: "3.45% fixed", "3.45%, fixed", "fixed at 3.45%",
@@ -290,10 +291,16 @@ const CAP_CLAUSE = /\b(?:(?:interest\s+)?rate\s+cap|capped)\b\s*(?:at|of|:)?\s*(
 /** The words that put a second loan in the first loan's own row. */
 const NAMES_SECOND_LOAN =
   /\bsupplemental\b|\b(?:second|2nd)[\s-]+(?:loan|lien|mortgage|note|trust\s+deed)\b|\(\s*(?:second|2nd)\s*\)|\bmezz(?:anine)?\b|\b(?:junior|subordinate)[\s-]+(?:loan|lien|mortgage|note|debt)\b|\b(?:both|two)\s+loans\b/i;
+/** Words that put a second loan on offer rather than in place. */
+const ON_OFFER = /\bavailable\b|\bup\s+to\b|\bmay\b|\beligib\w*|\boptional\b|\bcould\b|\bpotential\b/i;
+/** A fee's percentage, which is never a loan's rate: "1% fee", "a fee of 1%". */
+const FEE_PCT = /\d+(?:\.\d+)?\s*%\s*(?:\w+\s+)?fee\b|\bfee\s*(?:of|:)?\s*\d+(?:\.\d+)?\s*%/gi;
 /** Prepayment terms that say the loan stays: a lockout, or a sale subject to
- *  the loan. */
+ *  the loan — the loan in place ("the loan", "the existing CMBS loan",
+ *  "this loan", "assumption of the existing loan"), never a buyer's new
+ *  financing or a financing contingency (audit C3a). */
 const LOCKS_IN =
-  /\block(?:ed)?[\s-]*out\b|\bsubject\s+to\s+(?:the\s+)?(?:assumption\s+of\s+)?(?:the\s+)?(?:existing\s+)?(?:[A-Z]{2,5}\s+)?(?:loan|mortgage|debt|financing)\b|\bsubject\s+to\s+(?:its\s+|the\s+loan'?s?\s+)?assumption\b|\bmust\s+(?:be\s+)?assumed?\b|\b(?:assumption|assume)\s+(?:is\s+)?(?:required|mandatory)\b|\brequired\s+to\s+assume\b|\bno\s+prepayment\b(?!\s+(?:premium|penalty|fee|charge))|\bprepayment\s+(?:is\s+)?(?:not\s+(?:permitted|allowed)|prohibited)\b/i;
+  /\block(?:ed)?[\s-]*out\b|\bsubject\s+to\s+(?:(?:the\s+)?assumption\s+of\s+(?:the\s+|this\s+|its\s+)?(?:existing\s+|in[- ]place\s+|assumable\s+)?|(?:the|this|its)\s+(?:existing\s+|in[- ]place\s+|assumable\s+)?|(?:existing|in[- ]place|assumable)\s+)(?:(?!new\b|buyer)[A-Za-z&']{2,12}\s+){0,2}(?:loan|mortgage|debt)\b|\bsubject\s+to\s+(?:its\s+|the\s+loan'?s?\s+)?assumption\b|\bmust\s+(?:be\s+)?assumed?\b|\b(?:assumption|assume)\s+(?:is\s+)?(?:required|mandatory)\b|\brequired\s+to\s+assume\b|\bno\s+prepayment\b(?!\s+(?:premium|penalty|fee|charge))|\bprepayment\s+(?:is\s+)?(?:not\s+(?:permitted|allowed)|prohibited)\b/i;
 
 const spreadOf = (text: string): number | null => {
   const m = SPREAD_AFTER.exec(text) ?? SPREAD_BEFORE.exec(text) ?? SPREAD_WORD.exec(text);
@@ -313,6 +320,11 @@ export function floatingRateOf(text: string | null | undefined): FloatingRate | 
   const index = INDEX.exec(t);
   if (!floats && !index) return null;
   if (!floats && /\bfixed\b/i.test(t)) return null;
+  // A coupon stated beside a Treasury and its spread, with no word that it
+  // floats, is how a fixed agency coupon is quoted ("3.45% (10-yr UST + 180
+  // bps)"): the coupon, never a floating rate (audit C3a). A loan quoted
+  // over SOFR, LIBOR or prime floats whatever coupon it shows today.
+  if (!floats && index && /treasur|\bUST\b/i.test(index[0]) && couponOf(t) != null) return null;
   return { index: index ? index[0] : null, spreadPct: spreadOf(t) };
 }
 
@@ -356,10 +368,15 @@ const capText = (text: string): string | undefined => {
  *  figure of its own, is no second loan offered. */
 function statesTwoLoans(text: string, kind: "dollars" | "rates"): boolean {
   if (!text || !NAMES_SECOND_LOAN.test(text)) return false;
+  // A second loan the buyer may take is new financing, not a loan in place:
+  // every clause that names one says it is on offer ("supplemental loan of
+  // up to $3,000,000 available", audit C3a).
+  const naming = text.split(/[;()]/).filter((c) => NAMES_SECOND_LOAN.test(c));
+  if (naming.every((c) => ON_OFFER.test(c))) return false;
   const count =
     kind === "dollars"
-      ? [...text.replace(/,/g, "").matchAll(/\$?\d+(?:\.\d+)?\s*(?:k|thousand|mm|million|m|bn|billion|b)?\b/gi)].filter((m) => parseUsd(m[0]) != null).length
-      : (text.match(/\d+(?:\.\d+)?\s*%/g) ?? []).length;
+      ? [...text.replace(/,/g, "").matchAll(new RegExp(String.raw`\$?\d+(?:\.\d+)?\s*(?:${SCALE_WORDS})?\b`, "gi"))].filter((m) => parseUsd(m[0]) != null).length
+      : (text.replace(FEE_PCT, " ").match(/\d+(?:\.\d+)?\s*%/g) ?? []).length;
   return count >= 2;
 }
 

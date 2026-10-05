@@ -536,3 +536,58 @@ describe("wherever the deal is summarized (#419)", () => {
     expect(deriveUnderwriteInputs(SAMPLE_DEAL.extraction as ExtractionResult, SAMPLE_DEAL.name).meta.assumable).toBeNull();
   });
 });
+
+describe("a coupon priced off a Treasury, a supplemental on offer, a bare prime and a financing contingency (audit C3a MED-3)", () => {
+  const rate = (value: string) => readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000"), row("Assumable loan rate", value)]))!;
+
+  it("reads a stated coupon beside a Treasury index and its spread as a fixed coupon, never a floating rate", () => {
+    for (const [words, coupon] of [
+      ["3.45% (10-yr UST + 180 bps)", 3.45],
+      ["4.12% (Treasury + 1.80%)", 4.12],
+      ["3.45%, priced at the 10-year Treasury plus 1.80%", 3.45],
+    ] as const) {
+      const t = rate(words);
+      expect(t.floating, words).toBeUndefined();
+      expect(t.ratePct, words).toBe(coupon);
+    }
+    // A loan quoted over SOFR or prime still floats, whatever coupon it shows today.
+    expect(rate("6.10% today (SOFR + 2.75%)").floating).toEqual({ index: "SOFR", spreadPct: 2.75 });
+    expect(rate("8.50% (Prime + 1.00%)").floating).toEqual({ index: "Prime", spreadPct: 1 });
+    // A Treasury with a spread and no coupon is still said as an index.
+    expect(rate("10-yr UST + 180 bps").floating?.index).toBe("10-yr UST");
+  });
+
+  it("reads no prime index off a bare word", () => {
+    const t = rate("4.25% (Fannie Mae DUS, prime location)");
+    expect(t.floating).toBeUndefined();
+    expect(t.ratePct).toBe(4.25);
+    expect(rate("WSJ prime + 0.50%").floating).toEqual({ index: "WSJ prime", spreadPct: 0.5 });
+    expect(rate("Prime rate, floating").floating?.index).toBe("Prime rate");
+    expect(rate("100 bps over prime").floating).toEqual({ index: "prime", spreadPct: 1 });
+  });
+
+  it("reads no second loan off financing on offer, and never a fee's percentage as a second rate", () => {
+    const offered = readAssumableTerms(
+      sample([row("Assumable loan balance", "$24,500,000; supplemental loan of up to $3,000,000 available to a qualified buyer"), row("Assumable loan rate", "3.85% fixed")]),
+    )!;
+    expect(offered.supplemental).toBeUndefined();
+    expect(offered.balance).toBe(24_500_000);
+    const fee = rate("3.85% fixed; supplemental financing available, 1% fee");
+    expect(fee.supplemental).toBeUndefined();
+    expect(fee.ratePct).toBe(3.85);
+    expect(assumableTag(sample([row("Assumable loan balance", "$24,500,000"), row("Assumable loan rate", "3.85% fixed; supplemental financing available, 1% fee")]))).toBe(
+      "Assumable 3.85%",
+    );
+    // A supplemental stated as a loan in place is still one.
+    expect(rate("3.85% (first); 5.95% (supplemental)").supplemental).toBeDefined();
+  });
+
+  it("reads no lock-in off a financing contingency", () => {
+    const prepay = (value: string) => readAssumableTerms(sample([...LOAN, row("Prepayment", value)]))!.prepayment?.locksIn;
+    expect(prepay("Yield maintenance; sale subject to financing contingency")).toBe(false);
+    expect(prepay("Sale subject to the buyer's new financing")).toBe(false);
+    expect(prepay("Sale subject to the existing loan")).toBe(true);
+    expect(prepay("Sale subject to the existing Freddie Mac loan")).toBe(true);
+    expect(prepay("Subject to this loan; defeasance only")).toBe(true);
+  });
+});
