@@ -181,6 +181,8 @@ export const SAMPLE_COMP_PREMIUM_LINE =
   "$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it.";
 
 // NOTE deliberately absent: the Excel-preview IRR figures. Those are COMPUTED
-// from the live engine on the sample model at render time (app/page.tsx
-// imports computeModel + SAMPLE_DEAL) — hardcoding them here is exactly how
-// they drifted (7.1% vs the engine's 6.9%).
+// at render time by the screening engine (lib/underwrite/engine) on the
+// sample's one derivation, the demo workbook's (lib/sample-derive's
+// `sampleWorkbookPreview`, which app/page.tsx reads; the homepage's stress
+// bench runs the same derivation) — hardcoding them here is exactly how they
+// drifted (7.1% vs the engine's 6.9%).
