@@ -33,8 +33,9 @@ export const ACCOUNT_EXISTS =
 const COPY = {
   wrongPassword: "Wrong email or password. If you're new, switch to Create account.",
   confirmFirst: "Confirm your email first — check your inbox for the link.",
-  weakPassword:
-    "That password is too weak — use at least 8 characters with a mix of letters, numbers and symbols.",
+  // Said only where the service gives no reasons: never a rule the
+  // project's own settings may not hold (`weakPasswordCopy`).
+  weakPassword: "That password is too weak — choose a longer, less common one.",
   longPassword: "That password is too long — keep it under 72 characters.",
   badEmail: "That doesn't look like a valid email address — check it and try again.",
   signupsClosed: `New sign-ups are closed right now — email ${SUPPORT} and we'll set you up.`,
@@ -63,6 +64,15 @@ const GENERIC: Record<AuthIntent, string> = {
   resend: "Something went wrong sending the confirmation link — please try again.",
   password: "Something went wrong saving your new password — please try again.",
 };
+
+/** What the page says once an account is created and waits for its
+ *  confirmation link: the address it went to, so a mistyped one is seen
+ *  (the form keeps it, to correct and send again), and that the link
+ *  signs the person in only in this browser — the sign-up's code verifier
+ *  lives in its cookies (research pass 32). */
+export function accountCreatedNotice(email: string): string {
+  return `Account created. We sent a confirmation link to ${email} — open it in this browser to confirm your email and sign in. Not your address? Correct it and create the account again.`;
+}
 
 /** What the page says once a fresh confirmation link is asked for. The auth
  *  service answers alike for an address waiting to be confirmed, one already
@@ -98,8 +108,48 @@ function emailLimitCopy(message: string): string {
  * and its message second (older responses carry no code), with a fallback
  * that names what the person was trying to do.
  */
+/** The character classes a weak-password message lists, as a person says
+ *  them. The service's `characters` reason names the classes the project
+ *  requires, as the characters themselves. */
+const CHARACTER_CLASSES: [RegExp, string][] = [
+  [/abcdefghijklmnopqrstuvwxyz/, "a lower-case letter"],
+  [/ABCDEFGHIJKLMNOPQRSTUVWXYZ/, "an upper-case letter"],
+  [/0123456789/, "a number"],
+  [/[!@#$%^&*][!@#$%^&*()_+\-=[\]{};':"|<>?,./`~]{3,}/, "a symbol"],
+];
+
+/**
+ * A weak password, said by the reasons the auth service gives
+ * (`AuthWeakPasswordError.reasons`: length, characters, pwned) and the
+ * figures its own message states — never a rule the project's settings may
+ * not hold. The sentence had promised "at least 8 characters with a mix of
+ * letters, numbers and symbols" to every weak password alike, a rule the
+ * project's policy may not ask for (research pass 32).
+ */
+export function weakPasswordCopy(err: { message?: string | null; reasons?: readonly string[] | null }): string {
+  const message = err.message ?? "";
+  const reasons = err.reasons ?? [];
+  const parts: string[] = [];
+  if (reasons.includes("length")) {
+    const n = /at least (\d+) characters/i.exec(message)?.[1];
+    parts.push(n ? `use at least ${n} characters` : "make it longer");
+  }
+  if (reasons.includes("characters")) {
+    const kinds = CHARACTER_CLASSES.filter(([re]) => re.test(message)).map(([, words]) => words);
+    parts.push(
+      kinds.length === 0
+        ? "include the kinds of characters the sign-in service asks for"
+        : `include at least ${kinds.length === 1 ? kinds[0] : `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}`}`,
+    );
+  }
+  if (reasons.includes("pwned")) parts.push("choose one that hasn't appeared in a known data breach");
+  if (parts.length === 0) return COPY.weakPassword;
+  const said = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+  return `That password is too weak — ${said}.`;
+}
+
 export function authErrorCopy(
-  err: { message?: string | null; code?: string | null },
+  err: { message?: string | null; code?: string | null; reasons?: readonly string[] | null },
   intent: AuthIntent,
 ): string {
   const code = err.code ?? "";
@@ -114,7 +164,7 @@ export function authErrorCopy(
     case "email_exists":
       return ACCOUNT_EXISTS;
     case "weak_password":
-      return COPY.weakPassword;
+      return weakPasswordCopy(err);
     case "email_address_invalid":
       return COPY.badEmail;
     case "email_address_not_authorized":
@@ -147,7 +197,7 @@ export function authErrorCopy(
       return COPY.linkExpired;
     case "validation_failed":
       if (m.includes("72 characters")) return COPY.longPassword;
-      if (m.includes("password")) return COPY.weakPassword;
+      if (m.includes("password")) return weakPasswordCopy(err);
       if (m.includes("email")) return COPY.badEmail;
       return GENERIC[intent];
   }
@@ -163,7 +213,7 @@ export function authErrorCopy(
   if (m.includes("should be different from the old password")) return COPY.samePassword;
   if (m.includes("requires reauthentication")) return COPY.reauthenticate;
   if (m.includes("password should") || m.includes("password is too weak") || m.includes("weak password"))
-    return COPY.weakPassword;
+    return weakPasswordCopy(err);
   if (m.includes("signups not allowed") || m.includes("signup is disabled")) return COPY.signupsClosed;
   if (m.includes("invalid format") || m.includes("unable to validate email") || m.includes("is invalid"))
     return COPY.badEmail;
@@ -327,10 +377,16 @@ export function initialLoginMode(params: {
   mode?: string | null;
   link?: string | null;
   confirmed?: string | null;
+  next?: string | null;
 }): LoginMode {
   if (params.mode === "signup") return "signup";
   if (params.mode === "reset") return "reset";
+  if (params.mode === "signin") return "signin";
   // A refused reset link opens straight on "email me a new one".
   if (params.link === "expired" && !params.confirmed) return "reset";
+  // A signed-out invitee is sent here on the way to the invite: most are new
+  // to the site, so the page opens on Create account, a tab away from Sign
+  // in (research pass 32).
+  if (safeNextPath(params.next ?? null)?.startsWith("/team/join/")) return "signup";
   return "signin";
 }

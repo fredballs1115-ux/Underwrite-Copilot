@@ -40,7 +40,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { authenticate, resendConfirmation } from "@/app/login/actions";
-import { CONFIRMATION_RESENT } from "@/lib/auth-flow";
+import { CONFIRMATION_RESENT, accountCreatedNotice } from "@/lib/auth-flow";
 
 const ORIGIN = "https://app.test";
 
@@ -158,6 +158,32 @@ describe("Resend the confirmation link", () => {
     auth.error = null;
     const created = await authenticate(null, form({ intent: "signup", email: "new@firm.example", password: "a-long-password" }));
     expect(created).toMatchObject({ intent: "signup", resend: true, email: "new@firm.example" });
+  });
+});
+
+describe("the form keeps the address it was sent with (research pass 32)", () => {
+  it("on every refusal, so the field opens on it again rather than empty", async () => {
+    auth.error = { code: "invalid_credentials", message: "Invalid login credentials" };
+    const wrong = await authenticate(null, form({ intent: "signin", email: "a@firm.example", password: "a-long-password" }));
+    expect(wrong).toMatchObject({ intent: "signin", email: "a@firm.example" });
+    expect(wrong?.error).toBeTruthy();
+    auth.error = { code: "weak_password", message: "Password should be at least 8 characters." };
+    expect(await authenticate(null, form({ intent: "signup", email: "new@firm.example", password: "short-pw" }))).toMatchObject({
+      intent: "signup",
+      email: "new@firm.example",
+    });
+    auth.error = null;
+    expect(await authenticate(null, form({ intent: "signin", email: "a@firm.example", password: "" }))).toMatchObject({
+      error: "Email and password are required.",
+      email: "a@firm.example",
+    });
+  });
+
+  it("and the sign-up notice names it, so a mistyped address is seen", async () => {
+    const created = await authenticate(null, form({ intent: "signup", email: " new@firm.example ", password: "a-long-password" }));
+    expect(created?.notice).toBe(accountCreatedNotice("new@firm.example"));
+    expect(created?.notice).toContain("to new@firm.example");
+    expect(created?.notice).toContain("in this browser");
   });
 });
 

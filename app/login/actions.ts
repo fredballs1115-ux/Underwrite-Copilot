@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   ACCOUNT_EXISTS,
   CONFIRMATION_RESENT,
+  accountCreatedNotice,
   authErrorCopy,
   awaitingConfirmation,
   confirmationRedirect,
@@ -15,8 +16,9 @@ import { appUrl } from "@/lib/app-url";
 
 /** `intent` names the form that produced the state, so the sign-in tab never
  *  shows the sign-up tab's error. `resend` asks the page to offer a fresh
- *  confirmation link, and `email` is the address the form was sent with, so
- *  that offer opens on it (React empties the form once its action runs). */
+ *  confirmation link, and `email` is the address the form was sent with:
+ *  React empties the form once its action runs, so the field opens on it
+ *  again after any refusal, and the resend offer opens on it too. */
 export type AuthState = {
   error?: string;
   notice?: string;
@@ -51,7 +53,7 @@ export async function authenticate(
   const next = safeNextPath(String(formData.get("next") ?? "") || null);
 
   if (!email || !password) {
-    return { intent, error: "Email and password are required." };
+    return { intent, error: "Email and password are required.", email };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -77,14 +79,14 @@ export async function authenticate(
   } catch {
     // Network failure or a non-JSON response from the auth service — don't
     // surface a raw parse error to the person signing in.
-    return { intent, error: UNREACHABLE };
+    return { intent, error: UNREACHABLE, email };
   }
 
   if (error) {
     // "Confirm your email first" comes with a way to have the link sent again.
     return awaitingConfirmation(error)
       ? { intent, error: authErrorCopy(error, intent), resend: true, email }
-      : { intent, error: authErrorCopy(error, intent) };
+      : { intent, error: authErrorCopy(error, intent), email };
   }
 
   // With enumeration protection on, signing up an email that already has an
@@ -92,20 +94,14 @@ export async function authenticate(
   // session. Left alone, that reads as "Account created — check your email"
   // and the person waits for a message that never comes.
   if (intent === "signup" && data.user && (data.user.identities?.length ?? 0) === 0) {
-    return { intent, error: ACCOUNT_EXISTS };
+    return { intent, error: ACCOUNT_EXISTS, email };
   }
 
   // If the project requires email confirmation, sign-up succeeds but no session
   // is created. Redirecting to the app would just bounce back to /login — so
   // tell the user to confirm their email instead.
   if (!data.session) {
-    return {
-      intent,
-      notice:
-        "Account created. Check your email for the confirmation link — opening it signs you in.",
-      resend: true,
-      email,
-    };
+    return { intent, notice: accountCreatedNotice(email), resend: true, email };
   }
 
   // Success — the session cookie is set; send them into the app (or back to

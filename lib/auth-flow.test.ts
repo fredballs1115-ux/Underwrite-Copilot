@@ -20,6 +20,7 @@ import {
   landingAfterExchange,
   landingAfterFailedExchange,
   safeNextPath,
+  weakPasswordCopy,
 } from "./auth-flow";
 
 /** Every shape of `next` that must never leave the site or loop. */
@@ -34,6 +35,40 @@ const HOSTILE_NEXT = [
   "/a b",
   "/deals@evil.example",
 ];
+
+describe("a weak password is said by the service's own reasons (research pass 32)", () => {
+  it("states the length its message states, never a length of its own", () => {
+    expect(weakPasswordCopy({ message: "Password should be at least 6 characters.", reasons: ["length"] })).toBe(
+      "That password is too weak — use at least 6 characters.",
+    );
+    expect(weakPasswordCopy({ message: "Password is too short", reasons: ["length"] })).toBe(
+      "That password is too weak — make it longer.",
+    );
+  });
+
+  it("names the kinds of characters its message lists, and a breach", () => {
+    const msg =
+      "Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789";
+    expect(weakPasswordCopy({ message: msg, reasons: ["characters"] })).toBe(
+      "That password is too weak — include at least a lower-case letter, an upper-case letter and a number.",
+    );
+    expect(weakPasswordCopy({ message: "Password is known to be weak and easy to guess", reasons: ["pwned"] })).toBe(
+      "That password is too weak — choose one that hasn't appeared in a known data breach.",
+    );
+    expect(weakPasswordCopy({ message: "Password should be at least 10 characters.", reasons: ["length", "pwned"] })).toBe(
+      "That password is too weak — use at least 10 characters and choose one that hasn't appeared in a known data breach.",
+    );
+  });
+
+  it("with no reasons, promises no rule at all", () => {
+    const said = weakPasswordCopy({ message: "Password is too weak" });
+    expect(said).toBe("That password is too weak — choose a longer, less common one.");
+    expect(said).not.toMatch(/\d|symbol|number/);
+    expect(authErrorCopy({ code: "weak_password", message: "Password should be at least 6 characters.", reasons: ["length"] }, "signup")).toBe(
+      "That password is too weak — use at least 6 characters.",
+    );
+  });
+});
 
 describe("authErrorCopy — the auth service's codes become sentences", () => {
   it("names each sign-up refusal instead of 'something went wrong'", () => {
@@ -297,5 +332,13 @@ describe("initialLoginMode", () => {
     expect(initialLoginMode({ mode: "reset" })).toBe("reset");
     expect(initialLoginMode({ link: "expired" })).toBe("reset");
     expect(initialLoginMode({ link: "expired", confirmed: "1" })).toBe("signin");
+  });
+
+  it("an invitee on the way to the invite opens on Create account, unless the query asks for Sign in", () => {
+    expect(initialLoginMode({ next: "/team/join/0a1b2c3d" })).toBe("signup");
+    expect(initialLoginMode({ next: "/team/join/0a1b2c3d", mode: "signin" })).toBe("signin");
+    expect(initialLoginMode({ next: "/deals" })).toBe("signin");
+    // A hostile next opens nothing but the usual form.
+    expect(initialLoginMode({ next: "//evil.example/team/join/x" })).toBe("signin");
   });
 });
