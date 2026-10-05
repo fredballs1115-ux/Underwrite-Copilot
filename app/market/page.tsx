@@ -51,8 +51,7 @@ import {
 } from "@/lib/sector-leaderboard";
 import { blockCitations, rentOf, rentText, snapshotAge, snapshotReadOn } from "@/lib/tracker-read";
 import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
-import { datedNotes } from "@/lib/dated-window";
-import { DatedNotes } from "@/app/dated-notes";
+import { MarketNote } from "./market-note";
 import { SubmarketsPanel } from "./submarkets-panel";
 import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
 import { listSubmarkets } from "@/lib/market/store";
@@ -684,11 +683,6 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // market (lib/example-listings) — the DMV block's Dumfries, Virginia duplex
   // is Northern Virginia's, never Maryland's.
   const examples = examplesFor(active.id);
-  const noteStatus = (active.market_notes as { status?: string } | null)?.status ?? "sourced";
-  const noteMeta =
-    noteStatus === "verified"
-      ? "bg-emerald-500/10 text-emerald-600"
-      : "bg-brand/10 text-brand";
 
   return (
     <section id="explorer" className="shadow-card scroll-mt-6 rounded-2xl border border-line bg-surface p-5">
@@ -705,21 +699,14 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           name={active.name}
           eager
         />
-        <div>
-          <p className="text-sm leading-relaxed">
-            {(active.market_notes as { value?: string } | null)?.value}
-            <span className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${noteMeta}`}>
-              {noteStatus}
-            </span>
-          </p>
-          {/* A window the note states its figure for, ended — or a date it
-              gives, come — said under the note, which stays as written
-              (lib/dated-window). */}
-          <DatedNotes
-            notes={datedNotes((active.market_notes as { value?: string } | null)?.value, todayIso())}
-            className="mt-1"
-          />
-        </div>
+        {/* The market's note as written, the day its research was read
+            beside it and aging by the research rule, and under it what its
+            own dates say today (app/market/market-note). */}
+        <MarketNote
+          note={(active.market_notes as { value?: string; status?: string } | null) ?? null}
+          readOn={snapshotReadOn((active as { sector_snapshot?: unknown }).sector_snapshot)}
+          today={todayIso()}
+        />
 
         <SectorSnapshotPanel
           snapshot={
