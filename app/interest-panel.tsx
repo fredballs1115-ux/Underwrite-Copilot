@@ -234,7 +234,7 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
       {(r.summary || r.groundLease || r.loan) && (
         <ul className="mt-2 space-y-0.5 text-xs leading-relaxed text-muted">
           {r.summary && <li>{`The memorandum: ${r.summary}`}</li>}
-          {r.groundLease && <li>{`The ground lease as stated: ${r.groundLease}`}</li>}
+          {r.groundLease && <li>{`The ${r.masterLease ? "master" : "ground"} lease as stated: ${r.groundLease}`}</li>}
           {r.loan && <li>{`The loan as stated: ${r.loan}`}</li>}
         </ul>
       )}

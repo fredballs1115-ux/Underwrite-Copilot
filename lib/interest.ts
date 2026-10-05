@@ -36,7 +36,10 @@
 //
 // A LEASEHOLD IS A WASTING ASSET. The buyer owns the building and a lease on
 // the land; the ground rent comes ahead of the debt, and at expiry the
-// building reverts. A capitalised NOI values a perpetuity that ends.
+// building reverts. A capitalised NOI values a perpetuity that ends. Where
+// the memorandum's own words name a master lease of the building, sublet to
+// its tenants (a sandwich position), and no ground lease, the buyer owns
+// neither the building nor the land, and is told so (research pass 28).
 //
 // A LEASED FEE'S INCOME IS THE GROUND RENT (#415). The buyer takes the land
 // under a building someone else owns and becomes the ground lessor: the
@@ -215,6 +218,26 @@ function statedEntityLoan(ex: ExtractionResult | null | undefined): number | nul
  *  interest, and where no such row is stated: a blank is null. */
 export function entityLoanOf(ex: ExtractionResult | null | undefined): number | null {
   return interestOf(ex).entityLoan;
+}
+
+// A master lease of the building from its owner, sublet to its tenants — a
+// sandwich position — by the memorandum's own words: a master leasehold, the
+// master lessee, a sandwich lease, a leasehold held under a master lease or
+// a master lease of the building. A seller's master lease of vacant suites
+// (a rent guarantee) is none of these.
+const MASTER_LEASE =
+  /\bmaster[\s-]+leasehold\b|\bmaster[\s-]+lessee\b|\bsandwich[\s-]+(?:leases?|leasehold|position|interest)\b|\b(?:under|pursuant\s+to|through|via)\s+(?:an?|the|its)\s+master[\s-]+lease\b|\bmaster[\s-]+lease\s+(?:of|on|covering)\s+(?:the\s+)?(?:entire\s+|whole\s+)?(?:building|property|premises|improvements)\b/i;
+const NAMES_GROUND_LEASE = /\bground[\s-]+lease/i;
+
+/** Whether a leasehold is a master lease of the building, sublet to its
+ *  tenants (research pass 28), by the interest's own words — its sentence
+ *  and its lease as stated: a master or sandwich lease named, and no ground
+ *  lease. A plain leasehold, and anything but a leasehold, is not. */
+export function isMasterLeasehold(ex: ExtractionResult | null | undefined): boolean {
+  const it = ex?.interest;
+  if (it?.kind !== "leasehold") return false;
+  const words = [it.summary, it.groundLease].filter((w): w is string => typeof w === "string").join(" \n ");
+  return MASTER_LEASE.test(words) && !NAMES_GROUND_LEASE.test(words);
 }
 
 /** What a ground lease's tenant puts on the land, where the memorandum's
@@ -405,8 +428,13 @@ export interface InterestRead {
    *  or where the OM states no balance */
   note: NoteRead | null;
   /** the ground lease as stated ("" if none) — on a leasehold, or a
-   *  fee-simple deal with a ground lease on part of the site */
+   *  fee-simple deal with a ground lease on part of the site; on a master
+   *  leasehold (`masterLease`), the master lease as stated */
   groundLease: string;
+  /** a leasehold the memorandum's own words name a master lease of the
+   *  building, sublet to its tenants, and no ground lease
+   *  (`isMasterLeasehold`) */
+  masterLease: boolean;
   /** a note's terms as stated ("" if none) */
   loan: string;
   /** the annual ground rent the OM states (a leasehold pays it, a leased
@@ -645,11 +673,14 @@ export function readInterest(
   const groundLeased = kind === "leasehold" || kind === "leased_fee" || !!groundLease || groundRent != null;
   const equipment = groundLeased ? groundLeaseEquipment(ex) : null;
   const terminationRight = groundLeased ? (groundLeaseTerminationOf(ex) ?? "") : "";
+  // A master lease of the building, sublet to its tenants (research pass
+  // 28): its rent is the master lease's, never a ground rent.
+  const masterLease = isMasterLeasehold(ex);
   // "the building's $6.0M of income covers the $1.2M ground rent 5.0×" —
   // two stated figures, one division.
   const coverageClause =
     groundRentCoverage != null && groundRent != null && incomeBeforeGroundRent != null
-      ? `the building's ${money(incomeBeforeGroundRent)} of income before the ground rent covers the ${money(groundRent)} rent ${times(groundRentCoverage)}`
+      ? `the building's ${money(incomeBeforeGroundRent)} of income before the ${masterLease ? "master" : "ground"} rent covers the ${money(groundRent)} rent ${times(groundRentCoverage)}`
       : null;
 
   // The lead, a sentence a line: the panel says the first and folds the
@@ -711,8 +742,18 @@ export function readInterest(
       break;
     case "leasehold":
       lead.push(
-        "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land.",
-        "The ground rent comes ahead of the debt, and at the lease's end the building reverts — a capitalised NOI values a perpetuity that ends.",
+        ...(masterLease
+          ? // A sandwich position (research pass 28): the buyer leases the
+            // building from its owner and sublets it — it owns neither the
+            // building nor the land, and the position ends with the lease.
+            [
+              "This memorandum sells a LEASEHOLD: a master lease of the building, sublet to its tenants — not the building, and not the land.",
+              "The master rent is owed whatever the subtenants pay, and when the master lease ends the position ends with it — a capitalised NOI values a perpetuity that ends.",
+            ]
+          : [
+              "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land.",
+              "The ground rent comes ahead of the debt, and at the lease's end the building reverts — a capitalised NOI values a perpetuity that ends.",
+            ]),
       );
       if (coverageClause) lead.push(`Here ${coverageClause}.`);
       modelCaveat =
@@ -774,6 +815,7 @@ export function readInterest(
     discountPct,
     note,
     groundLease,
+    masterLease,
     loan,
     groundRent,
     incomeBeforeGroundRent,
@@ -795,7 +837,7 @@ export function readInterest(
  *  the OM after the extraction. */
 export function interestContextLine(r: InterestRead): string {
   const facts = [
-    r.groundLease ? `The ground lease as stated: ${r.groundLease}.` : "",
+    r.groundLease ? `The ${r.masterLease ? "master" : "ground"} lease as stated: ${r.groundLease}.` : "",
     r.termLine ? `${r.termLine}.` : "",
     r.loan ? `The loan as stated: ${r.loan}.` : "",
   ]
@@ -935,7 +977,11 @@ export function interestShortLine(r: InterestRead): string {
           : `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the whole`
         : "A share of the owning entity, its percentage not stated";
     case "leasehold":
-      return `A leasehold — the building and a lease on the land, not the land${termClause(r.term, "the lease ends")}${terminationClause(r)}`;
+      return `A leasehold — ${
+        // A sandwich position is a lease of the building, never the building
+        // (research pass 28).
+        r.masterLease ? "a master lease of the building, sublet to its tenants, not the building or the land" : "the building and a lease on the land, not the land"
+      }${termClause(r.term, "the lease ends")}${terminationClause(r)}`;
     case "leased_fee":
       // Under a tower, a sign or an array the land comes back, not a building.
       return r.equipment

@@ -11,6 +11,7 @@ import {
   interestOf,
   interestShortLine,
   interestTag,
+  isMasterLeasehold,
   isWholeShare,
   noteCaption,
   noteCollateralSentence,
@@ -276,6 +277,62 @@ describe("readInterest — what the price buys, said", () => {
     expect(bare.groundRentCoverage).toBeNull();
     expect(bare.headline).toContain("The rent is safe while the building's own income covers it.");
     expect(interestShortLine(bare)).toBe("The leased fee — the land under a building someone else owns, and its ground rent");
+  });
+
+  // Research pass 28: a master lease of a building, sublet to its tenants (a
+  // sandwich position), was told it sells "the building and a lease on the
+  // land" — the buyer owns neither.
+  it("a master leasehold, by the memorandum's own words, is a lease of the building, never the building and a lease on the land", () => {
+    const sandwich = ex(
+      interest({
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building through 2041, sublet to 14 office tenants",
+        groundLease: "Master lease through December 31, 2041; master rent $1,100,000 a year",
+      }),
+    );
+    expect(isMasterLeasehold(sandwich)).toBe(true);
+    const r = readInterest(sandwich, 20_000_000)!;
+    expect(r.masterLease).toBe(true);
+    expect(r.leadSentences.slice(0, 2)).toEqual([
+      "This memorandum sells a LEASEHOLD: a master lease of the building, sublet to its tenants — not the building, and not the land.",
+      "The master rent is owed whatever the subtenants pay, and when the master lease ends the position ends with it — a capitalised NOI values a perpetuity that ends.",
+    ]);
+    expect(r.headline).not.toContain("a lease on the land");
+    expect(r.headline).not.toContain("ground rent");
+    expect(interestShortLine(r)).toBe("A leasehold — a master lease of the building, sublet to its tenants, not the building or the land");
+    expect(interestContextLine(r)).toContain("The master lease as stated: Master lease through December 31, 2041");
+    expect(interestContextLine(r)).not.toContain("The ground lease as stated");
+    expect(gluedWords(`${r.headline} ${interestShortLine(r)}`)).toEqual([]);
+    // Its words, however put: a sandwich lease, the master lessee's position.
+    for (const summary of ["Sandwich leasehold position in a 120,000 SF office building", "The master lessee's position, subleased to the tenants"]) {
+      expect(isMasterLeasehold(ex(interest({ kind: "leasehold", summary }))), summary).toBe(true);
+    }
+    // A cover stated beside it is the master rent's, never a ground rent's.
+    const covered = readInterest(
+      { ...sandwich, metrics: [...sandwich.metrics, { label: "Ground rent", value: "$1,100,000", flagged: false, page: "p. 4", basis: "in_place" }, { label: "Income before ground rent", value: "$1,820,000", flagged: false, page: "p. 6", basis: "in_place" }] },
+      20_000_000,
+    )!;
+    expect(covered.headline).toContain("Here the building's $1.8M of income before the master rent covers the $1.1M rent 1.7×.");
+  });
+
+  it("a plain leasehold keeps its sentence: a ground lease named, a seller's master lease of vacant space, or no master lease at all", () => {
+    const LEAD = "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land.";
+    for (const over of [
+      { summary: "Leasehold interest under a 99-year ground lease" },
+      // A master lease beside a ground lease is not a sandwich read off the words alone.
+      { summary: "Leasehold under a ground lease; the building is held under a master lease of the building to an affiliate" },
+      // A seller's master lease of vacant suites is a rent guarantee.
+      { summary: "Leasehold interest; the seller will master lease the vacant suites for 24 months" },
+      {},
+    ]) {
+      const e = ex(interest({ kind: "leasehold", ...over }));
+      expect(isMasterLeasehold(e), JSON.stringify(over)).toBe(false);
+      const r = readInterest(e, 20_000_000)!;
+      expect(r.leadSentences[0], JSON.stringify(over)).toBe(LEAD);
+      expect(interestShortLine(r), JSON.stringify(over)).toBe("A leasehold — the building and a lease on the land, not the land");
+    }
+    // Only a leasehold: the words on any other interest change nothing.
+    expect(isMasterLeasehold(ex(interest({ kind: "fee_simple", summary: "Sandwich leasehold position" })))).toBe(false);
   });
 
   it("a leasehold states its cover where both figures are given, and a fee simple with a ground rent row still says so", () => {

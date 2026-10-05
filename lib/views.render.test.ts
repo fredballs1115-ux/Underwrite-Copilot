@@ -6308,6 +6308,19 @@ describe("InterestPanel — what the price buys, said before any figure is belie
       readInterestFor(base({ ...blank, kind: "leasehold", groundLease: "62 years remaining; $310,000 a year" }), 20_000_000)!.leadSentences,
     );
     expect(visibleText(leaseHtml)).toContain("The ground lease as stated: 62 years remaining; $310,000 a year");
+    // A master lease of the building, sublet (research pass 28): said as one.
+    const sandwichHtml = render(
+      React.createElement(InterestPanel, {
+        interest: readInterestFor(
+          base({ ...blank, kind: "leasehold", summary: "Sandwich leasehold position", groundLease: "Master lease through 2041; $1,100,000 a year" }),
+          20_000_000,
+        ),
+      }),
+    );
+    expect(visibleText(sandwichHtml)).toContain("This memorandum sells a LEASEHOLD: a master lease of the building, sublet to its tenants — not the building, and not the land.");
+    expect(visibleText(sandwichHtml)).toContain("The master lease as stated: Master lease through 2041; $1,100,000 a year");
+    expect(visibleText(sandwichHtml)).not.toContain("a lease on the land");
+    expect(gluedWords(visibleText(sandwichHtml))).toEqual([]);
     expect(render(React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "fee_simple" }), 20_000_000) }))).not.toContain("What is being sold");
   });
 
