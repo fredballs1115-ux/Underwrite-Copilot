@@ -248,6 +248,37 @@ on laptop bands, and smaller items). These five are yours:
    but its terms restrict building a database of places). Never a listing
    portal's photograph.
 
+**Keyboard and screen readers (research pass 33).** Every fix that was
+ours is in (focus rings everywhere, nothing focused under a sticky bar,
+real tabs, 4.5:1 labels, each deal's name in its browser tab, a
+half-typed deadline never saved). Three are yours:
+1. **Single-key shortcuts on the pipeline** ("n" opens the new-deal form,
+   "/" jumps to search). A speech-input user who says a word outside a
+   field can trigger them, and nothing turns them off (WCAG 2.1.4). The
+   fix is a modifier, as ⌘K has, or an off switch; either changes a habit.
+2. **Text sizes in pixels.** A reader who sets the browser's default text
+   size larger (rather than zooming) gets the body larger and every 9–13px
+   label unchanged: 784 uses in 126 files. Zoom works, so it is not a
+   failure; a px-to-rem sweep renders identically at default settings,
+   and it is yours because it touches nearly every page.
+3. **An accessibility statement.** Buyers who ask for one mostly name WCAG
+   2.1 AA. It is a public claim, so it should be written only once you
+   want to stand behind it.
+
+**From the batch's two audits.** Every finding that was ours is fixed.
+Three are yours:
+1. **Dallas retail on the homepage band** is credited to "CoStar-derived
+   tracking", which puts a CoStar-derived figure on a public page against
+   the site's own no-CoStar rule. Keep it, replace it, or leave the cell
+   empty.
+2. **A Fannie Mae figure credited to Northmarq**: the short credit drops
+   "(citing Fannie Mae)" from a research figure Northmarq published citing
+   Fannie Mae. Which name the credit carries is a licensing call.
+3. **A bulk condominium deal's count.** A memorandum stating "Units: 120"
+   and "Units offered: 42" puts every per-unit figure (the basis tag, the
+   model) on the 120. Saying which count the deal's count row is changes
+   the extraction.
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**
