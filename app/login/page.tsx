@@ -6,7 +6,7 @@ import { CONFIRM_LINK_FAILED, authLinkBanner, initialLoginMode } from "@/lib/aut
 import { deletedBanner } from "@/lib/account-deletion";
 import { publicMetadata } from "@/lib/page-meta";
 import { LoginForm } from "./login-form";
-import { PlaceBackdrop } from "@/app/place-band";
+import { PlaceBackdrop, WINDOW_BOXES } from "@/app/place-band";
 
 export const metadata = publicMetadata({
   title: "Sign in",
@@ -40,8 +40,10 @@ export default async function LoginPage({
       {/* The door opens on a real place too: Baltimore, a covered market a
           few miles from the DMV core. The centred scrim leaves the harbour
           showing on either side of the card (app/place-band). The page goes
-          through it, so the photograph's credit follows the form. */}
-      <PlaceBackdrop metro="baltimore" height={900} scrim="center" eager>
+          through it, so the photograph's credit follows the form. The
+          panorama covers the whole window by its height, so it is asked for
+          at the width that height draws it (WINDOW_BOXES). */}
+      <PlaceBackdrop metro="baltimore" height={900} scrim="center" boxes={WINDOW_BOXES} eager>
         <main id="main" className="relative mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
           <Link
             href="/"

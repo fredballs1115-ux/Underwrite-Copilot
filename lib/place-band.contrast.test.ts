@@ -6,9 +6,12 @@ import {
   HERO_SIDE_SCRIM,
   MARKET_BAND_CREDIT,
   MARKET_BAND_CREDIT_ROW,
+  MARKET_BAND_BOXES,
   MARKET_BAND_PICTURE,
   MARKET_BAND_WORDS_TOP,
+  PLACE_BAND_BOXES,
 } from "@/app/place-band";
+import type { BandBox } from "@/lib/skyline";
 
 /**
  * The scrim over a market photograph, held to the contrast floor.
@@ -394,6 +397,33 @@ describe("the caption scrim, for a market's own band on /market", () => {
     expect(shownAt(desk / 2)).toBeGreaterThanOrEqual(0.5);
     // …and the words' own zone is still mostly scrim.
     expect(shownAt(0)).toBeLessThan(0.05);
+  });
+});
+
+describe("the heights a band's picture is asked for by (research pass 29)", () => {
+  // A band's `sizes` is worked out from its picture box (lib/skyline
+  // `bandSizes`): a panorama covers the band by its height, so a height
+  // that drifted from the band's classes would ask for the wrong width.
+  const heightAt = (boxes: readonly BandBox[], w: number) =>
+    [...boxes].sort((a, b) => b.min - a.min).find((b) => w >= b.min)?.height;
+  const fn = (name: string) => new RegExp(`export function ${name}[\\s\\S]*?^}$`, "m").exec(SOURCE)?.[0] ?? "";
+
+  it("asks for the market band's picture by its strip on a phone and its row from sm", () => {
+    const band = fn("MarketBand");
+    expect(band).toContain("boxes={MARKET_BAND_BOXES}");
+    const strip = Number(/(?:^| )h-\[(\d+)rem\]/.exec(MARKET_BAND_PICTURE)?.[1]) * 16;
+    const row = Number(/sm:min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16;
+    expect(strip).toBeGreaterThan(0);
+    expect(heightAt(MARKET_BAND_BOXES, 390)).toBe(strip);
+    expect(heightAt(MARKET_BAND_BOXES, 820)).toBe(row);
+    expect(heightAt(MARKET_BAND_BOXES, 1280)).toBe(row);
+  });
+
+  it("asks for a page's opening band's picture by its heights", () => {
+    const band = fn("PlaceBand");
+    expect(band).toContain("boxes={PLACE_BAND_BOXES}");
+    expect(heightAt(PLACE_BAND_BOXES, 390)).toBe(Number(/ min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16);
+    expect(heightAt(PLACE_BAND_BOXES, 820)).toBe(Number(/sm:min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16);
   });
 });
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { CityPhoto } from "./city-photo";
 import { metroView } from "@/lib/metro-imagery";
-import { hasSkyline } from "@/lib/skyline";
+import { bandSizes, hasSkyline, skylineFor, type BandBox } from "@/lib/skyline";
 
 // A real place behind a page's opening words.
 //
@@ -176,9 +176,24 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
   );
 }
 
-/** How wide a band inside a public page's content column draws: the
- *  column's 72rem less its gutters, or the screen below that (#451). */
-export const PAGE_COLUMN_SIZES = "(min-width: 1200px) 1104px, 100vw";
+/**
+ * A band's picture box at each window width, for the `sizes` it is asked
+ * for by (lib/skyline `bandSizes`), inside a public page's content column:
+ * the column's 72rem less its gutters from 1200px, the screen below that
+ * (#451), at the band's own height on a phone and from `sm` — the least it
+ * is drawn at, which a band's words can only make taller.
+ */
+export function pageColumnBoxes(phone: number, sm: number): BandBox[] {
+  return [
+    { min: 0, width: "100vw", height: phone },
+    { min: 640, width: "100vw", height: sm },
+    { min: 1200, width: 1104, height: sm },
+  ];
+}
+
+/** A band the size of the window (the sign-in page): its picture covers the
+ *  whole screen, so a panorama is drawn by the window's height. */
+export const WINDOW_BOXES: readonly BandBox[] = [{ min: 0, width: "100vw", height: "100vh" }];
 
 /**
  * The picture and its scrim, for a band that positions itself, with the
@@ -191,7 +206,7 @@ export function PlaceBackdrop({
   metro,
   height = 600,
   scrim = "band",
-  sizes = "100vw",
+  boxes,
   eager = false,
   layer,
   creditLayer,
@@ -202,8 +217,12 @@ export function PlaceBackdrop({
   height?: number;
   /** "band" for words set at the bottom, "center" for a centred card */
   scrim?: Scrim;
-  /** how wide the band draws, for the browser to pick a file by (#451) */
-  sizes?: string;
+  /** the band's picture box at each window width (`pageColumnBoxes`,
+   *  `WINDOW_BOXES`): the `sizes` the browser picks a file by is worked out
+   *  from it and the photograph's shape, so a panorama covering the band by
+   *  its height is asked for at the width it is drawn (lib/skyline
+   *  `bandSizes`). Unset, the window's width, as before. */
+  boxes?: readonly BandBox[];
   /** the first thing on the page: fetched at once and ahead of the rest,
    *  never lazily — every other picture waits its turn */
   eager?: boolean;
@@ -232,7 +251,10 @@ export function PlaceBackdrop({
   // tower line and the bottom of the frame is usually road or water — and
   // where that cut a photograph wrong (a tower's crown off the top, a
   // skyline sunk under the words), at its own focus (`bandFocus`, the
-  // table's `bandFocusY`, judged by eye through the bands' crops).
+  // table's `bandFocusY`, judged by eye through the bands' crops). Asked for
+  // at the width it is drawn (`boxes`): a panorama covers a band by its
+  // height, wider than the band.
+  const sizes = boxes ? bandSizes(skylineFor(metro), boxes) : "100vw";
   return (
     <CityPhoto
       metro={metro}
@@ -251,6 +273,13 @@ export function PlaceBackdrop({
     </CityPhoto>
   );
 }
+
+/** PlaceBand's picture box: the window's width, at its 19rem and, from
+ *  `sm`, 23rem (lib/place-band.contrast.test.ts holds them to its classes). */
+export const PLACE_BAND_BOXES: readonly BandBox[] = [
+  { min: 0, width: "100vw", height: 304 },
+  { min: 640, width: "100vw", height: 368 },
+];
 
 /**
  * A dark band opening a page: the place behind, the words in front.
@@ -283,7 +312,7 @@ export function PlaceBand({
 }) {
   return (
     <section className="band-dark relative flex min-h-[19rem] items-end overflow-hidden text-white sm:min-h-[23rem]">
-      <PlaceBackdrop metro={metro} eager={eager}>
+      <PlaceBackdrop metro={metro} eager={eager} boxes={PLACE_BAND_BOXES}>
         <div className={`relative mx-auto w-full ${width} px-6 pb-12 pt-16 sm:pb-16 sm:pt-24`}>
           <div className="on-photo band-words">{children}</div>
         </div>
@@ -321,6 +350,10 @@ export const MARKET_BAND_PICTURE =
  *  they sit on the band and never on the sky; from `sm`, at the foot of the
  *  picture they sit over. */
 export const MARKET_BAND_WORDS_TOP = "pt-[14rem] sm:pt-12";
+/** The market band's picture box, for its `sizes`: the phone's 14rem strip,
+ *  then the 21rem row from `sm`, in the page's column (`pageColumnBoxes`;
+ *  lib/place-band.contrast.test.ts holds the heights to the classes). */
+export const MARKET_BAND_BOXES: readonly BandBox[] = pageColumnBoxes(224, 336);
 export const MARKET_BAND_CREDIT_ROW = "col-start-1 row-start-2";
 /** The credit's own type: solid band colour behind it, so the tier is
  *  measured against the band's colour (lib/place-band.contrast.test.ts). */
@@ -362,7 +395,7 @@ export function MarketBand({
         metro={metro}
         height={480}
         scrim="caption"
-        sizes={PAGE_COLUMN_SIZES}
+        boxes={MARKET_BAND_BOXES}
         eager={eager}
         layer={MARKET_BAND_PICTURE}
         creditLayer={MARKET_BAND_CREDIT_ROW}

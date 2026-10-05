@@ -2393,6 +2393,89 @@ export function skylineSrcSet(id: string): string {
 }
 
 /**
+ * How wide a photograph is drawn to cover a box `height` px tall, from its
+ * recorded size: a panorama cut to a squarer box is covered by its HEIGHT,
+ * so it is drawn wider than the box (#446). Null where the size is not
+ * recorded. The one copy of that arithmetic: a pipeline card's width
+ * (lib/market-picture's `marketPhotoWidth`) and a band's `sizes`
+ * (`bandSizes`) both read it.
+ */
+export function coverWidth(shot: Pick<SkylineShot, "size">, height: number): number | null {
+  const [w, h] = shot.size ?? [0, 0];
+  return w > 0 && h > 0 ? (height * w) / h : null;
+}
+
+/** A band's picture box from one window width up: the band's width (its
+ *  column's, in px, or the window's) and its height (in px, at the least
+ *  the band is drawn, or the window's). */
+export interface BandBox {
+  /** the window width this box holds from, in px (0 for the base) */
+  min: number;
+  width: number | "100vw";
+  height: number | "100vh";
+}
+
+/**
+ * `sizes` for a photograph covering a band — #446's card rule for a band.
+ * A band's height is set in pixels, not by its width, so a panorama covers
+ * it by its height and is drawn wider than the band (`coverWidth`): where a
+ * band said only its width ("100vw"), Portland's 3.75:1 panorama on a
+ * phone's band was asked for at a phone's width and drawn 1.69× its file,
+ * and the sign-in page's Baltimore 3.6×. So each breakpoint says the wider
+ * of the band's width and the width that covers its height, with a media
+ * condition where the window decides which (`min-width` for a band of set
+ * height, `max-aspect-ratio` for one the window's height — the viewer's own
+ * rule, lib/photo-srcset). Plain lengths and `calc()` only, which every
+ * browser's `sizes` reads. Without a recorded size, the band's width alone,
+ * as before.
+ */
+export function bandSizes(shot: Pick<SkylineShot, "size"> | null, boxes: readonly BandBox[]): string {
+  const [w, h] = shot?.size ?? [0, 0];
+  const known = w > 0 && h > 0;
+  const px = (n: number) => `${Math.ceil(n)}px`;
+  const width = (b: BandBox) => (b.width === "100vw" ? "100vw" : px(b.width));
+  const sorted = [...boxes].sort((a, b) => b.min - a.min);
+  const entries: Array<{ media: string[]; value: string }> = [];
+  sorted.forEach((box, i) => {
+    const upper = i === 0 ? Infinity : sorted[i - 1].min;
+    const from = box.min > 0 ? [`(min-width: ${box.min}px)`] : [];
+    if (!known || !shot) {
+      entries.push({ media: from, value: width(box) });
+      return;
+    }
+    if (box.height === "100vh") {
+      // Covered by the window's height wherever the window is narrower than
+      // the photograph's shape (or than the band's own width at that height).
+      const k = Math.ceil((w / h) * 1000) / 1000;
+      const byHeight = `calc(100vh * ${k})`;
+      const narrower = box.width === "100vw" ? `(max-aspect-ratio: ${w}/${h})` : `(min-height: ${Math.ceil((box.width * h) / w)}px)`;
+      entries.push({ media: [...from, narrower], value: byHeight });
+      entries.push({ media: from, value: width(box) });
+      return;
+    }
+    const cover = coverWidth(shot, box.height)!;
+    if (box.width !== "100vw") {
+      entries.push({ media: from, value: px(Math.max(box.width, cover)) });
+    } else if (cover <= box.min) {
+      entries.push({ media: from, value: "100vw" });
+    } else if (cover >= upper) {
+      entries.push({ media: from, value: px(cover) });
+    } else {
+      // The window decides: wider than the cover width, the band's width.
+      entries.push({ media: [`(min-width: ${Math.ceil(cover)}px)`], value: "100vw" });
+      entries.push({ media: from, value: px(cover) });
+    }
+  });
+  // An entry saying what the next one says adds nothing: the next one holds
+  // from a smaller width and answers the same.
+  const kept = entries.filter((e, i) => {
+    const next = entries[i + 1];
+    return !(next && next.value === e.value && e.media.length === 1 && next.media.length <= 1);
+  });
+  return kept.map((e) => (e.media.length ? `${e.media.join(" and ")} ${e.value}` : e.value)).join(", ");
+}
+
+/**
  * One attribution line for a GRID of these photographs.
  *
  * A tile 240px wide has no room for a photographer's name under it, but
