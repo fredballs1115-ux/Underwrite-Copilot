@@ -475,6 +475,50 @@ describe("the box holds a deal only to the figures its price buys", () => {
     expect(r.chip.label).not.toContain("Pursue");
   });
 
+  it("a tenancy in common and a GP stake are said as what they are, never a share of the owning entity (audit C3b MED-4)", () => {
+    // A TIC is title to the property, and its stated loan is the property's.
+    const tic = deal(
+      "partial_interest",
+      [["Asking price", "$6,000,000"], ["Entity loan balance", "$14,000,000"], ...BUILDING],
+      "30% undivided tenant-in-common interest",
+    );
+    const t = read(tic);
+    expect(checkOf(t, "Going-in cap")?.status).toBe("unknown");
+    expect(checkOf(t, "Going-in cap")?.detail).toBe(
+      "Mandate wants ≥6% going-in, but beside the stated $14.0M loan on the property, this interest's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.",
+    );
+    expect(dimOf(t, "cap")?.detail).toBe(checkOf(t, "Going-in cap")?.detail);
+    expect(checkOf(t, "Basis / unit")?.detail).toContain(
+      "this sells an undivided interest held as a tenant in common: a per-unit figure the memorandum states is on a basis it never says, the whole's or the interest's",
+    );
+    for (const c of [checkOf(t, "Going-in cap"), checkOf(t, "Basis / unit")]) expect(c?.detail).not.toContain("owning entity");
+    // A share of the general partner's interest is a share of a share. Where
+    // its cap slot is withheld (beside an entity's loan), the box holds it to
+    // no building cap or basis, and says why in its own words.
+    const gp = deal(
+      "partial_interest",
+      [["Asking price", "$3,000,000"], ["Entity loan balance", "$40,000,000"], ...BUILDING],
+      "50% of the general partner interest",
+    );
+    const g = read(gp);
+    expect(checkOf(g, "Going-in cap")?.status).toBe("unknown");
+    expect(checkOf(g, "Going-in cap")?.detail).toBe(
+      "Mandate wants ≥6% going-in, but this sells a share of the general partner's interest, a share of a share: no figure grosses its price up to the building's, and the building's cap is not a return its buyer earns.",
+    );
+    expect(checkOf(g, "Basis / unit")?.status).toBe("unknown");
+    expect(checkOf(g, "Basis / unit")?.detail).toContain(
+      "this sells a share of the general partner's interest, a share of a share: its price is never grossed up or divided over the building, and no per-unit basis is struck on it",
+    );
+    expect(redLines(gp)).toMatchObject({ tripped: [], unknown: ["cap rate", "basis / unit"] });
+    // With no entity loan the header prints the building's stated cap for a
+    // GP stake (capSlotWithheld withholds none), and the box judges that
+    // figure; its basis is still said in the GP stake's words.
+    const gpNoLoan = deal("partial_interest", [["Asking price", "$3,000,000"], ...BUILDING], "50% of the general partner interest");
+    expect(sourceReadsOf(gpNoLoan, null).capWithheld).toBeNull();
+    expect(checkOf(read(gpNoLoan), "Going-in cap")?.status).toBe("pass");
+    expect(checkOf(read(gpNoLoan), "Basis / unit")?.detail).toContain("a share of the general partner's interest");
+  });
+
   it("a share with a stated percentage and no entity loan keeps its cap, the grossed-up whole's — its stated per-unit figure is no basis", () => {
     const ex = deal("partial_interest", [["Asking price", "$20,580,000"], ...BUILDING], "A 49% limited partnership interest");
     expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, signalCap: null });

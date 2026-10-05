@@ -20,8 +20,9 @@ import {
 import { scoreMandateFit, type MandateScore } from "@/lib/mandate";
 import { FOLD_WORD, checkedSentence, fitCellText, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import { inferStrategy, signalGoingInCap, statedBasisIsBuildings } from "@/lib/deal-strategy";
-import { interestOf } from "@/lib/interest";
+import { entityLoanWords, interestOf, isGpStake, isTenancyInCommon } from "@/lib/interest";
 import { capSlotWithheld } from "@/lib/compare-interest";
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 /**
@@ -38,11 +39,19 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
  * read (the audit of 2026-10-05).
  */
 export function sourceReadsOf(extraction: ExtractionResult | null, firstSignal: FirstSignal | null): SourceReads {
+  const { kind, entityLoan } = interestOf(extraction);
+  // What a share holds, so the box says a tenancy in common and a GP stake
+  // as what they are, never "a share of the owning entity" (the audit C3b
+  // MED-4), with the stated loan in lib/interest's own words.
+  const holding = kind !== "partial_interest" ? null : isTenancyInCommon(extraction) ? "tic" : isGpStake(extraction) ? "gp_stake" : null;
+  const loanWords = holding === "tic" && entityLoan != null ? entityLoanWords(extraction, compactUsd(entityLoan)) : null;
   return {
-    interestKind: interestOf(extraction).kind,
+    interestKind: kind,
     capWithheld: capSlotWithheld(extraction),
     statedBasisIsBuildings: statedBasisIsBuildings(extraction),
     signalCap: signalGoingInCap(firstSignal),
+    ...(holding ? { holding } : {}),
+    ...(loanWords ? { loanWords } : {}),
   };
 }
 

@@ -23,6 +23,7 @@ import { countNoun } from "@/lib/asset-words";
 import type { CapWithheldKind } from "@/lib/cap-slot";
 import {
   type BuyBox,
+  type Holding,
   buildingSfFromMetrics,
   capWithheldDetail,
   capWithheldOf,
@@ -144,6 +145,11 @@ interface ExtractionLike {
   /** whether a per-unit figure the memorandum states is the building's: a
    *  basis ceiling is never tripped on one that is not */
   statedBasisIsBuildings?: boolean;
+  /** what a partial interest holds and the loan stated on a tenancy in
+   *  common's property (lib/criteria `Holding`), so the cap's words say a
+   *  TIC and a GP stake as what they are */
+  holding?: Holding | null;
+  loanWords?: string | null;
   /** the day the screen read the memorandum — a price label's year is read
    *  against its year (lib/criteria `screenYearOf`) */
   screenedOn?: string | null;
@@ -466,7 +472,7 @@ export function scoreMandateFit(
     const detail =
       s.status === "unknown"
         ? withheld
-          ? capWithheldDetail(box.minCapPct, withheld)
+          ? capWithheldDetail(box.minCapPct, withheld, extraction)
           : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`
         : s.status === "pass"
           ? `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${cap!.toFixed(2)}%. Clears the floor.`

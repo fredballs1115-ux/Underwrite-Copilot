@@ -745,10 +745,23 @@ interface ExtractionLike {
    *  carried in by `buyBoxCheckSource`'s reads; absent on a raw extraction,
    *  which is read as before */
   statedBasisIsBuildings?: boolean;
+  /** what a partial interest holds, carried in by `buyBoxCheckSource`'s
+   *  reads (`Holding`); absent on a raw extraction and on any other share */
+  holding?: Holding | null;
+  /** the loan the memorandum states on a tenancy in common's property, in
+   *  lib/interest's `entityLoanWords`; absent where none is stated */
+  loanWords?: string | null;
   /** the day the screen read the memorandum (ExtractionResult.screenedOn) —
    *  the year a price label's year is judged against (`screenYearOf`) */
   screenedOn?: string | null;
 }
+
+/** What a partial interest holds, where its words say: an undivided
+ *  interest in the property held as a tenant in common (lib/interest
+ *  `isTenancyInCommon`) — title to real estate, never a share of an entity —
+ *  or a share of the general partner's interest (`isGpStake`), a share of a
+ *  share. */
+export type Holding = "tic" | "gp_stake";
 
 /**
  * Why a deal's stated going-in cap is no cap its buyer earns — its cap
@@ -770,13 +783,26 @@ export function capWithheldOf(ex: ExtractionLike | null | undefined): CapWithhel
 /** The going-in cap check's words where the cap is withheld, by the cap
  *  slot's own reason — the buy box's check and the mandate's dimension say
  *  the same sentence. */
-export function capWithheldDetail(floorPct: number, why: CapWithheldKind): string {
+export function capWithheldDetail(
+  floorPct: number,
+  why: CapWithheldKind,
+  ex?: Pick<ExtractionLike, "holding" | "loanWords"> | null,
+): string {
   const head = `Mandate wants ≥${floorPct}% going-in`;
   if (why === "note") {
     return `${head}, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`;
   }
   if (why === "position") {
     return `${head}, but this is a preferred equity position: its price buys a rate and a redemption, never a slice of the building, and the building's cap is not a return the position's buyer earns.`;
+  }
+  // What the share holds, said as the deal's own surfaces say it (the audit
+  // C3b MED-4: a tenancy in common had read "a share of the owning entity",
+  // which its own lead says it is not, and its loan "its entity's").
+  if (ex?.holding === "gp_stake") {
+    return `${head}, but this sells a share of the general partner's interest, a share of a share: no figure grosses its price up to the building's, and the building's cap is not a return its buyer earns.`;
+  }
+  if (ex?.holding === "tic") {
+    return `${head}, but beside ${ex.loanWords ?? "the loan the memorandum states on the property"}, this interest's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
   }
   return `${head}, but beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
 }
@@ -835,6 +861,12 @@ export function basisWithheldWhy(ex: ExtractionLike | null | undefined, noun: st
     case "leased_fee":
       return "the price buys the land under the ground lease, and is never divided over the building";
     case "partial_interest":
+      if (ex.holding === "gp_stake") {
+        return `this sells a share of the general partner's interest, a share of a share: its price is never grossed up or divided over the building, and no per-${noun} basis is struck on it`;
+      }
+      if (ex.holding === "tic") {
+        return `this sells an undivided interest held as a tenant in common: a per-${noun} figure the memorandum states is on a basis it never says, the whole's or the interest's`;
+      }
       return `this sells a share of the owning entity: a per-${noun} figure the memorandum states is on a basis it never says, the whole's or the share's`;
     default:
       return `a per-${noun} figure the memorandum states is not the building's basis`;
@@ -1332,6 +1364,11 @@ export interface SourceReads {
    *  (lib/deal-strategy `signalGoingInCap`): only where it can be a cap on
    *  the price at all; null otherwise */
   signalCap: { text: string; pct: number } | null;
+  /** what a partial interest holds (`Holding`): absent where it is neither */
+  holding?: Holding | null;
+  /** the loan stated on a tenancy in common's property, in lib/interest's
+   *  `entityLoanWords`: absent where none is stated */
+  loanWords?: string | null;
 }
 
 /**
@@ -1418,6 +1455,8 @@ export function buyBoxCheckSource(
     // figure on a price that is not the building's is no basis.
     interest: reads ? { kind: reads.interestKind } : (extraction?.interest ?? null),
     ...(reads ? { capWithheld: reads.capWithheld, statedBasisIsBuildings: reads.statedBasisIsBuildings } : {}),
+    ...(reads?.holding ? { holding: reads.holding } : {}),
+    ...(reads?.loanWords ? { loanWords: reads.loanWords } : {}),
     // So does the day the screen read the memorandum: the price band and
     // the mandate's ceiling read a label's year against it, as the page's
     // price slot does.
@@ -1819,7 +1858,7 @@ export function evaluateBuyBox(
         label: "Going-in cap",
         onPrice: true,
         status: "unknown",
-        detail: capWithheldDetail(box.minCapPct, withheld),
+        detail: capWithheldDetail(box.minCapPct, withheld, extraction),
       });
     } else if (pct == null) {
       checks.push({
