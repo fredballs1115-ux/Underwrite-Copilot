@@ -3941,7 +3941,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photograph through the token-scoped `/api/share/[token]/picture` (only
   what is stored — a share never reads the memorandum — revalidated
   against the stored path, so a revoked link's picture stops with the
-  link), then the aerial, the credit following whichever loaded; the
+  link), then the aerial, the credit following whichever loaded — the
+  aerial of a street address ringing the building at its centre, as the
+  deal page does (`ring`, research pass 29; a neighbourhood placement's
+  centre is a district's and gets none); the
   memo's cover and so the report's first page take the photograph cut to
   the cover's pixels (`coverPictureFor`, `fitCover`), credited as the
   memorandum's or the reader's, the aerial behind it. Google's frames
@@ -3964,8 +3967,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   no Google satellite at card size. Each source is PINNED to one route, so
   the corner credit is exactly the picture on screen. `DealBanner` (client)
   advances to the next source when one fails, and the credit follows it.
-  Nothing loads, or there is no address and no photograph: a blank plate
-  with the building mark holds the slot. A picture that failed before
+  Nothing loads, or there is no address and no photograph: the deal's
+  drawn cover holds the slot, as on its pipeline card, with its stored
+  photograph's blur-up while it loads (research pass 29; the compare
+  page had passed neither, so its columns showed a dashed plate). The
+  compare columns keep the aerial, where two columns' overheads tell two
+  buildings apart. A picture that failed before
   hydration fired its `error` with no listener, so the banner also checks
   on mount (`complete` with no `naturalWidth` is a failure). The
   pipeline's `DealThumb` makes the same check, and since #420 it shows
@@ -3978,7 +3985,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   column: beside the picture, the column left the name "The Maddox /
   at…". **The pipeline opens as cards** (#428, `DealTile` in
   `app/(app)/deals/pipeline.tsx`, the Dealpath / listing-site pattern): a
-  card a deal in a grid (one column on a phone, up to four wide), led by
+  card a deal in a grid (one column on a phone, up to four wide — as many
+  columns as hold a card of 17.5rem, counted from the grid's own width,
+  `PIPELINE_CARD_GRID` in lib/pipeline-view, research pass 29: it had gone
+  two-up at `sm` while the sidebar arrives at `md`, so from 768 to 1023 a
+  card was 222–250px and its market caption collapsed), led by
   the building's picture through `DealBanner` at `CARD` (720×450, 16:10)
   with the call on it as a solid chip, the flood / interest / assumable
   tags on it, then the name, the class and place, and price, cap (or yield
@@ -3998,10 +4009,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photograph of its own borrowing its metro's through `metroAliasOf`),
   handed to `bannerSources` as `market` by the pipeline page only (two
   compare columns in one market would show one skyline twice). The card
-  names it on its face — "Market photo" over the market's name on a shade
-  at the foot (`data-picture="market"`), the photographer and licence
-  beside it (`photographerLine`), the place in its alt text with "No
-  photograph of the building yet" — and `lib/market-picture.test.ts`
+  names it on its face — "Market photo" over the market's name, two lines
+  at most across the caption's whole width, the photographer and licence
+  under it (`photographerLine`), on a black scrim at the foot
+  (`data-picture="market"`, `MARKET_CAPTION_SCRIM`: 80% at the foot, 62%
+  at the words' top, eased to nothing across the padding above them, its
+  stops the caption's own box so a longer wrap cannot outrun them) — the
+  place in its alt text with "No photograph of the building yet". The 9px
+  eyebrow over a light gradient had fallen under 4.5:1 on 94 of 209 served
+  photographs on a phone's card (research pass 29);
+  `lib/market-caption.contrast.test.ts` holds every line's white to AA
+  over a pure white frame at every point it can reach, for one and two name
+  lines and one to four credit lines, at both sizes. `lib/market-picture.test.ts`
   holds every market the site covers to having a photograph for its
   cards, its own or its metro's. The compare pick sits beside the call,
   clear of the caption. **No overhead on the pipeline at all** (#442):
@@ -4021,7 +4040,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   else the market's name, else the memorandum's words) — the market
   caption's type, and its accessible name saying there is no photograph of
   the deal yet. A wide frame's horizon sits at 72%, so the words sit on the
-  ground on the smallest card (224×140), and `lib/deal-cover.test.ts` holds
+  ground on a card of 140px (the grid now draws none under 17.5rem where one
+  fits; the test keeps 140 as its floor), and `lib/deal-cover.test.ts` holds
   the place to AAA and the eyebrow to AA over the worst pixel under each
   line, before the shade, across every kind and sky. The list row's thumbnail had asked the image route for
   "the best picture", which fell to the USGS aerial for every deal
@@ -4058,7 +4078,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (a picture that fails to load hands the lead to it), the aerial, the
   flood map and the map one step along the filmstrip, "Add photo" on it.
   Both surfaces draw ONE caption, `MarketCaption`
-  (`app/(app)/deals/market-caption.tsx`, pure). The List view is one
+  (`app/(app)/deals/market-caption.tsx`, pure). On a phone the filters
+  fold behind one row (research pass 29): the search and a summary saying
+  how many are set ("Filters · 2 set", `filtersFoldLabel`), open by itself
+  when any is; from 640px up the selects sit in the row as before. Four
+  selects stacked two by two had pushed a phone's first photograph to
+  y=884 of an 844px screen; folded, it starts at 758. The selects follow
+  the `<details>` rather than sit in it, since a closed details hides its
+  contents at every width. The List view is one
   `ViewToggle` away; the choice of cards or list is a cookie the page
   reads, so the server draws the view the reader left without a flash of
   the other, and the map is opened for a visit and never landed on
@@ -4092,8 +4119,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   that fails takes its view away as the view failing would. **Every view
   opens full screen** (#445, `app/(app)/deals/[id]/photo-viewer.tsx`): a
   click on the picture, or the expand control at its top left (the top
-  right is Replace photo; never over the map), opens `PhotoViewer`, a
-  dialog over the page with the views one at a time at the largest size
+  right is Replace photo, on the deal's own photographs only where it has
+  one — never over the flood map, the aerial or the map, where it read as
+  "replace this map"; "Add photo" on whatever leads where it has none:
+  `photoControlOn` in lib/property-views), opens `PhotoViewer`, a solid
+  black dialog over the page with the views one at a time at the largest size
   the site holds them (the overheads at 1280 × 960 rather than the
   header's band), each with its own view's credit, the building ringed on
   an overhead of a street address, the arrows, the arrow keys and a swipe
@@ -4131,9 +4161,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     (Washington's 1600px frame was 616 KB) and real photographs from the
     contact sheets came out at 53–57% of their bytes — which makes a 2400px
     width affordable, so `SKYLINE_SRCSET` is 480 / 960 / 1600 / 2400 and
-    `PlaceBackdrop` offers it (`sizes`: the full width for a page's band,
-    the 72rem column for `MarketBand`): a phone takes 1600 and a dense
-    laptop 2400 where one 1400px file had been stretched twice over. The
+    `PlaceBackdrop` offers it: a phone takes 1600 and a dense
+    laptop 2400 where one 1400px file had been stretched twice over. A
+    band's `sizes` is worked out from its picture box at each window width
+    and the photograph's recorded shape (`bandSizes` in lib/skyline, from
+    `boxes`: `PLACE_BAND_BOXES`, `MARKET_BAND_BOXES` through
+    `pageColumnBoxes`, `WINDOW_BOXES` for the sign-in page), because a
+    band's height is set in pixels and a panorama covers it by its height,
+    wider than the band — Portland's 3.75:1 panorama had been asked for at a
+    phone's width and drawn 1.69× its file, the sign-in page's Baltimore
+    3.6× (research pass 29). `coverWidth` is the one copy of that
+    arithmetic, which `marketPhotoWidth` reads too. And a band crops each
+    photograph at its own focus where the table records one
+    (`SkylineShot.bandFocusY`, `object-position: 50% <y>%`, through
+    `CityPhoto`'s `bandFocus`, bands only — never a card or a tile): the
+    laptop band's 42% cut the crowns of Atlanta's, Houston's, Tampa's,
+    Jacksonville's, Cleveland's, Indianapolis's, Miami's and Orlando's
+    towers and the top of PG County's wheel, and sank Chicago's skyline
+    under the words, each judged by eye through the bands' own crops. The
     PHOTOGRAPHS step's byte counts are what a visitor downloads.
   - **A small photograph enlarged by us, not the browser.** A memorandum
     exported for email carries its cover at 600–900px; `derivePicture`
@@ -4148,7 +4193,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     way)
     and fade the picture in on `load` — never its progressive scans, never
     an empty frame; the mount check catches a load that finished before
-    hydration. The first four cards are `loading="eager"` and
+    hydration. **And nothing on the picture speaks for it until it has
+    loaded** (research pass 29, `BannerFace` in deal-banner.tsx): the
+    credit, the market's caption, the photograph count, the ring on an
+    overhead and the flip arrows and dots wait for the picture they
+    describe and fade in with it, and the count says "2 / 5" only once the
+    flipped-to photograph is whole — a card had worn "From the offering
+    memorandum", or a photographer's name and licence, over the drawn cover
+    for as long as a phone took to fetch the photograph. The first four cards are `loading="eager"` and
     `fetchPriority="high"` (React also emits a preload link for them), the
     rest lazy, and a card's picture zooms a little on hover
     (`motion-safe:`).
@@ -4306,7 +4358,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   since a button inside an anchor is invalid), hidden at rest and shown on
   hover or focus, and always on a touch screen (`pointer-coarse:`); a
   horizontal swipe across the picture flips too, and a dot a photograph
-  (five at most, a window round the one on screen) says where you are.
+  (five at most, a window round the one on screen, on a dark pill so it
+  reads over any sky, and only with two photographs or more) says where
+  you are.
   `DealBanner` lays the one asked for (`slide`) over the lead photograph,
   fades it in once whole and moves the credit and the count ("2 / 5") to
   it only then; one that fails is dropped from the card's set
@@ -4327,8 +4381,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   picture), each credited with its page ("Memorandum, p. 7", the full
   credit as its title), each opening the viewer at itself, the last
   saying "+N more". The reader's Replace photo moves onto the cover tile,
-  and a tile that fails drops the mosaic back to the one picture. Checked
-  in Chromium at 390, 820 and 1280. **The full report prints them too**
+  and a tile that fails drops the mosaic back to the one picture. While
+  the mosaic is on screen the filmstrip leaves out the photographs it
+  shows (`mosaicRepeats` in lib/property-views — it had shown Photo 1–3
+  again under them); with another view open it keeps them all, the way
+  back included. Checked in Chromium at 390, 820 and 1280. **The full report prints them too**
   (#459): `galleryPhotosFor` (lib/memo/cover-aerial) reads up to
   `PHOTO_PAGE_MAX` (4) stored gallery heroes, cuts each to
   `PHOTO_PAGE_SIZE` (512 × 340, twice the 256 × 170 pt frame) by
@@ -4566,12 +4623,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   a brief) under a third shape, `"caption"`: the proportional "band"
   scrim is 85% opaque at 55% of the height because a page's opening
   words can reach 60% up, and on a 256px card band that veiled the lower
-  half of every photograph. `CAPTION_SCRIM` is anchored in PIXELS to the
-  tallest words the band holds (an eyebrow over a name wrapped to two
-  lines on a phone, 110px), clear by 208px, and the band is 15rem / 21rem
-  so everything above that is picture; the contrast test imports the
-  stops and holds white to AAA and the accent eyebrow to AA at every
-  point the words reach, against the same pure-white frame. **A
+  half of every photograph. From `sm`, `CAPTION_SCRIM` is anchored in
+  PIXELS to the tallest words the band holds (an eyebrow over a name
+  wrapped to two lines, 121px), clear by 208px, and the band is 21rem so
+  everything above that is picture; the contrast test imports the stops
+  and holds white to AAA and the accent eyebrow to AA at every point the
+  words reach, against the same pure-white frame. **Below `sm` the
+  picture is a 14rem strip across the top with the words under it on the
+  band's own colour** (`MARKET_BAND_PICTURE`, `MARKET_BAND_WORDS_TOP`,
+  research pass 29 — the hero's answer): under the scrim a 240px phone band
+  had been a teal wash with no pixel of the photograph untouched, and
+  night frames went black; the strip has nothing over it but the fade
+  into the band at its foot, and the test holds it to more than half the
+  band whether the name takes one line or two. **A
   submarket opens on its metro's photograph** (#424): the submarket's
   metro is whatever its owner typed, so `metroForName`
   (`lib/market-match.ts`, pure) reads it only where the text says which
