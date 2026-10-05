@@ -1584,6 +1584,22 @@ const fmtHurdle = (pct: number): string => `${Number(pct.toFixed(1))}%`;
 
 const fmtCompactUsd = (n: number): string => compactUsd(n, { millions: "auto", trim: true, thousandsFrom: 0 });
 
+/**
+ * The retrade grid's prices, one precision down the column and its zeros
+ * kept, so the modeled row reads "$36.0M" beside "$32.4M", never "$36M"
+ * (research pass 35). The unit and the places are the smallest row's: one
+ * place in millions from $10M, two from $1M (a $1.2M deal's 5% steps would
+ * otherwise round two rows to one figure), else whole thousands.
+ */
+export function retradePrices(prices: readonly number[]): string[] {
+  const min = Math.min(...prices);
+  if (min >= 1e6) {
+    const places = min >= 1e7 ? 1 : 2;
+    return prices.map((p) => `$${(p / 1e6).toFixed(places)}M`);
+  }
+  return prices.map((p) => `$${Math.round(p / 1e3).toLocaleString("en-US")}k`);
+}
+
 
 /**
  * One sensitivity grid: a spanning axis title over the column values, a
@@ -2201,12 +2217,10 @@ export function ReportDocument({
             axisLabel="PRICE"
             spanLabel="EXIT CAP"
             colLabels={sensitivity.priceGrid.capCols.map((cap) => `${(cap * 100).toFixed(2)}%`)}
-            rowLabels={sensitivity.priceGrid.priceRows.map(
-              (p) =>
-                `${fmtCompactUsd(p.price)}  ${
-                  p.deltaPct === 0 ? "(modeled)" : `(${p.deltaPct > 0 ? "+" : ""}${Math.round(p.deltaPct * 100)}%)`
-                }`,
-            )}
+            rowLabels={retradePrices(sensitivity.priceGrid.priceRows.map((p) => p.price)).map((price, i) => {
+              const d = sensitivity.priceGrid.priceRows[i].deltaPct;
+              return `${price}  ${d === 0 ? "(modeled)" : `(${d > 0 ? "+" : ""}${Math.round(d * 100)}%)`}`;
+            })}
             cells={sensitivity.priceGrid.cells}
             baseRow={sensitivity.priceGrid.baseRow}
             baseCol={sensitivity.priceGrid.baseCol}

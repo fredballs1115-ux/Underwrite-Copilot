@@ -9,7 +9,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument } from "./report-document";
+import { buildReportData, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices } from "./report-document";
 import { MemoDocument, buildMemoData } from "./memo-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
@@ -701,7 +701,13 @@ describe("ReportDocument (full report)", () => {
     };
     // The sample: the ask is what the model runs at, cited to its page.
     const sample = await render({ ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 });
-    expect(sample).toContain("$68M (modeled)");
+    // One place down the column, its zero kept: it read "$68M (modeled)"
+    // beside "$61.2M (-10%)" (research pass 35).
+    expect(sample).toContain("$61.2M (-10%) ");
+    expect(sample).toContain("$64.6M (-5%) ");
+    expect(sample).toContain("$68.0M (modeled) ");
+    expect(sample).toContain("$71.4M (+5%) ");
+    expect(sample).toContain("$74.8M (+10%) ");
     expect(sample).toContain("The modeled price is $68,000,000: OM asking / purchase price (p. 3).");
     expect(sample).not.toContain("(ask)");
     // A 49% share: the $33.3M ask grossed up to the $68M whole the model runs.
@@ -711,11 +717,22 @@ describe("ReportDocument (full report)", () => {
       interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
       metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
     } as ExtractionResult);
-    expect(share).toContain("$68M (modeled)");
+    expect(share).toContain("$68.0M (modeled)");
     expect(share).toContain("The modeled price is $68,000,000: The OM's $33,320,000 for a 49% share, grossed up to the whole asset");
     expect(share).toContain("(derived).");
     expect(share).not.toContain("(ask)");
   }, 60000);
+
+  it("prints the retrade grid's prices at one precision down the column, the smallest row's", () => {
+    // From $10M, one place in millions, its zero kept.
+    expect(retradePrices([32_400_000, 34_200_000, 36_000_000, 37_800_000, 39_600_000])).toEqual(["$32.4M", "$34.2M", "$36.0M", "$37.8M", "$39.6M"]);
+    // A column that starts under $10M takes two places all the way down,
+    // so a $1.2M deal's 5% steps stay five figures, not three.
+    expect(retradePrices([1_080_000, 1_140_000, 1_200_000, 1_260_000, 1_320_000])).toEqual(["$1.08M", "$1.14M", "$1.20M", "$1.26M", "$1.32M"]);
+    expect(retradePrices([9_000_000, 9_500_000, 10_000_000, 10_500_000, 11_000_000])).toEqual(["$9.00M", "$9.50M", "$10.00M", "$10.50M", "$11.00M"]);
+    // A column that starts under $1M is in thousands throughout.
+    expect(retradePrices([900_000, 950_000, 1_000_000, 1_050_000, 1_100_000])).toEqual(["$900k", "$950k", "$1,000k", "$1,050k", "$1,100k"]);
+  });
 
   it("leaves the IRR grids, the max bid and every model read out of an unpriced memorandum's report, and says why where the grids would have been", async () => {
     const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
