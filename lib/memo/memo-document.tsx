@@ -33,7 +33,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, planWithBasisChecked, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
-import { yieldOnCostText } from "@/lib/plan-facts";
+import { YOC_WITHHELD, yieldOnCostText } from "@/lib/plan-facts";
 import { dealTypeLabel, interestOf, interestShortLine, isWholeShare, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -155,7 +155,12 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
       plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} ${per} all-in` : ""
     })`;
   }
-  if (plan?.stabilizedNoi) return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)}`;
+  // A yield on cost the plan refuses is said as the plan's facts say it, with
+  // the plan's own sentence why (research pass 38): the line had dropped it
+  // and read as if no total cost were stated. So is a total cost the plan
+  // strikes on no equity's whole, in its own sentence.
+  const refused = plan?.yieldWithheld ? `; yield on cost ${YOC_WITHHELD}. ${plan.yieldWithheld}` : plan?.costWithheld ? `. ${plan.costWithheld}` : "";
+  if (plan?.stabilizedNoi) return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)}${refused}`;
   return kind;
 }
 

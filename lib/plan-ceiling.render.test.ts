@@ -58,6 +58,9 @@ import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ToastProvider } from "@/app/(app)/toaster";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { MemoDocument, buildMemoData } from "@/lib/memo/memo-document";
+import { pdfTextOf } from "@/lib/memo/pdf-text-of";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const metric = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "p. 3", basis: "na" });
@@ -220,6 +223,41 @@ describe("a yield on cost no project earns is refused on every surface, in one s
     expect(visibleText(row)).not.toContain("not stated");
     expect(html).not.toMatch(NO_FIGURE);
   });
+
+  it("the memo's plan line says it in the plan facts' words with the plan's sentence, never dropping it (part 1's leftover c)", async () => {
+    const data = buildMemoData({ name: "Parkline", asset_class: "auto", extraction: devTotalThousands } as never, "October 5, 2026");
+    expect(data.strategyLine).toBe(`Development · stabilized NOI $3.2M; yield on cost ${YOC_WITHHELD}. ${REFUSED}`);
+    expect(data.strategyLine).not.toMatch(NO_FIGURE);
+    const text = pdfTextOf(
+      await renderToBuffer(React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    ).replace(/\s+/g, " ");
+    expect(text).toContain(`yield on cost ${YOC_WITHHELD}.`);
+    expect(text).toContain(REFUSED);
+    expect(text).not.toMatch(NO_FIGURE);
+    // The equity's whole beside the entity's loan: no total cost is struck,
+    // and the line says why in the plan's own sentence.
+    const recap = {
+      dealName: "Harbor View Apartments",
+      assetClass: "multifamily",
+      totalPages: 40,
+      interest: { kind: "partial_interest", summary: "A 4.5% LP interest in the owning partnership", share: "4.5% limited partnership interest", groundLease: "", loan: "", page: "" },
+      strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" },
+      metrics: [
+        metric("Asking price", "$1,800,000"),
+        metric("Units", "240"),
+        metric("Entity loan balance", "$56,500,000"),
+        metric("Renovation budget", "$5,000,000"),
+        metric("NOI (stabilized, pro forma)", "$6,000,000"),
+      ],
+    } as ExtractionResult;
+    const line = buildMemoData({ name: "Harbor View", asset_class: "auto", extraction: recap } as never, "October 5, 2026").strategyLine;
+    expect(line).toMatch(/· stabilized NOI \$6\.0M\. No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the entity's \$56\.5M loan, which the model does not add\.$/);
+    // A yield that stands reads as before.
+    const sound = { ...devTotalThousands, metrics: [metric("Total project cost", "48,500,000"), ...devTotalThousands.metrics.slice(1)] } as ExtractionResult;
+    expect(buildMemoData({ name: "Parkline", asset_class: "auto", extraction: sound } as never, "October 5, 2026").strategyLine).toMatch(
+      /^Development · stabilized NOI \$3\.2M on \$48\.5M total cost \(6\.60% yield on cost/,
+    );
+  }, 30000);
 
   it("the Model tab refuses the first-draft model's own yield past the ceiling in the compare table's sentence", () => {
     expect(YOC_CEILING_PCT).toBe(IMPLIED_CAP_CEILING * 100);
