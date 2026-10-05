@@ -443,7 +443,7 @@ describe("the buy box's 1031 exchange (lib/exchange-window) — a blank is no ex
     expect(sanitizeExchange("2026-09-15")).toBeUndefined();
   });
 
-  it("counts as the box's content, round-trips through the store, and is listed for the read-only view and the verdict", () => {
+  it("counts as the box's content, round-trips through the store, and is listed for the read-only view, never the verdict", () => {
     const box: BuyBox = { exchange: { relinquishedTransferOn: "2026-09-15", filer: "partnership" } };
     expect(isEmptyBuyBox(box)).toBe(false);
     expect(isEmptyBuyBox({ exchange: { relinquishedTransferOn: null } })).toBe(true);
@@ -455,6 +455,9 @@ describe("the buy box's 1031 exchange (lib/exchange-window) — a blank is no ex
     expect(buyBoxLines({ exchange: { relinquishedTransferOn: "2026-10-01", returnExtended: true } })).toEqual([
       "1031 exchange: the relinquished property transferred Oct 1, 2026; who files the return is not set, so it is read as an individual's; the return is extended",
     ]);
+    // The lines a Claude step reads leave it out: the verdict's words reach
+    // a shared screen.
+    expect(buyBoxLines(box, { exchange: false })).toEqual([]);
   });
 });
 

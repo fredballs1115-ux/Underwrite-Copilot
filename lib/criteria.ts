@@ -1522,7 +1522,7 @@ export function evaluateBuyBox(
 }
 
 /** Human/prompt-readable one-liners describing the mandate (skips unset fields). */
-export function buyBoxLines(box: BuyBox): string[] {
+export function buyBoxLines(box: BuyBox, opts: { exchange?: boolean } = {}): string[] {
   const lines: string[] = [];
   if (box.assetClasses?.length)
     lines.push(`Asset classes: ${box.assetClasses.join(", ")}`);
@@ -1569,8 +1569,11 @@ export function buyBoxLines(box: BuyBox): string[] {
   }
   if (box.notes?.trim()) lines.push(`Priorities: ${box.notes.trim()}`);
   // The buyer's 1031 exchange (lib/exchange-window), as the box holds it;
-  // each deal's deadlines against it are the deal's own read.
-  const exchange = sanitizeExchange(box.exchange);
+  // each deal's deadlines against it are the deal's own read. Never in the
+  // lines a Claude step reads (`exchange: false`): the verdict's words reach
+  // a shared screen, and a counterparty who learns the buyer must close by a
+  // date holds the price.
+  const exchange = opts.exchange === false ? null : sanitizeExchange(box.exchange);
   if (exchange) {
     const filer = EXCHANGE_FILERS.find((f) => f.id === exchange.filer);
     lines.push(

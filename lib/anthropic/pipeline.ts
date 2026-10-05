@@ -67,7 +67,6 @@ import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
 import { condoNote, readCondo } from "@/lib/condo";
 import { readSandwichLease, sandwichNote } from "@/lib/sandwich-lease";
-import { exchangeForDeal } from "@/lib/exchange-deal";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -682,7 +681,9 @@ async function regenerateVerdict(
       (data?.user_id as string) ?? "",
       (data?.team_id as string) ?? null,
     );
-    buyBox = box ? buyBoxLines(box) : null;
+    // The box without the buyer's 1031 exchange: the verdict's words reach a
+    // shared screen, and the exchange is the reader's own (lib/criteria).
+    buyBox = box ? buyBoxLines(box, { exchange: false }) : null;
   } catch {
     buyBox = null;
   }
@@ -707,19 +708,10 @@ async function regenerateVerdict(
       buyBoxChecks = null;
     }
   }
-  // The buyer's 1031 exchange against this deal (lib/exchange-deal), on the
-  // worker's UTC day: the deadline the deal carries — read on its own, so a
-  // read that fails costs the brief this line and never the verdict — else
-  // the memorandum's, and what the price buys.
-  let exchangeLine: string | null = null;
-  if (box?.exchange) {
-    try {
-      const { data: due } = await admin.from("deals").select("offers_due").eq("id", dealId).maybeSingle();
-      exchangeLine = exchangeForDeal(box.exchange, extraction, (due?.offers_due as string | null | undefined) ?? null)?.line ?? null;
-    } catch {
-      exchangeLine = null;
-    }
-  }
+  // The buyer's 1031 exchange is never handed to the verdict: its words reach
+  // the shared screen, and a counterparty who learns the buyer must close by
+  // a date holds the price. The deadlines stay on the reader's own surfaces
+  // (the deal header's chip, the pipeline's tag, the memo).
 
   const verdict = await synthesizeVerdict({
     extraction,
@@ -737,7 +729,6 @@ async function regenerateVerdict(
     market: (data?.market as MarketResult) ?? null,
     buyBox,
     buyBoxChecks,
-    exchangeLine,
     // The latest published rates, the line the challenger is handed: the
     // debt deal-killer is read against a dated index and the site's own
     // screening spread, never a rate remembered as current.
