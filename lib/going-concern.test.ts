@@ -233,12 +233,44 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
     const note = goingConcernNote(r);
     for (const trap of ["(g) THE STRUCTURE", "(h) THE CHANGE OF OWNERSHIP", "(i) THE PAYOR MIX", "(j) SURVEYS AND STARS", "(k) LICENSED AND OPERATING BEDS"])
       expect(note).toContain(trap);
-    // A community sold with its operations asks the structure's question.
+    // A community its owner operates is sold with its operations.
     const al = readGoingConcern(deal({ assetClass: "Assisted Living / Memory Care" }, [row("Operating structure", "Owner-operated")]), TODAY)!;
-    expect(al).toMatchObject({ business: "senior_care", branch: "unstated" });
+    expect(al).toMatchObject({ business: "senior_care", branch: "going_concern" });
     expect(al.headline).toContain("Operating structure, as stated: Owner-operated.");
     // The care traps ride only on a care operation.
     expect(goingConcernNote(readGoingConcern(STATION, TODAY)!)).not.toContain("CARE-OPERATION TRAPS");
+  });
+
+  // The audit of 2026-10-05: the stated structure was printed under a first
+  // sentence saying the memorandum did not say, and the model's line called a
+  // lease's rent the operation's income.
+  it("reads a care operation's stated structure into what is sold, and says the model's line as a condition where nothing is stated", () => {
+    const care = (structure: string | null) =>
+      deal({ assetClass: "Assisted Living / Memory Care" }, [
+        ...(structure ? [row("Operating structure", structure)] : []),
+        row("NOI (in-place)", "$2,100,000"),
+      ]);
+    const model = { noi1: 2_100_000, exitCapPct: 0.07 };
+    const leased = readGoingConcern(care("Triple-net lease to a regional operator"), TODAY)!;
+    expect(leased.branch).toBe("operator_lease");
+    expect(leased.headline).toMatch(/^The memorandum sells the real estate under a senior care community, leased to its operator/);
+    expect(leased.headline).toContain("Operating structure, as stated: Triple-net lease to a regional operator.");
+    expect(goingConcernModelLine(leased, model)).toBeNull();
+    expect(goingConcernTag(care("Triple-net lease to a regional operator"), TODAY)).toBe("Operator lease");
+    for (const structure of ["Owner-operated", "RIDEA management agreement", "Managed by Sunrise under a management agreement; no lease to an operator"]) {
+      const r = readGoingConcern(care(structure), TODAY)!;
+      expect(r.branch, structure).toBe("going_concern");
+      expect(r.headline, structure).toMatch(/^The memorandum sells a senior care community with its real estate/);
+      expect(goingConcernModelLine(r, model), structure).toContain("on a senior care community that income is the operation's");
+    }
+    // A row that names both, or neither, decides nothing.
+    expect(readGoingConcern(care("Leased to an operator under a management agreement"), TODAY)!.branch).toBe("unstated");
+    // Nothing stated: the model's line is a condition, never the operation's income outright.
+    const unstated = readGoingConcern(care(null), TODAY)!;
+    expect(unstated.branch).toBe("unstated");
+    expect(goingConcernModelLine(unstated, model)).toBe(
+      "The model capitalises its $2.10M year-one income at a 7.00% exit cap as if it were rent; if the business is sold with the real estate, that income is the operation's, which the real estate does not earn without an operator, and the model allocates nothing to the business.",
+    );
   });
 
   it("writes every sentence without a glued word", () => {

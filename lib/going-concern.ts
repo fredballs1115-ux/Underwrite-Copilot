@@ -128,6 +128,24 @@ export const STATED_ROWS: ReadonlyArray<readonly [string, RegExp]> = [
 ];
 const RENT_ROW = /^\s*(?:annual\s+|current\s+|in[- ]place\s+)?base\s+rent\b|^\s*(?:lease|annual|contract)\s+rent$/i;
 
+// A care operation's structure, as its "Operating structure" row states it:
+// the real estate leased to an operator, or the operation run by its owner
+// or for the owner under a management contract (a RIDEA structure, whose
+// lease is the owner's own). A lease the row denies is no lease, and a row
+// naming both, or neither, says nothing of what is sold.
+const STRUCTURE_ROW = STATED_ROWS.find(([label]) => label === "Operating structure")![1];
+const STRUCTURE_LEASED = /\b(?:triple[\s-]+net|nnn|leas(?:e|ed|es)|lessee)\b/i;
+const STRUCTURE_OPERATED = /\bowner[\s/-]+operat(?:ed|ors?|ion)\b|\bself[\s-]+operated\b|\bmanagement\s+(?:agreements?|contracts?)\b|\bmanaged\b/i;
+const STRUCTURE_LEASE_DENIED = /\b(?:no|not|never|without)\s+(?:an?\s+|the\s+|any\s+)?(?:[\w-]+\s+)?(?:leas(?:e|ed|es)|lessee)\b/gi;
+
+function structureOf(value: string | null | undefined): "operator_lease" | "going_concern" | null {
+  const v = (value ?? "").replace(STRUCTURE_LEASE_DENIED, " ");
+  if (/\bridea\b/i.test(v)) return "going_concern";
+  const leased = STRUCTURE_LEASED.test(v);
+  const operated = STRUCTURE_OPERATED.test(v);
+  return leased === operated ? null : leased ? "operator_lease" : "going_concern";
+}
+
 export interface GoingConcernRead {
   business: OperatingBusiness | null;
   /** what is sold: the business with the real estate, the real estate
@@ -229,11 +247,13 @@ export function readGoingConcern(ex: ExtractionResult | null | undefined, asOf: 
   const rentRead = tenant?.rent ?? (rentRow && !/\/\s*mo|per\s+month|monthly|per\s*sf|psf/i.test(rentRow.value) ? parseMoney(rentRow.value) : null);
   const rent = rentRead != null && rentRead > 0 ? rentRead : null;
   const words = wordsOf(ex);
+  // The stated structure decides where the sale's words say nothing (the
+  // audit of 2026-10-05: "Operating structure: Triple-net lease to a
+  // regional operator" had been read as a sale that did not say).
+  const structure = structureOf(find(STRUCTURE_ROW)?.value);
   const branch: GoingConcernRead["branch"] = GOING_CONCERN_WORDS.test(words)
     ? "going_concern"
-    : tenant || rent != null
-      ? "operator_lease"
-      : "unstated";
+    : structure ?? (tenant || rent != null ? "operator_lease" : "unstated");
   const beforeRent = !!ebitda && /ebitdar/i.test(ebitda.label);
   const coverageRow = find(COVERAGE_ROW);
   const statedCoverage = coverageRow ? coverageOf(coverageRow.value) : null;
@@ -324,11 +344,15 @@ function sentencesOf(r: Omit<GoingConcernRead, "sentences" | "headline">): strin
 
 /** The model's read (`meta.goingConcern`): it capitalises the income it
  *  runs on as rent and allocates nothing to the business. Null on a lease
- *  to the operator, whose rent IS the landlord's income. */
+ *  to the operator, whose rent IS the landlord's income; said as a
+ *  condition where the memorandum does not say whether the business is
+ *  sold. */
 export function goingConcernModelLine(r: GoingConcernRead | null, m: { noi1: number | null; exitCapPct: number } | null): string | null {
   if (!r || r.branch === "operator_lease" || !m || m.noi1 == null) return null;
   const what = r.business ? BUSINESS_NAME[r.business] : "the operating business";
-  return `The model capitalises its ${money(m.noi1)} year-one income at ${withArticle(`${(m.exitCapPct * 100).toFixed(2)}% exit cap`)} as if it were rent; on ${what} that income is the operation's, which the real estate does not earn without an operator, and the model allocates nothing to the business.`;
+  const whose =
+    r.branch === "unstated" ? "if the business is sold with the real estate, that income is the operation's" : `on ${what} that income is the operation's`;
+  return `The model capitalises its ${money(m.noi1)} year-one income at ${withArticle(`${(m.exitCapPct * 100).toFixed(2)}% exit cap`)} as if it were rent; ${whose}, which the real estate does not earn without an operator, and the model allocates nothing to the business.`;
 }
 
 /** The pipeline row's tag: "Going concern", "Operator lease, 2.10x
