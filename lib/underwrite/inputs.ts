@@ -1090,19 +1090,33 @@ export function deriveUnderwriteInputs(
   // (research pass 34).
   if (interest.kind === "leased_fee") {
     const rent = groundRentOf(extraction);
+    // A year-1 NOI equal to the stated rent is the rent's own figure where
+    // it was read off a memorandum row (the OM's NOI, the T-12's), and the
+    // rent's only by arithmetic where it was struck — the price × the stated
+    // cap, or the assumed 6% (the second audit, MED-4: a NOI read off the
+    // OM's own row, which was the rent, was said to be "by arithmetic, not
+    // read from it" and the rent "not read").
+    const sameAsRent = rent != null && Math.abs(noi - rent) <= rent * 0.005;
+    const byArithmetic = sources.inPlaceRentAnnual?.provenance === "assumption" || noiRead === "this price × the stated going-in cap";
+    const sameFigure = rent != null ? ` — the same figure as the ${usd0(rent)} ground rent the OM states` : "";
     if (rent != null && sources.inPlaceRentAnnual) {
-      sources.inPlaceRentAnnual = {
-        ...sources.inPlaceRentAnnual,
-        note: `${sources.inPlaceRentAnnual.note}. The OM's ${usd0(rent)} ground rent is the leased fee's income; the model does not read it`,
-        notRun: { label: "ground rent", value: rent },
-      };
+      sources.inPlaceRentAnnual =
+        sameAsRent && !byArithmetic
+          ? { ...sources.inPlaceRentAnnual, note: `${sources.inPlaceRentAnnual.note}${sameFigure}` }
+          : {
+              ...sources.inPlaceRentAnnual,
+              note: `${sources.inPlaceRentAnnual.note}. The OM's ${usd0(rent)} ground rent is the leased fee's income; the model does not read it`,
+              notRun: { label: "ground rent", value: rent },
+            };
     }
     if (leasedFeePrice && sources.purchasePrice) {
       const against =
         rent == null
           ? ""
-          : Math.abs(noi - rent) <= rent * 0.005
-            ? ` — equal to the ${usd0(rent)} ground rent the OM states by arithmetic, not read from it`
+          : sameAsRent
+            ? byArithmetic
+              ? ` — equal to the ${usd0(rent)} ground rent the OM states by arithmetic, not read from it`
+              : sameFigure
             : `, not the ${usd0(rent)} ground rent the OM states`;
       sources.purchasePrice = {
         ...sources.purchasePrice,
