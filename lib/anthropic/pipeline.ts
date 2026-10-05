@@ -467,7 +467,7 @@ async function dealContextFromDb(
     // building's own municipality where the Census geocoder named it.
     return dealContextFor(
       (data?.extraction as ExtractionResult | null) ?? null,
-      flags && flags.status !== "pending" ? { flood: flags.flood } : null,
+      flags && flags.status !== "pending" ? { flood: flags.flood, pointIsBuilding: flags.pointIsBuilding } : null,
       (data?.first_signal as FirstSignal | null | undefined) ?? null,
       screenRegulation(data, flags),
     );
@@ -1643,7 +1643,7 @@ async function runReconciliationSteps(
     const flags = await storedSiteFlags(admin, dealId);
     const dealContext = dealContextFor(
       (deal.extraction as ExtractionResult | null) ?? null,
-      flags ? { flood: flags.flood } : null,
+      flags ? { flood: flags.flood, pointIsBuilding: flags.pointIsBuilding } : null,
       (deal.first_signal as FirstSignal | null | undefined) ?? null,
       // The rent rules, read as the screen's own context reads them.
       screenRegulation(deal, flags),

@@ -209,12 +209,13 @@ describe("askDeal — what Ask is told about the deal, as the screen's steps are
     take: "An office-to-residential conversion — check the construction budget before the price.",
   };
   const ADDRESS = "1400 Market St, Philadelphia, PA 19102";
-  const flags = (label: string, status = "ok") => ({
+  const flags = (label: string, status = "ok", pointIsBuilding = true) => ({
     status,
     subject: { lat: 39.95, lng: -75.16, label },
     tractGeoid: null,
     opportunityZone: null,
     flood: { zone: "AE", subtype: null, isHighRisk: true },
+    pointIsBuilding,
     retrievedAt: "2026-10-01T00:00:00.000Z",
     note: "",
   });
@@ -233,6 +234,11 @@ describe("askDeal — what Ask is told about the deal, as the screen's steps are
     db.deal = { ...db.deal, extraction, first_signal: null, site_flags: flags(ADDRESS), address: { label: ADDRESS } };
     await ask("Is it in a flood zone?");
     expect(db.context).toContain("FEMA's flood map puts the building's point in Zone AE, a Special Flood Hazard Area");
+    // A lookup made at a point placed only to the street is the address's
+    // point, as the flood view says it (the audit's L10).
+    db.deal = { ...db.deal, site_flags: flags(ADDRESS, "ok", false) };
+    await ask("Is it in a flood zone?");
+    expect(db.context).toContain("FEMA's flood map puts the point the address was placed at in Zone AE");
     // A lookup made for the address before an edit is the old building's,
     // and one still pending has said nothing: neither is read.
     for (const stale of [flags("500 Elm St, Philadelphia, PA 19103"), flags(ADDRESS, "pending")]) {

@@ -79,7 +79,7 @@ function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind)
  */
 export function dealContextFor(
   extraction: ExtractionResult | null,
-  site?: { flood?: SiteFlagsResult["flood"] } | null,
+  site?: { flood?: SiteFlagsResult["flood"]; pointIsBuilding?: boolean } | null,
   signal?: { take?: string; dealName?: string | null } | null,
   regulation?: RegulationRead | null,
 ): string | null {
@@ -158,8 +158,9 @@ export function dealContextFor(
   const condo = readCondo(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
-  // premium in the expense line and a lender's condition.
-  const flood = floodContextLine(site?.flood);
+  // premium in the expense line and a lender's condition. The point is the
+  // building's only where the lookup recorded it was (the audit's L10).
+  const flood = floodContextLine(site?.flood, site?.pointIsBuilding === true);
   // A price stated as a range (#466): which end every figure is struck at.
   const range = priceRangeLine(extraction, strategy.kind);
   const head = [

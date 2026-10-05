@@ -204,7 +204,7 @@ describe("legendEntryFor and floodZoneLine — what the map says at the building
     expect(floodZoneLine(flag("X", "0.2 PCT ANNUAL CHANCE FLOOD HAZARD"), legend)).toBe(
       "FEMA's map puts the building's point in Zone X (0.2% annual chance flood hazard), outside the Special Flood Hazard Area, in a hazard FEMA still maps: federal law does not require flood insurance there, though a lender may still ask for it.",
     );
-    expect(floodContextLine(flag("D", null))).toBe(
+    expect(floodContextLine(flag("D", null), true)).toBe(
       "FEMA's flood map puts the building's point in Zone D, where FEMA has not determined the flood hazard: outside a Special Flood Hazard Area federal law does not require flood insurance there, though a lender may still ask for it.",
     );
     expect(floodContextLine(flag("X", "0.2 PCT ANNUAL CHANCE FLOOD HAZARD"))).toContain("in a hazard FEMA still maps: federal law does not require flood insurance there");
@@ -325,20 +325,48 @@ describe("floodContextLine and the deal context — the zone as the Claude steps
   const flag = (zone: string, subtype: string | null) => ({ zone, subtype, isHighRisk: /^[AV]/.test(zone) });
 
   it("names the premium the seller's figures may not carry in a Special Flood Hazard Area, and says the other cases plainly", () => {
-    expect(floodContextLine(flag("AE", null))).toBe(
+    expect(floodContextLine(flag("AE", null), true)).toBe(
       "FEMA's flood map puts the building's point in Zone AE, a Special Flood Hazard Area: where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees, so the expense line needs a flood premium the seller's figures may not carry.",
     );
-    expect(floodContextLine(flag("X", "AREA OF MINIMAL FLOOD HAZARD"))).toBe("FEMA's flood map puts the building's point in Zone X, an area of minimal flood hazard.");
+    expect(floodContextLine(flag("X", "AREA OF MINIMAL FLOOD HAZARD"), true)).toBe("FEMA's flood map puts the building's point in Zone X, an area of minimal flood hazard.");
     expect(floodContextLine(flag("X", "0.2 PCT ANNUAL CHANCE FLOOD HAZARD"))).toContain("Zone X (0.2% annual chance flood hazard), outside the Special Flood Hazard Area");
     expect(floodContextLine(null)).toContain("whether it floods is not known from the map");
     expect(floodContextLine("unavailable")).toBeNull();
     expect(floodContextLine(undefined)).toBeNull();
   });
 
+  it("names the point the lookup was made at as the flood view does: the building's only where the house was placed (the audit's L10)", () => {
+    // A point placed at the street's centreline, a block or a town — or a
+    // lookup that recorded nothing — is the address's, never the house's.
+    expect(floodContextLine(flag("AE", null))).toMatch(/^FEMA's flood map puts the point the address was placed at in Zone AE, a Special Flood Hazard Area/);
+    expect(floodContextLine(null)).toBe("FEMA's digital flood map has no zone at the point the address was placed at, so whether it floods is not known from the map.");
+    expect(floodContextLine(null, true)).toBe("FEMA's digital flood map has no zone at the building's point, so whether it floods is not known from the map.");
+    for (const z of [flag("AE", null), flag("X", null), flag("D", null), flag("X", "AREA OF MINIMAL FLOOD HAZARD"), null]) {
+      expect(floodContextLine(z, false)).not.toContain("the building's point");
+    }
+  });
+
+  it("says open water, an area the map leaves out and a bare Zone X as the flood view says them, never as a hazard FEMA still maps", () => {
+    const water = floodContextLine(flag("OPEN WATER", null), true)!;
+    expect(water).toBe("FEMA's flood map puts the building's point in open water, so the point is likely off the building and the zone at the building itself is not known from this lookup.");
+    expect(water).not.toContain("Zone OPEN WATER");
+    const excluded = floodContextLine(flag("AREA NOT INCLUDED", null))!;
+    expect(excluded).toContain("an area this flood map does not include");
+    expect(excluded).not.toContain("Zone AREA");
+    expect(excluded).not.toContain("federal law does not require");
+    // A Zone X with no subtype is not one of the shaded hazards.
+    expect(floodContextLine(flag("X", null), true)).toBe(
+      "FEMA's flood map puts the building's point in Zone X, outside the Special Flood Hazard Area: federal law does not require flood insurance there, though a lender may still ask for it.",
+    );
+  });
+
   it("rides in the deal context after what is being sold, and leaves the context as it was without a lookup", () => {
     const ex = SAMPLE_DEAL.extraction as unknown as ExtractionResult;
-    const withFlood = dealContextFor(ex, { flood: flag("AE", null) }) ?? "";
+    const withFlood = dealContextFor(ex, { flood: flag("AE", null), pointIsBuilding: true }) ?? "";
     expect(withFlood).toContain("FEMA's flood map puts the building's point in Zone AE, a Special Flood Hazard Area");
+    // A lookup that recorded no building point is said at the address's.
+    const atAddress = dealContextFor(ex, { flood: flag("AE", null) }) ?? "";
+    expect(atAddress).toContain("FEMA's flood map puts the point the address was placed at in Zone AE, a Special Flood Hazard Area");
     const without = dealContextFor(ex) ?? "";
     expect(without).not.toContain("FEMA");
     expect(dealContextFor(ex, null)).toBe(dealContextFor(ex));

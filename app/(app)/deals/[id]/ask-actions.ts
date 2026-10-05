@@ -120,7 +120,7 @@ export async function askDeal(
     );
     const context = dealContextFor(
       extraction,
-      flags ? { flood: flags.flood } : null,
+      flags ? { flood: flags.flood, pointIsBuilding: flags.pointIsBuilding } : null,
       (deal.first_signal as FirstSignal | null | undefined) ?? null,
       // The rent rules that reach the building, read as the screen's steps
       // read them (lib/rent-regulation `regulationForDeal`), on the UTC day
