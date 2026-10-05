@@ -145,14 +145,22 @@ export const PREFERENTIAL_RENT_ROW = /^\s*(?:average\s+)?preferential\s+rents?\b
 
 const NOT_A_COUNT = /%|percent|\bshare\b|\$|expir|\bdate\b/i;
 
-/** A regime row whose words state none — "None", "No rent control", "N/A",
- *  "Not subject to rent control", "Exempt", "Market rate", a dash — names no
- *  regime: a park memorandum's "Rent control: None" (the row lib/manufactured-
- *  housing reads as not regulated) is a stated none, never the memorandum's
- *  claim of a regime. Read only from the start of the words, so "Rent
- *  stabilization (12 units exempt)" still names one. */
+/** A row whose words state none — "None", "No rent control", "N/A",
+ *  "Not subject to rent control", "Exempt", "Market rate", "Non-regulated",
+ *  "Deregulated", a dash — names no regime and no regulated rent: a park
+ *  memorandum's "Rent control: None" (the row lib/manufactured-housing reads
+ *  as not regulated) is a stated none, never the memorandum's claim of a
+ *  regime, and "Legal regulated rent: N/A" is no legal rent. Read only from
+ *  the start of the words, so "Rent stabilization (12 units exempt)" still
+ *  names one. */
 const STATES_NONE =
-  /^\s*(?:none|no|n\/?a|nil|unknown|tbd|[-–—]|exempt|unregulated|free[- ]market|market[- ]rate|not\s+(?:applicable|stated|provided|available|disclosed|subject|regulated|covered|rent[- ](?:controlled|stabili[sz]ed|regulated)))(?![\w-])/i;
+  /^\s*(?:none|no|n\/?a|nil|unknown|tbd|[-–—]|exempt|unregulated|non[- ]?regulated|deregulated|destabili[sz]ed|free[- ]market|market(?:[- ]rate)?|not\s+(?:applicable|stated|provided|available|disclosed|subject|regulated|covered|rent[- ](?:controlled|stabili[sz]ed|regulated)))(?![\w-])/i;
+
+/** A regime row that says yes and names no regime — "Yes", "Yes — city
+ *  caps lot rent at CPI": the building is regulated, as the memorandum
+ *  states, and "Yes" is never the regime's name (the audit of 2026-10-05:
+ *  "The memorandum states the building is under Yes"). */
+const STATES_YES = /^\s*yes(?![\w-])/i;
 
 /** The regulation's rows, in the order a key-terms block leads with them
  *  after the unit count — each only where the memorandum states it. */
@@ -191,6 +199,9 @@ export interface RegulationRead {
   regimes: RegimeRead[];
   /** the regime as the memorandum names it, as stated */
   stated: string | null;
+  /** the regime row's words where they say the building is regulated and
+   *  name no regime ("Yes", "Yes — city caps lot rent at CPI") */
+  statedYes: string | null;
   regulatedUnits: number | null;
   totalUnits: number | null;
   /** regulated over the count, where both are stated and agree */
@@ -294,15 +305,20 @@ export function readRegulation(
 ): RegulationRead | null {
   if (!ex) return null;
   const metrics = (Array.isArray(ex.metrics) ? (ex.metrics as unknown[]) : []).filter(isRow);
+  // A rent row that states none is no rent and no claim (the audit of
+  // 2026-10-05: "Legal regulated rent: N/A" had made Austin's apartments
+  // "Rent-regulated (OM)").
+  const statesSome = (r: MetricRow | null) => (r && r.value.trim() !== "" && !STATES_NONE.test(r.value.trim()) ? r : null);
   const statedRow = rowOf(metrics, REGIME_ROW);
   const unitsRow = rowOf(metrics, UNITS_ROW, NOT_A_COUNT);
-  const legalRow = rowOf(metrics, LEGAL_RENT_ROW);
-  const preferentialRow = rowOf(metrics, PREFERENTIAL_RENT_ROW);
+  const legalRow = statesSome(rowOf(metrics, LEGAL_RENT_ROW));
+  const preferentialRow = statesSome(rowOf(metrics, PREFERENTIAL_RENT_ROW));
   const statedWords = statedRow?.value.trim() ?? "";
-  const stated = statedWords && !STATES_NONE.test(statedWords) ? statedWords : null;
+  const statedYes = statedWords && STATES_YES.test(statedWords) ? statedWords : null;
+  const stated = statedWords && !STATES_NONE.test(statedWords) && !statedYes ? statedWords : null;
   const regulatedUnits = unitsRow ? parseCount(unitsRow.value) : null;
   const totalUnits = unitCountFromMetrics(metrics);
-  const memoSays = stated != null || regulatedUnits != null || legalRow != null || preferentialRow != null;
+  const memoSays = stated != null || statedYes != null || regulatedUnits != null || legalRow != null || preferentialRow != null;
 
   const residential = input.classKey ? assetWords(input.classKey).residential : undefined;
   let regimes: RegimeRead[] = [];
@@ -354,12 +370,16 @@ export function readRegulation(
   const noun = { many, one: many.replace(/s$/, "") };
   const claimOnly = regimes.length === 0 && memoSays;
 
+  // A yes with words after it keeps them, quoted; a bare yes says nothing more.
+  const yesWords = statedYes && !/^\s*yes\s*[.!]?\s*$/i.test(statedYes) ? ` ("${statedYes.replace(/\.$/, "")}")` : "";
   const parts: string[] = [];
   if (regimes.length) {
     parts.push(`${capital(regimes.map(regimeClause).join("; "))}.`);
   } else {
     parts.push(
-      `The memorandum states ${stated ? `the building is under ${stated.replace(/\.$/, "")}` : "regulated rents"}; no rent rule the site holds reaches this address, so that is the memorandum's claim.`,
+      `The memorandum states ${
+        stated ? `the building is under ${stated.replace(/\.$/, "")}` : statedYes ? `the building is rent-regulated${yesWords}` : "regulated rents"
+      }; no rent rule the site holds reaches this address, so that is the memorandum's claim.`,
     );
   }
   if (regulatedUnits != null) {
@@ -374,6 +394,7 @@ export function readRegulation(
     parts.push(`The memorandum states no count of regulated ${noun.many}, so no share of the building is read.`);
   }
   if (stated && regimes.length) parts.push(`It names the regime as ${stated.replace(/\.$/, "")}.`);
+  if (statedYes && regimes.length) parts.push(`It states the building is rent-regulated${yesWords} without naming the regime.`);
   for (const r of regimes) {
     if (r.allowance) parts.push(allowanceSentence(r.name, r.allowance));
   }
@@ -383,6 +404,7 @@ export function readRegulation(
   return {
     regimes,
     stated,
+    statedYes,
     regulatedUnits,
     totalUnits,
     sharePct,

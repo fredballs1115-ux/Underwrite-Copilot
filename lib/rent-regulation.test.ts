@@ -234,6 +234,49 @@ describe("a stated none is no claim", () => {
   });
 });
 
+// The audit of 2026-10-05: a rent row stating none made the memorandum's
+// claim of regulation, a regime row's "Yes", "Non-regulated" or
+// "Deregulated" was read as the regime's name.
+describe("a row's words that state none, or a bare yes", () => {
+  const austin = { address: { state: "TX", city: "Austin" }, classKey: "multifamily" };
+
+  it("reads a legal or preferential rent that states none as no rent and no claim", () => {
+    for (const r of [row("Legal regulated rent", "N/A"), row("Preferential rent", "None"), row("Legal regulated rent", "—"), row("Preferential rent", "Not applicable")]) {
+      expect(readRegulation(ex([row("Units", "48"), r]), austin, "2026-10-05"), `${r.label}: ${r.value}`).toBeNull();
+    }
+    // Where a regime reaches the building, a rent that states none is not said.
+    const nyc = readRegulation(walkUp([row("Legal regulated rent", "N/A"), row("Preferential rent", "None")]), BROOKLYN, "2026-10-05")!;
+    expect(nyc.legalRent).toBeNull();
+    expect(nyc.preferentialRent).toBeNull();
+    expect(nyc.headline).not.toContain("rent as stated");
+  });
+
+  it("reads a regime row's non-regime words as none, and a yes as regulated with no regime named", () => {
+    for (const none of ["Non-regulated", "Nonregulated", "Deregulated", "Destabilized", "Market", "Market-rate units"]) {
+      expect(readRegulation(ex([row("Units", "48"), row("Rent regulation", none)]), austin, "2026-10-05"), none).toBeNull();
+    }
+    const nyc = readRegulation(walkUp([row("Rent regulation", "Deregulated")]), BROOKLYN, "2026-10-05")!;
+    expect(nyc.stated).toBeNull();
+    expect(nyc.headline).not.toContain("It names the regime as Deregulated");
+    // A bare yes: the memorandum's claim, never a regime called "Yes".
+    const yes = readRegulation(ex([row("Units", "48"), row("Rent control", "Yes")]), austin, "2026-10-05")!;
+    expect(yes).toMatchObject({ claimOnly: true, stated: null, statedYes: "Yes" });
+    expect(yes.headline).toBe("The memorandum states the building is rent-regulated; no rent rule the site holds reaches this address, so that is the memorandum's claim.");
+    expect(regulationTag(yes)).toBe("Rent-regulated (OM)");
+    expect(regulationShortLine(yes)).toBe("Rent regulation: The memorandum states regulated rents, which no rule the site holds reaches here");
+    // A yes with words after it keeps them, quoted, and names no regime.
+    const park = readRegulation(
+      ex([row("Pads", "80"), row("Rent control", "Yes — city caps lot rent at CPI")], "manufactured_housing"),
+      { address: { state: "NJ", city: "Toms River" }, classKey: "manufactured_housing" },
+      "2026-10-05",
+    )!;
+    expect(park.stated).toBeNull();
+    expect(park.headline).toContain('It states the building is rent-regulated ("Yes — city caps lot rent at CPI") without naming the regime.');
+    expect(park.headline).not.toContain("It names the regime as Yes");
+    for (const r of [yes, park]) expect(gluedWords(r.headline)).toEqual([]);
+  });
+});
+
 describe("the prompt asks for what the reader reads", () => {
   it("names each regulation row by a label the reader's own pattern takes", () => {
     const prompt = extractionInstruction("multifamily");
