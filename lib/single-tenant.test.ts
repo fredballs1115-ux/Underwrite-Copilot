@@ -189,6 +189,50 @@ describe("readSingleTenant — the one lease the deal is", () => {
     expect(singleTenantModelLine(open, MODEL)).toContain("The tenant's right to end the lease early is already open");
   });
 
+  // Research pass 28: a government lease's firm term was never read. The
+  // tag said "Single tenant, 8 yrs left" and the model line "the lease has 3
+  // years left" at its sale, on a lease the government may leave on notice
+  // once its firm term ends — inside the hold.
+  it("a firm term's end is when the tenant may leave, never the lease's end", () => {
+    const gsa = (firm: Row[]) =>
+      ex([row("Lease expiration", "Sep 30, 2034", "p. 3"), ...firm], {
+        dealName: "Federal Building | Government-Leased Office (GSA)",
+        assetClass: "office",
+        singleTenant: tenant({ tenant: "United States of America (GSA)", guarantor: "", leaseType: "Modified gross" }),
+      });
+    const deal = gsa([row("Firm term expiration", "Sep 30, 2029", "p. 3")]);
+    const r = readSingleTenant(deal, TODAY)!;
+    expect(r.term?.ends).toBe("2034-09-30");
+    expect(r.early?.ends).toBe("2029-09-30");
+    expect(r.effective).toEqual({ ends: "2029-09-30", from: "date", yearsLeft: 3, early: true });
+    expect(singleTenantTag(deal, TODAY)).toBe("Single tenant, may leave in 3 yrs");
+    const line = singleTenantModelLine(r, MODEL);
+    expect(line).toBe(
+      "The lease may end Sep 2029, inside the model's 5-year hold: the model's rent after that is this tenant staying — the tenant's choice, not the buyer's — and its 2.0% vacancy is a market's allowance, not a single tenant's all-or-nothing.",
+    );
+    expect(line).not.toContain("years left");
+    expect(r.headline).toContain("The tenant may end the lease early from Sep 2029");
+    expect(gluedWords(`${r.headline} ${line}`)).toEqual([]);
+    // The firm term's end under the labels a memorandum gives it.
+    for (const label of ["Firm term end", "Firm term ends", "End of firm term", "Lease expiration (firm term)"]) {
+      expect(readSingleTenant(gsa([row(label, "Sep 30, 2029")]), TODAY)?.early?.ends, label).toBe("2029-09-30");
+    }
+    // Listed first, it is never read as the lease's own end, here or in the key terms.
+    const first = ex([row("Lease firm term expiration", "Sep 30, 2029"), row("Lease expiration", "Sep 30, 2034")]);
+    expect(readSingleTenant(first, TODAY)?.term?.ends).toBe("2034-09-30");
+    expect(readSingleTenant(first, TODAY)?.early?.ends).toBe("2029-09-30");
+    expect(singleTenantTermRows(first.metrics).map((m) => m.label)).toContain("Lease expiration");
+    expect(singleTenantTermRows(first.metrics).map((m) => m.label)).not.toContain("Lease firm term expiration");
+    // A firm term stated as a length is no date, and the lease keeps its own end.
+    const length = readSingleTenant(gsa([row("Firm term", "10 years (2019–2029)")]), TODAY)!;
+    expect(length.early).toBeNull();
+    expect(singleTenantTag(gsa([row("Firm term", "10 years")]), TODAY)).toBe("Single tenant, 8 yrs left");
+    // The extraction is asked to file a firm term's end where the reader reads it.
+    expect(extractionInstruction("office" as never)).toContain(
+      `under "Early termination date" exactly as written (a firm term's end, where the lease states one: after its firm term the tenant may leave on notice)`,
+    );
+  });
+
   it("a count of years is counted from today and said to be possibly short", () => {
     const r = readSingleTenant(ex([row("Lease term remaining", "9.5 years")]), TODAY)!;
     expect(r.term?.from).toBe("remaining");

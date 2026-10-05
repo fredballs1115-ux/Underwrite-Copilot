@@ -26,7 +26,9 @@
 //
 // AN EARLY TERMINATION IS THE LEASE'S END. A tenant who may leave on a date
 // gives the lease that date: the landlord cannot make it stay and a lender
-// will not count past it (the rollover card's rule for a break).
+// will not count past it (the rollover card's rule for a break). A firm
+// term's end is such a date — a government lease's tenant may leave on
+// notice once its firm term is over.
 //
 // THE INCREASES ARE THE GROWTH. Until the lease ends the rent grows as the
 // lease says, not as a market does: 10% every five years compounds to
@@ -71,7 +73,9 @@ const isRow = (m: unknown): m is MetricRow =>
 // The tenant's lease, never a ground lease's, the seller's loan's or a note's.
 const NOT_TENANT_LEASE = /ground|land\s*lease|assumable|\bloan\b|mortgage|\bnote\b|maturity/i;
 const END_ROW = /\blease\b.*\b(?:expir\w*|ends?|end\s+date|termination\s+date)\b|^(?:primary\s+|initial\s+|base\s+)?term\s+(?:expir\w*|ends?|end\s+date)\b|^expiration(?:\s+date)?$/i;
-const NOT_END = /option|renewal|extension|early|remaining|unexpired|\bleft\b|kick/i;
+// A firm term's end is when the tenant may first leave, never the lease's
+// own end (EARLY_ROW reads it).
+const NOT_END = /option|renewal|extension|early|remaining|unexpired|\bleft\b|kick|\bfirm\b/i;
 const LEFT_ROW = /\bterm\s+remaining\b|\bremaining\s+(?:lease\s+|primary\s+|base\s+|initial\s+)?term\b|\bunexpired\s+(?:lease\s+)?term\b|\blease\b.*\b(?:remaining|left)\b/i;
 const NOT_LEFT = /option|renewal|extension/i;
 const OPTION_ROW = /\b(?:renewal|extension)\s+options?\b|\boptions?\s+to\s+(?:renew|extend)\b|^(?:lease\s+)?options?$/i;
@@ -85,7 +89,13 @@ const NOT_RENT = /per\s*(?:sf|square|foot)|psf|\/\s*(?:sf|ft)\b|\bmarket\b|pro\s
 // reader's floor (a year's rent under $1,000 is not a building's).
 const RENT_VALUE_NOT_ANNUAL = /\/\s*mo(?:nth)?\b|per\s+month|monthly/i;
 const RATING_ROW = /\bcredit\s+rating\b|\brating\b/i;
-const EARLY_ROW = /\bearly\s+terminat\w*|\bterminat\w*\s+(?:option|right)s?\b|\bkick[- ]?out\b/i;
+// The first date the tenant may leave: an early termination, a termination
+// option or a kick-out — and a firm term's end ("Firm term expiration",
+// "End of firm term"), since after its firm term a tenant such as the
+// government may leave on notice (research pass 28). A row naming the firm
+// term without its end ("Firm term: 10 years") is a length, not a date.
+const EARLY_ROW =
+  /\bearly\s+terminat\w*|\bterminat\w*\s+(?:option|right)s?\b|\bkick[- ]?out\b|\bfirm\s+term\b.*\b(?:expir\w*|ends?|end\s+date)\b|\b(?:expir\w*|end)\b.*\bfirm\s+term\b/i;
 
 function rowsOf(ex: ExtractionResult): MetricRow[] {
   return (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_TENANT_LEASE.test(m.label));
