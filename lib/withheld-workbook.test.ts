@@ -184,3 +184,54 @@ describe("the workbook's Deal Summary says withheld over its live formulas (rese
     expect(wb.getWorksheet("Sensitivity")!.getCell(3, 1).value).toBeNull();
   }, 45000);
 });
+
+// Audit C4, M3: a retail leasehold whose ground lease ends Dec 31, 2028, read
+// on Oct 5, 2026 — inside the model's five-year hold. The deal page's tiles
+// read "n/a — lease ends in year 3" and the report leaves its grids out over
+// the leasehold card's sentence; the workbook's Deal Summary had printed
+// every return live under the generic leasehold caveat.
+describe("the workbook withholds a leasehold whose lease ends inside the hold, as the page and the report do", () => {
+  const AS_OF = new Date("2026-10-05T12:00:00Z");
+  const LEASEHOLD = ex({
+    dealName: "Fernwood Leasehold",
+    assetClass: "retail",
+    interest: {
+      kind: "leasehold",
+      summary: "The leasehold under a ground lease",
+      share: "",
+      groundLease: "Ground lease expires December 31, 2028; no extension options",
+      loan: "",
+      page: "",
+    },
+    metrics: [
+      m("Asking price", "$10,000,000"),
+      m("NOI (in-place)", "$950,000", "in_place"),
+      m("Total SF", "60,000 SF"),
+      m("Ground lease expiration", "December 31, 2028"),
+    ],
+  });
+
+  it("marks the returns withheld over their live formulas, the leasehold card's sentence in the band", async () => {
+    const d = deriveUnderwriteInputs(LEASEHOLD, "x", undefined, undefined, { asOf: AS_OF });
+    const interest = modelReturnsRead(LEASEHOLD, screeningCompareModel(d.inputs), AS_OF);
+    expect(interest.withheld).toBe("lease");
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(d, null, null, null, AS_OF, findingsOf(LEASEHOLD), interest)) as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet("Deal Summary")!;
+    const lines: string[] = [];
+    ws.eachRow((row) => {
+      const v = row.getCell(1).value;
+      if (typeof v === "string") lines.push(v);
+    });
+    expect(lines).toContain(
+      `The returns are withheld on the deal page, and the full report leaves its grids and max bid out. ${interest.line} The cells marked “withheld” keep their live formulas: give one a number format to read it.`,
+    );
+    const tileRow = rowOf(ws, 2, "LEVERED IRR");
+    for (const col of [2, 3, 4, 5]) expect(ws.getCell(tileRow + 1, col).numFmt, `tile ${col}`).toBe(WITHHELD_FMT);
+    const irr = ws.getCell(rowOf(ws, 4, "Levered IRR"), 5);
+    expect(formulaOf(irr)).toMatch(/IRR\(/);
+    expect(irr.numFmt).toBe(WITHHELD_FMT);
+    // The cap on year-1 NOI stands, as the page's cap does.
+    expect(ws.getCell(rowOf(ws, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).numFmt).toBe("0.00%");
+  }, 45000);
+});

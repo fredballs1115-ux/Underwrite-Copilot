@@ -17,6 +17,7 @@ import { WORKBOOK_WITHHELD_WORD, modelReadsWithheld, placeholderWorkbookLine, wi
 import { yearOneCapitalLine } from "./cost-note";
 import { noIrrText } from "./no-irr";
 import type { PlausibilityFinding } from "@/lib/deal-strategy";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -201,14 +202,20 @@ export async function buildUnderwriteWorkbook(
    *  withholds its tiles (research pass 40, H1); absent, only the model's
    *  own vacancy is read for that */
   findings?: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null,
+  /** the deal page's read of what the price buys (lib/compare-interest
+   *  `modelReturnsRead` over the screening model, on the reader's day): a
+   *  leasehold whose lease ends inside the hold has its returns marked
+   *  withheld, as the page and the report withhold them (audit C4, M3) */
+  interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
   const holdYears = result.holdYears;
-  // The returns the deal page withholds — a building run nearly vacant, a
-  // finding against them — said once and marked wherever the workbook
-  // prints them; every cell keeps its formula.
-  const withheld = withheldWorkbookRead(inputs, model.meta.occupancyPct, findings);
+  // The returns the deal page withholds — a leasehold whose lease ends
+  // inside the hold, a building run nearly vacant, a finding against them —
+  // said once and marked wherever the workbook prints them; every cell
+  // keeps its formula.
+  const withheld = withheldWorkbookRead(inputs, model.meta.occupancyPct, findings, interest);
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";

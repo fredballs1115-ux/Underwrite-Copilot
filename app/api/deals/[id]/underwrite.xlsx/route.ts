@@ -19,6 +19,8 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { regulationForDeal } from "@/lib/rent-regulation";
 import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
+import { modelReturnsRead } from "@/lib/compare-interest";
+import { screeningCompareModel } from "@/lib/underwrite/report-grid";
 
 export const runtime = "nodejs";
 
@@ -182,7 +184,12 @@ export async function GET(
     // them withheld over their live formulas, as the page withholds its
     // tiles and the report its grids (research pass 40, H1).
     const findings = assessPlausibility(extraction, inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null));
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), new Date(), findings);
+    // And what the price buys, on the deal page's own read of the same
+    // model: a leasehold whose lease ends inside the hold has its returns
+    // marked withheld, as the page and the report withhold them (audit C4,
+    // M3).
+    const interest = modelReturnsRead(extraction, screeningCompareModel(model.inputs), asOf);
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), new Date(), findings, interest);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";

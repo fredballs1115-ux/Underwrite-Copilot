@@ -909,7 +909,19 @@ export function withheldWorkbookRead(
   inputs: Pick<UnderwriteInputs, "vacancyPct">,
   occupancy: number | null | undefined,
   findings: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null | undefined,
+  /** the deal page's read of what the price buys (lib/compare-interest
+   *  `modelReturnsRead` over `screeningCompareModel`): a leasehold whose
+   *  lease ends inside the hold withholds the returns first, over the
+   *  leasehold card's own sentence, as the report's `leaseReturnsLine` does
+   *  (audit C4, M3); its cap on year-1 NOI stands, as the page's does */
+  interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null,
 ): { line: string; cap: boolean } | null {
+  if (interest?.withheld === "lease" && interest.line) {
+    return {
+      line: `The returns are withheld on the deal page, and the full report leaves its grids and max bid out. ${interest.line} The cells marked “${WORKBOOK_WITHHELD_WORD}” keep their live formulas: give one a number format to read it.`,
+      cap: false,
+    };
+  }
   const vacant = nearlyVacantReason(inputs, occupancy);
   const f = vacant ? null : (findings ?? []).find(findingWithholdsReturns);
   if (!vacant && !f) return null;
