@@ -33,7 +33,7 @@ import {
 } from "./criteria";
 import { countNoun } from "./asset-words";
 import { basisTag, statedCapSlot } from "./pipeline-slots";
-import { scoreMandateFit } from "./mandate";
+import { evalDealbreakers, scoreMandateFit } from "./mandate";
 import { dealCheckSource } from "./buy-box-chip";
 import type { ExtractionResult, FirstSignal } from "./anthropic/types";
 
@@ -1395,6 +1395,40 @@ describe("evaluateBuyBox — the basis check in the deal's own noun (lib/asset-w
     expect(check(park, "Basis / pad")?.status).toBe("pass");
     const apts = evaluateBuyBox("multifamily", ex([["Price per unit", "$150,000"]]), box);
     expect(check(apts, "Basis / unit")?.status).toBe("pass");
+  });
+
+  // Research pass 41 (M5): a value-add's verdict brief read "Basis / unit —
+  // fits: Mandate caps basis at $300k/unit — this is $217k/unit" beside the
+  // plan's all-in basis of $229k per planned unit — two bases, one of them
+  // the price alone.
+  it("on a plan deal labels the check by what it divides: the price over the units, never a second basis", () => {
+    const plan = (kind: string, rows: [string, string][]) => ({ ...ex(rows), strategy: { kind } });
+    const va = evaluateBuyBox("multifamily", plan("value_add", [["Price per unit", "$217,000"]]), { maxPerUnitK: 300 });
+    expect(check(va, "Basis / unit")).toBeUndefined();
+    expect(check(va, "Price / unit")).toMatchObject({
+      status: "pass",
+      onPrice: true,
+      detail: "Mandate caps the price at $300k/unit — this is $217k/unit. Inside.",
+    });
+    const rich = evaluateBuyBox("hospitality_str", plan("conversion", [["Price per key", "$252,000"]]), box);
+    expect(check(rich, "Price / key")?.detail).toBe("Mandate caps the price at $200k/key — this is $252k/key. Rich for the mandate.");
+    expect(check(evaluateBuyBox("multifamily", plan("development", []), box), "Price / unit")?.detail).toBe(
+      "Mandate caps the price at $200k/unit; no parseable per-unit price yet.",
+    );
+    // A stabilized deal, or one whose kind is not known, keeps its basis.
+    for (const kind of ["stabilized", "unknown"]) {
+      expect(check(evaluateBuyBox("multifamily", plan(kind, [["Price per unit", "$150,000"]]), box), "Basis / unit")?.detail).toBe(
+        "Mandate caps basis at $200k/unit — this is $150k/unit. Inside.",
+      );
+    }
+    // The hard ceiling says the same figure the same way.
+    const hard = { dealbreakers: { maxPerUnitK: 200 } };
+    expect(evalDealbreakers("multifamily", plan("value_add", [["Price per unit", "$252,000"]]), hard).tripped).toEqual([
+      "price $252k/unit over the $200k/unit ceiling",
+    ]);
+    expect(evalDealbreakers("multifamily", plan("stabilized", [["Price per unit", "$252,000"]]), hard).tripped).toEqual([
+      "basis $252k/unit over the $200k/unit ceiling",
+    ]);
   });
 });
 

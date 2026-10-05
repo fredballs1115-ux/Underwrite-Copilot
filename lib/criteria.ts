@@ -1754,7 +1754,14 @@ export function evaluateBuyBox(
     // The deal's own noun (lib/asset-words): a hotel is held to the mandate
     // per key, a park per pad — the figure the OM quotes is the one tested.
     const noun = assetWords(cls).noun?.one ?? "unit";
-    const label = `Basis / ${noun}`;
+    // On a plan deal the figure is the price over the units, and the deal's
+    // basis is its total cost (lib/deal-strategy `planSummary`): the check
+    // is labelled by what it divides, the mandate's own "max price per
+    // unit", never as a second basis beside the plan's (research pass 41).
+    const onPlan = planKindLabel(extraction) != null;
+    const label = `${onPlan ? "Price" : "Basis"} / ${noun}`;
+    const caps = onPlan ? "Mandate caps the price" : "Mandate caps basis";
+    const what = onPlan ? `per-${noun} price` : `per-${noun} figure`;
     // A per-unit figure on a price that is not the building's — a note's, a
     // position's, the land's, a share's — is on a basis the memorandum never
     // says: the box's ceiling is never held to it (the audit of 2026-10-05).
@@ -1764,21 +1771,21 @@ export function evaluateBuyBox(
         label,
         onPrice: true,
         status: "unknown",
-        detail: `Mandate caps basis at ${fmtM(max)}/${noun}, but ${withheld}.`,
+        detail: `${caps} at ${fmtM(max)}/${noun}, but ${withheld}.`,
       });
     } else if (dollars == null) {
       checks.push({
         label,
         onPrice: true,
         status: "unknown",
-        detail: `Mandate caps basis at ${fmtM(max)}/${noun}; no parseable per-${noun} figure yet.`,
+        detail: `${caps} at ${fmtM(max)}/${noun}; no parseable ${what} yet.`,
       });
     } else if (dollars <= max) {
       checks.push({
         label,
         onPrice: true,
         status: "pass",
-        detail: `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Inside.`,
+        detail: `${caps} at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Inside.`,
       });
     } else {
       const off = (dollars - max) / max;
@@ -1788,8 +1795,8 @@ export function evaluateBuyBox(
         onPrice: true,
         status: near ? "near" : "miss",
         detail: near
-          ? `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}, ${Math.round(off * 100)}% over. Within negotiating range.`
-          : `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Rich for the mandate.`,
+          ? `${caps} at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}, ${Math.round(off * 100)}% over. Within negotiating range.`
+          : `${caps} at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Rich for the mandate.`,
       });
     }
   }

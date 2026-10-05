@@ -39,6 +39,7 @@ import {
   NEAR_REL,
   NEAR_CAP_PT,
   NEAR_IRR_PT,
+  planKindLabel,
   returnWithheldDetail,
   returnWithheldOf,
   screenYearOf,
@@ -316,7 +317,9 @@ export function evalDealbreakers(
     const ceiling = db.maxPerUnitK * 1e3;
     if (perUnit == null) unknown.push("basis / unit");
     else if (perUnit <= ceiling) clear.push("basis / unit");
-    else tripped.push(`basis ${fmtM(perUnit)}/unit over the ${fmtM(ceiling)}/unit ceiling`);
+    // On a plan deal the figure is the price over the units, never the
+    // plan's all-in basis, and is said so (the box's check, lib/criteria).
+    else tripped.push(`${planKindLabel(extraction) ? "price" : "basis"} ${fmtM(perUnit)}/unit over the ${fmtM(ceiling)}/unit ceiling`);
     judged("basis / unit", perUnit != null);
   }
 

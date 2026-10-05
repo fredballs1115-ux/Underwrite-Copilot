@@ -1421,9 +1421,10 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           mandate={data.mandate}
           // Criteria the fold checks below but the 0–100 score doesn't weigh.
           // The basis check wears the deal's noun ("Basis / key" on a hotel),
-          // so it is matched by its prefix, never by one spelling.
+          // and on a plan deal what it divides ("Price / unit"), so it is
+          // matched by its prefix, never by one spelling.
           unscored={data.checks
-            .filter((c) => c.label === "Price" || c.label.startsWith("Basis / "))
+            .filter((c) => c.label === "Price" || c.label.startsWith("Basis / ") || c.label.startsWith("Price / "))
             .map((c) => (c.label === "Price" ? "price" : c.label.toLowerCase()))}
           // The criteria the deal misses outright: the header's chip folds
           // every check and reads "Outside box" on any of them (lib/buy-box-
