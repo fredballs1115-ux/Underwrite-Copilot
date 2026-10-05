@@ -154,8 +154,24 @@ export const PREFERENTIAL_RENT_ROW = /^\s*(?:average\s+)?preferential\s+rents?\b
 const NOT_A_COUNT = /%|percent|\bshare\b|\$|expir|\bdate\b/i;
 /** A count row that states nothing: no row at all. */
 const BLANK_COUNT = /^(?:n\/?a|not\s+(?:applicable|stated|provided|available|disclosed)|unknown|tbd|[-–—])\.?$/i;
-/** A count row that states none are regulated: a stated zero. */
-const ZERO_COUNT = /^(?:0|zero|no\s+units?)\.?$/i;
+/** A count row whose words say the count is not known — "Unknown – pending
+ *  DHCR review", "Not provided by seller", "TBD (see rent roll)", "N/A – see
+ *  registration history", "Not disclosed; registrations in the data room",
+ *  "No count available", "None stated": no count at all, said as stated and
+ *  never a zero. Read from the start of the words, ahead of the words that
+ *  state none (the batch audit: each of these had read as "none of the 48
+ *  units are rent-regulated", on the pipeline's tag and in every Claude
+ *  step). */
+const NO_COUNT =
+  /^\s*(?:unknown|tbd|t\.b\.d\.?|tba|to\s+be\s+(?:determined|confirmed|provided|disclosed)|n\/?a\b|not\s+(?:applicable|stated|provided|available|disclosed|known|specified|reported|confirmed|verified)|no\s+(?:count|figure|number|data|information|breakdown|details?)|none\s+(?:stated|provided|disclosed|available|given|reported)|pending|unconfirmed|unverified|[-–—])/i;
+/** A count row that states none are regulated: the figure 0 ("0", "0
+ *  units", "0 of 48", "Zero") … */
+const ZERO_FIGURE = /^\s*(?:0|zero)\b(?![.,]\d)/i;
+/** … or words that say so at the start: "None", "No units", "No regulated
+ *  units", "Market rate", "Market-rate units only", "Exempt",
+ *  "Deregulated", "Not subject to rent stabilization". */
+const STATES_ZERO =
+  /^\s*(?:none|nil|no\s+(?:(?:rent[- ])?(?:regulated|stabili[sz]ed|controlled)\s+)?(?:units?|apartments?|homes?)|(?:all\s+)?(?:market(?:[- ]rate)?|free[- ]market)|exempt|unregulated|non[- ]?regulated|deregulated|destabili[sz]ed|not\s+(?:subject|regulated|covered|rent[- ](?:controlled|stabili[sz]ed|regulated)))(?![\w-])/i;
 
 /** A row whose words state none — "None", "No rent control", "N/A",
  *  "Not subject to rent control", "Exempt", "Market rate", "Non-regulated",
@@ -220,6 +236,10 @@ export interface RegulationRead {
   /** the regulated-units row's own words where they state no count the
    *  reader can take ("41 of 48", "All"): said as stated, no share read */
   regulatedUnitsStated: string | null;
+  /** the regulated-units row's own words where they say no count is known
+   *  ("Unknown – pending DHCR review", "Not provided by seller"): said as
+   *  stated, never a zero and never the memorandum's claim of regulation */
+  regulatedUnitsUnknown: string | null;
   totalUnits: number | null;
   /** regulated over the count, where both are stated and agree */
   sharePct: number | null;
@@ -352,13 +372,18 @@ export function readRegulation(
   // The regulated count as stated: a count, a stated zero ("0", "None"), or
   // words no count is read from ("41 of 48", "All"), said as stated — never
   // "no count", which the key terms printing the row beside it contradicted
-  // (the audit of 2026-10-05). A row that states nothing is no row.
+  // (the audit of 2026-10-05). A row that states nothing is no row; a row
+  // whose words say the count is not known ("Unknown – pending DHCR
+  // review") is no count, said as stated — never a zero, which a blank is
+  // not.
   const unitsWords = unitsRow?.value.trim() ?? "";
   const unitsBlank = unitsWords === "" || BLANK_COUNT.test(unitsWords);
-  const unitsZero = !unitsBlank && (ZERO_COUNT.test(unitsWords) || STATES_NONE.test(unitsWords));
-  const counted = unitsBlank || unitsZero ? null : parseCount(unitsWords);
+  const unitsUnknown = !unitsBlank && NO_COUNT.test(unitsWords);
+  const unitsZero = !unitsBlank && !unitsUnknown && (ZERO_FIGURE.test(unitsWords) || STATES_ZERO.test(unitsWords));
+  const counted = unitsBlank || unitsUnknown || unitsZero ? null : parseCount(unitsWords);
   const regulatedUnits = unitsZero ? 0 : counted;
-  const regulatedUnitsStated = unitsBlank || unitsZero || counted != null ? null : unitsWords;
+  const regulatedUnitsUnknown = unitsUnknown ? unitsWords : null;
+  const regulatedUnitsStated = unitsBlank || unitsUnknown || unitsZero || counted != null ? null : unitsWords;
   const totalUnits = unitCountFromMetrics(metrics);
   // A stated zero is no claim of regulation.
   const memoSays =
@@ -445,6 +470,10 @@ export function readRegulation(
     );
   } else if (regulatedUnitsStated) {
     parts.push(`The memorandum states the regulated ${noun.many} as: ${regulatedUnitsStated.replace(/\.$/, "")}; no share is read.`);
+  } else if (regulatedUnitsUnknown) {
+    parts.push(
+      `The memorandum gives no count of regulated ${noun.many} (it states: ${regulatedUnitsUnknown.replace(/\.$/, "")}), so no share of the building is read.`,
+    );
   } else if (regimes.length) {
     parts.push(`The memorandum states no count of regulated ${noun.many}, so no share of the building is read.`);
   }
@@ -462,6 +491,7 @@ export function readRegulation(
     statedYes,
     regulatedUnits,
     regulatedUnitsStated,
+    regulatedUnitsUnknown,
     totalUnits,
     sharePct,
     countsDisagree,
@@ -516,7 +546,10 @@ function lowestCurrent(r: RegulationRead): { regime: RegimeRead; figure: Allowan
 /**
  * The pipeline row's tag — "Rent-stabilized, 41 of 48", "LA RSO, 3% cap",
  * "Rent rules: check", "Rent-regulated (OM)" — beside the price, where a scan
- * of the pipeline sees which buildings' rents a regime sets. Null where none.
+ * of the pipeline sees which buildings' rents a regime sets. Where the rules
+ * apply and the memorandum states none of the units regulated, "Rent rules
+ * apply; 0 of 48 regulated (OM)": never "Rent-stabilized, 0 of 48", which
+ * read as a stabilized building (the batch audit). Null where none.
  */
 export function regulationTag(r: RegulationRead | null): string | null {
   if (!r) return null;
@@ -524,6 +557,9 @@ export function regulationTag(r: RegulationRead | null): string | null {
   const lead = r.regimes[0];
   if (!lead) return null;
   if (lead.outcome !== "applies") return "Rent rules: check";
+  if (r.regulatedUnits === 0) {
+    return `Rent rules apply; ${r.totalUnits != null ? `0 of ${count(r.totalUnits)}` : "none"} regulated (OM)`;
+  }
   if (r.regulatedUnits != null && r.totalUnits != null && !r.countsDisagree) {
     return `${lead.short}, ${count(r.regulatedUnits)} of ${count(r.totalUnits)}`;
   }

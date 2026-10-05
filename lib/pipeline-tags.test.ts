@@ -160,6 +160,10 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     expect(tone("LA RSO, 3% cap").tone).toBe("caution");
     expect(tone("Rent-regulated (OM)").tone).toBe("caution");
     expect(tone("Rent rules: check")).toMatchObject({ tone: "muted", title: expect.stringMatching(/^Rent rules: check: the rent rules that reach the building/) });
+    // Rules that apply to a building the memorandum says has none of its
+    // units regulated: a fact to check, never a stabilized building in the
+    // warning tone (the batch audit).
+    expect(tone("Rent rules apply; 0 of 48 regulated (OM)").tone).toBe("muted");
   });
 
   it("a deal with nothing to flag carries no tags, and a flood lookup outside a hazard area adds none", () => {

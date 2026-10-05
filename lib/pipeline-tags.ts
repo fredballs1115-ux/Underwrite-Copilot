@@ -99,11 +99,13 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
     // The rent rules that reach the building (lib/rent-regulation): a regime
     // that applies, or the memorandum's claim of one, warns; one the rules
     // say possibly applies ("Rent rules: check") is a question to answer,
-    // in the muted tone.
+    // and rules that apply to a building the memorandum says has none of
+    // its units regulated ("Rent rules apply; 0 of 48 regulated (OM)") a
+    // fact to check, each in the muted tone.
     tag(
       "regulation",
       slots.regulation,
-      slots.regulation && /^Rent rules: check/.test(slots.regulation) ? "muted" : "caution",
+      slots.regulation && /^Rent rules\b/.test(slots.regulation) ? "muted" : "caution",
       "the rent rules that reach the building — the deal page reads the regime, the regulated share and the allowance in force against the model's growth",
     ),
     // One tenant leases the whole property (#454).

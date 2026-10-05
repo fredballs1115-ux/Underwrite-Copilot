@@ -277,7 +277,10 @@ describe("the regulated count as the memorandum states it", () => {
       expect(r.regulatedUnits, zero).toBe(0);
       expect(r.headline, zero).toContain("The memorandum states none of the 48 units are rent-regulated.");
       expect(r.headline, zero).not.toContain("no count of regulated units");
-      expect(regulationTag(r), zero).toBe("Rent-stabilized, 0 of 48");
+      // Rules that apply to a building the memorandum says has none of its
+      // units regulated: never "Rent-stabilized, 0 of 48", which read as a
+      // stabilized building (the batch audit).
+      expect(regulationTag(r), zero).toBe("Rent rules apply; 0 of 48 regulated (OM)");
       expect(regulationShortLine(r), zero).toContain("none of the 48 units rent-regulated as stated");
       expect(regulationModelLine(r, 3), zero).toContain("and none of the 48 units are regulated as the memorandum states");
     }
@@ -289,6 +292,61 @@ describe("the regulated count as the memorandum states it", () => {
     const austin = readRegulation(ex([row("Units", "48"), row("Rent-regulated units", "41 of 48")]), { address: { state: "TX", city: "Austin" }, classKey: "multifamily" }, "2026-10-05")!;
     expect(austin.claimOnly).toBe(true);
     expect(austin.headline).toContain("The memorandum states the regulated units as: 41 of 48; no share is read.");
+  });
+});
+
+// The batch audit: a regulated-units row whose words say the count is not
+// known was read as a stated zero — "The memorandum states none of the 48
+// units are rent-regulated" on the panel, "Rent-stabilized, 0 of 48" on the
+// pipeline, and the same sentence in every Claude step.
+describe("a regulated count the memorandum does not know", () => {
+  const UNKNOWN = [
+    "Unknown - pending DHCR registration review",
+    "Unknown – pending DHCR review",
+    "Not provided by seller",
+    "TBD (see rent roll)",
+    "N/A - see registration history",
+    "Not disclosed; registrations in data room",
+    "No count available",
+    "None stated",
+  ];
+
+  it("is no count at all, said as stated, and never a zero", () => {
+    for (const words of UNKNOWN) {
+      const r = readRegulation(walkUp([row("Rent-stabilized units", words)]), BROOKLYN, "2026-10-05")!;
+      expect(r.regulatedUnits, words).toBeNull();
+      expect(r.regulatedUnitsStated, words).toBeNull();
+      expect(r.regulatedUnitsUnknown, words).toBe(words);
+      expect(r.sharePct, words).toBeNull();
+      expect(r.headline, words).toContain(
+        `The memorandum gives no count of regulated units (it states: ${words}), so no share of the building is read.`,
+      );
+      expect(r.headline, words).not.toMatch(/none of the 48/i);
+      expect(regulationTag(r), words).toBe("Rent-stabilized, 0% cap");
+      expect(regulationShortLine(r), words).not.toMatch(/none of the/i);
+      expect(regulationModelLine(r, 3), words).not.toMatch(/none of the/i);
+      expect(regulationContextLine(r), words).not.toMatch(/none of the 48/i);
+      const html = renderToStaticMarkup(React.createElement(RegulationPanel, { regulation: r, today: "2026-10-05" }));
+      expect(visibleText(html), words).not.toMatch(/none of the 48/i);
+      expect(gluedWords(r.headline), words).toEqual([]);
+    }
+  });
+
+  it("is no claim of regulation where no rule reaches", () => {
+    const austin = { address: { state: "TX", city: "Austin" }, classKey: "multifamily" };
+    for (const words of UNKNOWN) {
+      expect(readRegulation(ex([row("Units", "48"), row("Rent-regulated units", words)]), austin, "2026-10-05"), words).toBeNull();
+    }
+  });
+
+  it("reads a zero only from the figure 0 or from words that state none at the start", () => {
+    for (const zero of ["0", "0 units", "Zero", "None", "No units", "No rent-stabilized units", "Market rate", "Market-rate units only", "Exempt", "Deregulated"]) {
+      const r = readRegulation(walkUp([row("Rent-stabilized units", zero)]), BROOKLYN, "2026-10-05")!;
+      expect(r.regulatedUnits, zero).toBe(0);
+      expect(r.regulatedUnitsUnknown, zero).toBeNull();
+      expect(r.headline, zero).toContain("The memorandum states none of the 48 units are rent-regulated.");
+      expect(regulationTag(r), zero).toBe("Rent rules apply; 0 of 48 regulated (OM)");
+    }
   });
 });
 
