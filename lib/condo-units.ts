@@ -55,6 +55,17 @@ export const condoCountOf = (r: Row | null): number | null => {
 };
 
 /**
+ * The units in the whole condominium, as stated — the building a rent rule
+ * counts (lib/rent-regulation `rulesSizeText`, research pass 41), never the
+ * units offered. Null where the memorandum states no such count, or the
+ * deal is not condominium units.
+ */
+export function condoUnitsInCondominium(ex: ExtractionResult | null | undefined): number | null {
+  const c = condoRows(ex);
+  return c ? condoCountOf(c.find(UNITS_IN_CONDO_ROW)) : null;
+}
+
+/**
  * The units a bulk condominium purchase buys: a row of their own, else —
  * where the class itself is a condominium — the deal's own unit count (on a
  * bulk sale the memorandum's "Units" are the units offered, and the count

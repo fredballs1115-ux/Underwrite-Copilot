@@ -61,7 +61,7 @@ import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageNote } from "@/lib/self-storage";
-import { regulationForDeal, regulationNote, type RegulationRead } from "@/lib/rent-regulation";
+import { regulationForDeal, regulationNote, regulationSaidByPark, type RegulationRead } from "@/lib/rent-regulation";
 import { forwardNote, isForwardPurchase, readForwardPurchase, readsConstructionLending } from "@/lib/forward-purchase";
 import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
@@ -1399,7 +1399,11 @@ async function runAnalysisSteps(
         // applies", that question named — the deal context, built after the
         // lookup, reads the building's own municipality.
         const regulation = screenRegulation({ extraction: ex, address: dr?.address, asset_class: assetClass }, null);
-        if (regulation) notes.push(regulationNote(regulation));
+        // A park's own read says its "Rent control" row (below): where the
+        // regulation's line would only say it again, the park's stands alone
+        // (lib/rent-regulation `regulationSaidByPark`).
+        const park = readManufacturedHousing(ex);
+        if (regulation && !regulationSaidByPark(regulation, park)) notes.push(regulationNote(regulation));
 
         // One tenant leases the whole property (#454): the lease's facts,
         // then the single-tenant traps keyed to them by name — the
@@ -1457,7 +1461,6 @@ async function runAnalysisSteps(
         // A manufactured-housing park (#470): the lot rent against the
         // comparable parks', the park-owned homes, the water and sewer the
         // park runs, the rent rules and the age restriction's compliance.
-        const park = readManufacturedHousing(ex);
         if (park) notes.push(mhNote(park));
         // A self-storage facility (#471): the street rate against recent
         // move-ins, the premium sitting tenants pay, the economic

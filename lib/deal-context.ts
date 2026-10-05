@@ -25,7 +25,7 @@ import { readSiteReports, siteReportsContextLine } from "@/lib/site-reports";
 import { readStudentHousing, studentContextLine } from "@/lib/student-housing";
 import { mhContextLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageContextLine } from "@/lib/self-storage";
-import { regulationContextLine, type RegulationRead } from "@/lib/rent-regulation";
+import { regulationContextLine, regulationSaidByPark, type RegulationRead } from "@/lib/rent-regulation";
 import { forwardContextLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseContextLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernContextLine, readGoingConcern } from "@/lib/going-concern";
@@ -177,8 +177,9 @@ export function dealContextFor(
     ...(noteFinancing ? [notePurchaseFinancingContextLine(noteFinancing)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
     // The rent rules that reach the building (lib/rent-regulation): the
-    // regime, the regulated share as stated and the allowance in force.
-    ...(regulation ? [regulationContextLine(regulation)] : []),
+    // regime, the regulated share as stated and the allowance in force —
+    // never a park's own row said twice (`regulationSaidByPark`).
+    ...(regulation && !regulationSaidByPark(regulation, park) ? [regulationContextLine(regulation)] : []),
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(roster ? [rosterContextLine(roster)] : []),
     ...(valueAdd ? [valueAddContextLine(valueAdd)] : []),

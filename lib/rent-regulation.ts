@@ -46,6 +46,9 @@ import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/asset-class";
 import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
+import { inferStrategy, notYetDelivered } from "@/lib/deal-strategy";
+import { interestOf } from "@/lib/interest";
+import { condoUnitsInCondominium } from "@/lib/condo-units";
 
 // ── The file ─────────────────────────────────────────────────────────────
 
@@ -249,6 +252,10 @@ export interface RegulationRead {
   preferentialRent: string | null;
   /** the memorandum names a regime, and no rule the site holds reaches here */
   claimOnly: boolean;
+  /** the price buys the land under a ground lease (lib/interest): a regime
+   *  reaches the leaseholder's building and its rents, never the ground rent
+   *  the buyer collects (research pass 41) */
+  leasedFee: boolean;
   /** the read in one paragraph, for the panel and the deal context */
   headline: string;
 }
@@ -316,11 +323,22 @@ export { unverifiedRule };
 /** The open question an unverified rule carries: its own caution. */
 export const UNVERIFIED_OPEN = "whether one reaches this address, which the site's rule has not verified — check the ordinance before an offer";
 
-function regimeClause(r: RegimeRead): string {
-  if (r.outcome === "applies") return `${r.name} applies by the site's rules`;
+/** " to the leaseholder's building" on a leased fee, where the regime reaches
+ *  a building the buyer does not own; "" otherwise. */
+const towhom = (leasedFee: boolean) => (leasedFee ? " to the leaseholder's building" : "");
+
+function regimeClause(r: RegimeRead, leasedFee = false): string {
+  if (r.outcome === "applies") return `${r.name} applies${towhom(leasedFee)} by the site's rules`;
   const open = r.unknowns.length ? ` (open: ${r.unknowns.join("; ")})` : "";
-  return `${r.name} possibly applies${open}`;
+  return `${r.name} possibly applies${towhom(leasedFee)}${open}`;
 }
+
+/** The memorandum's regime row as it words it, quoted: a regime's name
+ *  ("Rent stabilization") and a sentence ("Subject to the county's mobile
+ *  home park rent stabilization ordinance") read alike — "the building is
+ *  under Subject to the county's …" had been said of the second (research
+ *  pass 41). */
+const statedText = (stated: string) => `its rent regulation as “${stated.replace(/\.$/, "")}”`;
 
 /**
  * The size the rent rules test, in the words `buildSubject` reads ("248
@@ -332,12 +350,15 @@ function regimeClause(r: RegimeRead): string {
  * buildings "NYC rent stabilization applies"). One reader for this read and
  * the deal page's rules panel, which had read the header's Size slot — the
  * area where a memorandum states both, so its unit questions stayed open
- * beside a stated count (research pass 34).
+ * beside a stated count (research pass 34). Condominium units bought in bulk
+ * are counted by the condominium the memorandum states they sit in (lib/
+ * condo-units): its "42 of the condominium's 120 units" had left the count
+ * open (research pass 41).
  */
 export function rulesSizeText(ex: ExtractionResult | null | undefined, classKey: string | null | undefined): string | null {
   if (!ex) return null;
   const metrics = (Array.isArray(ex.metrics) ? (ex.metrics as unknown[]) : []).filter(isRow);
-  const totalUnits = unitCountFromMetrics(metrics);
+  const totalUnits = condoUnitsInCondominium(ex) ?? unitCountFromMetrics(metrics);
   const homes = assetClassKey(classKey) === "sfr_btr";
   const portfolio = Array.isArray(ex.properties) && ex.properties.length >= 2;
   return totalUnits != null && !homes && !portfolio ? `${totalUnits} units` : null;
@@ -394,6 +415,22 @@ export function readRegulation(
     preferentialRow != null;
 
   const residential = input.classKey ? assetWords(input.classKey).residential : undefined;
+  // The deal's other readers take the rows this read keeps: analysis output
+  // can carry a null or a row with no value, and none of them may throw here.
+  const kept: ExtractionResult = { ...ex, metrics: metrics as ExtractionResult["metrics"] };
+  // What the price buys (lib/interest): on a leased fee the regime reaches
+  // the leaseholder's building, never the ground rent the buyer collects.
+  const leasedFee = interestOf(kept).kind === "leased_fee";
+  // A building not yet delivered — a development, or a conversion whose new
+  // use comes with the works (lib/deal-strategy `notYetDelivered`) — has no
+  // building permit year yet: it is permitted no earlier than the year the
+  // rules are read in, so a rule's permit-after-date exemption resolves by
+  // its own condition (research pass 41: DC's 1975 cutoff had read "possibly
+  // applies" on a 300-unit building yet to be built). Every permit and built
+  // date the rules file holds is past (a test holds it), so this lower bound
+  // decides each as the true year would; every other question stays open,
+  // and nothing is made to apply that the rule does not say applies.
+  const permittedFrom = notYetDelivered(inferStrategy(kept).kind) && /^\d{4}-/.test(today) ? Number(today.slice(0, 4)) : null;
   let regimes: RegimeRead[] = [];
   if (input.address?.state && residential !== false) {
     const subject = buildSubject({
@@ -403,6 +440,7 @@ export function readRegulation(
       yearBuilt: yearBuiltOf(metrics),
       residential,
       today,
+      sectorFields: permittedFrom != null ? { building_permit_year: permittedFrom } : null,
     });
     // Where a regime of the deal's own place holds it (Newark's, Jersey
     // City's), that place is screened by its own rule: a statewide rule the
@@ -448,12 +486,20 @@ export function readRegulation(
   const yesWords = statedYes && !/^\s*yes\s*[.!]?\s*$/i.test(statedYes) ? ` ("${statedYes.replace(/\.$/, "")}")` : "";
   const parts: string[] = [];
   if (regimes.length) {
-    parts.push(`${capital(regimes.map(regimeClause).join("; "))}.`);
+    parts.push(`${capital(regimes.map((g) => regimeClause(g, leasedFee)).join("; "))}.`);
   } else {
     parts.push(
       `The memorandum states ${
-        stated ? `the building is under ${stated.replace(/\.$/, "")}` : statedYes ? `the building is rent-regulated${yesWords}` : "regulated rents"
+        stated ? statedText(stated) : statedYes ? `the building is rent-regulated${yesWords}` : "regulated rents"
       }; no rent rule the site holds reaches this address, so that is the memorandum's claim.`,
+    );
+  }
+  // A leased fee's buyer collects the ground rent: a regime sets the
+  // leaseholder's rents, and reaches the buyer only through the income that
+  // covers the ground rent (research pass 41).
+  if (leasedFee) {
+    parts.push(
+      "It sets the leaseholder's rents, never the ground rent this buyer collects: what it does here is to the leaseholder's income that covers the ground rent.",
     );
   }
   if (regulatedUnits === 0) {
@@ -475,7 +521,7 @@ export function readRegulation(
   } else if (regimes.length) {
     parts.push(`The memorandum states no count of regulated ${noun.many}, so no share of the building is read.`);
   }
-  if (stated && regimes.length) parts.push(`It names the regime as ${stated.replace(/\.$/, "")}.`);
+  if (stated && regimes.length) parts.push(`It states ${statedText(stated)}.`);
   if (statedYes && regimes.length) parts.push(`It states the building is rent-regulated${yesWords} without naming the regime.`);
   for (const r of regimes) {
     if (r.allowance) parts.push(allowanceSentence(r.name, r.allowance));
@@ -497,6 +543,7 @@ export function readRegulation(
     legalRent: legalRow?.value.trim() || null,
     preferentialRent: preferentialRow?.value.trim() || null,
     claimOnly,
+    leasedFee,
     headline: parts.join(" "),
   };
 }
@@ -577,9 +624,13 @@ export function regulationTag(r: RegulationRead | null): string | null {
 export function regulationShortLine(r: RegulationRead): string {
   const bits: string[] = [];
   if (r.claimOnly) {
-    bits.push(`the memorandum states ${r.stated ? r.stated.replace(/\.$/, "") : "regulated rents"}, which no rule the site holds reaches here`);
+    bits.push(`the memorandum states ${r.stated ? statedText(r.stated) : "regulated rents"}, which no rule the site holds reaches here`);
   } else {
-    bits.push(r.regimes.map((g) => (g.outcome === "applies" ? `${g.name} applies` : `${g.name} possibly applies`)).join("; "));
+    bits.push(
+      r.regimes
+        .map((g) => `${g.name} ${g.outcome === "applies" ? "applies" : "possibly applies"}${towhom(r.leasedFee)}`)
+        .join("; "),
+    );
   }
   if (r.regulatedUnits === 0 && r.totalUnits != null) {
     bits.push(`none of the ${count(r.totalUnits)} ${r.noun.many} rent-regulated as stated`);
@@ -605,7 +656,9 @@ export function regulationContextLine(r: RegulationRead): string {
  * allowance, never changed. Null where no regime reaches the building.
  */
 export function regulationModelLine(r: RegulationRead | null, rentGrowthPct: number | null): string | null {
-  if (!r || r.regimes.length === 0) return null;
+  // On a leased fee the model's rent is the ground rent, which no regime
+  // sets: its growth is never set against an allowance (research pass 41).
+  if (!r || r.regimes.length === 0 || r.leasedFee) return null;
   const growth = rentGrowthPct != null && Number.isFinite(rentGrowthPct) ? `grows every rent ${pctText(Number(rentGrowthPct.toFixed(2)))} a year` : "grows every rent at one rate";
   const share =
     r.regulatedUnits != null && r.totalUnits != null && r.sharePct != null
@@ -624,8 +677,37 @@ export function regulationModelLine(r: RegulationRead | null, rentGrowthPct: num
 const TRAPS =
   "REGULATION TRAPS, checked by name where the OM gives the inputs: (a) THE REGULATED SHARE — which units are regulated comes from the registration history, never the deck; ask for the rent registrations; (b) LEGAL AGAINST PREFERENTIAL RENT — which one the rent roll states, and which one renewals are struck on; (c) THE ALLOWANCE — a regulated renewal grows at the board's or the statute's allowance for its period, not the market's, so a pro forma that grows every rent at one market rate overstates the regulated income; (d) TURNOVER — the legal path, if any, by which a unit reaches market on vacancy, and none where vacancy decontrol is gone; (e) IMPROVEMENTS — recoveries for apartment and building-wide improvements are capped, so a renovation premium on a regulated unit is the cap's, never the market's; (f) EVICTION AND JUST CAUSE — the regime's eviction rules limit the turnover the pro forma assumes, and the gap to market on a regulated unit is the regulation's cost, not loss to lease.";
 
+/** A leased fee's in their place (research pass 41): the buyer collects the
+ *  ground rent, so the regime is the leaseholder's, and reaches the buyer
+ *  through the income that covers the rent. */
+const LEASED_FEE_TRAPS =
+  "REGULATION TRAPS ON THE LEASEHOLDER'S BUILDING, checked by name where the OM gives the inputs: (a) THE GROUND RENT IS NOT A REGULATED RENT — the regime sets the leaseholder's rents, never the rent this buyer collects; (b) COVERAGE — a regulated rent grows at the board's or the statute's allowance, not the market's, so the leaseholder's income that covers the ground rent grows no faster, and a reset that reprices the ground rent to land value lands on income the regime holds down; (c) THE REGULATED SHARE — which of the leaseholder's units are regulated comes from the registration history, never the deck; (d) THE REVERSION — read what the regime makes of the regulated tenancies in the building that comes back at the lease's end.";
+
 /** The regulation's traps, for the challenger — the facts first, then the
  *  traps by name. */
 export function regulationNote(r: RegulationRead): string {
-  return `${regulationContextLine(r)} ${TRAPS}`;
+  return `${regulationContextLine(r)} ${r.leasedFee ? LEASED_FEE_TRAPS : TRAPS}`;
+}
+
+/**
+ * Whether a park's own read says the regulation already (lib/manufactured-
+ * housing reads the same "Rent control" row: "Its lot rents are regulated, as
+ * stated (…)"): where no rule the site holds reaches the park and the
+ * memorandum states nothing past that row, the regulation's line is that
+ * sentence again, so a step's input — the deal context, the challenger's
+ * notes — carries the park's alone (research pass 41).
+ */
+export function regulationSaidByPark(
+  r: RegulationRead,
+  park: { rentControl: { regulated: boolean | null } | null } | null | undefined,
+): boolean {
+  return (
+    park?.rentControl != null &&
+    r.claimOnly &&
+    r.regulatedUnits == null &&
+    r.regulatedUnitsStated == null &&
+    r.regulatedUnitsUnknown == null &&
+    r.legalRent == null &&
+    r.preferentialRent == null
+  );
 }

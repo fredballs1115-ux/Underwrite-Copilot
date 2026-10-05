@@ -20,6 +20,7 @@ import {
   regulationForDeal,
   regulationModelLine,
   regulationNote,
+  regulationSaidByPark,
   regulationShortLine,
   regulationTag,
   regulationTermRows,
@@ -27,6 +28,8 @@ import {
   unverifiedRule,
 } from "./rent-regulation";
 import { readAffordable } from "./affordable";
+import { readManufacturedHousing } from "./manufactured-housing";
+import { dealContextFor } from "./deal-context";
 import { unitCountFromMetrics } from "./criteria";
 import { evaluateRules } from "./research";
 import { buildSubject, seedRules } from "./research-data";
@@ -567,6 +570,122 @@ describe("the words", () => {
     for (const s of [r.headline, regulationShortLine(r), regulationModelLine(r, 3.5)!, regulationNote(r)]) {
       expect(gluedWords(s), s).toEqual([]);
     }
+  });
+});
+
+// Research pass 41 (M6): rent-regulation lines that did not concern the
+// deal, or said a count the memorandum states was open.
+describe("the rules for what the deal is (research pass 41)", () => {
+  const dc = { address: { state: "DC", city: "Washington" }, classKey: "multifamily" };
+  const plan = (kind: string, metrics: Row[]): ExtractionResult => ({
+    ...ex(metrics),
+    strategy: { kind, summary: "", capitalBudget: "", timeline: "" },
+  } as ExtractionResult);
+
+  it("a building not yet delivered is permitted no earlier than this year: a permit-after exemption resolves by its own condition", () => {
+    // A ground-up building: DC's stabilization reaches buildings permitted
+    // on or before 1975, and it had read "possibly applies (open: building
+    // permit year)" on a 300-unit building yet to be built.
+    const dev = plan("development", [row("Units (proposed)", "300")]);
+    expect(readRegulation(dev, dc, "2026-10-05")).toBeNull();
+    // A conversion delivers its new use with the works: its permit is the
+    // conversion's, whatever year the shell was built.
+    const conv = plan("conversion", [row("Units (proposed)", "120"), row("Year built", "1962")]);
+    expect(readRegulation(conv, dc, "2026-10-05")).toBeNull();
+    // The same 1962 building bought as it stands is read as before.
+    const standing = plan("stabilized", [row("Units", "120"), row("Year built", "1962")]);
+    expect(readRegulation(standing, dc, "2026-10-05")!.regimes.find((g) => g.ruleId === "dc-rent-stab-coverage")?.outcome).toBe("applies");
+    // Nothing is made to apply: a California building yet to be built is
+    // inside AB 1482's rolling new-building exemption, by its own words.
+    const ca = { address: { state: "CA", city: "Fresno" }, classKey: "multifamily" };
+    expect(readRegulation(plan("development", [row("Units (proposed)", "200")]), ca, "2026-10-05")).toBeNull();
+    // The memorandum's own claim still stands where it makes one.
+    const claimed = readRegulation(plan("development", [row("Units (proposed)", "300"), row("Rent regulation", "Inclusionary units under DC's IZ program")]), dc, "2026-10-05")!;
+    expect(claimed.claimOnly).toBe(true);
+  });
+
+  it("holds the lower bound to the file: every permit and built date the rules state is before the year a screen reads it", () => {
+    const keys = ["building_permit_issued_after", "building_permit_issued_on_or_before", "built_before"];
+    const dates: string[] = [];
+    const walk = (v: unknown) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === "object")
+        for (const [k, w] of Object.entries(v)) {
+          if (keys.includes(k) && typeof w === "string") dates.push(w);
+          else walk(w);
+        }
+    };
+    walk((rulesFile as { rules: unknown[] }).rules);
+    expect(dates.length).toBeGreaterThan(5);
+    // The site was built in 2026: a later date would need the permit year
+    // as a lower bound, which the subject's one figure cannot say.
+    for (const d of dates) expect(Number(d.slice(0, 4)), d).toBeLessThan(2026);
+  });
+
+  it("on a leased fee speaks of the leaseholder's building and the ground rent's cover, never the lessor's income as a regulated rent", () => {
+    const leasedFee = {
+      ...walkUp([row("Rent-regulated units", "41"), row("Ground rent", "$1,200,000")]),
+      interest: { kind: "leased_fee", summary: "The land under the building, sold with its ground lease", share: "", groundLease: "99 years from 1990", loan: "", page: "p. 2" },
+    } as ExtractionResult;
+    const r = readRegulation(leasedFee, BROOKLYN, "2026-10-05")!;
+    expect(r.leasedFee).toBe(true);
+    expect(r.headline).toContain("NYC rent stabilization applies to the leaseholder's building by the site's rules.");
+    expect(r.headline).toContain("It sets the leaseholder's rents, never the ground rent this buyer collects");
+    const note = regulationNote(r);
+    expect(note).toContain("REGULATION TRAPS ON THE LEASEHOLDER'S BUILDING");
+    expect(note).toContain("(b) COVERAGE — a regulated rent grows at the board's or the statute's allowance");
+    expect(note).not.toContain("overstates the regulated income");
+    expect(regulationShortLine(r)).toContain("NYC rent stabilization applies to the leaseholder's building");
+    // The model's rent on a leased fee is the ground rent: never set against an allowance.
+    expect(regulationModelLine(r, 3)).toBeNull();
+    // The building's own owner reads as before.
+    const own = readRegulation(walkUp([row("Rent-regulated units", "41")]), BROOKLYN, "2026-10-05")!;
+    expect(own.leasedFee).toBe(false);
+    expect(own.headline).not.toContain("leaseholder");
+    expect(regulationNote(own)).toContain("overstates the regulated income");
+  });
+
+  it("quotes a stated regime, a name or a sentence, and a park's is said once in a step's input", () => {
+    const lancaster = { address: { state: "PA", city: "Lancaster" }, classKey: "manufactured_housing" };
+    const parkDeal = ex(
+      [row("Pads", "150"), row("Lot rent", "$430"), row("Rent control", "Subject to the county's mobile home park rent stabilization ordinance")],
+      "manufactured_housing",
+    );
+    const r = readRegulation(parkDeal, lancaster, "2026-10-05")!;
+    expect(r.headline).toBe(
+      "The memorandum states its rent regulation as “Subject to the county's mobile home park rent stabilization ordinance”; no rent rule the site holds reaches this address, so that is the memorandum's claim.",
+    );
+    expect(r.headline).not.toContain("the building is under");
+    expect(regulationShortLine(r)).toBe(
+      "Rent regulation: The memorandum states its rent regulation as “Subject to the county's mobile home park rent stabilization ordinance”, which no rule the site holds reaches here",
+    );
+    // The park's own read says the same row: the step is told once.
+    const park = readManufacturedHousing(parkDeal);
+    expect(park?.rentControl?.regulated).toBe(true);
+    expect(regulationSaidByPark(r, park)).toBe(true);
+    const context = dealContextFor(parkDeal, null, null, r) ?? "";
+    expect(context.match(/Subject to the county's mobile home park rent stabilization ordinance/g)).toHaveLength(1);
+    expect(context).not.toContain("Rent regulation:");
+    // A park that states a count beside the row keeps the regulation's line.
+    const counted = readRegulation(
+      ex([...parkDeal.metrics.slice(1), row("Rent-regulated units", "150")], "manufactured_housing"),
+      lancaster,
+      "2026-10-05",
+    )!;
+    expect(regulationSaidByPark(counted, readManufacturedHousing(parkDeal))).toBe(false);
+    // A name reads the same way, beside a regime the rules hold.
+    const named = readRegulation(walkUp([row("Rent regulation", "Rent stabilization")]), BROOKLYN, "2026-10-05")!;
+    expect(named.headline).toContain("It states its rent regulation as “Rent stabilization”.");
+    expect(regulationSaidByPark(named, null)).toBe(false);
+  });
+
+  it("counts a bulk condominium purchase's building by the condominium the memorandum states", () => {
+    const condo = ex([row("Units offered", "42"), row("Units in condominium", "120"), row("HOA dues", "$650 per unit per month")], "Condominium Units (bulk sale)");
+    expect(rulesSizeText(condo, "multifamily")).toBe("120 units");
+    const r = readRegulation({ ...condo, metrics: [...condo.metrics, row("Year built", "1962")] }, BROOKLYN, "2026-10-05")!;
+    expect(r.regimes[0].unknowns).not.toContain("unit count");
+    // Only the units offered stated: the building's count stays open.
+    expect(rulesSizeText(ex([row("Units offered", "42")], "Condominium Units (bulk sale)"), "multifamily")).toBeNull();
   });
 });
 
