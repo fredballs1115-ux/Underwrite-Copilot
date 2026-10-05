@@ -1,15 +1,19 @@
 -- ============================================================================
--- 0037 — one live job a deal (research pass 39)
+-- 0037 — one live job a deal, and the public-record lookups held to the
+-- app's own asks (research pass 39)
 --
 -- A DRAFT, not yet run anywhere. Run it AFTER 0036, whole, in the Supabase
 -- SQL editor, then supabase/CHECK_MIGRATIONS.sql: its 0037 rows should read
--- ✅. It is idempotent, and each block checks that what it guards exists.
+-- ✅. After 0036 because part 2 replaces the two functions whose grants 0036
+-- takes away, and a replaced function keeps the grants it has — run first,
+-- 0037 would leave them as 0028 and 0030 granted them, until 0036 ran. It is
+-- idempotent, and each block checks that what it guards exists.
 --
 -- Who is trusted, as in 0036: the web's server actions write with the
 -- signed-in user's session, so auth.uid() is that user; the worker, the
 -- in-process pipeline and every other back-office writer use the service
 -- role, and the SQL editor runs as postgres — both have auth.uid() null, and
--- the guard below leaves them alone.
+-- the guard in part 1 leaves them alone.
 --
 --   1. One live job a deal. analysis_jobs is writable by the deal's owner
 --      and teammates (0007's "own jobs" policy, which says nothing about a
@@ -50,6 +54,21 @@
 --
 --      Needs 0016's payload column (the trigger names it); without it there
 --      is no worker and nothing to queue, and the trigger is left off.
+--
+--   2. The public-record lookups. nearest_property (0030) and nearby_sales
+--      (0028) are SECURITY DEFINER, so they read past the tables' own
+--      policies, and each took any radius it was handed — nearest_property
+--      capped its rows at 20 and nearby_sales at 200, and neither its
+--      reach. Each now holds the radius and the rows to the most the app
+--      itself ever asks for (lib/public-record-asks, which both callers
+--      read): nearest_property 120 m and one parcel, the deal page's card;
+--      nearby_sales 4,800 m — the comps pull's three-mile widening — and 80
+--      sales. A larger ask is answered at the cap, never refused, so no
+--      caller of the app sees a change. Everything else in each body is the
+--      original's, line for line, and the arguments, their defaults and the
+--      return type are unchanged, so the call is the same call. nearby_sales
+--      needs 0028 (and PostGIS), nearest_property 0030_public_data_layer;
+--      a database without one is left as it is.
 --
 -- Rolling back: see the end of the file.
 -- ============================================================================
@@ -107,7 +126,63 @@ begin
 end;
 $$;
 
+-- 2. The public-record lookups, held to the app's own asks -------------------
+do $$
+begin
+  if to_regprocedure('public.nearest_property(double precision, double precision, double precision, integer)') is not null then
+    execute $fn$
+      create or replace function public.nearest_property(
+        in_lat double precision,
+        in_lng double precision,
+        in_radius_m double precision default 120,
+        in_limit int default 5
+      ) returns setof public.properties
+      language sql stable security definer set search_path = public as $body$
+        select p.*
+        from public.properties p
+        where p.lat is not null and p.lng is not null
+          and p.lat between in_lat - (least(in_radius_m, 120) / 111320.0)
+                        and in_lat + (least(in_radius_m, 120) / 111320.0)
+          and p.lng between in_lng - (least(in_radius_m, 120) / (111320.0 * greatest(cos(radians(in_lat)), 0.2)))
+                        and in_lng + (least(in_radius_m, 120) / (111320.0 * greatest(cos(radians(in_lat)), 0.2)))
+        order by ((p.lat - in_lat)^2 + ((p.lng - in_lng) * cos(radians(in_lat)))^2)
+        limit least(in_limit, 1);
+      $body$;
+    $fn$;
+  end if;
+  if to_regprocedure('public.nearby_sales(double precision, double precision, double precision, text, integer, integer)') is not null then
+    execute $fn$
+      create or replace function public.nearby_sales(
+        in_lat double precision,
+        in_lng double precision,
+        in_radius_m double precision default 1600,
+        in_asset_class text default null,
+        in_months int default 24,
+        in_limit int default 80
+      ) returns setof public.recorded_sales
+      language sql stable security definer set search_path = public as $body$
+        select *
+        from public.recorded_sales s
+        where s.geog is not null
+          and ST_DWithin(
+            s.geog,
+            ST_SetSRID(ST_MakePoint(in_lng, in_lat), 4326)::geography,
+            least(in_radius_m, 4800)
+          )
+          and s.sale_date >= (current_date - make_interval(months => in_months))
+          and (in_asset_class is null or s.asset_class = in_asset_class)
+        order by s.geog <-> ST_SetSRID(ST_MakePoint(in_lng, in_lat), 4326)::geography
+        limit least(in_limit, 80);
+      $body$;
+    $fn$;
+  end if;
+end;
+$$;
+
 -- ── ROLLING BACK ─────────────────────────────────────────────────────────────
 -- Each statement undoes one part. Run only the one for the part that broke
 -- something, then tell whoever maintains the app which path it was.
 --   1. drop trigger if exists analysis_jobs_one_live_run on public.analysis_jobs;
+--   2. run 0028's definition of nearby_sales and 0030_public_data_layer's of
+--      nearest_property again (each file is idempotent; a replaced function
+--      keeps 0036's grants).

@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { abbrevState, type StructuredAddress } from "@/lib/address";
+import { RECORDED_SALES } from "@/lib/public-record-asks";
 import {
   compStats,
   finalizeComps,
@@ -17,10 +18,12 @@ import {
 // every failure mode lands as a stored status the panel renders honestly —
 // never a silent absence.
 
-const RADIUS_KM = 1.6; // 1 mile
-const WIDE_RADIUS_KM = 4.8; // 3 miles
-const MONTHS_BACK = 24;
-const WIDE_MONTHS_BACK = 36;
+// The asks, one place (lib/public-record-asks): migration 0037 caps the
+// nearby_sales lookup at the widest of them.
+const RADIUS_KM = RECORDED_SALES.radiusKm; // 1 mile
+const WIDE_RADIUS_KM = RECORDED_SALES.wideRadiusKm; // 3 miles
+const MONTHS_BACK = RECORDED_SALES.monthsBack;
+const WIDE_MONTHS_BACK = RECORDED_SALES.wideMonthsBack;
 const MIN_COMPS_BEFORE_WIDENING = 5;
 const PENDING_STALE_MS = 10 * 60 * 1000;
 
@@ -124,7 +127,7 @@ async function tryDbComps(
       in_radius_m: Math.round(radiusKm * 1000),
       in_asset_class: assetClass.includes("multifamily") ? "multifamily" : null,
       in_months: monthsBack,
-      in_limit: 80,
+      in_limit: RECORDED_SALES.limit,
     });
     if (error || !Array.isArray(data) || data.length === 0) return null;
     return (data as Record<string, unknown>[]).map((r) => ({

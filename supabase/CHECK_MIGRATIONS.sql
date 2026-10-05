@@ -80,7 +80,10 @@
 -- its one-live-job trigger by its definition and its function's body — a
 -- trigger that does not fire on a change of status, deal, payload or last
 -- write, or a function without the deal's lock or the ten-minute window, is
--- not 0037's guard.
+-- not 0037's guard — and the two public-record lookups by their bodies, each
+-- holding its radius and its rows to the app's own asks. A lookup that does
+-- not exist is named too, as on 0036's grants row: run 0028 and
+-- 0030_public_data_layer, then 0036 and 0037 again.
 -- ============================================================================
 
 with
@@ -317,6 +320,29 @@ with
       ], null) as missing
   ),
 
+  -- 0037's lookups read by what they say: each holds its radius and its rows
+  -- to the most the app asks (lib/public-record-asks).
+  lookups_res as (
+    select
+      371 as seq,
+      '0037_job_queue_and_lookups.sql (the public-record lookups)' as migration,
+      'The parcel and recorded-sale lookups answer no wider and no longer than the app ever asks: 120 m and one parcel, 4,800 m and 80 sales. ❌ names each lookup still taking any radius — or that does not exist yet: then run 0028 and 0030_public_data_layer first, and 0036 and 0037 again.' as unblocks,
+      array(
+        select x.name
+        from (values
+          ('nearest_property', array['least(in_radius_m, 120)', 'least(in_limit, 1)']),
+          ('nearby_sales', array['least(in_radius_m, 4800)', 'least(in_limit, 80)'])
+        ) as x(name, caps)
+        where not exists (
+          select 1
+          from pg_proc p
+          join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.proname = x.name
+            and (select bool_and(p.prosrc like '%' || c || '%') from unnest(x.caps) as c)
+        )
+      ) as missing
+  ),
+
   -- A write taken away: no signed-in session may update a regulatory alert,
   -- a row every user's banner reads. Names each role that still can, and
   -- each write policy still on the table.
@@ -354,5 +380,6 @@ from (
   union all select * from queue_res
   union all select * from alerts_res
   union all select * from one_live_res
+  union all select * from lookups_res
 ) r
 order by r.seq;
