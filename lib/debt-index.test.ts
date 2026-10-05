@@ -200,6 +200,17 @@ describe("today's rates, as a line a Claude step reads (the audit of 2026-09-30)
     expect(line).toContain("never state a rate as current that is not one of them or built from one of them");
   });
 
+  // Research pass 41 (M4): the line asked every interest "whether the
+  // going-in cap sits below the cost of the debt" beside notes saying a
+  // note's, a position's or a leased fee's price buys no building.
+  it("asks the negative-leverage question only where the price buys the building", () => {
+    const line = ratesPromptLine(debtSeeds(rates, 60), 60)!;
+    expect(line).toContain(
+      "Judge the financing against these figures — and whether the going-in cap sits below the cost of the debt, where the price buys the building: a note's, a preferred equity position's or a leased fee's price buys none, and a share's buys the share, so no cap struck on that price is the deal's",
+    );
+    expect(line).not.toContain("Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures");
+  });
+
   // Audit B, LOW-6: a step's words reach the deal page and the shared screen
   // with no notice under them, so SOFR's level is the one figure it is
   // handed to judge by and never to write.

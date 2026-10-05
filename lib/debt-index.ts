@@ -269,7 +269,7 @@ export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number, spread?: P
     );
   }
   if (parts.length === 0) return null;
-  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.${
+  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing against these figures — and whether the going-in cap sits below the cost of the debt, where the price buys the building: a note's, a preferred equity position's or a leased fee's price buys none, and a share's buys the share, so no cap struck on that price is the deal's — and never state a rate as current that is not one of them or built from one of them.${
     seeds.floating ? ` ${SOFR_LEVEL_RULE}` : ""
   }`;
 }

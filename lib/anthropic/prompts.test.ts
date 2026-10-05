@@ -102,6 +102,23 @@ describe("plan deals are judged on their own terms", () => {
     expect(verdictInstruction()).toContain("debt is the construction or bridge financing and the carry through the works");
   });
 
+  // Research pass 41 (M4): the challenger asked every interest whether "the
+  // asking price per unit / per SF" is defensible and named negative
+  // leverage on "the going-in cap", beside notes saying a note's, a
+  // position's or a leased fee's price buys no building — the verdict's
+  // instruction already said so.
+  it("the challenger tests no basis and no negative leverage on a price the notes say is not the building's", () => {
+    for (const cls of ["multifamily", "office", "hospitality_str", "auto"] as const) {
+      const p = challengerInstruction(cls);
+      expect(p, cls).toContain(
+        "Where the notes on this deal say the price is not the building's — a note's price is a loan's, a preferred equity position's buys a rate and a redemption, a share's price buys the share and the building's is the whole it implies, a leased fee's price buys the land — or that a figure is not a price at all — an auction's starting bid is where the bidding opens — the price per unit or per SF and a going-in cap on that figure are not this deal's",
+      );
+      expect(p, cls).toContain("test the basis on the figure the notes compute, or say there is none and why, and set no cap struck on that figure against the cost of the debt");
+    }
+    // The verdict's instruction says the same of the brief.
+    expect(verdictInstruction()).toContain("never strike a basis, a cap or a return on that figure");
+  });
+
   it("the market check tests the figures BEHIND the stabilized pro forma, not NOI ÷ price", () => {
     const p = marketCheckInstruction("multifamily");
     expect(p).toContain("If the OM describes a plan");
