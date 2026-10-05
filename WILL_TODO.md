@@ -425,6 +425,24 @@ yours:
 5. **The research reseed** above also carries Chicago's corrected band to
    signed-in pages.
 
+**From the security review of October 5 (research pass 39):**
+1. **Run migration 0036 first** (item 1 under 2026-09-30 below), before
+   anything else on this page: the review found its exposures live today.
+2. **Your buy box on a shared screen.** The verdict is handed your buy box
+   so its call can weigh it, and the shared screen prints the verdict's
+   reason and risks as written, so where a deal misses your box those
+   words can name your price band, return floors or priorities to whoever
+   holds the link. Recommended: the verdict writes its fit apart from its
+   reason and risks, and the shared screen never prints the fit. It
+   changes the verdict's prompt and fields, so it waits for your yes.
+   Until then the share panel says the link's reasons can name your box.
+3. **Who reads the public-record tables in bulk.** Any signed-in account
+   can read the property and recorded-sales tables the comps page draws
+   on. Say whether that should stay open to every account.
+4. **The free plan's screening allowance** (item 11 under 2026-09-30
+   below) is the one guard on what an account spends; the review weighs
+   it again.
+
 **Run the research seed after the merge** (`node scripts/seed-research.mjs`,
 the step that writes the FY2027 fair market rents). The runner read every
 source link the audit had marked dead. Two research figures changed:
@@ -502,7 +520,9 @@ Four choices are yours to overrule:
    budgeted:
    - `CENSUS_API_KEY`: a deal's own census tract figures;
    - `GOOGLE_MAPS_API_KEY`: Street View photographs of a building with no
-     memorandum photo;
+     memorandum photo. Google's terms forbid keeping the image, so every
+     view of such a photograph is a billed call; set a quota on the key in
+     Google's console when you add it;
    - `HUD_API_TOKEN` (free, huduser.gov): the yearly fair market rent pull
      (`fmr.yml`) reads it; until it is set, the rents are the ones seeded from
      HUD's own FY2027 file.
