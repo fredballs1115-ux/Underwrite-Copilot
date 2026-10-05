@@ -735,7 +735,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
 
   it("credits each figure to its own house, area and period — never the block's first link or the snapshot's day", () => {
     // Chicago's cap is Essex Realty's April 2026 average for the small-building
-    // stock; the block's first link is JPMorgan's, the vacancy's source.
+    // stock; the block's first link is Cushman & Wakefield's, the vacancy's source.
     const chicago = trackerFor("chicago", "multifamily")!;
     expect(chicago.cap).toMatchObject({
       house: "Essex Realty",
@@ -745,7 +745,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
       construct: "a transaction average of 175 sales, not a quoted band",
     });
     expect(chicago.cap!.slice).toContain("Class B/C neighborhood buildings");
-    expect(chicago.vacancy!.links).toEqual(["https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook"]);
+    expect(chicago.vacancy!.links).toEqual(["https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/multifamily"]);
     // Prince George's County's office figure is Colliers' Suburban Maryland survey area, both counties together.
     expect(trackerFor("pg_county", "office")!.vacancy).toMatchObject({
       house: "Colliers",

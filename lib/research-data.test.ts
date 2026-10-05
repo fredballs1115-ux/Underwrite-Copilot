@@ -148,14 +148,14 @@ describe("sector snapshot benchmark rows", () => {
     expect(miamiRent.source).toBe("");
     expect(miamiRent.cite).toBe("Colliers, Miami-Dade, Q2 2026; average asking");
     // Chicago's cap is Essex Realty's April 2026 average — the block's first
-    // link is JPMorgan's, the vacancy's source.
+    // link is Cushman & Wakefield's, the vacancy's source.
     const chicagoCap = snapRows.find((b) => b.metro === "Chicago" && b.metric === "multifamily_cap_rate_pct")!;
     expect(chicagoCap.source).toBe("https://essexrealtygroup.com/chicago-multifamily-report-april-2026/");
     expect(chicagoCap.cite).toBe(
       "Essex Realty, Chicago, April 2026; a transaction average of 175 sales, not a quoted band; for the small-building stock, mostly the Class B/C neighborhood buildings that drive Chicago volume",
     );
     const chicagoVacancy = snapRows.find((b) => b.metro === "Chicago" && b.metric === "multifamily_vacancy_pct")!;
-    expect(chicagoVacancy.source).toBe("https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook");
+    expect(chicagoVacancy.source).toBe("https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/multifamily");
     // Prince George's County's office figure is Suburban Maryland's, both counties together.
     const pgOffice = snapRows.find((b) => b.metro === "Prince George's County MD" && b.metric === "office_vacancy_pct")!;
     expect(pgOffice.cite).toBe("Colliers, Suburban Maryland (Montgomery and Prince George's together, not a county split), Q1 2026");
