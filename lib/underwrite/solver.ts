@@ -76,20 +76,38 @@ export interface MaxBidSolution {
   /** The floor with the thinnest margin at the solution — the one that gives
    *  first if you pay a dollar more. */
   binding: keyof BidFloors | null;
-  /** True when every floor still clears at the search ceiling (2× the modeled
-   *  price): the box isn't the constraint, and `price` holds the ceiling. */
+  /** True when every floor still clears at the top of the range searched
+   *  (`MAX_BID_SEARCH_X` times the modeled price): the box isn't the
+   *  constraint, and `price` holds that top — the bid is AT LEAST it, and the
+   *  model's own ceiling lies above the range searched. */
   unbounded: boolean;
   /** Engine metrics at the solved price (what you'd underwrite to there). */
   at: BidMetrics | null;
 }
 
-// Search window and resolution. The grid pass brackets the feasibility edge
-// (robust even if a metric wiggles locally); bisection then sharpens the
-// bracket to well under $1k on any realistic deal size.
+// Search window and resolution. The window opens at twice the modelled
+// price and doubles while every floor still clears at its top (research pass
+// 40, H2: an auction's modelled price is its opening floor, and a model whose
+// own ceiling at the hurdle was $7.31M all-in was said to set none past
+// $5.25M, twice the floor), up to `MAX_BID_SEARCH_X`. The grid pass then
+// brackets the feasibility edge inside the last doubling (robust even if a
+// metric wiggles locally); bisection sharpens the bracket to well under $1k
+// on any realistic deal size. A window that never doubles is searched
+// exactly as before.
 const FLOOR_X = 0.05;
 const CEILING_X = 2;
+/** The top of the range the max bid is searched over, as a multiple of the
+ *  modelled price: past it, the bid is said as "at least" the top, never as
+ *  a ceiling the model does not set. */
+export const MAX_BID_SEARCH_X = 64;
 const GRID = 48;
 const BISECT_ITERS = 40;
+
+/** A multiple of the modelled price in words: "twice", "64 times". */
+export function timesWords(x: number): string {
+  const n = Number(x.toFixed(x < 10 ? 1 : 0));
+  return n === 2 ? "twice" : `${n} times`;
+}
 
 function metricsAt(
   base: UnderwriteInputs,
@@ -170,20 +188,29 @@ export function solveMaxBid(
     return none;
   }
 
-  const lo0 = base.purchasePrice * FLOOR_X;
-  const hi0 = base.purchasePrice * CEILING_X;
+  let lo0 = base.purchasePrice * FLOOR_X;
+  let hi0 = base.purchasePrice * CEILING_X;
+  const top = base.purchasePrice * MAX_BID_SEARCH_X;
   const at = (p: number) => metricsAt(base, levers, p);
 
-  // Still feasible at the ceiling → the box isn't the constraint.
-  const ceilingMetrics = at(hi0);
-  if (clears(ceilingMetrics, floors)) {
-    return {
-      price: hi0,
-      deltaPct: (hi0 - base.purchasePrice) / base.purchasePrice,
-      binding: null,
-      unbounded: true,
-      at: ceilingMetrics,
-    };
+  // Still feasible at the window's top → double it, until a top fails or the
+  // range reaches its stated maximum. A top that fails brackets the edge
+  // between it and the last top that cleared; the maximum still clearing
+  // means the box isn't the constraint inside the range searched.
+  let ceilingMetrics = at(hi0);
+  while (clears(ceilingMetrics, floors)) {
+    if (hi0 >= top) {
+      return {
+        price: hi0,
+        deltaPct: (hi0 - base.purchasePrice) / base.purchasePrice,
+        binding: null,
+        unbounded: true,
+        at: ceilingMetrics,
+      };
+    }
+    lo0 = hi0;
+    hi0 = Math.min(hi0 * 2, top);
+    ceilingMetrics = at(hi0);
   }
 
   // Grid pass: find the LAST feasible stop so bisection brackets the highest

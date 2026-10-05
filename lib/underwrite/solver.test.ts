@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import { scenarioMetrics } from "./playground";
-import { bidFloors, floorWords, floorsWords, fmtBid, solveMaxBid } from "./solver";
+import { MAX_BID_SEARCH_X, bidFloors, floorWords, floorsWords, fmtBid, solveMaxBid } from "./solver";
 
 /** Same realistic levered base case the playground tests use. */
 function baseInputs(over: Partial<UnderwriteInputs> = {}): UnderwriteInputs {
@@ -113,10 +113,19 @@ describe("solveMaxBid — price that clears the floors", () => {
     expect(s.binding).toBe("minIrr");
   });
 
-  it("a floor met even at 2× price reports unbounded instead of a fake edge", () => {
+  it("a floor met at twice the price keeps the window doubling to its edge (research pass 40)", () => {
+    // It had stopped at 2× and called the floor unbounded.
     const s = solveMaxBid(base, { minCap: 0.005 });
+    expect(s.unbounded).toBe(false);
+    expect(s.price! / base.purchasePrice).toBeGreaterThan(2);
+    expect(s.at!.cap!).toBeCloseTo(0.005, 6);
+    expect(s.binding).toBe("minCap");
+  });
+
+  it("a floor met even at the top of the range searched reports unbounded there, never a fake edge", () => {
+    const s = solveMaxBid(base, { minCap: 0.0001 });
     expect(s.unbounded).toBe(true);
-    expect(s.price).toBeCloseTo(base.purchasePrice * 2, 6);
+    expect(s.price).toBeCloseTo(base.purchasePrice * MAX_BID_SEARCH_X, 6);
     expect(s.binding).toBeNull();
   });
 

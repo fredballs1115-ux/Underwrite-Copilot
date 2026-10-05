@@ -19,7 +19,7 @@ import {
 import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
-import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
+import { solveMaxBid, timesWords, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 import {
   MISREAD_WORD,
   misreadPageLine,
@@ -816,8 +816,11 @@ function MaxBidCard({
           economics, not the price, are the blocker.
         </p>
       ) : bid.unbounded ? (
+        // Every floor still clears at the top of the range searched — the
+        // window doubles from twice the price while they clear (research
+        // pass 40, H2) — so the bid is at least that top, and said so.
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          {`Your floors hold even at twice ${vs} — the buy box isn't the constraint on this deal.`}
+          {`Your floors hold even at ${timesWords(1 + (bid.deltaPct ?? 0))} ${vs} (${fmtBid(bid.price)}), the top of the range searched — the buy box isn't the constraint on this deal.`}
         </p>
       ) : (
         <>

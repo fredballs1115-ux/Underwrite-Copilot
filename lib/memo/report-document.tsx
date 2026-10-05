@@ -47,6 +47,7 @@ import {
   type HeatCell,
 } from "@/lib/underwrite/report-grid";
 import { NO_IRR_SHORT, NO_IRR_WHY } from "@/lib/underwrite/no-irr";
+import { timesWords } from "@/lib/underwrite/solver";
 import { withArticle } from "@/lib/article";
 import {
   SPREAD_BG,
@@ -1563,7 +1564,9 @@ function maxBidLineFor(
     if (bid.onTerm) {
       const lead = bid.unbounded ? "That is on the model's capitalised exit" : "That IRR runs on the model's capitalised exit";
       const where = `on the term the ${lease} has left at the sale`;
-      const at = bid.unbounded ? "at twice the modelled price" : "at that price";
+      // Unbounded, the bid is the top of the range searched (research pass
+      // 40), a multiple of the modelled price that is said.
+      const at = bid.unbounded ? `at ${timesWords(1 + bid.deltaPct)} the modelled price` : "at that price";
       return `${line} ${lead}; ${
         bid.onTerm.irr != null
           ? `${where} the levered IRR ${at} is ${pctOrDash(bid.onTerm.irr)}`

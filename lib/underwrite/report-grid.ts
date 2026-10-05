@@ -13,7 +13,7 @@ import { costAssumptionsLine } from "./cost-note";
 import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
 import { NO_IRR_SHORT, NO_IRR_WHY, noIrrWhy, type NoIrrWhy } from "./no-irr";
-import { floorWords, floorsWords, fmtBid, solveMaxBid, type BidFloors, type BidMetrics } from "./solver";
+import { MAX_BID_SEARCH_X, floorWords, floorsWords, fmtBid, solveMaxBid, timesWords, type BidFloors, type BidMetrics } from "./solver";
 
 /** Where each of the model's inputs came from (lib/underwrite/inputs). */
 export type ModelSources = DerivedModel["sources"];
@@ -945,7 +945,7 @@ function noBidSentence(floors: BidFloors, nb: NoBidRead | null): string | null {
   const never = nb.alone.filter((a) => a.price == null);
   const alone = nb.alone.filter((a) => a.price != null);
   const clearsAlone = alone.map(
-    (a, i) => `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${a.unbounded ? "at every tested price" : `up to ${fmtBid(a.price!)}`}`,
+    (a, i) => `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${a.unbounded ? `at every price searched, up to ${timesWords(MAX_BID_SEARCH_X)} the modelled price` : `up to ${fmtBid(a.price!)}`}`,
   );
   const aloneLine = clearsAlone.length > 0 ? `${clearsAlone.join(", and ").replace(/^y/, "Y")}.` : "";
   if (never.length === 0) {
@@ -997,10 +997,14 @@ export function maxBidSentence(
     if (!box) return `No price inside the tested range holds ${what} under these assumptions.`;
     return noBidSentence(f.floors, s.noBid ?? null) ?? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`;
   }
+  // Every floor still clearing at the top of the range searched: the bid is
+  // at least that top, and the range is said — the window doubles from twice
+  // the modelled price while the floors clear (research pass 40, H2).
   if (bid.unbounded) {
+    const times = `${timesWords(1 + bid.deltaPct)} the modelled price`;
     return box
-      ? `Max bid: ${what} hold even at twice the modelled price, so the box is not the constraint on this deal.`
-      : `Max bid holding ${what}: clears at every tested price — the constraint never binds inside the search range.`;
+      ? `Max bid: ${what} hold even at ${times} (${fmtBid(bid.price)}), the top of the range searched, so the box is not the constraint on this deal.`
+      : `Max bid holding ${what}: at least ${fmtBid(bid.price)}, ${times} and the top of the range searched — the model's own ceiling lies above it.`;
   }
   const delta = `${bid.deltaPct > 0 ? "+" : ""}${(bid.deltaPct * 100).toFixed(1)}% vs the modelled price`;
   const binds = box && bid.binding ? `; your ${floorWords(bid.binding, f.floors)} floor binds` : "";
