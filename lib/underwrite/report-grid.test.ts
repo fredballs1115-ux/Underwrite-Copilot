@@ -255,13 +255,27 @@ describe("gridTakeaway says two full clauses, each with its own subject (researc
     baseRow: 2,
     baseCol: 2,
   });
-  // Clears 13% up to the 5.25% exit at base growth, and from 3.5% growth at
-  // the base exit.
+  // Clears 13% only at the 5.25% exit or tighter at base growth, 25 bps under
+  // the 5.50% base, and from 3.5% growth at the base exit.
   const ordinary = at((r, c) => 13 + (c - 2) - (r - 1));
 
-  it("the ordinary case: the deal holds up to a cap, and needs a growth rate", () => {
+  it("the ordinary case: the deal clears only on compression, and needs a growth rate", () => {
     expect(gridTakeaway(ordinary, 13)).toBe(
-      "At base growth, the deal holds 13%+ up to a 5.25% exit cap; at the base exit cap, it needs at least 3.5% rent growth.",
+      "At base growth, the deal holds 13%+ only at a 5.25% exit cap or tighter, 25 bps under the base 5.50%; at the base exit cap, it needs at least 3.5% rent growth.",
+    );
+  });
+
+  // Research pass 40, M10: "holds 13%+ up to a 4.95% exit cap" read 50 bps of
+  // compression as resilience beside a base exit of 5.45%. "Up to" is said
+  // only where the base itself clears, with room above it.
+  it("says 'up to' only where the base exit clears, and the compression where only a tighter one does", () => {
+    expect(gridTakeaway(at((r, c) => 13 + (c - 2) - (r - 3)), 13)).toBe(
+      "At base growth, the deal holds 13%+ up to a 5.75% exit cap; at the base exit cap, it needs at least 2.5% rent growth.",
+    );
+    // The sample, at the demo mandate's 13% (the report's own input).
+    const sample = buildSensitivityData(sampleDerivedInputs().inputs, 13);
+    expect(sample.takeaway).toMatch(
+      /^At base growth, the deal holds 13%\+ only at a 4\.95% exit cap or tighter, 50 bps under the base 5\.45%; /,
     );
   });
 
@@ -284,14 +298,14 @@ describe("gridTakeaway says two full clauses, each with its own subject (researc
 
   it("after a clause that names the deal, the hurdle is said again rather than as 'it'", () => {
     expect(gridTakeaway(at((r, c) => 13 - (r - 1) + (c - 2) * 0.1), 13)).toBe(
-      "At base growth, the deal holds 13%+ up to a 5.25% exit cap; at the base exit cap, no tested rent growth clears 13%.",
+      "At base growth, the deal holds 13%+ only at a 5.25% exit cap or tighter, 25 bps under the base 5.50%; at the base exit cap, no tested rent growth clears 13%.",
     );
   });
 
   it("leads with what the grids are of where the price did not buy the building, and never calls it the deal", () => {
     const subject = "the collateral, run at the note's price";
     expect(gridTakeaway(ordinary, 13, "rent growth", subject)).toBe(
-      "The collateral, run at the note's price: at base growth, it holds 13%+ up to a 5.25% exit cap; at the base exit cap, it needs at least 3.5% rent growth.",
+      "The collateral, run at the note's price: at base growth, it holds 13%+ only at a 5.25% exit cap or tighter, 25 bps under the base 5.50%; at the base exit cap, it needs at least 3.5% rent growth.",
     );
     expect(gridTakeaway(at(() => 5), 13, "rent growth", subject)).toBe(
       "The collateral, run at the note's price: at base growth, no tested exit cap clears 13%; at the base exit cap, no tested rent growth clears it.",

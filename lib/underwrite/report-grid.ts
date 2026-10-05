@@ -251,12 +251,21 @@ export function gridTakeaway(
 
   // WinAnsi-safe wording (no "≥" — it isn't printable in the PDF's Helvetica).
   const capSome = capsClearing.length > 0 && capsClearing.length < grid.capRows.length;
+  // Where the hurdle clears only at exit caps under the base, the deal clears
+  // it on cap compression, never "up to" a cap as if it held there with room
+  // to spare (research pass 40, M10: the sample "holds 13%+ up to a 4.95%
+  // exit cap" beside a base exit of 5.45%, where it reads 9.28%).
+  const topClearing = capsClearing.length > 0 ? Math.max(...capsClearing) : null;
+  const baseCap = grid.capRows[grid.baseRow];
+  const underBase = topClearing != null && baseCap != null ? Math.round((baseCap - topClearing) * 10_000) : 0;
   const capPart =
     capsClearing.length === 0
       ? `no tested exit cap clears ${hurdle}`
       : !capSome
         ? `every tested exit cap clears ${hurdle}`
-        : `${named} holds ${hurdle}+ up to ${withArticle(fmtPctPt(Math.max(...capsClearing), 2))} exit cap`;
+        : underBase > 0
+          ? `${named} holds ${hurdle}+ only at ${withArticle(fmtPctPt(topClearing!, 2))} exit cap or tighter, ${underBase} bps under the base ${fmtPctPt(baseCap, 2)}`
+          : `${named} holds ${hurdle}+ up to ${withArticle(fmtPctPt(topClearing!, 2))} exit cap`;
   // After a clause with a subject, the hurdle is said again rather than as
   // an "it" that could be the deal.
   const target = capSome ? hurdle : "it";
