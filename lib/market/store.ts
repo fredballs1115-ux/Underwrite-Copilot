@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { applyExclusionRules } from "./exclusions";
 import { submarketMetrics, type SubmarketMetrics } from "./metrics";
+import { readAll } from "@/lib/read-all";
 
 /**
  * Persistence for submarkets.
@@ -62,17 +63,37 @@ export async function getPeriods(
   return ((data ?? []) as Record<string, unknown>[]).map(parsePeriodRow);
 }
 
+/**
+ * Every pipeline building of a submarket, soonest delivery first — a page at
+ * a time (lib/read-all), the id breaking ties so the pages neither overlap
+ * nor skip. It had asked for 2,000 in one read, which the project's max rows
+ * cuts to 1,000 with nothing saying so, and read a failed read as no
+ * pipeline: months of supply then said the submarket had none (research pass
+ * 42). A failed read throws — the submarket page shows its error, and every
+ * deal-page caller already leaves the check out.
+ */
 export async function getPipeline(
   supabase: SupabaseClient,
   submarketId: string,
 ): Promise<PipelineProperty[]> {
-  const { data } = await supabase
-    .from("pipeline_properties")
-    .select(PIPELINE_COLS)
-    .eq("submarket_id", submarketId)
-    .order("expected_delivery", { ascending: true, nullsFirst: false })
-    .limit(2000);
-  return ((data ?? []) as Record<string, unknown>[]).map(parsePipelineRow);
+  let failure: unknown = null;
+  const rows = await readAll<Record<string, unknown>>(
+    (from, to) =>
+      supabase
+        .from("pipeline_properties")
+        .select(PIPELINE_COLS)
+        .eq("submarket_id", submarketId)
+        .order("expected_delivery", { ascending: true, nullsFirst: false })
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>,
+    (e) => {
+      failure = e;
+    },
+  );
+  if (!rows) {
+    throw new Error(`pipeline read failed: ${String((failure as { message?: unknown } | null)?.message ?? failure)}`);
+  }
+  return rows.map(parsePipelineRow);
 }
 
 export interface SubmarketView {

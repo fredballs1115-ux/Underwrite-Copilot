@@ -17,6 +17,7 @@ import {
 } from "@/lib/market/import";
 import { RENT_BASES, type ExclusionRules, type RentBasis } from "@/lib/market/types";
 import { getSubmarket } from "@/lib/market/store";
+import { readAll } from "@/lib/read-all";
 import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
 
 const MAX_FILE = 32 * 1024 * 1024;
@@ -165,20 +166,21 @@ export async function importSubmarketFile(formData: FormData) {
     // Replace rather than append — the rows this file wrote before, and any
     // stored row that is one of these buildings by name and address, so a
     // renamed copy of the same export does not double the pipeline.
-    const { data: existing, error: readError } = await supabase
-      .from("pipeline_properties")
-      .select("id, name, address, source")
-      .eq("submarket_id", id)
-      .limit(5000);
-    if (readError) {
-      console.error("[submarkets] pipeline read failed", readError.message);
-      redirect(`/submarkets/${id}?error=importsave`);
-    }
-    const replace = pipelineRowsToReplace(
-      (existing ?? []) as { id: string; name: string | null; address: string | null; source: string | null }[],
-      rows,
-      file.name,
+    // Every stored row, a page at a time in the id's order (lib/read-all):
+    // a limit of 5,000 is cut to the project's max rows, so past 1,000 a
+    // building already loaded could be missed and loaded twice.
+    const existing = await readAll<{ id: string; name: string | null; address: string | null; source: string | null }>(
+      (from, to) =>
+        supabase
+          .from("pipeline_properties")
+          .select("id, name, address, source")
+          .eq("submarket_id", id)
+          .order("id")
+          .range(from, to),
+      (e) => console.error("[submarkets] pipeline read failed", (e as { message?: string } | null)?.message ?? e),
     );
+    if (!existing) redirect(`/submarkets/${id}?error=importsave`);
+    const replace = pipelineRowsToReplace(existing, rows, file.name);
 
     // The new rows go in FIRST: a write that fails then leaves what was
     // loaded before untouched, never a pipeline deleted and not replaced.
