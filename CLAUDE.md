@@ -1466,8 +1466,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   that is why the fallback is in the component and not the route, because
   naming the wrong photographer is a licence breach. An overhead stays only
   where the subject is one building (deal header, pipeline thumbnail, memo
-  cover, shared screen); there `lib/imagery.ts` already prefers a Street
-  View photograph when `GOOGLE_MAPS_API_KEY` is set. A market with no
+  cover, shared screen); `lib/imagery.ts` can put a Street View photograph
+  ahead of it when `GOOGLE_MAPS_API_KEY` is set, but the deal page and the
+  compare columns never ask for one whatever the key (a544615: each draws
+  a non-Google map or overhead beside its pictures, which Google's terms
+  forbid beside Street View), so only the image route's callers that sit
+  beside no other map can. A market with no
   verified file keeps its overhead, so the table grows one photograph at a
   time. **Never write a filename, author or licence into that table from
   memory**: the sandbox cannot reach Commons (403 through its egress
@@ -3762,7 +3766,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     satellite frame whatever the key says, the image route reads `?google=0`
     into it (under a validator of its own), and the pipeline map's hover
     card and every `DealAvatar` ask for it, since each sits over or beside a
-    Leaflet map of other tiles. Nothing changes until the key is set.
+    Leaflet map of other tiles; and the deal page's picture
+    (`googleEnabled={false}`) and the compare columns are held off Google
+    whatever the key (a544615), since each draws USGS's aerial, FEMA's
+    flood map or an OpenStreetMap view beside its pictures. Nothing changes
+    until the key is set.
+  - **OpenStreetMap's credit follows its geocoder** (the batch-2 audit,
+    LOW-8): where the Census geocoder finds nothing, Photon (a geocoder on
+    OpenStreetMap's data) places the deal, and the location carries which
+    one did (`DealLocation.source`, `placedByOpenStreetMap`). Every picture
+    and map framed on such a point names OpenStreetMap after its own credit
+    (`OSM_LOCATION_PARTS` linked, `OSM_LOCATION_WORDS` where no link fits):
+    the deal page's aerial, flood view and map, the pipeline map, the
+    compare columns, the shared screen, the memo's cover and the report's
+    site page. The flood view's ring, and the report's, follow the aerial's:
+    no ring on a point placed on the street, its zone read "at the frame's
+    centre".
 - Where a deal is, by its county (#447). The markets' keyword lists name
   principal cities and a few counties, so a deal in Frisco, Irvine, Fort
   Lauderdale or Cranberry Township read its STATE's figures.
@@ -3928,6 +3947,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `todaysRatesLine` in the pipeline) and appends the line to the
     challenger's notes, after the document so the cache never moves; the
     first-draft model's reconciliation gets it through `liveDebtSeeds`.
+    Where SOFR is handed over the line ends on `SOFR_LEVEL_RULE`: a step
+    judges a floating loan against it but never writes its level, since
+    the New York Fed licenses its rates with a notice beside each figure
+    and a step's words reach the deal page and the shared screen with
+    none under them (the batch-2 audit, LOW-6).
   - **The Opportunity Zone answer names its round, as it stands on the day
     the page is read** (`opportunityZoneRead(flags, today)` in
     lib/site-flags/core, its dates held by a test to
@@ -4053,8 +4077,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   on desktop, and each card on a phone, opens on the deal's picture. The
   list of sources is `bannerSources` in `lib/deal-banner.ts` (pure, in
   `imagePlan`'s order): the deal's own cached photograph, then Street
-  View where the key and a street address allow, then the USGS aerial —
-  no Google satellite at card size. Each source is PINNED to one route, so
+  View where the key and a street address allow (the compare page passes
+  `googleEnabled: false` since a544615, so never there), then the USGS
+  aerial — no Google satellite at card size. Each source is PINNED to one route, so
   the corner credit is exactly the picture on screen. `DealBanner` (client)
   advances to the next source when one fails, and the credit follows it.
   Nothing loads, or there is no address and no photograph: the deal's
