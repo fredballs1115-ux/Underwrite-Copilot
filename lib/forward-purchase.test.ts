@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import {
+  DELIVERY_CAP_ROW,
+  DELIVERY_ROW,
+  DEPOSIT_ROW,
+  DEVELOPER_ROW,
+  GUARANTY_ROW,
+  OUTSIDE_ROW,
+  PRICE_ADJUSTMENT_ROW,
+  RENT_COMMENCEMENT_ROW,
   deliveryText,
   forwardContextLine,
   forwardModelLine,
@@ -13,6 +21,8 @@ import {
   readForwardPurchase,
 } from "./forward-purchase";
 import { gluedWords } from "./render-lint";
+import { extractionInstruction } from "./anthropic/prompts";
+import { findGoingInCap } from "./criteria";
 
 // Research pass 28's two forward deals (rp28/deals.ts), with the rows the
 // extraction will file for them.
@@ -244,5 +254,55 @@ describe("a forward purchase, read as stated (pass 28)", () => {
       for (const text of [r.headline, forwardShortLine(r), forwardContextLine(r), forwardModelLine(r, { noi1: 4_320_000, noiAssumed: true, price: 72_000_000 }) ?? ""])
         expect(gluedWords(text)).toEqual([]);
     }
+  });
+});
+
+describe("the prompt asks for what the reader reads", () => {
+  it("names each forward-purchase row by a label the reader's own pattern takes", () => {
+    const prompt = extractionInstruction("industrial");
+    const labels: [string, RegExp][] = [
+      ["Delivery date", DELIVERY_ROW],
+      ["Outside date", OUTSIDE_ROW],
+      ["Deposit", DEPOSIT_ROW],
+      ["Delivery cap rate", DELIVERY_CAP_ROW],
+      ["Rent commencement", RENT_COMMENCEMENT_ROW],
+      ["Price adjustment", PRICE_ADJUSTMENT_ROW],
+      ["Developer", DEVELOPER_ROW],
+      ["Completion guaranty", GUARANTY_ROW],
+    ];
+    for (const [label, re] of labels) {
+      expect(prompt).toContain(`"${label}"`);
+      expect(re.test(label), label).toBe(true);
+    }
+    // The cap at delivery is never filed as the going-in cap, and no budget
+    // row is asked for the developer's cost.
+    expect(prompt).toContain('"Delivery cap rate" (a cap the price is struck at on the rent at delivery — never filed as "Going-in cap rate"');
+    expect(prompt).toContain("never a budget row for the developer's cost of the works");
+    expect(findGoingInCap([row("Delivery cap rate", "5.75%")])).toBeNull();
+    // Each label, as the extraction writes it, is read.
+    const r = readForwardPurchase(
+      deal("Forward purchase at completion", [
+        row("Purchase price", "$30,000,000"),
+        row("Delivery date", "June 30, 2028"),
+        row("Outside date", "December 31, 2028"),
+        row("Deposit", "$1,500,000, hard after 60 days"),
+        row("Delivery cap rate", "5.75%"),
+        row("Rent commencement", "Certificate of occupancy"),
+        row("Price adjustment", "Repriced at a 5.75% cap on the rent at delivery"),
+        row("Developer", "Ridgeline Logistics Partners"),
+        row("Completion guaranty", "Parent guaranty of completion"),
+      ]),
+      TODAY,
+    )!;
+    expect([r.delivery?.iso, r.outside?.iso, r.deposit?.amount, r.deliveryYieldPct, r.rentCommencement, r.priceAdjustment, r.developer, r.guaranty]).toEqual([
+      "2028-06-30",
+      "2028-12-31",
+      1_500_000,
+      5.75,
+      "Certificate of occupancy",
+      "Repriced at a 5.75% cap on the rent at delivery",
+      "Ridgeline Logistics Partners",
+      "Parent guaranty of completion",
+    ]);
   });
 });

@@ -517,6 +517,16 @@ describe("findGoingInCap — never the finished project's figure", () => {
     expect(findGoingInCap(rows([["Cap rate at completion", "7.0%"]]))).toBeNull();
   });
 
+  it("never reads a forward purchase's cap at delivery as a going-in cap (research pass 28)", () => {
+    // The extraction files it as "Delivery cap rate": the cap the price is
+    // struck at on the rent at delivery, on a building not yet standing.
+    expect(findGoingInCap(rows([["Delivery cap rate", "5.75%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Cap rate at delivery", "5.75%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Going-in cap rate (at delivery)", "5.75%"]]))).toBeNull();
+    // A going-in cap beside it is still the going-in cap.
+    expect(findGoingInCap(rows([["Delivery cap rate", "5.75%"], ["Going-in cap rate", "6.10%"]]))?.value).toBe("6.10%");
+  });
+
   it("evaluateBuyBox: a conversion with only a stabilized cap is 'unknown' and says why, never a pass", () => {
     const box: BuyBox = { minCapPct: 5.0 };
     const conversion = {

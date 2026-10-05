@@ -297,10 +297,12 @@ export const METRIC_FIND = {
   // The going-in cap is today's income against the price. A stabilized, pro
   // forma, forward or at-completion cap — or a yield on cost — describes a
   // plan deal's finished project, and reading it as the going-in cap is how
-  // a conversion "cleared" a 6% floor at 11.7%.
+  // a conversion "cleared" a 6% floor at 11.7%. A forward purchase's cap at
+  // delivery ("Delivery cap rate", "Cap rate at delivery", research pass 28)
+  // is struck on a building not yet standing, never today's income.
   goingInCap: {
     inc: /going[- ]?in cap/i,
-    exc: /stabili[sz]|pro ?forma|forward|projected|at completion|yield/i,
+    exc: /stabili[sz]|pro ?forma|forward|projected|at completion|deliver|yield/i,
   },
   capRate: {
     // "Cap rate" or "Capitalization rate" — the OM's formal wording.
@@ -309,8 +311,9 @@ export const METRIC_FIND = {
     // parentheses or a cap on cost is a projection, not today's income
     // against the price (a Year-1 cap is the going-in figure by another
     // name, so the shared year guard starts at 2 — as classifyNoi's does).
+    // A cap at delivery is a forward purchase's, as above.
     exc: new RegExp(
-      String.raw`exit|terminal|reversion|residual|stabili[sz]|pro ?forma|forward|projected|at completion|yield|on cost|\(\s*(19|20)\d\d|` +
+      String.raw`exit|terminal|reversion|residual|stabili[sz]|pro ?forma|forward|projected|at completion|deliver|yield|on cost|\(\s*(19|20)\d\d|` +
         LATER_YEAR.source,
       "i",
     ),
