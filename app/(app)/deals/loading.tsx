@@ -4,6 +4,8 @@
 // reader lands on (#428) — where the signed-in area's generic skeleton drew
 // a list. The deal page and its tabs keep their own ([id]/loading.tsx), and
 // the compare page the generic one (compare/loading.tsx).
+import { PIPELINE_CARD_GRID } from "@/lib/pipeline-view";
+
 export default function PipelineLoading() {
   return (
     <div role="status" aria-label="Loading your pipeline" className="space-y-6">
@@ -22,7 +24,7 @@ export default function PipelineLoading() {
       </div>
       <div>
         <div className="skeleton h-5 w-28 rounded" />
-        <ul className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-loading="cards">
+        <ul className={PIPELINE_CARD_GRID} data-loading="cards">
           {Array.from({ length: 6 }, (_, i) => (
             <li key={i} className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
               <div className="skeleton aspect-[16/10] w-full" data-card-picture />

@@ -22,9 +22,10 @@ const contrast = (fg: readonly number[], bg: readonly number[]) => {
  *  caption's `pb-2` under the place's 13px line at `leading-tight`, under
  *  the eyebrow's 9px line at the page's 1.5. */
 const WORDS = { place: [8, 8 + 16.25], eyebrow: [8 + 16.25, 8 + 16.25 + 13.5] } as const;
-/** The heights a card's picture is drawn at: the smallest the pipeline
- *  draws (two columns beside the sidebar at 768px, 224 × 140), a desktop
- *  card, a phone's and the widest. */
+/** The heights a card's picture is drawn at: 224 × 140, the smallest the
+ *  pipeline drew until research pass 29 (two columns beside the sidebar at
+ *  768px; a card is 17.5rem at least now, lib/pipeline-view) and kept as the
+ *  floor, a desktop card, a phone's and the widest. */
 const CARD_HEIGHTS = [140, 187, 224, 262];
 
 describe("a deal's cover (#442)", () => {

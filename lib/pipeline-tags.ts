@@ -143,14 +143,16 @@ export function chipWidth(text: string): number {
  * a card's picture is at least the first, and each tier holds from its
  * width up to the next's. The card component asks the same widths of its
  * own picture (container queries, `@min-[278px]/card`, `@min-[348px]/card`).
- *  - 222: the narrowest the grid draws — two columns beside the 240px
- *    sidebar at 768px wide (768 − 240 − 2 × 32 of page padding leaves 464,
- *    less the 16px gap, over two is a 224px card), less the card's 1px
- *    border a side;
- *  - 278: a phone's card from 320px wide, two columns from 640 (beside the
- *    sidebar from 880), three from 1280 and four from 1536;
- *  - 348: a phone's card from 390px wide, two columns beside the sidebar
- *    from 1020, three from 1386.
+ *  - 222: a phone narrower than 320px, where a card is the whole column,
+ *    less the card's 1px border a side. It was the narrowest card on any
+ *    screen until research pass 29 — two columns beside the 240px sidebar
+ *    at 768px wide — and the grid (lib/pipeline-view `PIPELINE_CARD_GRID`)
+ *    now draws none narrower than 17.5rem where one fits;
+ *  - 278: 17.5rem less the border, the narrowest card wherever one fits: a
+ *    phone's from 320px wide, two columns from 616 (beside the sidebar from
+ *    880), three from 1176 and four from 1472;
+ *  - 348: a phone's card from 390px wide, one column beside the sidebar
+ *    from 768, two from 1020, three from 1386.
  */
 export const PICTURE_TIERS = [222, 278, 348] as const;
 

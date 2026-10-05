@@ -22,7 +22,7 @@ import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
-import { PIPELINE_VIEW_COOKIE, remembersView, type PipelineView } from "@/lib/pipeline-view";
+import { PIPELINE_CARD_GRID, PIPELINE_CARD_SIZES, PIPELINE_VIEW_COOKIE, remembersView, type PipelineView } from "@/lib/pipeline-view";
 import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
@@ -1174,8 +1174,10 @@ export function Pipeline({
                     </button>
                     {open && view === "cards" && (
                       // The photograph-led view (#428): a card a deal, the
-                      // building's picture first, the way a listing reads.
-                      <ul className="stagger mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-view="cards">
+                      // building's picture first, the way a listing reads —
+                      // never a card narrower than 17.5rem where one fits
+                      // (lib/pipeline-view).
+                      <ul className={`stagger ${PIPELINE_CARD_GRID}`} data-view="cards">
                         {sectionDeals.map((d, idx) => (
                           <DealTile
                             key={d.id}
@@ -2213,7 +2215,7 @@ const DealTile = memo(function DealTile({
           onPhoto={setPhotoOn}
           onSlideGone={dropSlide}
           onMarket={reportMarket}
-          sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
+          sizes={PIPELINE_CARD_SIZES}
         />
         {/* The call, and in compare mode the pick beside it: the foot of the
             picture is the market photograph's caption (#438). */}

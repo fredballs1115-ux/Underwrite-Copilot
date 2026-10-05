@@ -50,7 +50,7 @@ import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table"
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
-import { landingView, remembersView } from "@/lib/pipeline-view";
+import { PIPELINE_CARD_GRID, PIPELINE_CARD_SIZES, landingView, remembersView } from "@/lib/pipeline-view";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
@@ -1010,6 +1010,54 @@ describe("Pipeline — its loading state, and the reads that stream after it", (
     const grid = cards.match(/<ul class="stagger ([^"]*)" data-view="cards">/)?.[1];
     expect(grid).toBeTruthy();
     expect(html).toContain(`<ul class="${grid}" data-loading="cards">`);
+    expect(grid).toBe(PIPELINE_CARD_GRID);
+  });
+
+  it("sizes the cards' grid by its own width: no card under 17.5rem where one fits, four across at most (research pass 29)", () => {
+    // Its breakpoints went two-up at 640px while the sidebar arrives at
+    // 768, so from 768 to 1023 a card was 222–250px wide and its market
+    // caption collapsed. The grid's own terms, read off the class both the
+    // cards and their loading state draw:
+    const terms = /grid-cols-\[repeat\(auto-fill,minmax\(min\((\d+(?:\.\d+)?)rem,100%\),1fr\)\)\]/.exec(PIPELINE_CARD_GRID);
+    expect(terms, PIPELINE_CARD_GRID).not.toBeNull();
+    const least = Number(terms![1]) * 16;
+    const gap = Number(/\bgap-(\d+)\b/.exec(PIPELINE_CARD_GRID)?.[1]) * 4;
+    expect(least).toBeGreaterThanOrEqual(280);
+    expect(PIPELINE_CARD_GRID).not.toMatch(/\b(?:sm|md|lg|xl|2xl):grid-cols-/);
+    // The shell around it (app/(app)/app-shell.tsx): the 240px sidebar from
+    // md, the page's 20px or, from sm, 32px of padding, the 80rem column.
+    const shell = readFileSync("app/(app)/app-shell.tsx", "utf8");
+    expect(shell).toMatch(/<aside className="[^"]*\bhidden\b[^"]*\bw-60\b[^"]*\bmd:flex\b/);
+    expect(shell).toContain('mx-auto w-full px-5 py-8 sm:px-8 ${pathname === "/deals" ? "max-w-7xl"');
+    const column = (vw: number) => Math.min(vw - (vw >= 768 ? 240 : 0), 1280) - (vw >= 640 ? 64 : 40);
+    const laid = (vw: number) => {
+      const w = column(vw);
+      const n = Math.max(1, Math.floor((w + gap) / (Math.min(least, w) + gap)));
+      return { n, card: (w - (n - 1) * gap) / n };
+    };
+    for (let vw = 320; vw <= 2560; vw++) {
+      const { n, card } = laid(vw);
+      expect(card, `${vw}px`).toBeGreaterThanOrEqual(least);
+      expect(n, `${vw}px`).toBeLessThanOrEqual(4);
+    }
+    // Measured in Chromium beside the sidebar, the same widths.
+    expect([390, 768, 820, 1024, 1280, 1440, 1536, 1920].map((vw) => [laid(vw).n, Math.round(laid(vw).card)])).toEqual([
+      [1, 350], [1, 464], [1, 516], [2, 352], [3, 315], [3, 368], [4, 292], [4, 292],
+    ]);
+    // The pictures' sizes hint says the card's width at every screen.
+    const sizesAt = (vw: number) => {
+      for (const entry of PIPELINE_CARD_SIZES.split(/,\s*/)) {
+        const m = /^(?:\(min-width: (\d+)px\)\s+)?(.+)$/.exec(entry.trim())!;
+        if (m[1] && vw < Number(m[1])) continue;
+        const px = /^(\d+(?:\.\d+)?)px$/.exec(m[2]);
+        if (px) return Number(px[1]);
+        const calc = /^calc\((\d+(?:\.\d+)?)vw - (\d+(?:\.\d+)?)px\)$/.exec(m[2]);
+        expect(calc, m[2]).not.toBeNull();
+        return (Number(calc![1]) / 100) * vw - Number(calc![2]);
+      }
+      return NaN;
+    };
+    for (let vw = 320; vw <= 2560; vw += 2) expect(Math.abs(sizesAt(vw) - laid(vw).card), `${vw}px`).toBeLessThanOrEqual(1);
   });
 
   it("leaves the compare page the signed-in area's generic skeleton, rather than a grid of cards", () => {

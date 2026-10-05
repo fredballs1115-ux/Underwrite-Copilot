@@ -35,7 +35,8 @@ export const MARKET_CAPTION_SCRIM = {
  * eyebrow keeps one line, the name takes two at most and the credit wraps,
  * each at the caption's whole width — so the market's name, the one word
  * the caption exists to say, has two full lines on a card (the longest the
- * table names, 42 characters, takes two), where it had the half beside the
+ * table names, 42 characters, takes two on the narrowest card the grid
+ * draws, 17.5rem — lib/pipeline-view), where it had the half beside the
  * credit and was cut at one; and the licence's words are never cut.
  */
 export const MARKET_CAPTION = {
