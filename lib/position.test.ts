@@ -260,6 +260,73 @@ describe("a current pay the memorandum does not state", () => {
   });
 });
 
+// The second pre-merge audit's items on a position (MED-1, LOW-1 to LOW-5,
+// and the first audit's L1).
+describe("a position's parts, dates and stack, each said as it is", () => {
+  const swap = (rows: ExtractionResult["metrics"], ...labels: string[]) =>
+    ex([...PREF.metrics.filter((m) => !labels.includes(m.label)), ...rows], "preferred_equity");
+
+  it("reads its parts after a slash or a colon as 8% current of 12%, and solves 11.4% at par (MED-1)", () => {
+    for (const words of ["12% (8% current / 4% accrual)", "12% preferred return: 8% current, 4% accrued"]) {
+      const r = readPosition(
+        ex([metric("Preferred equity amount", "$15,000,000"), metric("Preferred return", words), metric("Mandatory redemption date", "June 2029")], "preferred_equity"),
+        15_000_000,
+        ON,
+      )!;
+      expect(r.terms, words).toMatchObject({ totalPct: 12, currentPayPct: 8, currentPayDerived: false, accrualPct: 4 });
+      expect(r.yieldPct!.toFixed(1), words).toBe("11.4");
+      expect(r.currentPayYear, words).toBe(1_200_000);
+      expect(positionTag(r), words).toBe("Pref equity, 12% to Jun 2029");
+      expect(r.sentences.join(" "), words).not.toContain("nothing is paid in cash");
+    }
+  });
+
+  it("says a redemption in the senior loan's own month as the same month, its side by the day, and one month as one (LOW-1)", () => {
+    const said = (redemption: string, maturity: string) =>
+      readPosition(swap([metric("Mandatory redemption date", redemption), metric("Senior loan maturity", maturity)], "Mandatory redemption date", "Senior loan maturity"), 15_000_000, ON)!.sentences.join(" ");
+    // Both a month alone: one month, its order not read.
+    const months = said("June 2029", "June 2029");
+    expect(months).toContain("It redeems in the same month as the senior loan matures (Jun 2029): the sponsor must refinance or sell to its last dollar by then.");
+    // Both to the day, the redemption after: said after, never "0 months before".
+    const after = said("June 30, 2029", "June 1, 2029");
+    expect(after).toContain("It redeems after the senior loan matures (Jun 2029), in the same month: the senior loan must be refinanced first, ahead of it.");
+    expect(said("June 1, 2029", "June 30, 2029")).toContain("It redeems in the same month as the senior loan matures (Jun 2029):");
+    // A month apart is one month.
+    const one = said("May 15, 2029", "June 15, 2029");
+    expect(one).toContain("It redeems 1 month before the senior loan matures (Jun 2029)");
+    for (const s of [months, after, one]) expect(s).not.toMatch(/\b0 months\b|\b1 months\b/);
+  });
+
+  it("names no accrual to a redemption due this month (LOW-2)", () => {
+    const due = readPosition(PREF, 15_000_000, new Date("2029-06-15T12:00:00Z"))!;
+    expect(due.monthsLeft).toBe(0);
+    const said = due.sentences.join(" ");
+    expect(said).toContain("Current pay is cash and accrual a promise: $1.20M a year is paid in cash.");
+    expect(said).not.toMatch(/\$0 accrues|\$0 if it compounds/);
+  });
+
+  it("says the last dollar is the least it can be where no accrual to a redemption is counted (LOW-3)", () => {
+    const past = readPosition(PREF, 15_000_000, new Date("2029-08-01T12:00:00Z"))!;
+    expect(past.detachmentBeforeAccrual).toBe(true);
+    expect(past.sentences.join(" ")).toContain("the position's first dollar sits at 65.0% and its last at 83.8% at least, before any accrued return.");
+    expect(past.sentences.join(" ")).not.toContain("at redemption");
+    expect(positionModelLine(past)).toContain("its last dollar sits at 83.8% of the stated value at least, before any accrued return");
+    const undated = readPosition(swap([], "Mandatory redemption date"), 15_000_000, ON)!;
+    expect(undated.sentences.join(" ")).toContain("its last at 83.8% at least, before any accrued return.");
+    // A position paying its current pay alone owes no accrual: its last
+    // dollar is the figure, at redemption.
+    const cashOnly = readPosition(swap([], "Preferred return"), 15_000_000, ON)!;
+    expect(cashOnly.detachmentBeforeAccrual).toBe(false);
+    expect(cashOnly.sentences.join(" ")).toContain("its last at 83.8% at redemption.");
+  });
+
+  it("names the yield's basis only beside a yield (LOW-5)", () => {
+    // No price read, so no yield is drawn: the months alone.
+    expect(positionCaption(readPosition(PREF, null, ON))).toBe("32 months to its Jun 2029 redemption.");
+    expect(positionCaption(readPosition(PREF, 14_000_000, ON))).toContain("the accrual read as simple, the lower yield");
+  });
+});
+
 // The extraction asks for each row this reads, by the reader's own labels,
 // and files the position as its own kind (lib/interest reads it from there).
 describe("the extraction asks for the rows a position is read from", () => {

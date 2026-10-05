@@ -7328,11 +7328,14 @@ describe("InterestPanel — a preferred equity position read as a position (lib/
       "8.6%",
       "a year's current pay on the price",
       "Cash a year",
-      "$1.2M",
+      // One writer for the panel's tiles and its sentences: "$1.20M", as
+      // the read beside it says it (the second pre-merge audit, LOW-4).
+      "$1.20M",
       "8.0% current pay on $15.0M",
     ]) {
       expect(text, tile).toContain(tile);
     }
+    expect(text).not.toMatch(/\$1\.2M/);
     expect(text).toContain("32 months to its Jun 2029 redemption, the accrual read as simple, the lower yield — the memorandum does not say whether it compounds.");
     // The stack: the senior loan to 65%, the position to 83.75% today, the
     // accrual to 86.1% at redemption, and the stated value a tick at 100%.
@@ -7349,7 +7352,7 @@ describe("InterestPanel — a preferred equity position read as a position (lib/
     expect(key.map((k) => k.says)).toEqual([
       "Senior loan $52.0M · 65.0% of the stated value",
       "The position $15.0M · 65.0% to 83.8% today",
-      "Accrued by redemption $1.9M, if it compounds · to 86.1%",
+      "Accrued by redemption $1.87M, if it compounds · to 86.1%",
       "The stated value $80.0M",
     ]);
     expect(key[0].swatch).toContain("bg-ink/30");

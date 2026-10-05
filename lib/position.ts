@@ -92,7 +92,10 @@ export interface PositionTerms {
   redemption: string | null;
   redemptionIsMonth: boolean;
   seniorBalance: number | null;
+  /** the senior loan's maturity as an ISO day; a month alone is its first
+   *  day */
   seniorMaturity: string | null;
+  seniorMaturityIsMonth: boolean;
   value: number | null;
   extension: string | null;
   remedies: string | null;
@@ -126,9 +129,17 @@ export interface PositionRead {
   attachmentPct: number | null;
   detachmentTodayPct: number | null;
   detachmentPct: number | null;
-  /** months from the redemption to the senior loan's maturity — negative
-   *  where the position redeems after the senior matures */
+  /** the last dollar counts no accrual though one may be owed — no
+   *  redemption ahead to accrue to, or the accrual not stated beside an
+   *  unstated current pay: `detachmentPct` is then the least it can be */
+  detachmentBeforeAccrual: boolean;
+  /** whole months from the redemption to the senior loan's maturity —
+   *  negative where the position redeems after the senior matures, its side
+   *  decided by the day (`daysToSeniorMaturity`) */
   monthsToSeniorMaturity: number | null;
+  /** days from the redemption to the senior loan's maturity, negative where
+   *  the redemption comes after it */
+  daysToSeniorMaturity: number | null;
   headline: string;
   sentences: string[];
 }
@@ -250,6 +261,7 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
     redemptionIsMonth: !!redemption?.month,
     seniorBalance: seniorRow ? money(seniorRow.value) : null,
     seniorMaturity: seniorMaturity?.iso ?? null,
+    seniorMaturityIsMonth: !!seniorMaturity?.month,
     value: valueRow ? money(valueRow.value) : null,
     extension: extensionRow ? extensionRow.value.trim() : null,
     remedies: remediesRow ? remediesRow.value.trim() : null,
@@ -274,7 +286,11 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const monthYear = (isoDay: string) => `${MONTHS[Number(isoDay.slice(5, 7)) - 1]} ${isoDay.slice(0, 4)}`;
 const pctText = (n: number, places = 2) => `${n.toFixed(places)}%`;
-const money2 = (n: number): string => compactUsd(n, { millions: "auto" });
+/** A position's dollars, as its sentences say them and its panel's tiles
+ *  and key draw them: one writer, so "$1.20M a year" in a sentence is never
+ *  "$1.2M" on the tile beside it (the second pre-merge audit). */
+export const positionMoney = (n: number): string => compactUsd(n, { millions: "auto" });
+const money2 = positionMoney;
 
 /** The position read at its price on a day. Null unless the memorandum
  *  sells one (`isPreferredEquity`) and states its amount. */
@@ -336,12 +352,22 @@ export function readPosition(
   const attachmentPct = stacked ? (senior / value) * 100 : null;
   const detachmentTodayPct = stacked ? ((senior + amount) / value) * 100 : null;
   const detachmentPct = stacked && accruedForStack != null ? ((senior + amount + accruedForStack) / value) * 100 : detachmentTodayPct;
+  // No accrual counted in the last dollar where one may be owed: past the
+  // redemption, or with none stated, it has no month to accrue to; and an
+  // accrual not stated beside an unstated current pay may exist. The figure
+  // is then the least the last dollar can be (the second pre-merge audit:
+  // "its last at 83.8% at redemption" with no redemption ahead).
+  const detachmentBeforeAccrual = stacked && accruedForStack == null && (terms.accrualPct != null || !currentKnown);
+  // The redemption against the senior's maturity, its side read by the day:
+  // whole months read "0 months before" a maturity the redemption fell
+  // after inside one month (the pre-merge audits).
+  const daysToSeniorMaturity = terms.redemption && terms.seniorMaturity ? daysBetween(terms.redemption, terms.seniorMaturity) : null;
   const monthsToSeniorMaturity =
-    terms.redemption && terms.seniorMaturity
-      ? terms.redemption <= terms.seniorMaturity
-        ? monthsBetween(terms.redemption, terms.seniorMaturity)
-        : -monthsBetween(terms.seniorMaturity, terms.redemption)
-      : null;
+    daysToSeniorMaturity == null
+      ? null
+      : daysToSeniorMaturity >= 0
+        ? monthsBetween(terms.redemption!, terms.seniorMaturity!)
+        : -monthsBetween(terms.seniorMaturity!, terms.redemption!);
 
   const read: Omit<PositionRead, "headline" | "sentences"> = {
     terms,
@@ -358,7 +384,9 @@ export function readPosition(
     attachmentPct,
     detachmentTodayPct,
     detachmentPct,
+    detachmentBeforeAccrual,
     monthsToSeniorMaturity,
+    daysToSeniorMaturity,
   };
   const sentences = positionSentences(read);
   return { ...read, headline: sentences[0], sentences };
@@ -391,8 +419,12 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
   } else {
     out.push(`${lead}.`);
   }
-  // Current pay is cash, accrual a promise.
-  if (r.currentPayYear != null || (t.accrualPct != null && r.monthsLeft != null)) {
+  // Current pay is cash, accrual a promise. With no month left to the
+  // redemption no accrual is counted to it: "$0 accrues" said the accrued
+  // return was nothing (the second pre-merge audit), where what has accrued
+  // since the position was made is not read.
+  const accrues = t.accrualPct != null && r.monthsLeft != null && r.monthsLeft > 0;
+  if (r.currentPayYear != null || accrues) {
     const cash =
       r.currentPayYear == null
         ? "the memorandum states no current pay"
@@ -400,11 +432,11 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
           ? "nothing is paid in cash"
           : `${money2(r.currentPayYear)} a year is paid in cash`;
     let owed = "";
-    if (t.accrualPct != null && r.monthsLeft != null && r.accruedSimple != null && r.accruedCompound == null) {
+    if (accrues && r.accruedSimple != null && r.accruedCompound == null) {
       // The compounding earns the preferred return, which the current pay
       // not stated leaves unknown.
       owed = `; ${money2(r.accruedSimple)} accrues to be paid at redemption, not counting any compounding`;
-    } else if (t.accrualPct != null && r.monthsLeft != null && r.accruedSimple != null && r.accruedCompound != null) {
+    } else if (accrues && r.accruedSimple != null && r.accruedCompound != null) {
       if (t.compounds === true) owed = `; ${money2(r.accruedCompound)} accrues, compounding, to be paid at redemption`;
       else if (t.compounds === false) owed = `; ${money2(r.accruedSimple)} accrues, not compounding, to be paid at redemption`;
       else
@@ -412,11 +444,17 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
     }
     out.push(`Current pay is cash and accrual a promise: ${cash}${owed}.`);
   }
-  // The stack.
+  // The stack. The last dollar "at redemption" only where an accrual to it
+  // is counted; where one may be owed and is not counted — no redemption
+  // ahead, or the split not stated — the least it can be, said so (the
+  // second pre-merge audit).
   if (r.attachmentPct != null && r.detachmentPct != null && t.seniorBalance != null && t.value != null) {
     const today = r.detachmentTodayPct != null && Math.abs(r.detachmentTodayPct - r.detachmentPct) >= 0.05 ? ` (${pctText(r.detachmentTodayPct, 1)} today)` : "";
+    const last = r.detachmentBeforeAccrual
+      ? `${pctText(r.detachmentPct, 1)} at least, before any accrued return`
+      : `${pctText(r.detachmentPct, 1)}${r.monthsLeft != null ? " at redemption" : ""}${today}`;
     out.push(
-      `Behind the ${money2(t.seniorBalance)} senior loan on the ${money2(t.value)} stated value, the position's first dollar sits at ${pctText(r.attachmentPct, 1)} and its last at ${pctText(r.detachmentPct, 1)} at redemption${today}.`,
+      `Behind the ${money2(t.seniorBalance)} senior loan on the ${money2(t.value)} stated value, the position's first dollar sits at ${pctText(r.attachmentPct, 1)} and its last at ${last}.`,
     );
     if (r.detachmentPct >= 100) out.push("Its last dollar is past the stated value: a sale at that value would not repay it whole.");
   } else if (t.seniorBalance == null) {
@@ -424,13 +462,27 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
   } else if (t.value == null) {
     out.push("The memorandum states no value for the property, so the stack is not read.");
   }
-  // The redemption against the senior's maturity.
-  if (r.monthsToSeniorMaturity != null && t.seniorMaturity && t.redemption) {
-    out.push(
-      r.monthsToSeniorMaturity >= 0
-        ? `It redeems ${r.monthsToSeniorMaturity} months before the senior loan matures (${monthYear(t.seniorMaturity)}): the sponsor must refinance or sell to its last dollar by then.`
-        : `It redeems after the senior loan matures (${monthYear(t.seniorMaturity)}): the senior loan must be refinanced first, ahead of it.`,
-    );
+  // The redemption against the senior's maturity, its side by the day. In
+  // one month the order is the days' where both are stated to the day; a
+  // month alone names no day, so none is read — "in the same month", never
+  // "0 months before" (the pre-merge audits).
+  if (r.monthsToSeniorMaturity != null && r.daysToSeniorMaturity != null && t.seniorMaturity && t.redemption) {
+    const when = monthYear(t.seniorMaturity);
+    const refinance = "the sponsor must refinance or sell to its last dollar by then";
+    const after = "the senior loan must be refinanced first, ahead of it";
+    const dated = !t.redemptionIsMonth && !t.seniorMaturityIsMonth;
+    if (sameMonth(t.redemption, t.seniorMaturity)) {
+      out.push(
+        dated && r.daysToSeniorMaturity < 0
+          ? `It redeems after the senior loan matures (${when}), in the same month: ${after}.`
+          : `It redeems in the same month as the senior loan matures (${when}): ${refinance}.`,
+      );
+    } else if (r.daysToSeniorMaturity >= 0) {
+      const m = r.monthsToSeniorMaturity;
+      out.push(`It redeems ${m < 1 ? "under a month" : `${m} ${m === 1 ? "month" : "months"}`} before the senior loan matures (${when}): ${refinance}.`);
+    } else {
+      out.push(`It redeems after the senior loan matures (${when}): ${after}.`);
+    }
   }
   if (t.extension) out.push(`Extension options, as stated: ${t.extension.replace(/\.$/, "")}.`);
   if (t.remedies) out.push(`Remedies, as stated: ${t.remedies.replace(/\.$/, "")}.`);
@@ -464,6 +516,9 @@ export function positionCaption(r: PositionRead | null): string {
   const months = `${r.monthsLeft} ${r.monthsLeft === 1 ? "month" : "months"}`;
   // No cash part stated: no yield was solved, and the small print says why.
   if (t.currentPayPct == null) return `${months} to its ${when} redemption; the memorandum states no current pay, so no yield to redemption is read.`;
+  // No yield drawn (no price read): the yield's basis is named only beside
+  // a yield (the second pre-merge audit).
+  if (r.yieldPct == null) return `${months} to its ${when} redemption.`;
   // The yield's accrual on the side lib/position reads it: as stated, else
   // simple — the lower.
   const basis =
@@ -481,7 +536,10 @@ export function positionCaption(r: PositionRead | null): string {
 export function positionModelLine(r: PositionRead | null): string | null {
   if (!r) return null;
   const yieldPart = r.yieldPct != null ? `its yield to redemption is ${pctText(r.yieldPct, 1)}` : "its return is its rate and its redemption";
-  const stackPart = r.detachmentPct != null ? ` and its last dollar sits at ${pctText(r.detachmentPct, 1)} of the stated value` : "";
+  const stackPart =
+    r.detachmentPct != null
+      ? ` and its last dollar sits at ${pctText(r.detachmentPct, 1)} of the stated value${r.detachmentBeforeAccrual ? " at least, before any accrued return" : ""}`
+      : "";
   return `The property model runs the whole building at the position's price; that is not this position's return — ${yieldPart}${stackPart}.`;
 }
 

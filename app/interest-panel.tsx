@@ -4,7 +4,7 @@ import { LeaseTermBar } from "@/app/lease-term-bar";
 import { Key, KeyItem, MEASURE, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 import { termEndLabel } from "@/lib/ground-lease-term";
 import { isWholeShare, noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
-import { positionCaption } from "@/lib/position";
+import { positionCaption, positionMoney } from "@/lib/position";
 
 /**
  * What is being sold (#414) — the pure panel for `lib/interest`, drawn by
@@ -79,11 +79,13 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
       ? [
           p.yieldPct != null ? { label: "To redemption", value: `${tenths(p.yieldPct)}%`, sub: "if paid and redeemed as agreed" } : null,
           p.currentYieldPct != null ? { label: "Current yield", value: `${tenths(p.currentYieldPct)}%`, sub: "a year's current pay on the price" } : null,
+          // The position's dollars through its own writer, as its sentences
+          // say them (lib/position `positionMoney`).
           p.currentPayYear != null && p.terms.currentPayPct != null
             ? {
                 label: "Cash a year",
-                value: money(p.currentPayYear),
-                sub: `${tenths(p.terms.currentPayPct)}% current pay${p.terms.amount != null ? ` on ${money(p.terms.amount)}` : ""}`,
+                value: positionMoney(p.currentPayYear),
+                sub: `${tenths(p.terms.currentPayPct)}% current pay${p.terms.amount != null ? ` on ${positionMoney(p.terms.amount)}` : ""}`,
               }
             : null,
         ].filter((t): t is { label: string; value: string; sub: string } => t != null)
@@ -132,10 +134,10 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
             amount: span(p.attachmentPct, p.detachmentTodayPct),
             accrued: accrues ? span(p.detachmentTodayPct, p.detachmentPct) : null,
             value: at(100),
-            seniorText: money(p.terms.seniorBalance),
-            amountText: money(p.terms.amount),
-            accruedText: `${money(accrued)}${p.terms.compounds === true ? ", compounding" : p.terms.compounds === false ? ", simple" : ", if it compounds"}`,
-            valueText: money(p.terms.value),
+            seniorText: positionMoney(p.terms.seniorBalance),
+            amountText: positionMoney(p.terms.amount),
+            accruedText: `${positionMoney(accrued)}${p.terms.compounds === true ? ", compounding" : p.terms.compounds === false ? ", simple" : ", if it compounds"}`,
+            valueText: positionMoney(p.terms.value),
             attachText: tenths(p.attachmentPct),
             todayText: tenths(p.detachmentTodayPct),
             lastText: tenths(p.detachmentPct),
