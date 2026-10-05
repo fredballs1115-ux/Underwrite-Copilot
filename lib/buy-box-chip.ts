@@ -20,7 +20,7 @@ import {
 import { scoreMandateFit, type MandateScore } from "@/lib/mandate";
 import { FOLD_WORD, checkedSentence, fitCellText, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import { inferStrategy, signalGoingInCap, statedBasisIsBuildings } from "@/lib/deal-strategy";
-import { entityLoanWords, interestOf, isGpStake, isTenancyInCommon } from "@/lib/interest";
+import { entityLoanWords, interestOf, isGpStake, isTenancyInCommon, isWholeShare } from "@/lib/interest";
 import { capSlotWithheld } from "@/lib/compare-interest";
 import { compactUsd } from "@/lib/money";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -55,7 +55,12 @@ export function sourceReadsOf(extraction: ExtractionResult | null, firstSignal: 
     // in common's loan is the property's.
     share:
       interest.kind === "partial_interest"
-        ? { gpStake: isGpStake(extraction), pctStated: interest.sharePct != null, tic: isTenancyInCommon(extraction) }
+        ? {
+            gpStake: isGpStake(extraction),
+            pctStated: interest.sharePct != null,
+            tic: isTenancyInCommon(extraction),
+            all: isWholeShare(interest.sharePct),
+          }
         : null,
     signalCap: signalGoingInCap(firstSignal),
     ...(holding ? { holding } : {}),

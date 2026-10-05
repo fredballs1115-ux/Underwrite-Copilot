@@ -481,7 +481,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
       [["Asking price", "$20,580,000"], ["Entity loan balance", "$56,500,000"], ...BUILDING],
       "A 49% limited partnership interest",
     );
-    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true, tic: false }, signalCap: null });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true, tic: false, all: false }, signalCap: null });
     const r = read(ex);
     expect(checkOf(r, "Going-in cap")?.status).toBe("unknown");
     expect(checkOf(r, "Going-in cap")?.detail).toContain("beside the loan its entity carries, this share's price grossed up is the equity's whole");
@@ -537,7 +537,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
 
   it("a share with a stated percentage and no entity loan keeps its cap, the grossed-up whole's — its stated per-unit figure is no basis", () => {
     const ex = deal("partial_interest", [["Asking price", "$20,580,000"], ...BUILDING], "A 49% limited partnership interest");
-    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true, tic: false }, signalCap: null });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true, tic: false, all: false }, signalCap: null });
     const r = read(ex);
     // The header prints the memorandum's cap for this share, and the box
     // judges the same figure.
@@ -700,5 +700,21 @@ describe("the box holds a deal only to the figures its price buys", () => {
       expect(detail, label).toContain("beside the loan on the property, this interest's price grossed up is the equity's whole");
       expect(detail, label).not.toMatch(/its entity|this share/);
     }
+    // All the tenant-in-common interests: the price is the whole's,
+    // nothing grossed up, as the deal's own lead says (audit C5, LOW-7).
+    const all = deal(
+      "partial_interest",
+      [["Asking price", "$14,000,000"], ["Entity loan balance", "$9,000,000"], ["Levered IRR", "14.0%"], ...BUILDING],
+      "100% tenant-in-common interests",
+    );
+    const ra = buyBoxRead("multifamily", dealCheckSource(all, null, null), { ...BOX, minIrrPct: 15 });
+    for (const label of ["Going-in cap", "Target return"]) {
+      const detail = checkOf(ra, label)?.detail ?? "";
+      expect(detail, label).toContain(
+        "beside the loan on the property, the price for all the tenant-in-common interests is the equity's whole, nothing grossed up, not the building's",
+      );
+      expect(detail, label).not.toMatch(/grossed up is|this interest|its entity/);
+    }
+    expect(checkOf(ra, "Target return")?.detail).toContain("not read as these interests' return");
   });
 });

@@ -778,6 +778,9 @@ export interface ShareRead {
   gpStake: boolean;
   pctStated: boolean;
   tic: boolean;
+  /** a stated 100%: all the interests, the price the whole's, nothing
+   *  grossed up (lib/interest `isWholeShare`) */
+  all?: boolean;
 }
 
 /**
@@ -801,10 +804,23 @@ export function capWithheldOf(ex: ExtractionLike | null | undefined): CapWithhel
  *  words its holding takes: on a tenancy in common the loan is the
  *  property's and the share an interest, since no entity owns the property
  *  (research pass 37, audit C4 L3). */
-const besideTheLoan = (ex: Pick<ExtractionLike, "shareRead"> | null | undefined): string =>
-  ex?.shareRead?.tic
+const besideTheLoan = (ex: Pick<ExtractionLike, "shareRead"> | null | undefined): string => {
+  const s = ex?.shareRead;
+  // All the interests (a stated 100%): the price is the whole's, nothing
+  // grossed up, as the deal's own lead says (audit C5, LOW-7).
+  if (s?.all) {
+    return s.tic
+      ? "beside the loan on the property, the price for all the tenant-in-common interests is the equity's whole, nothing grossed up, not the building's"
+      : "beside the loan its entity carries, the price for all of the entity's interests is the equity's whole, nothing grossed up, not the building's";
+  }
+  return s?.tic
     ? "beside the loan on the property, this interest's price grossed up is the equity's whole, not the building's"
     : "beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's";
+};
+
+/** Whose return a stated IRR is not, in the withheld check's words. */
+const returnHolder = (ex: Pick<ExtractionLike, "shareRead"> | null | undefined): string =>
+  ex?.shareRead?.all ? "these interests'" : ex?.shareRead?.tic ? "this interest's" : "this share's";
 
 /** The going-in cap check's words where the cap is withheld, by the cap
  *  slot's own reason — the buy box's check and the mandate's dimension say
@@ -883,7 +899,7 @@ export function returnWithheldDetail(targetPct: number, why: ReturnWithheldKind,
   if (why === "leased_fee") {
     return `${head}, but the price buys the land under the ground lease: the screen does not read whether an IRR the memorandum states is the land's or the building's above it, so it is not held to the target.`;
   }
-  return `${head}, but ${besideTheLoan(ex)}: an IRR the memorandum states is not read as this ${ex?.shareRead?.tic ? "interest" : "share"}'s return.`;
+  return `${head}, but ${besideTheLoan(ex)}: an IRR the memorandum states is not read as ${returnHolder(ex)} return.`;
 }
 
 /**
