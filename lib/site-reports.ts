@@ -345,7 +345,10 @@ export function readSiteReports(ex: ExtractionResult | null | undefined, asOf: D
   return { ...read, sentences, headline: sentences.join(" ") };
 }
 
-const FINDING_WORDS: Record<EsaFinding, string> = {
+/** A Phase I finding in words, for a sentence ("a recognized environmental
+ *  condition"); "" for a finding stated in the report's own words, which a
+ *  caller quotes instead. */
+export const FINDING_WORDS: Record<EsaFinding, string> = {
   none: "no recognized environmental conditions",
   rec: "a recognized environmental condition",
   crec: "a controlled recognized environmental condition",

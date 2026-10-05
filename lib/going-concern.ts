@@ -1,0 +1,325 @@
+// An operating business on its real estate (research pass 28, round 3) — a
+// gas station and its store, a car wash, a marina, a golf course, a
+// campground, a bowling center, a funeral home, a childcare center. The
+// screen read each as a building with a rent: a memorandum's "NOI" that
+// carries the fuel and store business was capitalised as rent, a stated
+// EBITDA was read by nothing but the model's note (lib/underwrite/inputs),
+// and nothing asked whose earnings these were.
+//
+// Pure — no I/O, no model call. Two branches, one reader:
+//   A GOING CONCERN — the memorandum sells the business with the real
+//     estate: its earnings are the operation's;
+//   AN OPERATOR'S LEASE — the memorandum sells the real estate leased to
+//     the operator (a sale-leaseback, a net lease to a station, a wash, a
+//     childcare operator): the rent is the landlord's income, and the
+//     unit's earnings over the rent are its credit.
+//
+// Six rules.
+//
+// THE BUSINESS IS NOT THE REAL ESTATE. An income stated for an operating
+// business carries the business's earnings; a real estate cap struck on it
+// prices the business as if it were rent. The split between the real
+// estate, the fixtures and the business is said only as the memorandum
+// states it, never derived.
+//
+// EBITDA IS NOT NOI. It is the operator's figure, before a management fee
+// and a reserve for the fixtures (and EBITDAR before rent too), never the
+// landlord's.
+//
+// THE RENT IS THE LANDLORD'S INCOME, THE COVERAGE ITS CREDIT. On a lease,
+// the unit's EBITDAR over the rent says how much room the tenant has; a
+// coverage is read as stated, or as EBITDAR over the stated rent, never
+// from an EBITDA, which is after the rent.
+//
+// THE CONTRACTS GO WITH THE OPERATOR. A fuel supply agreement and its
+// branding, a submerged-land lease, a franchise, a licence: what transfers
+// is the memorandum's to say, and each is said as stated.
+//
+// THE GROUND HOLDS THE RISK. Tanks under a station, a wash's water, a fuel
+// dock: a Phase I's finding is named here where the memorandum cites one
+// (lib/site-reports), and a tank system is said as stated.
+//
+// A BLANK IS NULL.
+
+import type { ExtractionResult } from "@/lib/anthropic/types";
+import { parseMoney } from "@/lib/criteria";
+import { ebitdaFigure, type EbitdaFigure } from "@/lib/deal-strategy";
+import { FINDING_WORDS, readSiteReports } from "@/lib/site-reports";
+import { readSingleTenant } from "@/lib/single-tenant";
+
+type Row = { label: string; value: string; page?: string };
+const isRow = (m: unknown): m is Row =>
+  !!m && typeof m === "object" && typeof (m as Row).label === "string" && typeof (m as Row).value === "string";
+const NOT_STATED = /^(?:n\/?a|not\s+(?:applicable|stated|provided|available|disclosed)|unknown|tbd|none|[-–—])?\.?$/i;
+
+/** The businesses this reader names, each by the words a memorandum uses. */
+export type OperatingBusiness = "fuel" | "car_wash" | "marina" | "golf" | "campground" | "bowling" | "funeral" | "childcare";
+
+const BUSINESS_WORDS: ReadonlyArray<readonly [OperatingBusiness, RegExp]> = [
+  [
+    "fuel",
+    /\b(?:gas(?:oline)?\s+stations?|fuel(?:ing)?\s+(?:stations?|centers?|plazas?)|filling\s+stations?|service\s+stations?|convenience\s+stores?|c-stores?|truck\s+stops?|travel\s+(?:centers?|plazas?))\b/i,
+  ],
+  ["car_wash", /\bcar\s*wash(?:es)?\b|\bexpress\s+(?:tunnel\s+)?wash\b/i],
+  ["marina", /\bmarinas?\b|\bboat\s*(?:yards?|storage)\b|\bdry[\s-]stack\b/i],
+  ["golf", /\bgolf\s+(?:courses?|clubs?|links)\b|\bcountry\s+clubs?\b/i],
+  ["campground", /\bcampgrounds?\b|\bcamp\s*sites?\b|\brv\s+campgrounds?\b/i],
+  ["bowling", /\bbowling\s+(?:centers?|alleys?|lanes)\b/i],
+  ["funeral", /\bfuneral\s+homes?\b|\bmortuar(?:y|ies)\b/i],
+  ["childcare", /\b(?:day\s*care|child\s*care|early\s+(?:learning|education|childhood)\s+cent(?:er|re)s?|preschools?)\b/i],
+];
+
+const BUSINESS_NAME: Record<OperatingBusiness, string> = {
+  fuel: "a fuel station and its store",
+  car_wash: "a car wash",
+  marina: "a marina",
+  golf: "a golf course",
+  campground: "a campground",
+  bowling: "a bowling center",
+  funeral: "a funeral home",
+  childcare: "a childcare center",
+};
+
+/** The memorandum sells the business with the real estate. */
+const GOING_CONCERN_WORDS =
+  /\bgoing[\s-]+concern\b|\b(?:business|operations?)\s+(?:is\s+|are\s+)?included\b|\bincludes?\s+(?:the\s+)?(?:business|operations?|ff&e|equipment|inventory)\b|\bturn[\s-]?key\s+(?:business|operation)\b|\bbusiness\s+and\s+(?:the\s+)?real\s+estate\b|\breal\s+estate\s+and\s+(?:the\s+)?business\b/i;
+
+export const COVERAGE_ROW = /^\s*(?:rent|ebitdar?m?|ebitda\s*r?)\s+coverage\b|^\s*coverage\s+\((?:rent|ebitdar?)\)/i;
+export const MARKET_RENT_ROW = /^\s*market\s+rent\b/i;
+export const ALLOCATION_ROWS: ReadonlyArray<readonly ["realEstate" | "ffe" | "business", RegExp]> = [
+  ["realEstate", /^\s*(?:real\s+estate|real\s+property|land\s+and\s+building)\s+(?:value|allocation)\b/i],
+  ["ffe", /^\s*(?:ff&e|furniture,?\s+fixtures\s+(?:and|&)\s+equipment|equipment)\s+(?:value|allocation)\b/i],
+  ["business", /^\s*(?:business|goodwill|intangibles?|business\s+enterprise)\s+(?:value|allocation)\b/i],
+];
+/** The contracts and the ground, each as stated. */
+export const STATED_ROWS: ReadonlyArray<readonly [string, RegExp]> = [
+  ["Fuel supply agreement", /^\s*fuel\s+supply(?:\s+agreement)?\b|^\s*(?:fuel\s+)?brand(?:ing)?\s+agreement\b/i],
+  ["Tank system", /^\s*(?:underground\s+storage\s+)?tanks?(?:\s+system)?\b|^\s*usts?\b/i],
+  ["Submerged land lease", /^\s*submerged\s+land(?:s)?\s+lease\b/i],
+  ["Franchise", /^\s*franchise(?:\s+agreement)?\b/i],
+  ["Licence", /^\s*licen[cs]es?\b|^\s*(?:liquor|childcare|operating)\s+licen[cs]e\b/i],
+];
+const RENT_ROW = /^\s*(?:annual\s+|current\s+|in[- ]place\s+)?base\s+rent\b|^\s*(?:lease|annual|contract)\s+rent$/i;
+
+export interface GoingConcernRead {
+  business: OperatingBusiness | null;
+  /** what is sold: the business with the real estate, the real estate
+   *  leased to the operator, or not said */
+  branch: "going_concern" | "operator_lease" | "unstated";
+  /** the operator's earnings as stated (lib/deal-strategy `ebitdaFigure`) */
+  ebitda: EbitdaFigure | null;
+  /** an EBITDAR or EBITDARM — before rent — as stated */
+  beforeRent: boolean;
+  /** the annual rent, where the memorandum states one */
+  rent: number | null;
+  /** the unit's EBITDAR over the rent: as stated, else the two stated rows
+   *  divided; null from an EBITDA (after rent) */
+  coverage: { times: number; from: "stated" | "ebitdar_over_rent" } | null;
+  marketRent: string | null;
+  /** the split as the memorandum states it, each part or null */
+  allocation: { realEstate: number | null; ffe: number | null; business: number | null } | null;
+  /** the contracts and the ground as stated, in the reader's order */
+  stated: Array<{ label: string; value: string }>;
+  /** a cited Phase I's finding in words ("a recognized environmental
+   *  condition", "no recognized environmental conditions"), or its own
+   *  words quoted; null where the memorandum cites no finding */
+  phaseI: string | null;
+  sentences: string[];
+  headline: string;
+}
+
+const money = (n: number): string => {
+  const a = Math.abs(n);
+  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
+  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+};
+const times = (n: number) => `${n.toFixed(2)}x`;
+
+/** The words the business is named in: the class, the name, the plan, the
+ *  interest and a single tenant — never a shopping center's tenant list,
+ *  where a station on an outparcel is one tenant among many. */
+function wordsOf(ex: ExtractionResult): string {
+  return [ex.assetClass, ex.dealName, ex.strategy?.summary, ex.interest?.summary, ex.singleTenant?.tenant]
+    .filter((w): w is string => typeof w === "string" && w.trim() !== "")
+    .join(" \n ");
+}
+
+/** The business the memorandum's own words name, or null. */
+export function operatingBusinessOf(ex: ExtractionResult | null | undefined): OperatingBusiness | null {
+  if (!ex) return null;
+  const words = wordsOf(ex);
+  for (const [kind, re] of BUSINESS_WORDS) if (re.test(words)) return kind;
+  return null;
+}
+
+/** A coverage as written: "2.10x", "2.1 times", "1.85". */
+function coverageOf(value: string): number | null {
+  const m = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*(?:x|×|times)?/i);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isFinite(n) && n > 0 && n < 20 ? n : null;
+}
+
+/**
+ * The operating business on the property, as stated: what is sold, the
+ * operator's earnings, the rent and its coverage, the split, the contracts
+ * and the ground. Null unless the memorandum's own words name an operating
+ * business or it states an EBITDA beside a price.
+ */
+export function readGoingConcern(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): GoingConcernRead | null {
+  if (!ex) return null;
+  const rows = (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_STATED.test(m.value.trim()));
+  const business = operatingBusinessOf(ex);
+  const ebitda = ebitdaFigure(rows);
+  if (!business && !ebitda) return null;
+  const find = (re: RegExp) => rows.find((m) => re.test(m.label)) ?? null;
+
+  const tenant = readSingleTenant(ex, asOf);
+  const rentRow = find(RENT_ROW);
+  const rentRead = tenant?.rent ?? (rentRow && !/\/\s*mo|per\s+month|monthly|per\s*sf|psf/i.test(rentRow.value) ? parseMoney(rentRow.value) : null);
+  const rent = rentRead != null && rentRead > 0 ? rentRead : null;
+  const words = wordsOf(ex);
+  const branch: GoingConcernRead["branch"] = GOING_CONCERN_WORDS.test(words)
+    ? "going_concern"
+    : tenant || rent != null
+      ? "operator_lease"
+      : "unstated";
+  const beforeRent = !!ebitda && /ebitdar/i.test(ebitda.label);
+  const coverageRow = find(COVERAGE_ROW);
+  const statedCoverage = coverageRow ? coverageOf(coverageRow.value) : null;
+  const coverage =
+    statedCoverage != null
+      ? { times: statedCoverage, from: "stated" as const }
+      : beforeRent && ebitda && rent != null && rent > 0
+        ? { times: Math.round((ebitda.value / rent) * 100) / 100, from: "ebitdar_over_rent" as const }
+        : null;
+
+  const parts = Object.fromEntries(
+    ALLOCATION_ROWS.map(([key, re]) => {
+      const r = find(re);
+      const n = r ? parseMoney(r.value) : null;
+      return [key, n != null && n > 0 ? n : null];
+    }),
+  ) as { realEstate: number | null; ffe: number | null; business: number | null };
+  const allocation = parts.realEstate != null || parts.ffe != null || parts.business != null ? parts : null;
+  const stated = STATED_ROWS.flatMap(([label, re]) => {
+    const r = find(re);
+    return r ? [{ label, value: r.value.trim() }] : [];
+  });
+  const marketRow = find(MARKET_RENT_ROW);
+  const p1 = readSiteReports(ex, asOf)?.phaseI ?? null;
+  const phaseI = !p1?.finding ? null : p1.finding === "stated" ? (p1.words ? `"${p1.words}"` : null) : FINDING_WORDS[p1.finding] || null;
+
+  const read: Omit<GoingConcernRead, "sentences" | "headline"> = {
+    business,
+    branch,
+    ebitda,
+    beforeRent,
+    rent,
+    coverage,
+    marketRent: marketRow?.value.trim() ?? null,
+    allocation,
+    stated,
+    phaseI,
+  };
+  const sentences = sentencesOf(read);
+  return { ...read, sentences, headline: sentences.join(" ") };
+}
+
+function sentencesOf(r: Omit<GoingConcernRead, "sentences" | "headline">): string[] {
+  const out: string[] = [];
+  const what = r.business ? BUSINESS_NAME[r.business] : "an operating business";
+  if (r.branch === "going_concern") {
+    out.push(
+      `The memorandum sells ${what} with its real estate: its earnings are the operation's, and a real estate cap struck on them prices the business as if it were rent.`,
+    );
+  } else if (r.branch === "operator_lease") {
+    out.push(`The memorandum sells the real estate under ${what}, leased to its operator: the rent is the landlord's income, and the operator's earnings are its credit.`);
+  } else {
+    out.push(`The property is ${what}; the memorandum does not say whether the business is sold with it or leased from it, and the two are priced differently.`);
+  }
+  if (r.ebitda) {
+    out.push(
+      `It states ${r.ebitda.label} of ${money(r.ebitda.value)}: the operator's earnings, before a management fee and a reserve for the fixtures${
+        r.beforeRent ? " and before rent" : ""
+      }, never the real estate's NOI.`,
+    );
+  }
+  if (r.coverage && r.rent != null) {
+    out.push(
+      r.coverage.from === "stated"
+        ? `The rent of ${money(r.rent)} is covered ${times(r.coverage.times)}, as stated.`
+        : `Its EBITDAR covers the ${money(r.rent)} rent ${times(r.coverage.times)}.`,
+    );
+  } else if (r.coverage) {
+    out.push(`The rent is covered ${times(r.coverage.times)}, as stated.`);
+  } else if (r.rent != null && r.ebitda && !r.beforeRent) {
+    out.push(`Its ${r.ebitda.label} is after rent, so no coverage is read from it; an EBITDAR would say how much room the operator has.`);
+  }
+  if (r.marketRent) out.push(`Market rent, as stated: ${r.marketRent.replace(/\.$/, "")}.`);
+  if (r.allocation) {
+    const parts = [
+      r.allocation.realEstate != null ? `real estate ${money(r.allocation.realEstate)}` : "",
+      r.allocation.ffe != null ? `fixtures and equipment ${money(r.allocation.ffe)}` : "",
+      r.allocation.business != null ? `business ${money(r.allocation.business)}` : "",
+    ].filter(Boolean);
+    out.push(`The memorandum splits the price: ${parts.join(", ")}.`);
+  } else if (r.branch === "going_concern") {
+    out.push("It states no split between the real estate, the fixtures and the business.");
+  }
+  for (const s of r.stated) out.push(`${s.label}, as stated: ${s.value.replace(/\.$/, "")}.`);
+  if (r.phaseI) out.push(`The seller's Phase I found ${r.phaseI}: the ground is the risk on a site an operation has run on.`);
+  return out;
+}
+
+/** The model's read (`meta.goingConcern`): it capitalises the income it
+ *  runs on as rent and allocates nothing to the business. Null on a lease
+ *  to the operator, whose rent IS the landlord's income. */
+export function goingConcernModelLine(r: GoingConcernRead | null, m: { noi1: number | null; exitCapPct: number } | null): string | null {
+  if (!r || r.branch === "operator_lease" || !m || m.noi1 == null) return null;
+  const what = r.business ? BUSINESS_NAME[r.business] : "the operating business";
+  return `The model capitalises its ${money(m.noi1)} year-one income at a ${(m.exitCapPct * 100).toFixed(2)}% exit cap as if it were rent; on ${what} that income is the operation's, which the real estate does not earn without an operator, and the model allocates nothing to the business.`;
+}
+
+/** The pipeline row's tag: "Going concern", "Operator lease, 2.10x
+ *  coverage", "Operating business". */
+export function goingConcernTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
+  const r = readGoingConcern(ex, asOf);
+  if (!r) return null;
+  if (r.branch === "going_concern") return "Going concern";
+  if (r.branch === "operator_lease") return r.coverage ? `Operator lease, ${times(r.coverage.times)} coverage` : "Operator lease";
+  return "Operating business";
+}
+
+/** The read in one line, for the memo, the workbook's cover and the
+ *  report. */
+export function goingConcernShortLine(r: GoingConcernRead): string {
+  const parts = [
+    r.branch === "going_concern" ? "sold with the business" : r.branch === "operator_lease" ? "leased to the operator" : "sale of the business not stated",
+    r.ebitda ? `${r.ebitda.label} ${money(r.ebitda.value)}` : "",
+    r.coverage ? `rent covered ${times(r.coverage.times)}` : "",
+  ].filter(Boolean);
+  const what = r.business ? BUSINESS_NAME[r.business].replace(/^an? /, "") : "operating business";
+  return `${what[0].toUpperCase()}${what.slice(1)}: ${parts.join("; ")}`;
+}
+
+/** The read as the steps after the extraction see it (lib/deal-context). */
+export function goingConcernContextLine(r: GoingConcernRead): string {
+  return `Operating business: ${r.headline}`;
+}
+
+const TRAPS =
+  "OPERATING-BUSINESS TRAPS, checked by name where the OM gives the inputs: (a) THE ALLOCATION — the real estate, the fixtures and the business, as stated or not at all; (b) THE OPERATOR — whose earnings these are, and what the property is worth with another operator or none; (c) THE CONTRACTS — a fuel supply agreement and its branding, a dealer's rights on a leased station, a submerged-land lease and its permits, a franchise, a licence that does not transfer; (d) THE TANKS AND THE SITE — the tanks' age, compliance and release history, and a state fund's coverage; (e) THE COVERAGE — on a lease, the unit's EBITDAR over the rent and its trend, and the tenant's reporting; (f) THE EXIT — a buyer of a business pays a multiple of its earnings and a buyer of real estate a cap on its rent: which one is the exit.";
+
+/** The facts, then the traps by name, for the assumption review. */
+export function goingConcernNote(r: GoingConcernRead): string {
+  return `OPERATING BUSINESS AS STATED: ${r.headline} ${TRAPS}`;
+}
+
+/** The rows a key-terms block leads with, each only where stated: the
+ *  earnings, the coverage, then the contracts. */
+export function goingConcernTermRows<M extends { label: string; value: string }>(metrics: ReadonlyArray<M>): M[] {
+  const rows = metrics.filter((m) => isRow(m) && !NOT_STATED.test(m.value.trim()));
+  const pick = (re: RegExp) => rows.find((m) => re.test(m.label));
+  return [pick(/^\s*ebitdar?m?\b/i), pick(COVERAGE_ROW), ...STATED_ROWS.map(([, re]) => pick(re))].filter((m): m is M => m != null);
+}
