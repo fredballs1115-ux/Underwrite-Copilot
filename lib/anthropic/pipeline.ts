@@ -65,6 +65,7 @@ import { regulationForDeal, regulationNote, type RegulationRead } from "@/lib/re
 import { forwardNote, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
+import { condoNote, readCondo } from "@/lib/condo";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -1400,6 +1401,11 @@ async function runAnalysisSteps(
         // a care operation's own after them.
         const goingConcern = readGoingConcern(ex);
         if (goingConcern) notes.push(goingConcernNote(goingConcern));
+        // Condominium units bought in bulk (lib/condo): the buyer's share of
+        // the association, its dues and a lender's limit on a single owner as
+        // stated, then the condo traps by name.
+        const condo = readCondo(ex);
+        if (condo) notes.push(condoNote(condo));
 
         if (flagged.length) {
           notes.push(

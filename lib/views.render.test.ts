@@ -1586,7 +1586,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const bare = (label: string) => label.replace(/ · model$/, "");
     const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => bare(m[1]));
     const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => bare(m[1]));
-    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Operating business", "Mixed-use", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
+    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Operating business", "Mixed-use", "Condominium", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
     // Four deals none of which states a hotel, a sale, a restriction or any
     // of the other deal-type facts: no column of dashes for any of them.
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
@@ -1658,6 +1658,19 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(cells.match(/—/g)).toHaveLength(2);
     expect(cells).not.toMatch(/\bnone\b/i);
     expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("sets condominium units side by side (lib/condo): the tag, a dash beside every other deal", () => {
+    const cols: Col[] = [COLS[0], { ...COLS[1], condo: "Bulk 42 of 120 (35%)" }, COLS[2]];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const row = html.match(/<tr\b(?:(?!<\/tr>)[\s\S])*?>Condominium<\/td>[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(row).not.toBe("");
+    const cells = visibleText(row);
+    expect(cells).toContain("Bulk 42 of 120 (35%)");
+    expect(cells.match(/—/g)).toHaveLength(2);
+    expect(cells).not.toMatch(/\bnone\b/i);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("sets an operating business side by side (lib/going-concern): the tag, a dash beside every other deal", () => {
@@ -9215,6 +9228,137 @@ describe("Pipeline — an operating business's tag (lib/going-concern)", () => {
       expect(text, initialView).toContain("Operator lease, 2.61x coverage");
       expect(chip("Operator lease, 2.61x coverage"), initialView).toContain("text-brand");
       expect(chip("Going concern"), initialView).toContain("text-caution");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});
+
+// ── Condominium units bought in bulk (lib/condo) ───────────────────────────
+import { CondoPanel } from "@/app/condo-panel";
+import { condoModelLine, condoTag, readCondo } from "@/lib/condo";
+
+const CONDO_TODAY = new Date("2026-10-05T12:00:00Z");
+const condoDeck = (assetClass: string, metrics: { label: string; value: string }[]) =>
+  ({
+    dealName: "Harbor View",
+    assetClass,
+    totalPages: 40,
+    metrics: metrics.map((m) => ({ ...m, flagged: false, page: "p. 6", basis: "na" as const })),
+  }) as unknown as ExtractionResult;
+const BULK_CONDO = condoDeck("Condominium Units (bulk sale)", [
+  { label: "Asking price", value: "$16,800,000" },
+  { label: "Units", value: "42" },
+  { label: "NOI (in-place)", value: "$840,000" },
+  { label: "HOA dues", value: "$650 per unit per month" },
+  { label: "Units in building", value: "120" },
+  { label: "Rental restrictions", value: "No leases under 12 months" },
+]);
+
+describe("CondoPanel (lib/condo) — the units offered as a share of the association, a lender's limit on a single owner as a tick", () => {
+  it("draws a block over the lender's limit in the warning tone: the share, the limit as the lender's rule with its section and version, a tile a fact, then the model's read", () => {
+    const r = readCondo(BULK_CONDO, CONDO_TODAY)!;
+    const html = render(React.createElement(CondoPanel, { condo: r, modelLine: condoModelLine(r, { exitCapPct: 0.06 })! }));
+    dumpView("condo-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="condo-panel"');
+    expect(html).toContain("border-l-caution");
+    expect(text).toContain("42 of 120 units, 35% of the association");
+    for (const bar of ["condo-share", "condo-limit"]) expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    expect(text).toContain("42 of the condominium's 120 units offered, 35%");
+    // The lender's rule, with its section linked, its version and the day it
+    // was read.
+    expect(text).toContain("Fannie Mae's single-entity limit, 20% of a project of 21 or more units — the lender's rule, Selling Guide B4-2.1-03, Ineligible Projects");
+    expect(text).toContain(", its Aug 5, 2026 version, read Oct 5, 2026");
+    expect(html).toContain('href="https://selling-guide.fanniemae.com/sel/b4-2.1-03/ineligible-projects"');
+    for (const key of ["dues-year", "rental-restrictions"]) expect(html).toContain(`data-condo="${key}"`);
+    expect(text).toContain("$328k");
+    expect(text).toContain("$650 a unit a month on 42 units");
+    // The read's first sentence in the open, the rest one click away.
+    expect(text).toContain("the buyer becomes one owner in an association whose declaration governs the building");
+    expect(html).toContain("Read the rest (3 more)");
+    expect(text).toContain("The model sells the 42 units as one building at its 6.00% exit cap");
+    expect(a11yIssues(html), "condo panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("keeps the lender's rule in view once its research is stale, draws no limit under it, and nothing on anything else", () => {
+    const stale = render(React.createElement(CondoPanel, { condo: readCondo(BULK_CONDO, new Date("2027-05-01T12:00:00Z")) }));
+    expect(stale.match(/data-bar="condo-limit"/g)).toHaveLength(1);
+    expect(visibleText(stale)).toContain(", its Aug 5, 2026 version, read Oct 5, 2026; 208 days old, stale");
+    const under = readCondo(
+      condoDeck("Condominium units", [
+        { label: "Units offered", value: "20" },
+        { label: "Units in condominium", value: "120" },
+        { label: "Special assessment", value: "$4,000 a unit, roof replacement" },
+        { label: "Association reserves", value: "$310,000, 42% funded" },
+      ]),
+      CONDO_TODAY,
+    )!;
+    const html = render(React.createElement(CondoPanel, { condo: under }));
+    const text = visibleText(html);
+    expect(html).toContain("border-l-brand");
+    expect(html.match(/data-bar="condo-share"/g)).toHaveLength(1);
+    expect(html).not.toContain('data-bar="condo-limit"');
+    expect(text).toContain("20 of 120 units, 16.7% of the association");
+    for (const key of ["special-assessment", "association-reserves"]) expect(html).toContain(`data-condo="${key}"`);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(CondoPanel, { condo: null }))).toBe("");
+    expect(readCondo(condoDeck("Multifamily", [{ label: "Units", value: "48" }]), CONDO_TODAY)).toBeNull();
+  });
+});
+
+describe("ShareView — condominium units (lib/condo)", () => {
+  it("draws the share and the lender's limit without the model's read, and nothing on the sample", () => {
+    const props = {
+      dealName: "Harbor View",
+      assetClass: "auto",
+      expiresAt: "2026-10-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      today: "2026-10-05",
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: BULK_CONDO }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="condo-panel"');
+    expect(html.match(/data-bar="condo-limit"/g)).toHaveLength(1);
+    expect(text).not.toContain("The model sells");
+    // The key terms lead with the condominium's count and the dues, ahead of
+    // the memorandum's own NOI.
+    const term = (label: string) => html.indexOf(`<span class="line-clamp-2">${label}</span>`);
+    expect(term("Units in building")).toBeGreaterThan(-1);
+    expect(term("Units in building")).toBeLessThan(term("NOI (in-place)"));
+    expect(term("HOA dues")).toBeLessThan(term("NOI (in-place)"));
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("condo-panel");
+  });
+});
+
+describe("Pipeline — condominium units' tag (lib/condo)", () => {
+  const tag = condoTag(BULK_CONDO, CONDO_TODAY)!;
+  const bulk = card({
+    id: "cd",
+    name: "Harbor View",
+    verdict: "caution",
+    slots: { cap: "5.0%", price: "$16,800,000", yoc: null, condo: tag },
+    market: "Miami, FL",
+    coveredMarket: null,
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says the units offered of the condominium's in the brand's tone on the row and the card", () => {
+    expect(tag).toBe("Bulk 42 of 120 (35%)");
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([bulk]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Bulk 42 of 120 (35%)");
+      const chip = html.match(/<span[^>]*title="Bulk 42 of 120 \(35%\):[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(chip, initialView).toContain("text-brand");
       expect(gluedWords(text), initialView).toEqual([]);
       expect(a11yIssues(html), initialView).toEqual([]);
     }

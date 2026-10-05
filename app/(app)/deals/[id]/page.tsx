@@ -32,6 +32,8 @@ import { MixedUsePanel } from "@/app/mixed-use-panel";
 import { readMixedUse } from "@/lib/mixed-use";
 import { GoingConcernPanel } from "@/app/going-concern-panel";
 import { readGoingConcern } from "@/lib/going-concern";
+import { CondoPanel } from "@/app/condo-panel";
+import { readCondo } from "@/lib/condo";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1563,6 +1565,11 @@ export default async function DealPage({
           mixedUse={readMixedUse(extraction, new Date(`${todayIso}T12:00:00Z`))}
           modelLine={derived?.meta.mixedUse?.read ?? ""}
         />
+        {/* Condominium units bought in bulk (lib/condo): the buyer's share of
+            the association with a lender's limit on a single owner, a year of
+            the dues, the reserves and restrictions as stated, and what the
+            model does with the units. */}
+        <CondoPanel condo={readCondo(extraction, new Date(`${todayIso}T12:00:00Z`))} modelLine={derived?.meta.condo?.read ?? ""} />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML
             against the lenders' 20%, and what the model does with the

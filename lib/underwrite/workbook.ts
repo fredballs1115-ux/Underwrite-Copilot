@@ -533,6 +533,23 @@ function buildCover(
       r++;
     }
   }
+  // Condominium units bought in bulk (lib/condo): the units offered of the
+  // condominium's, a year of their dues and a special assessment, then what
+  // this model does with them — one building at one exit cap, no retail
+  // exit.
+  if (meta.condo) {
+    fact("The condominium units", meta.condo.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.condo.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.condo.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // What the third-party reports found (#465): the Phase I, the immediate
   // repairs, the seismic PML and the zoning, then what this model does with
   // the repairs.

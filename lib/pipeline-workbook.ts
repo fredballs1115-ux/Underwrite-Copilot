@@ -106,6 +106,9 @@ export interface PipelineExportRow {
    *  lease, 2.61x coverage" (lib/going-concern `goingConcernTag`); carried in
    *  the price cell's note */
   goingConcern?: string | null;
+  /** condominium units bought in bulk — "Bulk 42 of 120 (35%)", "Condo
+   *  units" (lib/condo `condoTag`); carried in the price cell's note */
+  condo?: string | null;
   /** the going-in cap on today's income — always null on a plan deal, and
    *  on a note (`capWithheld`) */
   cap: string | null;
@@ -303,6 +306,7 @@ export async function buildPipelineWorkbook(
         d.forward ? `${d.forward}: the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery.` : null,
         d.mixedUse ? `${d.mixedUse}: a mixed-use building's commercial share — the deal page reads the two incomes, the commercial space and what one exit cap does to both.` : null,
         d.goingConcern ? `${d.goingConcern}: an operating business on its real estate — the deal page reads whose earnings these are, the rent's coverage and the split.` : null,
+        d.condo ? `${d.condo}: condominium units in an association its declaration governs — the deal page reads the buyer's share of the votes, a year of the dues and a lender's limit on a single owner.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

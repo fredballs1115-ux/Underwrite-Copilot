@@ -1517,6 +1517,31 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The operating business")).toThrow();
   });
 
+  it("condominium units (lib/condo): the units offered of the condominium's and a year of the dues, then the model's one building", async () => {
+    const bulk = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        dealName: "Harbor View",
+        assetClass: "Condominium Units (bulk sale)",
+        metrics: [
+          { label: "Asking price", value: "$16,800,000", flagged: false, page: "p. 2" },
+          { label: "Units", value: "42", flagged: false, page: "p. 4" },
+          { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "p. 9" },
+          { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "p. 11" },
+          { label: "Units in building", value: "120", flagged: false, page: "p. 4" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(bulk));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The condominium units");
+    expect(String(cover.getCell(r, 3).value)).toBe("Condominium units: 42 of 120 units; dues $328k a year");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model sells the 42 units as one building at its [\d.]+% exit cap/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The condominium units")).toThrow();
+  });
+
   it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
     const storage = deriveUnderwriteInputs(
       {

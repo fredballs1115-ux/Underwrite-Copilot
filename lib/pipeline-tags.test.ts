@@ -60,13 +60,14 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         mh: "Lot rent $430 vs $525 mkt, Private water & sewer",
         storage: "Lease-up, 72% occupied",
         mixedUse: "Commercial 29% of income",
+        condo: "Bulk 42 of 120 (35%)",
         broker: "CBRE",
         basis: "$274k/unit",
       }),
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse",
+      "flood", "sale", "interest", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse", "condo",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -84,6 +85,8 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     );
     expect(dealTags(slots({ student: "Pre-leased 87%, +5 pts y/y", mh: "Lot rent $430 vs $525 mkt", storage: "In-place 21.1% over street" })).map((t) => t.tone)).toEqual(["brand", "brand", "brand"]);
     expect(tone("mixedUse")).toBe("brand");
+    // Condominium units are the brand's: the deal page reads the share.
+    expect(tone("condo")).toBe("brand");
     // A lease the operator's earnings cover is the brand's; a business sold
     // with its real estate, one not settled, or a coverage under 1.00x warns.
     expect(tone("goingConcern")).toBe("brand");

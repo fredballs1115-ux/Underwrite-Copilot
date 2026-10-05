@@ -69,6 +69,7 @@ import { regulationModelLine, regulationShortLine, type RegulationRead } from "@
 import { forwardModelLine, forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseModelLine, mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernModelLine, goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
+import { condoModelLine, condoShortLine, readCondo } from "@/lib/condo";
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -218,6 +219,11 @@ export interface WorkbookMeta {
    *  allocates nothing to the business ("" on a lease to the operator,
    *  whose rent is the landlord's income). Absent on anything else. */
   goingConcern?: { line: string; read: string } | null;
+  /** condominium units bought in bulk (lib/condo): the units offered of the
+   *  condominium's, a year of their dues and a special assessment in a line,
+   *  then what this model does with them — it sells them as one building at
+   *  its exit cap and runs no retail exit. Absent on anything else. */
+  condo?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -448,6 +454,16 @@ function goingConcernMeta(extraction: ExtractionResult | null, inputs: Underwrit
   const r = readGoingConcern(extraction);
   if (!r) return null;
   return { line: goingConcernShortLine(r), read: goingConcernModelLine(r, { noi1, exitCapPct: inputs.exitCapPct }) ?? "" };
+}
+
+/** The cover's lines about condominium units bought in bulk (lib/condo):
+ *  the read in a line, then what this model does with them — it sells the
+ *  units as one building at its exit cap, and runs no retail exit. Null on
+ *  anything else. */
+function condoMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["condo"] {
+  const r = readCondo(extraction);
+  if (!r) return null;
+  return { line: condoShortLine(r), read: condoModelLine(r, { exitCapPct: inputs.exitCapPct }) ?? "" };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -1089,6 +1105,7 @@ export function deriveUnderwriteInputs(
       forward: forwardMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption"),
       mixedUse: mixedUseMeta(extraction, inputs),
       goingConcern: goingConcernMeta(extraction, inputs, noi),
+      condo: condoMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

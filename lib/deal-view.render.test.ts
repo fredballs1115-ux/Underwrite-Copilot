@@ -43,6 +43,8 @@ import { readMixedUse } from "./mixed-use";
 import { MixedUsePanel } from "@/app/mixed-use-panel";
 import { readGoingConcern } from "./going-concern";
 import { GoingConcernPanel } from "@/app/going-concern-panel";
+import { readCondo } from "./condo";
+import { CondoPanel } from "@/app/condo-panel";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
@@ -1158,6 +1160,38 @@ describe("the deal page's operating-business panel reads the derived model (lib/
     expect(html).toContain('data-qa="going-concern-panel"');
     expect(text).toMatch(/The model capitalises its \$256k year-one income at an? [\d.]+% exit cap as if it were rent/);
     expect(text).toContain(`${(derived.inputs.exitCapPct * 100).toFixed(2)}% exit cap`);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the deal page's condominium panel reads the derived model (lib/condo)", () => {
+  it("draws the units with the model's own exit cap in its read", () => {
+    // As app/(app)/deals/[id]/page.tsx draws it: the read on the page's day,
+    // with `meta.condo.read` from the derived model.
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      metrics: [
+        { label: "Asking price", value: "$16,800,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Units", value: "42", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Units in building", value: "120", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const derived = deriveUnderwriteInputs(extraction, "Harbor View");
+    const html = renderToStaticMarkup(
+      React.createElement(CondoPanel, {
+        condo: readCondo(extraction, new Date("2026-10-05T12:00:00Z")),
+        modelLine: derived.meta.condo?.read ?? "",
+      }),
+    );
+    const text = textOf(html);
+    expect(html).toContain('data-qa="condo-panel"');
+    expect(html.match(/data-bar="condo-limit"/g)).toHaveLength(1);
+    expect(text).toContain(`The model sells the 42 units as one building at its ${(derived.inputs.exitCapPct * 100).toFixed(2)}% exit cap`);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });

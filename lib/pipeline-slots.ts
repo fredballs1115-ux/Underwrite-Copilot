@@ -30,6 +30,7 @@ import { regulationForDeal, regulationTag, type DealForRegulation } from "@/lib/
 import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
 import { goingConcernTag } from "@/lib/going-concern";
+import { condoTag } from "@/lib/condo";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
@@ -131,6 +132,10 @@ export interface PipelineSlots {
    *  `goingConcernTag`); absent or null where the memorandum names no
    *  operating business and states no EBITDA */
   goingConcern?: string | null;
+  /** condominium units bought in bulk — "Bulk 42 of 120 (35%)", "Condo
+   *  units" (lib/condo `condoTag`); absent or null where the deal's own words
+   *  name no condominium or the memorandum states none of its figures */
+  condo?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -309,6 +314,9 @@ export function pickSlots(
     // An operating business on its real estate (lib/going-concern): sold
     // with the business, or leased to the operator and its coverage.
     goingConcern: goingConcernTag(extraction, asOf),
+    // Condominium units bought in bulk (lib/condo): the units offered of the
+    // condominium's, where both are stated.
+    condo: condoTag(extraction, asOf),
     // The price by the unit or the foot, as a listing card shows it (#469),
     // in the deal's one class.
     basis: basisTag(extraction, strategy.kind, storedClass),

@@ -337,6 +337,32 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(snf, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Licensed beds", "Management fee"]);
   });
 
+  it("condominium units' counts, dues and special assessment lead after the count, and an association's dues alone never lead as one (lib/condo)", () => {
+    const bulk = [
+      { label: "Occupancy", value: "93%", flagged: true },
+      { label: "Special assessment", value: "$4,000 a unit, roof", flagged: false },
+      { label: "HOA dues", value: "$650 per unit per month", flagged: false },
+      { label: "Units in condominium", value: "120", flagged: false },
+      { label: "Units offered", value: "42", flagged: false },
+      { label: "Asking price", value: "$16,800,000", flagged: false },
+    ];
+    expect(keyTermRows(bulk, "stabilized", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Units offered",
+      "Units in condominium",
+      "HOA dues",
+      "Special assessment",
+    ]);
+    // A build-to-rent community's association dues are no bulk purchase's.
+    const btr = [
+      { label: "Occupancy", value: "96%", flagged: true },
+      { label: "HOA dues", value: "$45 per home per month", flagged: false },
+      { label: "Homes", value: "180", flagged: false },
+      { label: "Asking price", value: "$72,000,000", flagged: false },
+    ];
+    expect(keyTermRows(btr, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Homes", "Occupancy"]);
+  });
+
   it("a student building's pre-leasing and walk lead after the price (#468)", () => {
     const student = [
       { label: "Occupancy", value: "96%", flagged: false },

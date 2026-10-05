@@ -1425,6 +1425,31 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("condominium units: the challenger reads the buyer's share of the association, its dues and the condo traps, and the deal context says them (lib/condo)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Condominium Units (bulk sale)",
+      dealName: "Harbor View",
+      metrics: [
+        { label: "Asking price", value: "$16,800,000", flagged: false, page: "", basis: "na" },
+        { label: "Units offered", value: "42", flagged: false, page: "", basis: "na" },
+        { label: "Units in condominium", value: "120", flagged: false, page: "", basis: "na" },
+        { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "", basis: "in_place" },
+        { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("CONDOMINIUM UNITS AS STATED: The memorandum offers 42 of the condominium's 120 units, 35%");
+    expect(note).toContain("At $650 a unit a month, the dues on 42 units are $328k a year");
+    expect(note).toContain("CONDO TRAPS, checked by name");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Condominium units: The memorandum offers 42 of the condominium's 120 units");
+    expect(context).not.toContain("CONDO TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a rent-regulated building: the challenger and the deal context read the rules that reach it, the allowance in force and the regulation traps (lib/rent-regulation)", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     vi.mocked(extractTerms).mockResolvedValue({

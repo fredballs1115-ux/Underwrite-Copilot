@@ -573,6 +573,39 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").goingConcernLine).toBe("");
   }, 30000);
 
+  it("says condominium units under the title (lib/condo), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      metrics: [
+        { label: "Asking price", value: "$16,800,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Units", value: "42", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Units in building", value: "120", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const deal = {
+      name: "Harbor View",
+      asset_class: "auto",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.condoLine).toBe("Condominium units: 42 of 120 units; dues $328k a year");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Condominium units: 42 of 120 units; dues $328k a year");
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").condoLine).toBe("");
+  }, 30000);
+
   it("says the rent rules that reach the building under the title, on the day it is given (lib/rent-regulation), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

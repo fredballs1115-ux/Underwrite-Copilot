@@ -25,6 +25,7 @@ import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
 import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
 import { goingConcernTag } from "@/lib/going-concern";
+import { condoTag } from "@/lib/condo";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
 import { shownAssetClass, statedCapSlot } from "@/lib/pipeline-slots";
@@ -136,6 +137,7 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     forward: forwardTag(readForwardPurchase(extraction, new Date(`${ctx.today}T12:00:00Z`), strategy)),
     mixedUse: mixedUseTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
     goingConcern: goingConcernTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
+    condo: condoTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
     // The pipeline card's own cap reader: none on a plan deal, none on a
     // note (its collateral's cap is not the buyer's figure, and the cell
     // says the cap is withheld).

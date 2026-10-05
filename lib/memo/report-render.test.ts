@@ -1267,6 +1267,39 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Fuel station and its store: sold with the business; EBITDA (T-12) $410k. The model capitalises its $256k year-one income");
   }, 60000);
 
+  it("prints condominium units over the grids, and the model's one building (lib/condo)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      metrics: [
+        { label: "Asking price", value: "$16,800,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Units", value: "42", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Units in building", value: "120", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: "Harbor View",
+      asset_class: "auto",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "Harbor View");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.condo ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.condo).toEqual(derived.meta.condo);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("Condominium units: 42 of 120 units; dues $328k a year. The model sells the 42 units as one building");
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

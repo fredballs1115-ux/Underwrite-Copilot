@@ -21,6 +21,7 @@ import {
 import { forwardTermRows } from "./forward-purchase";
 import { COMMERCIAL_INCOME_ROW, RESIDENTIAL_INCOME_ROW, mixedUseTermRows } from "./mixed-use";
 import { goingConcernTermRows } from "./going-concern";
+import { HOA_DUES_ROW, condoTermRows } from "./condo";
 import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
@@ -165,6 +166,12 @@ export function keyTermRows<M extends KeyTermMetric>(
   // leads as one.
   const business = goingConcernTermRows(rows);
   if (business.some((m) => !SHARED_OPERATING_ROW.test(m.label))) for (const row of business) lead(row);
+  // Condominium units bought in bulk (lib/condo): the units offered and the
+  // condominium's, a unit's dues and a special assessment — only beside a
+  // row of the bulk purchase's own, so an association's dues alone (a
+  // build-to-rent community's, a townhome's) never lead as one.
+  const condo = condoTermRows(rows);
+  if (condo.some((m) => !HOA_DUES_ROW.test(m.label))) for (const row of condo) lead(row);
   // On a note no cap on the collateral's income is printed at all — the
   // going-in, the in-place, the stabilized, the exit: among the rows a
   // reader would take any of them for a cap on the note's price, which none

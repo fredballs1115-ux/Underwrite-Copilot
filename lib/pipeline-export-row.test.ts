@@ -122,6 +122,26 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal(), ctx).goingConcern).toBeNull();
   });
 
+  it("says condominium units, as the pipeline card says them, and carries them in the price cell's note (lib/condo)", async () => {
+    const bulk = {
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      market: "Miami, FL",
+      address: "",
+      metrics: [m("Asking price", "$16,800,000"), m("Units", "42"), m("HOA dues", "$650 per unit per month"), m("Units in building", "120")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: bulk }), ctx);
+    expect(row.condo).toBe("Bulk 42 of 120 (35%)");
+    expect(row.condo).toBe(pickSlots(bulk, null, "auto").condo);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain(
+      "Bulk 42 of 120 (35%): condominium units in an association its declaration governs",
+    );
+    expect(pipelineExportRow(deal(), ctx).condo).toBeNull();
+  });
+
   it("prints the deal's one class: the deck's on a deal filed Auto, the analyst's where they filed one", async () => {
     expect(pipelineExportRow(deal(), ctx).assetClass).toBe("multifamily");
     expect(pipelineExportRow(deal({ asset_class: "office" }), ctx).assetClass).toBe("office");

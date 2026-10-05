@@ -428,6 +428,28 @@ describe("dealContextFor — an operating business on its real estate (lib/going
   });
 });
 
+describe("dealContextFor — condominium units bought in bulk (lib/condo)", () => {
+  it("says the buyer's share of the association and a year of its dues, as stated", () => {
+    const bulk: ExtractionResult = {
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      metrics: [
+        m("Asking price", "$16,800,000"),
+        m("Units", "42"),
+        m("NOI (in-place)", "$840,000"),
+        m("HOA dues", "$650 per unit per month"),
+        m("Units in building", "120"),
+      ],
+    };
+    const ctx = dealContextFor(bulk)!;
+    expect(ctx).toContain(
+      "Condominium units: The memorandum offers 42 of the condominium's 120 units, 35%: the buyer becomes one owner in an association whose declaration governs the building",
+    );
+    expect(ctx).toContain("At $650 a unit a month, the dues on 42 units are $328k a year");
+    expect(dealContextFor({ ...bulk, dealName: "Harbor View Apartments", assetClass: "Multifamily" }) ?? "").not.toContain("Condominium units");
+  });
+});
+
 describe("dealContextFor — the rent rules that reach the building (lib/rent-regulation)", () => {
   const walkUp: ExtractionResult = {
     dealName: "The Walk-up",

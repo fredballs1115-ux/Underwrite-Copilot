@@ -74,6 +74,7 @@ import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
+import { condoShortLine, readCondo } from "@/lib/condo";
 import type { AssumableView } from "@/lib/assumable-debt";
 import type { InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
@@ -1025,6 +1026,11 @@ export interface ReportInput {
    *  printed over the grids; absent where the caller built no model, and
    *  then the line prints alone */
   goingConcern?: { line: string; read: string } | null;
+  /** condominium units bought in bulk, and what the model does with them —
+   *  one building at one exit cap, no retail exit (lib/condo via the derived
+   *  model's `meta.condo`) — printed over the grids; absent where the caller
+   *  built no model, and then the line prints alone */
+  condo?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427,
    *  #472): the deal's flood frame cut to the band, the key of the zones it
    *  shows and the zone sentence; null for no page */
@@ -1071,6 +1077,7 @@ export function buildReportData(
   forward?: { line: string; read: string } | null,
   mixedUse?: { line: string; read: string } | null,
   goingConcern?: { line: string; read: string } | null,
+  condo?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -1113,6 +1120,7 @@ export function buildReportData(
     forward: modelRead(forward),
     mixedUse: modelRead(mixedUse),
     goingConcern: modelRead(goingConcern),
+    condo: modelRead(condo),
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1582,6 +1590,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // An operating business (lib/going-concern), the same way.
   const goingConcernRead = readGoingConcern(extraction);
   const goingConcern = input.goingConcern ?? (goingConcernRead ? { line: goingConcernShortLine(goingConcernRead), read: "" } : null);
+  // Condominium units bought in bulk (lib/condo), the same way.
+  const condoRead = readCondo(extraction);
+  const condo = input.condo ?? (condoRead ? { line: condoShortLine(condoRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1815,6 +1826,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={mh} />}
           {!sensitivity && <SingleTenantCaveat lease={storage} />}
           {!sensitivity && <SingleTenantCaveat lease={mixedUse} />}
+          {!sensitivity && <SingleTenantCaveat lease={condo} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1864,6 +1876,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={mh} />
           <SingleTenantCaveat lease={storage} />
           <SingleTenantCaveat lease={mixedUse} />
+          <SingleTenantCaveat lease={condo} />
 
           {/* The base case the grids are struck around, each input with
               where it came from — the workbook's Deal Summary. */}

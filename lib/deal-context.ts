@@ -28,6 +28,7 @@ import { regulationContextLine, type RegulationRead } from "@/lib/rent-regulatio
 import { forwardContextLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseContextLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernContextLine, readGoingConcern } from "@/lib/going-concern";
+import { condoContextLine, readCondo } from "@/lib/condo";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -145,6 +146,10 @@ export function dealContextFor(
   // A mixed-use building (lib/mixed-use): its residential and commercial
   // incomes as stated, the commercial share of each and the shops' roll.
   const mixedUse = readMixedUse(extraction);
+  // Condominium units bought in bulk (lib/condo): the buyer's share of the
+  // association, a year of its dues, a lender's limit on a single owner and
+  // the reserves and restrictions as stated.
+  const condo = readCondo(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
@@ -173,6 +178,7 @@ export function dealContextFor(
     ...(park ? [mhContextLine(park)] : []),
     ...(storage ? [storageContextLine(storage)] : []),
     ...(mixedUse ? [mixedUseContextLine(mixedUse)] : []),
+    ...(condo ? [condoContextLine(condo)] : []),
     ...(reports ? [siteReportsContextLine(reports)] : []),
     ...(flood ? [flood] : []),
   ];

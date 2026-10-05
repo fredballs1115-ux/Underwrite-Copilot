@@ -167,6 +167,9 @@ export type Col = {
    *  lease, 2.61x coverage" — lib/going-concern `goingConcernTag`); absent
    *  otherwise */
   goingConcern?: string | null;
+  /** condominium units bought in bulk ("Bulk 42 of 120 (35%)", "Condo
+   *  units" — lib/condo `condoTag`); absent otherwise */
+  condo?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -404,6 +407,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A mixed-use building's commercial share (lib/mixed-use): a dash,
     // never "none", beside a deal with no read.
     { label: "Mixed-use", get: (c) => c.mixedUse || "—" },
+    // Condominium units bought in bulk (lib/condo): the buyer's share of the
+    // association, a dash beside a deal with no read.
+    { label: "Condominium", get: (c) => c.condo || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

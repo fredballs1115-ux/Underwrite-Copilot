@@ -643,6 +643,27 @@ describe("deriveUnderwriteInputs — an operating business's income capitalised 
   });
 });
 
+describe("deriveUnderwriteInputs — condominium units sold as one building (lib/condo)", () => {
+  it("says the units in a line and that the model sells them as one building at its exit cap, and nothing on anything else", () => {
+    const bulk = ex(
+      [
+        metric("Asking price", "$16,800,000"),
+        metric("Units", "42"),
+        metric("NOI (in-place)", "$840,000"),
+        metric("HOA dues", "$650 per unit per month"),
+        metric("Units in building", "120"),
+      ],
+      { assetClass: "Condominium Units (bulk sale)" },
+    );
+    const m = deriveUnderwriteInputs(bulk, "fallback");
+    expect(m.meta.condo?.line).toBe("Condominium units: 42 of 120 units; dues $328k a year");
+    expect(m.meta.condo?.read).toBe(
+      `The model sells the 42 units as one building at its ${(m.inputs.exitCapPct * 100).toFixed(2)}% exit cap; a bulk buyer's other exit, the units sold one by one, is priced a unit at a time, which the model does not run.`,
+    );
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.condo).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 

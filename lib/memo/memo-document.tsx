@@ -51,6 +51,7 @@ import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
+import { condoShortLine, readCondo } from "@/lib/condo";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -284,6 +285,14 @@ function goingConcernLineFor(extraction: ExtractionResult | null, today: string)
   return r ? goingConcernShortLine(r) : "";
 }
 
+/** Condominium units bought in bulk (lib/condo) in one line for the memo's
+ *  header: the units offered of the condominium's, a year of their dues and
+ *  a special assessment. "" on anything else. */
+function condoLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readCondo(extraction, new Date(`${today}T12:00:00Z`));
+  return r ? condoShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -387,6 +396,10 @@ export type MemoData = {
    *  operator's earnings and the rent's coverage (lib/going-concern), in one
    *  line; "" on anything else */
   goingConcernLine?: string;
+  /** condominium units bought in bulk — the units offered of the
+   *  condominium's, a year of their dues and a special assessment
+   *  (lib/condo), in one line; "" on anything else */
+  condoLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -698,6 +711,7 @@ export function buildMemoData(
     forwardLine: pdfSafe(forwardLineFor(extraction ?? null, strategy, today)),
     mixedUseLine: pdfSafe(mixedUseLineFor(extraction ?? null, today)),
     goingConcernLine: pdfSafe(goingConcernLineFor(extraction ?? null, today)),
+    condoLine: pdfSafe(condoLineFor(extraction ?? null, today)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
@@ -1228,6 +1242,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A mixed-use building (lib/mixed-use): the residential and
                 commercial incomes and the commercial share. */}
             {data.mixedUseLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.mixedUseLine}</Text>}
+            {/* Condominium units bought in bulk (lib/condo): the buyer's
+                share of the association and a year of its dues. */}
+            {data.condoLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.condoLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}

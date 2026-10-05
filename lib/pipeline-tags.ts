@@ -3,14 +3,14 @@
 // business, the seller's loan, a covenant on the rents, the rent rules, the
 // one lease, the listed tenants, a renovation program, a tax abatement, a
 // hotel's contracts, the third-party reports, and the reads of a student
-// building, a park, a storage facility and a mixed-use building (no tag
-// reads a module's tables here: the pipeline's client draws these, so each
-// tone is read off the slot's own words) — in ONE order, each with its tone
-// and its tooltip, so the list row and the card draw one list
-// (lib/pipeline-slots reads each slot). And the card's rule for which of
-// them its picture carries: a chip there is never cut, so one that cannot
-// fit whole on a picture as wide as its card's waits on the card's own
-// line under the figures. Pure: no I/O, no LLM.
+// building, a park, a storage facility, a mixed-use building and
+// condominium units (no tag reads a module's tables here: the pipeline's
+// client draws these, so each tone is read off the slot's own words) — in
+// ONE order, each with its tone and its tooltip, so the list row and the
+// card draw one list (lib/pipeline-slots reads each slot). And the card's
+// rule for which of them its picture carries: a chip there is never cut,
+// so one that cannot fit whole on a picture as wide as its card's waits on
+// the card's own line under the figures. Pure: no I/O, no LLM.
 import type { PipelineSlots } from "@/lib/pipeline-slots";
 import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 
@@ -120,6 +120,14 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
       slots.mixedUse,
       "brand",
       "a mixed-use building's commercial share — the deal page reads the two incomes, the commercial space and what one exit cap does to both",
+    ),
+    // Condominium units bought in bulk (lib/condo): a share of an
+    // association someone else's declaration governs.
+    tag(
+      "condo",
+      slots.condo,
+      "brand",
+      "condominium units in an association its declaration governs — the deal page reads the buyer's share of the votes, a year of the dues and a lender's limit on a single owner",
     ),
   ].filter((t): t is DealTag => t !== null);
 }

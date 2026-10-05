@@ -40,6 +40,8 @@ import { MixedUsePanel } from "@/app/mixed-use-panel";
 import { readMixedUse } from "@/lib/mixed-use";
 import { GoingConcernPanel } from "@/app/going-concern-panel";
 import { readGoingConcern } from "@/lib/going-concern";
+import { CondoPanel } from "@/app/condo-panel";
+import { readCondo } from "@/lib/condo";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -421,6 +423,11 @@ export function ShareView({
       {/* A mixed-use building (lib/mixed-use): the residential and
           commercial incomes and the commercial share of the area. */}
       <MixedUsePanel mixedUse={readMixedUse(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
+
+      {/* Condominium units bought in bulk (lib/condo): the buyer's share of
+          the association, a year of its dues and a lender's limit on a single
+          owner. */}
+      <CondoPanel condo={readCondo(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
 
       {/* What the third-party reports found (#465): a tile a report, the
           Phase I's age and the seismic PML against the lenders' lines. */}
