@@ -637,6 +637,22 @@ yours to overrule:
    "Wenatchee-East Wenatchee, WA", "Michigan City-La Porte, IN",
    "Muskegon-Norton Shores, MI"); cutting each to its first city is yours.
 
+**Photographs, round 15.** Seven more: San Angelo (the Concho River),
+Pueblo (the Historic Arkansas Riverwalk), Greenville, NC (the city from a
+rooftop at sunset), Blacksburg-Christiansburg-Radford (Burruss Hall),
+Waterloo-Cedar Falls (downtown across the frozen river), Wausau (downtown
+at dusk from a drone) and Sheboygan (its riverfront). Eleven keep the
+drawn cover, and Columbus (Indiana), Grand Island and Walla Walla still do
+after a deeper search each. Three choices are yours to overrule:
+1. **Two modest picks**: Blacksburg (the hall is small under a sky that
+   fills the card) and Sheboygan (a plain riverfront in flat light). The
+   drawn cover is the alternative for each.
+2. **Two hyphenated titles are kept whole** ("Blacksburg-Christiansburg-
+   Radford, VA", "Waterloo-Cedar Falls, IA"); cutting each to its first
+   city is yours.
+3. **Two credits are account names** as the runner printed them:
+   "Wikideas1" (Wausau, CC0) and "AsherHeimermann" (Sheboygan).
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**

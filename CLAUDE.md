@@ -1885,7 +1885,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Two hundred and two are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Two hundred and nine are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -2002,7 +2002,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Inclined Plane) — run 37314140256 — with Lawton (the Wichitas at a
   winter sunrise, from the Wildlife Refuge's category) and Homosassa
   Springs (Three Sisters Springs) from a one-market run each (37321853635
-  and 37321374937)),
+  and 37321374937); then round 15: San Angelo (the Concho River) — run
+  37330183778 — Greenville (North Carolina; the city from a rooftop at
+  sunset, its credit the photographer and the agency as printed) and
+  Blacksburg-Christiansburg-Radford (Burruss Hall across the Drillfield,
+  the title kept whole) — run 37330328150 — Waterloo-Cedar Falls
+  (downtown across the frozen river), Wausau (downtown at dusk from a
+  drone, a 2.89:1 frame served at 2400) and Sheboygan (its riverfront) —
+  run 37330877189, Wausau's credit the account whose user page its file
+  page's Author field links and Sheboygan's an account whose user page was
+  never created, each as printed (zori probe_url run 37343970376) — with
+  Pueblo (the Historic Arkansas Riverwalk, from its category) from a
+  one-market run (37340733360)),
   each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
@@ -2055,9 +2066,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   categories never reached), Grand Island (a crane sunrise that names no
   place on the river), Walla Walla, Sioux City (its skyline under the
   words, one-market run 37321660533) and Lewiston (the confluence a film
-  scan with a scanner's line down it) on the drawn cover. A one-state
+  scan with a scanner's line down it) on the drawn cover. Round 15 left
+  Abilene (its skyline a silhouette under power lines), Wichita Falls (its
+  blocks a low row under the words), Odessa, Valdosta, Albany (Georgia),
+  Florence-Muscle Shoals, Paducah, Terre Haute (the courthouse's dome cut
+  at 21:9; one-market run 37332047933), Ames (a garden courtyard;
+  one-market run 37341240059), Manhattan (Kansas; the town soft and small
+  from a hill; one-market run 37341627920) and Grand Forks (an aerial that
+  reads as a map) on the drawn cover, and a one-market run each for round
+  14's Columbus (Indiana; 37343088880), Grand Island (the courthouse's
+  cupola cut at 21:9, and cranes on a Platte that names no place;
+  37343351814) and Walla Walla (the Blue Mountains a soft thin line over a
+  field; 37343538606) found nothing better. A one-state
   title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); 35 of the 185
+  truncates a long one and the deal page shows it in full); 35 of the 192
   are cut, most to their first city, three to the city the place is known
   by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
   name (Boise, Honolulu). A two-state title is cut to

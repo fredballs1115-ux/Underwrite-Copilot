@@ -7971,6 +7971,12 @@
         "Greenville North Carolina downtown",
         "East Carolina University campus",
         "Tar River Greenville"
+      ],
+      "candidates": [
+        {
+          "file": "Greenville, North Carolina - 2026 9.jpg",
+          "note": "Greenville, NC — Aaron Hines/City of Greenville, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37330328150)."
+        }
       ]
     },
     {
@@ -7993,6 +7999,12 @@
         "Virginia Tech Burruss Hall",
         "Blacksburg Virginia mountains",
         "Virginia Tech drillfield"
+      ],
+      "candidates": [
+        {
+          "file": "Virginia Tech Burruss Hall from Drillfield.JPG",
+          "note": "Blacksburg-Christiansburg-Radford, VA — Eric T Gunther, CC BY 3.0; Virginia Tech's Burruss Hall. The chosen file, in lib/skyline.ts (skyline-sheet run 37330328150)."
+        }
       ]
     },
     {
@@ -8051,6 +8063,12 @@
         "San Angelo Texas Concho River",
         "San Angelo Texas downtown",
         "Fort Concho San Angelo"
+      ],
+      "candidates": [
+        {
+          "file": "San Angelo September 2019 66 (Concho River).jpg",
+          "note": "San Angelo, TX — Michael Barera, CC BY-SA 4.0; the Concho River. The chosen file, in lib/skyline.ts (skyline-sheet run 37330183778)."
+        }
       ]
     },
     {
@@ -8209,6 +8227,12 @@
         "Waterloo Iowa Cedar River",
         "Cedar Falls Iowa downtown",
         "Waterloo Iowa downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Waterloo, Iowa (2014) (cropped).jpg",
+          "note": "Waterloo-Cedar Falls, IA — David Wilson from Oak Park, Illinois, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37330877189)."
+        }
       ]
     },
     {
@@ -8248,6 +8272,12 @@
         "Pueblo Colorado Riverwalk",
         "Pueblo Colorado downtown",
         "Pueblo Colorado mountains"
+      ],
+      "candidates": [
+        {
+          "file": "Historic Arkansas Riverwalk of Pueblo.JPG",
+          "note": "Pueblo, CO — Jeffrey Beall, CC BY 4.0; the Historic Arkansas Riverwalk. The chosen file, in lib/skyline.ts (skyline-sheet run 37340733360, a one-market run)."
+        }
       ]
     },
     {
@@ -8288,6 +8318,12 @@
         "Wausau Wisconsin Wisconsin River",
         "Rib Mountain Wausau view",
         "Wausau Wisconsin downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Wausau, Wisconsin downtown.jpg",
+          "note": "Wausau, WI — Wikideas1, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37330877189)."
+        }
       ]
     },
     {
@@ -8307,6 +8343,12 @@
         "Sheboygan breakwater lighthouse",
         "Sheboygan Wisconsin harbor",
         "Sheboygan Lake Michigan"
+      ],
+      "candidates": [
+        {
+          "file": "Sheboygan Riverfront.jpg",
+          "note": "Sheboygan, WI — AsherHeimermann, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37330877189)."
+        }
       ]
     }
   ]
