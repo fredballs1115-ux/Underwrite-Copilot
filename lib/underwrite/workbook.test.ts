@@ -1564,6 +1564,24 @@ describe("the workbook reads on paper", () => {
   });
 });
 
+// Research pass 35, F18: the tab said its axes were "centred" above grids
+// whose key reads "Center row/column". One tab, one spelling.
+describe("the Sensitivity tab's words", () => {
+  it("spell centered one way, the key's", async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
+    const words: string[] = [];
+    wb.getWorksheet("Sensitivity")!.eachRow((row) =>
+      row.eachCell((c) => {
+        if (typeof c.value === "string") words.push(c.value);
+      }),
+    );
+    expect(words.some((w) => w.includes("its axes centered on the inputs as they stand"))).toBe(true);
+    expect(words.some((w) => w.startsWith("Center row/column"))).toBe(true);
+    expect(words.filter((w) => /centr(e|ed)\b/i.test(w))).toEqual([]);
+  });
+});
+
 // ── When it was built ─────────────────────────────────────────────────────
 describe("the workbook says the day it was built, which its \"from today\" lines count from", () => {
   it("prints the build day on the cover and stamps the file's created and modified time with it, never 1970", async () => {

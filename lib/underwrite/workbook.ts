@@ -2240,7 +2240,9 @@ function buildSensitivity(
   let r = 2;
   label(
     wsSens.getCell(r, 1),
-    "Live — every cell is a full re-run of the model, its axes centred on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
+    // "centered", the spelling of the "Center row/column" line under the
+    // grids: one tab, one spelling.
+    "Live — every cell is a full re-run of the model, its axes centered on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
     { color: MUTED, size: 9 },
   );
   r += 2;
