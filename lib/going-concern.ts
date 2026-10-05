@@ -54,7 +54,17 @@ const isRow = (m: unknown): m is Row =>
 const NOT_STATED = /^(?:n\/?a|not\s+(?:applicable|stated|provided|available|disclosed)|unknown|tbd|none|[-–—])?\.?$/i;
 
 /** The businesses this reader names, each by the words a memorandum uses. */
-export type OperatingBusiness = "fuel" | "car_wash" | "marina" | "golf" | "campground" | "bowling" | "funeral" | "childcare";
+export type OperatingBusiness =
+  | "fuel"
+  | "car_wash"
+  | "marina"
+  | "golf"
+  | "campground"
+  | "bowling"
+  | "funeral"
+  | "childcare"
+  | "snf"
+  | "senior_care";
 
 const BUSINESS_WORDS: ReadonlyArray<readonly [OperatingBusiness, RegExp]> = [
   [
@@ -68,6 +78,11 @@ const BUSINESS_WORDS: ReadonlyArray<readonly [OperatingBusiness, RegExp]> = [
   ["bowling", /\bbowling\s+(?:centers?|alleys?|lanes)\b/i],
   ["funeral", /\bfuneral\s+homes?\b|\bmortuar(?:y|ies)\b/i],
   ["childcare", /\b(?:day\s*care|child\s*care|early\s+(?:learning|education|childhood)\s+cent(?:er|re)s?|preschools?)\b/i],
+  // Care a resident buys is an operation too (research pass 28, round 6):
+  // a skilled nursing facility's earnings are its operator's, and a
+  // licensed community's census, labour and payor mix are the business.
+  ["snf", /\b(?:snfs?|skilled\s+nursing|nursing\s+(?:homes?|facilit(?:y|ies)|cent(?:er|re)s?)|post[\s-]+acute)\b/i],
+  ["senior_care", /\b(?:assisted\s+living|memory\s+care|independent\s+living|senior\s+living|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies))\b/i],
 ];
 
 const BUSINESS_NAME: Record<OperatingBusiness, string> = {
@@ -79,6 +94,8 @@ const BUSINESS_NAME: Record<OperatingBusiness, string> = {
   bowling: "a bowling center",
   funeral: "a funeral home",
   childcare: "a childcare center",
+  snf: "a skilled nursing facility",
+  senior_care: "a senior care community",
 };
 
 /** The memorandum sells the business with the real estate. */
@@ -99,6 +116,14 @@ export const STATED_ROWS: ReadonlyArray<readonly [string, RegExp]> = [
   ["Submerged land lease", /^\s*submerged\s+land(?:s)?\s+lease\b/i],
   ["Franchise", /^\s*franchise(?:\s+agreement)?\b/i],
   ["Licence", /^\s*licen[cs]es?\b|^\s*(?:liquor|childcare|operating)\s+licen[cs]e\b/i],
+  // A care operation's own facts, each as stated (round 6).
+  ["Operating structure", /^\s*operating\s+structure\b|^\s*structure\s*\((?:operating|lease|management)\)/i],
+  ["Licensed beds", /^\s*licensed\s+beds\b/i],
+  ["Operating beds", /^\s*operating\s+beds\b/i],
+  ["Payor mix", /^\s*payor\s+mix\b|^\s*payer\s+mix\b/i],
+  ["CMS star rating", /^\s*(?:cms\s+)?(?:overall\s+)?star\s+rating\b/i],
+  ["Certificate of need", /^\s*certificate\s+of\s+need\b|^\s*con\b/i],
+  ["Management fee", /^\s*management\s+fee\b/i],
 ];
 const RENT_ROW = /^\s*(?:annual\s+|current\s+|in[- ]place\s+)?base\s+rent\b|^\s*(?:lease|annual|contract)\s+rent$/i;
 
@@ -312,9 +337,16 @@ export function goingConcernContextLine(r: GoingConcernRead): string {
 const TRAPS =
   "OPERATING-BUSINESS TRAPS, checked by name where the OM gives the inputs: (a) THE ALLOCATION — the real estate, the fixtures and the business, as stated or not at all; (b) THE OPERATOR — whose earnings these are, and what the property is worth with another operator or none; (c) THE CONTRACTS — a fuel supply agreement and its branding, a dealer's rights on a leased station, a submerged-land lease and its permits, a franchise, a licence that does not transfer; (d) THE TANKS AND THE SITE — the tanks' age, compliance and release history, and a state fund's coverage; (e) THE COVERAGE — on a lease, the unit's EBITDAR over the rent and its trend, and the tenant's reporting; (f) THE EXIT — a buyer of a business pays a multiple of its earnings and a buyer of real estate a cap on its rent: which one is the exit.";
 
-/** The facts, then the traps by name, for the assumption review. */
+// A care operation's own questions, after the six (round 6): each a
+// question to ask, never a figure or a claim of law.
+const CARE_TRAPS =
+  "CARE-OPERATION TRAPS: (g) THE STRUCTURE — a lease to an operator (the rent, its coverage and the operator's credit), a management contract (census, labour and the payor mix are the owner's) or owner-operated, and whether the stated NOI is before or after a management fee; (h) THE CHANGE OF OWNERSHIP — ask whether the buyer takes the Medicare provider agreement and with it the seller's overpayments and penalties, and how the licence and any certificate of need move under the state's process; (i) THE PAYOR MIX — each payor's share as stated, and the state's Medicaid rate behind its share; (j) SURVEYS AND STARS — the survey history and the CMS star rating, which are public; (k) LICENSED AND OPERATING BEDS — the beds in service against the beds licensed.";
+
+/** The facts, then the traps by name, for the assumption review — a care
+ *  operation's own after the six. */
 export function goingConcernNote(r: GoingConcernRead): string {
-  return `OPERATING BUSINESS AS STATED: ${r.headline} ${TRAPS}`;
+  const care = r.business === "snf" || r.business === "senior_care";
+  return `OPERATING BUSINESS AS STATED: ${r.headline} ${TRAPS}${care ? ` ${CARE_TRAPS}` : ""}`;
 }
 
 /** The rows a key-terms block leads with, each only where stated: the

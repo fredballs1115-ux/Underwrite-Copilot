@@ -159,6 +159,42 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
     ]);
   });
 
+  it("reads a care operation as one: a skilled nursing facility's EBITDAR over its rent, and its own facts as stated (round 6)", () => {
+    const snf = deal(
+      {
+        assetClass: "Skilled Nursing Facility (NNN)",
+        singleTenant: { tenant: "Harbor Care Operations LLC", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "" } as ExtractionResult["singleTenant"],
+      },
+      [
+        row("Asking price", "$18,000,000", "p. 2"),
+        row("Licensed beds", "120"),
+        row("Operating beds", "112"),
+        row("Annual base rent", "$1,440,000"),
+        row("EBITDAR (T-12)", "$2,016,000"),
+        row("Payor mix", "Medicaid 68%, Medicare 14%, private 18%"),
+        row("CMS star rating", "3 stars (Aug 2026)"),
+      ],
+    );
+    const r = readGoingConcern(snf, TODAY)!;
+    expect(r).toMatchObject({ business: "snf", branch: "operator_lease", rent: 1_440_000 });
+    expect(r.coverage).toEqual({ times: 1.4, from: "ebitdar_over_rent" });
+    expect(r.headline).toContain("The memorandum sells the real estate under a skilled nursing facility, leased to its operator");
+    expect(r.headline).toContain("Its EBITDAR covers the $1.44M rent 1.40x.");
+    expect(r.headline).toContain("Payor mix, as stated: Medicaid 68%, Medicare 14%, private 18%.");
+    expect(r.headline).toContain("Licensed beds, as stated: 120.");
+    expect(r.headline).toContain("Operating beds, as stated: 112.");
+    expect(goingConcernTag(snf, TODAY)).toBe("Operator lease, 1.40x coverage");
+    const note = goingConcernNote(r);
+    for (const trap of ["(g) THE STRUCTURE", "(h) THE CHANGE OF OWNERSHIP", "(i) THE PAYOR MIX", "(j) SURVEYS AND STARS", "(k) LICENSED AND OPERATING BEDS"])
+      expect(note).toContain(trap);
+    // A community sold with its operations asks the structure's question.
+    const al = readGoingConcern(deal({ assetClass: "Assisted Living / Memory Care" }, [row("Operating structure", "Owner-operated")]), TODAY)!;
+    expect(al).toMatchObject({ business: "senior_care", branch: "unstated" });
+    expect(al.headline).toContain("Operating structure, as stated: Owner-operated.");
+    // The care traps ride only on a care operation.
+    expect(goingConcernNote(readGoingConcern(STATION, TODAY)!)).not.toContain("CARE-OPERATION TRAPS");
+  });
+
   it("writes every sentence without a glued word", () => {
     for (const d of [STATION, WASH]) {
       const r = readGoingConcern(d, TODAY)!;
