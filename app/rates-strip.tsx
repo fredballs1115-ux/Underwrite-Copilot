@@ -11,6 +11,7 @@ import {
   type Observation,
   type YieldCurve,
 } from "@/lib/live-rates";
+import { FRED_NOTICE } from "@/lib/data-notices";
 
 /**
  * Today's rates — across the top of the calculators, and on `/market`.
@@ -154,6 +155,12 @@ export function RatesStrip({
         The 30-year survey is an owner-occupier residential rate, not a
         commercial quote, so it is shown here and never fills a box. An index
         is shown as its change from a year ago, never as a level.
+      </p>
+      {/* FRED's terms ask for this notice prominently on the application
+          (lib/data-notices), and the strip is where /tools and /market draw
+          FRED's figures, so it stands under them as well as in the footer. */}
+      <p className="mt-2 text-[11px] text-muted" data-qa="fred-notice">
+        {FRED_NOTICE}
       </p>
     </section>
   );

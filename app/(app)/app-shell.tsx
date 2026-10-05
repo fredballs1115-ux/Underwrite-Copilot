@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
 import { LogoMark } from "@/app/logo";
+import { DataNotices } from "@/app/data-notices";
 import { ToastProvider } from "./toaster";
 import { CommandPalette } from "./command-palette";
 import type { MarketNavEntry } from "@/lib/market-match";
@@ -339,6 +340,10 @@ export function AppShell({
               Security
             </Link>
           </nav>
+          {/* The data providers' notices on every signed-in page, in the
+              footer's type: the deal pages, the market pages and the
+              calculators all draw FRED's figures (app/data-notices). */}
+          <DataNotices className="mx-auto mt-2 max-w-7xl text-xs text-muted" />
         </footer>
       </div>
     </div>

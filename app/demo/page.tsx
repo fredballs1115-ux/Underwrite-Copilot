@@ -30,6 +30,7 @@ import { liveMetroRates } from "@/lib/live-rates-read";
 import { metroDemand, type MetroDemand } from "@/lib/metro-demand";
 import { metroForAddress } from "@/lib/market-match";
 import { PlaceBand } from "@/app/place-band";
+import { DataNotices } from "@/app/data-notices";
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
@@ -586,6 +587,10 @@ export default async function DemoPage() {
               Home
             </Link>
           </span>
+          {/* The demo draws FRED's figures (the leverage and demand cards)
+              outside either shell, so its own footer carries the data
+              providers' notices too (app/data-notices). */}
+          <DataNotices className="basis-full" />
         </div>
       </footer>
     </div>
