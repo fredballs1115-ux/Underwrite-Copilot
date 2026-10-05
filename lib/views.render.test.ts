@@ -4590,6 +4590,7 @@ describe("a metro's for-sale market, from Realtor.com", () => {
 // ── The deal page's picture ─────────────────────────────────────────────────
 import { PropertyVisual } from "@/app/(app)/deals/[id]/property-visual";
 import { PhotoViewerBody } from "@/app/(app)/deals/[id]/photo-viewer";
+import { photoControlOn } from "@/lib/property-views";
 import type { SiteFlagsResult as SiteFlagsResultForTest } from "@/lib/site-flags/core";
 import { photographerParts } from "@/lib/credit-parts";
 
@@ -4775,6 +4776,36 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(html).not.toContain(market.src.replace(/&/g, "&amp;"));
     expect(html).not.toContain('data-view-thumb="market"');
     expect(html).toMatch(/aria-pressed="true" data-view-thumb="photo"/);
+  });
+
+  it("offers Replace photo on the photographs only, never over an overhead, the flood map, the market's photograph or the map (research pass 29)", () => {
+    // The rule PropertyVisual reads for the view on screen. With a
+    // photograph of the deal's own: its photographs only, the mosaic's cover
+    // carrying a control of its own.
+    const own = { photos: ["photo", "g1", "g2"], ownPhoto: true, mosaic: false };
+    for (const v of ["photo", "g1", "g2"]) expect(photoControlOn(v, own), v).toBe(true);
+    for (const v of ["aerial", "flood", "market", "map", "street", "satellite"]) expect(photoControlOn(v, own), v).toBe(false);
+    expect(photoControlOn("photo", { ...own, mosaic: true })).toBe(false);
+    expect(photoControlOn("g1", { ...own, mosaic: true })).toBe(true);
+    // With none on screen, "Add photo" is the one way to put one there: on
+    // the picture that leads, never over the flood map or the map.
+    const none = { photos: ["g1"], ownPhoto: false, mosaic: false };
+    for (const v of ["aerial", "market", "street", "satellite", "g1"]) expect(photoControlOn(v, none), v).toBe(true);
+    for (const v of ["flood", "map"]) expect(photoControlOn(v, none), v).toBe(false);
+    // Drawn: a photograph on screen carries Replace photo once, and the
+    // mosaic once, on its cover.
+    const photo = visibleText(renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: { credit: "From the offering memorandum", source: "om" as const } })));
+    expect(photo.split("Replace photo").length - 1).toBe(1);
+    const mosaic = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...base, picture: { credit: "From the offering memorandum", source: "om" as const }, gallery }),
+    );
+    expect(mosaic).toContain('data-picture="mosaic"');
+    expect(visibleText(mosaic).split("Replace photo").length - 1).toBe(1);
+    // The aerial leading a deal with no photograph offers to add one; the
+    // control never claims to replace a picture that is not there.
+    const aerial = visibleText(renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null })));
+    expect(aerial).toContain("Add photo");
+    expect(aerial).not.toContain("Replace photo");
   });
 
   it("never offers to replace the sample deal's picture", () => {

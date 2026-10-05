@@ -16,6 +16,7 @@ import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 import { previewStyle } from "@/lib/photo-preview";
+import { photoControlOn } from "@/lib/property-views";
 import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER } from "@/lib/image-frames";
 import {
   headerPhotoSizes,
@@ -63,7 +64,9 @@ import {
  *
  * It is the deal header's picture (#433, `DealHero`): no card of its own,
  * beside the name and the figures where the header is wide and above them
- * where it is not, with the reader's Replace photo on the picture itself.
+ * where it is not, with the reader's Replace photo on the photograph itself
+ * — never over an overhead, the flood map, the market's photograph or the
+ * map (lib/property-views `photoControlOn`).
  *
  * The Flood tab (#425) is the deal's flood frame (#472, lib/flood-map): the
  * USGS aerial at a wider frame, calmed, with FEMA's flood zones drawn over it
@@ -837,12 +840,14 @@ export function PropertyVisual({
           </button>
         )}
 
-        {/* "That's not the building": on the picture itself, where a cover
-            photograph's own control sits — never over the map, whose corner
-            belongs to its controls. */}
-        {canReplace && active !== "map" && !(mosaic && active === "photo") && (
+        {/* "That's not the building": on the photograph itself, where a
+            cover photograph's own control sits — never over the aerial,
+            FEMA's flood map, the market's photograph or the map
+            (lib/property-views). A deal with no photograph of its own on
+            screen is offered "Add photo" on the picture that leads. */}
+        {canReplace && photoControlOn(active, { photos: photoIds, ownPhoto: photoPossible, mosaic }) && (
           <div className="absolute right-2 top-2 z-[5]">
-            <ReplacePicture dealId={dealId} hasPicture={!!picture} tone="overlay" />
+            <ReplacePicture dealId={dealId} hasPicture={photoPossible} tone="overlay" />
           </div>
         )}
       </div>
