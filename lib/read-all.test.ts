@@ -1,7 +1,7 @@
 // Reading every row past a project's row cap, and naming many ids a hundred
 // at a time (lib/read-all, research pass 42).
 import { describe, expect, it } from "vitest";
-import { ID_CHUNK, READ_PAGE, chunks, readAll, readByIds } from "./read-all";
+import { ID_CHUNK, READ_PAGE, chunks, readAll, readAllResult, readByIds } from "./read-all";
 
 /** A table that answers at most `cap` rows a response, as a project's max
  *  rows does — a normal success, with no sign the rest exist. */
@@ -39,6 +39,14 @@ describe("readAll", () => {
     );
     expect(got).toBeNull();
     expect(said).toEqual([{ message: "timeout" }]);
+  });
+});
+
+describe("readAllResult", () => {
+  it("answers as a query does: every row, or none and the error", async () => {
+    expect(await readAllResult(table(5, 2).page)).toEqual({ data: [0, 1, 2, 3, 4].map((id) => ({ id })), error: null });
+    const failed = await readAllResult(() => Promise.resolve({ data: null, error: { message: "relation does not exist" } }));
+    expect(failed).toEqual({ data: null, error: { message: "relation does not exist" } });
   });
 });
 

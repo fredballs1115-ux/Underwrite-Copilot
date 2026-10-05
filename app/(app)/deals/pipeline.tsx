@@ -319,6 +319,7 @@ export function Pipeline({
   viewerId = null,
   onTeam = false,
   todayIso,
+  totalDeals = null,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -344,6 +345,11 @@ export function Pipeline({
    *  counts from it, so the server's markup and the browser's are the same
    *  day */
   todayIso: string;
+  /** the exact count of the deals the reader can see (research pass 42):
+   *  the page reads every one, a page at a time, and where the count is
+   *  larger than the deals read — a deal added between the two — the header
+   *  says both, never a total it did not read */
+  totalDeals?: number | null;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -811,8 +817,17 @@ export function Pipeline({
           {(deals.length > 0 || showUsage) && (
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
               {deals.length > 0 && (
-                <span>
-                  {deals.length} {deals.length === 1 ? "deal" : "deals"}
+                <span
+                  data-qa="deal-count"
+                  title={
+                    totalDeals != null && totalDeals > deals.length
+                      ? `${totalDeals} deals counted, ${deals.length} read — refresh to read them all`
+                      : undefined
+                  }
+                >
+                  {totalDeals != null && totalDeals > deals.length
+                    ? `${deals.length} of ${totalDeals} deals`
+                    : `${deals.length} ${deals.length === 1 ? "deal" : "deals"}`}
                 </span>
               )}
               {showUsage && allowance && allowance.left != null && (

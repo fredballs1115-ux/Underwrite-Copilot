@@ -8,6 +8,7 @@ import {
   type PipelineExportRow,
 } from "@/lib/pipeline-workbook";
 import { pipelineExportRow } from "@/lib/pipeline-export-row";
+import { readAll } from "@/lib/read-all";
 
 // exceljs needs the Node runtime.
 export const runtime = "nodejs";
@@ -31,19 +32,6 @@ export async function GET(req: Request) {
     );
   }
 
-  const [{ data, error }, team] = await Promise.all([
-    supabase
-      .from("deals")
-      // The first signal and the address too: the row reads the deal's kind
-      // and its buy-box fit on the pipeline page's own inputs.
-      .select(
-        "id, name, asset_class, created_at, verdict, extraction, first_signal, address, site_flags, user_id, team_id, stage, is_sample",
-      )
-      .order("created_at", { ascending: false }),
-    getTeam(supabase, user.id).catch(() => null),
-  ]);
-  if (error) return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
-
   type Row = {
     id: string;
     name: string;
@@ -59,7 +47,31 @@ export async function GET(req: Request) {
     stage: string | null;
     is_sample: boolean | null;
   };
-  const rows = ((data ?? []) as Row[]).filter((d) => !d.is_sample);
+  // Every deal, a page at a time, newest first (lib/read-all), with the
+  // exact count beside it: "the whole pipeline" had been the newest 1,000 —
+  // one read's most — and the meeting's totals short with no sign (research
+  // pass 42). A read that fails, or reads fewer deals than the count says
+  // there are, builds no workbook: the page says so and the reader asks again.
+  const [data, { count, error: countError }, team] = await Promise.all([
+    readAll<Row>((from, to) =>
+      supabase
+        .from("deals")
+        // The first signal and the address too: the row reads the deal's kind
+        // and its buy-box fit on the pipeline page's own inputs.
+        .select(
+          "id, name, asset_class, created_at, verdict, extraction, first_signal, address, site_flags, user_id, team_id, stage, is_sample",
+        )
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    supabase.from("deals").select("id", { count: "exact", head: true }),
+    getTeam(supabase, user.id).catch(() => null),
+  ]);
+  if (!data || countError || (count != null && count > data.length)) {
+    return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
+  }
+  const rows = data.filter((d) => !d.is_sample);
 
   // Deadlines, teammate names, and both buy boxes are mutually independent —
   // one parallel batch instead of four sequential round trips.

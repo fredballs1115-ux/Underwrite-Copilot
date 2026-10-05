@@ -30,6 +30,7 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { listJobStatus, screenedDay, screenedOn, type JobLike } from "@/lib/screen-run";
 import { screenedAnOm } from "@/lib/onboarding";
 import { olderScreen } from "@/lib/older-screen";
+import { readAllResult } from "@/lib/read-all";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -96,18 +97,43 @@ export default async function DealsPage({
   // Request-cached: shares the layout's auth call instead of a second hop.
   const user = await getCurrentUser();
 
-  // Billing state, the deal list, and the personal buy box are independent —
-  // fetch them together.
-  const [billing, { data, error }, personalBox] = await Promise.all([
+  type Row = Pick<
+    DealRow,
+    "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
+  > & {
+    address: unknown;
+    first_signal: unknown;
+    user_id: string;
+    team_id: string | null;
+    stage: string | null;
+    is_sample: boolean | null;
+    photo?: DealVisualCache | null;
+    om_storage_path?: string | null;
+  };
+
+  // Billing state, the deal list, its count and the personal buy box are
+  // independent — fetch them together. Every deal the reader can see, a page
+  // at a time, newest first (lib/read-all): one read answers at most the
+  // project's max rows, and the page had counted, funnelled, split and
+  // exported only the newest 1,000 with nothing saying the rest exist
+  // (research pass 42). The exact count beside it is the total the page
+  // states.
+  const [billing, { data, error: readError }, { count: dealTotal }, personalBox] = await Promise.all([
     user ? getBilling(supabase, user.id) : Promise.resolve(null),
-    supabase
-      .from("deals")
-      .select(
-        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path",
-      )
-      .order("created_at", { ascending: false }),
+    readAllResult<Row>((from, to) =>
+      supabase
+        .from("deals")
+        .select(
+          "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path",
+        )
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    supabase.from("deals").select("id", { count: "exact", head: true }),
     user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
   ]);
+  const error = readError ? { message: (readError as { message?: string }).message ?? "" } : null;
   const teamBox = billing?.team
     ? await getBuyBoxForDeal("", billing.team.id).catch(() => null)
     : null;
@@ -116,7 +142,7 @@ export default async function DealsPage({
     // "Relation does not exist" means the migrations haven't run (a setup
     // state); anything else is a transient outage — don't tell a user in
     // production to go run SQL.
-    const schemaMissing = /relation|does not exist|schema/i.test(error.message);
+    const schemaMissing = /relation|does not exist|schema/i.test(error.message ?? "");
     return (
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
         {schemaMissing ? (
@@ -139,20 +165,6 @@ export default async function DealsPage({
       </div>
     );
   }
-
-  type Row = Pick<
-    DealRow,
-    "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
-  > & {
-    address: unknown;
-    first_signal: unknown;
-    user_id: string;
-    team_id: string | null;
-    stage: string | null;
-    is_sample: boolean | null;
-    photo?: DealVisualCache | null;
-    om_storage_path?: string | null;
-  };
 
   // The card view's pictures (#428): the reader's choice of view from its
   // cookie — the cards or the list, never the map (#438) — and whether
@@ -532,6 +544,10 @@ export default async function DealsPage({
         viewerId={user?.id ?? null}
         onTeam={!!billing?.team}
         todayIso={todayIso}
+        // The exact count beside the deals read: the page says the two
+        // apart should they ever differ (a deal added or removed between the
+        // count and the read), never a total it did not read.
+        totalDeals={dealTotal ?? null}
       />
       {/* The strip's own read streams after the pipeline rather than
           holding it back; nothing is drawn until it has stories. */}

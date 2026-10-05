@@ -53,6 +53,18 @@ export async function readAll<T>(
   }
 }
 
+/** `readAll` as a query answers: every row, or no rows and the failed
+ *  page's error — for a caller that says the error's own words. */
+export async function readAllResult<T>(
+  page: (from: number, to: number) => Result<T>,
+): Promise<{ data: T[] | null; error: unknown }> {
+  let error: unknown = null;
+  const data = await readAll(page, (e) => {
+    error = e ?? new Error("read failed");
+  });
+  return { data, error: data ? null : error };
+}
+
 /** A list in runs of at most `size`. */
 export function chunks<T>(list: readonly T[], size = ID_CHUNK): T[][] {
   const out: T[][] = [];
