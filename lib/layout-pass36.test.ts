@@ -19,6 +19,8 @@ import { ShareControl } from "@/app/(app)/deals/[id]/share-control";
 import { DealActions } from "@/app/(app)/deals/[id]/deal-actions";
 import { StageSelect } from "@/app/(app)/deals/[id]/stage-select";
 import { OffersDueControl } from "@/app/(app)/deals/offers-due";
+import { ShareView } from "@/app/share/[token]/share-view";
+import { SAMPLE_DEAL } from "./sample-deal";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const h = React.createElement;
@@ -184,6 +186,73 @@ describe("the toolbar on a phone (research pass 36, F8)", () => {
     const row = src("app/(app)/deals/[id]/tool-row.tsx");
     expect(row).toMatch(/target\.matches\(":focus-visible"\)/);
     expect(row).toMatch(/scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\)/);
+  });
+});
+
+describe("the shared screen says the call beside the title (research pass 36, F3)", () => {
+  // Every deal-kind panel and the building's picture come before the
+  // verdict: on a phone the call sat 1.6 screens down for a hotel sold at
+  // auction, 8.1 with every panel.
+  const sold = {
+    ...SAMPLE_DEAL.extraction,
+    sale: { method: "auction" as const, terms: "", condition: "", page: "" },
+    metrics: [
+      ...SAMPLE_DEAL.extraction.metrics,
+      { label: "Starting bid", value: "$40,000,000", flagged: false, page: "", basis: "na" as const },
+      { label: "Buyer's premium", value: "5%", flagged: false, page: "", basis: "na" as const },
+    ],
+  };
+  const base = {
+    dealName: SAMPLE_DEAL.name,
+    assetClass: SAMPLE_DEAL.asset_class,
+    expiresAt: "2026-09-30T12:00:00Z",
+    verdictStale: false,
+    picture: null,
+    extraction: sold,
+    comps: SAMPLE_DEAL.comps,
+    market: SAMPLE_DEAL.market,
+    verdict: { ...SAMPLE_DEAL.verdict, generatedAt: "2026-09-12T14:03:00.000Z" },
+  };
+  const render = (over: Partial<React.ComponentProps<typeof ShareView>> = {}) => renderToStaticMarkup(h(ShareView, { ...base, ...over }));
+
+  it("draws the deal header's pill and the day it was written beside the name, before any panel", () => {
+    const html = render();
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const chip = elementWith(html, 'data-qa="share-call"');
+    expect(html.indexOf("</h1>")).toBeLessThan(html.indexOf('data-qa="share-call"'));
+    expect(html.indexOf('data-qa="share-call"')).toBeLessThan(html.indexOf('data-qa="sale-panel"'));
+    expect(html.indexOf('data-qa="share-call"')).toBeLessThan(html.indexOf("First-pass verdict<"));
+    // The header's own words and colours, a current call drawn solid.
+    expect(chip).toMatch(/<span class="rounded-full px-2\.5 py-0\.5 font-semibold bg-caution\/10 text-caution"><span class="sr-only">First-pass verdict: <\/span>Caution<\/span>/);
+    expect(visibleText(chip).replace(/\s+/g, " ").trim()).toBe("First-pass verdict: Caution Screened Sep 12, 2026");
+    // Go and No-go in theirs; a call saved before it was dated says no day.
+    expect(elementWith(render({ verdict: { ...base.verdict, verdict: "pass" } }), 'data-qa="share-call"')).toContain("bg-pass/10 text-pass");
+    const undated = elementWith(render({ verdict: { ...base.verdict, verdict: "pass_on", generatedAt: undefined } }), 'data-qa="share-call"');
+    expect(undated).toContain("bg-kill/15 text-kill");
+    expect(visibleText(undated)).not.toContain("Screened");
+    // A call the header draws no pill for draws no chip.
+    expect(render({ verdict: { ...base.verdict, verdict: "unknown" as never } })).not.toContain('data-qa="share-call"');
+  });
+
+  it("never shows a call as current where the verdict below marks it the previous screen's", () => {
+    for (const why of ["running", "stalled", "failed"] as const) {
+      const html = render({ verdictStale: true, staleWhy: why });
+      expect(a11yIssues(html), why).toEqual([]);
+      const chip = elementWith(html, 'data-qa="share-call"');
+      // Dashed, as the deal header draws a call a run is replacing, and said
+      // in words a phone shows: the title carries the verdict's own sentence.
+      expect(chip, why).toContain("border border-dashed border-current");
+      const said = visibleText(chip).replace(/\s+/g, " ").trim();
+      expect(said, why).toBe("First-pass verdict: Caution From the previous screen, Sep 12, 2026");
+      expect(said, why).not.toContain("Screened");
+      const note = /title="([^"]*)"/.exec(chip)?.[1] ?? "";
+      expect(visibleText(html), why).toContain(note.replace(/&#x27;/g, "'"));
+      expect(note, why).toMatch(/^From the previous completed screen — /);
+    }
+    // A run that stopped is never said to be re-screening.
+    const stalled = elementWith(render({ verdictStale: true, staleWhy: "stalled" }), 'data-qa="share-call"');
+    expect(stalled).not.toMatch(/re-screening/);
   });
 });
 

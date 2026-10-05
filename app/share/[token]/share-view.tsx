@@ -141,6 +141,15 @@ const UNKNOWN_VERDICT = {
   dot: "bg-muted",
 };
 
+// The deal header's call pill (VERDICT_PILL on the deal page), colour for
+// colour, with its words above: the chip that says the call beside the
+// title. A call the header draws no pill for draws no chip.
+const CALL_PILL: Record<VerdictCall, string> = {
+  pass: "bg-pass/10 text-pass",
+  caution: "bg-caution/10 text-caution",
+  pass_on: "bg-kill/15 text-kill",
+};
+
 const LEVER_LABEL: Record<string, string> = { basis: "Basis", exit: "Exit", debt: "Debt" };
 const SCENARIO_LABEL: Record<VerdictScenario["scenario"], string> = {
   conservative: "Conservative",
@@ -266,6 +275,17 @@ function splitOf(b: { lines: string[]; national?: number }, local: string, each:
   return nat > 0 ? `${b.lines.length - nat} ${local} and ${nat} the nation's, ${none}` : each;
 }
 
+/** Why the call on file is the previous completed screen's — one sentence
+ *  for each way the sender's latest run did not reach it, said by the
+ *  verdict below and carried by the call's chip beside the title. */
+function previousCallNote(why: BehindWhy): string {
+  return why === "running"
+    ? "From the previous completed screen — the sender is re-screening this deal, and this call is replaced when the run reaches its verdict."
+    : why === "stalled"
+      ? "From the previous completed screen — the sender’s latest run of this deal stopped before it finished."
+      : "From the previous completed screen — the sender’s latest run of this deal did not finish.";
+}
+
 /** A read the sender's latest screen has not rewritten: the previous
  *  screen's, beside this run's terms, and said so. */
 function PreviousRead({ why }: { why: BehindWhy }) {
@@ -299,6 +319,9 @@ export function ShareView({
 }: ShareViewProps) {
   const vmeta = VERDICT_META[verdict.verdict] ?? UNKNOWN_VERDICT;
   const call: VerdictCall | null = VERDICT_META[verdict.verdict] ? verdict.verdict : null;
+  // The day the call was written ("Sep 12, 2026"), or none for a call saved
+  // before the pipeline dated one.
+  const on = screenedOn(verdict.generatedAt);
 
   const screen = verdict.screen;
   // The deal's kind first — a partner reading "$21M stabilized NOI" beside a
@@ -345,7 +368,32 @@ export function ShareView({
         </p>
       </header>
 
-      <h1 className="mt-6 text-3xl font-semibold tracking-tight">{dealName}</h1>
+      {/* The call beside the name (research pass 36): the deal-kind panels
+          and the building's picture come before the verdict below — up to
+          eight phone screens of them — and the partner or lender the call is
+          for had read every one before it. The deal header's own pill, its
+          words and colours, with the day it was written; drawn dashed and
+          said to be the previous screen's wherever the verdict below says
+          so, never as current. */}
+      <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">{dealName}</h1>
+        {call && (
+          <p data-qa="share-call" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <span
+              className={`rounded-full px-2.5 py-0.5 font-semibold ${CALL_PILL[call]}${verdictStale ? " border border-dashed border-current" : ""}`}
+              title={verdictStale ? previousCallNote(staleWhy) : undefined}
+            >
+              <span className="sr-only">First-pass verdict: </span>
+              {vmeta.label}
+            </span>
+            {verdictStale ? (
+              <span className="text-caution">{on ? `From the previous screen, ${on}` : "From the previous screen"}</span>
+            ) : on ? (
+              <span className="text-muted">{`Screened ${on}`}</span>
+            ) : null}
+          </p>
+        )}
+      </div>
       <p className="mt-1 text-sm text-muted">
         {[
           extraction?.market,
@@ -480,10 +528,10 @@ export function ShareView({
       >
         <p className="text-xs font-medium uppercase tracking-wider text-muted">
           First-pass verdict
-          {screenedOn(verdict.generatedAt) ? (
+          {on ? (
             <span className="normal-case tracking-normal" data-qa="verdict-date">
               {" · "}
-              {screenedOn(verdict.generatedAt)}
+              {on}
             </span>
           ) : null}
         </p>
@@ -497,15 +545,7 @@ export function ShareView({
             {vmeta.label}
           </p>
         </div>
-        {verdictStale && (
-          <p className="mt-2 text-xs text-caution">
-            {staleWhy === "running"
-              ? "From the previous completed screen — the sender is re-screening this deal, and this call is replaced when the run reaches its verdict."
-              : staleWhy === "stalled"
-                ? "From the previous completed screen — the sender\u2019s latest run of this deal stopped before it finished."
-                : "From the previous completed screen — the sender\u2019s latest run of this deal did not finish."}
-          </p>
-        )}
+        {verdictStale && <p className="mt-2 text-xs text-caution">{previousCallNote(staleWhy)}</p>}
         {verdict.reason && (
           <p className="mt-3 text-sm leading-relaxed">{verdict.reason}</p>
         )}
