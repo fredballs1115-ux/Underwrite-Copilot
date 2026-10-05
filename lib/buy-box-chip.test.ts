@@ -471,7 +471,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
       ["Current pay rate", "8%"],
       ...BUILDING,
     ]);
-    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "preferred_equity", capWithheld: "position", statedBasisIsBuildings: false, signalCap: null });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "preferred_equity", capWithheld: "position", statedBasisIsBuildings: false, share: null, signalCap: null });
     expect(checkOf(read(ex), "Going-in cap")?.detail).toContain("preferred equity position");
   });
 
@@ -481,7 +481,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
       [["Asking price", "$20,580,000"], ["Entity loan balance", "$56,500,000"], ...BUILDING],
       "A 49% limited partnership interest",
     );
-    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false, signalCap: null });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true }, signalCap: null });
     const r = read(ex);
     expect(checkOf(r, "Going-in cap")?.status).toBe("unknown");
     expect(checkOf(r, "Going-in cap")?.detail).toContain("beside the loan its entity carries, this share's price grossed up is the equity's whole");
@@ -537,7 +537,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
 
   it("a share with a stated percentage and no entity loan keeps its cap, the grossed-up whole's — its stated per-unit figure is no basis", () => {
     const ex = deal("partial_interest", [["Asking price", "$20,580,000"], ...BUILDING], "A 49% limited partnership interest");
-    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, signalCap: null });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true }, signalCap: null });
     const r = read(ex);
     // The header prints the memorandum's cap for this share, and the box
     // judges the same figure.
@@ -648,5 +648,41 @@ describe("the box holds a deal only to the figures its price buys", () => {
     expect(counting.length).toBeGreaterThanOrEqual(7);
     const scoreless = counting.filter((f) => /\bbuyBoxCoverage\([^()]*,\s*null\s*\)/.test(readFileSync(f, "utf8")));
     expect(scoreless).toEqual([]);
+  });
+
+  // Audit C4, L2: a GP stake's price buys a share of a share, and a share of
+  // no stated percentage grosses up to nothing: neither buys the building,
+  // and an IRR the memorandum states is no return of their buyers'. The box
+  // had held each to its target ("near — the OM projects 14.0%").
+  it("holds no stated IRR to the target on a GP stake or a share of no stated percentage", () => {
+    const IRR: [string, string][] = [["Units", "200"], ["Levered IRR", "14.0%"]];
+    const box: BuyBox = { assetClasses: ["multifamily"], minIrrPct: 15 };
+    const readIrr = (ex: ExtractionResult) => buyBoxRead("multifamily", dealCheckSource(ex, null, null), box);
+    const cases: [string, ExtractionResult, string][] = [
+      [
+        "GP stake",
+        deal("partial_interest", [["Asking price", "$5,000,000"], ...IRR], "A 50% interest in the general partner of the owning partnership"),
+        "this is a share of the general partner's interest: a share of a share",
+      ],
+      [
+        "no percentage",
+        deal("partial_interest", [["Asking price", "$20,000,000"], ...IRR], "A limited partnership interest in the owning entity"),
+        "this share states no percentage",
+      ],
+    ];
+    for (const [name, ex, words] of cases) {
+      const r = readIrr(ex);
+      const check = checkOf(r, "Target return");
+      expect(check, name).toMatchObject({ status: "unknown", onPrice: true });
+      expect(check?.detail, name).toContain(words);
+      expect(check?.detail, name).not.toContain("14.0%");
+      const dim = r.mandate?.dimensions.find((d) => d.key === "irr");
+      expect(dim?.status, name).toBe("unknown");
+      expect(dim?.detail, name).toBe(check?.detail);
+    }
+    // A share of a stated percentage with no entity loan stands, as before:
+    // whether its deal-level IRR is the share's is the owner's call.
+    const lp = readIrr(deal("partial_interest", [["Asking price", "$9,800,000"], ...IRR], "A 49% limited partnership interest"));
+    expect(checkOf(lp, "Target return")?.status).toBe("near");
   });
 });

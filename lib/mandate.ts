@@ -24,6 +24,7 @@ import type { CapWithheldKind } from "@/lib/cap-slot";
 import {
   type BuyBox,
   type Holding,
+  type ShareRead,
   buildingSfFromMetrics,
   capWithheldDetail,
   capWithheldOf,
@@ -150,6 +151,9 @@ interface ExtractionLike {
    *  TIC and a GP stake as what they are */
   holding?: Holding | null;
   loanWords?: string | null;
+  /** a share's holding (lib/criteria `ShareRead`): a GP stake's and a
+   *  share of no stated percentage's IRR is never scored */
+  shareRead?: ShareRead | null;
   /** the day the screen read the memorandum — a price label's year is read
    *  against its year (lib/criteria `screenYearOf`) */
   screenedOn?: string | null;

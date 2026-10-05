@@ -39,7 +39,8 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
  * read (the audit of 2026-10-05).
  */
 export function sourceReadsOf(extraction: ExtractionResult | null, firstSignal: FirstSignal | null): SourceReads {
-  const { kind, entityLoan } = interestOf(extraction);
+  const interest = interestOf(extraction);
+  const { kind, entityLoan } = interest;
   // What a share holds, so the box says a tenancy in common and a GP stake
   // as what they are, never "a share of the owning entity" (the audit C3b
   // MED-4), with the stated loan in lib/interest's own words.
@@ -49,6 +50,12 @@ export function sourceReadsOf(extraction: ExtractionResult | null, firstSignal: 
     interestKind: kind,
     capWithheld: capSlotWithheld(extraction),
     statedBasisIsBuildings: statedBasisIsBuildings(extraction),
+    // A share's holding (audit C4, L2): a GP stake's and a share of
+    // no stated percentage's stated IRR is held to no target.
+    share:
+      interest.kind === "partial_interest"
+        ? { gpStake: isGpStake(extraction), pctStated: interest.sharePct != null }
+        : null,
     signalCap: signalGoingInCap(firstSignal),
     ...(holding ? { holding } : {}),
     ...(loanWords ? { loanWords } : {}),

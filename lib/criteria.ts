@@ -751,6 +751,9 @@ interface ExtractionLike {
   /** the loan the memorandum states on a tenancy in common's property, in
    *  lib/interest's `entityLoanWords`; absent where none is stated */
   loanWords?: string | null;
+  /** a share's holding, carried in by `buyBoxCheckSource`'s reads
+   *  (`ShareRead`); absent on a raw extraction and on anything but a share */
+  shareRead?: ShareRead | null;
   /** the day the screen read the memorandum (ExtractionResult.screenedOn) —
    *  the year a price label's year is judged against (`screenYearOf`) */
   screenedOn?: string | null;
@@ -762,6 +765,17 @@ interface ExtractionLike {
  *  or a share of the general partner's interest (`isGpStake`), a share of a
  *  share. */
 export type Holding = "tic" | "gp_stake";
+
+/**
+ * What a share of the owning entity is, by lib/interest's readers (which
+ * this module cannot import): a share of the general partner's interest (a
+ * share of a share, `isGpStake`) and whether a percentage of the entity is
+ * stated (`interestOf`'s `sharePct`).
+ */
+export interface ShareRead {
+  gpStake: boolean;
+  pctStated: boolean;
+}
 
 /**
  * Why a deal's stated going-in cap is no cap its buyer earns — its cap
@@ -810,8 +824,10 @@ export function capWithheldDetail(
 /** Why the target-return check holds no IRR the memorandum states to the
  *  box's floor: the cap slot's own reasons (`capWithheldOf`: a note, a
  *  preferred equity position, a share beside the loan its entity carries),
- *  and a leased fee, whose price buys the land under the ground lease. */
-export type ReturnWithheldKind = CapWithheldKind | "leased_fee";
+ *  a leased fee, whose price buys the land under the ground lease, a share
+ *  of the general partner's interest (a share of a share), and a share of
+ *  no stated percentage, whose price grosses up to no building's. */
+export type ReturnWithheldKind = CapWithheldKind | "leased_fee" | "gp_stake" | "share_unstated";
 
 /**
  * Why an IRR the memorandum states is no return of this deal's buyer
@@ -819,12 +835,20 @@ export type ReturnWithheldKind = CapWithheldKind | "leased_fee";
  * property's — the collateral's, the building's above a position or the
  * entity's loan, the building's above the land — or of a kind the screen
  * does not read, and the box holds none of them to its target, as the cap
- * and basis checks beside it hold none. One reader for the buy box's check
- * and the mandate's IRR dimension. Null where the stated IRR is checked.
+ * and basis checks beside it hold none. A GP stake's price buys a share of
+ * a share, and a share of no stated percentage grosses up to no building's
+ * price (audit C4, L2). One reader for the buy box's check and the
+ * mandate's IRR dimension. Null where the stated IRR is checked — a share
+ * of a stated percentage with no entity loan among them, whose deal-level
+ * IRR is the owner's call.
  */
 export function returnWithheldOf(ex: ExtractionLike | null | undefined): ReturnWithheldKind | null {
   if (!ex) return null;
-  return capWithheldOf(ex) ?? (ex.interest?.kind === "leased_fee" ? "leased_fee" : null);
+  if (ex.shareRead?.gpStake) return "gp_stake";
+  const cap = capWithheldOf(ex);
+  if (cap) return cap;
+  if (ex.interest?.kind === "leased_fee") return "leased_fee";
+  return ex.interest?.kind === "partial_interest" && ex.shareRead && !ex.shareRead.pctStated ? "share_unstated" : null;
 }
 
 /** The target-return check's words where the IRR is withheld, by the same
@@ -832,6 +856,12 @@ export function returnWithheldOf(ex: ExtractionLike | null | undefined): ReturnW
  *  sentence. */
 export function returnWithheldDetail(targetPct: number, why: ReturnWithheldKind): string {
   const head = `Mandate targets ≥${targetPct}% IRR`;
+  if (why === "gp_stake") {
+    return `${head}, but this is a share of the general partner's interest: a share of a share, whose price no figure grosses up to the building's, so an IRR the memorandum states is not read as this stake's return.`;
+  }
+  if (why === "share_unstated") {
+    return `${head}, but this share states no percentage of the owning entity: its price grosses up to no building's, so an IRR the memorandum states is not read as this share's return.`;
+  }
   if (why === "note" || why === "under_water") {
     return `${head}, but this is a note: its price is a loan's, and an IRR the memorandum states is not read as the note's return — the collateral's is not a return the note's buyer earns.`;
   }
@@ -1360,6 +1390,10 @@ export interface SourceReads {
    *  (lib/deal-strategy `statedBasisIsBuildings`): false for a note, a
    *  position, a leased fee and a share */
   statedBasisIsBuildings: boolean;
+  /** on a share of the owning entity, what it is (`ShareRead`): a GP stake
+   *  and a share of no stated percentage hold no stated IRR to the target;
+   *  null on anything but a share */
+  share?: ShareRead | null;
   /** the first signal's going-in cap, as the deal header reads it
    *  (lib/deal-strategy `signalGoingInCap`): only where it can be a cap on
    *  the price at all; null otherwise */
@@ -1457,6 +1491,7 @@ export function buyBoxCheckSource(
     ...(reads ? { capWithheld: reads.capWithheld, statedBasisIsBuildings: reads.statedBasisIsBuildings } : {}),
     ...(reads?.holding ? { holding: reads.holding } : {}),
     ...(reads?.loanWords ? { loanWords: reads.loanWords } : {}),
+    ...(reads?.share ? { shareRead: reads.share } : {}),
     // So does the day the screen read the memorandum: the price band and
     // the mandate's ceiling read a label's year against it, as the page's
     // price slot does.
