@@ -179,12 +179,35 @@ describe("buildRentRollWorkbook — structure", () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);
     const cf = wb.getWorksheet("Cash Flow")!;
-    expect((cf.getCell(CF_ROW.leveredIrr, 2).value as CellVal).formula).toMatch(/^IRR\(/);
+    // The native function, wrapped so flows no rate solves read a sentence
+    // rather than an error code (research pass 35).
+    expect((cf.getCell(CF_ROW.leveredIrr, 2).value as CellVal).formula).toMatch(/^IFERROR\(IRR\(B40:L40\),/);
+    expect((cf.getCell(CF_ROW.unleveredIrr, 2).value as CellVal).formula).toMatch(/^IFERROR\(IRR\(B39:L39\),/);
     // HyperFormula has no XIRR, so the recalculation assertions below don't
     // cover it — LibreOffice does. What's asserted here is that the cell holds
     // the native function rather than a value we computed and pasted.
-    expect((cf.getCell(44, 2).value as CellVal).formula).toMatch(/^XIRR\(/);
+    expect((cf.getCell(44, 2).value as CellVal).formula).toMatch(/^IFERROR\(XIRR\(B40:L40,B3:L3\),/);
     expect((cf.getCell(CF_ROW.equityMultiple, 2).value as CellVal).formula).toContain("SUM(");
+  });
+
+  // Research pass 35 (F8): years printed "2,027", the statistics' labels were
+  // cut at a 10-wide column, and the indicator columns printed 1 and 0.
+  it("prints a year as a year, the indicators as Yes or No over their 1 and 0, and the statistics' labels whole", async () => {
+    const { wb, value } = await loadWorkbook(buffer);
+    const roll = wb.getWorksheet("Rent Roll")!;
+    for (let r = 4; r < 4 + LEASES.length; r++) {
+      expect(roll.getCell(r, 10).numFmt, `Rent Roll!J${r}`).toBe("0");
+      for (const c of [13, 14]) expect(roll.getCell(r, c).numFmt, `Rent Roll!${colLetter(c)}${r}`).toBe('"Yes";"Yes";"No"');
+    }
+    // The indicators still hold numbers, which the statistics multiply.
+    expect(value("Rent Roll", 4, 10)).toBe(2027);
+    expect(value("Rent Roll", 4, 13)).toBe(1);
+    expect(value("Rent Roll", 6, 13)).toBe(0); // the vacant suite
+    const rollover = wb.getWorksheet("Rollover")!;
+    expect(rollover.getCell(4, 2).numFmt).toBe("0");
+    expect(value("Rollover", 4, 2)).toBe(2026);
+    // Wide enough for "WALT — rent weighted (yrs)" and its indent.
+    expect(roll.getColumn(1).width).toBeGreaterThanOrEqual(26);
   });
 
   it("writes no serial for a day that does not exist, so the page and the workbook date the same leases", () => {
@@ -304,6 +327,33 @@ describe("buildRentRollWorkbook — the formulas compute the app's numbers", () 
   });
 });
 
+// Research pass 35 (F8): on flows that never earn the equity back the
+// levered IRR read #NUM! (HyperFormula, Excel) and Err:523 (LibreOffice),
+// beside an equity multiple of -1.71x. The multiple is the formula's honest
+// answer and stays; the IRR cell says why it has no rate, and stays a formula.
+// A price far over what the roll's income carries, at 90% loan-to-cost: the
+// debt service outruns the NOI every year and the sale does not repay the loan.
+const UNDERWATER: WorkbookInputs = { ...INPUTS, purchasePrice: 100_000_000, ltc: 0.9 };
+
+describe("buildRentRollWorkbook — flows no rate solves read a sentence, not an error", () => {
+  const sunk = buildRentRollCashFlow(LEASES, UNDERWATER);
+
+  it("says the levered flows never turn positive, as the mirror does, and stays a formula", async () => {
+    // The fixture is what it says: every levered flow at or under zero.
+    expect(Math.max(...sunk.leveredVector)).toBeLessThanOrEqual(0);
+    expect(sunk.leveredIrr).toBeNull();
+    expect(sunk.leveredIrrNote).toBe("no IRR: the levered flows never turn positive");
+    const { wb, value } = await loadWorkbook(await buildRentRollWorkbook(LEASES, UNDERWATER));
+    expect(value("Cash Flow", CF_ROW.leveredIrr, 2)).toBe(sunk.leveredIrrNote);
+    expect((wb.getWorksheet("Cash Flow")!.getCell(CF_ROW.leveredIrr, 2).value as CellVal).formula).toMatch(/^IFERROR\(IRR\(B40:L40\),IF\(MAX\(B40:L40\)<=0,/);
+    // The multiple is left as the formula computes it.
+    expect(value("Cash Flow", CF_ROW.equityMultiple, 2) as number).toBeLessThan(0);
+    // A rate that stands has no note, in the mirror or the file.
+    expect(model.leveredIrrNote).toBeNull();
+    expect(model.unleveredIrrNote).toBeNull();
+  });
+});
+
 describe("buildRentRollWorkbook — the model is live", () => {
   it("moves levered IRR when the exit cap on the Assumptions tab changes", async () => {
     const { value, setValue } = await loadWorkbook(buffer);
@@ -403,5 +453,38 @@ describe.skipIf(!SOFFICE)("LibreOffice recalculation", () => {
     // XIRR dates the flows a year apart, so it lands near — not on — the
     // undated IRR. Within 50 bps is the honest tolerance.
     expect(labelled("Levered XIRR (dated)")).toBeCloseTo(model.leveredIrr!, 2);
+  }, 300_000);
+
+  // LibreOffice answered Err:523 for an IRR no rate solves; the cell now
+  // reads the mirror's sentence there too, and XIRR's says the same.
+  it("reads the sentence, not Err:523, where the levered flows never turn positive", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rentroll-wb-sunk-"));
+    const xlsx = join(dir, "model.xlsx");
+    const outDir = join(dir, "out");
+    mkdirSync(outDir);
+    return buildRentRollWorkbook(LEASES, UNDERWATER).then((buf) => {
+      writeFileSync(xlsx, buf);
+      execFileSync(
+        SOFFICE!,
+        [
+          "--headless",
+          "--norestore",
+          `-env:UserInstallation=file://${join(dir, "loprofile")}`,
+          "--convert-to",
+          "csv:Text - txt - csv (StarCalc):44,34,76,1,,0,false,true,false,false,,4",
+          "--outdir",
+          outDir,
+          xlsx,
+        ],
+        { stdio: "pipe", timeout: 240_000 },
+      );
+      const produced = readdirSync(outDir).filter((f) => f.endsWith(".csv"));
+      expect(produced.length).toBeGreaterThan(0);
+      const rows = parseCsv(readFileSync(join(outDir, produced[0]), "utf8"));
+      const cell = (name: string) => String(rows.find((r) => String(r[0] ?? "").trim() === name)?.[1] ?? "");
+      const sunk = buildRentRollCashFlow(LEASES, UNDERWATER);
+      expect(cell("Levered IRR")).toBe(sunk.leveredIrrNote);
+      expect(cell("Levered XIRR (dated)")).toBe("no XIRR: the levered flows never turn positive");
+    });
   }, 300_000);
 });
