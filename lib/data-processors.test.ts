@@ -3,10 +3,12 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BROWSER_DIRECT_NOTE, DATA_PROCESSORS } from "./data-processors";
+import { BROWSER_DIRECT_NOTE, DATA_PROCESSORS, supportInboxProvider } from "./data-processors";
 import { censusUrl, photonUrl } from "./geocode";
 import { BASEMAP_IMG_HOSTS, BASEMAPS, NFHL_ROOT, usgsAerialUrl } from "./basemaps";
 import { COVERAGE_LIVE } from "./public-comps/core";
+import { buyBoxLines, type BuyBox } from "./criteria";
+import { SUPPORT_EMAIL, supportMailto } from "./support-link";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import SecurityPage from "@/app/security/page";
 import PrivacyPage from "@/app/privacy/page";
@@ -80,12 +82,93 @@ describe("the outside services a user's data reaches, one list held to the code"
       }
       expect(text).toContain(BROWSER_DIRECT_NOTE);
       expect(text).not.toMatch(/receives only the address text you type/i);
-      // Each page dated by its own last change: the privacy page's cookie
-      // section was written out in full on October 1 (pass 14), and named
-      // the time-zone cookie on October 4.
-      expect(text).toContain(name === "privacy" ? "Last updated: October 4, 2026" : "Last updated: September 30, 2026");
+      // Each page dated by its own last change: both print the list, which
+      // named the buy box, the typed facts and the support inbox on
+      // October 5 (research pass 39).
+      expect(text).toContain("Last updated: October 5, 2026");
       expect(a11yIssues(html), name).toEqual([]);
       expect(gluedWords(text), name).toEqual([]);
     }
+  });
+});
+
+// The list said Anthropic received the documents and the questions asked
+// about them, while every verdict is also handed the buy box and a deal with
+// no OM is screened from the facts typed for it; and it left out the support
+// inbox the stopped-screen link writes to (research pass 39).
+describe("what Anthropic and the support inbox receive, held to the code", () => {
+  const anthropic = DATA_PROCESSORS.find((p) => p.name.startsWith("Anthropic"))!;
+
+  it("names every kind of line of the buy box a verdict is handed, and leaves the 1031 exchange out as the code does", () => {
+    expect(src("lib/anthropic/pipeline.ts")).toContain("buyBoxLines(box, { exchange: false })");
+    // Each line a full box hands a Claude step, by its label, against the
+    // words the list names it by: a new kind of line fails here until the
+    // list names it too.
+    const words: Record<string, string> = {
+      "Asset classes": "asset classes",
+      Geography: "markets",
+      Size: "size and price bands",
+      Count: "size and price bands",
+      Price: "size and price bands",
+      "Max basis per unit": "basis cap",
+      "Min going-in cap": "return floors",
+      "Min year-one cash-on-cash": "return floors",
+      "Target base-case IRR": "return floors",
+      Dealbreakers: "dealbreakers",
+      Priorities: "your priorities as you wrote them",
+    };
+    const full: BuyBox = {
+      assetClasses: ["multifamily"],
+      markets: "Anytown",
+      sfMin: 10_000,
+      sfMax: 90_000,
+      unitsMin: 20,
+      unitsMax: 200,
+      priceMinM: 5,
+      priceMaxM: 50,
+      maxPerUnitK: 250,
+      minCapPct: 5.5,
+      minCoCPct: 6,
+      minIrrPct: 14,
+      dealbreakers: { requireGeography: true },
+      notes: "value-add only",
+      exchange: { relinquishedTransferOn: "2026-09-15", filer: "partnership" },
+    };
+    const lines = buyBoxLines(full, { exchange: false });
+    expect(lines).toHaveLength(Object.keys(words).length);
+    for (const line of lines) {
+      const label = line.slice(0, line.indexOf(":"));
+      expect(words[label], line).toBeDefined();
+      expect(anthropic.receives, line).toContain(words[label]);
+    }
+    expect(anthropic.receives).toContain("your buy box, which every verdict is handed");
+    expect(lines.some((l) => /1031/.test(l))).toBe(false);
+    expect(anthropic.receives).toContain("never your 1031 exchange");
+  });
+
+  it("names the facts typed for a deal with no OM, which its screen reads as a fact sheet", () => {
+    expect(src("lib/anthropic/pipeline.ts")).toMatch(/omFromText\(manualFactSheet\(/);
+    expect(anthropic.receives).toContain("the facts you type for a deal with no OM");
+  });
+
+  it("names the support inbox by its address and the provider its address shows, and what the stopped-screen link fills in", () => {
+    const inbox = DATA_PROCESSORS.find((p) => p.name.includes(SUPPORT_EMAIL));
+    expect(inbox, "the support inbox is listed").toBeDefined();
+    // A support address on any other domain names its mail provider by hand.
+    const provider = supportInboxProvider(SUPPORT_EMAIL);
+    expect(provider, `name the mail provider of ${SUPPORT_EMAIL} in lib/data-processors`).not.toBeNull();
+    expect(inbox!.name.startsWith(`${provider} `)).toBe(true);
+    expect(inbox!.hosts).toEqual([]);
+    expect(supportInboxProvider("someone@Gmail.com")).toBe("Gmail");
+    expect(supportInboxProvider("help@example.com")).toBeNull();
+    expect(supportInboxProvider("not an address")).toBeNull();
+    // What the link under a stopped screen writes into the email.
+    const mail = decodeURIComponent(
+      supportMailto({ dealId: "deal-id-1", dealName: "Deal name", step: "market", error: "The page's sentence" }),
+    );
+    for (const part of ["Deal: Deal name", "Deal id: deal-id-1", "Stopped at the market step", "What the page said: The page's sentence"]) {
+      expect(mail).toContain(part);
+    }
+    expect(inbox!.receives).toContain("the deal's name and id, the step it stopped at and what the page said");
   });
 });

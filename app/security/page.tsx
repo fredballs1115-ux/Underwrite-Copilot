@@ -89,7 +89,7 @@ export default function SecurityPage() {
 
       <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-tight">Security</h1>
-        <p className="mt-2 text-sm text-muted">Last updated: September 30, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: October 5, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Every upload comes down to one thing: whether it is safe to put a
           confidential OM here. This page is the answer — how documents are
