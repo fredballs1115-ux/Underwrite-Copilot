@@ -983,8 +983,14 @@ export function BrokerComps({
               kind: "web",
               name: c.name,
               detail: [c.detail, c.date].filter(Boolean).join(" · "),
-              sourceLabel: c.sourceName || "Public source",
-              sourceHref: c.sourceUrl || null,
+              // Linked only where the source is a page the search returned
+              // (lib/anthropic/search-sources); otherwise its name alone,
+              // said unverified.
+              sourceLabel:
+                c.sourceInSearch === true
+                  ? c.sourceName || "Public source"
+                  : `${c.sourceName || "Public source"} (unverified)`,
+              sourceHref: c.sourceInSearch === true ? c.sourceUrl || null : null,
               queries: geocodeCandidates(
                 c.name,
                 c.detail ?? "",
@@ -1154,8 +1160,13 @@ function PublicWebComps({
                       {c.note}
                     </p>
                   )}
-                  {/* LLM-sourced URL — only http(s) ever becomes a link. */}
-                  {safeHttpUrl(c.sourceUrl) && (
+                  {/* A source becomes a link only where it is a page the
+                      search returned, at the search's own address, and then
+                      only an http(s) one (lib/anthropic/search-sources). A
+                      source the model named that the search did not return,
+                      or one stored before the check, is its name in words,
+                      said unverified — never a link. */}
+                  {c.sourceInSearch === true && safeHttpUrl(c.sourceUrl) ? (
                     <a
                       href={safeHttpUrl(c.sourceUrl)!}
                       target="_blank"
@@ -1164,7 +1175,15 @@ function PublicWebComps({
                     >
                       {c.sourceName || "Source"} →
                     </a>
-                  )}
+                  ) : c.sourceName ? (
+                    <p className="mt-1.5 text-xs text-muted" data-qa="source-unverified">
+                      {`${c.sourceName} · unverified, ${
+                        c.sourceInSearch === false
+                          ? "not a page the search returned"
+                          : "not checked against the search's pages"
+                      }`}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
