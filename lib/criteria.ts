@@ -828,7 +828,7 @@ const returnHolder = (ex: Pick<ExtractionLike, "shareRead"> | null | undefined):
 export function capWithheldDetail(
   floorPct: number,
   why: CapWithheldKind,
-  ex?: Pick<ExtractionLike, "holding" | "loanWords"> | null,
+  ex?: Pick<ExtractionLike, "holding" | "loanWords" | "shareRead"> | null,
 ): string {
   const head = `Mandate wants ≥${floorPct}% going-in`;
   if (why === "note") {
@@ -843,6 +843,9 @@ export function capWithheldDetail(
   if (ex?.holding === "gp_stake") {
     return `${head}, but this sells a share of the general partner's interest, a share of a share: no figure grosses its price up to the building's, and the building's cap is not a return its buyer earns.`;
   }
+  // All the interests (a stated 100%): nothing is grossed up, as the deal's
+  // own lead says (audit C5, LOW-7).
+  if (ex?.shareRead?.all) return `${head}, but ${besideTheLoan(ex)}: a cap stated against that price is on a basis the memorandum never says.`;
   if (ex?.holding === "tic") {
     return `${head}, but beside ${ex.loanWords ?? "the loan the memorandum states on the property"}, this interest's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
   }

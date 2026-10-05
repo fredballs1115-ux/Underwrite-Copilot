@@ -697,7 +697,9 @@ describe("the box holds a deal only to the figures its price buys", () => {
     const r = buyBoxRead("multifamily", dealCheckSource(tic, null, null), { ...BOX, minIrrPct: 15 });
     for (const label of ["Going-in cap", "Target return"]) {
       const detail = checkOf(r, label)?.detail ?? "";
-      expect(detail, label).toContain("beside the loan on the property, this interest's price grossed up is the equity's whole");
+      // The cap's words name the stated loan (lib/interest's entityLoanWords);
+      // the return's say "the loan on the property". Both are the property's.
+      expect(detail, label).toMatch(/beside the (?:stated \$[\d.]+M )?loan on the property, this interest's price grossed up is the equity's whole/);
       expect(detail, label).not.toMatch(/its entity|this share/);
     }
     // All the tenant-in-common interests: the price is the whole's,

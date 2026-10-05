@@ -43,7 +43,7 @@ describe("all the tenant-in-common interests are said as that, never an entity's
   it("the compare table's model-returns line and the workbook's price tile", () => {
     const ex = tic([row("NOI (in-place)", "$300,000", "in_place")]);
     const d = deriveUnderwriteInputs(ex, "x");
-    expect(d.meta.priceLabel).toBe("Equity's Whole (all the tenant-in-common interests)");
+    expect(d.meta.priceLabel).toBe("Equity's Whole (all the TIC interests)");
     const line = modelReturnsRead(ex, { purchasePrice: d.inputs.purchasePrice, year1Noi: 300_000, goingInCapPct: 7.1 }).line;
     expect(line).toBe(
       "This price buys all the tenant-in-common interests, and beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld.",
