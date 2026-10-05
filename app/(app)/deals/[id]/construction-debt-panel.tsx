@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { useMemo, useState } from "react";
 import { withArticle } from "@/lib/article";
@@ -235,7 +236,18 @@ export function ConstructionDebtPanel({
                   a real cost of the plan and the OM&apos;s figure leaves it out.
                 </>
               )}{" "}
-              The draw is assumed to average {Math.round(DEFAULT_DRAW_PROFILE * 100)}% outstanding across the works.
+              The draw is assumed to average {Math.round(DEFAULT_DRAW_PROFILE * 100)}% outstanding across the works.{" "}
+              {/* The shortcut describes a loan drawn from the first day; a
+                  lender funds the equity first, so the loan draws later and
+                  less, and the reserve here errs high (research pass 40,
+                  L11; lib/tools/construction-draw runs it by the month). The
+                  method stays the owner's. */}
+              That is a screening shortcut for a loan drawn from the first day: a lender has the equity
+              in first, so the loan draws later and the reserve here errs high —{" "}
+              <Link href="/tools#construction-draw" className="underline decoration-dotted underline-offset-2 hover:text-ink">
+                the construction draw card
+              </Link>{" "}
+              runs the draw month by month.
             </p>
           )}
         </>

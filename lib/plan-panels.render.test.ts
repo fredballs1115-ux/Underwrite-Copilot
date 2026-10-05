@@ -13,7 +13,7 @@ import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
 import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { DEFAULT_DRAW_PROFILE } from "@/lib/construction-debt";
-import { gluedWords, visibleText } from "@/lib/render-lint";
+import { a11yIssues, gluedWords, visibleText } from "@/lib/render-lint";
 import { NY_FED_SOFR_NOTICE, NY_FED_SOFR_NOTICES } from "@/lib/data-notices";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -206,6 +206,21 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/construction-debt-panel.tsx"), "utf8");
     expect(src).not.toMatch(/\b0\.55\b/);
     expect(src).toContain("DEFAULT_DRAW_PROFILE");
+  });
+
+  // Research pass 40, L11: the 55% average is a shortcut for a loan drawn
+  // from the first day, and the site's own construction-draw card shows a
+  // lender's equity-first funding draws less — so the reserve here errs high,
+  // and the panel says so beside the method, which stays as it is.
+  it("says the draw's average errs high against the equity-first draw the /tools card runs", () => {
+    const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, props));
+    // The link breaks the visible text's lines: read it as one run of words.
+    expect(visibleText(html).replace(/\s+/g, " ")).toContain(
+      "That is a screening shortcut for a loan drawn from the first day: a lender has the equity in first, so the loan draws later and the reserve here errs high — the construction draw card runs the draw month by month.",
+    );
+    expect(html).toContain('href="/tools#construction-draw"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 });
 
