@@ -110,6 +110,40 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(note, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
   });
 
+  it("on a preferred equity position: the price, then the position's own terms — never the building's cap (lib/position)", () => {
+    const position = [
+      { label: "Going-in cap rate", value: "5.50%", flagged: true },
+      { label: "Asking price", value: "$14,000,000", flagged: false },
+      { label: "Units", value: "240", flagged: false },
+      { label: "Whole-asset value", value: "$80,000,000", flagged: false },
+      { label: "Remedies", value: "Pledge of the sponsor's membership interests", flagged: false },
+      { label: "Senior loan balance", value: "$52,000,000", flagged: false },
+      { label: "Mandatory redemption date", value: "June 2029", flagged: false },
+      { label: "Current pay rate", value: "8.0%", flagged: false },
+      { label: "Preferred return", value: "12% preferred return, 8% current pay", flagged: false },
+      { label: "Preferred equity amount", value: "$15,000,000", flagged: false },
+      { label: "Cap rate (pro forma)", value: "6.1%", flagged: true },
+    ];
+    expect(keyTermRows(position, "stabilized", SCREEN_YEAR, 8, "preferred_equity").map((m) => m.label)).toEqual([
+      "Asking price",
+      "Preferred equity amount",
+      "Preferred return",
+      "Current pay rate",
+      "Mandatory redemption date",
+      "Senior loan balance",
+      "Remedies",
+      "Units",
+    ]);
+    // No cap on the building's income prints at all, flagged or not: beside
+    // the position's price any of them would read as a cap on it.
+    const shown = keyTermRows(position, "stabilized", SCREEN_YEAR, 30, "preferred_equity").map((m) => m.label);
+    expect(shown).not.toContain("Going-in cap rate");
+    expect(shown).not.toContain("Cap rate (pro forma)");
+    expect(shown).toContain("Whole-asset value");
+    // Read as a building, the same rows lead with its cap.
+    expect(keyTermRows(position, "stabilized", SCREEN_YEAR, 2).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate"]);
+  });
+
   it("a single tenant's lease leads after the cap (#454): when it ends, how its rent grows, the tenant's options", () => {
     const nnn = [
       { label: "Tenant credit rating", value: "BBB- (S&P)", flagged: false },

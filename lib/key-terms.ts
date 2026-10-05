@@ -24,6 +24,7 @@ import { goingConcernTermRows } from "./going-concern";
 import { HOA_DUES_ROW, condoTermRows } from "./condo";
 import { sandwichTermRows } from "./sandwich-lease";
 import { noteTermRows } from "./note-yield";
+import { positionTermRows } from "./position";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
 import { hotelTermRows } from "./hotel-deal";
@@ -72,10 +73,15 @@ export interface KeyTermMetric {
  * the loan's own terms follow the price — the balance, the coupon, the
  * maturity, whether it pays — and the collateral's cap is not led with,
  * since it is not the buyer's; financing the seller offers on a note
- * follows them, labelled as the note purchase's. Rows that are not objects
- * (analysis output can carry nulls) are dropped. `screenYear` is the year
- * the screen read the memorandum (lib/criteria `screenYearOf`), which the
- * price row's label is read against, as on every other surface.
+ * follows them, labelled as the note purchase's. On a preferred equity
+ * position (lib/position) its own terms follow the price the same way — the
+ * amount, the preferred return and its parts, the redemption, the senior
+ * loan ahead of it, the remedies — and no cap on the building's income is
+ * printed, since its price buys a rate and a redemption, never a slice of
+ * the building (the cap slot's rule, lib/compare-interest). Rows that are
+ * not objects (analysis output can carry nulls) are dropped. `screenYear` is
+ * the year the screen read the memorandum (lib/criteria `screenYearOf`),
+ * which the price row's label is read against, as on every other surface.
  */
 export function keyTermRows<M extends KeyTermMetric>(
   metrics: ReadonlyArray<M | null | undefined>,
@@ -106,6 +112,10 @@ export function keyTermRows<M extends KeyTermMetric>(
     // leads beside the note's own terms, so the block's limit never cuts
     // it, and is labelled as that below.
     for (const row of sellerFinancingTermRows(rows)) lead(row);
+  } else if (interest === "preferred_equity") {
+    // A preferred equity position's own terms lead after the price, as a
+    // note's do; the building's cap is not led with, and is not printed.
+    for (const row of positionTermRows(rows)) lead(row);
   } else if (isPlanDeal(kind)) {
     const stabilized = noiFigures(rows).find((f) => f.kind === "stabilized");
     if (stabilized) lead(rows.find((m) => m.label === stabilized.label));
@@ -182,8 +192,11 @@ export function keyTermRows<M extends KeyTermMetric>(
   // On a note no cap on the collateral's income is printed at all — the
   // going-in, the in-place, the stabilized, the exit: among the rows a
   // reader would take any of them for a cap on the note's price, which none
-  // is. An interest rate cap is a term of the loan and stays.
-  const rest = rows.filter((m) => !head.includes(m) && !(interest === "note" && isCollateralCap(m)));
+  // is. An interest rate cap is a term of the loan and stays. On a preferred
+  // equity position the same: a cap on the building's income would read as
+  // one on the position's price.
+  const noCap = interest === "note" || interest === "preferred_equity";
+  const rest = rows.filter((m) => !head.includes(m) && !(noCap && isCollateralCap(m)));
   const out = [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
   if (interest !== "note") return out;
   // On a note every row of the seller's financing is the note purchase's,

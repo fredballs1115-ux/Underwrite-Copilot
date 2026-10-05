@@ -3,7 +3,7 @@
 // compile time — so this test renders the real sample memo to real PDF
 // bytes, exactly the way the public /api/demo/memo route does. If the memo
 // design breaks, this fails in CI instead of at a user's download click.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, onTestFinished, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { MemoDocument, basePosition, buildMemoData, clampWords } from "./memo-document";
@@ -86,6 +86,53 @@ describe("MemoDocument (redesigned)", () => {
     // The sample itself is a fee simple: its memo carries no such line.
     const plain = buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 24, 2026", []);
     expect(plain.interestLine).toBe("");
+  }, 30000);
+
+  it("says a preferred equity position under the title, its key terms led by its own rows and no cap on the building (lib/position)", async () => {
+    // The day its yield to redemption is read on.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 6", basis: "na" });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$14,000,000" } : m)),
+        row("Preferred equity amount", "$15,000,000"),
+        row("Preferred return", "12% preferred return, 8% current pay"),
+        row("Current pay rate", "8.0%"),
+        row("Mandatory redemption date", "June 2029"),
+        row("Senior loan balance", "$52,000,000"),
+        row("Whole-asset value", "$80,000,000"),
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", []);
+    expect(data.interestLine).toBe("A preferred equity position in the owning entity, not the property, 14.3% to its Jun 2029 redemption at the $14.0M price");
+    // The position's own terms lead after the price, as a note's do — cut at
+    // the memo's four beside the screen block — and no cap on the
+    // building's income prints beside its price, nor a basis under it.
+    expect(data.keyTerms.map((t) => t.label)).toEqual(["Asking price", "Preferred equity amount", "Preferred return", "Current pay rate"]);
+    expect(data.keyTerms.map((t) => t.label).filter((l) => /\bcap\b/i.test(l))).toEqual([]);
+    expect(data.keyTerms.some((t) => t.sub)).toBe(false);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("A preferred equity position in the owning entity, not the property, 14.3% to its Jun 2029 redemption");
+    // The memo prints its key terms' labels in capitals.
+    expect(text).toContain("KEY TERMS ASKING PRICE $14,000,000 PREFERRED EQUITY AMOUNT $15,000,000 PREFERRED RETURN");
   }, 30000);
 
   it("prints the day the verdict was written, so a memo printed later never passes an old call off as the day's", async () => {
