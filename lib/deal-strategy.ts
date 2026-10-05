@@ -40,6 +40,8 @@ import {
   findMetric,
   findPriceRow,
   isCountLabel,
+  occupancyPctFromMetrics,
+  occupancyRow,
   parseCount,
   parseMoney,
   parsePct,
@@ -81,7 +83,8 @@ export const STRATEGY_LABEL: Record<StrategyKind, string> = {
 export const STRATEGY_READING: Record<StrategyKind, string> = {
   stabilized: "An operating asset bought for its in-place income; NOI ÷ price is the going-in cap.",
   value_add: "In-place income plus a renovation program; the stabilized NOI belongs over price plus the budget, not over price alone.",
-  lease_up: "Largely vacant space to be leased; little in-place income, so the stabilized NOI is a forward figure over total cost.",
+  // "Any": a lease-up's memorandum may state none (research pass 37).
+  lease_up: "Largely vacant space to be leased; little in-place income, so any stabilized NOI is a forward figure over total cost.",
   conversion: "A change of use with construction and downtime first; expect little or no NOI through the works, and read the stabilized NOI as a yield on total cost.",
   development: "Ground-up or to-be-built; there is no in-place income, only a budget, a timeline and a stabilized pro forma.",
   unknown: "",
@@ -154,6 +157,38 @@ const RX = {
 const IDENTITY_ROW =
   /year (built|renovated|completed|constructed|of construction)|(built|renovated|completed|constructed) (in|year|date)|renovation (year|date)|vintage/i;
 
+// A building the deal's own words call vacant, or offer to an owner-user —
+// never vacant land, a lot or a site, which is no building to lease, and
+// never a vacant part of a building ("two vacant suites"), which says the
+// rest is let.
+const VACANT_OR_OWNER_USER =
+  /\bvacant\b(?![\s-]+(?:land|lots?|parcels?|sites?|acre(?:s|age)?|pads?|units?|suites?|apartments?|floors?|bays?|homes?|keys?|rooms?|beds?|spaces?|storefronts?|positions?))|\bowner[\s/-]*(?:users?|occupants?)\b/i;
+
+/**
+ * Whether the deal is a building with no income today (research pass 37):
+ * no in-place or Year-1 NOI stated, and either a stated in-place occupancy of
+ * 0%, or — where no occupancy is stated — the deal's own words (its name, its
+ * plan, the buyer's notes, the first read's) calling it vacant or offering it
+ * to an owner-user. A stated occupancy above 0% says the building has
+ * tenants, whatever the words; where a lease-up begins above 0% is the
+ * owner's call. Land is no building to lease.
+ */
+function noIncomeToday(
+  extraction: ExtractionResult | null,
+  signal?: { take?: string; dealName?: string | null } | null,
+): boolean {
+  if (!extraction) return false;
+  const metrics = extraction.metrics ?? [];
+  if (noiFigures(metrics).some((f) => f.kind === "in_place" || f.kind === "year1")) return false;
+  if (!assetWords(extraction.assetClass).operating) return false;
+  const occupied = occupancyPctFromMetrics(metrics);
+  if (occupied != null) return occupied === 0;
+  const words = [extraction.dealName, extraction.assetClass, extraction.strategy?.summary, extraction.buyerNotes, signal?.take, signal?.dealName]
+    .filter((w): w is string => typeof w === "string" && w.trim() !== "")
+    .join(" \n ");
+  return VACANT_OR_OWNER_USER.test(words);
+}
+
 function haystack(
   extraction: ExtractionResult | null,
   signal?: { take?: string; dealName?: string | null } | null,
@@ -211,6 +246,10 @@ export function inferStrategy(
   // A land sale — a land or site price and no income figure — is a
   // development, not an operating asset with no price.
   else if (hasMetrics && isLandOnly(extraction?.metrics ?? [], screenYearOf(extraction))) kind = "development";
+  // A building with no income today — stated 0% occupied, or called vacant
+  // or offered to an owner-user in the deal's own words — and no in-place or
+  // Year-1 NOI is a lease-up, not an operating asset (research pass 37).
+  else if (hasMetrics && noIncomeToday(extraction, signal)) kind = "lease_up";
   else if (hasMetrics) kind = "stabilized";
   else return { kind: "unknown", label: STRATEGY_LABEL.unknown, summary: "", source: "none" };
 
@@ -1463,13 +1502,23 @@ export function assessPlausibility(
   //    price row runs too).
   findings.push(...costFindings(extraction, strategy, price, priceWord));
 
-  // 5. A stabilized deal with no income in place reads as something else.
+  // 5. A stabilized deal with no income in place reads as something else —
+  //    a stated NOI of nothing, or (research pass 37) a stated in-place
+  //    occupancy of 0% with no in-place NOI stated beside it.
+  const noIncomeDetail = `An operating asset produces income. Either this is a lease-up, conversion or development the deck does not name plainly, or the figure was misread. Settle the strategy first — every return depends on it.`;
   if (strategy.kind === "stabilized" && going && going.value <= 0) {
     findings.push({
       code: "no_income_in_place",
       severity: "medium",
       title: `${going.label} is ${money(going.value)} on a deal read as stabilized`,
-      detail: `An operating asset produces income. Either this is a lease-up, conversion or development the deck does not name plainly, or the figure was misread. Settle the strategy first — every return depends on it.`,
+      detail: noIncomeDetail,
+    });
+  } else if (strategy.kind === "stabilized" && !figs.some((f) => f.kind === "in_place") && occupancyPctFromMetrics(metrics) === 0) {
+    findings.push({
+      code: "no_income_in_place",
+      severity: "medium",
+      title: `${occupancyRow(metrics)?.label.trim() || "Occupancy"} is 0% and no in-place NOI is stated, on a deal read as stabilized`,
+      detail: noIncomeDetail,
     });
   }
 
@@ -1563,6 +1612,31 @@ const FORWARD_PLAN_TEXT =
   "A FORWARD PURCHASE: the buyer pays the price at delivery and the developer funds the works, so the buyer carries no construction — no budget, no carry through the works, no interest reserve and no construction or bridge loan of its own; the price is the buyer's whole cost. The NOI the memorandum states at delivery is the delivered building's figure, not today's income: test it against today's leased comparables, and judge the purchase on its yield at delivery against the exit cap, on the clock to delivery against the outside date, and on the deposit at risk before delivery — never on a going-in cap on a building that stands.";
 
 /**
+ * A lease-up's paragraph in place of `PLAN_TEXT` (research pass 37): the
+ * building stands and the plan is the leasing, so a stabilized NOI and a
+ * budget are spoken of only where the memorandum states them — each one it
+ * does not state is said to be not stated, never tested as if it were. Where
+ * the plan's figures do not all tie (`untied`), its stabilized NOI is never
+ * called "not a misread", as `PLAN_TEXT_UNTIED` says for any plan.
+ */
+function leaseUpPlanText(plan: PlanSummary | null, untied = false): string {
+  const noi = plan?.stabilizedNoi != null;
+  return [
+    noi
+      ? untied
+        ? "The stabilized NOI is the sponsor's pro forma for the building once it is leased, not today's income: struck over the acquisition price alone it reads as a cap the building does not earn today. But the plan's figures do not all tie, as said here, so it or the cost it is set against may be a misread: check both against their source pages before judging the plan on them."
+        : "The stabilized NOI is the sponsor's pro forma for the building once it is leased — not a misread and not today's income: struck over the acquisition price alone it reads as a cap the building does not earn today."
+      : "The memorandum states no stabilized NOI, so there is no pro forma for the leased building to test and no yield on cost to judge, and none is built here.",
+    plan?.budget != null
+      ? "Test the budget it states — the tenant improvements, the commissions, any renovation — and its schedule against comparable lease-ups."
+      : "Nor does it state a construction, renovation or leasing budget: ask for the tenant improvements, the commissions and the downtime the lease-up will cost before any rent is paid.",
+    noi
+      ? "Test whether the stabilized NOI is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the carry and any income through the lease-up, and the yield on total cost against the exit cap and against the cost of debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price."
+      : "Judge the plan on the time and the cost of leasing the building and on the carry until it is let — never on a going-in cap on the acquisition price.",
+  ].join(" ");
+}
+
+/**
  * The strategy, the plan's figures and the findings as one paragraph for the
  * challenger and the verdict. Empty when there is nothing to say: a clean
  * stabilized deal.
@@ -1587,14 +1661,19 @@ export function plausibilityNote(
     // construction, so the construction paragraph a development gets is the
     // purchase's own — the facts and traps by name follow in the
     // challenger's notes (lib/forward-purchase `forwardNote`).
-    // "Not a misread" only where no finding stands and no yield on cost was
-    // refused past the ceiling (research pass 38).
+    // A lease-up's building stands (research pass 37): its paragraph is the
+    // leasing's, and never speaks of a stabilized NOI or a budget the
+    // memorandum does not state. "Not a misread" only where no finding
+    // stands and no yield on cost was refused past the ceiling (research
+    // pass 38), on a lease-up as on any plan.
     bits.push(
       plan?.forward || isForwardPurchase(extraction, strategy)
         ? FORWARD_PLAN_TEXT
-        : findings.length > 0 || plan?.yieldWithheld
-          ? PLAN_TEXT_UNTIED
-          : PLAN_TEXT,
+        : strategy.kind === "lease_up"
+          ? leaseUpPlanText(plan, findings.length > 0 || !!plan?.yieldWithheld)
+          : findings.length > 0 || plan?.yieldWithheld
+            ? PLAN_TEXT_UNTIED
+            : PLAN_TEXT,
     );
   }
   if (findings.length) {

@@ -45,6 +45,66 @@ describe("deriveUnderwriteInputs — NOI anchor", () => {
   });
 });
 
+// Research pass 37: a vacant 42,000 SF office stated "Occupancy 0%" and no
+// NOI, and the note said "No NOI or cap in the OM — assumed 6% going-in"
+// beside a rent line of $92.7M a year; 22 acres of farmland in rezoning read
+// the same. The notes now say what the 6% is. Words only: every figure is the
+// model's as before (the model on such deals is the owner's call).
+describe("deriveUnderwriteInputs — a building with no income today, and land, say the 6% is a placeholder", () => {
+  const office = (occupancy: string | null, over: Partial<ExtractionResult> = {}): ExtractionResult => ({
+    dealName: "1200 Corporate Drive",
+    assetClass: "Office",
+    metrics: [
+      { label: "Asking price", value: "8,500,000", flagged: false, page: "p. 2" },
+      { label: "Total SF", value: "42,000 SF", flagged: false, page: "p. 2" },
+      ...(occupancy != null ? [{ label: "Occupancy", value: occupancy, flagged: false, page: "p. 3", basis: "in_place" as const }] : []),
+      { label: "Year built", value: "1999", flagged: false, page: "p. 3" },
+    ],
+    ...over,
+  });
+
+  it("a building stated 0% occupied with no NOI: no income in place, the 6% a placeholder, and its rent line no building's rent", () => {
+    const d = deriveUnderwriteInputs(office("0%"), "x");
+    expect(d.sources.inPlaceRentAnnual?.provenance).toBe("assumption");
+    expect(d.sources.inPlaceRentAnnual?.note).toBe(
+      "The memorandum states the building 0% occupied and no NOI: no income is in place, and the 6% is a placeholder. The $92.7M of gross potential rent on this line is backed out of that placeholder at the stated 0% occupancy, which the model runs as a 99% vacancy — it is no building's rent",
+    );
+    // The figures are the model's as before: the 6% NOI, grossed up through 99%.
+    expect(computeUnderwrite(d.inputs).cashFlow[0].noi).toBeCloseTo(510_000, 0);
+    expect(d.inputs.vacancyPct).toBeCloseTo(0.99, 6);
+    expect(d.inputs.inPlaceRentAnnual).toBeCloseTo(92_727_273, -1);
+    // Above 0% the note is as it was: where a lease-up begins is the owner's call.
+    expect(deriveUnderwriteInputs(office("15%"), "x").sources.inPlaceRentAnnual?.note).toBe("No NOI or cap in the OM — assumed 6% going-in");
+    expect(deriveUnderwriteInputs(office(null), "x").sources.inPlaceRentAnnual?.note).toBe("No NOI or cap in the OM — assumed 6% going-in");
+  });
+
+  it("land with no NOI: the 6% and the loan beside it are placeholders, and the returns are not the land's", () => {
+    const land: ExtractionResult = {
+      dealName: "Cypress Creek 22-acre site",
+      assetClass: "Land",
+      strategy: { kind: "development", summary: "22.4-acre site in rezoning to a planned unit development", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Land price", value: "14,500,000", flagged: false, page: "p. 2" },
+        { label: "Acres", value: "22.4", flagged: false, page: "p. 2" },
+      ],
+    };
+    const d = deriveUnderwriteInputs(land, "x");
+    expect(d.sources.inPlaceRentAnnual?.note).toBe("Land earns no income: the 6% and the loan beside it are placeholders, and the returns are not the land's");
+    expect(computeUnderwrite(d.inputs).cashFlow[0].noi).toBeCloseTo(14_500_000 * 0.06, 0);
+    // The land under a ground lease earns its ground rent: not said to earn nothing.
+    const leasedFee = deriveUnderwriteInputs(
+      {
+        ...land,
+        strategy: undefined,
+        interest: { kind: "leased_fee", summary: "", share: "", groundLease: "Ground lease to 2071", loan: "", page: "" },
+        metrics: [{ label: "Asking price", value: "$10,000,000", flagged: false, page: "p. 2" }, { label: "Ground rent", value: "$600,000", flagged: false, page: "p. 4" }],
+      },
+      "x",
+    );
+    expect(leasedFee.sources.inPlaceRentAnnual?.note).not.toContain("Land earns no income");
+  });
+});
+
 // Research pass 28: a skilled-nursing deck stating "EBITDAR (T-12) $2.8M",
 // or a car wash stating its EBITDA, ran on "No NOI or cap in the OM —
 // assumed 6% going-in" — a note that read as if the memorandum stated no

@@ -14,6 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
+import { compactUsd } from "@/lib/money";
 import {
   entityLoanOf,
   groundRentOf,
@@ -912,6 +913,9 @@ export function deriveUnderwriteInputs(
   // What the year-1 NOI was read from, in words — a leased fee's price note
   // says it, beside the ground rent the model does not read.
   let noiRead: string;
+  // A building the memorandum states 0% occupied with no NOI, its year-1 NOI
+  // the 6% placeholder: the rent line's note says what its rent is, below.
+  let noIncomeInPlace = false;
   if (t12Noi != null) {
     noi = t12Noi;
     noiRead = "the T-12's actual NOI";
@@ -976,14 +980,27 @@ export function deriveUnderwriteInputs(
     const earnings = ebitda
       ? `The OM states the business's ${ebitda.label} of $${Math.round(ebitda.value).toLocaleString("en-US")}, which is not the real estate's NOI and is not used`
       : "";
+    // Land, which earns no income, and a building the memorandum states 0%
+    // occupied with no NOI (research pass 37): the 6% is said to be a
+    // placeholder, never an assumption about income the memorandum
+    // describes. Words only — the model's figures stand (the owner's call).
+    // A leased fee's land earns its ground rent, and a rent roll's occupancy
+    // outranks the memorandum's.
+    const noneStated = !skipped && !earnings && interest.kind !== "leased_fee";
+    const landNoIncome = noneStated && !assetWords(extraction?.assetClass).operating;
+    noIncomeInPlace = noneStated && !landNoIncome && rrOcc == null && occupancyPctFromMetrics(metrics) === 0;
     mark(
       "inPlaceRentAnnual",
       "assumption",
-      skipped
-        ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI${earnings ? `. ${earnings}` : ""}`
-        : earnings
-          ? `${earnings}; with no NOI or cap in the OM, the model assumed 6% going-in`
-          : "No NOI or cap in the OM — assumed 6% going-in",
+      landNoIncome
+        ? "Land earns no income: the 6% and the loan beside it are placeholders, and the returns are not the land's"
+        : noIncomeInPlace
+          ? "The memorandum states the building 0% occupied and no NOI: no income is in place, and the 6% is a placeholder"
+          : skipped
+            ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI${earnings ? `. ${earnings}` : ""}`
+            : earnings
+              ? `${earnings}; with no NOI or cap in the OM, the model assumed 6% going-in`
+              : "No NOI or cap in the OM — assumed 6% going-in",
     );
   }
 
@@ -1117,6 +1134,16 @@ export function deriveUnderwriteInputs(
   const pgr = egr / (1 - vacancy);
   const inPlaceRentAnnual = pgr;
   const operatingExpenses = egr - noi; // = expenseRatio × EGR
+  // On a building with no income in place the rent line is the placeholder
+  // grossed up through the vacancy the stated 0% occupancy is run at — said,
+  // with its figure, as no building's rent (research pass 37: $92.7M a year on
+  // a vacant 42,000 SF office). Words only; the figure stands.
+  if (noIncomeInPlace && sources.inPlaceRentAnnual) {
+    sources.inPlaceRentAnnual = {
+      ...sources.inPlaceRentAnnual,
+      note: `${sources.inPlaceRentAnnual.note}. The ${compactUsd(pgr)} of gross potential rent on this line is backed out of that placeholder at the stated 0% occupancy, which the model runs as ${withArticle(`${Math.round(vacancy * 100)}% vacancy`)} — it is no building's rent`,
+    };
+  }
 
   // ── The rate ──────────────────────────────────────────────────────────
   // The index is a fact and the spread is a judgment (lib/debt-index): with
