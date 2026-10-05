@@ -226,15 +226,18 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   }
   if (tag) {
     const range = row ? priceRange(row.value) : null;
+    // A tenancy in common is title to the property, not a share of an
+    // entity: its percentage is an undivided interest's (research pass 41).
+    const share = isTenancyInCommon(ex) ? "interest" : "share";
     const what = allInterests
       ? "the price for all of the owning entity's interests, nothing grossed up"
       : sharePct != null
-        ? `the whole the ${shareText(sharePct)} share's price implies`
+        ? `the whole the ${shareText(sharePct)} ${share}'s price implies`
         : range
           ? "the top of the price range the OM states, the end that does not flatter a return"
           : "the asking price";
     const over = words.basis === "sf" ? "the building's area" : `the OM's ${noun.one} count`;
-    const never = sharePct != null && !allInterests ? " The share's own price over the whole building is no basis." : "";
+    const never = sharePct != null && !allInterests ? ` The ${share}'s own price over the whole building is no basis.` : "";
     return `THE BUILDING'S BASIS, computed in code: ${tag} — ${what}, over ${over}.${never} Build the basis range on this figure.`;
   }
   const price = row ? parsePrice(row.value) : null;

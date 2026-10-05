@@ -1654,7 +1654,11 @@ function planFiguresSaidByContext(plan: PlanSummary): { noi: boolean; costAndYie
  *  plainly what is not. With `contextSays`, only what the deal context beside
  *  it does not state: the price and the budget, and each figure it leaves
  *  out. */
-function planLine(plan: PlanSummary, contextSays = false): string {
+function planLine(plan: PlanSummary, contextSays = false, extraction: ExtractionResult | null = null): string {
+  // A figure's own words end without a period: the parts are joined by
+  // semicolons and the line closes with one (research pass 41: "as units
+  // turn.." and "2030.;").
+  const bare = (t: string) => t.trim().replace(/[.\s]+$/, "");
   const said = contextSays ? planFiguresSaidByContext(plan) : null;
   const parts: string[] = [];
   // A forward purchase's NOI is the one the memorandum states at delivery,
@@ -1672,7 +1676,7 @@ function planLine(plan: PlanSummary, contextSays = false): string {
   const shown = plan.price ?? plan.equityWhole ?? null;
   parts.push(
     shown != null
-      ? `${shareWhole ? "whole price, the share's grossed up," : "price"} ${money(shown)}${
+      ? `${shareWhole ? `whole price, the ${isTenancyInCommon(extraction) ? "interest's" : "share's"} grossed up,` : "price"} ${money(shown)}${
           plan.entityLoan != null
             ? ` (the equity's whole, not the asset's: ${
                 plan.loanOnProperty ? `the stated ${money(plan.entityLoan)} loan on the property` : `the entity's stated ${money(plan.entityLoan)} loan`
@@ -1716,8 +1720,8 @@ function planLine(plan: PlanSummary, contextSays = false): string {
   if (plan.yieldWithheld && !said) parts.push(plan.yieldWithheld.replace(/\.$/, "").replace(/^No /, "no "));
   // …and where none is struck on the equity's whole, the page's sentence why.
   if (plan.costWithheld && !said) parts.push(plan.costWithheld.replace(/\.$/, "").replace(/^No /, "no "));
-  if (!said?.timeline) parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
-  if (plan.capitalBudgetText) parts.push(`budget as worded: ${plan.capitalBudgetText}`);
+  if (!said?.timeline) parts.push(plan.timeline ? `timeline: ${bare(plan.timeline)}` : "timeline to stabilization not stated");
+  if (plan.capitalBudgetText) parts.push(`budget as worded: ${bare(plan.capitalBudgetText)}`);
   return parts.join("; ");
 }
 
@@ -1824,13 +1828,14 @@ export function plausibilityNote(
       // where that summary is not this very sentence.
       if (strategy.summary !== reading) bits.push(`DEAL STRATEGY: ${reading}`);
     } else {
+      // The type and its summary end their own sentence before the reading.
       const summary =
         strategy.summary && strategy.summary !== reading && strategy.summary !== STRATEGY_READING[strategy.kind]
-          ? ` — ${strategy.summary}`
+          ? ` — ${strategy.summary.trim().replace(/[.\s]+$/, "")}`
           : "";
-      bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary} ${reading}`);
+      bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary}. ${reading}`);
     }
-    const figures = plan ? planLine(plan, contextSaysPlan) : "";
+    const figures = plan ? planLine(plan, contextSaysPlan, extraction) : "";
     if (figures) bits.push(`THE PLAN AS THE OM STATES IT: ${figures}.`);
     // A forward purchase (research pass 28): the buyer carries no
     // construction, so the construction paragraph a development gets is the

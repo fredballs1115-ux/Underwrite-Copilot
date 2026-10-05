@@ -202,7 +202,10 @@ export function dealContextFor(
   const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   // Whose strategy it is on a note or a leased fee (the deal header's own
   // label): the steps read the type as the collateral's, never the price's.
-  const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
+  // The summary ends its own sentence (research pass 41: a summary with no
+  // period of its own ran into "The OM's NOI at delivery…").
+  const summary = strategy.summary.trim().replace(/[.\s]+$/, "");
+  const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${summary ? ` — ${summary}.` : "."}`];
   if (plan?.stabilizedNoi && plan.forward) {
     // A forward purchase's NOI is the one stated at delivery (on a
     // build-to-suit the lease's first year), over the price the buyer pays
@@ -243,10 +246,13 @@ export function dealContextFor(
     // In the class's own noun (lib/asset-words): a hotel's plan is costed
     // per key, a student deal's per bed.
     const noun = assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" };
+    // What the price alone buys, by the kind of plan: a development's land,
+    // a conversion's shell, and a value-add's or a lease-up's standing
+    // building — never "the shell's" there (research pass 41).
+    const priceAlone =
+      plan.kind === "development" ? "the land price" : plan.kind === "conversion" ? "the shell's price" : "the price alone";
     lines.push(
-      `Total cost is ${compact(plan.costPerUnit)} per planned ${noun.one} (${plan.units.toLocaleString("en-US")} ${noun.many}) — the basis to hold sale comps and per-${noun.one} norms against, never the ${
-        plan.kind === "development" ? "land" : "shell's"
-      } price.`,
+      `Total cost is ${compact(plan.costPerUnit)} per planned ${noun.one} (${plan.units.toLocaleString("en-US")} ${noun.many}) — the basis to hold sale comps and per-${noun.one} norms against, never ${priceAlone}.`,
     );
   }
   if (plan?.timeline) lines.push(`Timeline as stated: ${plan.timeline.replace(/\.\s*$/, "")}.`);

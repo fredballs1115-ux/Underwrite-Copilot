@@ -371,6 +371,60 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(renoBrief).toContain("THE PLAN AS THE OM STATES IT: stabilized NOI not stated; price $20.0M; $2.0M (Renovation budget); total cost $22.0M; timeline to stabilization not stated.");
   });
 
+  // Research pass 41 (L6): a summary with no period ran into the next
+  // sentence, the plan's own words closed twice ("as units turn.." and
+  // "2030.;"), a value-add's basis said "never the shell's price", and a
+  // tenancy in common was called a share.
+  it("closes each of the plan's own sentences once, and names what the price alone buys", () => {
+    const reno = base({
+      strategy: {
+        kind: "value_add",
+        summary: "Renovate the 200 classic units",
+        capitalBudget: "$3,000,000 interior program, stabilized in 2030.",
+        timeline: "Renovation over 36 months as units turn.",
+      },
+      metrics: [m("Asking price", "$20,000,000"), m("Units", "200"), m("NOI (in-place)", "$1,200,000", "in_place"), m("Renovation budget", "$3,000,000")],
+    });
+    const alone = buildBrief({ extraction: reno, ...none });
+    expect(alone).toContain("DEAL STRATEGY: Value-add — Renovate the 200 classic units. In-place income");
+    expect(alone).toContain("timeline: Renovation over 36 months as units turn; budget as worded: $3,000,000 interior program, stabilized in 2030.");
+    expect(alone).not.toContain("..");
+    expect(alone).not.toContain(".;");
+    const context = dealContextFor(reno)!;
+    expect(context).toContain("Deal type: Value-add — Renovate the 200 classic units. ");
+    expect(context).toContain("never the price alone.");
+    expect(context).not.toContain("shell's");
+  });
+
+  it("calls a tenancy in common's percentage an interest, never a share", () => {
+    const tic = {
+      kind: "partial_interest" as const,
+      summary: "An undivided 30% tenant-in-common interest in the fee simple of a medical office building",
+      share: "30% tenant-in-common interest",
+      groundLease: "",
+      loan: "",
+      page: "p. 2",
+    };
+    const held = base({
+      assetClass: "Medical Office",
+      interest: tic,
+      metrics: [m("Asking price", "$4,200,000"), m("Total SF", "48,000 SF"), m("NOI (in-place)", "$980,000", "in_place")],
+    });
+    const basis = section(briefOf(held));
+    expect(basis).toContain("the whole the 30% interest's price implies");
+    expect(basis).toContain("The interest's own price over the whole building is no basis.");
+    expect(basis).not.toContain("share's");
+    const works = base({
+      assetClass: "Medical Office",
+      interest: tic,
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$4,200,000"), m("Total SF", "48,000 SF"), m("NOI (in-place)", "$980,000", "in_place"), m("Renovation budget", "$500,000")],
+    });
+    const plan = buildBrief({ extraction: works, ...none });
+    expect(plan).toContain("whole price, the interest's grossed up, $14.0M");
+    expect(plan).not.toContain("the share's grossed up");
+  });
+
   it("a plan deal's basis is its total cost a planned unit, never the land's price", () => {
     const dev = base({
       dealName: "Riverside — ground-up development site, fully entitled",

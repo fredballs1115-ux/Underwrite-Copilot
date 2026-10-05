@@ -648,10 +648,11 @@ describe("plausibilityNote", () => {
       const s = inferStrategy(e);
       return plausibilityNote([], s, planSummary(e, s), e);
     };
-    expect(noteFor("note")).toMatch(/^DEAL STRATEGY: Value-add \(the collateral\) /);
-    expect(noteFor("leased_fee")).toMatch(/^DEAL STRATEGY: Value-add \(the leaseholder's building\) /);
+    // The type ends its own sentence before the reading (research pass 41).
+    expect(noteFor("note")).toMatch(/^DEAL STRATEGY: Value-add \(the collateral\)\. In-place income/);
+    expect(noteFor("leased_fee")).toMatch(/^DEAL STRATEGY: Value-add \(the leaseholder's building\)\. /);
     // A price that buys the building keeps the label as it stands.
-    expect(noteFor("fee_simple")).toMatch(/^DEAL STRATEGY: Value-add /);
+    expect(noteFor("fee_simple")).toMatch(/^DEAL STRATEGY: Value-add\. /);
     expect(noteFor("fee_simple")).not.toMatch(/\(the /);
   });
 
