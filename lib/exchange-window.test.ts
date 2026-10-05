@@ -23,7 +23,7 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     );
     const partnership = w("2026-10-01", { filer: "partnership" });
     expect(partnership).toMatchObject({ closeBy: "2027-03-15", cutShort: true });
-    expect(partnership.sentence).toContain("close by Mar 15, 2027 — the Form 1065 return is due Mar 15, 2027, which ends it before the 180th day unless the return is extended.");
+    expect(partnership.sentence).toContain("close by Mar 15, 2027 — a calendar-year Form 1065 return is due Mar 15, 2027, which ends it before the 180th day unless the return is extended.");
     expect(w("2026-10-01", { filer: "s_corporation" }).closeBy).toBe("2027-03-15");
     expect(w("2026-12-20", { filer: "c_corporation" })).toMatchObject({ returnDueBy: "2027-04-15", closeBy: "2027-04-15", cutShort: true });
     expect(w("2026-12-20", { filer: "trust" }).form).toBe("Form 1041");
@@ -80,6 +80,10 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
       'The price buys a leasehold with 22 years left, 20 more in its options as stated. The regulation\'s example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"; whether this one counts, its options included or not, is a question for your exchange counsel.',
     );
     expect(exchangeFit(x, { offersDueIso: null, interestKind: "leasehold", leaseYearsLeft: 45 })!.flags).toEqual([]);
+    // Under a year left is said as that, never "0 years" (the batch-2 audit).
+    expect(exchangeFit(x, { offersDueIso: null, interestKind: "leasehold", leaseYearsLeft: 0.6 })!.flags[0].text).toMatch(
+      /^The price buys a leasehold with under a year left\./,
+    );
     expect(exchangeShortLine(x, note)).toBe(
       "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; the price buys a loan secured by the building, not the building. Section 1031 reaches only real property exchanged for real property of like kind; whether a note counts is a question for your exchange counsel",
     );

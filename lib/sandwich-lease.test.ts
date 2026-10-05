@@ -81,6 +81,10 @@ describe("a sandwich position's spread and term (pass 28, round 9)", () => {
     expect(one.masterRent).toBe(1_100_004);
     expect(one.spread).toBeNull();
     expect(one.headline).toContain("the memorandum states no sublease income beside it, so the spread is not read.");
+    // A month's figure, read as twelve, is said so — never "as stated" (the
+    // batch-2 audit); a year's figure is as stated.
+    expect(one.headline).toContain("The master rent is $1.10M a year, twelve times the month the memorandum states;");
+    expect(readSandwichLease(deal([row("Master lease rent", "$1,100,000")]), TODAY)!.headline).toContain("$1.10M a year, as stated;");
     expect(one.headline).toContain("The memorandum states no end for the master lease, so the years the position has are not read");
     expect(annualOf("$22.50/SF")).toBeNull();
     expect(annualOf("$1.0M - $1.2M")).toBeNull();
@@ -98,6 +102,24 @@ describe("a sandwich position's spread and term (pass 28, round 9)", () => {
 
   it("leads the key terms with the two rents and the master lease's end", () => {
     expect(sandwichTermRows(SANDWICH.metrics).map((m) => m.label)).toEqual(["Master lease rent", "Sublease income", "Master lease expiration", "Master lease options"]);
+    // A date and a count of years left are one end: the options still come
+    // (the batch-2 audit).
+    const both = deal([
+      row("Master lease rent", "$1,100,000"),
+      row("Master lease expiration", "December 31, 2041"),
+      row("Master lease term remaining", "15 years"),
+      row("Master lease options", "Two 5-year options"),
+    ]);
+    expect(sandwichTermRows(both.metrics).map((m) => m.label)).toEqual(["Master lease rent", "Master lease expiration", "Master lease options"]);
+  });
+
+  it("says subleases that bring in exactly the master rent as no spread, never a shortfall of $0 (the batch-2 audit)", () => {
+    const even = deal([row("Master lease rent", "$1,100,000"), row("Sublease income", "$1,100,000")]);
+    const r = readSandwichLease(even, TODAY)!;
+    expect(r.spread).toBe(0);
+    expect(r.headline).toContain("The subleases bring in exactly the $1.10M master rent: the position has no spread before its own costs.");
+    expect(r.headline).not.toMatch(/\$0\b/);
+    expect(sandwichTag(even, TODAY)).toBe("Subleases equal the master rent");
   });
 
   it("says the model capitalises the position as if it ran forever, and where it ends against the sale", () => {

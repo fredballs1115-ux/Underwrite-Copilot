@@ -135,7 +135,10 @@ export function SandwichPanel({
         </div>
       )}
 
-      {term && (
+      {/* The master lease's term against the model's hold, where the page has
+          the model. Without it the bar would be the interest panel's own,
+          drawn just above — the shared screen drew the same bar twice. */}
+      {term && holdYears != null && holdYears > 0 && (
         <div className="mt-3" data-qa="sandwich-term">
           <LeaseTermBar
             yearsLeft={term.yearsLeft}

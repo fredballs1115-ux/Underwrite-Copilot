@@ -153,7 +153,7 @@ export function exchangeWindow(block: ExchangeBlock | null | undefined, asOf: Da
 function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
   const from = `from the ${exchangeDay(w.transferOn)} transfer`;
   const cut = w.cutShort
-    ? ` — ${w.filer ? "the" : "an individual's"} ${w.form} return is due ${exchangeDay(w.returnDueBy)}, which ends it before the 180th day unless the return is extended`
+    ? ` — ${w.filer ? "a calendar-year" : "an individual's"} ${w.form} return is due ${exchangeDay(w.returnDueBy)}, which ends it before the 180th day unless the return is extended`
     : w.extended
       ? " — the return is extended, so the full 180 days"
       : "";
@@ -243,10 +243,12 @@ export function exchangeFit(
     });
   } else if (deal.interestKind === "leasehold" && deal.leaseYearsLeft != null && deal.leaseYearsLeft < 30) {
     const left = Math.floor(deal.leaseYearsLeft);
+    // Under a year left is said as that, never "0 years" (the batch-2 audit).
+    const leftWords = left < 1 ? "under a year" : `${left} ${left === 1 ? "year" : "years"}`;
     const opts = deal.leaseOptionYears && deal.leaseOptionYears > 0 ? `, ${Math.round(deal.leaseOptionYears)} more in its options as stated` : "";
     flags.push({
       kind: "short_leasehold",
-      text: `The price buys a leasehold with ${left} ${left === 1 ? "year" : "years"} left${opts}. The regulation's example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"; whether this one counts, its options included or not, is ${ASK}.`,
+      text: `The price buys a leasehold with ${leftWords} left${opts}. The regulation's example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"; whether this one counts, its options included or not, is ${ASK}.`,
     });
   }
   const tag = flags.length

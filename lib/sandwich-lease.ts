@@ -52,6 +52,10 @@ export const MASTER_RENT_ROW = /^\s*(?:annual\s+|current\s+|in[- ]place\s+)?mast
 export const SUBLEASE_INCOME_ROW =
   /^\s*(?:annual\s+|current\s+|in[- ]place\s+)?(?:sub[\s-]?lease|subtenant|sub[\s-]?tenant)\s+(?:income|rents?|revenues?)\b(?!\s+(?:increases?|escalations?|per)\b)/i;
 const MASTER_TERM_ROW = /^\s*master[\s-]+lease\s+(?:expir|term|end|options?|extension|renewal)/i;
+/** A row's figure stated a month at a time (lib/mixed-use's own words). */
+const MONTH_WORDS = /\/\s*mo(?:nth)?\b|\bper\s+month\b|\bmonthly\b|\ba\s+month\b/i;
+/** A master-lease term row that is its options, not its end. */
+const MASTER_OPTIONS_ROW = /options?|extension|renewal/i;
 
 /** A year's rent or income from a row's words, the figure before any
  *  clause that follows it ("$1,100,000 a year, increasing 2% annually");
@@ -74,6 +78,9 @@ export interface SandwichRead {
   cushionPct: number | null;
   /** the master lease's term, read on the day (lib/ground-lease-term) */
   term: GroundLeaseTerm | null;
+  /** a rent the memorandum states a month at a time, read as twelve */
+  masterRentFromMonth?: boolean;
+  subleaseIncomeFromMonth?: boolean;
   termLine: string;
   /** the stated NOI, where it is more than the spread — it counts income
    *  beyond the subleases, or comes before the master rent */
@@ -99,9 +106,17 @@ const pctWhole = (n: number) => `${Math.round(n)}%`;
 export function readSandwichLease(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): SandwichRead | null {
   if (!ex || !isMasterLeasehold(ex)) return null;
   const rows = (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_STATED.test(m.value.trim()));
+  const rowOf = (re: RegExp) => rows.find((m) => re.test(m.label) && !NOT_TODAY.test(m.label));
   const yearOf = (re: RegExp) => {
-    const r = rows.find((m) => re.test(m.label) && !NOT_TODAY.test(m.label));
+    const r = rowOf(re);
     return r ? annualOf(r.value) : null;
+  };
+  // A rent the memorandum states a month at a time is read as twelve of
+  // them, and said so — never "as stated" (the batch-2 audit). The month
+  // words are lib/mixed-use `annualIncomeOf`'s own.
+  const monthly = (re: RegExp) => {
+    const r = rowOf(re);
+    return !!r && MONTH_WORDS.test(r.value);
   };
   const masterRent = yearOf(MASTER_RENT_ROW);
   const subleaseIncome = yearOf(SUBLEASE_INCOME_ROW);
@@ -124,6 +139,8 @@ export function readSandwichLease(ex: ExtractionResult | null | undefined, asOf:
     term,
     termLine: term ? groundLeaseTermLine(term, "master lease") : "",
     noiOverSpread,
+    masterRentFromMonth: masterRent != null && monthly(MASTER_RENT_ROW),
+    subleaseIncomeFromMonth: subleaseIncome != null && monthly(SUBLEASE_INCOME_ROW),
   };
   const sentences = sentencesOf(read);
   return { ...read, sentences, headline: sentences.join(" ") };
@@ -135,15 +152,17 @@ function sentencesOf(r: Omit<SandwichRead, "sentences" | "headline">): string[] 
     out.push(
       r.spread > 0
         ? `The subleases bring in ${money(r.subleaseIncome)} a year against the ${money(r.masterRent)} master rent: a spread of ${money(r.spread)}, the position's income before its own costs, the sublease income covering the master rent ${times(r.coverage)}.`
-        : `The subleases bring in ${money(r.subleaseIncome)} a year against the ${money(r.masterRent)} master rent: the position pays ${money(-r.spread)} a year more than its subtenants bring in.`,
+        : r.spread === 0
+          ? `The subleases bring in exactly the ${money(r.masterRent)} master rent: the position has no spread before its own costs.`
+          : `The subleases bring in ${money(r.subleaseIncome)} a year against the ${money(r.masterRent)} master rent: the position pays ${money(-r.spread)} a year more than its subtenants bring in.`,
     );
     if (r.cushionPct != null) {
       out.push(`The master rent is owed whatever the subtenants pay: a fall of ${pctWhole(r.cushionPct)} in the sublease income takes the whole spread.`);
     }
   } else if (r.masterRent != null) {
-    out.push(`The master rent is ${money(r.masterRent)} a year, as stated; the memorandum states no sublease income beside it, so the spread is not read.`);
+    out.push(`The master rent is ${money(r.masterRent)} a year, ${r.masterRentFromMonth ? "twelve times the month the memorandum states" : "as stated"}; the memorandum states no sublease income beside it, so the spread is not read.`);
   } else if (r.subleaseIncome != null) {
-    out.push(`The subleases bring in ${money(r.subleaseIncome)} a year, as stated; the memorandum states no master rent beside it, so the spread is not read.`);
+    out.push(`The subleases bring in ${money(r.subleaseIncome)} a year, ${r.subleaseIncomeFromMonth ? "twelve times the month the memorandum states" : "as stated"}; the memorandum states no master rent beside it, so the spread is not read.`);
   }
   if (r.term) {
     out.push(
@@ -187,7 +206,11 @@ export function sandwichModelLine(r: SandwichRead | null, m: { holdYears: number
 export function sandwichTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const r = readSandwichLease(ex, asOf);
   if (!r || r.spread == null || r.coverage == null) return null;
-  return r.spread > 0 ? `Spread ${money(r.spread)}, ${times(r.coverage)} cover` : "Subleases under the master rent";
+  return r.spread > 0
+    ? `Spread ${money(r.spread)}, ${times(r.coverage)} cover`
+    : r.spread === 0
+      ? "Subleases equal the master rent"
+      : "Subleases under the master rent";
 }
 
 /** The read in one line, for the memo, the workbook's cover and the report. */
@@ -223,5 +246,15 @@ export function sandwichNote(r: SandwichRead): string {
 export function sandwichTermRows<M extends { label: string; value: string }>(metrics: ReadonlyArray<M>): M[] {
   const rows = metrics.filter((m) => isRow(m) && !NOT_STATED.test(m.value.trim()));
   const pick = (re: RegExp) => rows.filter((m) => re.test(m.label));
-  return [...pick(MASTER_RENT_ROW).slice(0, 1), ...pick(SUBLEASE_INCOME_ROW).slice(0, 1), ...pick(MASTER_TERM_ROW).slice(0, 2)];
+  // The end and the options, one each: two end rows (a date and a count)
+  // had crowded out the options (the batch-2 audit).
+  const terms = pick(MASTER_TERM_ROW);
+  const ends = terms.filter((m) => !MASTER_OPTIONS_ROW.test(m.label));
+  const options = terms.filter((m) => MASTER_OPTIONS_ROW.test(m.label));
+  return [
+    ...pick(MASTER_RENT_ROW).slice(0, 1),
+    ...pick(SUBLEASE_INCOME_ROW).slice(0, 1),
+    ...ends.slice(0, 1),
+    ...options.slice(0, 1),
+  ];
 }

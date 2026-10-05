@@ -9476,7 +9476,7 @@ describe("SandwichPanel (lib/sandwich-lease) — the subleases against the maste
 });
 
 describe("ShareView — a sandwich position (lib/sandwich-lease)", () => {
-  it("draws the spread and the master lease's term without the model's hold or read, the two rents lead the key terms, and nothing on the sample", () => {
+  it("draws the spread without the model's hold or read, the master lease's term once (the interest panel's), the two rents lead the key terms, and nothing on the sample", () => {
     const props = {
       dealName: "Founders Plaza",
       assetClass: "auto",
@@ -9493,8 +9493,11 @@ describe("ShareView — a sandwich position (lib/sandwich-lease)", () => {
     expect(html).toContain('data-qa="sandwich-panel"');
     const panel = html.match(/<section aria-label="Sandwich position"[\s\S]*?<\/section>/)?.[0] ?? "";
     expect(panel.match(/data-bar="sandwich-spread"/g)).toHaveLength(1);
-    expect(panel.match(/data-bar="lease-term"/g)).toHaveLength(1);
+    // With no model there is no hold to draw it against, so the panel leaves
+    // the term to the interest panel above it: one bar on the page, not two.
+    expect(panel).not.toContain('data-bar="lease-term"');
     expect(panel).not.toContain('data-bar="lease-hold"');
+    expect(html.match(/data-bar="lease-term"/g)).toHaveLength(1);
     expect(text).not.toContain("The model capitalises");
     // The key terms lead with the two rents and the master lease's end,
     // ahead of the memorandum's own NOI.
