@@ -96,6 +96,7 @@ import { evalDealbreakers, scoreMandateFit, type MandateScore } from "@/lib/mand
 import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
 import { requesterOf } from "@/lib/jobs";
 import { omFingerprint } from "@/lib/om-fingerprint";
+import { READER_ROUND } from "@/lib/reader-round";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import type {
@@ -1159,7 +1160,9 @@ async function runAnalysisSteps(
           !memorandumReplacedSince(deal.qa, typeof lastScreen === "string" ? lastScreen : null, fingerprint),
       });
       // A reading kept with no stamp is stored with none, never an invented day.
-      extraction = { ...extraction, omFingerprint: fingerprint, screenedOn: stamp };
+      // The readers it was read under are this run's, whatever the day kept
+      // (lib/reader-round): a deal re-screened reads every field asked today.
+      extraction = { ...extraction, omFingerprint: fingerprint, screenedOn: stamp, readerRound: READER_ROUND };
       if (!stamp) delete extraction.screenedOn;
       await writeResult(admin, dealId, "extraction", extraction);
       // Place the deal by its address (#441): a deal uploaded with the

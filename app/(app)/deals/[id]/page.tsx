@@ -101,11 +101,14 @@ import {
   type FirstSignal,
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
+import { RetryForm } from "./deal-sections";
 import { parseFactRow, type DealFact } from "@/lib/facts";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { jobAgeMs, storedPreviousResults, verdictBehind } from "@/lib/screen-run";
+import { olderScreen } from "@/lib/older-screen";
+import { OlderScreenNote } from "./older-screen-note";
 import { documentKindWarning } from "@/lib/document-kind";
 import { sameMemorandum, sameMemorandumTail, type SameMemorandum, type TwinDeal } from "@/lib/same-memorandum";
 import { readingMemorandum } from "@/lib/screen-reading";
@@ -442,6 +445,13 @@ export default async function DealPage({
   // stores: a first screen has no previous screen's results to mark.
   const staleResults = storedPreviousResults(job, { extraction, challenges, comps, market, verdict });
   const verdictLag = verdictBehind(job);
+  // A screen stored before a reader its figures turn on (lib/older-screen):
+  // said at the head of the header's panels with the re-screen control —
+  // never on the sample or a deal typed by hand, and not while a screen is
+  // already going (its extraction lands with every field asked today) —
+  // the pipeline card's own rule (`listJobStatus`'s "running").
+  const older =
+    verdictLag === "running" ? null : olderScreen(extraction, { isSample: !!(deal as { is_sample?: boolean }).is_sample });
 
   // The call in the header and the sticky bar. While the verdict on file
   // is the previous screen's, it is drawn dashed and says so, so the header
@@ -1536,6 +1546,15 @@ export default async function DealPage({
           </>
         }
       >
+        {/* A screen stored before the site read what its figures turn on —
+            what is being sold — says so first, once, with the re-screen
+            control (lib/older-screen). */}
+        {older ? (
+          <OlderScreenNote
+            line={older.line}
+            action={<RetryForm dealId={id} label="Re-screen" className="" secondary />}
+          />
+        ) : null}
         {/* The plan, as the OM states it, when the deal is not a stabilized
             asset — it changes what every figure above means. Then anything
             that genuinely does not tie. Its basis is per the counting row's

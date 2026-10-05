@@ -35,7 +35,7 @@ import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parsePrice, priceRange, priceRangeShort, type BuyBoxCoverage } from "@/lib/criteria";
 import { compareSortValues, pipelineSortValue, type PipelineSortKey, type SortDir } from "@/lib/pipeline-sort";
-import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
+import { PERSONAL_TAG, PICTURE_TIERS, dealTags, olderScreenTag, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
 import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-deal";
 // Why a fit wears "First read": it is judged on the first signal, before the
 // extraction lands — the deal page's buy-box panel says the same, and the
@@ -135,6 +135,10 @@ export type DealCard = {
   place?: MapPlace | null;
   /** a geocoder definitively found nothing for the address */
   placeMiss?: boolean;
+  /** the screen was stored before a reader its figures turn on (lib/older-
+   *  screen): the server's sentence, worn as the "Older screen" chip on the
+   *  card's line and the row's, the sentence in its title */
+  older?: string | null;
 };
 
 // How the pipeline is drawn, and which view is remembered, live in
@@ -1808,8 +1812,11 @@ const DealRow = memo(function DealRow({
   // line of their own under the figures at every width, so a tag never
   // pushes the price, the cap or the fit off a one-line truncation — the
   // phone's line had read "$41.3M · 49% share · 5…" — and is never cut
-  // itself. A deal the reader's team does not see says so last.
-  const tags = d.personal ? [...dealTags(d.slots, d.flood), PERSONAL_TAG] : dealTags(d.slots, d.flood);
+  // itself. A screen stored before a reader its figures turn on says so
+  // after them (lib/older-screen), and a deal the reader's team does not see
+  // says so last.
+  const older = olderScreenTag(d.older);
+  const tags = [...dealTags(d.slots, d.flood), ...(older ? [older] : []), ...(d.personal ? [PERSONAL_TAG] : [])];
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -2365,10 +2372,12 @@ const DealTile = memo(function DealTile({
   const pictureTags = placed.filter((p) => p.onPicture.some(Boolean));
   const lineTags = placed.filter((p) => p.onPicture.some((on) => !on));
   const lineAt = new Map(lineTags.map((p) => [p.tag.key, p.onPicture.map((on) => !on)]));
-  // A deal the reader's team does not see says so on the line at every
+  // A screen stored before a reader its figures turn on (lib/older-screen),
+  // and a deal the reader's team does not see, say so on the line at every
   // width, after the tags; never on the picture, which carries what the
   // building's figures must not hide.
-  const lineShown = PICTURE_TIERS.map((_, k) => !!d.personal || lineTags.some((p) => !p.onPicture[k]));
+  const older = olderScreenTag(d.older);
+  const lineShown = PICTURE_TIERS.map((_, k) => !!d.personal || !!older || lineTags.some((p) => !p.onPicture[k]));
 
   const inner = (
     <>
@@ -2543,7 +2552,7 @@ const DealTile = memo(function DealTile({
           the two ask the same width. */}
       <div className="@container/card pb-3.5">
         <TagLine
-          tags={d.personal ? [...lineTags.map((p) => p.tag), PERSONAL_TAG] : lineTags.map((p) => p.tag)}
+          tags={[...lineTags.map((p) => p.tag), ...(older ? [older] : []), ...(d.personal ? [PERSONAL_TAG] : [])]}
           className={`px-4 pt-2.5 ${atTiers(lineShown).flex}`}
           chipClass={(t) => atTiers(lineAt.get(t.key) ?? []).block}
         />

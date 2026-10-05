@@ -29,6 +29,7 @@ import { scoreMandateFit } from "@/lib/mandate";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
 import { screenedAnOm } from "@/lib/onboarding";
+import { olderScreen } from "@/lib/older-screen";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -364,6 +365,11 @@ export default async function DealsPage({
         today: todayIso,
       }, box?.exchange ? { block: box.exchange, offersDue: dueById.get(d.id) ?? null } : null),
       jobStatus,
+      // A screen stored before a reader its figures turn on — what is being
+      // sold — wears "Older screen", the deal page's sentence in its title
+      // (lib/older-screen); never the sample or a deal typed by hand, and
+      // not while a re-screen is rewriting it.
+      older: jobStatus === "running" ? null : (olderScreen(extraction, { isSample: !!d.is_sample })?.line ?? null),
       // A first screen before its terms are read: an empty slot is "not
       // read yet" and shimmers, never the dash that says "not stated"
       // (lib/pipeline-slots). The fit waits with them only where a buy box

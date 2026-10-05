@@ -228,6 +228,7 @@ import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { MAX_OM_PAGES, countPdfPages } from "@/lib/pdf";
 import { incrementalRevision, testMemorandum } from "@/lib/test-memorandum";
 import { pageCapFailure } from "./document-failures";
+import { READER_ROUND } from "@/lib/reader-round";
 
 const EXTRACTION = {
   dealName: "Oakwood Flats",
@@ -251,6 +252,8 @@ const EXTRACTION = {
 const STORED_EXTRACTION = {
   ...EXTRACTION,
   omFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+  // the round of readers this run read under (lib/reader-round)
+  readerRound: READER_ROUND,
 };
 const SIGNAL = { dealName: "Oakwood Flats", assetClass: "multifamily", market: "Dallas, TX" } as unknown as FirstSignal;
 const CHALLENGES = { challenges: [], summary: "" } as unknown as ChallengerResult;
@@ -517,6 +520,7 @@ describe("runAnalysis — the happy path", () => {
       omRead: "pdf",
       screenedOn: "2026-12-31",
       omFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+      readerRound: READER_ROUND,
     });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual(COMPS);
@@ -2082,6 +2086,9 @@ describe("runAnalysis — a re-screen of the same memorandum keeps the day it wa
       vi.useRealTimers();
     }
     expect(state.deals.d1.extraction).toMatchObject({ screenedOn: "2026-11-20", omFingerprint: same });
+    // …while the readers it was read under are this run's (lib/reader-round,
+    // research pass 42): the day is the memorandum's, the round the screen's.
+    expect((state.deals.d1.extraction as { readerRound?: number }).readerRound).toBe(READER_ROUND);
 
     // The extraction on file was read from other bytes: a new reading.
     state.deals.d1.extraction = { ...EXTRACTION, screenedOn: "2026-11-20", omFingerprint: "0000000000000000" };

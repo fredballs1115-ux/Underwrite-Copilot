@@ -158,6 +158,13 @@ export interface ExtractionResult {
    *  deck changed since) keeps its first stamp — or its lack of one, and
    *  with it the 2026 reading (lib/criteria `screenStampFor`). */
   screenedOn?: string;
+  /** The round of readers the screen read under (lib/reader-round
+   *  `READER_ROUND`), stamped beside `screenedOn` by the pipeline and the
+   *  manual-deal path — never a field the model writes. Absent on an
+   *  extraction stored before the stamp (round 0), whose missing fields may
+   *  be ones its screen never asked for: lib/older-screen says so where the
+   *  absence changes what a figure means. */
+  readerRound?: number;
   /** Which memorandum this extraction was read from: the fingerprint of its
    *  bytes (lib/om-fingerprint), stamped with `screenedOn`, so a re-screen
    *  can tell the same deck from a reissued one. Absent on a deal entered by

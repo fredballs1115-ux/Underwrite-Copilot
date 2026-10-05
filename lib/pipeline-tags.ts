@@ -29,6 +29,21 @@ export type TagTone = "brand" | "caution" | "kill" | "muted";
  */
 export const PERSONAL_TAG: DealTag = { key: "personal", text: PERSONAL_CHIP, tone: "muted", title: PERSONAL_TITLE };
 
+/** The chip a deal screened before a reader its figures turn on wears
+ *  (lib/older-screen, research pass 42). */
+export const OLDER_SCREEN_CHIP = "Older screen";
+
+/**
+ * A screen stored before a reader its figures turn on — what is being sold —
+ * said on the card's line and the row's tag line, at every width, never on
+ * the picture: the chip says it briefly and its title says the server's
+ * sentence ("Screened before the site read what is being sold — re-screen to
+ * read it"). Null where the deal has none to say.
+ */
+export function olderScreenTag(line: string | null | undefined): DealTag | null {
+  return line ? { key: "older", text: OLDER_SCREEN_CHIP, tone: "caution", title: line } : null;
+}
+
 export interface DealTag {
   /** the slot it comes from, stable for a React key */
   key: string;
