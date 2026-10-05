@@ -169,19 +169,60 @@ export function noteCapSlot(
   return { ytmPct: compareInterest(ex, null, asOf).noteYtmPct, of: kind === "note" ? "note" : "position" };
 }
 
+/** Why a deal's going-in cap slot holds no cap: its price buys a loan or a
+ *  position, which have a yield of their own (`OwnYield`), or a share beside
+ *  the loan its entity carries. */
+export type CapWithheld = OwnYield | "share";
+
+/** A share's withheld cap, in the words every surface says it in. */
+export const SHARE_CAP_WORDS = {
+  na: "n/a — share",
+  title:
+    "Beside the loan its entity carries, a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
+} as const;
+
+/**
+ * Whether the memorandum's stated going-in cap may fill a deal's cap slot,
+ * read ONE way wherever the slot is drawn: the deal header and the bar that
+ * repeats it, the research panel's leverage check, the pipeline card, its
+ * list and its CSV, the meeting workbook and the compare table. Null where
+ * the stated cap stands; else why it is withheld:
+ *   - "note" and "position": the price buys a loan or a preferred equity
+ *     position, and its own yield takes the slot (`noteCapSlot`);
+ *   - "share": a share beside the loan its entity carries (lib/interest
+ *     `entityLoan`), whose price grossed up is the equity's whole, not the
+ *     building's — no cap is struck on it (the audit of 2026-10-04), and
+ *     one the memorandum states is on a basis it never says.
+ * Every other share keeps the memorandum's cap, as the header has always
+ * printed it; the compare table had left it blank where no model ran.
+ */
+export function capSlotWithheld(ex: ExtractionResult | null | undefined): CapWithheld | null {
+  if (!ex) return null;
+  const { kind, entityLoan } = interestOf(ex);
+  if (kind === "note") return "note";
+  if (kind === "preferred_equity") return "position";
+  if (kind === "partial_interest" && entityLoan != null) return "share";
+  return null;
+}
+
 /**
  * The going-in cap slot beside a deal's price in its header (and the bar
  * that repeats it): the cap as the memorandum states it — or, on a note,
  * its yield to maturity at its price where it pays or may, else the cap
- * withheld ("n/a — note", the compare table's words).
+ * withheld ("n/a — note", the compare table's words); and beside the loan
+ * a share's entity carries, the cap withheld (`capSlotWithheld`).
  */
 export function goingInCapFigure(
   ex: ExtractionResult | null | undefined,
   statedCap: string | null,
   asOf: Date = new Date(),
-): { label: string; value: string | null } {
+): { label: string; value: string | null; title?: string } {
   const own = noteCapSlot(ex, asOf);
-  if (!own) return { label: "Going-in cap", value: statedCap };
+  if (!own) {
+    return capSlotWithheld(ex) === "share"
+      ? { label: "Going-in cap", value: SHARE_CAP_WORDS.na, title: SHARE_CAP_WORDS.title }
+      : { label: "Going-in cap", value: statedCap };
+  }
   const words = OWN_YIELD_WORDS[own.of];
   return own.ytmPct != null
     ? { label: words.label, value: `${own.ytmPct.toFixed(1)}%` }

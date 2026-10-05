@@ -7,9 +7,9 @@
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { shownAssetClass } from "@/lib/asset-class";
 import { findGoingInCap, screenYearOf, unitCountRow } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
+import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, signalGoingInCap, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
-import { noteCapSlot } from "@/lib/compare-interest";
+import { capSlotWithheld, noteCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -39,14 +39,16 @@ import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
 export interface PipelineSlots {
-  /** the going-in cap as the OM states it — null on a plan deal, which has
-   *  none (its stabilized cap or yield on cost is the finished project's),
-   *  and on a note, whose collateral's cap is not the buyer's (`capWithheld`) */
+  /** the going-in cap as the OM states it, else as the first signal read it
+   *  (the deal header's rule, `statedCapSlot`) — null on a plan deal, which
+   *  is judged on its yield on total cost, and where the slot is withheld
+   *  (`capWithheld`) */
   cap: string | null;
   /** "note" where the going-in cap is withheld because the price is a
-   *  loan's, "position" where it is a preferred equity position's
-   *  (lib/compare-interest `noteCapSlot`); absent or null otherwise */
-  capWithheld?: "note" | "position" | null;
+   *  loan's, "position" where it is a preferred equity position's, "share"
+   *  where it is a share's beside the loan its entity carries
+   *  (lib/compare-interest `capSlotWithheld`); absent or null otherwise */
+  capWithheld?: "note" | "position" | "share" | null;
   /** the buyer's own yield at its price — "13.8%" — in the cap slot: a
    *  note's to maturity where it pays or may, a position's to redemption
    *  where the date has not gone by; absent or null otherwise */
@@ -198,17 +200,25 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
 
 /**
  * The going-in cap the memorandum states, as a pipeline row's Cap slot
- * shows it: none on a plan deal, whose stabilized cap or yield on cost is the
- * finished project's (its slot carries the yield on total cost), and none on
- * a note, whose collateral's cap is not the buyer's figure (lib/compare-
- * interest `noteCapSlot`: its slot carries the note's yield). The compare
- * table reads it where a deal's model has no cap (lib/compare-figures), and
- * the meeting workbook's row reads it too, so the three show one figure.
+ * shows it — and where the extraction states none, or has not landed yet,
+ * the first signal's, where it can be a cap on the price at all (lib/deal-
+ * strategy `signalGoingInCap`): the deal header's own fallback, and
+ * lib/model-vs-market's `dealGoingInCap`'s, so a cap the header prints is
+ * never a dash on the card. None on a plan deal, which is judged on its
+ * yield on total cost (its slot carries that), and none where the slot is
+ * withheld (lib/compare-interest `capSlotWithheld`): a note's and a
+ * position's carry their own yield, and a share's beside the loan its
+ * entity carries says why. The compare table reads it where a deal's model
+ * has no cap (lib/compare-figures), and the meeting workbook's row reads it
+ * too, so every surface shows one figure.
  */
-export function statedCapSlot(extraction: ExtractionResult, planDeal: boolean): string | null {
-  const { kind } = interestOf(extraction);
-  if (planDeal || kind === "note" || kind === "preferred_equity") return null;
-  return findGoingInCap(extraction.metrics ?? [])?.value ?? null;
+export function statedCapSlot(
+  extraction: ExtractionResult | null,
+  planDeal: boolean,
+  signal?: { goingInCap?: string | null } | null,
+): string | null {
+  if (planDeal || capSlotWithheld(extraction)) return null;
+  return findGoingInCap(extraction?.metrics ?? [])?.value ?? signalGoingInCap(signal)?.text ?? null;
 }
 
 // The asset class a pipeline row shows — the deal's one class — is
@@ -255,8 +265,9 @@ export interface SlotExchange {
  *  ("auto" where the analyst left it to the deck), read with the
  *  extraction's through `shownAssetClass` wherever a slot speaks in the
  *  class's terms. Before the extraction lands — a first screen's first
- *  minute — the first signal is all there is: its ask fills the price, as
- *  on the deal page, and every other slot waits for the terms. `place` is
+ *  minute — the first signal is all there is: its ask fills the price and
+ *  its cap the cap, as on the deal page's header, and every other slot
+ *  waits for the terms. `place` is
  *  where the deal is and the day it is read on: the rent rules are read only
  *  where it is given, and the slot is null where it is not; a forward
  *  purchase's clock counts from its day, else from the clock's. `exchange`
@@ -269,15 +280,18 @@ export function pickSlots(
   place?: SlotPlace | null,
   exchange?: SlotExchange | null,
 ): PipelineSlots {
-  if (!extraction) return { cap: null, price: signalAskPrice(signal), yoc: null };
+  if (!extraction) return { cap: statedCapSlot(null, false, signal), price: signalAskPrice(signal), yoc: null };
   const metrics = extraction.metrics ?? [];
   // The same read the deal page makes — extraction plus the first signal —
   // so a deal never shows a price on one surface and none on the other.
   const strategy = inferStrategy(extraction, signal);
   const plan = planSummary(extraction, strategy);
   // A note's cap slot (#423's rule): the collateral's cap withheld, the
-  // note's yield to maturity in its place where the note pays or may.
+  // note's yield to maturity in its place where the note pays or may — and
+  // a position's to redemption, and a share's beside its entity's loan
+  // withheld with the reason (lib/compare-interest `capSlotWithheld`).
   const note = plan ? null : noteCapSlot(extraction);
+  const withheld = plan ? null : capSlotWithheld(extraction);
   // The day a dated slot is read on: the reader's own where the caller
   // hands it (lib/reader-day), else the clock's.
   const asOf = place?.today ? new Date(`${place.today}T12:00:00Z`) : new Date();
@@ -285,9 +299,10 @@ export function pickSlots(
     // The going-in cap only, and only on an operating asset: the same rule
     // the meeting .xlsx, the analytics and the comp memory apply, so a
     // value-add's row shows its yield on cost where the export shows "n/a
-    // — plan", never a cap on one and a yield on the other.
-    cap: statedCapSlot(extraction, plan != null),
-    capWithheld: note ? note.of : null,
+    // — plan", never a cap on one and a yield on the other. Where the
+    // memorandum states none, the first signal's, as the deal header reads it.
+    cap: statedCapSlot(extraction, plan != null, signal),
+    capWithheld: withheld,
     noteYield: note?.ytmPct != null ? `${note.ytmPct.toFixed(1)}%` : null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask

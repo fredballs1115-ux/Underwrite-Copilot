@@ -57,7 +57,7 @@ import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { dealTypeLabel, interestTag, readInterest } from "@/lib/interest";
 import { yieldOnCostText } from "@/lib/plan-facts";
-import { goingInCapFigure, modelReturnsRead, noteCapSlot } from "@/lib/compare-interest";
+import { capSlotWithheld, goingInCapFigure, modelReturnsRead } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
@@ -1156,7 +1156,7 @@ export default async function DealPage({
   const returnFigure: HeroFigure = plan
     ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
     : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
-  const noteCap = noteCapSlot(extraction);
+  const capWithheld = capSlotWithheld(extraction);
 
   return (
     <div className="flex flex-col gap-6">
@@ -1779,10 +1779,11 @@ export default async function DealPage({
           priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
           // The leverage read spreads the BUYER's cap against debt, so on a
           // note it does not run on the collateral's, nor on a preferred
-          // equity position on the building's (lib/compare-interest): the
-          // panel says why instead.
-          capText={noteCap ? null : summaryCap}
-          capWithheld={noteCap?.of ?? null}
+          // equity position on the building's, nor on a share beside its
+          // entity's loan (lib/compare-interest `capSlotWithheld`, the
+          // header's rule): the panel says why instead.
+          capText={capWithheld ? null : summaryCap}
+          capWithheld={capWithheld}
           planLabel={isPlanDeal(strategy.kind) ? strategy.label : null}
           yearBuilt={summaryYearBuilt}
           sectorFields={

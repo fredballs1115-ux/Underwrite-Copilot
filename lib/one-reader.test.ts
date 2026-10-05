@@ -9,12 +9,13 @@ import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ExcelJS from "exceljs";
-import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractedMetric, ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "./deal-strategy";
 import { pickSlots } from "./pipeline-slots";
 import { pipelineExportRow, type ExportRowContext } from "./pipeline-export-row";
 import { buildPipelineWorkbook, type PipelineExportRow } from "./pipeline-workbook";
 import { compareReturns } from "./compare-figures";
+import { SHARE_CAP_WORDS, capSlotWithheld, goingInCapFigure } from "./compare-interest";
 import { deriveInternalComps } from "./internal-comps";
 import { pctText, yieldOnCostText } from "./plan-facts";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
@@ -35,9 +36,9 @@ async function workbookRow(row: PipelineExportRow): Promise<ExcelJS.Row> {
 }
 
 /** A compare column as the compare page builds it from `compareReturns`. */
-function compareCol(e: ExtractionResult, id = "x"): Col {
-  const strategy = inferStrategy(e);
-  const figs = compareReturns(e, null, strategy);
+function compareCol(e: ExtractionResult, id = "x", signal: FirstSignal | null = null): Col {
+  const strategy = inferStrategy(e, signal);
+  const figs = compareReturns(e, null, strategy, undefined, signal);
   return {
     id,
     name: `Deal ${id}`,
@@ -56,6 +57,7 @@ function compareCol(e: ExtractionResult, id = "x"): Col {
     coc: null,
     cap: figs.cap,
     capFrom: figs.capFrom,
+    capWithheld: figs.capWithheld,
     yoc: figs.yoc,
     yocFrom: figs.yocFrom,
     leverage: null,
@@ -122,5 +124,81 @@ describe("a plan's yield on cost and a going-in cap, at the header's two decimal
     const page = readFileSync(join(process.cwd(), "app/(app)/analytics/page.tsx"), "utf8");
     expect(page).toMatch(/const pct = pctText;/);
     expect(page).not.toMatch(/toFixed\(1\)\}%/);
+  });
+});
+
+const signalOf = (over: Partial<FirstSignal>): FirstSignal => ({
+  dealName: "Deal",
+  assetClass: "multifamily",
+  market: "Dallas, TX",
+  askPrice: "",
+  size: "",
+  goingInCap: "",
+  perUnit: "",
+  take: "",
+  ...over,
+});
+
+describe("the going-in cap: the memorandum's, else the first signal's, withheld by one rule (findings 8 and 15)", () => {
+  it("a cap only the first signal read: the header's 5.6% on the card, the CSV, the workbook and the compare table", async () => {
+    // Price and NOI stated, no cap row; the first signal read 5.6%.
+    const e = ex([m("Asking price", "$24,000,000"), m("In-place NOI", "$1,344,000")]);
+    const signal = signalOf({ askPrice: "$24,000,000", goingInCap: "5.6%" });
+    // The header's own read (app/(app)/deals/[id]/page.tsx), through the slot it draws.
+    expect(goingInCapFigure(e, "5.6%").value).toBe("5.6%");
+    // The card and its CSV cell.
+    expect(pickSlots(e, signal).cap).toBe("5.6%");
+    // The meeting workbook.
+    const row = pipelineExportRow({ name: "Deal", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", verdict: null, extraction: e, first_signal: signal, stage: "screening" }, ctx);
+    expect(row.cap).toBe("5.6%");
+    expect((await workbookRow(row)).getCell(8).value).toBeCloseTo(0.056, 10);
+    // The compare table, as the compare page reads the column.
+    const figs = compareReturns(e, null, inferStrategy(e, signal), undefined, signal);
+    expect(figs.cap).toBe(5.6);
+    expect(compareText([compareCol(e, "x", signal)])).toContain("5.60% (OM)");
+  });
+
+  it("a 49% share: the memorandum's cap on the header, the card, the workbook and now the compare table", async () => {
+    const share = ex([m("Asking price", "$20,580,000"), m("Going-in cap rate", "5.40%"), m("Units", "200")], {
+      interest: { kind: "partial_interest", summary: "", share: "49% limited partnership interest", groundLease: "", loan: "", page: "p. 2" },
+    });
+    expect(goingInCapFigure(share, "5.40%").value).toBe("5.40%");
+    expect(pickSlots(share, null)).toMatchObject({ cap: "5.40%", capWithheld: null });
+    const row = pipelineExportRow({ name: "Share", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", verdict: null, extraction: share, stage: "screening" }, ctx);
+    expect((await workbookRow(row)).getCell(8).value).toBeCloseTo(0.054, 10);
+    // No model ran: the table had left the cap blank.
+    expect(compareText([compareCol(share)])).toContain("5.40% (OM)");
+  });
+
+  it("a share beside the loan its entity carries: the cap withheld on every surface, saying so", async () => {
+    const recap = ex(
+      [m("Asking price", "$20,580,000"), m("Going-in cap rate", "5.40%"), m("Units", "200"), m("Entity loan balance", "$56,500,000")],
+      { interest: { kind: "partial_interest", summary: "", share: "49% limited partnership interest", groundLease: "", loan: "", page: "p. 2" } },
+    );
+    expect(capSlotWithheld(recap)).toBe("share");
+    // The header (and the bar that repeats it), with its reason.
+    expect(goingInCapFigure(recap, "5.40%")).toEqual({ label: "Going-in cap", value: "n/a — share", title: SHARE_CAP_WORDS.title });
+    // The card: no cap, and why.
+    expect(pickSlots(recap, null)).toMatchObject({ cap: null, capWithheld: "share" });
+    // The workbook's cell says so rather than a dash.
+    const row = pipelineExportRow({ name: "Recap", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", verdict: null, extraction: recap, stage: "screening" }, ctx);
+    expect(row).toMatchObject({ cap: null, capWithheld: "share" });
+    expect((await workbookRow(row)).getCell(8).value).toBe("n/a — share");
+    // The compare table.
+    const figs = compareReturns(recap, null, inferStrategy(recap));
+    expect(figs).toMatchObject({ cap: null, capWithheld: "share" });
+    const text = compareText([compareCol(recap)]);
+    expect(text).toMatch(/Going-in cap\s*n\/a — share/);
+    expect(text).not.toContain("5.40%");
+  });
+
+  it("a note and a position keep their own yield in the slot; a leased fee keeps its cap", () => {
+    expect(capSlotWithheld(ex([], { interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" } }))).toBe("note");
+    expect(capSlotWithheld(ex([], { interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" } }))).toBe("position");
+    const leasedFee = ex([m("Asking price", "$15,000,000"), m("Cap rate", "4.00%")], {
+      interest: { kind: "leased_fee", summary: "", share: "", groundLease: "", loan: "", page: "" },
+    });
+    expect(capSlotWithheld(leasedFee)).toBeNull();
+    expect(pickSlots(leasedFee, null).cap).toBe("4.00%");
   });
 });

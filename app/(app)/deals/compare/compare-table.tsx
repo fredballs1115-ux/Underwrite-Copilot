@@ -5,7 +5,7 @@ import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
-import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
+import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, type CapWithheld } from "@/lib/compare-interest";
 import { pctText } from "@/lib/plan-facts";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
@@ -89,6 +89,11 @@ export type Col = {
   /** where the cap came from: the first-draft model, or the memorandum's
    *  own going-in cap where the model has none (lib/compare-figures) */
   capFrom?: FigureSource | null;
+  /** why the cap slot is withheld on every surface the deal is summarized
+   *  on (lib/compare-interest `capSlotWithheld`): a note's and a position's
+   *  yield stands in its place, and a share beside the loan its entity
+   *  carries says "n/a — share" */
+  capWithheld?: CapWithheld | null;
   /** stabilized NOI ÷ total cost, % — the yardstick for a deal with a plan:
    *  the model's, else the one the deal's header prints; null for a
    *  stabilized asset */
@@ -468,7 +473,12 @@ export function CompareTable({ cols }: { cols: Col[] }) {
             ? c.noteYtm != null
               ? `${pct(c.noteYtm)} ${OWN_YIELD_WORDS[c.withheld].to}`
               : OWN_YIELD_WORDS[c.withheld].na
-            : pct2(c.cap),
+            : // A share beside the loan its entity carries: the cap is
+              // withheld here as on its header and its card, never a dash
+              // that reads as "not stated".
+              c.capWithheld === "share"
+              ? SHARE_CAP_WORDS.na
+              : pct2(c.cap),
       mono: true,
       num: (c) => (c.planDeal ? null : c.cap),
       // The model's cap, else the memorandum's (lib/compare-figures); a
@@ -505,9 +515,11 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           ? "judged on yield on cost"
           : c.withheld === "note" || c.withheld === "position"
             ? OWN_YIELD_WORDS[c.withheld].na
-            : c.leverage
-              ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
-              : null,
+            : c.capWithheld === "share"
+              ? SHARE_CAP_WORDS.na
+              : c.leverage
+                ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
+                : null,
       cls: (c) =>
         c.leverage?.tone === "negative"
           ? "text-kill"
@@ -534,9 +546,11 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           ? "judged on yield on cost"
           : c.withheld === "note" || c.withheld === "position"
             ? OWN_YIELD_WORDS[c.withheld].na
-            : c.capOverTenYear
-              ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
-              : null,
+            : c.capWithheld === "share"
+              ? SHARE_CAP_WORDS.na
+              : c.capOverTenYear
+                ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
+                : null,
       mono: true,
       num: (c) => (c.planDeal || !c.capOverTenYear ? null : c.capOverTenYear.spreadBps),
       signed: true,

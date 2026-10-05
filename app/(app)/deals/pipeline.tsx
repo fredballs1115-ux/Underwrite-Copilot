@@ -87,7 +87,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; capWithheld?: "note" | "position" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; capWithheld?: "note" | "position" | "share" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -155,6 +155,24 @@ const OWN_YIELD: Record<"note" | "position", { to: string; micro: string; na: st
   },
 };
 
+/** Why a cap slot holds no cap, in the words every surface says it in
+ *  (lib/compare-interest `capSlotWithheld` and `SHARE_CAP_WORDS`): the slot
+ *  where no figure stands, and its tooltip. A share beside the loan its
+ *  entity carries has no yield of its own to show in the cap's place. */
+const CAP_WITHHELD: Record<"note" | "position" | "share", { na: string; title: string }> = {
+  note: OWN_YIELD.note,
+  position: OWN_YIELD.position,
+  share: {
+    na: "n/a — share",
+    title:
+      "Beside the loan its entity carries, a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
+  },
+};
+
+/** The words of the yield standing in a cap slot: a note's, else a
+ *  position's (only those two carry one). */
+const ownYieldOf = (w: DealCard["slots"]["capWithheld"]) => OWN_YIELD[w === "position" ? "position" : "note"];
+
 /** A card as the map reads it. */
 function mapDealOf(d: DealCard): MapDeal {
   return {
@@ -167,7 +185,7 @@ function mapDealOf(d: DealCard): MapDeal {
       : d.slots.yoc
         ? `${d.slots.yoc} yield on cost`
         : d.slots.noteYield
-          ? `${d.slots.noteYield} ${OWN_YIELD[d.slots.capWithheld ?? "note"].to}`
+          ? `${d.slots.noteYield} ${ownYieldOf(d.slots.capWithheld).to}`
           : null,
     place: d.place ?? null,
     placeMiss: d.placeMiss,
@@ -723,7 +741,7 @@ export function Pipeline({
         d.flood?.cell ?? "",
         // A note's or a position's cap is withheld, said so rather than
         // left blank (#423).
-        d.slots.cap ?? (d.slots.capWithheld ? OWN_YIELD[d.slots.capWithheld].na : ""),
+        d.slots.cap ?? (d.slots.capWithheld ? CAP_WITHHELD[d.slots.capWithheld].na : ""),
         d.slots.yoc ?? "",
         // A fit judged on the first signal, before the extraction lands, is
         // marked on each of its figures as the card marks it — "Near (first
@@ -1798,9 +1816,9 @@ const DealRow = memo(function DealRow({
   ) : d.slots.noteYield ? (
     // A note, or a preferred equity position, has no going-in cap: its own
     // yield takes the slot.
-    <span title={OWN_YIELD[d.slots.capWithheld ?? "note"].title}>
+    <span title={ownYieldOf(d.slots.capWithheld).title}>
       <span className="font-mono tabular-nums">{d.slots.noteYield}</span>{" "}
-      <span className="text-[9px] font-medium uppercase">{OWN_YIELD[d.slots.capWithheld ?? "note"].micro}</span>
+      <span className="text-[9px] font-medium uppercase">{ownYieldOf(d.slots.capWithheld).micro}</span>
     </span>
   ) : null;
   // The mandate score, when there is one: a call's colour, the words a
@@ -2009,12 +2027,12 @@ const DealRow = memo(function DealRow({
               </span>
             ) : d.slots.noteYield ? (
               // A note, or a position, has no going-in cap: its own yield, labelled.
-              <span title={OWN_YIELD[d.slots.capWithheld ?? "note"].title} className="text-brand">
+              <span title={ownYieldOf(d.slots.capWithheld).title} className="text-brand">
                 {d.slots.noteYield}{" "}
-                <span className="text-[9px] font-sans font-medium uppercase">{OWN_YIELD[d.slots.capWithheld ?? "note"].micro}</span>
+                <span className="text-[9px] font-sans font-medium uppercase">{ownYieldOf(d.slots.capWithheld).micro}</span>
               </span>
             ) : d.slots.capWithheld ? (
-              <span title={OWN_YIELD[d.slots.capWithheld].title} className="font-sans text-xs text-muted">
+              <span title={CAP_WITHHELD[d.slots.capWithheld].title} className="font-sans text-xs text-muted">
                 n/a
               </span>
             ) : (
@@ -2393,10 +2411,10 @@ const DealTile = memo(function DealTile({
             takes it where the note pays or may, else it says n/a. */}
         <TileStat
           label={
-            !d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? OWN_YIELD[d.slots.capWithheld ?? "note"].label : "Cap"
+            !d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? ownYieldOf(d.slots.capWithheld).label : "Cap"
           }
-          title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld ? OWN_YIELD[d.slots.capWithheld].title : undefined}
-          sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? OWN_YIELD[d.slots.capWithheld ?? "note"].to : undefined}
+          title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld ? CAP_WITHHELD[d.slots.capWithheld].title : undefined}
+          sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? ownYieldOf(d.slots.capWithheld).to : undefined}
         >
           {d.slots.cap ??
             d.slots.yoc ??

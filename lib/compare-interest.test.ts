@@ -122,12 +122,16 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     const src = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
     expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null\), figure: true \}/);
     expect(src).not.toMatch(/\{ label: "Going-in cap", value: summaryCap \?\? null, figure: true \}/);
-    expect(src).toMatch(/capText=\{noteCap \? null : summaryCap\}/);
-    // The slot's own kind: a note's, or a preferred equity position's.
-    expect(src).toMatch(/capWithheld=\{noteCap\?\.of \?\? null\}/);
+    // The slot's own kind, read by the one rule every surface reads
+    // (`capSlotWithheld`): a note's, a preferred equity position's, or a
+    // share's beside the loan its entity carries.
+    expect(src).toMatch(/const capWithheld = capSlotWithheld\(extraction\);/);
+    expect(src).toMatch(/capText=\{capWithheld \? null : summaryCap\}/);
+    expect(src).toMatch(/capWithheld=\{capWithheld\}/);
     const panel = readFileSync("app/(app)/deals/[id]/research-panel.tsx", "utf8");
     expect(panel).toMatch(/capWithheld === "note"/);
     expect(panel).toMatch(/capWithheld === "position"/);
+    expect(panel).toMatch(/capWithheld === "share"/);
   });
 });
 

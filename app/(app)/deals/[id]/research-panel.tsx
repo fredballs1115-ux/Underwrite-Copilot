@@ -38,6 +38,7 @@ import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
 import { capSpreadRead, leverageRead, SEEDED_RATE_BENCHMARK } from "@/lib/leverage";
+import { SHARE_CAP_WORDS } from "@/lib/compare-interest";
 import {
   benchmark30,
   datedLong,
@@ -268,11 +269,13 @@ export async function ResearchPanel({
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
   capText?: string | null;
   /** "note" where the deal's price is a loan's: the collateral's income
-   *  over it is a cap nobody earns (lib/compare-interest `noteCapSlot`), so
-   *  the leverage check does not run and says why; "position" where it is a
-   *  preferred equity position's, which buys a rate and a redemption, never
-   *  a slice of the building — the same rule, its own reason */
-  capWithheld?: "note" | "position" | null;
+   *  over it is a cap nobody earns (lib/compare-interest `capSlotWithheld`),
+   *  so the leverage check does not run and says why; "position" where it is
+   *  a preferred equity position's, which buys a rate and a redemption, never
+   *  a slice of the building — the same rule, its own reason; "share" where
+   *  it is a share's beside the loan its entity carries, whose price grossed
+   *  up is the equity's whole and no cap is struck on it */
+  capWithheld?: "note" | "position" | "share" | null;
   /** the screening rate the model was seeded with off today's curve
    *  (lib/debt-index): the index a fact, the class spread an assumption,
    *  the note naming both — the leverage check reads the cap against it */
@@ -539,6 +542,20 @@ export async function ResearchPanel({
               "The price is a position's, not the building's: it buys a preferred return and a redemption in the owning entity, never a slice of the building, so the building's income over it is a cap nobody earns, and there is no cap of the buyer's to spread against debt. The position is read by its yield to redemption at its price, and by where its last dollar sits on the stated value, not by a cap rate."
             }
           </p>
+        </div>
+      )}
+      {/* A share beside the loan its entity carries: the share's price
+          grossed up is the equity's whole, not the building's, so no cap is
+          struck on it — the header says the same (lib/compare-interest). */}
+      {capPct == null && capWithheld === "share" && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3" data-qa="leverage-share">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
+              n/a on this share
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">{SHARE_CAP_WORDS.title}</p>
         </div>
       )}
       {/* A plan deal with no going-in cap: a dark building has nothing to

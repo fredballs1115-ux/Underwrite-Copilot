@@ -113,14 +113,17 @@ export interface PipelineExportRow {
    *  under the master rent" (lib/sandwich-lease `sandwichTag`); carried in
    *  the price cell's note */
   sandwich?: string | null;
-  /** the going-in cap on today's income — always null on a plan deal, and
-   *  on a note (`capWithheld`) */
+  /** the going-in cap on today's income — the memorandum's, else the first
+   *  signal's, as the pipeline card reads it — always null on a plan deal,
+   *  and where the slot is withheld (`capWithheld`) */
   cap: string | null;
   /** "note" where the going-in cap is withheld because the price is a
-   *  loan's: the collateral's income over it is a cap nobody earns; and
-   *  "position" where it is a preferred equity position's (lib/compare-
-   *  interest `noteCapSlot`) — the cell says "n/a — note" or "n/a — position" */
-  capWithheld?: "note" | "position" | null;
+   *  loan's: the collateral's income over it is a cap nobody earns;
+   *  "position" where it is a preferred equity position's; and "share"
+   *  where it is a share's beside the loan its entity carries (lib/compare-
+   *  interest `capSlotWithheld`) — the cell says "n/a — note", "n/a —
+   *  position" or "n/a — share" */
+  capWithheld?: "note" | "position" | "share" | null;
   /** a plan deal's stabilized NOI over total cost, as a fraction — 0.0627
    *  — written raw into the cell, whose "0.00%" shows the "6.27%" the deal
    *  header prints; never a rounded string read back */

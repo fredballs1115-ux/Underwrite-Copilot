@@ -108,9 +108,10 @@ function toCol(
   // struck on the whole its price implies, and returns the price did not
   // buy are withheld rather than set beside buildings' (lib/compare-interest).
   // Where the first-draft model has no figure, the memorandum's own: the
-  // header's yield on cost, the pipeline card's going-in cap, each said as
+  // header's yield on cost, the pipeline card's going-in cap — the first
+  // signal's where the memorandum states none, as on both — each said as
   // the memorandum's (lib/compare-figures).
-  const figs = compareReturns(ex, r ?? null, strat);
+  const figs = compareReturns(ex, r ?? null, strat, undefined, signal);
   const planDeal = figs.planDeal;
   const cap = figs.cap;
   // The price and the year-1 NOI: the model's, else the memorandum's — the
@@ -174,6 +175,7 @@ function toCol(
     coc: figs.withheld ? null : (r?.cashOnCashPct ?? null),
     cap,
     capFrom: figs.capFrom,
+    capWithheld: figs.capWithheld,
     yoc: figs.yoc,
     yocFrom: figs.yocFrom,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap

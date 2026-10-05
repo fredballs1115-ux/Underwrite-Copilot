@@ -344,13 +344,17 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(bare, { askPrice: "Call for offers", goingInCap: "", perUnit: "", assetClass: "", market: "", take: "", dealName: "" } as never).price).toBeNull();
   });
 
-  it("with no extraction at all — a first screen's first minute — the first signal's ask is the price and nothing else is read yet", () => {
+  it("with no extraction at all — a first screen's first minute — the first signal's ask is the price, its cap the cap, and nothing else is read yet", () => {
     const signal = { askPrice: "$20,000,000", goingInCap: "5.2%", perUnit: "$83k/unit", assetClass: "multifamily", market: "Dallas, TX", take: "", dealName: "X", size: "240 units" };
     // The deal page's summary bar prints the same ask before the extraction
-    // lands; the card printed "Price —" because the page never asked.
-    expect(pickSlots(null, signal)).toEqual({ cap: null, price: "$20,000,000", yoc: null });
+    // lands; the card printed "Price —" because the page never asked. It
+    // prints the signal's cap too (research pass 34): the card's cap had
+    // been a dash beside the header's "5.2%".
+    expect(pickSlots(null, signal)).toEqual({ cap: "5.2%", price: "$20,000,000", yoc: null });
     expect(pickSlots(null, { ...signal, askPrice: "Unpriced" }).price).toBeNull();
     expect(pickSlots(null, { ...signal, askPrice: "" }).price).toBeNull();
+    // A "cap" no price could carry is no cap, on the header or the card.
+    expect(pickSlots(null, { ...signal, goingInCap: "105%" }).cap).toBeNull();
     // No signal yet either: nothing to show.
     expect(pickSlots(null, null)).toEqual({ cap: null, price: null, yoc: null });
   });

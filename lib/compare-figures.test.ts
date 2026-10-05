@@ -62,16 +62,44 @@ describe("compareReturns — the model's figures, else the memorandum's, each sa
     expect(none.capFrom).toBeNull();
   });
 
-  it("never falls back where the price does not buy the building (#423): a note's cap is withheld, a share's unrun model is no whole's", () => {
+  it("never falls back where the cap slot is withheld (#423): a note's, and a share's beside the loan its entity carries", () => {
     const note = ex(stabilized.metrics, { interest: { ...blank, kind: "note" } });
     const n = compareReturns(note, null, inferStrategy(note));
     expect(n.withheld).toBe("note");
+    expect(n.capWithheld).toBe("note");
     expect(n.cap).toBeNull();
     expect(n.capFrom).toBeNull();
+    // A share whose model has not run: its returns are withheld, but the
+    // memorandum's cap stands, as on its header, its card, its CSV and its
+    // workbook row (research pass 34 — the table alone had left it blank).
     const share = ex(stabilized.metrics, { interest: { ...blank, kind: "partial_interest", share: "49% limited partnership interest" } });
     const s = compareReturns(share, null, inferStrategy(share));
     expect(s.withheld).toBe("share");
-    expect(s.cap).toBeNull();
-    expect(s.capFrom).toBeNull();
+    expect(s.capWithheld).toBeNull();
+    expect(s.cap).toBe(5.5);
+    expect(s.capFrom).toBe("om");
+    expect(pickSlots(share, null).cap).toBe("5.50%");
+    // Beside the loan its entity carries, the share's price grossed up is the
+    // equity's whole: no cap on any surface, the table included.
+    const recap = ex([...stabilized.metrics, m("Entity loan balance", "$56,500,000")], { interest: { ...blank, kind: "partial_interest", share: "49% limited partnership interest" } });
+    const r = compareReturns(recap, null, inferStrategy(recap));
+    expect(r.capWithheld).toBe("share");
+    expect(r.cap).toBeNull();
+    expect(r.capFrom).toBeNull();
+    expect(pickSlots(recap, null)).toMatchObject({ cap: null, capWithheld: "share" });
+  });
+
+  it("where the memorandum states no cap, the first signal's, as on the deal header and the card (research pass 34)", () => {
+    const priced = ex([m("Asking price", "$24,000,000"), m("In-place NOI", "$1,344,000")]);
+    const signal = { askPrice: "$24,000,000", goingInCap: "5.6%", perUnit: "", assetClass: "multifamily", market: "Dallas, TX", take: "", dealName: "X", size: "" };
+    const r = compareReturns(priced, null, inferStrategy(priced, signal), undefined, signal);
+    expect(r.cap).toBe(5.6);
+    expect(r.capFrom).toBe("om");
+    expect(pickSlots(priced, signal).cap).toBe("5.6%");
+    // A cap the memorandum states wins over the signal's.
+    const stated = compareReturns(stabilized, null, inferStrategy(stabilized), undefined, signal);
+    expect(stated.cap).toBe(5.5);
+    // Never on a plan deal.
+    expect(compareReturns(valueAdd, null, inferStrategy(valueAdd), undefined, signal).cap).toBeNull();
   });
 });

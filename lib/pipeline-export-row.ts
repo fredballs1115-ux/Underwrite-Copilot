@@ -5,7 +5,7 @@
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
-import { noteCapSlot } from "@/lib/compare-interest";
+import { capSlotWithheld } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
@@ -140,11 +140,12 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     goingConcern: goingConcernTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
     condo: condoTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
     sandwich: sandwichTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
-    // The pipeline card's own cap reader: none on a plan deal, none on a
-    // note (its collateral's cap is not the buyer's figure, and the cell
-    // says the cap is withheld).
-    cap: extraction ? statedCapSlot(extraction, plan != null) : null,
-    capWithheld: extraction && !plan ? (noteCapSlot(extraction)?.of ?? null) : null,
+    // The pipeline card's own cap reader: the memorandum's, else the first
+    // signal's (the deal header's fallback, before the extraction lands
+    // too); none on a plan deal, none where the slot is withheld — a note,
+    // a position, a share beside its entity's loan — and the cell says so.
+    cap: statedCapSlot(extraction, plan != null, signal),
+    capWithheld: !plan ? capSlotWithheld(extraction) : null,
     // The plan's own figure, unrounded: the workbook writes it into a
     // percent cell, where a string rounded to "6.3%" and read back printed
     // the header's 6.27% as "6.30%".

@@ -14,14 +14,18 @@
 //   plan's own reader (`planSummary`) states.
 //
 //   THE GOING-IN CAP is the model's, read for what the price buys
-//   (lib/compare-interest); with none it is the memorandum's, read as the
-//   pipeline card reads it (`statedCapSlot`). Never on a plan deal, and
-//   never where compare-interest withholds the cap (a note; a share the
-//   model did not run at its whole).
+//   (lib/compare-interest); with none it is the memorandum's — else the
+//   first signal's — read as the pipeline card and the deal header read it
+//   (`statedCapSlot`). Never on a plan deal, and never where the cap slot is
+//   withheld (lib/compare-interest `capSlotWithheld`: a note, a position, a
+//   share beside the loan its entity carries). A share whose model did not
+//   run at its whole shows the memorandum's cap where the model's struck on
+//   the whole is not there, as its header and its card do: the table had
+//   left it blank.
 
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { parsePct } from "@/lib/criteria";
-import { compareInterest, type CompareInterest, type CompareModel } from "@/lib/compare-interest";
+import { capSlotWithheld, compareInterest, type CapWithheld, type CompareInterest, type CompareModel } from "@/lib/compare-interest";
 import { isPlanDeal, planSummary, type DealStrategy } from "@/lib/deal-strategy";
 import { statedCapSlot } from "@/lib/pipeline-slots";
 
@@ -39,10 +43,14 @@ export interface CompareReturns extends CompareInterest {
   /** the deal carries a plan (value-add, lease-up, conversion,
    *  development): its answer is the yield on total cost, never a cap */
   planDeal: boolean;
-  /** the going-in cap, percent: null on a plan deal, where compare-interest
-   *  withholds it, and where neither the model nor the memorandum has one */
+  /** the going-in cap, percent: null on a plan deal, where the cap slot is
+   *  withheld, and where neither the model nor the memorandum has one */
   cap: number | null;
   capFrom: FigureSource | null;
+  /** why the cap slot is withheld on every surface (lib/compare-interest
+   *  `capSlotWithheld`) — the cell says so rather than a dash; null where
+   *  the cap stands, and on a plan deal, whose cell says "n/a — plan" */
+  capWithheld: CapWithheld | null;
   /** a plan deal's yield on total cost, percent */
   yoc: number | null;
   yocFrom: FigureSource | null;
@@ -53,11 +61,15 @@ export function compareReturns(
   model: CompareModelReturns | null | undefined,
   strategy: DealStrategy,
   asOf: Date = new Date(),
+  /** the deal's first signal: its cap stands in where the memorandum states
+   *  none, as on the deal header and the pipeline card */
+  signal: FirstSignal | null = null,
 ): CompareReturns {
   const planDeal = isPlanDeal(strategy.kind);
   const ci = compareInterest(ex, model ?? null, asOf);
   const modelCap = planDeal ? null : ci.cap;
-  const statedCapText = !planDeal && modelCap == null && !ci.withheld && ex ? statedCapSlot(ex, planDeal) : null;
+  const capWithheld = planDeal ? null : capSlotWithheld(ex);
+  const statedCapText = !planDeal && modelCap == null ? statedCapSlot(ex ?? null, planDeal, signal) : null;
   const statedCap = statedCapText ? parsePct(statedCapText) : null;
   const modelYoc = model?.yieldOnCostPct ?? null;
   const planYoc = planDeal && modelYoc == null ? (planSummary(ex ?? null, strategy)?.yieldOnCost ?? null) : null;
@@ -67,6 +79,7 @@ export function compareReturns(
     planDeal,
     cap: modelCap ?? statedCap,
     capFrom: modelCap != null ? "model" : statedCap != null ? "om" : null,
+    capWithheld,
     yoc: modelYoc ?? statedYoc,
     yocFrom: modelYoc != null ? "model" : statedYoc != null ? "om" : null,
   };
