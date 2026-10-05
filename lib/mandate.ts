@@ -152,7 +152,8 @@ interface ExtractionLike {
   holding?: Holding | null;
   loanWords?: string | null;
   /** a share's holding (lib/criteria `ShareRead`): a GP stake's and a
-   *  share of no stated percentage's IRR is never scored */
+   *  share of no stated percentage's IRR is never scored, and a tenancy in
+   *  common's words name the property's loan */
   shareRead?: ShareRead | null;
   /** the day the screen read the memorandum — a price label's year is read
    *  against its year (lib/criteria `screenYearOf`) */
@@ -511,7 +512,7 @@ export function scoreMandateFit(
     const detail =
       s.status === "unknown"
         ? withheld
-          ? returnWithheldDetail(box.minIrrPct, withheld)
+          ? returnWithheldDetail(box.minIrrPct, withheld, extraction)
           : `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen.`
         : s.status === "pass"
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${irr!.toFixed(1)}%. On target (broker figure — verify).`

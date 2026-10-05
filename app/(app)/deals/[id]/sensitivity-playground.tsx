@@ -93,6 +93,12 @@ export interface PlaygroundData {
    *  bid, the whole's times the share, beside the whole's; absent where no
    *  percentage is stated or the price is the whole's */
   sharePct?: number | null;
+  /** what that share is called in the bid's words: "interest" on an
+   *  undivided interest held as a tenant in common, which is title to the
+   *  property and never an entity's share (lib/interest `isTenancyInCommon`,
+   *  research pass 37, audit C4 L4), as the price label names it; absent,
+   *  "share" */
+  shareNoun?: "share" | "interest";
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
@@ -533,6 +539,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           against={bidAgainst != null ? "yours" : "modeled"}
           dirty={dirty}
           sharePct={data.sharePct ?? null}
+          shareNoun={data.shareNoun ?? "share"}
         />
       )}
       {box && !floorsSet && (
@@ -822,6 +829,7 @@ function MaxBidCard({
   against = "modeled",
   dirty,
   sharePct = null,
+  shareNoun = "share",
 }: {
   bid: MaxBidSolution;
   box: BuyBox;
@@ -835,12 +843,14 @@ function MaxBidCard({
    *  whole's, and the share's — the whole's times the share — is said
    *  beside it (research pass 40, M7) */
   sharePct?: number | null;
+  /** what the share is called (`PlaygroundData.shareNoun`) */
+  shareNoun?: "share" | "interest";
 }) {
   const vs = against === "yours" ? "your price" : "the modeled price";
   // The share's bid, rounded down as the whole's is, so it still clears.
   const shareBid = (whole: number, atLeast = false): string | null =>
     sharePct != null
-      ? `the whole's price, the share grossed up; the ${Number(sharePct.toFixed(2))}% share's is ${atLeast ? "at least " : ""}${fmtBid(whole * (sharePct / 100))}`
+      ? `the whole's price, the ${shareNoun} grossed up; the ${Number(sharePct.toFixed(2))}% ${shareNoun}'s is ${atLeast ? "at least " : ""}${fmtBid(whole * (sharePct / 100))}`
       : null;
   return (
     <div className="mt-3 rounded-xl border border-brand/25 bg-brand/[0.04] p-3.5">

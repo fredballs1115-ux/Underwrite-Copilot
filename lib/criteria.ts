@@ -769,12 +769,15 @@ export type Holding = "tic" | "gp_stake";
 /**
  * What a share of the owning entity is, by lib/interest's readers (which
  * this module cannot import): a share of the general partner's interest (a
- * share of a share, `isGpStake`) and whether a percentage of the entity is
- * stated (`interestOf`'s `sharePct`).
+ * share of a share, `isGpStake`), whether a percentage of the entity is
+ * stated (`interestOf`'s `sharePct`), and whether it is an undivided interest
+ * held as a tenant in common, whose loan is the property's and whose share
+ * is an interest, never an entity's (`isTenancyInCommon`, research pass 37).
  */
 export interface ShareRead {
   gpStake: boolean;
   pctStated: boolean;
+  tic: boolean;
 }
 
 /**
@@ -793,6 +796,15 @@ export function capWithheldOf(ex: ExtractionLike | null | undefined): CapWithhel
   const kind = ex.interest?.kind;
   return kind === "note" ? "note" : kind === "preferred_equity" ? "position" : null;
 }
+
+/** A share's price grossed up beside the loan the memorandum states, in the
+ *  words its holding takes: on a tenancy in common the loan is the
+ *  property's and the share an interest, since no entity owns the property
+ *  (research pass 37, audit C4 L3). */
+const besideTheLoan = (ex: Pick<ExtractionLike, "shareRead"> | null | undefined): string =>
+  ex?.shareRead?.tic
+    ? "beside the loan on the property, this interest's price grossed up is the equity's whole, not the building's"
+    : "beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's";
 
 /** The going-in cap check's words where the cap is withheld, by the cap
  *  slot's own reason — the buy box's check and the mandate's dimension say
@@ -854,7 +866,7 @@ export function returnWithheldOf(ex: ExtractionLike | null | undefined): ReturnW
 /** The target-return check's words where the IRR is withheld, by the same
  *  reasons — the buy box's check and the mandate's dimension say the same
  *  sentence. */
-export function returnWithheldDetail(targetPct: number, why: ReturnWithheldKind): string {
+export function returnWithheldDetail(targetPct: number, why: ReturnWithheldKind, ex?: Pick<ExtractionLike, "shareRead"> | null): string {
   const head = `Mandate targets ≥${targetPct}% IRR`;
   if (why === "gp_stake") {
     return `${head}, but this is a share of the general partner's interest: a share of a share, whose price no figure grosses up to the building's, so an IRR the memorandum states is not read as this stake's return.`;
@@ -871,7 +883,7 @@ export function returnWithheldDetail(targetPct: number, why: ReturnWithheldKind)
   if (why === "leased_fee") {
     return `${head}, but the price buys the land under the ground lease: the screen does not read whether an IRR the memorandum states is the land's or the building's above it, so it is not held to the target.`;
   }
-  return `${head}, but beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's: an IRR the memorandum states is not read as this share's return.`;
+  return `${head}, but ${besideTheLoan(ex)}: an IRR the memorandum states is not read as this ${ex?.shareRead?.tic ? "interest" : "share"}'s return.`;
 }
 
 /**
@@ -1391,7 +1403,8 @@ export interface SourceReads {
    *  position, a leased fee and a share */
   statedBasisIsBuildings: boolean;
   /** on a share of the owning entity, what it is (`ShareRead`): a GP stake
-   *  and a share of no stated percentage hold no stated IRR to the target;
+   *  and a share of no stated percentage hold no stated IRR to the target,
+   *  and a tenancy in common's withheld checks say the property's loan;
    *  null on anything but a share */
   share?: ShareRead | null;
   /** the first signal's going-in cap, as the deal header reads it
@@ -1938,7 +1951,7 @@ export function evaluateBuyBox(
         label: "Target return",
         onPrice: true,
         status: "unknown",
-        detail: returnWithheldDetail(box.minIrrPct, withheld),
+        detail: returnWithheldDetail(box.minIrrPct, withheld, extraction),
       });
     } else if (pct == null) {
       checks.push({

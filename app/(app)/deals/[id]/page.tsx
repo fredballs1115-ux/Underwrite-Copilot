@@ -55,7 +55,7 @@ import { readTaxAbatement } from "@/lib/tax-abatement";
 import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
-import { dealTypeLabel, interestTag, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestTag, isTenancyInCommon, readInterest } from "@/lib/interest";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { capSlotWithheld, goingInCapFigure, modelReturnsRead } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -940,6 +940,7 @@ export default async function DealPage({
         // the memorandum states (research pass 40, M7).
         priceLabel: derived.meta.priceLabel ?? null,
         sharePct: derived.meta.grossedUpSharePct ?? null,
+        shareNoun: isTenancyInCommon(extraction) ? "interest" : "share",
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own

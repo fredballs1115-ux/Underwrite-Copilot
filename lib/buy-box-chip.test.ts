@@ -481,7 +481,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
       [["Asking price", "$20,580,000"], ["Entity loan balance", "$56,500,000"], ...BUILDING],
       "A 49% limited partnership interest",
     );
-    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true }, signalCap: null });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true, tic: false }, signalCap: null });
     const r = read(ex);
     expect(checkOf(r, "Going-in cap")?.status).toBe("unknown");
     expect(checkOf(r, "Going-in cap")?.detail).toContain("beside the loan its entity carries, this share's price grossed up is the equity's whole");
@@ -537,7 +537,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
 
   it("a share with a stated percentage and no entity loan keeps its cap, the grossed-up whole's — its stated per-unit figure is no basis", () => {
     const ex = deal("partial_interest", [["Asking price", "$20,580,000"], ...BUILDING], "A 49% limited partnership interest");
-    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true }, signalCap: null });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, share: { gpStake: false, pctStated: true, tic: false }, signalCap: null });
     const r = read(ex);
     // The header prints the memorandum's cap for this share, and the box
     // judges the same figure.
@@ -684,5 +684,21 @@ describe("the box holds a deal only to the figures its price buys", () => {
     // whether its deal-level IRR is the share's is the owner's call.
     const lp = readIrr(deal("partial_interest", [["Asking price", "$9,800,000"], ...IRR], "A 49% limited partnership interest"));
     expect(checkOf(lp, "Target return")?.status).toBe("near");
+  });
+
+  // Audit C4, L3: a tenancy in common's loan is the property's, and no
+  // entity owns the property (research pass 37).
+  it("says a TIC's loan is the property's, and its share an interest, in both withheld checks", () => {
+    const tic = deal(
+      "partial_interest",
+      [["Asking price", "$4,200,000"], ["Entity loan balance", "$9,000,000"], ["Levered IRR", "14.0%"], ...BUILDING],
+      "30% tenant-in-common interest",
+    );
+    const r = buyBoxRead("multifamily", dealCheckSource(tic, null, null), { ...BOX, minIrrPct: 15 });
+    for (const label of ["Going-in cap", "Target return"]) {
+      const detail = checkOf(r, label)?.detail ?? "";
+      expect(detail, label).toContain("beside the loan on the property, this interest's price grossed up is the equity's whole");
+      expect(detail, label).not.toMatch(/its entity|this share/);
+    }
   });
 });

@@ -50,11 +50,12 @@ export function sourceReadsOf(extraction: ExtractionResult | null, firstSignal: 
     interestKind: kind,
     capWithheld: capSlotWithheld(extraction),
     statedBasisIsBuildings: statedBasisIsBuildings(extraction),
-    // A share's holding (audit C4, L2): a GP stake's and a share of
-    // no stated percentage's stated IRR is held to no target.
+    // A share's holding (audit C4, L2 and L3): a GP stake's and a share of
+    // no stated percentage's stated IRR is held to no target, and a tenancy
+    // in common's loan is the property's.
     share:
       interest.kind === "partial_interest"
-        ? { gpStake: isGpStake(extraction), pctStated: interest.sharePct != null }
+        ? { gpStake: isGpStake(extraction), pctStated: interest.sharePct != null, tic: isTenancyInCommon(extraction) }
         : null,
     signalCap: signalGoingInCap(firstSignal),
     ...(holding ? { holding } : {}),

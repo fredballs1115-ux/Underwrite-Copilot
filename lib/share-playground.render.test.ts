@@ -14,6 +14,7 @@ import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { solveMaxBid } from "@/lib/underwrite/solver";
 import { modelReturnsRead } from "@/lib/compare-interest";
+import { isTenancyInCommon } from "@/lib/interest";
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { SensitivityPlayground, type PlaygroundData } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { a11yIssues, visibleText } from "./render-lint";
@@ -49,6 +50,7 @@ function drawn(ex: ExtractionResult) {
     buildingPriced: !d.meta.interest?.basisWithheld,
     priceLabel: d.meta.priceLabel ?? null,
     sharePct: d.meta.grossedUpSharePct ?? null,
+    shareNoun: isTenancyInCommon(ex) ? "interest" : "share",
   };
   const html = renderToStaticMarkup(React.createElement(SensitivityPlayground, { data }));
   return { d, html, text: visibleText(html) };
@@ -80,5 +82,26 @@ describe("a share's price and max bid on the deal page (research pass 40, M7)", 
     expect(d.meta.grossedUpSharePct).toBeUndefined();
     expect(html).toMatch(/aria-label="Purchase price scenario"/);
     expect(text).not.toContain("share's is");
+  });
+
+  // Audit C4, L4: a tenancy in common's share is an interest in the
+  // property, never an entity's share (research pass 37); the bid had said
+  // "the 30% share's is …" beside "Whole Price (30% TIC interest grossed up)".
+  it("calls a TIC's share an interest in the bid's words, as its price label does", () => {
+    const tic = {
+      ...SHARE,
+      interest: {
+        kind: "partial_interest",
+        summary: "An undivided 30% tenant-in-common interest in the fee simple, held under a TIC agreement",
+        share: "30% tenant-in-common interest",
+        groundLease: "",
+        loan: "",
+        page: "p. 2",
+      },
+    } as unknown as ExtractionResult;
+    const { d, text } = drawn(tic);
+    expect(d.meta.priceLabel).toBe("Whole Price (30% TIC interest grossed up)");
+    expect(text).toMatch(/That is the whole's price, the interest grossed up; the 30% interest's is \$[\d.]+M\./);
+    expect(text).not.toMatch(/share grossed up|share's is/);
   });
 });
