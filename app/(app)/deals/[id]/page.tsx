@@ -168,6 +168,7 @@ import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { versionBadge } from "@/lib/bridge/version-rules";
+import { readAll } from "@/lib/read-all";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
 import { SubmarketCard } from "./submarket-card";
@@ -271,16 +272,23 @@ export default async function DealPage({
         .not("extraction", "is", null)
         .order("created_at", { ascending: false })
         .limit(40),
-      // Live share links (pre-0017 schema: the query errors and data reads
-      // null — the Share button simply shows an empty list).
-      supabase
-        .from("deal_shares")
-        .select("id, created_at, expires_at")
-        .eq("deal_id", id)
-        .eq("revoked", false)
-        .gt("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
-        .limit(5),
+      // Every live share link (pre-0017 schema: the query errors and data
+      // reads null — the Share button simply shows an empty list). All of
+      // them, newest first, a page at a time: the panel says a link is
+      // "revocable here anytime", and the newest five had left the sixth and
+      // older live and out of view until their thirty days ran out
+      // (research pass 42). A link lives thirty days, so they are few.
+      readAll<ShareRow>((from, to) =>
+        supabase
+          .from("deal_shares")
+          .select("id, created_at, expires_at")
+          .eq("deal_id", id)
+          .eq("revoked", false)
+          .gt("expires_at", new Date().toISOString())
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ).then((data) => ({ data })),
       // Citation facts (pre-0018 schema: query errors, data reads null — the
       // deal simply shows no source chips rather than faking them).
       supabase

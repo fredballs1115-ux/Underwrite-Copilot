@@ -89,9 +89,12 @@ export function ShareControl({
           <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4" />
         </svg>
         Share
+        {/* A space a screen reader reads; the flex row draws none. */}
+        {shares.length > 0 && " "}
         {shares.length > 0 && (
-          <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
+          <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand" data-qa="share-count">
             {shares.length}
+            <span className="sr-only">{` ${liveLinksWords(shares.length)}`}</span>
           </span>
         )}
       </button>
@@ -123,40 +126,52 @@ export function ShareControl({
           </form>
 
           {shares.length > 0 && (
-            <ul className="mt-3 space-y-2 border-t border-line pt-3">
-              {shares.map((s) => (
-                <li key={s.id} className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">
-                    /share/{s.id.slice(0, 8)}…
-                  </span>
-                  <span className="shrink-0 text-[11px] text-muted">
-                    to {DATE_FMT.format(new Date(s.expires_at))}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => copy(s.id)}
-                    className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-medium transition-colors hover:bg-faint"
-                    aria-live="polite"
-                  >
-                    {copied === s.id ? "Copied ✓" : "Copy"}
-                  </button>
-                  <form action={revokeShareLink} className="shrink-0">
-                    <input type="hidden" name="dealId" value={dealId} />
-                    <input type="hidden" name="shareId" value={s.id} />
+            // Every live link, so each can be revoked here; a long list
+            // scrolls inside the panel rather than past the screen.
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="text-[11px] text-muted" data-qa="share-live">
+                {`${shares.length} ${liveLinksWords(shares.length)}, newest first`}
+              </p>
+              <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                {shares.map((s) => (
+                  <li key={s.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">
+                      /share/{s.id.slice(0, 8)}…
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted">
+                      to {DATE_FMT.format(new Date(s.expires_at))}
+                    </span>
                     <button
-                      type="submit"
-                      title="Revoke this link now"
-                      className="rounded-md px-1.5 py-1 text-[11px] font-medium text-muted transition-colors hover:text-kill"
+                      type="button"
+                      onClick={() => copy(s.id)}
+                      className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-medium transition-colors hover:bg-faint"
+                      aria-live="polite"
                     >
-                      Revoke
+                      {copied === s.id ? "Copied ✓" : "Copy"}
                     </button>
-                  </form>
-                </li>
-              ))}
-            </ul>
+                    <form action={revokeShareLink} className="shrink-0">
+                      <input type="hidden" name="dealId" value={dealId} />
+                      <input type="hidden" name="shareId" value={s.id} />
+                      <button
+                        type="submit"
+                        title="Revoke this link now"
+                        className="rounded-md px-1.5 py-1 text-[11px] font-medium text-muted transition-colors hover:text-kill"
+                      >
+                        Revoke
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
     </div>
   );
+}
+
+/** "live link" / "live links" — what the Share button's count counts. */
+function liveLinksWords(n: number): string {
+  return n === 1 ? "live link" : "live links";
 }

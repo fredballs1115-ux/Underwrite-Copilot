@@ -5,6 +5,7 @@
  * it. Said in one line, before a link is made.
  */
 import React from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -35,5 +36,30 @@ describe("the share panel says what the link shows", () => {
     expect(html.indexOf('data-qa="share-buybox-note"')).toBeLessThan(html.indexOf("Create share link"));
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("every live link can be revoked here (research pass 42, M2)", () => {
+  it("lists every live link the page reads, each with its Revoke, and the count says what it counts", () => {
+    const shares = Array.from({ length: 7 }, (_, i) => ({
+      id: `${i}bcdef0123456789`,
+      created_at: `2026-10-0${i + 1}T00:00:00Z`,
+      expires_at: `2026-10-3${i % 2}T00:00:00Z`,
+    }));
+    const html = renderToStaticMarkup(React.createElement(ShareControl, { dealId: "d1", shares, appUrl: "https://example.com" }));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(html.match(/name="shareId"/g)).toHaveLength(7);
+    expect(text).toContain("7 live links, newest first");
+    expect(text).toContain("Share 7 live links");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("is handed every live link: the deal page reads them all, never the newest five", () => {
+    const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
+    const read = page.slice(page.indexOf('.from("deal_shares")') - 200, page.indexOf('.from("deal_shares")') + 500);
+    expect(read).toContain("readAll<ShareRow>");
+    expect(read).toContain(".range(from, to)");
+    expect(read).not.toMatch(/\.limit\(/);
   });
 });
