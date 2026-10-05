@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   recent: null as { id: string; team_id: string | null } | null,
   /** the deals insert's refusal, as the database's cap trigger raises it */
   insertError: null as { message: string } | null,
+  /** refusals for the next inserts, one each, ahead of `insertError` */
+  insertErrors: [] as ({ message: string } | null)[],
 }));
 
 vi.mock("next/navigation", () => ({
@@ -68,8 +70,10 @@ vi.mock("@/lib/supabase/server", () => {
           return api;
         },
         maybeSingle: async () => ({ data: table === "deals" && op === "select" ? state.recent : null, error: null }),
-        single: async () =>
-          state.insertError ? { data: null, error: state.insertError } : { data: { id: "new-deal" }, error: null },
+        single: async () => {
+          const error = state.insertErrors.length > 0 ? state.insertErrors.shift()! : state.insertError;
+          return error ? { data: null, error } : { data: { id: "new-deal" }, error: null };
+        },
         then: (ok: (v: unknown) => unknown, fail?: (e: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(ok, fail),
       };
       return api;
@@ -124,6 +128,7 @@ beforeEach(() => {
   state.inserted.length = 0;
   state.recent = null;
   state.insertError = null;
+  state.insertErrors = [];
 });
 
 describe("a member's new deal says where it was filed", () => {
@@ -193,6 +198,25 @@ describe("a refused upload says why", () => {
     state.insertError = { message: "canceling statement due to statement timeout" };
     expect(await createDealFromBatch(uploadForm())).toEqual({ ok: false, error: "save" });
     expect(await createManualDeal(null, manualForm())).toEqual({ error: "Couldn’t save the deal. Please try again." });
+  });
+
+  it("a team insert that loses the trial's last slot to another is filed as the reader's own (the batch-2 audit)", async () => {
+    // The read saw room in the trial; another insert took the last slot
+    // before this one: the trigger refuses the team's deal, and the reader's
+    // own slots decide, never a sentence saying they are used up.
+    state.billing = billing(TRIAL_OPEN);
+    state.insertErrors = [{ message: "team_plan_required" }];
+    expect(await landing(() => createManualDeal(null, manualForm()))).toBe("/deals/new-deal?filed=personal");
+    expect(state.inserted.map((r) => r.team_id)).toEqual(["team-1", null]);
+    state.inserted.length = 0;
+    state.insertErrors = [{ message: "team_plan_required" }];
+    expect(await createDealFromBatch(uploadForm())).toEqual({ ok: true, dealId: "new-deal", personal: true });
+    expect(state.inserted.map((r) => r.team_id)).toEqual(["team-1", null]);
+    // Both pools in use: the team's limit, said as both.
+    state.insertErrors = [{ message: "team_plan_required" }, { message: "free_deal_limit_reached" }];
+    expect((await createManualDeal(null, manualForm()))?.error).toMatch(/^Your team’s trial deals and your personal free deals are all in use/);
+    state.insertErrors = [{ message: "team_plan_required" }, { message: "free_deal_limit_reached" }];
+    expect(await createDealFromBatch(uploadForm())).toEqual({ ok: false, error: "teamlimit" });
   });
 
   it("a chosen file of 0 bytes is empty; no file chosen is no file", async () => {

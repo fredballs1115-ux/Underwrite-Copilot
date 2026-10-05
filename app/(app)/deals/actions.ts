@@ -164,22 +164,17 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
-  const personal = !!billing.team && !teamAllowed;
-  const { data: deal, error: insertErr } = await supabase
-    .from("deals")
-    .insert({
-      name,
-      asset_class: assetClass,
-      user_id: user.id,
-      team_id: teamAllowed ? billing.team!.id : null,
-    })
-    .select("id")
-    .single();
+  const filed = await fileDeal(
+    supabase,
+    { name, asset_class: assetClass, user_id: user.id },
+    teamAllowed ? billing.team!.id : null,
+  );
   // The database's own cap refusal is the plan's limit, said as one — a
   // double-submit or a second tab the read above let through.
-  if (insertErr || !deal) return { ok: false, error: capRefusalOf(insertErr) ?? "save" };
+  if (!("id" in filed)) return { ok: false, error: filed.refusal ?? "save" };
+  const personal = !!billing.team && !filed.teamFiled;
 
-  const dealId = deal.id as string;
+  const dealId = filed.id;
   const path = omStoragePath(user.id, dealId);
 
   // Optional property address from the autocomplete: the structured pick
@@ -277,6 +272,32 @@ export type ManualDealState = { error: string } | null;
 /** The typed-facts form's words for a plan's limit — the app's own check
  *  and the database's refusal alike. */
 const MANUAL_LIMIT = "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.";
+/**
+ * Insert a new deal: on the reader's team while its plan or trial allows
+ * (`teamId`), else as the reader's own. Where the database refuses the
+ * team's insert for its trial — another insert took the last slot between
+ * the allowance read and this write — the deal is filed again as the
+ * reader's own, which the personal cap then decides; refused there too, both
+ * pools are in use, and the refusal is the team's limit. So "your personal
+ * free deals are all in use" is said only where they are (the batch-2
+ * audit: a raced team insert had said it with the reader's own slots free).
+ */
+async function fileDeal(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  row: Record<string, unknown>,
+  teamId: string | null,
+): Promise<{ id: string; teamFiled: boolean } | { refusal: "limit" | "teamlimit" | null }> {
+  const insert = (team_id: string | null) => supabase.from("deals").insert({ ...row, team_id }).select("id").single();
+  const first = await insert(teamId);
+  if (first.data && !first.error) return { id: first.data.id as string, teamFiled: teamId !== null };
+  const refusal = capRefusalOf(first.error);
+  if (teamId === null || refusal !== "teamlimit") return { refusal };
+  const again = await insert(null);
+  if (again.data && !again.error) return { id: again.data.id as string, teamFiled: false };
+  const second = capRefusalOf(again.error);
+  return { refusal: second === "limit" ? "teamlimit" : second };
+}
+
 const MANUAL_TEAM_LIMIT =
   "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro.";
 
@@ -337,27 +358,20 @@ export async function createManualDeal(
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
-  const personal = !!billing.team && !teamAllowed;
-  const { data: deal, error: insertErr } = await supabase
-    .from("deals")
-    .insert({
-      name: facts.name,
-      asset_class: facts.assetClass,
-      user_id: user.id,
-      team_id: teamAllowed ? billing.team!.id : null,
-      extraction,
-      first_signal: firstSignal,
-    })
-    .select("id")
-    .single();
-  if (insertErr || !deal) {
+  const filed = await fileDeal(
+    supabase,
+    { name: facts.name, asset_class: facts.assetClass, user_id: user.id, extraction, first_signal: firstSignal },
+    teamAllowed ? billing.team!.id : null,
+  );
+  if (!("id" in filed)) {
     // The database's own cap refusal is the plan's limit, never "try again".
-    const cap = capRefusalOf(insertErr);
+    const cap = filed.refusal;
     return {
       error: cap === "teamlimit" ? MANUAL_TEAM_LIMIT : cap === "limit" ? MANUAL_LIMIT : "Couldn’t save the deal. Please try again.",
     };
   }
-  const dealId = deal.id as string;
+  const personal = !!billing.team && !filed.teamFiled;
+  const dealId = filed.id;
 
   // Best-effort separate update so a pre-0011 schema can't sink the create.
   if (address) {
