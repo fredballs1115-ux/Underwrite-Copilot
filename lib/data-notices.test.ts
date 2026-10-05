@@ -39,7 +39,7 @@ describe("the providers' notices, in their printed words", () => {
   it("the template filled for SOFR with the site's own name as the publisher, and nothing else changed", () => {
     expect(NY_FED_PUBLISHER).toBe("Underwrite Copilot");
     expect(NY_FED_SOFR_NOTICE).toBe(
-      "The SOFR is subject to the Terms of Use posted at newyorkfed.org. The New York Fed is not responsible for publication of the SOFR by Underwrite Copilot, does not sanction or endorse any particular republication, and has no liability for your use.",
+      "The SOFR data is subject to the Terms of Use posted at newyorkfed.org. The New York Fed is not responsible for publication of the SOFR data by Underwrite Copilot, does not sanction or endorse any particular republication, and has no liability for your use.",
     );
     // No blank, bracket or footnote mark is left, whatever is filled in.
     for (const filled of [NY_FED_SOFR_NOTICE, nyFedNotice("BGCR", "a publisher")]) {

@@ -67,7 +67,7 @@ export function nyFedNotice(dataName: string, publisher: string): string {
 
 /** The notice for SOFR, the reference rate the site shows with its 30-day
  *  average (`NY_FED_SERIES`). */
-export const NY_FED_SOFR_NOTICE = nyFedNotice("SOFR", NY_FED_PUBLISHER);
+export const NY_FED_SOFR_NOTICE = nyFedNotice("SOFR data", NY_FED_PUBLISHER);
 
 /**
  * The same terms, as printed: "The Secured Overnight Financing Rate (SOFR)
