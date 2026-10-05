@@ -33,7 +33,14 @@ export function NewsStrip({ items }: { items: NewsStripItem[] }) {
   return (
     <section className="mt-6 rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">CRE news</h2>
+        {/* The score is the weekday sweep's, for one buyer profile
+            (scripts/daily-intel.mjs), never the reader's buy box: an office
+            analyst had read "8/10" as relevance to them (research pass 32).
+            /news and /market say the same. */}
+        <h2 className="text-sm font-semibold">
+          CRE news{" "}
+          <span className="font-normal text-muted">· AI-scored for a small East Coast 2–4 unit buyer, not your buy box</span>
+        </h2>
         <Link
           href="/news"
           className="text-xs font-medium text-brand underline decoration-dotted underline-offset-2"
@@ -48,8 +55,11 @@ export function NewsStrip({ items }: { items: NewsStripItem[] }) {
             <li key={it.url} className="text-sm leading-snug">
               {it.relevance !== null && (
                 <>
-                  <span className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted">
-                    {it.relevance}/10
+                  <span
+                    className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted"
+                    title={`Relevance ${it.relevance} of 10, scored for one buyer profile (a small East Coast buyer of 2–4 unit buildings), not your buy box`}
+                  >
+                    {`${it.relevance}/10`}
                   </span>{" "}
                 </>
               )}
