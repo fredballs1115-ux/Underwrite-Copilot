@@ -3064,6 +3064,7 @@ function NewDealForm({
           accept="application/pdf"
           hint="PDF offering memorandum, up to 32 MB"
           maxBytes={32 * 1024 * 1024}
+          tooLarge="memorandum"
           onFile={(file) => {
             if (!file) return;
             const next = prefillName(name, filledName.current, file.name);

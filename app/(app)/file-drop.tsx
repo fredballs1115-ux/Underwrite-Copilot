@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { tooLargeMessage, wrongTypeMessage } from "@/lib/upload-limit";
+import { TOO_LARGE_REMEDY, tooLargeMessage, wrongTypeMessage } from "@/lib/upload-limit";
 
 /** Does this file satisfy the accept string (".pdf,.csv" / "application/pdf")? */
 function matchesAccept(file: File, accept?: string): boolean {
@@ -26,6 +26,7 @@ export function FileDrop({
   accept,
   hint,
   maxBytes,
+  tooLarge = "document",
   onFile,
 }: {
   name: string;
@@ -33,6 +34,9 @@ export function FileDrop({
   hint?: string;
   /** reject oversized files before wasting an upload */
   maxBytes?: number;
+  /** what the refusal of an oversized file tells the reader to do: a
+   *  memorandum is never split (lib/upload-limit) */
+  tooLarge?: keyof typeof TOO_LARGE_REMEDY;
   /** told the file now chosen, or null once none is — so the form around
    *  it can read the file's name (the new-deal form names the deal by it) */
   onFile?: (file: File | null) => void;
@@ -53,7 +57,7 @@ export function FileDrop({
       return;
     }
     if (maxBytes && file.size > maxBytes) {
-      setTypeError(tooLargeMessage(file.name, file.size, maxBytes));
+      setTypeError(tooLargeMessage(file.name, file.size, maxBytes, tooLarge));
       return;
     }
     setTypeError(null);
@@ -121,7 +125,7 @@ export function FileDrop({
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
             if (f && maxBytes && f.size > maxBytes) {
-              setTypeError(tooLargeMessage(f.name, f.size, maxBytes));
+              setTypeError(tooLargeMessage(f.name, f.size, maxBytes, tooLarge));
               e.target.value = "";
               setFileName(null);
               onFile?.(null);

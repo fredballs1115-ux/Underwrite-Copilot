@@ -30,11 +30,25 @@ export function sizeAgainstLimit(bytes: number, maxBytes: number): { size: strin
   return { size: sizeTenths > limitTenths ? fromTenths(sizeTenths) : null, limit: fromTenths(limitTenths) };
 }
 
+/** What to do with a file over the limit, by what the file is: a part of a
+ *  supplement is useful, a part of a memorandum is screened as if it were
+ *  the whole (research pass 32), and a photograph is simply taken smaller. */
+export const TOO_LARGE_REMEDY = {
+  document: "Try compressing or splitting it.",
+  memorandum: "Compress it and upload it again — split, it would be screened on part of the memorandum.",
+  picture: "Try a smaller copy.",
+} as const;
+
 /** The refusal of a file over the limit. */
-export function tooLargeMessage(name: string, bytes: number, maxBytes: number): string {
+export function tooLargeMessage(
+  name: string,
+  bytes: number,
+  maxBytes: number,
+  remedy: keyof typeof TOO_LARGE_REMEDY = "document",
+): string {
   const { size, limit } = sizeAgainstLimit(bytes, maxBytes);
   const over = size ? `is ${size} MB — over the ${limit} MB limit` : `is just over the ${limit} MB limit`;
-  return `"${name}" ${over}. Try compressing or splitting it.`;
+  return `"${name}" ${over}. ${TOO_LARGE_REMEDY[remedy]}`;
 }
 
 /** The refusal of a file of a type the picker does not take, in the hint's

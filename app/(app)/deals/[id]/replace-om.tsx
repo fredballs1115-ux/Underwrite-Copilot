@@ -30,7 +30,7 @@ function PickButton({ disabled, attach, prominent }: { disabled: boolean; attach
           if (f.size > 32 * 1024 * 1024) {
             // Past 32 MB the request would blow the server-action body cap
             // and die as a raw 500 — reject before the confirm dialog.
-            alert(tooLargeMessage(f.name, f.size, 32 * 1024 * 1024));
+            alert(tooLargeMessage(f.name, f.size, 32 * 1024 * 1024, "memorandum"));
             e.currentTarget.value = "";
             return;
           }
