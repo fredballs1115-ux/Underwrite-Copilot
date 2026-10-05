@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import {
+  ALLOCATION_ROWS,
+  COVERAGE_ROW,
+  MARKET_RENT_ROW,
+  STATED_ROWS,
   goingConcernContextLine,
   goingConcernModelLine,
   goingConcernNote,
@@ -11,6 +15,7 @@ import {
   readGoingConcern,
 } from "./going-concern";
 import { gluedWords } from "./render-lint";
+import { extractionInstruction } from "./anthropic/prompts";
 
 const TODAY = new Date("2026-10-05T12:00:00Z");
 const row = (label: string, value: string, page = "p. 5") => ({ label, value, page, flagged: false });
@@ -200,5 +205,41 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
       const r = readGoingConcern(d, TODAY)!;
       for (const text of [r.headline, goingConcernShortLine(r), goingConcernContextLine(r)]) expect(gluedWords(text)).toEqual([]);
     }
+  });
+});
+
+describe("the prompt asks for what the reader reads", () => {
+  it("names each operating-business row by a label the reader's own pattern takes", () => {
+    const prompt = extractionInstruction("auto");
+    const stated = new Map(STATED_ROWS.map(([label, re]) => [label, re] as const));
+    const labels: [string, RegExp][] = [
+      ["Rent coverage", COVERAGE_ROW],
+      ["Market rent", MARKET_RENT_ROW],
+      ...ALLOCATION_ROWS.map(([key, re]) => [{ realEstate: "Real estate value", ffe: "FF&E value", business: "Business value" }[key], re] as [string, RegExp]),
+      ...[...stated.entries()],
+    ];
+    expect(labels).toHaveLength(17);
+    for (const [label, re] of labels) {
+      expect(prompt).toContain(`"${label}"`);
+      expect(re.test(label), label).toBe(true);
+    }
+    // EBITDA and EBITDAR were asked for already, never under an NOI label.
+    expect(prompt).toContain('under "EBITDA" or "EBITDAR" exactly as stated');
+    // Each label, as the extraction writes it, is read.
+    const r = readGoingConcern(
+      deal({ assetClass: "Gas Station / Convenience Store" }, [
+        row("Rent coverage", "2.4x"),
+        row("Market rent", "$180,000 a year"),
+        row("Real estate value", "$8,500,000"),
+        row("FF&E value", "$1,200,000"),
+        row("Business value", "$2,300,000"),
+        ...[...stated.keys()].map((label) => row(label, `${label} as stated`)),
+      ]),
+      TODAY,
+    )!;
+    expect(r.coverage).toEqual({ times: 2.4, from: "stated" });
+    expect(r.marketRent).toBe("$180,000 a year");
+    expect(r.allocation).toEqual({ realEstate: 8_500_000, ffe: 1_200_000, business: 2_300_000 });
+    expect(r.stated.map((s) => s.label)).toEqual([...stated.keys()]);
   });
 });
