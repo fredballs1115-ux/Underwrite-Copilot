@@ -33,7 +33,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, planWithBasisChecked, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
-import { YOC_WITHHELD, yieldOnCostText } from "@/lib/plan-facts";
+import { YOC_WITHHELD, planNoiText, yieldOnCostText } from "@/lib/plan-facts";
 import { dealTypeLabel, interestOf, interestShortLine, isWholeShare, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -151,7 +151,7 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   const noun = countNounOf(extraction?.metrics ?? [], cls, strategy.kind).one;
   const per = `per ${notYetDelivered(strategy.kind) ? "planned " : ""}${noun}`;
   if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
-    return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
+    return `${kind} · ${noiWord} ${planNoiText(plan.stabilizedNoi, m)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
       plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} ${per} all-in` : ""
     })`;
   }
@@ -160,7 +160,7 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   // and read as if no total cost were stated. So is a total cost the plan
   // strikes on no equity's whole, in its own sentence.
   const refused = plan?.yieldWithheld ? `; yield on cost ${YOC_WITHHELD}. ${plan.yieldWithheld}` : plan?.costWithheld ? `. ${plan.costWithheld}` : "";
-  if (plan?.stabilizedNoi) return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)}${refused}`;
+  if (plan?.stabilizedNoi) return `${kind} · ${noiWord} ${planNoiText(plan.stabilizedNoi, m)}${refused}`;
   return kind;
 }
 

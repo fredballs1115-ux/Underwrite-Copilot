@@ -30,6 +30,20 @@ export function planReadLine(kind: StrategyKind, label: string, landPrice: boole
 export const moneyCompact = (n: number): string => compactUsd(n);
 
 /**
+ * The plan's NOI as every surface that prints it says it: where the
+ * memorandum states it a month at a time (lib/deal-strategy `noiOfRow`,
+ * research pass 40), the year it makes, written to the hundredth of a
+ * million so the twelve visibly ties, with the month beside it —
+ * "$1.32M (twelve times the $110k a month stated)" — never a year bare
+ * beside a key term that says "(monthly)" (audit C4, M2). A year the
+ * memorandum states is written as the facts write every figure.
+ */
+export function planNoiText(f: { value: number; month?: number }, money: (n: number) => string = moneyCompact): string {
+  if (f.month == null) return money(f.value);
+  return `${compactUsd(f.value, { millions: "auto", trim: true })} (twelve times the ${money(f.month)} a month stated)`;
+}
+
+/**
  * A percent figure — a going-in cap, a yield on cost — as every surface that
  * shows a deal prints it: to two decimals, the precision an offering
  * memorandum states a cap in. The pipeline card prints the memorandum's
@@ -89,7 +103,7 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
       // A forward purchase's NOI is the one the OM states at delivery (on a
       // build-to-suit, the lease's first year).
       plan.forward ? "NOI at delivery" : "Stabilized NOI",
-      plan.stabilizedNoi ? moneyCompact(plan.stabilizedNoi.value) : "not stated",
+      plan.stabilizedNoi ? planNoiText(plan.stabilizedNoi) : "not stated",
     ],
     // A price the OM states for something other than the project — a
     // note, the land under a ground lease, a share of no stated percentage

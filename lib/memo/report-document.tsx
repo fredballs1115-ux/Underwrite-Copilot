@@ -60,7 +60,7 @@ import {
   type SpreadBucket,
   type YocGrid,
 } from "@/lib/plan-sensitivity";
-import { planFacts, yieldOnCostText } from "@/lib/plan-facts";
+import { planFacts, planNoiText, yieldOnCostText } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
@@ -2175,13 +2175,14 @@ export function ReportDocument({
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
             {str(
               plan.breakevens.noiCushion > 0
-                ? `Stabilized NOI can come in ${fmtPct(plan.breakevens.noiCushion)} under the OM's ${fmtCompactUsd(
-                    plan.plan.stabilizedNoi!.value,
+                ? `Stabilized NOI can come in ${fmtPct(plan.breakevens.noiCushion)} under the OM's ${planNoiText(
+                    plan.plan.stabilizedNoi!,
+                    fmtCompactUsd,
                   )} — down to ${fmtCompactUsd(plan.breakevens.noiAtRefCap)} — before the yield on cost falls to the ${fmtPct(
                     plan.refCap.pct,
                     2,
                   )} reference cap.`
-                : `The OM's ${fmtCompactUsd(plan.plan.stabilizedNoi!.value)} stabilized NOI already yields less than the ${fmtPct(
+                : `The OM's ${planNoiText(plan.plan.stabilizedNoi!, fmtCompactUsd)} stabilized NOI already yields less than the ${fmtPct(
                     plan.refCap.pct,
                     2,
                   )} reference cap on ${fmtCompactUsd(plan.plan.totalCost ?? 0)} of total cost — the plan is under water before any stress.`,

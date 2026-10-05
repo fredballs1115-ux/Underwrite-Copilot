@@ -1604,7 +1604,14 @@ function buildDealSummary(
         noiCell.value = meta.stabilizedNoi.value;
         styleInput(noiCell, FMT.usd);
         noiCell.alignment = { horizontal: "right" };
-        label(ws.getCell(r, 3), meta.stabilizedNoi.page ? `OM ${meta.stabilizedNoi.page}` : "OM", { color: MUTED, size: 9 });
+        // A month the OM states is credited as the month, times twelve: the
+        // OM states no such year (audit C4, M2).
+        const omAt = meta.stabilizedNoi.page ? `OM ${meta.stabilizedNoi.page}` : "OM";
+        label(
+          ws.getCell(r, 3),
+          meta.stabilizedNoi.month != null ? `${omAt}: $${Math.round(meta.stabilizedNoi.month).toLocaleString("en-US")} a month × 12` : omAt,
+          { color: MUTED, size: 9 },
+        );
       } else {
         // A blank is null, never zero: the OM stated no stabilized figure.
         label(noiCell, "not stated", { color: MUTED });

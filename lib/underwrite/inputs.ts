@@ -325,7 +325,13 @@ export interface WorkbookMeta {
    *  finished project's figure, never year 1's; the workbook's Deal Summary
    *  puts it over total cost as the yield the plan is judged on. Null when
    *  the OM states none, or on a stabilized asset. */
-  stabilizedNoi?: { value: number; page?: string } | null;
+  stabilizedNoi?: {
+    value: number;
+    page?: string;
+    /** the month the memorandum states, where it states the NOI a month at
+     *  a time: `value` is twelve times it (lib/deal-strategy `noiOfRow`) */
+    month?: number;
+  } | null;
   /** the rate the model was seeded with off today's curve, with its note,
    *  so the deal page's debt sizer starts where the workbook does; null
    *  where no index was given or the class carries no permanent loan */
@@ -1605,7 +1611,13 @@ export function deriveUnderwriteInputs(
       strategy: strategy.kind,
       stabilizedNoi:
         isPlanDeal(strategy.kind) && stabilizedFig && stabilizedFig.value > 0
-          ? { value: stabilizedFig.value, page: stabilizedFig.page }
+          ? {
+              value: stabilizedFig.value,
+              page: stabilizedFig.page,
+              // A month the memorandum states, so the workbook credits the
+              // twelve to the month and never a year to the OM (audit C4, M2).
+              ...(stabilizedFig.month != null ? { month: stabilizedFig.month } : {}),
+            }
           : null,
       rateSeed,
     },
