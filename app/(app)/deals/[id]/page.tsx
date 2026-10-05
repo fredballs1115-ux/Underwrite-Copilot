@@ -92,6 +92,7 @@ import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { jobAgeMs, storedPreviousResults, verdictBehind } from "@/lib/screen-run";
+import { documentKindWarning } from "@/lib/document-kind";
 import { readingMemorandum } from "@/lib/screen-reading";
 import {
   SCREEN_DURATION_SAMPLE,
@@ -289,6 +290,10 @@ export default async function DealPage({
   const firstSignal = deal.first_signal
     ? (deal.first_signal as FirstSignal)
     : null;
+  // What the uploaded document is by its own pages (the first signal's
+  // read): a warning where it is not an offering memorandum. Only a deal
+  // screened from an upload; a deal typed in by hand has no document.
+  const documentKindNotice = deal.om_storage_path ? documentKindWarning(firstSignal?.documentKind) : null;
   const extraction = deal.extraction
     ? (deal.extraction as ExtractionResult)
     : null;
@@ -1099,6 +1104,15 @@ export default async function DealPage({
       {filedPersonal && (
         <p role="status" data-qa="filed-personal" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
           {filedPersonalNotice(TEAM_TRIAL_DEALS)}
+        </p>
+      )}
+
+      {/* The first signal read the upload as something other than an
+          offering memorandum (lib/document-kind): said, never acted on —
+          the screen runs as it would on an OM. */}
+      {documentKindNotice && (
+        <p role="status" data-qa="document-kind" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
+          {documentKindNotice}
         </p>
       )}
 

@@ -242,7 +242,9 @@ These are look-up facts from the OM's summary pages — answer immediately, no d
 
 \`goingInCap\` is the cap on TODAY's in-place income against the asking price, and nothing else. A stabilized, pro forma, forward or "at completion" cap, or a yield on cost, is the finished project's figure — on a conversion, development, lease-up or value-add it is not a going-in cap at all: leave \`goingInCap\` empty and name that figure for what it is in \`take\`.
 
-Then \`take\`: ONE skeptical sentence — what kind of deal this is (stabilized, value-add, lease-up, conversion, development) and the first thing worth checking. The full six-stage screen runs next; this is just the instant signal.`;
+Then \`take\`: ONE skeptical sentence — what kind of deal this is (stabilized, value-add, lease-up, conversion, development) and the first thing worth checking. The full six-stage screen runs next; this is just the instant signal.
+
+Last, say what the attached document IS, by its own pages — \`documentKind\`: "offering_memorandum" (a broker's package offering a property, a portfolio, a note or an interest for sale — an investment summary, the property, its financials, the market), "flyer_or_teaser" (a one- or two-page flyer or teaser for an offering), "bov" (a broker's opinion of value written for an owner), "lease" (a lease or a lease abstract), "rent_roll" (a rent roll on its own), "operating_statement" (an operating statement, a T-12 or a budget on its own), "appraisal" (an appraisal report), "loan_document" (a loan agreement, a term sheet or a lender's commitment — never a note offered for sale, which is an offering memorandum) or "other". Read the pages as they are: never answer "offering_memorandum" because these instructions call the document one.`;
 }
 
 /** Step 1 — Extraction */

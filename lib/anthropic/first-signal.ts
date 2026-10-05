@@ -8,6 +8,7 @@ import { MODELS } from "./models";
 import { ANALYST_SYSTEM, firstSignalInstruction } from "./prompts";
 import { todayLine } from "./today";
 import type { AssetClass, FirstSignal } from "./types";
+import { DOCUMENT_KINDS } from "@/lib/document-kind";
 
 const FirstSignalSchema = z.object({
   dealName: z.string(),
@@ -18,6 +19,10 @@ const FirstSignalSchema = z.object({
   goingInCap: z.string(),
   perUnit: z.string(),
   take: z.string(),
+  // What the document IS (lib/document-kind): the deal page warns where it
+  // is not an offering memorandum. Asked after the cached document, so the
+  // prompt cache's prefix never moves.
+  documentKind: z.enum(DOCUMENT_KINDS),
 });
 
 /**

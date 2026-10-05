@@ -56,6 +56,12 @@ export interface FirstSignal {
   perUnit: string;
   /** one skeptical sentence: what kind of deal this is and the first thing to check */
   take: string;
+  /** what the document IS, by its own pages — one of lib/document-kind's
+   *  `DOCUMENT_KINDS` ("offering_memorandum", "lease", "rent_roll"…), read
+   *  through `documentKindOf`; absent on a signal read before it was asked
+   *  and on a deal typed in by hand. The deal page warns on anything but an
+   *  OM; nothing stops a screen on it. */
+  documentKind?: string;
 }
 
 /** Step 1 — Extraction */
