@@ -155,7 +155,7 @@ describe("the workbook's Deal Summary says withheld over its live formulas (rese
     expect(lines).toContain(
       `The returns and the cap on year-1 NOI are withheld on the deal page, and the full report leaves its grids and max bid out: ${reason} The cells marked “withheld” keep their live formulas: give one a number format to read it.`,
     );
-    for (const lab of ["Going-In Cap (Yr-1 NOI / Price)", "Year-1 Yield on Total Cost", "Levered IRR"]) {
+    for (const lab of ["Going-In Cap (Yr-1 NOI / Price)", "Year-1 Yield on Total Uses (before yr-1 capital)", "Levered IRR"]) {
       const c = ws.getCell(rowOf(ws, 4, lab), 5);
       expect(formulaOf(c), lab).toBeTruthy();
       expect(c.numFmt, lab).toBe(WITHHELD_FMT);

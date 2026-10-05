@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import ExcelJS from "exceljs";
 import { HyperFormula } from "hyperformula";
-import { RENT_LINE_LABEL, buildUnderwriteWorkbook } from "./workbook";
+import { RENT_LINE_LABEL, YEAR1_YIELD_LABEL, buildUnderwriteWorkbook } from "./workbook";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import { buildSensitivityGrids } from "./sensitivity";
@@ -615,7 +615,7 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     // the cap on modelled year-1 income.
     const summary = wb.getWorksheet("Deal Summary")!;
     expect(() => findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)")).toThrow();
-    expect(() => findRow(summary, 4, "Year-1 Yield on Total Cost")).toThrow();
+    expect(() => findRow(summary, 4, YEAR1_YIELD_LABEL)).toThrow();
     findRow(summary, 4, "Cap on Yr-1 Income (as modelled)");
     findRow(summary, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
     const noiRow = findRow(summary, 1, "OM Stabilized NOI (pro forma)");
@@ -754,7 +754,7 @@ describe("where the price did not buy the building, no building basis or cap is 
     expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
     expect(String(summary.getCell(tiles + 2, 1).value)).toContain("not the note's return");
     expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe("n/a — note");
-    expect(summary.getCell(findRow(summary, 4, "Year-1 Yield on Total Cost"), 5).value).toBe("n/a — note");
+    expect(summary.getCell(findRow(summary, 4, YEAR1_YIELD_LABEL), 5).value).toBe("n/a — note");
     const labels = opsLabels(w);
     expect(labels).not.toContain("Price / Unit");
     expect(labels).not.toContain("Price / SF");
@@ -1089,6 +1089,16 @@ describe("the workbook's labels and colours say what their cells are", () => {
     ]) {
       expect(assum.getCell(findRow(assum, 1, label), 2).name, label).toBe(name);
     }
+  });
+
+  // Research pass 40, L7: the cost of sale is struck on the sale price, which
+  // the SOURCE said and the label did not.
+  it("names the cost of sale a share of the sale price", async () => {
+    const assum = (await book(model)).getWorksheet("Assumptions")!;
+    expect(() => findRow(assum, 1, "Sale Costs % of price")).toThrow();
+    const r = findRow(assum, 1, "Sale Costs % of sale price");
+    expect(assum.getCell(r, 2).name).toBe("SaleCostPct");
+    expect(String(assum.getCell(r, 3).value)).toBe("Assumption — Default 2.0% of sale price");
   });
 
   it("the TI input says it is charged on the whole building's SF every year, never a per-lease allowance", async () => {
@@ -1560,7 +1570,11 @@ describe("the workbook reads on paper", () => {
     // The row's cells sit at its top, both blocks, beside the label's first line.
     for (const c of [1, 2, 4, 5]) expect(plan.getCell(yoc, c).alignment?.vertical).toBe("top");
     const stab = (await load(model)).getWorksheet("Deal Summary")!;
-    const y1 = findRow(stab, 4, "Year-1 Yield on Total Cost");
+    // Over the uses at closing, and said so: the year-1 capital is not in
+    // them (research pass 40, L6).
+    expect(YEAR1_YIELD_LABEL).toBe("Year-1 Yield on Total Uses (before yr-1 capital)");
+    expect(() => findRow(stab, 4, "Year-1 Yield on Total Cost")).toThrow();
+    const y1 = findRow(stab, 4, YEAR1_YIELD_LABEL);
     expect(stab.getCell(y1, 5).value).toMatchObject({ formula: expect.stringContaining("/TotalUses") });
     expect(() => findRow(stab, 4, "Stabilized Yield (on cost)")).toThrow();
   });

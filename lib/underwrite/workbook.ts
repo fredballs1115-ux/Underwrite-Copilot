@@ -80,8 +80,13 @@ const FMT = {
 const COVER_LINE = 80;
 
 /** A stabilized deal's year-1 NOI over its total uses, in the Deal
- *  Summary's return block: what it is, never a "stabilized" figure. */
-const YEAR1_YIELD_LABEL = "Year-1 Yield on Total Cost";
+ *  Summary's return block: what it is, never a "stabilized" figure — and
+ *  over the uses at closing, which leave out the capital the model spends
+ *  in year 1, where the plan block's Total Cost carries it (research pass
+ *  40, L6: it read "Year-1 Yield on Total Cost"). */
+export const YEAR1_YIELD_LABEL = "Year-1 Yield on Total Uses (before yr-1 capital)";
+/** The same on a leased fee, whose price is the land's. */
+export const YEAR1_YIELD_LAND_LABEL = "Year-1 Yield on Total Uses (the Land's, before yr-1 capital)";
 /** About what one line of the Deal Summary's 18-wide value column holds at
  *  10 pt: a market name past it wraps. */
 const MARKET_LINE = 20;
@@ -983,7 +988,8 @@ function buildAssumptions(
 
   header("Exit");
   input("Exit Cap", inp.exitCapPct, "ExitCap", FMT.pct2, "exitCapPct", true);
-  input("Sale Costs % of price", inp.saleCostPct, "SaleCostPct", FMT.pct1, "saleCostPct");
+  // Struck on the sale price, not the purchase price (research pass 40, L7).
+  input("Sale Costs % of sale price", inp.saleCostPct, "SaleCostPct", FMT.pct1, "saleCostPct");
 }
 
 // ── CASH FLOW (ANNUAL) ────────────────────────────────────────────────────────
@@ -1714,7 +1720,9 @@ function buildDealSummary(
       const cell = ws.getCell(row, c);
       cell.alignment = { ...cell.alignment, vertical: "top", ...(c === 4 ? { wrapText: true } : {}) };
     }
-    ws.getRow(row).height = 26;
+    // Two lines of the 30-wide column hold about 56 characters; a longer
+    // label gets the third.
+    ws.getRow(row).height = Math.max(26, Math.ceil(lab.length / 28) * 13);
   };
   const ret = (lab: string, formula: string, fmt: string, name?: string) => {
     label(ws.getCell(rr, 4), lab, { indent: 1 });
@@ -1779,7 +1787,7 @@ function buildDealSummary(
     ret(onLand ? "Going-In Cap on the Land's Price (Yr-1 NOI / Price)" : "Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, capFmt(FMT.pct2));
     // Year-1 NOI over the total uses — no stabilized figure, so never called
     // one (it read "Stabilized Yield (on cost)").
-    ret(onLand ? `${YEAR1_YIELD_LABEL} (the Land's)` : YEAR1_YIELD_LABEL, `IF(TotalUses<=0,"n/a",${noiY1}/TotalUses)`, capFmt(FMT.pct2));
+    ret(onLand ? YEAR1_YIELD_LAND_LABEL : YEAR1_YIELD_LABEL, `IF(TotalUses<=0,"n/a",${noiY1}/TotalUses)`, capFmt(FMT.pct2));
   }
   // The returns the tiles show, marked as the tiles are where the page
   // withholds them (research pass 40, H1). The unlevered pair runs on the

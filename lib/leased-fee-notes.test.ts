@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
+import { YEAR1_YIELD_LAND_LABEL, buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
 import { ex, m } from "@/lib/pass38.fixture";
 
 const LEASED_FEE = { kind: "leased_fee", summary: "The land under an office building, sold with its ground lease", share: "", groundLease: "Ground lease to 2079", loan: "", page: "p. 2" };
@@ -66,7 +66,7 @@ describe("a leased fee's cap in the workbook (the second audit, MED-5)", () => {
   it("prints the cap on the land's price, live, as the page prints it", async () => {
     const rows = await summaryOf(deriveUnderwriteInputs(fee([m("NOI (in-place)", "600,000", "in_place", "p. 5")]), "x"));
     expect(rows.get("Going-In Cap on the Land's Price (Yr-1 NOI / Price)")).toMatchObject({ formula: expect.stringContaining("/PurchasePrice") });
-    expect(rows.get("Year-1 Yield on Total Cost (the Land's)")).toMatchObject({ formula: expect.stringContaining("/TotalUses") });
+    expect(rows.get(YEAR1_YIELD_LAND_LABEL)).toMatchObject({ formula: expect.stringContaining("/TotalUses") });
     expect([...rows.values()]).not.toContain("n/a — leased fee");
   });
 
