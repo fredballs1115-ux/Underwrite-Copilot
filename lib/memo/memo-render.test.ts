@@ -931,6 +931,53 @@ describe("MemoDocument (redesigned)", () => {
     expect(pdf).toMatch(/\/Subtype\s*\/Image/);
   }, 30000);
 
+  it("keeps a typical memo to one page: the screen's date, the cover, a flood zone and what is being sold under the title (research pass 35)", async () => {
+    // The day the leasehold's term is read on.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: {
+        ...SAMPLE_DEAL.extraction,
+        interest: { kind: "leasehold", summary: "The leasehold interest in the building", share: "", groundLease: "Ground lease through December 31, 2071; unsubordinated.", loan: "", page: "p. 12" },
+        metrics: [
+          ...SAMPLE_DEAL.extraction.metrics,
+          { label: "Ground lease expiration", value: "December 31, 2071", flagged: false, page: "p. 12", basis: "na" },
+          { label: "Ground lease extension options", value: "Four 10-year options", flagged: false, page: "p. 12", basis: "na" },
+        ],
+      },
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: { ...SAMPLE_DEAL.verdict, generatedAt: "2026-09-28T14:00:00.000Z" },
+      prior_screen: null,
+      site_flags: { status: "ok", tractGeoid: null, opportunityZone: null, flood: { zone: "AE", subtype: null, isHighRisk: true }, retrievedAt: "2026-09-25T00:00:00Z", note: "" },
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", checks, null, null, { dataUri: TINY_PNG_DATA_URI, credit: "From the offering memorandum" });
+    // Each of the lines the pass measured turning the risks onto page two.
+    expect(data.screened).toBe("Screened Sep 28, 2026");
+    expect(data.floodLine).toMatch(/^Flood zone AE: a Special Flood Hazard Area/);
+    expect(data.interestLine).toBe("A leasehold — the building and a lease on the land, not the land; the lease ends Dec 2071, 45.2 years from today");
+    const pages = pdfPageTextsOf(
+      await renderToBuffer(React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    ).map((t) => t.replace(/\s+/g, " "));
+    expect(pages).toHaveLength(1);
+    // The two dates share one line, and the risks and next steps are on the
+    // page the call is.
+    expect(pages[0]).toContain("October 5, 2026 · Screened Sep 28, 2026");
+    expect(pages[0]).toContain("TOP RISKS");
+    expect(pages[0]).toContain("NEXT STEPS");
+    for (const r of SAMPLE_DEAL.verdict.topRisks.slice(0, 2)) expect(pages[0]).toContain(r);
+  }, 30000);
+
   it("draws where the base sits in each range as a track and a dot, and the calls as dots", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,
@@ -1016,16 +1063,24 @@ describe("MemoDocument (redesigned)", () => {
     expect(sample).toHaveLength(1);
     expect(sample[0]).not.toContain("continued");
 
-    // The sample with an analyst's override: the override's section moves
-    // whole to page two, which says whose memo it is.
-    const overridden = await render(base, ["Rent growth check dismissed: the renovated comps support 4% for two years (analyst)"]);
+    // The sample with an analyst's override: it travels on page one now the
+    // lines under the title run the page's width (research pass 35).
+    const RENT = "Rent growth check dismissed: the renovated comps support 4% for two years (analyst)";
+    const SUPPLY = "Supply check dismissed: the pipeline counts a project that broke ground in 2019 and delivered last spring (analyst)";
+    const overriddenOnce = await render(base, [RENT]);
+    expect(overriddenOnce).toHaveLength(1);
+    expect(overriddenOnce[0]).toContain(RENT);
+    // Two overrides: the section moves whole to page two, which says whose
+    // memo it is.
+    const overridden = await render(base, [RENT, SUPPLY]);
     expect(overridden).toHaveLength(2);
     expect(overridden[0]).not.toContain("screening memo, continued");
     expect(overridden[1]).toMatch(/^Sample — The Maddox at Brewerytown — screening memo, continued /);
-    expect(onePage(overridden, "SUBMARKET CHECKS OVERRIDDEN", "Rent growth check dismissed")).toBe(true);
+    expect(onePage(overridden, "SUBMARKET CHECKS OVERRIDDEN", RENT, SUPPLY)).toBe(true);
 
     // Lines under the title push the break down into the screen's cards:
-    // two fixtures, measured so that without the guards the first cuts the
+    // two fixtures, measured (research pass 35, once those lines ran the
+    // page's full width) so that without the guards the first cuts the
     // call's flips from their label and the second cuts each deal-killer
     // card from its "breaks if".
     const screen = SAMPLE_DEAL.verdict.screen!;
@@ -1034,7 +1089,11 @@ describe("MemoDocument (redesigned)", () => {
       { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
       { ...SAMPLE_DEMO_BOX, markets: "Philadelphia, Pittsburgh", priceMaxM: 60, maxPerUnitK: 250, sfMin: 150000 } as typeof SAMPLE_DEMO_BOX,
     );
-    const crowd = (name: string, hotel: boolean) => ({
+    // A memorandum that states a rent regime and, on the second fixture, a
+    // student building's pre-leasing: one more line under the title each.
+    const REGULATED = [row("Rent regulation", "Rent stabilization"), row("Rent-regulated units", "41")];
+    const PRELEASED = [row("Pre-leased", "87% for fall 2026"), row("Beds", "612")];
+    const crowd = (name: string, hotel: boolean, extra: ReturnType<typeof row>[] = []) => ({
       ...base,
       name,
       verdict: {
@@ -1065,13 +1124,14 @@ describe("MemoDocument (redesigned)", () => {
           row("Tax abatement expiration", "2031"),
           row("Abated real estate taxes", "$70,000"),
           row("Unabated real estate taxes", "$520,000"),
+          ...extra,
         ],
       },
       site_flags: { status: "ok", tractGeoid: null, opportunityZone: null, flood: { zone: "AE", subtype: null, isHighRisk: true }, retrievedAt: "2026-09-25T00:00:00Z", note: "" },
     });
-    const flipsAtBreak = await render(crowd("Riverside Gardens Apartments (Receivership Sale)", false), null, { checks: wideBox, cover: true });
+    const flipsAtBreak = await render(crowd("Riverside Gardens Apartments (Receivership Sale)", true, REGULATED), null, { checks: wideBox, cover: true });
     const killersAtBreak = await render(
-      crowd("Riverside Gardens Apartments and Townhomes at the Brewerytown Riverfront (Receivership Sale)", true),
+      crowd("Riverside Gardens Apartments and Townhomes at the Brewerytown Riverfront (Receivership Sale)", true, [...REGULATED, ...PRELEASED]),
       null,
       { checks: wideBox, cover: true },
     );

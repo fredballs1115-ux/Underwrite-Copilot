@@ -848,7 +848,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: C.brand,
     marginTop: 8,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   titleRow: {
     flexDirection: "row",
@@ -945,13 +945,15 @@ const s = StyleSheet.create({
   buyBoxMark: { fontSize: 8, fontFamily: "Helvetica-Bold", marginRight: 3 },
   buyBoxLabel: { fontSize: 8, color: C.ink },
 
-  section: { marginTop: 11 },
-  twoCol: { flexDirection: "row", marginTop: 11, gap: 14 },
+  // The sections sit 9pt apart (research pass 35: 11 left the risks and
+  // the next steps a few points short of page one under a wrapped title).
+  section: { marginTop: 9 },
+  twoCol: { flexDirection: "row", marginTop: 9, gap: 14 },
   col: { flex: 1 },
   sectionTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 7,
+    marginBottom: 6,
   },
   sectionTick: {
     width: 3,
@@ -1200,9 +1202,9 @@ export function MemoPage({ data }: { data: MemoData }) {
           render={({ pageNumber }) => (pageNumber > 1 ? `${data.name} — screening memo, continued` : "")}
         />
         {/* The masthead: brand and date, the rule, the title and its chip —
-            and, when there is one, the cover aerial at the far right spanning
-            all three rows. It borrows the height the masthead already spends,
-            so a memo that fit one page without it still does. */}
+            and, when there is one, the cover at the far right spanning all
+            three rows. It borrows the height the masthead already spends, so
+            a memo that fit one page without it still does. */}
         <View style={s.masthead}>
           <View style={{ flex: 1 }}>
         <View style={s.header}>
@@ -1223,16 +1225,41 @@ export function MemoPage({ data }: { data: MemoData }) {
           </View>
           <View>
             <Text style={s.metaRight}>Deal Screening Memo</Text>
-            <Text style={s.metaRight}>{data.dateStr}</Text>
-            {data.screened ? <Text style={s.metaRight}>{data.screened}</Text> : null}
+            {/* The export date and the day the call was written share one
+                line (research pass 35): a third line here narrowed the
+                title's column for its whole height. */}
+            <Text style={s.metaRight}>{data.screened ? `${data.dateStr} · ${data.screened}` : data.dateStr}</Text>
           </View>
         </View>
 
         <View style={s.divider} />
 
         <View style={s.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.title}>{data.name}</Text>
+          <Text style={[s.title, { flex: 1 }]}>{data.name}</Text>
+          {data.verdictWord ? (
+            <View
+              style={[s.titleChipBox, { backgroundColor: data.verdictColor }]}
+            >
+              <Text style={s.titleChipText}>{data.verdictWord}</Text>
+            </View>
+          ) : null}
+        </View>
+          </View>
+          {data.cover ? (
+            <View style={s.coverBox}>
+              {/* react-pdf's Image has no alt concept (print canvas, not DOM) */}
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={data.cover.dataUri} style={s.cover} />
+              <Text style={s.coverCredit}>{pdfSafe(data.cover.credit)}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* The lines under the title run the page's full width, below the
+            masthead and the cover beside it (research pass 35): in the
+            title's column beside the cover every one of them wrapped, and
+            one wrapped line was enough to turn the risks onto a second page. */}
+        <View>
             {subParts.length > 0 && (
               <Text style={s.sub}>{subParts.join("  ·  ")}</Text>
             )}
@@ -1310,24 +1337,6 @@ export function MemoPage({ data }: { data: MemoData }) {
                 {data.exchangeLine}
               </Text>
             )}
-          </View>
-          {data.verdictWord ? (
-            <View
-              style={[s.titleChipBox, { backgroundColor: data.verdictColor }]}
-            >
-              <Text style={s.titleChipText}>{data.verdictWord}</Text>
-            </View>
-          ) : null}
-        </View>
-          </View>
-          {data.cover ? (
-            <View style={s.coverBox}>
-              {/* react-pdf's Image has no alt concept (print canvas, not DOM) */}
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
-              <Image src={data.cover.dataUri} style={s.cover} />
-              <Text style={s.coverCredit}>{pdfSafe(data.cover.credit)}</Text>
-            </View>
-          ) : null}
         </View>
 
         {data.verdictWord && (
@@ -1502,8 +1511,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.topRisks.length > 0 && (
               <View style={s.col}>
                 <Text style={s.sectionTitle}>Top risks</Text>
-                {data.topRisks.map((r, i) => (
-                  <View key={i} style={s.row}>
+                {/* The last item ends the page's block: no margin under it. */}
+                {data.topRisks.map((r, i, all) => (
+                  <View key={i} style={i === all.length - 1 ? [s.row, { marginBottom: 0 }] : s.row}>
                     <Text style={s.bullet}>•</Text>
                     <Text style={s.itemText}>{r}</Text>
                   </View>
@@ -1513,8 +1523,8 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.nextSteps.length > 0 && (
               <View style={s.col}>
                 <Text style={s.sectionTitle}>Next steps</Text>
-                {data.nextSteps.map((n, i) => (
-                  <View key={i} style={s.row}>
+                {data.nextSteps.map((n, i, all) => (
+                  <View key={i} style={i === all.length - 1 ? [s.row, { marginBottom: 0 }] : s.row}>
                     <Text style={s.bullet}>{i + 1}.</Text>
                     <Text style={s.itemText}>{n}</Text>
                   </View>
