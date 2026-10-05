@@ -159,6 +159,30 @@ describe("a mixed-use building's two incomes, read as stated (pass 28, round 7)"
     );
   });
 
+  // Research pass 38's leftover: an income read off a month's figure was
+  // said as a year the memorandum "states" ($1.1M where it states $91,667 a
+  // month).
+  it("says an income read off a month as the month it states and the year it makes, never a stated year", () => {
+    const monthly = readMixedUse(deal([row("Residential income", "$91,667/month"), row("Commercial income", "$610,000")], "Mixed-use"), TODAY)!;
+    expect(monthly).toMatchObject({ residentialIncome: 1_100_004, residentialFromMonth: true, commercialFromMonth: false });
+    expect(monthly.headline).toContain("The memorandum states $92k a month of residential income ($1.10M a year) and $610k of commercial: ");
+    expect(monthly.headline).not.toContain("states $1.10M");
+    const shops = readMixedUse(deal([row("Residential income", "$1,520,000"), row("Commercial income", "$50,000 per month")], "Mixed-use"), TODAY)!;
+    expect(shops).toMatchObject({ commercialIncome: 600_000, commercialFromMonth: true, residentialFromMonth: false });
+    expect(shops.headline).toContain("The memorandum states $1.52M of residential income and $50k a month of commercial ($600k a year): ");
+    const alone = readMixedUse(deal([row("Commercial income", "$50,000/mo")], "Mixed-use"), TODAY)!;
+    expect(alone.headline).toContain("The memorandum states $50k a month of commercial income ($600k a year) and no residential figure beside it");
+    // Summed rows, one of them a month's: the year is said, and the month
+    // among them.
+    const summed = readMixedUse(deal([row("Residential income", "$1,520,000"), row("Retail income", "$25,000/month"), row("Office income", "$400,000")], "Mixed-use"), TODAY)!;
+    expect(summed).toMatchObject({ commercialIncome: 700_000, commercialFromMonth: true });
+    expect(summed.headline).toContain("$700k a year of commercial (retail income and office income, added), a month's figure among them taken twelve times: ");
+    // A year stated beside its month is a stated year.
+    const both = readMixedUse(deal([row("Residential income", "$1,520,000"), row("Commercial income", "$610,000 annually ($50,833/month)")], "Mixed-use"), TODAY)!;
+    expect(both.commercialFromMonth).toBe(false);
+    for (const r of [monthly, shops, alone, summed]) expect(gluedWords(r.headline)).toEqual([]);
+  });
+
   it("is no mixed-use read on another building, or with nothing commercial stated", () => {
     expect(readMixedUse(deal([row("Commercial income", "$90,000")], "Multifamily"), TODAY)).toBeNull();
     expect(readMixedUse(deal([row("Residential income", "$1,520,000")], "Mixed-Use"), TODAY)).toBeNull();

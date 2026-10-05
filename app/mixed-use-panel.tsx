@@ -50,8 +50,10 @@ export function MixedUsePanel({ mixedUse, modelLine = "" }: { mixedUse: MixedUse
       : null;
 
   const tiles: { key: string; label: string; value: string; sub: string }[] = [];
-  if (!income && r.commercialIncome != null) tiles.push({ key: "commercial-income", label: "Commercial income", value: money(r.commercialIncome), sub: "A year's, as stated" });
-  if (!income && r.residentialIncome != null) tiles.push({ key: "residential-income", label: "Residential income", value: money(r.residentialIncome), sub: "A year's, as stated" });
+  // A year read off a month's figure says so, never "as stated".
+  const yearSub = (fromMonth: boolean) => (fromMonth ? "A year's, twelve times the month stated" : "A year's, as stated");
+  if (!income && r.commercialIncome != null) tiles.push({ key: "commercial-income", label: "Commercial income", value: money(r.commercialIncome), sub: yearSub(r.commercialFromMonth) });
+  if (!income && r.residentialIncome != null) tiles.push({ key: "residential-income", label: "Residential income", value: money(r.residentialIncome), sub: yearSub(r.residentialFromMonth) });
   if (!area && r.commercialSf != null) tiles.push({ key: "commercial-sf", label: "Commercial space", value: sfText(r.commercialSf), sub: "As stated" });
   if (r.commercialOccupancyPct != null) tiles.push({ key: "occupancy", label: "Commercial occupancy", value: pct1(r.commercialOccupancyPct), sub: "As stated" });
   if (r.roll) tiles.push({ key: "roll", label: "The commercial leases", value: r.roll, sub: "From the tenant list" });

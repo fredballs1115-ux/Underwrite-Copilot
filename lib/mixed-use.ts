@@ -195,9 +195,15 @@ export function annualIncomeOf(stated: string): number | null {
 
 export interface MixedUseRead {
   residentialIncome: number | null;
+  /** the residential income is twelve times a month's figure, the row
+   *  stating no year (`statedIncomeOf`): said so, never "states" a year */
+  residentialFromMonth: boolean;
   /** the commercial income: one row's, or the sum of one row a kind
    *  (retail, office) where the memorandum states each apart */
   commercialIncome: number | null;
+  /** the commercial income, or one of the rows summed into it, is twelve
+   *  times a month's figure */
+  commercialFromMonth: boolean;
   /** the rows summed into the commercial income, where more than one */
   commercialRows: string[];
   /** commercial rows whose sum the reader cannot know — a commercial total
@@ -253,7 +259,8 @@ export function readMixedUse(ex: ExtractionResult | null | undefined, asOf: Date
   const find = (re: RegExp) => rows.find((m) => re.test(m.label) && !NOT_TODAY.test(m.label) && !PER_UNIT_WORDS.test(m.label)) ?? null;
 
   const residentialRow = find(RESIDENTIAL_INCOME_ROW);
-  const residentialIncome = residentialRow ? annualIncomeOf(residentialRow.value) : null;
+  const residentialStated = residentialRow ? statedIncomeOf(residentialRow.value) : null;
+  const residentialIncome = residentialStated?.annual ?? null;
   // Every commercial row, not the first: an office income and a retail
   // income stated apart are one commercial income, added (the audit of
   // 2026-10-05: the retail row was dropped, so $300k of retail beside $400k
@@ -262,14 +269,18 @@ export function readMixedUse(ex: ExtractionResult | null | undefined, asOf: Date
   // sum the reader cannot know: named, never added.
   const commercial = rows.flatMap((m) => {
     if (!COMMERCIAL_INCOME_ROW.test(m.label) || NOT_TODAY.test(m.label) || PER_UNIT_WORDS.test(m.label)) return [];
-    const value = annualIncomeOf(m.value);
-    return value == null ? [] : [{ row: m as Row, kind: commercialKind(m.label), value }];
+    const stated = statedIncomeOf(m.value);
+    return stated == null ? [] : [{ row: m as Row, kind: commercialKind(m.label), value: stated.annual, fromMonth: stated.fromMonth }];
   });
   const kinds = new Map<string, number[]>();
   for (const c of commercial) kinds.set(c.kind, [...(kinds.get(c.kind) ?? []), c.value]);
   const unknowable =
     (kinds.has("commercial") && kinds.size > 1) || [...kinds.values()].some((vs) => new Set(vs).size > 1);
   const commercialIncome = commercial.length === 0 || unknowable ? null : [...kinds.values()].reduce((sum, vs) => sum + vs[0], 0);
+  // A kind's first row is the one summed (`kinds` keeps each kind's values
+  // in order), so the month is read off those rows alone.
+  const summed = [...new Set(commercial.map((c) => c.kind))].map((k) => commercial.find((c) => c.kind === k)!);
+  const commercialFromMonth = commercialIncome != null && summed.some((c) => c.fromMonth);
   const commercialRow = commercial[0]?.row ?? null;
   const commercialRows = !unknowable && kinds.size > 1 ? [...new Set(commercial.map((c) => c.row.label))] : [];
   const commercialUnread = unknowable ? [...new Set(commercial.map((c) => c.row.label))] : [];
@@ -283,7 +294,9 @@ export function readMixedUse(ex: ExtractionResult | null | undefined, asOf: Date
     part != null && other != null && part + other > 0 ? Math.round((part / (part + other)) * 1000) / 10 : null;
   const read: Omit<MixedUseRead, "sentences" | "headline"> = {
     residentialIncome,
+    residentialFromMonth: residentialIncome != null && residentialStated?.fromMonth === true,
     commercialIncome,
+    commercialFromMonth,
     commercialRows,
     commercialUnread,
     commercialIncomeSharePct: share(commercialIncome, residentialIncome),
@@ -312,14 +325,24 @@ function sentencesOf(r: Omit<MixedUseRead, "sentences" | "headline">): string[] 
   // "(retail income and office income, added)" where the commercial income
   // is the sum of rows the memorandum states apart.
   const added = r.commercialRows.length > 1 ? ` (${r.commercialRows.map((l) => l.toLowerCase()).join(" and ")}, added)` : "";
+  // An income read off a month's figure is said as the month it states and
+  // the year it makes, never as a year the memorandum states.
+  const residential = (n: number) =>
+    r.residentialFromMonth ? `${money(n / 12)} a month of residential income (${money(n)} a year)` : `${money(n)} of residential income`;
+  const commercial = (n: number, word: string) =>
+    !r.commercialFromMonth
+      ? `${money(n)} of ${word}${added}`
+      : r.commercialRows.length > 1
+        ? `${money(n)} a year of ${word}${added}, a month's figure among them taken twelve times`
+        : `${money(n / 12)} a month of ${word} (${money(n)} a year)`;
   if (r.commercialIncome != null && r.residentialIncome != null && r.commercialIncomeSharePct != null) {
     out.push(
-      `The memorandum states ${money(r.residentialIncome)} of residential income and ${money(r.commercialIncome)} of commercial${added}: ${pct1(
+      `The memorandum states ${residential(r.residentialIncome)} and ${commercial(r.commercialIncome, "commercial")}: ${pct1(
         r.commercialIncomeSharePct,
       )} of the income is the commercial space's, which re-lets on commercial terms (longer vacancies, leasing capital, a credit per tenant) where the apartments turn over every year.`,
     );
   } else if (r.commercialIncome != null) {
-    out.push(`The memorandum states ${money(r.commercialIncome)} of commercial income${added} and no residential figure beside it, so no share of the income is read.`);
+    out.push(`The memorandum states ${commercial(r.commercialIncome, "commercial income")} and no residential figure beside it, so no share of the income is read.`);
   } else if (r.commercialUnread.length > 0) {
     out.push(
       `The memorandum states commercial income in more than one row (${r.commercialUnread.join(", ")}), and whether one includes another is its to say: no commercial total or share is read.`,
