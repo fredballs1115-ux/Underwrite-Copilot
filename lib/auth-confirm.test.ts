@@ -218,7 +218,7 @@ describe("a press in a browser another account is signed in to", () => {
     const html = await page({ token_hash: HASH, type: "signup", next: "/billing", switch: "1" });
     const text = visibleText(html);
     expect(text).toContain(`You’re signed in as ${SIGNED_IN.email}`);
-    expect(text).toContain(`continuing signs ${SIGNED_IN.email} out of this browser first`);
+    expect(text).toContain(`Continuing signs ${SIGNED_IN.email} out of this browser first`);
     expect(text).toContain(`Stay signed in as ${SIGNED_IN.email}`);
     expect(html).toContain('name="replace" value="1"');
     expect(html).toContain('name="next" value="/billing"');
@@ -246,6 +246,23 @@ describe("a press in a browser another account is signed in to", () => {
     expect(await press({ token_hash: HASH, type: "recovery" })).toBe(confirmSwitchPath("recovery", HASH, null));
     expect(names()).toEqual(["getUser"]);
     expect(confirmSwitchCopy("recovery", null).heading).toBe("This browser may be signed in already");
+  });
+
+  it("says what the link does and whom continuing signs out, as the action does it (audit C3b LOW-3)", () => {
+    // The link signs this browser in, where the new password is set on the
+    // next screen; and the second press signs out whoever is signed in here,
+    // the same account included, as the press test above shows.
+    const named = confirmSwitchCopy("recovery", "ana@example.com");
+    expect(named.body).toBe(
+      "This link signs this browser in to the account it was sent to, and takes you on to set its new password. Continuing signs ana@example.com out of this browser first.",
+    );
+    expect(named.body).not.toContain("If that is another account");
+    expect(confirmSwitchCopy("recovery", null).body).toBe(
+      "This link signs this browser in to the account it was sent to, and takes you on to set its new password. Continuing signs out whoever is signed in here first.",
+    );
+    expect(confirmSwitchCopy("signup", "ana@example.com").body).toBe(
+      "This link confirms the account it was sent to, and signs this browser in to that account. Continuing signs ana@example.com out of this browser first.",
+    );
   });
 });
 

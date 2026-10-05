@@ -448,8 +448,12 @@ export function confirmSwitchCopy(
 ): { heading: string; body: string; button: string; stay: string } {
   const does =
     type === "recovery"
-      ? "This link sets a new password on the account it was sent to, and signs this browser in to that account."
+      ? // It signs in; the new password is set on the page it lands on (the
+        // audit C3b LOW-3: it had said the link itself sets one).
+        "This link signs this browser in to the account it was sent to, and takes you on to set its new password."
       : "This link confirms the account it was sent to, and signs this browser in to that account.";
+  // The second press signs out whoever is signed in here, the same account
+  // included (app/auth/confirm/actions.ts), so the words name no condition.
   if (!email) {
     return {
       heading: "This browser may be signed in already",
@@ -460,7 +464,7 @@ export function confirmSwitchCopy(
   }
   return {
     heading: `You’re signed in as ${email}`,
-    body: `${does} If that is another account, continuing signs ${email} out of this browser first.`,
+    body: `${does} Continuing signs ${email} out of this browser first.`,
     button: "Sign out and continue",
     stay: `Stay signed in as ${email}`,
   };
