@@ -116,9 +116,12 @@ export interface DeliveryDate {
    *  is read as, in the order written: the delivery is the latest, the side
    *  that does not flatter (research pass 37). Absent on a single date */
   dates?: { text: string; iso: string }[];
-  /** the words name phases, tranches or takedowns, each date one of them:
-   *  the price is paid in tranches as they deliver */
+  /** the words name phases or numbered buildings, each date one of them */
   phased?: true;
+  /** each phase is a closing of its own — the words name tranches,
+   *  takedowns or a closing a phase, and never one closing ("closing at
+   *  final completion"): the price is paid in tranches as they deliver */
+  closings?: true;
 }
 
 const lastDayOf = (y: number, mo: number) => new Date(Date.UTC(y, mo, 0)).getUTCDate();
@@ -139,21 +142,34 @@ const DATE_MENTION = new RegExp(
   ].join("|"),
   "gi",
 );
-/** Words that make each date a phase's: the price is paid in tranches. */
+/** Words that make each date a phase's. */
 const PHASE_WORDS = /\bphases?\b|\btranches?\b|\btake[- ]?downs?\b/i;
 const NAMED_BUILDINGS = /\bBuildings?\s+(?:[A-Z]|\d{1,2})\b/;
+/** Words that make each phase a closing of its own: tranches, takedowns, a
+ *  closing a phase or a building (audit C3a: any "Phase" had read as
+ *  tranches, beside a memorandum that said it closes once). */
+const SEPARATE_CLOSINGS =
+  /\btranches?\b|\btake[- ]?downs?\b|\bseparate\s+closings\b|\bphased\s+closings?\b|\bclos(?:ing|ings|es|ed)\b[^.;]{0,30}\b(?:each|every|per|by)\s+(?:phase|building|tranche)\b|\b(?:each|every|per)\s+(?:phase|building)\b[^.;]{0,30}\bclos(?:ing|es|ed)\b/i;
+/** Words that say the purchase closes once, whatever its phases. */
+const ONE_CLOSING =
+  /\b(?:single|one)\s+closing\b|\bclos(?:ing|es|e)\s+(?:at|upon|on)\s+(?:the\s+)?(?:final|full|substantial)\s+completion\b|\bclos(?:ing|es|e)\s+(?:at|upon|on)\s+(?:the\s+)?(?:completion|delivery)\s+of\s+(?:the\s+)?(?:last|final)\b/i;
 
 /** A date as written, read on its LAST day where it names a quarter, a
  *  month or a year alone. Null for words with no date in them ("upon
  *  completion", "TBD"). Words that name several dates are read at the
  *  latest — "Phase 1 (60 homes) Q2 2027; Phase 2 (80 homes) Q4 2027; Phase
  *  3 (60 homes) Q2 2028" is delivered when its last phase is — and each date
- *  is kept, a phase's where the words name phases. */
-export function readDeliveryDate(text: string | null | undefined, asOf: Date): DeliveryDate | null {
+ *  is kept, a phase's where the words name phases. The phases are closings
+ *  of their own only where the row or the deal's `context` words say so
+ *  (tranches, takedowns, a closing a phase) and never where they say it
+ *  closes once (`closings`). */
+export function readDeliveryDate(text: string | null | undefined, asOf: Date, context = ""): DeliveryDate | null {
   const s = (text ?? "").trim();
   if (!s) return null;
   const read = (t: string) => readOneDate(t, asOf);
   const phased = PHASE_WORDS.test(s) || NAMED_BUILDINGS.test(s);
+  const both = `${s} \n ${context}`;
+  const closings = phased && SEPARATE_CLOSINGS.test(both) && !ONE_CLOSING.test(both);
   type Found = { text: string; index: number; at: DeliveryDate };
   const found: Found[] = [];
   for (const m of s.matchAll(DATE_MENTION)) {
@@ -179,6 +195,7 @@ export function readDeliveryDate(text: string | null | undefined, asOf: Date): D
     precision: latest.at.precision,
     dates: dates.map((d) => ({ text: d.text, iso: d.at.iso })),
     ...(phased ? { phased: true as const } : {}),
+    ...(closings ? { closings: true as const } : {}),
   };
 }
 
@@ -220,12 +237,14 @@ export function lastDeliveryWords(d: DeliveryDate): string {
 }
 
 /** What a delivery is said as: the memorandum's words, with the day they
- *  are read as where they name no day. A phased delivery is said by its
+ *  are read as where they name no day. A delivery in tranches is said by its
  *  takedowns and the last of them — "phased: 3 takedowns, the last Q2 2028
- *  (read as Jun 30, 2028)" — and words that name several dates otherwise
- *  with the latest of them. */
+ *  (read as Jun 30, 2028)" — one in phases that close once by the last of
+ *  them ("the last of 3 phases, Q2 2028 (read as Jun 30, 2028)"), and words
+ *  that name several dates otherwise with the latest of them. */
 export function deliveryText(d: DeliveryDate): string {
-  if (d.dates && d.phased) return `phased: ${d.dates.length} takedowns, the last ${latestDeliveryText(d)}`;
+  if (d.dates && d.phased && d.closings) return `phased: ${d.dates.length} takedowns, the last ${latestDeliveryText(d)}`;
+  if (d.dates && d.phased) return `the last of ${d.dates.length} phases, ${latestDeliveryText(d)}`;
   if (d.dates) return `${d.text} (read as ${dayText(d.iso)}, the latest date it names)`;
   return d.precision === "day" ? dayText(d.iso) : `${d.text} (read as ${dayText(d.iso)})`;
 }
@@ -236,8 +255,11 @@ export function latestDeliveryText(d: DeliveryDate): string {
   return d.precision === "day" ? dayText(d.iso) : `${lastDeliveryWords(d)} (read as ${dayText(d.iso)})`;
 }
 
-/** A phased delivery's count of takedowns; null on one delivery. */
-const takedowns = (d: DeliveryDate | null): number | null => (d?.phased && d.dates ? d.dates.length : null);
+/** A delivery in tranches' count of takedowns; null on one closing. */
+const takedowns = (d: DeliveryDate | null): number | null => (d?.phased && d.closings && d.dates ? d.dates.length : null);
+/** A delivery in phases that close once: its count of phases; null
+ *  otherwise. */
+const phasesOnly = (d: DeliveryDate | null): number | null => (d?.phased && !d.closings && d.dates ? d.dates.length : null);
 
 function monthsBetweenIso(fromIso: string, toIso: string): number {
   const a = new Date(`${fromIso}T00:00:00Z`);
@@ -303,7 +325,7 @@ export function readForwardPurchase(
   const price = buildingPriceOf(ex, stated != null && stated > 0 ? stated : null);
 
   const deliveryRow = rowOf(metrics, DELIVERY_ROW);
-  const delivery = deliveryRow ? readDeliveryDate(deliveryRow.value, asOf) : null;
+  const delivery = deliveryRow ? readDeliveryDate(deliveryRow.value, asOf, words) : null;
   const outsideRow = rowOf(metrics, OUTSIDE_ROW);
   const outside = outsideRow ? readDeliveryDate(outsideRow.value, asOf) : null;
   const todayIso = asOf.toISOString().slice(0, 10);
@@ -365,12 +387,19 @@ export function readForwardPurchase(
   if (phases != null && deliveryRow) {
     parts.push(`The takedowns as stated: ${deliveryRow.value.trim().replace(/[.;]+$/, "")} — the price is paid in tranches as each delivers.`);
   }
-  // The clock's end: the delivery, or on a phased delivery its last takedown.
-  const end = phases != null ? "the last takedown" : "delivery";
+  // Phases that close once: the phases said as stated, the price paid at
+  // the one closing (audit C3a).
+  const phaseCount = phasesOnly(delivery);
+  if (phaseCount != null && deliveryRow) {
+    parts.push(`The phases as stated: ${deliveryRow.value.trim().replace(/[.;]+$/, "")} — the memorandum names no closing a phase, so the price is read as paid at one closing.`);
+  }
+  // The clock's end: the delivery, or on a phased delivery its last takedown
+  // or its last phase.
+  const end = phases != null ? "the last takedown" : phaseCount != null ? "the last phase" : "delivery";
   if (deliveryPassed && delivery) {
     parts.push(
-      phases != null
-        ? `The last stated takedown, ${latestDeliveryText(delivery)}, has passed; whether each phase was delivered is the memorandum's to say.`
+      phases != null || phaseCount != null
+        ? `The last stated ${phases != null ? "takedown" : "phase"}, ${latestDeliveryText(delivery)}, has passed; whether each phase was delivered is the memorandum's to say.`
         : `The stated delivery, ${deliveryText(delivery)}, has passed; whether the building was delivered is the memorandum's to say.`,
     );
   }
@@ -384,7 +413,7 @@ export function readForwardPurchase(
   if (outside) {
     parts.push(
       slackMonths != null && slackMonths < 0
-        ? `The outside date, ${deliveryText(outside)}, is before the ${phases != null ? "last stated takedown" : "stated delivery"}: the two cannot both hold, and which governs is the contract's.`
+        ? `The outside date, ${deliveryText(outside)}, is before the ${phases != null ? "last stated takedown" : phaseCount != null ? "last stated phase" : "stated delivery"}: the two cannot both hold, and which governs is the contract's.`
         : slackMonths != null
           ? `The outside date is ${deliveryText(outside)}, ${slackMonths} ${slackMonths === 1 ? "month" : "months"} after ${end}.`
           : `The outside date is ${deliveryText(outside)}.`,
@@ -428,8 +457,13 @@ export function forwardTag(r: ForwardRead | null): string | null {
   const word = r.kind === "bts" ? "Build-to-suit" : "Forward";
   if (r.deliveryYieldPct != null) return `${word}, ${pctText(r.deliveryYieldPct)} at delivery`;
   const phases = takedowns(r.delivery);
+  const phaseCount = phasesOnly(r.delivery);
   if (r.delivery && !r.deliveryPassed) {
-    return phases != null ? `${word}, ${phases} takedowns to ${lastDeliveryWords(r.delivery)}` : `${word}, delivers ${lastDeliveryWords(r.delivery)}`;
+    return phases != null
+      ? `${word}, ${phases} takedowns to ${lastDeliveryWords(r.delivery)}`
+      : phaseCount != null
+        ? `${word}, ${phaseCount} phases to ${lastDeliveryWords(r.delivery)}`
+        : `${word}, delivers ${lastDeliveryWords(r.delivery)}`;
   }
   return `${word} purchase`;
 }
@@ -438,10 +472,13 @@ export function forwardTag(r: ForwardRead | null): string | null {
  *  screen. */
 export function forwardShortLine(r: ForwardRead): string {
   const phases = takedowns(r.delivery);
+  const phaseCount = phasesOnly(r.delivery);
   const when =
     r.delivery && phases != null
       ? ` in ${phases} takedowns as its phases deliver, the last ${lastDeliveryWords(r.delivery)}`
-      : ` at delivery${r.delivery ? ` (${r.delivery.text})` : ""}`;
+      : r.delivery && phaseCount != null
+        ? ` at delivery of the last of ${phaseCount} phases (${lastDeliveryWords(r.delivery)})`
+        : ` at delivery${r.delivery ? ` (${r.delivery.text})` : ""}`;
   const bits = [`${r.price != null ? money(r.price) : "the price"} paid${when}, the works the developer's`];
   if (r.deliveryYieldPct != null) bits.push(`${pctText(r.deliveryYieldPct)} at delivery${r.yieldFrom === "noi_over_price" ? " on the stated NOI" : ""}`);
   if (r.outside) bits.push(`outside date ${deliveryText(r.outside)}`);
@@ -473,7 +510,12 @@ export function forwardModelLine(
   model: { noi1: number | null; noiAssumed: boolean; price: number | null } | null,
 ): string | null {
   if (!r) return null;
-  const when = r.delivery ? `delivery, ${r.delivery.text}` : "delivery";
+  const phaseCount = phasesOnly(r.delivery);
+  const when = r.delivery
+    ? phaseCount != null
+      ? `delivery of the last of ${phaseCount} phases, ${lastDeliveryWords(r.delivery)}`
+      : `delivery, ${r.delivery.text}`
+    : "delivery";
   // Whenever the deposit row says it is paid (the audit of 2026-10-05: "paid
   // at signing" was said of every deposit).
   const deposit = r.deposit ? ", and the deposit sits outside its cash flows" : "";

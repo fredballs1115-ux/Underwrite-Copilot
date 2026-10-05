@@ -347,7 +347,12 @@ describe("a forward purchase delivered in phases (research pass 37)", () => {
       ],
       phased: true,
     });
-    expect(deliveryText(d)).toBe("phased: 3 takedowns, the last Q2 2028 (read as Jun 30, 2028)");
+    // Phases with no word of a closing each are phases, never tranches; with
+    // the deal's words naming takedowns, takedowns.
+    expect(deliveryText(d)).toBe("the last of 3 phases, Q2 2028 (read as Jun 30, 2028)");
+    const t = readDeliveryDate(PHASES, TODAY, "three phased takedowns at certificate of occupancy")!;
+    expect(t.closings).toBe(true);
+    expect(deliveryText(t)).toBe("phased: 3 takedowns, the last Q2 2028 (read as Jun 30, 2028)");
     // A phase stated by its year alone, and named buildings, the same.
     expect(readDeliveryDate("Phase 1 Q4 2027; Phase 2 2028", TODAY)).toMatchObject({ iso: "2028-12-31", phased: true });
     expect(readDeliveryDate("Building A Q3 2027; Building B Q1 2028", TODAY)).toMatchObject({ iso: "2028-03-31", text: "Q1 2028", phased: true });
@@ -397,6 +402,33 @@ describe("a forward purchase delivered in phases (research pass 37)", () => {
     expect(gluedWords(text)).toEqual([]);
     // One delivery draws no takedown tick.
     expect(renderToStaticMarkup(React.createElement(ForwardPanel, { forward: readForwardPurchase(bts, TODAY), today: "2026-10-05" }))).not.toContain("fwd-phase");
+  });
+
+  it("says phases that close once as phases, never tranches (audit C3a)", () => {
+    const once = deal(
+      "Forward purchase of a 200-home build-to-rent community, one closing at final completion",
+      [
+        row("Purchase price", "$78,000,000", "p. 2"),
+        row("Homes", "200"),
+        row("Delivery date", `${PHASES} — closing at final completion`),
+      ],
+      "Build-to-Rent Community",
+    );
+    const r = readForwardPurchase(once, TODAY)!;
+    expect(r.delivery).toMatchObject({ iso: "2028-06-30", phased: true });
+    expect(r.delivery!.closings).toBeUndefined();
+    const all = [r.headline, forwardTag(r) ?? "", forwardShortLine(r), forwardModelLine(r, null) ?? ""].join(" ");
+    expect(all).not.toMatch(/takedown|tranche/);
+    expect(r.headline).toContain("the buyer pays $78.0M at delivery, the last of 3 phases, Q2 2028 (read as Jun 30, 2028), and the developer funds the works");
+    expect(r.headline).toContain("the memorandum names no closing a phase, so the price is read as paid at one closing.");
+    expect(forwardTag(r)).toBe("Forward, 3 phases to Q2 2028");
+    expect(forwardShortLine(r)).toMatch(/^Forward purchase: \$78\.0M paid at delivery of the last of 3 phases \(Q2 2028\), the works the developer's/);
+    expect(forwardModelLine(r, null)).toContain("that day is delivery of the last of 3 phases, Q2 2028");
+    const text = visibleText(renderToStaticMarkup(React.createElement(ForwardPanel, { forward: r, today: "2026-10-05" })));
+    expect(text).toContain("$78.0M paid at delivery of the last of 3 phases, Q2 2028");
+    expect(text).toContain("Earlier phases, Q2 2027 and Q4 2027");
+    expect(text).not.toMatch(/takedown|tranche/);
+    for (const s of [r.headline, forwardShortLine(r), text]) expect(gluedWords(s)).toEqual([]);
   });
 });
 

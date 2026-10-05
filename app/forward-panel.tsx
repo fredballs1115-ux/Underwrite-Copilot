@@ -68,10 +68,15 @@ export function ForwardPanel({
   // A phased delivery: the price is paid in tranches, one a takedown, the
   // delivery the last of them (research pass 37).
   const phased = r.delivery?.phased && r.delivery.dates ? r.delivery.dates : null;
+  // Tranches only where each phase closes on its own (audit C3a); phases
+  // that close once are paid at the last.
+  const tranches = phased && r.delivery?.closings ? phased : null;
   const headline = `${r.price != null ? `${money(r.price)} paid` : "Paid"}${
-    r.delivery && phased
-      ? ` in ${phased.length} takedowns, the last ${lastDeliveryWords(r.delivery)}`
-      : ` at delivery${r.delivery ? `, ${r.delivery.text}` : r.deliveryWords ? ` (${r.deliveryWords})` : ""}`
+    r.delivery && tranches
+      ? ` in ${tranches.length} takedowns, the last ${lastDeliveryWords(r.delivery)}`
+      : r.delivery && phased
+        ? ` at delivery of the last of ${phased.length} phases, ${lastDeliveryWords(r.delivery)}`
+        : ` at delivery${r.delivery ? `, ${r.delivery.text}` : r.deliveryWords ? ` (${r.deliveryWords})` : ""}`
   }`;
 
   // The clock, from the day the page is read to the later of the delivery
@@ -127,7 +132,7 @@ export function ForwardPanel({
             <KeyItem>{`Today, ${dayText(today)}`}</KeyItem>
             {clock.phases.length > 0 && (
               <KeyItem mark="tick" tone="bg-ink/40">
-                {`${clock.phases.length === 1 ? "An earlier takedown" : "Earlier takedowns"}, ${listOf(clock.phases.map((p) => p.text))}`}
+                {`${tranches ? (clock.phases.length === 1 ? "An earlier takedown" : "Earlier takedowns") : clock.phases.length === 1 ? "An earlier phase" : "Earlier phases"}, ${listOf(clock.phases.map((p) => p.text))}`}
               </KeyItem>
             )}
             <KeyItem mark="tick" tone="bg-ink">
