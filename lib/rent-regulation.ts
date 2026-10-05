@@ -509,8 +509,15 @@ export function regulationTag(r: RegulationRead | null): string | null {
   if (r.regulatedUnits != null && r.totalUnits != null && !r.countsDisagree) {
     return `${lead.short}, ${count(r.regulatedUnits)} of ${count(r.totalUnits)}`;
   }
-  const low = lead.allowance?.state === "current" ? lead.allowance.figures.reduce((lo, f) => (f.pct < lo.pct ? f : lo)) : null;
-  return low ? `${lead.short}, ${pctText(low.pct)} cap` : lead.short;
+  const a = lead.allowance?.state === "current" && lead.allowance.figures.length > 0 ? lead.allowance : null;
+  if (!a) return lead.short;
+  // Every figure the regime allows, never its lowest alone: DC's 2.1% is a
+  // registered elderly or disabled tenant's, its 4.1% every other unit's
+  // (the audit of 2026-10-05: "DC rent control, 2.1% cap").
+  const pcts = a.figures.map((f) => f.pct);
+  const lo = Math.min(...pcts);
+  const hi = Math.max(...pcts);
+  return lo === hi ? `${lead.short}, ${pctText(lo)} cap` : `${lead.short}, ${pctText(lo).replace(/%$/, "")}–${pctText(hi)} cap`;
 }
 
 /** The regulation in one line, for the documents with no room for the panel

@@ -418,6 +418,9 @@ describe("Washington DC and Los Angeles", () => {
     expect(r.headline).toContain(
       "the allowance for increases taking effect May 1, 2026 to Apr 30, 2027 is 4.1% on a rent-controlled unit and 2.1% on a unit with a registered elderly or disabled tenant",
     );
+    // The tag names both caps, never the elderly or disabled tenant's 2.1%
+    // as the building's (the audit of 2026-10-05).
+    expect(regulationTag(r)).toBe("DC rent control, 2.1–4.1% cap");
   });
 
   it("puts the city's own regime before the state's cap", () => {
