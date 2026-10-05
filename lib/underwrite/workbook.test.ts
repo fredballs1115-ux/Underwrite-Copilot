@@ -603,7 +603,7 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     // the cap on modelled year-1 income.
     const summary = wb.getWorksheet("Deal Summary")!;
     expect(() => findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)")).toThrow();
-    expect(() => findRow(summary, 4, "Stabilized Yield (on cost)")).toThrow();
+    expect(() => findRow(summary, 4, "Year-1 Yield on Total Cost")).toThrow();
     findRow(summary, 4, "Cap on Yr-1 Income (as modelled)");
     findRow(summary, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
     const noiRow = findRow(summary, 1, "OM Stabilized NOI (pro forma)");
@@ -742,7 +742,7 @@ describe("where the price did not buy the building, no building basis or cap is 
     expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
     expect(String(summary.getCell(tiles + 2, 1).value)).toContain("not the note's return");
     expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe("n/a — note");
-    expect(summary.getCell(findRow(summary, 4, "Stabilized Yield (on cost)"), 5).value).toBe("n/a — note");
+    expect(summary.getCell(findRow(summary, 4, "Year-1 Yield on Total Cost"), 5).value).toBe("n/a — note");
     const labels = opsLabels(w);
     expect(labels).not.toContain("Price / Unit");
     expect(labels).not.toContain("Price / SF");
@@ -1423,6 +1423,147 @@ describe("the Portfolio tab — each property as the memorandum states it, the s
   });
 });
 
+// ── On paper (research pass 35, F13) ──────────────────────────────────────
+// Labels and formats only: the cover's labels sat at the foot of their tall
+// rows, a plan's yield-on-cost label was cut at its column's edge, a year-1
+// figure was called stabilized, multiples printed one place where the report
+// prints two, the Market Read printed some 300 characters wide at a few
+// points' type, and the Debt Schedule repeated the monthly header over the
+// annual rollup.
+describe("the workbook reads on paper", () => {
+  const read: ModelVsMarket = {
+    readOn: "2026-09-21",
+    metro: "Washington DC",
+    checks: [
+      {
+        key: "exit_cap",
+        title: "Exit cap",
+        model: "6.00%",
+        modelSource: "derived from the documents",
+        published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
+        tone: "widens",
+        toneLabel: "spread widens at the exit",
+        scope: "national",
+        read: "The exit cap 6.00% is 106 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year unchanged — the conservative direction.",
+      },
+    ],
+  };
+  const load = async (m: typeof model, mr?: ModelVsMarket) => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(m, null, mr)) as unknown as ArrayBuffer);
+    return wb;
+  };
+
+  it("sets the cover's labels at the top of their rows and wraps what runs past the band", async () => {
+    const note = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+        metrics: [...extraction.metrics, { label: "Unpaid principal balance", value: "$62,500,000", flagged: false, page: "p. 3" }],
+      },
+      "fallback",
+    );
+    const cover = (await load(note)).getWorksheet("Cover")!;
+    for (const lab of ["Asset class", "Prepared", "What is being sold"]) {
+      const row = findRow(cover, 2, lab);
+      expect(cover.getCell(row, 2).alignment?.vertical, lab).toBe("top");
+      expect(cover.getCell(row, 3).alignment?.vertical, lab).toBe("top");
+    }
+    // The note's line is longer than the column: wrapped, with its lines.
+    const sold = findRow(cover, 2, "What is being sold");
+    expect(String(cover.getCell(sold, 3).value).length).toBeGreaterThan(80);
+    expect(cover.getCell(sold, 3).alignment?.wrapText).toBe(true);
+    expect(cover.getRow(sold).height).toBeGreaterThanOrEqual(28);
+    // The Contents: a description longer than the column wraps inside the band.
+    const ops = findRow(cover, 2, "Operating Metrics");
+    expect(cover.getCell(ops, 3).alignment?.wrapText).toBe(true);
+    expect(cover.getRow(ops).height).toBeGreaterThanOrEqual(28);
+    // A short one is left on its line.
+    const summaryRow = findRow(cover, 2, "Deal Summary");
+    expect(cover.getCell(summaryRow, 3).alignment?.wrapText ?? false).toBe(false);
+  });
+
+  it("wraps the plan's yield-on-cost label whole, and names a stabilized deal's year-1 yield for what it is", async () => {
+    const plan = (await load(deriveUnderwriteInputs(conversion, "fallback"))).getWorksheet("Deal Summary")!;
+    const yoc = findRow(plan, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
+    expect(plan.getCell(yoc, 4).alignment?.wrapText).toBe(true);
+    expect(plan.getRow(yoc).height).toBe(26);
+    // The row's cells sit at its top, both blocks, beside the label's first line.
+    for (const c of [1, 2, 4, 5]) expect(plan.getCell(yoc, c).alignment?.vertical).toBe("top");
+    const stab = (await load(model)).getWorksheet("Deal Summary")!;
+    const y1 = findRow(stab, 4, "Year-1 Yield on Total Cost");
+    expect(stab.getCell(y1, 5).value).toMatchObject({ formula: expect.stringContaining("/TotalUses") });
+    expect(() => findRow(stab, 4, "Stabilized Yield (on cost)")).toThrow();
+  });
+
+  it("prints a multiple to two places, as the report does, on the tiles, the return block and the sensitivity grids", async () => {
+    const wb = await load(model);
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE");
+    expect(summary.getCell(tiles, 3).value).toBe("EQUITY MULTIPLE");
+    expect(summary.getCell(tiles + 1, 3).numFmt).toBe('0.00"x"');
+    for (const lab of ["Unlevered Equity Multiple", "Levered Equity Multiple"]) {
+      expect(summary.getCell(findRow(summary, 4, lab), 5).numFmt, lab).toBe('0.00"x"');
+    }
+    const sens = wb.getWorksheet("Sensitivity")!;
+    let em = 0;
+    sens.eachRow((row) =>
+      row.eachCell((c) => {
+        const col = Number(c.col);
+        const formula = c.value && typeof c.value === "object" && "formula" in c.value ? String(c.value.formula) : "";
+        if (col >= 8 && col <= 12 && /Sensitivity Engine/.test(formula)) {
+          expect(c.numFmt).toBe('0.00"x"');
+          em++;
+        }
+      }),
+    );
+    expect(em).toBe(75);
+  });
+
+  it("prints the Market Read one page wide at a readable size, its words wrapped in their columns", async () => {
+    const ws = (await load(model, read)).getWorksheet("Market Read")!;
+    const widths = Array.from({ length: 9 }, (_, i) => ws.getColumn(i + 1).width ?? 0);
+    expect(widths.reduce((s, w) => s + w, 0)).toBeLessThanOrEqual(150);
+    expect(Math.max(...widths)).toBeLessThanOrEqual(44);
+    expect(ws.pageSetup.orientation).toBe("landscape");
+    expect(ws.pageSetup.fitToWidth).toBe(1);
+    // The sentence wraps in its column, its row as tall as its lines.
+    expect(ws.getCell(6, 9).alignment?.wrapText).toBe(true);
+    expect(ws.getRow(6).height).toBeGreaterThan(24);
+    // The lines across the top and the notices under the figures span the
+    // tab, wrapped, rather than running off its last column.
+    for (const row of [2, 3, 8]) {
+      expect(ws.getCell(row, 1).alignment?.wrapText, `row ${row}`).toBe(true);
+      expect(ws.getCell(row, 9).isMerged, `row ${row}`).toBe(true);
+    }
+    expect(ws.getCell(8, 1).value).toBe(FRED_NOTICE);
+  });
+
+  it("puts the Debt Schedule's annual rollup above the monthly table, whose header alone repeats on each page", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const ws = wb.getWorksheet("Debt Schedule")!;
+    const rollup = findRow(ws, 1, "ANNUAL ROLLUP");
+    const head = findRow(ws, 1, "Month");
+    expect(rollup).toBeLessThan(head);
+    expect(ws.pageSetup.printTitlesRow).toBe(`${head}:${head}`);
+    expect(ws.views[0]).toMatchObject({ state: "frozen", ySplit: head });
+    // Nothing follows the months but the tie check, so no page prints the
+    // monthly header over another block's rows.
+    const lastMonth = head + model.inputs.holdMonths;
+    expect(ws.getCell(lastMonth, 1).value).toBe(model.inputs.holdMonths);
+    for (let r = lastMonth + 1; r <= ws.rowCount; r++) {
+      expect(ws.getCell(r, 1).value ?? null, `row ${r}`).toBeNull();
+    }
+    // The same arithmetic: year 1's interest is its twelve months', and the
+    // exit balance still ties to the Deal Summary.
+    const id = hf.getSheetId("Debt Schedule")!;
+    const v = (row: number, col: number) => Number(hf.getCellValue({ sheet: id, row: row - 1, col: col - 1 }));
+    const months = Array.from({ length: 12 }, (_, i) => v(head + 1 + i, 5)).reduce((s, x) => s + x, 0);
+    expect(v(rollup + 2, 5)).toBeCloseTo(months, 2);
+    expect(named(hf, "CheckDebtTie")).toBe(true);
+  });
+});
+
 // ── When it was built ─────────────────────────────────────────────────────
 describe("the workbook says the day it was built, which its \"from today\" lines count from", () => {
   it("prints the build day on the cover and stamps the file's created and modified time with it, never 1970", async () => {
@@ -1430,7 +1571,10 @@ describe("the workbook says the day it was built, which its \"from today\" lines
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await buildUnderwriteWorkbook(model, null, null, null, builtAt)) as unknown as ArrayBuffer);
     const cover = wb.getWorksheet("Cover")!;
-    expect(cover.getCell(findRow(cover, 2, "Built"), 3).value).toBe("Sep 30, 2026");
+    // "Prepared": under the address, "Built" read as the year the building
+    // was built (research pass 35).
+    expect(cover.getCell(findRow(cover, 2, "Prepared"), 3).value).toBe("Sep 30, 2026");
+    expect(() => findRow(cover, 2, "Built")).toThrow();
     expect(wb.created?.toISOString()).toBe(builtAt.toISOString());
     expect(wb.modified?.toISOString()).toBe(builtAt.toISOString());
     // A caller that passes no time is stamped now, not with the epoch.

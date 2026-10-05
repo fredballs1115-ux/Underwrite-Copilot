@@ -54,10 +54,20 @@ const FMT = {
   psf: "$0.00",
   pct1: "0.0%",
   pct2: "0.00%",
-  mult: '0.0"x"',
+  // Two places, as the report prints a multiple ("1.53x"): one figure, one
+  // way of writing it.
+  mult: '0.00"x"',
   int: "#,##0",
   ratio: '0.00"x"',
 } as const;
+
+/** How many characters of 10 pt text a line of the Cover's 64-wide column C
+ *  holds — Excel's Arial reaches its edge sooner than LibreOffice's does. */
+const COVER_LINE = 80;
+
+/** A stabilized deal's year-1 NOI over its total uses, in the Deal
+ *  Summary's return block: what it is, never a "stabilized" figure. */
+const YEAR1_YIELD_LABEL = "Year-1 Yield on Total Cost";
 
 function sourceText(s: InputSource | undefined): string {
   if (!s) return "";
@@ -176,9 +186,9 @@ export async function buildUnderwriteWorkbook(
   const wsMonthly = wb.addWorksheet("Monthly Cash Flow", {
     views: [{ state: "frozen", xSplit: 1, ySplit: 3, showGridLines: false }],
   });
-  const wsDebt = wb.addWorksheet("Debt Schedule", {
-    views: [{ state: "frozen", xSplit: 0, ySplit: 3, showGridLines: false }],
-  });
+  // Frozen at its monthly table's header, which buildDebtSchedule places
+  // under the annual rollup.
+  const wsDebt = wb.addWorksheet("Debt Schedule", { views: [{ showGridLines: false }] });
   const wsOps = wb.addWorksheet("Operating Metrics", { views: [{ showGridLines: false }] });
   const wsSens = wb.addWorksheet("Sensitivity", { views: [{ showGridLines: false }] });
   // Hidden tab holding one live cash-flow block per sensitivity scenario.
@@ -196,7 +206,7 @@ export async function buildUnderwriteWorkbook(
   const cf = buildCashFlow(wsCf, inputs, holdYears);
   buildDealSummary(wsSummary, model, cf, holdYears);
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
-  buildDebtSchedule(wsDebt, inputs);
+  const debtHeadRow = buildDebtSchedule(wsDebt, inputs);
   buildOperatingMetrics(wsOps, cf, model, holdYears);
   buildSensitivity(wsSens, wsEng, inputs);
 
@@ -220,8 +230,9 @@ export async function buildUnderwriteWorkbook(
     fitToPage: false,
     printTitlesColumn: "A:A",
   };
-  // The amortization table spans pages — repeat its header row on each.
-  wsDebt.pageSetup = { ...wsDebt.pageSetup, printTitlesRow: "3:3" };
+  // The amortization table spans pages — repeat its header row on each. The
+  // annual rollup sits above it, so no page puts this header over the rollup.
+  wsDebt.pageSetup = { ...wsDebt.pageSetup, printTitlesRow: `${debtHeadRow}:${debtHeadRow}` };
 
   // Firm branding (Feature 6): file properties + print chrome, plus the
   // Cover's "Prepared by" line (written in buildCover) — additive only, so
@@ -275,16 +286,31 @@ function buildCover(
   const fact = (lab: string, val: string | null | undefined) => {
     label(ws.getCell(r, 2), lab, { bold: true, size: 10, color: MUTED });
     label(ws.getCell(r, 3), val || "—", { size: 10 });
+    // Both at the top of the row, so a label sits beside the first line of
+    // a value that wraps rather than at the foot of a tall row.
+    ws.getCell(r, 2).alignment = { vertical: "top" };
+    ws.getCell(r, 3).alignment = { vertical: "top" };
     r++;
+  };
+  // A value or a description longer than column C holds on one line wraps,
+  // its row given the lines it needs: a line of the 64-wide column holds
+  // about 80 characters at 10 pt, the measure Excel's Arial reaches first.
+  const wrapToFit = (row: number, col: number, text: string) => {
+    if (text.length <= COVER_LINE) return;
+    const cell = ws.getCell(row, col);
+    cell.alignment = { ...cell.alignment, wrapText: true, vertical: "top" };
+    ws.getRow(row).height = Math.ceil(text.length / COVER_LINE) * 13 + 2;
   };
   fact("Asset class", meta.assetClass);
   fact("Market", meta.market);
   fact("Address", meta.address);
-  // The day the workbook was built: every "years from today" below — a
+  // The day the workbook was made: every "years from today" below — a
   // ground lease's term, an abatement's end — counts from it, and a file
-  // opened months later would otherwise read them as this year's.
+  // opened months later would otherwise read them as this year's. Named
+  // "Prepared", never "Built", which under the address reads as the year
+  // the building was built.
   fact(
-    "Built",
+    "Prepared",
     builtAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }),
   );
   // The deal's strategy decides what its figures mean. On a plan deal
@@ -327,6 +353,8 @@ function buildCover(
   // model is and is not on it, before anyone reads a return off it.
   if (meta.interest) {
     fact("What is being sold", meta.interest.line);
+    // A note's or a leasehold's line runs past the band at one line.
+    wrapToFit(r - 1, 3, meta.interest.line);
     if (meta.interest.modelCaveat) {
       const c = ws.getCell(r, 3);
       c.value = meta.interest.modelCaveat;
@@ -673,6 +701,10 @@ function buildCover(
   for (const [name, desc] of toc) {
     label(ws.getCell(r, 2), name, { bold: true, size: 10 });
     label(ws.getCell(r, 3), desc, { size: 10, color: MUTED });
+    // Inside the band: a description longer than the column wraps under it
+    // (Operating Metrics' had printed past the band's end).
+    ws.getCell(r, 2).alignment = { vertical: "top" };
+    wrapToFit(r, 3, desc);
     r++;
   }
   r++;
@@ -1039,43 +1071,80 @@ function buildPortfolio(ws: ExcelJS.Worksheet, p: PortfolioRead, noun: { one: st
  * was built, and the Assumptions tab stays the live model.
  */
 function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
-  [24, 12, 26, 56, 10, 12, 18, 30, 110].forEach((w, i) => {
+  // Narrow enough to print one page wide at a readable size — the tab had
+  // been some 300 characters wide, its last column 110, and printed at a
+  // few points' type — with the words wrapped inside their columns, each
+  // row given the lines its longest cell needs. It prints landscape, one
+  // page wide (printSetup).
+  const widths = [14, 9, 14, 24, 8, 11, 12, 13, 44];
+  widths.forEach((w, i) => {
     ws.getColumn(i + 1).width = w;
   });
+  const lastCol = widths.length;
+  const tabWidth = widths.reduce((s, w) => s + w, 0);
+  // Lines a text takes in a width: Excel's Arial holds about 1.15
+  // characters a column unit at 9 pt and 1.0 at 10 pt (on the safe side).
+  const linesIn = (text: string, width: number, size: number) =>
+    Math.max(1, Math.ceil(text.length / Math.max(1, Math.floor(width * (size <= 9 ? 1.15 : 1.0)))));
+  const lineHeight = (size: number) => (size <= 9 ? 12 : 13);
+  // A sentence across the tab's width, wrapped, on a row of its own.
+  const across = (row: number, text: string, opts: { color?: { argb: string }; size?: number } = {}) => {
+    const size = opts.size ?? 10;
+    ws.mergeCells(row, 1, row, lastCol);
+    label(ws.getCell(row, 1), text, { color: opts.color, size });
+    ws.getCell(row, 1).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(row).height = linesIn(text, tabWidth, size) * lineHeight(size) + 2;
+  };
+  // A cell that wraps in its column; returns the height it needs.
+  const wrapped = (cell: ExcelJS.Cell, text: string, size: number): number => {
+    cell.alignment = { ...cell.alignment, wrapText: true, vertical: "top" };
+    return linesIn(text, widths[Number(cell.col) - 1], size) * lineHeight(size) + 3;
+  };
   titleRow(ws, "Assumptions against the published figures");
   // The deal page's card's own words (lib/model-vs-market-scope): the
   // published figures for the market or the state, and the nation's — the
   // day in the card's own format ("Sep 21, 2026"), never the ISO key.
-  label(ws.getCell(2, 1), readScope(read, datedLong(read.readOn)), { color: MUTED, size: 9 });
-  label(
-    ws.getCell(3, 1),
+  across(2, readScope(read, datedLong(read.readOn)), { color: MUTED, size: 9 });
+  across(
+    3,
     `A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)} The model's figures are the Assumptions tab's as built; change them there.`,
     { color: MUTED, size: 9 },
   );
   const headers = ["Assumption", "Model", "Model source", "Published figure", "Figure", "As of", "Publisher", "Read", "What the figures say"];
   sectionHeader(ws, 5, headers[0], 1, headers.length);
   headers.forEach((h, i) => {
-    if (i === 0) return;
     const c = ws.getCell(5, i + 1);
-    c.value = h.toUpperCase();
-    c.font = { name: ARIAL, size: 10, bold: true, color: WHITE };
+    if (i > 0) {
+      c.value = h.toUpperCase();
+      c.font = { name: ARIAL, size: 10, bold: true, color: WHITE };
+    }
+    c.alignment = { wrapText: true, vertical: "bottom" };
   });
+  ws.getRow(5).height = 28;
   let r = 6;
   for (const c of read.checks) {
     const figures = c.published.length > 0 ? c.published : [null];
     figures.forEach((p, i) => {
+      // The row's height: the most lines any of its wrapped cells needs.
+      let height = lineHeight(10) + 3;
       if (i === 0) {
         label(ws.getCell(r, 1), c.title, { bold: true });
+        height = Math.max(height, wrapped(ws.getCell(r, 1), c.title, 10));
         label(ws.getCell(r, 2), c.model);
+        ws.getCell(r, 2).alignment = { vertical: "top" };
         label(ws.getCell(r, 3), c.modelSource, { color: MUTED, size: 9 });
+        height = Math.max(height, wrapped(ws.getCell(r, 3), c.modelSource, 9));
         label(ws.getCell(r, 8), c.toneLabel);
+        height = Math.max(height, wrapped(ws.getCell(r, 8), c.toneLabel, 10));
         const s = ws.getCell(r, 9);
         s.value = c.read;
         s.font = { name: ARIAL, size: 9, color: MUTED };
-        s.alignment = { wrapText: true, vertical: "top" };
+        height = Math.max(height, wrapped(s, c.read, 9));
       }
       if (p) {
-        label(ws.getCell(r, 4), `${p.label}: ${p.text}`, { size: 9 });
+        const said = `${p.label}: ${p.text}`;
+        label(ws.getCell(r, 4), said, { size: 9 });
+        height = Math.max(height, wrapped(ws.getCell(r, 4), said, 9));
         const v = ws.getCell(r, 5);
         // Raw, so it sorts and computes, and shown in its unit: a published
         // figure is a percent change or a level in percent (PublishedFigure),
@@ -1083,6 +1152,7 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
         v.value = p.value;
         v.numFmt = '0.00"%"';
         v.font = { name: ARIAL, size: 10, color: INK };
+        v.alignment = { vertical: "top" };
         // A feed's observation day is a date, so the column sorts by it; a
         // research figure's period ("Q1 2026", "undated") stays as written,
         // and so does a day that does not exist, never rolled into another.
@@ -1092,12 +1162,15 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
           asOf.value = new Date(day);
           asOf.numFmt = "mmm d, yyyy";
           asOf.font = { name: ARIAL, size: 9, color: INK };
-          asOf.alignment = { horizontal: "left" };
+          asOf.alignment = { horizontal: "left", vertical: "top" };
         } else {
           label(asOf, p.asOf, { size: 9 });
+          height = Math.max(height, wrapped(asOf, p.asOf, 9));
         }
         label(ws.getCell(r, 7), p.publisher, { size: 9, color: MUTED });
+        height = Math.max(height, wrapped(ws.getCell(r, 7), p.publisher, 9));
       }
+      ws.getRow(r).height = height;
       r++;
     });
     bottomBorder(ws, r - 1, 1, headers.length);
@@ -1106,7 +1179,7 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
   // export travels with no page around it.
   r++;
   for (const n of documentNotices(read.checks.flatMap((c) => c.published.map((p) => p.publisher)))) {
-    label(ws.getCell(r, 1), n, { color: MUTED, size: 9 });
+    across(r, n, { color: MUTED, size: 9 });
     r++;
   }
 }
@@ -1494,12 +1567,26 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   resRow("Net Sale Proceeds", "GrossSale-SaleCosts-OutstandingDebt", FMT.usd, "NetSaleProceeds", false, true);
 
   let rr = resTop;
+  // A label longer than its 30-wide column holds on one line (about 34
+  // characters at 10 pt in Excel) wraps onto a second line rather than
+  // being cut — the plan's yield on cost says what it divides by, which is
+  // why it reads under the other documents' — and the row's cells in both
+  // blocks sit at its top, beside the label's first line.
+  const fitLabel = (row: number, lab: string) => {
+    if (lab.length <= 34) return;
+    for (const c of [1, 2, 4, 5]) {
+      const cell = ws.getCell(row, c);
+      cell.alignment = { ...cell.alignment, vertical: "top", ...(c === 4 ? { wrapText: true } : {}) };
+    }
+    ws.getRow(row).height = 26;
+  };
   const ret = (lab: string, formula: string, fmt: string, name?: string) => {
     label(ws.getCell(rr, 4), lab, { indent: 1 });
     const c = ws.getCell(rr, 5);
     c.value = { formula } as ExcelJS.CellFormulaValue;
     if (name) c.name = name;
     styleFormula(c, fmt);
+    fitLabel(rr, lab);
     rr++;
   };
   // Where the price did not buy the building (lib/deal-strategy
@@ -1511,6 +1598,7 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     label(ws.getCell(rr, 4), lab, { indent: 1 });
     label(ws.getCell(rr, 5), `n/a — ${basisWithheld!.word}`, { color: MUTED });
     ws.getCell(rr, 5).alignment = { horizontal: "right" };
+    fitLabel(rr, lab);
     rr++;
   };
   if (planDeal && basisWithheld) {
@@ -1533,12 +1621,14 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     );
   } else if (basisWithheld) {
     withheldRet("Going-In Cap (Yr-1 NOI / Price)");
-    withheldRet("Stabilized Yield (on cost)");
+    withheldRet(YEAR1_YIELD_LABEL);
   } else {
     // The model's year-1 NOI over the price — not the OM's stated cap, which
     // the deal's header and cards print; the label says which it is.
     ret("Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
-    ret("Stabilized Yield (on cost)", `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
+    // Year-1 NOI over the total uses — no stabilized figure, so never called
+    // one (it read "Stabilized Yield (on cost)").
+    ret(YEAR1_YIELD_LABEL, `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
   }
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
   ret("Levered IRR", `IFERROR(IRR(${levRange}),"check inputs")`, FMT.pct1, "LeveredIRR");
@@ -1652,9 +1742,17 @@ function buildMonthlyCashFlow(ws: ExcelJS.Worksheet, cf: CfMap, inp: UnderwriteI
  * fixed payment splits into interest + principal off the running balance. The
  * exit-month balance ties to the Deal Summary's closed-form Outstanding Debt
  * (CheckDebtTie) — same math, iterated vs closed form.
+ *
+ * The annual rollup sits ABOVE the monthly table. The table's header row is
+ * repeated at the top of every printed page and frozen on screen, so a block
+ * after the table printed and scrolled under a header that was not its own
+ * ("Month · Op Year · Beginning Balance" over "Op Year · Payments") —
+ * research pass 35. Returns that header's row, which the caller repeats in
+ * print.
  */
-function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
+function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs): number {
   const holdMonths = Math.max(1, inp.holdMonths);
+  const years = Math.ceil(holdMonths / 12);
   ws.getColumn(1).width = 10;
   ws.getColumn(2).width = 10;
   for (let c = 3; c <= 7; c++) ws.getColumn(c).width = 16;
@@ -1662,7 +1760,47 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
   titleRow(ws, "Debt Schedule");
   label(ws.getCell(1, 3), "exact monthly amortization — exit payoff ties to Deal Summary", { color: MUTED, size: 9 });
 
-  const headRow = 3;
+  // Where each block sits: the rollup's section header and its column
+  // labels, a row a year, a blank row, then the monthly table's header and
+  // its months.
+  const rollupHead = 3;
+  const rollupFirst = rollupHead + 2;
+  const headRow = rollupFirst + years + 1;
+  const first = headRow + 1;
+  const lastRow = first + holdMonths - 1;
+  // Frozen at the monthly header, which stays in view over the months.
+  ws.views = [{ state: "frozen", xSplit: 0, ySplit: headRow, showGridLines: false }];
+
+  // Annual rollup: interest / principal / total by operating year.
+  sectionHeader(ws, rollupHead, "Annual Rollup", 1, 7);
+  ["Op Year", "", "", "Payments", "Interest", "Principal", "Year-End Balance"].forEach((h, i) => {
+    if (!h) return;
+    const c = ws.getCell(rollupHead + 1, 1 + i);
+    c.value = h;
+    c.font = { name: ARIAL, size: 9, bold: true, color: MUTED };
+    c.alignment = { horizontal: i === 0 ? "center" : "right" };
+  });
+  for (let y = 1; y <= years; y++) {
+    const r = rollupFirst + y - 1;
+    const from = first + (y - 1) * 12;
+    const to = Math.min(first + y * 12 - 1, lastRow);
+    const yc = ws.getCell(r, 1);
+    yc.value = y;
+    yc.font = { name: ARIAL, size: 9, color: MUTED };
+    yc.alignment = { horizontal: "center" };
+    const put = (col: number, formula: string) => {
+      const c = ws.getCell(r, col);
+      c.value = { formula } as ExcelJS.CellFormulaValue;
+      styleFormula(c, FMT.usd);
+      c.font = { ...c.font, size: 9 };
+    };
+    put(4, `SUM(${cellA1(from, 4)}:${cellA1(to, 4)})`);
+    put(5, `SUM(${cellA1(from, 5)}:${cellA1(to, 5)})`);
+    put(6, `SUM(${cellA1(from, 6)}:${cellA1(to, 6)})`);
+    put(7, cellA1(to, 7));
+  }
+  bottomBorder(ws, rollupFirst + years - 1, 1, 7);
+
   const heads = ["Month", "Op Year", "Beginning Balance", "Payment", "Interest", "Principal", "Ending Balance"];
   heads.forEach((h, i) => {
     const c = ws.getCell(headRow, 1 + i);
@@ -1672,7 +1810,6 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
     c.alignment = { horizontal: i < 2 ? "center" : "right" };
   });
 
-  const first = headRow + 1;
   for (let m = 1; m <= holdMonths; m++) {
     const r = first + m - 1;
     const y = Math.ceil(m / 12);
@@ -1699,7 +1836,6 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
     put(7, `MAX(0,${cellA1(r, 3)}-${cellA1(r, 6)})`);
     if (m % 12 === 0) bottomBorder(ws, r, 1, 7);
   }
-  const lastRow = first + holdMonths - 1;
 
   // Tie check: iterated ending balance == the closed-form Outstanding Debt.
   const tieRow = lastRow + 2;
@@ -1716,39 +1852,7 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
       { type: "cellIs", operator: "equal", priority: 2, formulae: ["TRUE"], style: { font: { color: { argb: "FF1B7A5E" }, bold: true } } },
     ],
   });
-
-  // Annual rollup: interest / principal / total by operating year.
-  let r = tieRow + 2;
-  sectionHeader(ws, r, "Annual Rollup", 1, 7);
-  r++;
-  ["Op Year", "", "", "Payments", "Interest", "Principal", "Year-End Balance"].forEach((h, i) => {
-    if (!h) return;
-    const c = ws.getCell(r, 1 + i);
-    c.value = h;
-    c.font = { name: ARIAL, size: 9, bold: true, color: MUTED };
-    c.alignment = { horizontal: i === 0 ? "center" : "right" };
-  });
-  r++;
-  const years = Math.ceil(holdMonths / 12);
-  for (let y = 1; y <= years; y++) {
-    const from = first + (y - 1) * 12;
-    const to = Math.min(first + y * 12 - 1, lastRow);
-    const yc = ws.getCell(r, 1);
-    yc.value = y;
-    yc.font = { name: ARIAL, size: 9, color: MUTED };
-    yc.alignment = { horizontal: "center" };
-    const put = (col: number, formula: string) => {
-      const c = ws.getCell(r, col);
-      c.value = { formula } as ExcelJS.CellFormulaValue;
-      styleFormula(c, FMT.usd);
-      c.font = { ...c.font, size: 9 };
-    };
-    put(4, `SUM(${cellA1(from, 4)}:${cellA1(to, 4)})`);
-    put(5, `SUM(${cellA1(from, 5)}:${cellA1(to, 5)})`);
-    put(6, `SUM(${cellA1(from, 6)}:${cellA1(to, 6)})`);
-    put(7, cellA1(to, 7));
-    r++;
-  }
+  return headRow;
 }
 
 // ── SENSITIVITY ───────────────────────────────────────────────────────────────
