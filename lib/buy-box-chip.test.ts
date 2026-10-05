@@ -29,8 +29,8 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { BUY_BOX_NOT_READ, notifyAnalysisReady } from "./email";
 import { buyBoxChip, buyBoxRead, dealCheckSource, sourceReadsOf } from "./buy-box-chip";
-import { fitScoreLabel } from "./fit-label";
-import { buyBoxCheckSource, evaluateBuyBox } from "./criteria";
+import { FOLD_WORD, fitCellText, fitScoreLabel } from "./fit-label";
+import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox } from "./criteria";
 import { evalDealbreakers } from "./mandate";
 import { inferStrategy } from "./deal-strategy";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
@@ -246,11 +246,14 @@ describe("the chip's fold", () => {
     expect(buyBoxChip([check("pass"), check("near")], score(30, "PASS"))).toEqual({ label: "Fit 30 · Pass", tone: "kill" });
   });
 
-  it("folds the checks where there is no score", () => {
-    expect(buyBoxChip([check("pass"), check("miss")], null).label).toBe("Outside buy box");
-    expect(buyBoxChip([check("pass"), check("near")], null).label).toBe("Near buy box");
-    expect(buyBoxChip([check("pass")], null).label).toBe("Fits buy box");
-    expect(buyBoxChip([check("pass"), check("unknown")], null).label).toBe("Buy box unverified");
+  it("folds the checks where there is no score, in the words the CSV and the meeting workbook's cell write (lib/fit-label)", () => {
+    expect(buyBoxChip([check("pass"), check("miss")], null)).toEqual({ label: "Outside", tone: "kill" });
+    expect(buyBoxChip([check("pass"), check("near")], null)).toEqual({ label: "Near", tone: "caution" });
+    expect(buyBoxChip([check("pass")], null)).toEqual({ label: "Fits", tone: "pass" });
+    // A pass beside a criterion it could not check: the cell's "Fits (1 of
+    // 2)", never "unverified" over a deal the cell calls a fit (the audit of
+    // 2026-10-05, LOW-10).
+    expect(buyBoxChip([check("pass"), check("unknown")], null).label).toBe("Fits (1 of 2)");
     expect(buyBoxChip([], score(0, null)).label).toBe("Buy box unverified");
   });
 });
@@ -344,15 +347,24 @@ describe("the chip says how much of the box it was judged on (research pass 35)"
     expect(near.tone).toBe("caution");
   });
 
-  it("the fold without a score says the count beside a near or a miss; a box it could judge none of stays unverified", () => {
+  it("the fold without a score says the count beside its word, as the cell does; a box it could judge none of stays unverified", () => {
     expect(buyBoxChip([check("Price", "near", true), check("Basis / unit", "unknown", true)], null)).toEqual({
-      label: "Near buy box · 1 of 2 checked",
+      label: "Near (1 of 2)",
       tone: "caution",
       note: "Judged on 1 of the buy box's 2 criteria; basis / unit could not be checked.",
     });
-    expect(buyBoxChip([check("Price", "miss", true), check("Basis / unit", "unknown", true)], null).label).toBe(
-      "Outside buy box · 1 of 2 checked",
-    );
+    expect(buyBoxChip([check("Price", "miss", true), check("Basis / unit", "unknown", true)], null).label).toBe("Outside (1 of 2)");
+    // The audit's case: a $24M deal inside a $10-50M band, its cap unstated.
+    // The chip and the CSV cell say one thing, muted, the cap named.
+    const unpriced = [check("Price", "pass", true), check("Going-in cap", "unknown", true)];
+    expect(buyBoxChip(unpriced, null)).toEqual({
+      label: "Fits (1 of 2)",
+      tone: "muted",
+      note: "Judged on 1 of the buy box's 2 criteria; going-in cap could not be checked.",
+    });
+    expect(buyBoxChip(unpriced, null).label).toBe(fitCellText(FOLD_WORD.fits, buyBoxCoverage(unpriced, null)));
+    // Only the place unchecked: the cell's own green.
+    expect(buyBoxChip([check("Price", "pass", true), check("Geography", "unknown")], null)).toMatchObject({ label: "Fits (1 of 2)", tone: "pass" });
     expect(buyBoxChip([check("Price", "unknown", true)], null)).toEqual({
       label: "Buy box unverified",
       tone: "muted",

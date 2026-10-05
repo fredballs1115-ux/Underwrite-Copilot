@@ -18,7 +18,7 @@ import {
   type SourceReads,
 } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore } from "@/lib/mandate";
-import { checkedOf, checkedSentence, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
+import { FOLD_WORD, checkedSentence, fitCellText, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import { inferStrategy, signalGoingInCap, statedBasisIsBuildings } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
 import { capSlotWithheld } from "@/lib/compare-interest";
@@ -116,30 +116,33 @@ export function buyBoxRead(
  * the 0–100 score deliberately does not weigh), so a deal outside the box on
  * one of those never shows a green Pursue: a hard "outside" wins the chip,
  * whatever the score's call (lib/fit-label `fitScoreLabel`, the pipeline
- * card's own words). Without a score the older fold (Outside / Near / Fits)
- * stands in.
+ * card's own words). Without a score the fold (Outside / Near / Fits)
+ * stands in, in the words below.
  *
  * Where the screen could not check every criterion the box sets, the chip
  * says how many it did, and is never green while one the price decides is
  * among those it could not (lib/criteria `buyBoxCoverage`, lib/fit-label):
  * a note read "Fit 100 · Pursue" in green on its asset class and its unit
  * count alone, the box's cap and return never judged (research pass 35).
+ *
+ * Without a score the chip says what the pipeline's CSV and the meeting
+ * workbook's cell say, in lib/fit-label's words (`fitCellText`, `fitTone`):
+ * "Fits", "Near (1 of 2)", "Outside (2 of 3)". It had read "Buy box
+ * unverified" over a deal the cell called "Fits (1 of 2)" (the audit of
+ * 2026-10-05). Only a box none of whose criteria could be judged — no
+ * pass, near or miss to fold — stays unverified, its note saying so.
  */
 export function buyBoxChip(checks: BuyBoxCheck[], mandate: MandateScore | null): BuyBoxChip {
   const coverage = buyBoxCoverage(checks, mandate);
   const note = checkedSentence(coverage) ?? undefined;
   const withNote = (chip: BuyBoxChip): BuyBoxChip => (note ? { ...chip, note } : chip);
+  const fold = foldBuyBoxChecks(checks);
   if (mandate?.score != null && mandate.verdict) {
-    const fold = foldBuyBoxChecks(checks);
     return withNote({
       label: fitScoreLabel(mandate.score, mandate.verdict, fold === "outside", coverage),
       tone: fitTone(mandate.verdict, fold, coverage),
     });
   }
-  const count = checkedOf(coverage);
-  const counted = (words: string) => (count ? `${words} · ${count}` : words);
-  if (checks.some((c) => c.status === "miss")) return withNote({ label: counted("Outside buy box"), tone: "kill" });
-  if (checks.some((c) => c.status === "near")) return withNote({ label: counted("Near buy box"), tone: "caution" });
-  if (checks.length > 0 && checks.every((c) => c.status === "pass")) return { label: "Fits buy box", tone: "pass" };
+  if (fold) return withNote({ label: fitCellText(FOLD_WORD[fold], coverage), tone: fitTone(null, fold, coverage) });
   return withNote({ label: "Buy box unverified", tone: "muted" });
 }

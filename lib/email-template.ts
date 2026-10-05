@@ -12,11 +12,12 @@ export interface AnalysisReadyEmailInput {
   verdictColor: string;
   /** the deal header's buy-box chip (lib/buy-box-chip): "Fit 82 · Pursue",
    *  "Fit 61 · Outside box", "Fit 100 · 2 of 4 checked" where the box could
-   *  not be judged whole, "Fits buy box", "Near buy box", "Outside buy
-   *  box", "Buy box unverified" — or "No buy box set", or lib/email's line
-   *  for a box it could not read. Drawn after "Buy box:", as the plain-text
-   *  part has always said it: beside the call's pill, a bare "Fit 82 ·
-   *  Pursue" read as a second call ("No-go  Fit 82 · Pursue"). */
+   *  not be judged whole; without a score the pipeline cell's words, "Fits",
+   *  "Near (1 of 2)", "Outside", or "Buy box unverified" — or "No buy box
+   *  set", or lib/email's line for a box it could not read. Drawn after
+   *  "Buy box:", as the plain-text part has always said it: beside the
+   *  call's pill, a bare "Fit 82 · Pursue" read as a second call ("No-go
+   *  Fit 82 · Pursue"). */
   buyBoxLabel: string;
   /** one-line verdict reason ("" to omit) */
   reason: string;
