@@ -1150,10 +1150,17 @@ export function deriveUnderwriteInputs(
   } else if (sfParsed && sfParsed > 100) {
     mark("rsf", "extracted", "OM building size", pageOf(sfMetric));
   } else if (typicalSf != null) {
+    // A class sized by the bed (student housing) whose memorandum counts
+    // units: the typical size is a bed's, applied to a unit count, and the
+    // note says so (research pass 38 — "180 units × 350 SF" for 600 beds).
+    // The area itself is the owner's.
+    const bedSizeOnUnits = words.noun?.one === "bed" && unitNoun.many !== "beds";
     mark(
       "rsf",
       "assumption",
-      `${units!.toLocaleString("en-US")} ${units === 1 ? unitNoun.one : unitNoun.many} × ${cd.sfPerUnit} SF typical — enter the rentable SF`,
+      `${units!.toLocaleString("en-US")} ${units === 1 ? unitNoun.one : unitNoun.many} × ${cd.sfPerUnit} SF typical — ${
+        bedSizeOnUnits ? `${cd.sfPerUnit} SF is a bed's typical size, applied here to a count of ${unitNoun.many}, not beds; ` : ""
+      }enter the rentable SF`,
     );
   } else {
     mark("rsf", "assumption", "Enter rentable SF");

@@ -395,6 +395,16 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   // "Apartments" in the plural too: the bare word ran past the rule's end
   // and filed nowhere, a building of apartments read as no class at all.
   [/\b(multifamily|multi[- ]family|apartments?|residential|condo|garden|mid[- ]rise|high[- ]rise|walk[- ]up)\b/i, "multifamily"],
+  // A small apartment building named by its count of homes — a duplex, a
+  // triplex, a fourplex or quadplex ("4-Plex", "Four-plex"), a "2-unit" —
+  // filed nowhere, so a fourplex that states no area ran on the generic
+  // 100,000 SF placeholder and its reserves took 82% of its NOI (research
+  // pass 38). Read after the commercial rules, so a "2-unit retail strip"
+  // stays retail.
+  [
+    /\b(?:duplex(?:es)?|triplex(?:es)?|fourplex(?:es)?|quadplex(?:es)?|quadruplex(?:es)?|(?:2|3|4|two|three|four|tri|quad)[\s-]?plex(?:es)?|(?:2|3|4|two|three|four)[\s-]units?)\b/i,
+    "multifamily",
+  ],
   // Rental housing named by its program or its tenants ("Affordable Housing
   // (LIHTC)", "Workforce Housing") — last, so a student, senior,
   // manufactured or single-family phrase is read by its own rule first.
