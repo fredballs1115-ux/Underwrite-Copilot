@@ -188,10 +188,14 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
             left: `${r.holding === "tic" ? "The interest" : "The share"} ${money(r.askingPrice)}`,
             // Beside the entity's stated loan the whole is the equity's, and
             // the loan sits on top of it (lib/interest).
+            // Beside a stated total project cost above it, the same (research
+            // pass 37).
             right:
               r.entityLoan != null
                 ? `The equity's whole, grossed up ${money(r.impliedWhole)} · ${r.holding === "tic" ? "the property's" : "the entity's"} ${money(r.entityLoan)} loan on top`
-                : `The whole, grossed up ${money(r.impliedWhole)}`,
+                : r.projectCost != null
+                  ? `The equity's whole, grossed up ${money(r.impliedWhole)} · the ${money(r.projectCost)} project cost above it`
+                  : `The whole, grossed up ${money(r.impliedWhole)}`,
           }
         : r.groundRent != null && r.incomeBeforeGroundRent != null && r.groundRentCoverage != null
           ? {

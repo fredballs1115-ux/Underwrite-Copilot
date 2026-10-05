@@ -61,7 +61,7 @@ import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal, notYetDelivered, planSummary } from "@/lib/deal-strategy";
-import { interestOf, isWholeShare, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
+import { interestOf, isGpStake, isWholeShare, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
@@ -1514,12 +1514,23 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
  * block's own read (research pass 35: "At that price: IRR 19.8%" one
  * paragraph above a block taking 5.5 points off the base IRR).
  */
-function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestOf>, leasehold?: LeaseholdExitView | null): string {
+function maxBidLineFor(
+  s: SensitivityData,
+  /** what the price buys, and whether it is a share of the general partner's
+   *  interest (lib/interest `isGpStake`) */
+  interest: ReturnType<typeof interestOf> & { gpStake?: boolean },
+  leasehold?: LeaseholdExitView | null,
+): string {
   if (interest.kind === "note") {
     return "No max bid: the model's price is the collateral's, run as if the building were bought at the loan's price, so a bid solved on it is not a price for the note.";
   }
   if (interest.kind === "preferred_equity") {
     return "No max bid: the model runs the whole building as if bought at the preferred equity position's price, so a bid solved on it is the building's, not a price for the position, which buys a rate and a redemption.";
+  }
+  // A share of a share (research pass 37): its percentage is the general
+  // partner's interest's, never the entity's, so nothing grosses it up.
+  if (interest.kind === "partial_interest" && interest.gpStake) {
+    return "No max bid: the price buys a share of the general partner's interest — a share of a share — so a bid solved on the model, which runs the whole building at that price, would be neither the stake's price nor the building's.";
   }
   if (interest.kind === "partial_interest" && interest.sharePct == null) {
     return "No max bid: the memorandum states no single percentage for the share, so the model cannot gross its price up to the whole building, and a bid solved on it would be neither the share's price nor the building's.";
@@ -2324,7 +2335,7 @@ export function ReportDocument({
               and named by the one that binds (lib/underwrite/report-grid) —
               none on a note, the whole building's on a share. */}
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {str(maxBidLineFor(sensitivity, interestOf(extraction), input.leasehold))}
+            {str(maxBidLineFor(sensitivity, { ...interestOf(extraction), gpStake: isGpStake(extraction) }, input.leasehold))}
           </Text>
           </View>
 

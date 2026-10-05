@@ -26,7 +26,7 @@
 
 import { compactUsd } from "@/lib/money";
 import { withArticle } from "@/lib/article";
-import { dealTypeLabel, entityLoanOf, groundRentOf, interestOf, isWholeShare } from "@/lib/interest";
+import { dealTypeLabel, entityLoanOf, groundRentOf, interestOf, isGpStake, isWholeShare, shareProjectCostOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
@@ -635,7 +635,10 @@ export function askingPriceOf(extraction: ExtractionResult | null | undefined): 
  * buildings' sales may divide: the asking price on a fee simple or a
  * leasehold; a share's grossed up to the whole where the OM states its
  * percentage; and null for a note (a loan's price), a leased fee (the
- * land's), a share with no stated percentage, and a share beside a loan its
+ * land's), a share with no stated percentage — a share of the general
+ * partner's interest among them, whose percentage is the general partner's
+ * interest's and never the entity's (lib/interest `isGpStake`, research pass
+ * 37: "$21k/unit" for a building valued at $267k) — and a share beside a loan its
  * entity carries (lib/interest `entityLoanOf`): grossed up, that share's
  * price is the equity's whole, and the building's cost is that plus the
  * loan, which nothing adds — no building basis is struck on any of these,
@@ -923,6 +926,11 @@ export interface PlanSummary {
    *  whole and the loan sits on top of it, said and never added in; null
    *  or absent otherwise */
   entityLoan?: number | null;
+  /** a share's price grossed up beside a stated total project cost above it
+   *  (lib/interest `shareProjectCostOf`, research pass 37): the price is the
+   *  equity's whole, said so, and the plan's cost is read as before; absent
+   *  otherwise */
+  projectCostAbove?: number | null;
   /** the stabilized pro forma NOI, when the OM states one — on a forward
    *  purchase (`forward`) the NOI the OM states at delivery
    *  (`forwardDeliveryNoi`: the stabilized figure, or on a build-to-suit the
@@ -1007,7 +1015,11 @@ export function planSummary(
           ? `${money(stated)} for the preferred equity position — a position's price, not the project's`
           : interest.kind === "leased_fee"
             ? `${money(stated)} for the land under the ground lease — not the project's`
-            : `${money(stated)} for a share of no stated percentage — not the whole project's`;
+            : isGpStake(extraction)
+              ? // A share of a share (research pass 37): its percentage is
+                // the general partner's interest's, never the entity's.
+                `${money(stated)} for a share of the general partner's interest — a share of a share, not the project's`
+              : `${money(stated)} for a share of no stated percentage — not the whole project's`;
   // A leased fee's buyer holds the land: the works and their cost are the
   // leaseholder's, so the plan has no cost or yield of the buyer's to state.
   const landOnly = interest.kind === "leased_fee";
@@ -1082,6 +1094,10 @@ export function planSummary(
   // All of the entity's interests (a stated 100%, research pass 28): the
   // price is the whole's, never "the share grossed up".
   const allInterests = isWholeShare(interest.sharePct);
+  // A stated total project cost above a share's grossed-up price makes that
+  // figure the equity's whole, never the whole (research pass 37): labelled
+  // so, the cost the plan builds on unchanged.
+  const projectCostAbove = price != null && !priceRowIsLand(priceMetric) ? shareProjectCostOf(extraction, price) : null;
   return {
     kind: strategy.kind,
     price,
@@ -1095,10 +1111,13 @@ export function planSummary(
             : "Equity's whole, the share grossed up"
           : allInterests
             ? "Price"
-            : "Whole price, the share grossed up"
+            : projectCostAbove != null
+              ? "Equity's whole, the share grossed up"
+              : "Whole price, the share grossed up"
         : "Price",
     priceWithheld,
     entityLoan,
+    ...(projectCostAbove != null ? { projectCostAbove } : {}),
     stabilizedNoi,
     budget,
     totalCost,
@@ -1311,10 +1330,13 @@ export function assessPlausibility(
   // All of the entity's interests (a stated 100%, research pass 28): the
   // price itself, with nothing grossed up.
   const allInterests = isWholeShare(interest.sharePct);
+  // Beside a stated total project cost above it, a share's grossed-up price
+  // is the equity's whole too (research pass 37).
+  const projectCost = shareProjectCostOf(extraction, price);
   const priceWord = allInterests
     ? "price for all the entity's interests"
     : interest.sharePct != null
-      ? entityLoan != null
+      ? entityLoan != null || projectCost != null
         ? "whole equity the share implies"
         : "whole-asset price the share implies"
       : "price";
@@ -1323,7 +1345,9 @@ export function assessPlausibility(
       ? allInterests
         ? ` The ${money(price)} for all the entity's interests is the equity's whole, not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
         : ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
-      : "";
+      : projectCost != null
+        ? ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the project's: the memorandum's stated ${money(projectCost)} total project cost sits above it.`
+        : "";
 
   const findings: PlausibilityFinding[] = [];
   const planDeal = NON_STABILIZED.has(strategy.kind);
@@ -1479,7 +1503,9 @@ function planLine(plan: PlanSummary): string {
       ? `${shareWhole ? "whole price, the share's grossed up," : "price"} ${money(shown)}${
           plan.entityLoan != null
             ? ` (the equity's whole, not the asset's: the entity's stated ${money(plan.entityLoan)} loan sits on top of it)`
-            : ""
+            : plan.projectCostAbove != null
+              ? ` (the equity's whole, not the project's: the memorandum's stated ${money(plan.projectCostAbove)} total project cost sits above it)`
+              : ""
         }`
       : plan.priceWithheld
         ? `price ${plan.priceWithheld}`

@@ -69,6 +69,7 @@
 
 import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
+import { parsePrice } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
 import { compactUsd, parseUsd } from "@/lib/money";
 import {
@@ -103,6 +104,17 @@ const NOT_A_SHARE =
 // the entity it is a share of ("49% of the LLC").
 const SHARE_WORDS =
   /\binterests?\b|\bstakes?\b|\bown(?:ed|er|ers|ership)\b|\bshares?\b|\bten(?:ant|ants|ancy)[\s-]+in[\s-]+common\b|\btic\b|\bmember(?:s|ships?)?\b|\bpartner(?:s|ships?)?\b|\bllcs?\b|\bentity\b|\b(?:joint[\s-]+)?ventures?\b|\bjv\b/i;
+// A percentage OF a partner's, a member's, a manager's or a sponsor's interest
+// is a share of a share, never the owning entity's share (research pass 37):
+// "50% of the general partner interest", "of the GP's interest", "a co-GP
+// stake", "a 25% interest in the managing member", "of the sponsor's
+// interest", "of the promote", "of the carried interest". A partner's own
+// stake in the partnership ("a 2% GP interest") is not one: no "of" or "in"
+// puts it inside another holder's share.
+const SHARE_OF_SHARE = new RegExp(
+  String.raw`\b(?:of|in)\s+(?:the\s+|its\s+)?(?:(?:general\s+partner|gp|managing\s+member|managing\s+partner|manager|sponsor)(?:['’]s|s['’])?\b|(?:gp['’]?s?\s+)?promote\b|carried\s+interest\b)|\bco[\s-]?(?:gp|general\s+partner)s?\b`,
+  "i",
+);
 // A percentage up to 100: a stated 100% of the interests is the whole entity
 // (research pass 28), never a figure the reader cannot see.
 const PCT_MENTION = /(?<![\d.])(\d{1,2}(?:\.\d+)?|100(?:\.0+)?)\s*(?:%|percent\b|per cent\b)/gi;
@@ -115,11 +127,26 @@ const WORDS_AFTER_END = new RegExp(String.raw`[,;:)\]\n]|\.(?=\s|$)|${CLAUSE_WOR
 // "TIC interest (49%)").
 const WORDS_BEFORE_START = new RegExp(String.raw`[,;\n]|\.(?=\s|$)|${CLAUSE_WORD}`, "gi");
 
-/** What one percentage's own words say it is: "share", "not" (a return, a
- *  rate, an occupancy…), or null where they name neither. */
-function readShareWords(words: string): "share" | "not" | null {
+/** What one percentage's own words say it is: "share", "of_share" (a share
+ *  of a partner's, a member's, a manager's or a sponsor's interest — never
+ *  the entity's), "not" (a return, a rate, an occupancy…), or null where they
+ *  name none of them. */
+function readShareWords(words: string): "share" | "of_share" | "not" | null {
+  if (SHARE_OF_SHARE.test(words)) return "of_share";
   if (NOT_A_SHARE.test(words)) return "not";
   return SHARE_WORDS.test(words) ? "share" : null;
+}
+
+/** A field that is one percentage and nothing else ("49%", read off a
+ *  table's "Interest offered" cell). */
+const LONE_PCT = /^(\d{1,2}(?:\.\d+)?|100(?:\.0+)?)\s*(?:%|percent|per cent)$/i;
+
+/** The lone percentage a field is, where it is one and over 0; null
+ *  otherwise. */
+function lonePct(t: string | null | undefined): number | null {
+  const lone = (t ?? "").trim().match(LONE_PCT);
+  const n = lone ? Number(lone[1]) : null;
+  return n != null && n > 0 && n <= 100 ? n : null;
 }
 
 /** A partial interest's share, in percent, read off the OM's own words
@@ -132,19 +159,45 @@ function readShareWords(words: string): "share" | "not" | null {
  *  where those name nothing, the words right before it in its clause — name
  *  an ownership share and no return, rate or occupancy; a percentage among
  *  other words that name nothing is withheld, and so is a range ("49–51%").
- *  A field that is ONE percentage and nothing else is the share, since the
- *  field is the share's. */
+ *  A percentage OF a partner's, a member's, a manager's or a sponsor's
+ *  interest ("50% of the general partner interest", "a 25% interest in the
+ *  managing member") is a share of a share and never the entity's (research
+ *  pass 37: it had grossed a GP stake's $3.2M up to $6.4M for a building the
+ *  memorandum values at $80.0M). A field that is ONE percentage and nothing
+ *  else is the share, since the field is the share's. */
 export function parseSharePct(text: string | null | undefined): number | null {
   const t = text ?? "";
   // The share field is filled only on a partial interest, so a field that
-  // is nothing but one percentage ("49%", read off a table's "Interest
-  // offered" cell) IS the share: there are no words beside it to be a
-  // return's or a rate's.
-  const lone = t.trim().match(/^(\d{1,2}(?:\.\d+)?|100(?:\.0+)?)\s*(?:%|percent|per cent)$/i);
-  if (lone) {
-    const n = Number(lone[1]);
-    return n > 0 && n <= 100 ? n : null;
-  }
+  // is nothing but one percentage IS the share: there are no words beside it
+  // to be a return's or a rate's.
+  if (LONE_PCT.test(t.trim())) return lonePct(t);
+  return onePct(percentsReading(t, "share"));
+}
+
+/** The one percentage a share of a share is stated at — "50% of the general
+ *  partner interest" is 50 — read as `parseSharePct` reads a share; null
+ *  where none, or two different ones, are stated. */
+export function shareOfSharePct(text: string | null | undefined): number | null {
+  return onePct(percentsReading(text ?? "", "of_share"));
+}
+
+/** One distinct percentage among those read, a stated 100% counting only
+ *  alone: "a 49% limited partnership interest in the entity that owns 100%
+ *  of the fee simple interest" sells 49% (the audit of 2026-10-05 —
+ *  admitting 100% had left it no share at all, and the model ran the whole
+ *  building at the share's price); two different ones ("a 49% LP interest
+ *  and a 2% GP interest") is not one, withheld rather than picked. */
+function onePct(read: number[]): number | null {
+  const valid = [...new Set(read)];
+  const under = valid.filter((n) => n < 100);
+  const shareOf = under.length > 0 ? under : valid;
+  return shareOf.length === 1 ? shareOf[0] : null;
+}
+
+/** Every percentage up to 100 in the text whose own words read as `want`
+ *  (`readShareWords`): the words right after it, or where those name
+ *  nothing, the words right before it in its clause. A range is none. */
+function percentsReading(t: string, want: "share" | "of_share"): number[] {
   const hits = [...t.matchAll(PCT_MENTION)].map((m, i, all) => {
     const start = m.index ?? 0;
     const end = start + m[0].length;
@@ -154,7 +207,7 @@ export function parseSharePct(text: string | null | undefined): number | null {
     const tail = t.slice(end, upTo);
     return { n: Number(m[1]), start, end, tail, cut: tail.search(WORDS_AFTER_END) };
   });
-  const shares = hits.flatMap((h, i) => {
+  return hits.flatMap((h, i) => {
     if (!Number.isFinite(h.n) || !(h.n > 0) || !(h.n <= 100)) return [];
     // A range is no one share.
     if (/\d\s*%?\s*(?:[-–—]|\bto)\s*$/i.test(t.slice(0, h.start)) || /^\s*(?:[-–—]|to\b)\s*\d/i.test(t.slice(h.end))) return [];
@@ -166,19 +219,8 @@ export function parseSharePct(text: string | null | undefined): number | null {
     const lead = !prev ? t.slice(0, h.start) : prev.cut >= 0 ? prev.tail.slice(prev.cut) : "";
     const clauseStart = [...lead.matchAll(WORDS_BEFORE_START)].at(-1);
     const before = clauseStart ? lead.slice((clauseStart.index ?? 0) + clauseStart[0].length) : lead;
-    return (readShareWords(after) ?? readShareWords(before)) === "share" ? [h.n] : [];
+    return (readShareWords(after) ?? readShareWords(before)) === want ? [h.n] : [];
   });
-  const valid = [...new Set(shares)];
-  // A stated 100% beside a share under it is what the entity holds, never
-  // the share sold: "a 49% limited partnership interest in the entity that
-  // owns 100% of the fee simple interest" sells 49% (the audit of
-  // 2026-10-05 — admitting 100% had left it no share at all, and the model
-  // ran the whole building at the share's price). A 100% counts only alone.
-  const under = valid.filter((n) => n < 100);
-  const shareOf = under.length > 0 ? under : valid;
-  // Two different shares ("a 49% LP interest and a 2% GP interest") is not
-  // one share: withheld rather than picked.
-  return shareOf.length === 1 ? shareOf[0] : null;
 }
 
 /** A share stated as 100% — all of the owning entity's interests, like a
@@ -218,19 +260,55 @@ const DST_WORDS = /\bdelaware\s+statutory\s+trusts?\b|\bdsts?\b|\bbeneficial\s+i
  *  entity's, by the interest's own words (its share as stated and its
  *  sentence): an undivided interest in the property held as a tenant in
  *  common ("tic") — title to real estate beside its co-owners, no entity's
- *  share at all — or beneficial interests in a Delaware statutory trust
- *  ("dst"), a trust's. */
-export type ShareHolding = "tic" | "dst";
+ *  share at all — beneficial interests in a Delaware statutory trust
+ *  ("dst"), a trust's, or a share of the general partner's interest
+ *  ("gp_stake"), a share of a share whose economics are the general
+ *  partner's capital and promote. */
+export type ShareHolding = "tic" | "dst" | "gp_stake";
+
+/** The words a share of the general partner's interest is read off: the
+ *  share as stated, where it names a share of a share; else, where the share
+ *  as stated names no ownership share of its own (a lone figure, or
+ *  nothing), the first clause of the interest's sentence, which says what is
+ *  sold — never a later clause about what the sponsor keeps ("a 90% LP
+ *  interest; the sponsor retains the GP interest" sells the LP's). */
+function gpStakeWords(ex: ExtractionResult | null | undefined): string | null {
+  const share = ex?.interest?.share ?? "";
+  if (SHARE_OF_SHARE.test(share)) return share;
+  if (SHARE_WORDS.test(share)) return null;
+  const first = (ex?.interest?.summary ?? "").split(/[;\n]|\.(?=\s|$)/)[0] ?? "";
+  return SHARE_OF_SHARE.test(first) ? first : null;
+}
 
 /** The share's holding (`ShareHolding`) on a partial interest; null for a
- *  share of the owning entity as such, and on every other interest. A trust
- *  named in the words is the trust's, whatever else they say. */
+ *  share of the owning entity as such, and on every other interest. A share
+ *  of a share is read first, then a trust named in the words, whatever else
+ *  they say. */
 export function shareHoldingOf(ex: ExtractionResult | null | undefined): ShareHolding | null {
   if (interestKindOf(ex) !== "partial_interest") return null;
+  if (gpStakeWords(ex) != null) return "gp_stake";
   const words = [ex?.interest?.share, ex?.interest?.summary].filter((w): w is string => typeof w === "string").join(" \n ");
   if (DST_WORDS.test(words)) return "dst";
   if (TIC_WORDS.test(words)) return "tic";
   return null;
+}
+
+/** A share of the general partner's interest (research pass 37): a share
+ *  of a share — of the general partner's, the managing member's, the
+ *  sponsor's interest, a co-GP stake or a slice of the promote — never a
+ *  share of the owning entity, and grossed up to nothing. */
+export function isGpStake(ex: ExtractionResult | null | undefined): boolean {
+  return shareHoldingOf(ex) === "gp_stake";
+}
+
+/** A GP stake's own percentage, as stated ("50% of the general partner
+ *  interest" is 50): of the general partner's interest, never the entity's.
+ *  The share as stated is read first — a lone figure there is the stake's —
+ *  then the sentence's first clause; null where none is stated. */
+export function gpStakePctOf(ex: ExtractionResult | null | undefined): number | null {
+  if (!isGpStake(ex)) return null;
+  const share = ex?.interest?.share ?? "";
+  return shareOfSharePct(share) ?? lonePct(share) ?? shareOfSharePct(gpStakeWords(ex));
 }
 
 /** An undivided interest in the property held as a tenant in common: title
@@ -260,7 +338,11 @@ export function interestOf(ex: ExtractionResult | null | undefined): {
   const share = kind === "partial_interest";
   return {
     kind,
-    sharePct: share ? parseSharePct(ex?.interest?.share) : null,
+    // A share of the general partner's interest is a share of a share: no
+    // percentage of the entity is stated, so nothing is grossed up and no
+    // building's price is read off it — even a lone figure in the share's
+    // field, which is the stake's (research pass 37).
+    sharePct: share && !isGpStake(ex) ? parseSharePct(ex?.interest?.share) : null,
     entityLoan: share ? statedEntityLoan(ex) : null,
   };
 }
@@ -269,21 +351,74 @@ export function interestOf(ex: ExtractionResult | null | undefined): {
 // to label "Entity loan balance" — never a loan the buyer takes, one offered
 // for assumption or a share's slice of the balance.
 const ENTITY_LOAN_ROW = /^\s*entity(?:[- ]level)?\s+(?:loan|debt|mortgage)(?:\s+(?:balance|amount|outstanding))?\s*(?:\([^)]*\))?\s*$/i;
+// The construction loan the owning entity has committed, from the row the
+// extraction is asked to label "Entity construction loan" (research pass 37:
+// a development joint venture's equity commitment sits under it, as a share
+// of a drawn balance's equity does).
+const ENTITY_CONSTRUCTION_LOAN_ROW =
+  /^\s*entity(?:[- ]level)?\s+construction\s+(?:loan|debt|financing)(?:\s+(?:balance|amount|commitment|committed|outstanding))?\s*(?:\([^)]*\))?\s*$/i;
 
-/** The balance the entity-loan row states, whatever is being sold. */
+/** The loan the entity-loan rows state, whatever is being sold: the drawn
+ *  balance where one is stated, else the construction loan committed. */
 function statedEntityLoan(ex: ExtractionResult | null | undefined): number | null {
-  const row = (ex?.metrics ?? []).find((m) => m && typeof m.label === "string" && ENTITY_LOAN_ROW.test(m.label));
-  if (!row || typeof row.value !== "string" || /%|percent/i.test(row.value)) return null;
-  const n = parseUsd(row.value);
+  const rows = ex?.metrics ?? [];
+  for (const re of [ENTITY_LOAN_ROW, ENTITY_CONSTRUCTION_LOAN_ROW]) {
+    const row = rows.find((m) => m && typeof m.label === "string" && re.test(m.label));
+    if (!row || typeof row.value !== "string" || /%|percent/i.test(row.value)) continue;
+    const n = parseUsd(row.value);
+    if (n != null && n > 0) return n;
+  }
+  return null;
+}
+
+/** The loan the owning entity carries, as the memorandum states it, on a
+ *  partial interest — its unpaid balance ("Entity loan balance"), else the
+ *  construction loan it has committed ("Entity construction loan") — the
+ *  debt that sits on top of the equity a share's price grosses up to. Null
+ *  on every other interest, and where no such row is stated: a blank is
+ *  null. */
+export function entityLoanOf(ex: ExtractionResult | null | undefined): number | null {
+  return interestOf(ex).entityLoan;
+}
+
+// The plan's total row — the whole project's cost, the price inside it — in
+// lib/deal-strategy's own words (its TOTAL_ROW, and the rates, reserves and
+// annual figures its BUDGET_EXCLUDE refuses), read here because that module
+// reads this one; a test holds the two readers to each other.
+const PROJECT_COST_ROW = /total (project|development) (cost|budget)s?|total capitali[sz]ation|all[- ]?in (cost|basis|budget)/i;
+const NOT_A_PROJECT_COST = /\bper\b|\/|psf|unit|(?<!interest[\s-])reserve|annual|\byr\b|year/i;
+
+/** The whole project's cost the memorandum states — the total row the
+ *  plan's cost is read from, a range at its top — or null. */
+export function statedProjectCostOf(ex: ExtractionResult | null | undefined): number | null {
+  const row = (ex?.metrics ?? []).find((m) => m && typeof m.label === "string" && PROJECT_COST_ROW.test(m.label) && !NOT_A_PROJECT_COST.test(m.label));
+  const n = row && typeof row.value === "string" ? parsePrice(row.value) : null;
   return n != null && n > 0 ? n : null;
 }
 
-/** The unpaid balance of the loan the owning entity carries, as the
- *  memorandum states it, on a partial interest — the debt that sits on top
- *  of the equity a share's price grosses up to. Null on every other
- *  interest, and where no such row is stated: a blank is null. */
-export function entityLoanOf(ex: ExtractionResult | null | undefined): number | null {
-  return interestOf(ex).entityLoan;
+/** The stated total project cost where it sits above the figure a share's
+ *  price grosses up to (research pass 37): that figure is then the equity's
+ *  whole, never the whole — a development joint venture's equity commitment
+ *  grossed up is its equity, with the construction debt above it. Null where
+ *  none is stated, or it sits at or under the figure. */
+export function projectCostAboveOf(ex: ExtractionResult | null | undefined, grossedUp: number | null): number | null {
+  if (grossedUp == null || !(grossedUp > 0)) return null;
+  const cost = statedProjectCostOf(ex);
+  return cost != null && cost > grossedUp * 1.005 ? cost : null;
+}
+
+/** `projectCostAboveOf` where it is the one thing that says a share's
+ *  grossed-up figure is the equity's whole: a share of the owning entity
+ *  under 100% beside no stated entity loan (whose words already say so) —
+ *  never a tenancy in common or a share of a share. Every reader that names
+ *  the grossed-up figure asks this one (the interest's own lines, the
+ *  model's price note, the plan, the plausibility check). */
+export function shareProjectCostOf(ex: ExtractionResult | null | undefined, grossedUp: number | null): number | null {
+  const { kind, sharePct, entityLoan } = interestOf(ex);
+  if (kind !== "partial_interest" || sharePct == null || isWholeShare(sharePct) || entityLoan != null) return null;
+  const holding = shareHoldingOf(ex);
+  if (holding === "tic" || holding === "gp_stake") return null;
+  return projectCostAboveOf(ex, grossedUp);
 }
 
 // A master lease of the building from its owner, sublet to its tenants — a
@@ -428,8 +563,14 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
       return positionTag(readPosition(ex, null, asOf)) ?? "Pref equity";
     case "partial_interest":
       // An undivided interest held as a tenant in common is the real
-      // estate's, never an entity's share (research pass 37).
+      // estate's, never an entity's share; a share of the general partner's
+      // interest is a share of a share, its percentage the stake's (research
+      // pass 37).
       if (isTenancyInCommon(ex)) return sharePct != null ? `TIC ${shareText(sharePct)}` : "TIC";
+      if (isGpStake(ex)) {
+        const stake = gpStakePctOf(ex);
+        return stake != null ? `GP stake ${shareText(stake)}` : "GP stake";
+      }
       // A stated 100% buys all of the entity's interests, never "100% share".
       return sharePct != null ? (isWholeShare(sharePct) ? "All entity interests" : `${shareText(sharePct)} share`) : "Share";
     case "leasehold":
@@ -503,6 +644,10 @@ export const MASTER_LEASE_LABEL = "Master lease of the building, sublet";
  *  which every surface had called it (research pass 37). */
 export const TIC_LABEL = "An undivided interest in the property, as a tenant in common";
 
+/** A share of a share's own words (`isGpStake`): never "a share of the
+ *  owning entity" (research pass 37). */
+export const GP_STAKE_LABEL = "A share of the general partner's interest";
+
 export interface InterestRead {
   kind: InterestKind;
   label: string;
@@ -518,9 +663,18 @@ export interface InterestRead {
   inUnits: boolean;
   /** what a partial interest's share is a share OF where it is not the
    *  owning entity's (`shareHoldingOf`): an undivided interest held as a
-   *  tenant in common, or a Delaware statutory trust's beneficial interests;
-   *  null otherwise */
+   *  tenant in common, a Delaware statutory trust's beneficial interests, or
+   *  a share of the general partner's interest; null otherwise */
   holding: ShareHolding | null;
+  /** a share of the general partner's interest: its own percentage of that
+   *  interest, as stated (`gpStakePctOf`) — never the entity's; null
+   *  otherwise */
+  stakePct: number | null;
+  /** a share's price grossed up beside a stated total project cost above it
+   *  (`projectCostAboveOf`): the grossed-up figure is then the equity's
+   *  whole, never the whole; null otherwise, and beside a stated entity
+   *  loan, whose words already say so */
+  projectCost: number | null;
   /** the price the OM asks for what is being sold */
   askingPrice: number | null;
   /** a partial interest: the asking price over the share — the equity's
@@ -775,6 +929,11 @@ export function readInterest(
   const price = askingPrice != null && askingPrice > 0 ? askingPrice : null;
   const impliedWhole = sharePct != null && price != null ? price / (sharePct / 100) : null;
   const entityLoan = kind === "partial_interest" ? entityLoanOf(ex) : null;
+  // A share's price grossed up beside a stated total project cost above it is
+  // the equity's whole, never the whole (research pass 37) — said where no
+  // entity loan already says so. A GP stake's own percentage, as stated.
+  const projectCost = shareProjectCostOf(ex, impliedWhole);
+  const stakePct = holding === "gp_stake" ? gpStakePctOf(ex) : null;
   const noteTerms = kind === "note" ? readNoteTerms(ex) : null;
   const position = kind === "preferred_equity" ? readPosition(ex, price, asOf) : null;
   const balance = noteTerms?.balance ?? null;
@@ -827,6 +986,26 @@ export function readInterest(
         "The property model runs the whole building at the position's price; that is not this position's return, which is its rate and its redemption.";
       break;
     case "partial_interest":
+      if (holding === "gp_stake") {
+        // A share of the general partner's interest (research pass 37): a
+        // share of a share, whose economics are the general partner's
+        // capital and promote — no figure grosses its price up to the
+        // building's, so no basis, cap or price finding is struck on it.
+        lead.push(
+          "This memorandum sells a share of the general partner's interest, not a share of the owning entity: its economics are the general partner's own capital and its promote, as stated, and the property model is not its return.",
+        );
+        if (price != null) {
+          lead.push(
+            stakePct != null
+              ? `The memorandum's ${money(price)} buys ${shareText(stakePct)} of the general partner's interest, as stated: no figure grosses that up to the building's price, so no basis or cap is struck on it.`
+              : `No figure grosses the memorandum's ${money(price)} up to the building's price, so no basis or cap is struck on it.`,
+          );
+        }
+        if (entityLoan != null) lead.push(`The memorandum states the entity carries ${withArticle(money(entityLoan))} loan.`);
+        modelCaveat =
+          "A share of the general partner's interest is a share of a share: the screening model runs the whole building's cash flows at its price, so its cap and returns are not the stake's, which earns the general partner's capital share and its promote as the waterfall states.";
+        break;
+      }
       if (holding === "tic") {
         // An undivided interest held as a tenant in common (research pass
         // 37): title to a share of the property itself, beside its
@@ -893,6 +1072,19 @@ export function readInterest(
           "A minority share is worth less than its slice once control, the promote and the exit rights are priced.",
         );
         modelCaveat = `The screening model runs the whole asset at the ${money(impliedWhole)} the share's price implies — the equity's whole: the entity's stated ${money(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${money(impliedWhole)} instead. The share earns its ${shareText(sharePct)} of the cash flows only before the waterfall's promote and the sponsor's fees.`;
+        break;
+      }
+      if (sharePct != null && price != null && impliedWhole != null && projectCost != null) {
+        // A stated total project cost above the figure the share's price
+        // grosses up to (research pass 37: a development joint venture's
+        // "$31.5M LP equity commitment" for 90% read "$35.0M for the whole"
+        // beside a $95.0M project): that figure is the equity's whole, the
+        // project's cost above it — both named, nothing added.
+        lead.push(
+          `This memorandum sells ${withArticle(shareText(sharePct))} share of the owning entity, not the whole asset: ${money(price)} for the share is ${money(impliedWhole)} grossed up — the equity's whole, not the project's, since the memorandum's stated ${money(projectCost)} total project cost sits above it, and the screen sets the whole building's income against the ${money(impliedWhole)} alone.`,
+          "A minority share is worth less than its slice once control, the promote and the exit rights are priced.",
+        );
+        modelCaveat = `The screening model runs the whole asset at the ${money(impliedWhole)} the share's price implies — the equity's whole, with the memorandum's stated ${money(projectCost)} total project cost above it. The share earns its ${shareText(sharePct)} of the cash flows only before the waterfall's promote and the sponsor's fees.`;
         break;
       }
       lead.push(
@@ -973,16 +1165,20 @@ export function readInterest(
     label:
       holding === "tic"
         ? TIC_LABEL
-        : isWholeShare(sharePct)
-          ? "All of the owning entity's interests"
-          : masterLease
-            ? MASTER_LEASE_LABEL
-            : INTEREST_LABEL[kind],
+        : holding === "gp_stake"
+          ? GP_STAKE_LABEL
+          : isWholeShare(sharePct)
+            ? "All of the owning entity's interests"
+            : masterLease
+              ? MASTER_LEASE_LABEL
+              : INTEREST_LABEL[kind],
     summary: (it.summary ?? "").trim(),
     page,
     sharePct,
     inUnits,
     holding,
+    stakePct,
+    projectCost,
     askingPrice: price,
     impliedWhole,
     entityLoan,
@@ -1048,7 +1244,9 @@ export function interestNote(r: InterestRead): string {
         : `(a) THE PRICE IS FOR A SHARE — hold the whole asset's income against the price grossed up by the share, never against the share's price${
             r.entityLoan != null
               ? `, and read that grossed-up figure as the equity's whole, not the asset's: the entity's stated ${money(r.entityLoan)} loan sits on top of it`
-              : ""
+              : r.projectCost != null
+                ? `, and read that grossed-up figure as the equity's whole, not the project's: the memorandum's stated ${money(r.projectCost)} total project cost sits above it`
+                : ""
           }`
     }; (b) CONTROL — who decides a sale, a refinance and a budget, and what a minority holder can block; (c) THE WATERFALL — the share's economics after the sponsor's promote and fees, not its pro-rata slice; (d) EXIT RIGHTS — buy-sell, right of first refusal, drag and tag, and how a minority share is ever sold; (e) CAPITAL CALLS — what happens to a holder who does not fund one.`,
     leasehold:
@@ -1092,6 +1290,11 @@ export function interestNote(r: InterestRead): string {
   // beside a share's.
   if (r.holding === "tic") traps.partial_interest = ticTraps(r.entityLoan);
   if (r.holding === "dst") traps.partial_interest = `${traps.partial_interest} ${DST_TRAPS}`;
+  // A share of the general partner's interest is a share of a share: its
+  // traps are the general partner's — its promote, its capital, its fees,
+  // its guarantees, its control — in place of a share's gross-up and
+  // waterfall (research pass 37).
+  if (r.holding === "gp_stake") traps.partial_interest = GP_STAKE_TRAPS;
   const shared = r.holding === "tic" ? SHARED_TRAPS_TIC : SHARED_TRAPS_READ[r.kind];
   return `${interestContextLine(r)} ${traps[r.kind]}${terminationTrap}${shared ? ` ${shared}` : ""}`;
 }
@@ -1109,6 +1312,14 @@ function ticTraps(loan: number | null): string {
       : "ask whether the property carries a loan, whether the co-owners are its co-borrowers, and whether its lender has consented to this transfer";
   return `TENANCY-IN-COMMON TRAPS, asked by name where the OM gives the inputs: (a) UNANIMITY — ask what the TIC agreement makes every co-owner approve: a sale, a lease, a refinancing, the manager; (b) PARTITION — ask whether each co-owner keeps a right to partition the property, and whether it has been waived to the lender; (c) THE LOAN — ${theLoan}; (d) THE MANAGER AND ITS FEES — ask who manages the property under the TIC agreement, and what it is paid; (e) THE EXIT — ask whether the co-owners hold a right of first refusal on this interest, and whether the agreement carries a buy-sell.`;
 }
+
+/**
+ * A share of the general partner's interest's traps (research pass 37):
+ * questions, each answered by the partnership's and the general partner's
+ * own agreements as stated — never a figure or a rule written here.
+ */
+const GP_STAKE_TRAPS =
+  "GP-STAKE TRAPS, asked by name where the OM gives the inputs: (a) THE PROMOTE IS THE RETURN — it is paid only past the investors' preferred return, as the waterfall states: ask for each hurdle and the general partner's share above it; (b) THE GP'S CAPITAL AND ITS CALLS — ask what capital the general partner has put in and must still put in, and what this stake owes on a call; (c) THE FEES IT SHARES — ask which of the general partner's fees this stake shares, as stated; (d) THE GUARANTEES IT SHARES — ask which guarantees the general partner has given — non-recourse carve-outs, completion — and whether this stake shares them; (e) CONTROL AND REMOVAL — ask who controls the general partner, and on what terms the investors may remove it.";
 
 /**
  * A Delaware statutory trust's traps (research pass 37), beside a share's:
@@ -1223,6 +1434,13 @@ export function interestShortLine(r: InterestRead): string {
           ? `${head} — ${money(r.askingPrice)} for the interest is ${money(r.impliedWhole)} for the equity's whole; the stated ${money(r.entityLoan)} loan on the property sits on top of it`
           : `${head} — ${money(r.askingPrice)} for the interest is ${money(r.impliedWhole)} for the whole`;
       }
+      // A share of the general partner's interest: a share of a share, its
+      // percentage the stake's and nothing grossed up (research pass 37).
+      if (r.holding === "gp_stake") {
+        return r.stakePct != null && r.askingPrice != null
+          ? `${shareText(r.stakePct)} of the general partner's interest for ${money(r.askingPrice)}, as stated — a share of a share, not of the owning entity`
+          : "A share of the general partner's interest — a share of a share, not of the owning entity";
+      }
       // All of the entity's interests: the price is the whole's (research
       // pass 28).
       if (isWholeShare(r.sharePct)) {
@@ -1236,7 +1454,9 @@ export function interestShortLine(r: InterestRead): string {
       return r.sharePct != null && r.askingPrice != null && r.impliedWhole != null
         ? r.entityLoan != null
           ? `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the equity's whole; the entity's stated ${money(r.entityLoan)} loan sits on top of it`
-          : `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the whole`
+          : r.projectCost != null
+            ? `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the equity's whole; the stated ${money(r.projectCost)} total project cost sits above it`
+            : `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the whole`
         : "A share of the owning entity, its percentage not stated";
     case "leasehold":
       return `A leasehold — ${

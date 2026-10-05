@@ -7110,6 +7110,21 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(ticText).toContain("The equity's whole, grossed up $14.0M · the property's $9.0M loan on top");
     expect(ticText).not.toMatch(/entity's|owning entity/);
     expect(gluedWords(ticText)).toEqual([]);
+    // Beside a stated total project cost above it, a share's grossed-up
+    // figure is the equity's whole (research pass 37).
+    const jvEx = base({ ...blank, kind: "partial_interest", share: "90% limited partner interest" }, [
+      { label: "Total project cost", value: "$95,000,000", flagged: false, page: "p. 4" },
+    ]);
+    const jvText = visibleText(render(React.createElement(InterestPanel, { interest: readInterestFor(jvEx, 31_500_000) })));
+    expect(jvText).toContain("The equity's whole, grossed up $35.0M · the $95.0M project cost above it");
+    expect(jvText).not.toContain("The whole, grossed up");
+    expect(gluedWords(jvText)).toEqual([]);
+    // A share of the general partner's interest draws no whole at all.
+    const gpHtml = render(
+      React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "partial_interest", share: "50% of the general partner interest" }), 3_200_000) }),
+    );
+    expect(visibleText(gpHtml)).toContain("A share of the general partner's interest");
+    expect(gpHtml).not.toContain('data-bar="interest"');
     const leaseHtml = render(
       React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "leasehold", groundLease: "62 years remaining; $310,000 a year" }), 20_000_000) }),
     );

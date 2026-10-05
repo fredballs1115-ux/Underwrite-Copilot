@@ -789,6 +789,28 @@ describe("where the price did not buy the building, no building basis or cap is 
       expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
       noErrors(h);
     }
+    // A share of the general partner's interest (research pass 37): a share
+    // of a share, run at its price as stated, with no cap or basis struck on
+    // it — each cell "n/a — share", as a share of no stated percentage's.
+    const gp = deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "partial_interest", share: "50% of the general partner interest" } }), "fallback");
+    expect(gp.inputs.purchasePrice).toBe(50_000_000);
+    expect(gp.meta.priceLabel).toBeNull();
+    {
+      const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(gp));
+      const summary = w.getWorksheet("Deal Summary")!;
+      expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe("n/a — share");
+      expect(opsLabels(w)).toContain(
+        "Price / Unit and All-in Basis / Unit left out: the price buys a share of the general partner's interest, a share of a share that no figure grosses up to the building's price, so no building basis is struck on it.",
+      );
+      const tiles = findRow(summary, 1, "PURCHASE PRICE");
+      expect(summary.getCell(tiles + 2, 1).value).toBe(gp.meta.interest!.modelCaveat);
+      expect(gp.meta.interest!.modelCaveat).toMatch(/^A share of the general partner's interest is a share of a share/);
+      const assumptions = w.getWorksheet("Assumptions")!;
+      expect(String(assumptions.getCell(findRow(assumptions, 1, "Purchase Price"), 3).value)).toContain(
+        "The OM's price for a share of the GENERAL PARTNER'S interest — a share of a share, not of the owning entity: this model runs the whole building's cash flows at that price, so its cap and returns are not the stake's",
+      );
+      noErrors(h);
+    }
     // A 49% share with no entity loan: the model runs at the whole the
     // price implies, a building's price, so its cap and basis stand.
     const share = deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" } }), "fallback");

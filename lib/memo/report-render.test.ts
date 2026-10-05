@@ -534,6 +534,16 @@ describe("ReportDocument (full report)", () => {
     } as ExtractionResult);
     expect(unstated).toContain("No max bid: the memorandum states no single percentage for the share");
     expect(unstated).not.toMatch(/Max bid (clearing|holding)/);
+    // A share of the general partner's interest is a share of a share
+    // (research pass 37): it states a percentage, of the general partner's
+    // interest, and no bid is solved on it.
+    const gpStake = await render({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "50% of the general partner interest", groundLease: "", loan: "", page: "" },
+    } as ExtractionResult);
+    expect(gpStake).toContain("No max bid: the price buys a share of the general partner's interest — a share of a share");
+    expect(gpStake).not.toContain("no single percentage");
+    expect(gpStake).not.toMatch(/Max bid (clearing|holding)/);
     // All of the entity's interests (a stated 100%, research pass 28): the
     // bid is solved on the price itself, and it is no share's.
     const whole = await render({

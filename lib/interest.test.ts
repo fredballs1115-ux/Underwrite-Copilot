@@ -1787,3 +1787,198 @@ describe("a Delaware statutory trust's beneficial interests are asked their own 
     expect(interestNote(readInterest(lp, 20_000_000)!)).not.toContain("DELAWARE STATUTORY TRUST TRAPS");
   });
 });
+
+// Research pass 37: "50% of the general partner interest" read as 50% of the
+// entity and grossed up 2×, so the pipeline card printed "$21k/unit" for a
+// building the memorandum values at $267k a unit, and the plausibility check
+// blamed the memorandum for the site's own misread.
+describe("a share of the general partner's interest is a share of a share, never the entity's", () => {
+  const row = (label: string, value: string, basis: ExtractionResult["metrics"][number]["basis"] = "na") => ({ label, value, flagged: false, page: "p. 3", basis });
+  const gp = (over: Partial<ExtractedInterest> = {}, metrics: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    dealName: "Crescent Ridge GP Interest",
+    assetClass: "Multifamily",
+    totalPages: 40,
+    interest: interest({
+      kind: "partial_interest",
+      summary: "50% of the general partner interest in the partnership that owns the property; the GP holds a 10% capital interest and a 20% promote over an 8% preferred return",
+      share: "50% of the general partner interest",
+      page: "p. 2",
+      ...over,
+    }),
+    metrics: [row("Asking price", "3,200,000"), row("Units", "300"), row("NOI (in-place)", "4,400,000", "in_place"), row("Whole-asset value", "80,000,000"), ...metrics],
+  });
+
+  it("parseSharePct reads a percentage of a partner's, a member's, a manager's or a sponsor's interest as no share of the entity", async () => {
+    const { shareOfSharePct } = await import("./interest");
+    for (const [text, stake] of [
+      ["50% of the general partner interest", 50],
+      ["50% of the general partner's interest", 50],
+      ["a 25% interest in the managing member", 25],
+      ["30% of the GP's interest", 30],
+      ["a 10% co-GP interest", 10],
+      ["40% of the sponsor's interest", 40],
+      ["10% of the GP promote", 10],
+      ["20% of the carried interest", 20],
+    ] as const) {
+      expect(parseSharePct(text), text).toBeNull();
+      expect(shareOfSharePct(text), text).toBe(stake);
+    }
+    // A partner's own stake in the partnership is the entity's share, and so
+    // is a general partnership's.
+    expect(parseSharePct("a 2% GP interest")).toBe(2);
+    expect(parseSharePct("49% interest in the general partnership")).toBe(49);
+    expect(parseSharePct("90% limited partner interest")).toBe(90);
+    expect(shareOfSharePct("90% limited partner interest")).toBeNull();
+    // An LP share beside the sponsor's GP interest kept is the LP's.
+    expect(parseSharePct("a 90% interest in the partnership, the sponsor retaining the general partner interest")).toBe(90);
+  });
+
+  it("reads the stake off its own words — the share as stated, else the sentence's first clause — and grosses nothing up", async () => {
+    const { buildingPriceOf } = await import("./deal-strategy");
+    const { isGpStake, gpStakePctOf } = await import("./interest");
+    const e = gp();
+    expect(isGpStake(e)).toBe(true);
+    expect(shareHoldingOf(e)).toBe("gp_stake");
+    expect(interestOf(e)).toEqual({ kind: "partial_interest", sharePct: null, entityLoan: null });
+    expect(gpStakePctOf(e)).toBe(50);
+    // A lone figure in the share's field is the stake's where the sentence says so.
+    const lone = gp({ share: "50%" });
+    expect([isGpStake(lone), interestOf(lone).sharePct, gpStakePctOf(lone)]).toEqual([true, null, 50]);
+    // An LP interest whose sentence goes on to name the sponsor's GP interest is the LP's.
+    const lp = gp({ share: "90% LP interest", summary: "A 90% LP interest; the sponsor retains 100% of the general partner interest" });
+    expect([isGpStake(lp), interestOf(lp).sharePct]).toEqual([false, 90]);
+    // No basis, no comps tick, no price finding.
+    expect(buildingPriceOf(e, 3_200_000)).toBeNull();
+    expect(assessPlausibility(e)).toEqual([]);
+  });
+
+  it("says a share of a share on every line — the label, the lead, the caveat, the short line, the tag — and asks the general partner's questions", () => {
+    const e = gp();
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.label).toBe("A share of the general partner's interest");
+    expect(r.holding).toBe("gp_stake");
+    expect(r.stakePct).toBe(50);
+    expect(r.impliedWhole).toBeNull();
+    expect(r.leadSentences).toEqual([
+      "This memorandum sells a share of the general partner's interest, not a share of the owning entity: its economics are the general partner's own capital and its promote, as stated, and the property model is not its return.",
+      "The memorandum's $3.2M buys 50% of the general partner's interest, as stated: no figure grosses that up to the building's price, so no basis or cap is struck on it.",
+    ]);
+    expect(r.modelCaveat).toBe(
+      "A share of the general partner's interest is a share of a share: the screening model runs the whole building's cash flows at its price, so its cap and returns are not the stake's, which earns the general partner's capital share and its promote as the waterfall states.",
+    );
+    expect(interestShortLine(r)).toBe("50% of the general partner's interest for $3.2M, as stated — a share of a share, not of the owning entity");
+    expect(interestTag(e)).toBe("GP stake 50%");
+    expect(interestTag(gp({ share: "", summary: "An interest in the general partner of the partnership" }))).toBe("GP stake");
+    const note = interestNote(r);
+    expect(note).toContain(
+      "GP-STAKE TRAPS, asked by name where the OM gives the inputs: (a) THE PROMOTE IS THE RETURN — it is paid only past the investors' preferred return, as the waterfall states: ask for each hurdle and the general partner's share above it; (b) THE GP'S CAPITAL AND ITS CALLS — ask what capital the general partner has put in and must still put in, and what this stake owes on a call; (c) THE FEES IT SHARES — ask which of the general partner's fees this stake shares, as stated; (d) THE GUARANTEES IT SHARES — ask which guarantees the general partner has given — non-recourse carve-outs, completion — and whether this stake shares them; (e) CONTROL AND REMOVAL — ask who controls the general partner, and on what terms the investors may remove it.",
+    );
+    expect(note).not.toMatch(/PARTIAL-INTEREST TRAPS|grossed up by the share|states no single percentage/);
+    expect(note).not.toMatch(/Rev\.|Revenue Ruling|U\.S\.C|§/);
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${note} ${dealContextFor(e)}`;
+    expect(said).not.toMatch(/\$6\.4M|for the whole, grossed up|states no single percentage/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("runs the model at the stake's price as a share of no stated percentage's runs, its notes saying what it is", () => {
+    const d = deriveUnderwriteInputs(gp(), "x");
+    expect(d.inputs.purchasePrice).toBe(3_200_000);
+    expect(d.sources.purchasePrice?.provenance).toBe("extracted");
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's price for a share of the GENERAL PARTNER'S interest — a share of a share, not of the owning entity: this model runs the whole building's cash flows at that price, so its cap and returns are not the stake's",
+    );
+    expect(d.meta.priceLabel).toBeNull();
+    // The building's stated income is not wrong: the price is not the building's.
+    expect(d.sources.inPlaceRentAnnual?.note).toBe(
+      "The OM's NOI (in-place) of $4,400,000 is 138% of price — the whole building's income against the price of a share of the general partner's interest, which is not the building's price, so it does not anchor year 1 here. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI",
+    );
+    expect(d.meta.interest?.basisWithheld).toEqual({
+      word: "share",
+      why: "the price buys a share of the general partner's interest, a share of a share that no figure grosses up to the building's price",
+    });
+    expect(d.meta.interest?.line).toBe("50% of the general partner's interest for $3.2M, as stated — a share of a share, not of the owning entity");
+  });
+});
+
+// Research pass 37: a development joint venture's "$31,500,000 (LP equity
+// commitment)" for a 90% limited partner interest read "$35.0M for the
+// whole" beside a $95.0M project and a $60.0M construction loan read by
+// nothing.
+describe("a development joint venture's grossed-up equity is the equity's whole, never the whole", () => {
+  const row = (label: string, value: string, basis: ExtractionResult["metrics"][number]["basis"] = "na") => ({ label, value, flagged: false, page: "p. 3", basis });
+  const jv = (metrics: ExtractionResult["metrics"]): ExtractionResult => ({
+    dealName: "Riverline Phase II JV",
+    assetClass: "Multifamily",
+    totalPages: 40,
+    strategy: { kind: "development", summary: "LP equity for a ground-up 300-unit development: the investor funds 90% of the equity", capitalBudget: "", timeline: "26-month construction" },
+    interest: interest({ kind: "partial_interest", summary: "90% limited partner interest in the development joint venture", share: "90% limited partner interest", page: "p. 2" }),
+    metrics: [row("Asking price", "31,500,000 (LP equity commitment)"), row("Units (proposed)", "300"), row("NOI (stabilized, pro forma)", "6,300,000", "pro_forma"), ...metrics],
+  });
+
+  it("reads the entity's committed construction loan beside its drawn balance, the balance first", async () => {
+    const { entityLoanOf } = await import("./interest");
+    expect(entityLoanOf(jv([row("Entity construction loan", "60,000,000 (committed)")]))).toBe(60_000_000);
+    expect(entityLoanOf(jv([row("Entity construction loan commitment", "$60,000,000")]))).toBe(60_000_000);
+    expect(entityLoanOf(jv([row("Entity construction loan", "$60,000,000"), row("Entity loan balance", "$18,000,000")]))).toBe(18_000_000);
+    // A buyer's construction loan, or a rate, is no entity's loan.
+    expect(entityLoanOf(jv([row("Construction loan", "60,000,000 (committed)")]))).toBeNull();
+    expect(entityLoanOf(jv([row("Entity construction loan", "65% LTC")]))).toBeNull();
+    // Beside it, the existing rule's words: the equity's whole, the loan on top.
+    const r = readInterest(jv([row("Entity construction loan", "60,000,000 (committed)")]), 31_500_000)!;
+    expect(r.leadSentences[0]).toContain("$31.5M for the share is $35.0M grossed up — the equity's whole, not the asset's, since the entity's stated $60.0M loan sits on top of it");
+  });
+
+  it("the prompt asks for both entity-loan rows by the labels the reader reads", async () => {
+    const { extractionInstruction } = await import("./anthropic/prompts");
+    const prompt = extractionInstruction("multifamily");
+    for (const label of ["Entity loan balance", "Entity construction loan"]) expect(prompt, label).toContain(`"${label}"`);
+    const { entityLoanOf } = await import("./interest");
+    expect(entityLoanOf(jv([row("Entity loan balance", "$18,000,000")]))).toBe(18_000_000);
+    expect(entityLoanOf(jv([row("Entity construction loan", "$60,000,000")]))).toBe(60_000_000);
+  });
+
+  it("beside a stated total project cost above it, the grossed-up figure is the equity's whole on every line, the model's price unchanged", async () => {
+    const { planSummary, plausibilityNote, inferStrategy: infer, buildingPriceOf } = await import("./deal-strategy");
+    const e = jv([row("Total project cost", "95,000,000"), row("Construction loan", "60,000,000 (committed)")]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.projectCost).toBe(95_000_000);
+    expect(r.leadSentences[0]).toBe(
+      "This memorandum sells a 90% share of the owning entity, not the whole asset: $31.5M for the share is $35.0M grossed up — the equity's whole, not the project's, since the memorandum's stated $95.0M total project cost sits above it, and the screen sets the whole building's income against the $35.0M alone.",
+    );
+    expect(r.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $35.0M the share's price implies — the equity's whole, with the memorandum's stated $95.0M total project cost above it. The share earns its 90% of the cash flows only before the waterfall's promote and the sponsor's fees.",
+    );
+    expect(interestShortLine(r)).toBe("A 90% share of the owning entity — $31.5M for the share is $35.0M for the equity's whole; the stated $95.0M total project cost sits above it");
+    expect(interestNote(r)).toContain("read that grossed-up figure as the equity's whole, not the project's: the memorandum's stated $95.0M total project cost sits above it");
+    // The model's price is the grossed-up figure as before; its note and label say what it is.
+    const d = deriveUnderwriteInputs(e, "x");
+    expect(d.inputs.purchasePrice).toBe(35_000_000);
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $31,500,000 for a 90% share, grossed up to $35,000,000 — the equity's whole, not the project's: the memorandum's stated $95,000,000 total project cost sits above it; the model runs the whole building's cash flows, and the share earns 90% of them before the promote and the sponsor's fees",
+    );
+    expect(d.meta.priceLabel).toBe("Equity's Whole (90% share grossed up)");
+    // The plan's cost and yield read as before; its label says the equity's whole.
+    const plan = planSummary(e)!;
+    expect([plan.price, plan.totalCost, plan.priceLabel, plan.projectCostAbove]).toEqual([35_000_000, 95_000_000, "Equity's whole, the share grossed up", 95_000_000]);
+    expect(plausibilityNote([], infer(e), plan, e)).toContain(
+      "whole price, the share's grossed up, $35.0M (the equity's whole, not the project's: the memorandum's stated $95.0M total project cost sits above it)",
+    );
+    expect(buildingPriceOf(e, 31_500_000)).toBe(35_000_000);
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${d.sources.purchasePrice?.note}`;
+    expect(said).not.toMatch(/for the whole\b|whole asset —/);
+    expect(gluedWords(said)).toEqual([]);
+    // A total at or under the grossed-up figure says nothing new.
+    const allEquity = jv([row("Total project cost", "35,000,000")]);
+    expect(readInterest(allEquity, 31_500_000)!.projectCost).toBeNull();
+  });
+
+  it("the deal-strategy reader's total row and the interest's are one reader", async () => {
+    const { capitalBudgetFromMetrics } = await import("./deal-strategy");
+    const { statedProjectCostOf } = await import("./interest");
+    for (const label of ["Total project cost", "Total development cost", "Total development budget", "Total capitalization", "All-in cost", "All-in basis", "Total project cost per unit", "Annual total project cost", "Hard costs", "Construction budget"]) {
+      const rows = [row(label, "$95,000,000")];
+      const total = capitalBudgetFromMetrics(rows, null)?.isTotal === true;
+      expect(statedProjectCostOf(jv(rows)) != null, label).toBe(total);
+    }
+  });
+});

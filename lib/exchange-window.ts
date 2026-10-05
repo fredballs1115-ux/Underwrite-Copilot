@@ -262,7 +262,11 @@ export function exchangeFit(
   } else if (deal.interestKind === "partial_interest") {
     flags.push({
       kind: "entity_share",
-      text: `The price buys a share of the owning entity, not the building. ${REAL_PROPERTY}; whether this share counts is ${ASK}.`,
+      // A share of the general partner's interest is a share of a share
+      // (research pass 37), said as one.
+      text: `The price buys ${
+        deal.holding === "gp_stake" ? "a share of the general partner's interest in the owning entity" : "a share of the owning entity"
+      }, not the building. ${REAL_PROPERTY}; whether this share counts is ${ASK}.`,
     });
   } else if (deal.interestKind === "preferred_equity") {
     // An interest in the entity, as a share is — a preferred return and a

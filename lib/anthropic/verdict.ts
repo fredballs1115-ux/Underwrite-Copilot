@@ -19,7 +19,7 @@ import {
 import { buyBoxCoverage, foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { checkedSentence } from "@/lib/fit-label";
 import type { MandateScore } from "@/lib/mandate";
-import { interestOf, isWholeShare } from "@/lib/interest";
+import { interestOf, isGpStake, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
 import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-slots";
@@ -156,6 +156,11 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   }
   if (kind === "leased_fee") {
     return "THE BUILDING'S BASIS: none — the price buys the land under the ground lease, not the building, and is never divided over the building's units or area.";
+  }
+  // A share of the general partner's interest is a share of a share
+  // (research pass 37): its percentage is never the entity's.
+  if (kind === "partial_interest" && isGpStake(ex)) {
+    return "THE BUILDING'S BASIS: none — this sells a share of the general partner's interest, a share of a share: its price buys the general partner's capital share and promote, never a slice of the building, and is never grossed up or divided over the whole building's units or area.";
   }
   if (kind === "partial_interest" && sharePct == null) {
     return "THE BUILDING'S BASIS: none — the OM states no percentage for the share, so the whole its price implies cannot be read, and the share's price is never divided over the whole building's units or area.";

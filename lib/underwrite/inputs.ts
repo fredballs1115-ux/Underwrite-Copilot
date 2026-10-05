@@ -14,7 +14,18 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { entityLoanOf, groundRentOf, interestOf, interestShortLine, isTenancyInCommon, isWholeShare, readInterest, type EquipmentUse } from "@/lib/interest";
+import {
+  entityLoanOf,
+  groundRentOf,
+  interestOf,
+  interestShortLine,
+  isGpStake,
+  isTenancyInCommon,
+  isWholeShare,
+  readInterest,
+  shareProjectCostOf,
+  type EquipmentUse,
+} from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -395,6 +406,14 @@ export function basisWithheldOf(extraction: ExtractionResult | null): { word: st
     case "leased_fee":
       return { word: "leased fee", why: "the price buys the land under the building, not the building" };
     case "partial_interest":
+      // A share of the general partner's interest is a share of a share:
+      // nothing grosses its price up to the building's (research pass 37).
+      if (isGpStake(extraction)) {
+        return {
+          word: "share",
+          why: "the price buys a share of the general partner's interest, a share of a share that no figure grosses up to the building's price",
+        };
+      }
       // An undivided interest held as a tenant in common is the real
       // estate's: a loan the memorandum states is the property's, never an
       // entity's (research pass 37).
@@ -777,7 +796,12 @@ export function deriveUnderwriteInputs(
     // estate beside its co-owners, never an entity's share: no promote, and a
     // loan the memorandum states is the property's (research pass 37).
     const tic = isTenancyInCommon(extraction);
-    priceLabel = `${entityLoan != null ? "Equity's Whole" : "Whole Price"} (${shareWord} ${tic ? "TIC interest" : "share"} grossed up)`;
+    // A stated total project cost above the figure grossed up makes it the
+    // equity's whole, never the whole (research pass 37: a development joint
+    // venture's equity commitment grossed up is its equity, the construction
+    // debt above it). Said; nothing is added to the price.
+    const projectCost = shareProjectCostOf(extraction, price);
+    priceLabel = `${entityLoan != null || projectCost != null ? "Equity's Whole" : "Whole Price"} (${shareWord} ${tic ? "TIC interest" : "share"} grossed up)`;
     const sold = tic ? `an undivided ${share}% interest held as a tenant in common` : `${withArticle(`${share}%`)} share`;
     const earns = tic
       ? `the interest earns ${share}% of them before any fee the co-owners' agreement pays its manager`
@@ -788,7 +812,9 @@ export function deriveUnderwriteInputs(
       "derived",
       entityLoan != null
         ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to ${usd0(price)} — the equity's whole, not the asset's: ${loanOnTop} sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, and ${earns}`
-        : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to the whole asset — the model runs the whole building's cash flows; ${earns}`,
+        : projectCost != null
+          ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to ${usd0(price)} — the equity's whole, not the project's: the memorandum's stated ${usd0(projectCost)} total project cost sits above it; the model runs the whole building's cash flows, and ${earns}`
+          : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to the whole asset — the model runs the whole building's cash flows; ${earns}`,
       pageOf(priceMetric),
     );
   } else if (price != null) {
@@ -799,9 +825,14 @@ export function deriveUnderwriteInputs(
         : interest.kind === "preferred_equity"
           ? "The OM's price for a PREFERRED EQUITY position in the owning entity — this model runs the whole building as if bought outright at that price, which is not the position's return: that is its rate and its redemption"
         : interest.kind === "partial_interest"
-          ? isTenancyInCommon(extraction)
-            ? "The OM's price for an UNDIVIDED INTEREST held as a tenant in common that states no single percentage — the model cannot gross it up, so its returns are not the interest's"
-            : "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
+          ? isGpStake(extraction)
+            ? // A share of a share (research pass 37): the price runs as
+              // stated, as a share of no stated percentage's does, and its
+              // returns are said not to be the stake's.
+              "The OM's price for a share of the GENERAL PARTNER'S interest — a share of a share, not of the owning entity: this model runs the whole building's cash flows at that price, so its cap and returns are not the stake's"
+            : isTenancyInCommon(extraction)
+              ? "The OM's price for an UNDIVIDED INTEREST held as a tenant in common that states no single percentage — the model cannot gross it up, so its returns are not the interest's"
+              : "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
           : interest.kind === "leased_fee"
             ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease"
             : "OM asking / purchase price";
@@ -857,13 +888,22 @@ export function deriveUnderwriteInputs(
   // Why a stated NOI was not the anchor — said truthfully for each case: a
   // zero or negative figure is no income to anchor on; a plan deal's
   // stabilized figure is the finished project's; a figure past the cap
-  // ceiling on an operating asset cannot be year-1 income on this price.
+  // ceiling on an operating asset cannot be year-1 income on this price — and
+  // beside a price that buys a share no figure grosses up, the building's own
+  // income is not wrong, the price is not the building's (research pass 37:
+  // a GP stake's note had called the building's stated NOI no year-1 income).
+  const shareUngrossed = interest.kind === "partial_interest" && interest.sharePct == null;
   const implausible = (f: { label: string; value: number }) => {
     // A loss is written with its minus outside the dollar, as every surface
     // writes one: "−$310,000", never "$-310,000" (research pass 38).
     const whole = Math.round(f.value);
     const amount = `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}`;
     if (!(f.value > 0)) return `The OM's ${f.label} is ${amount} — no income in place to anchor year 1 on`;
+    if (shareUngrossed && !isPlanDeal(strategy.kind)) {
+      return `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the whole building's income against the price of ${
+        isGpStake(extraction) ? "a share of the general partner's interest" : "a share the memorandum states no percentage for"
+      }, which is not the building's price, so it does not anchor year 1 here`;
+    }
     return isPlanDeal(strategy.kind)
       ? `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the finished project's stabilized figure on ${withArticle(strategy.label.toLowerCase())} deal, not year-1 income, so it does not anchor year 1 here`
       : `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} above any going-in cap on this price, so it cannot be year-1 income and does not anchor year 1 here`;

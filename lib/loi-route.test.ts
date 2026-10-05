@@ -224,6 +224,8 @@ describe("the LOI is refused where the memorandum sells something else, or sells
       { ...extraction, interest: interest("partial_interest", { share: "30% tenant-in-common interest", summary: "An undivided 30% tenant-in-common interest in the fee simple" }) },
       "tic",
     ],
+    // A share of the general partner's interest is a share of a share.
+    ["a share of the general partner's interest", { ...extraction, interest: interest("partial_interest", { share: "50% of the general partner interest" }) }, "gp_stake"],
     // A preferred equity position (lib/position): its own kind, and a share
     // filed before the kind was asked whose rows say a position.
     [
@@ -302,6 +304,7 @@ describe("the LOI is refused where the memorandum sells something else, or sells
     // A tenancy in common is never called a share of an entity (research pass 37).
     expect(LOI_REFUSAL.tic).toMatch(/sells an undivided interest in the property, held as a tenant in common beside its co-owners/);
     expect(LOI_REFUSAL.tic).not.toMatch(/entity/);
+    expect(LOI_REFUSAL.gp_stake).toMatch(/sells a share of the general partner's interest, not the property — a share of a share/);
     expect(LOI_REFUSAL.auction).toMatch(/bid for under the auction's own terms/);
     // True of a stalking horse whether or not the memorandum prices it.
     expect(LOI_REFUSAL.bids).toMatch(/states a stalking-horse bid — the property is sold through bidding that higher bids can reopen/);

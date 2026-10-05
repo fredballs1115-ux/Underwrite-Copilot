@@ -65,6 +65,19 @@ describe("compareInterest — the compare table's model figures, read for what t
     expect(unstated.withheld).toBe("share");
   });
 
+  // Research pass 37: "50% of the general partner interest" had been grossed
+  // up 2× and its cap struck on a building price the memorandum never states.
+  it("a share of the general partner's interest is a share of a share: no cap, the returns withheld, each cell 'n/a — share'", () => {
+    const gp = deal({ ...blank, kind: "partial_interest", share: "50% of the general partner interest" }, []);
+    const r = modelReturnsRead(gp, MODEL);
+    expect(r).toMatchObject({ tag: "GP stake 50%", cap: null, withheld: "share", share: true });
+    expect(r.line).toBe(
+      "A share of the general partner's interest is a share of a share: this model ran the whole building's cash flows at its price, so its cap and returns are withheld.",
+    );
+    // Withheld whatever price the model ran at: nothing grosses the stake up.
+    expect(compareInterest(gp, { ...MODEL, purchasePrice: 40_000_000 }).withheld).toBe("share");
+  });
+
   it("a leasehold and a leased fee stand as the model runs them, with what the price buys beside it", () => {
     const AS_OF = new Date(Date.UTC(2026, 8, 25));
     const lease = [row("Ground lease expiration", "December 31, 2071")];

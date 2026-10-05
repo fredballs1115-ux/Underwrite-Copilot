@@ -9,7 +9,7 @@
 // sells it some other way, that is the wrong document, and the page says so
 // rather than drafting it.
 
-export type LoiRefusalKind = "note" | "share" | "tic" | "position" | "leased_fee" | "auction" | "bankruptcy" | "bids";
+export type LoiRefusalKind = "note" | "share" | "tic" | "gp_stake" | "position" | "leased_fee" | "auction" | "bankruptcy" | "bids";
 
 /** One sentence a refusal: what the memorandum sells or how, and why this
  *  letter is not the document for it. */
@@ -21,6 +21,11 @@ export const LOI_REFUSAL: Record<LoiRefusalKind, string> = {
   // real estate's, never an entity's share — but not the whole property, and
   // held under the co-owners' agreement, which this draft has no terms for.
   tic: "No LOI draft here: this memorandum sells an undivided interest in the property, held as a tenant in common beside its co-owners, and this draft is written to buy a property outright, with no terms for the co-owners' agreement the interest is held under.",
+  // A share of the general partner's interest (research pass 37): a share of
+  // a share, bought under the partnership's and the general partner's own
+  // agreements.
+  gp_stake:
+    "No LOI draft here: this memorandum sells a share of the general partner's interest, not the property — a share of a share is bought under the partnership's and the general partner's own agreements, not a property letter of intent.",
   // A preferred equity position (lib/position): capital put into the owning
   // entity for a preferred return and a redemption — nothing is conveyed
   // by the property's owner, so a property purchase is the wrong paper.
@@ -41,6 +46,7 @@ export const LOI_REFUSAL_CODE: Record<LoiRefusalKind, string> = {
   note: "loinote",
   share: "loishare",
   tic: "loitic",
+  gp_stake: "loigpstake",
   position: "loiposition",
   leased_fee: "loileasedfee",
   auction: "loiauction",

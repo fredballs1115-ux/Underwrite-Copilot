@@ -21,7 +21,10 @@
 //   that whole — within 2% of it; run at the share's price they set the
 //   whole building's cash flows against a fraction of its cost. Beside a
 //   loan its entity carries, the share grossed up is the equity's whole, no
-//   building's price: no cap is struck and the returns are withheld.
+//   building's price: no cap is struck and the returns are withheld. A share
+//   of the general partner's interest is a share of a share (research pass
+//   37): nothing grosses it up, so its cap and returns are withheld as a
+//   share's of no stated percentage are, each cell "n/a — share".
 //
 //   A PREFERRED EQUITY POSITION HAS NO CAP EITHER (lib/position). Its price
 //   buys a rate and a redemption, never a slice of the building: the cap row
@@ -54,7 +57,7 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf, signalGoingInCap } from "@/lib/deal-strategy";
-import { interestOf, interestTag, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
+import { interestOf, interestTag, isGpStake, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
 import { leaseEndInHold, type LeaseEndInHold } from "@/lib/leasehold-exit";
 
 export interface CompareModel {
@@ -190,14 +193,18 @@ export function modelReturnsRead(
       : ci.withheld === "position"
         ? "A preferred equity position's price is a position's: this model runs the whole building as if bought outright at it, so its cap and returns are the building's, not the position's, and are withheld."
         : ci.withheld === "share"
-          ? ci.cap != null
-            ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
-            : interestOf(ex).entityLoan != null
-              ? isWholeShare(interestOf(ex).sharePct)
-                ? // All of the entity's interests (a stated 100%, research pass 28).
-                  "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-                : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-              : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+          ? isGpStake(ex)
+            ? // A share of a share (research pass 37): no figure grosses its
+              // price up to the building's, so nothing of the model's stands.
+              "A share of the general partner's interest is a share of a share: this model ran the whole building's cash flows at its price, so its cap and returns are withheld."
+            : ci.cap != null
+              ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
+              : interestOf(ex).entityLoan != null
+                ? isWholeShare(interestOf(ex).sharePct)
+                  ? // All of the entity's interests (a stated 100%, research pass 28).
+                    "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                  : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
           : ci.withheld === "lease"
             ? // The leasehold card's own sentence (lib/leasehold-exit).
               (ci.leaseEnd?.sentence ?? null)

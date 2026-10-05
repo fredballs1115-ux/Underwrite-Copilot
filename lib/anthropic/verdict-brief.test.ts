@@ -183,6 +183,29 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(brief).toContain("- Asking price: $20,000,000 [p. 3]");
   });
 
+  // Research pass 37: "50% of the general partner interest" read as 50% of
+  // the entity, so the brief struck "$21k/unit" on a building the
+  // memorandum values at $267k a unit.
+  it("a share of the general partner's interest: a share of a share, and no building basis", () => {
+    const gp = base({
+      interest: {
+        kind: "partial_interest",
+        summary: "50% of the general partner interest in the partnership that owns the property; the GP holds a 10% capital interest and a 20% promote over an 8% preferred return",
+        share: "50% of the general partner interest",
+        groundLease: "",
+        loan: "",
+        page: "p. 2",
+      },
+      metrics: [m("Asking price", "3,200,000"), m("Units", "300"), m("NOI (in-place)", "4,400,000", "in_place"), m("Whole-asset value", "80,000,000")],
+    });
+    const est = section(briefOf(gp));
+    expect(est).toContain("What is being sold: a share of the general partner's interest.");
+    expect(est).toContain(
+      "THE BUILDING'S BASIS: none — this sells a share of the general partner's interest, a share of a share: its price buys the general partner's capital share and promote, never a slice of the building, and is never grossed up or divided over the whole building's units or area.",
+    );
+    expect(est).not.toMatch(/\/unit|share of the owning entity\. This memorandum sells a 50%/);
+  });
+
   it("a note: the context carries the note's own read, and there is no building basis", () => {
     // Read on a pinned day: the note matures March 1, 2028, and from Feb 2
     // of that year it is due within the month, with no yield to state.

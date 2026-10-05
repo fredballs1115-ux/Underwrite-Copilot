@@ -102,6 +102,12 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     expect(gluedWords(tic.flags[0].text)).toEqual([]);
     // A trust's beneficial interests are asked about as a share is.
     expect(exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest", holding: "dst" })!.tag).toBe("1031: share — ask counsel");
+    // A share of the general partner's interest is said as a share of a share.
+    const gp = exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest", holding: "gp_stake" })!;
+    expect(gp.flags[0].text).toBe(
+      "The price buys a share of the general partner's interest in the owning entity, not the building. Section 1031 reaches only real property exchanged for real property of like kind; whether this share counts is a question for your exchange counsel.",
+    );
+    expect(gp.tag).toBe("1031: share — ask counsel");
     // A preferred equity position is an interest in the entity, as a share is.
     const position = exchangeFit(x, { offersDueIso: null, interestKind: "preferred_equity" })!;
     expect(position.flags).toEqual([
