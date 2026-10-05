@@ -1029,7 +1029,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   A hyphen in the words after the figure is read past ("$24,500,000
   (Freddie Mac, non-recourse)", "$650,000 (T-12)"). It had refused any
   value with a hyphen anywhere, so figures the memorandum stated read as
-  none. `parseMoney` is untouched. Stored deals re-read on their next view.
+  none. Stored deals re-read on their next view. **`parseMoney` reads a
+  scale only where it ends its word** (the scale words and their values
+  are lib/money's, `SCALE_WORDS` and `scaleOf`): it had read the next
+  word's first letter as one, so "$450,000 more or less" was $450 billion
+  and "$600,000 base rent" $600 billion.
 - **Assumable debt that is not one fixed loan** (research pass 37):
   - **A floating rate**, one naming an index or saying it floats, is
     carried as its index and spread with no coupon. The card prices
@@ -1055,6 +1059,59 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   last Q2 2028" in the read, the tag "Forward, 3 takedowns to Q2 2028",
   and a lighter tick on the panel for each takedown
   (`data-bar="fwd-phase"`). The model still runs one closing and says so.
+- **A tenancy in common, a DST and a share of a share** (research pass
+  37). A TIC is title to the property: its own label, lead, caveat and
+  short line, TIC traps (a)–(e) in place of the partial interest's, the
+  1031 flag `tic`, the tag "TIC 30%" and a letter of intent refused in its
+  own words. "Co-tenancy" is a TIC only in an owner's words, never a retail
+  lease's clause. A TIC's stated loan is the property's, so it is named so
+  beside the equity's whole (`entityLoanWords`) on the plan, the
+  plausibility note, the verdict and the model tab, and the cap slot's
+  tooltip names "the loan the memorandum states". A DST asks DST traps
+  (a)–(d) beside the share list. **A share of the general partner's
+  interest** (`isGpStake`) is a share of a share that no figure grosses up
+  to the building's price: no building price, basis, comps tick, price
+  finding or implied cap; the model runs at the stated price with its cap
+  and returns withheld ("n/a — share"); GP-STAKE TRAPS (a)–(e); the tag "GP
+  stake 50%"; no letter of intent. The extraction files "Entity
+  construction loan", which `entityLoanOf` reads.
+- **A building with no income today** (research pass 37): a deal of no
+  stated strategy with no NOI of any kind beside 0% occupancy, or a vacant
+  or owner-user building's words, is a lease-up wherever the deal's kind is
+  read (`noIncomeToday`). One that states a pro forma NOI stays as it was
+  read, since the model would run that figure as year 1 one way and not
+  the other, and a stated 0% occupancy on a deal read as stabilized is a
+  plausibility finding. A lease-up's plan paragraph (`leaseUpPlanText`)
+  speaks of a stabilized NOI or a budget only where the memorandum states
+  it, and calls the NOI "not a misread" only where the plan's figures tie.
+- **Audit C2's fixes** (2026-10-05):
+  - The buy box and the mandate hold a preferred equity position, or a
+    share beside its entity's loan, to no building cap or basis; each
+    check reads unknown with the cap slot's own reason. Every page, route
+    and document builds its check source through `dealCheckSource`.
+  - `buyBoxCoverage` counts the mandate's cash-on-cash floor and every red
+    line that could not be checked.
+  - The first signal's cap counts where the memorandum states none and the
+    deal is no plan deal: the buy box judges it, and the internal comps,
+    the market memory and the analytics pool it through `statedCapRead`.
+  - A fit with no score reads "Fits (1 of 2)" on the header chip, the
+    pipeline cell's words.
+  - Puerto Rico sits in lib/market-county's own tables only: a deal there
+    gets its metro area's photograph and reads no market figures.
+  - The deal page's interest read, cap figure and model-returns read run
+    on the reader's day (`readerNoon`), and so do the memo's and report's
+    filenames and the report's rent-regulation read.
+  - A conversion's or a development's all-in basis divides by a count the
+    memorandum labels proposed or planned (`planCountRow`); with none, no
+    basis is struck and the plan says why (`costPerUnitWithheld`).
+  - The rent-roll workbook's "Loan balance at exit" and "Gross sale
+    proceeds" handle a 0% rate and a 0% exit cap as the mirror does, still
+    live formulas.
+- **A mixed-use income read off a month** is said as the month the
+  memorandum states and the year it makes ("$92k a month of residential
+  income ($1.10M a year)"; `residentialFromMonth`, `commercialFromMonth`),
+  never as a stated year, and the panel's tile says "twelve times the month
+  stated".
 - A manufactured-housing park (#470): the extraction labels a park's
   figures as rows of their own, each only as stated — "Pads" (never with
   the RV sites in it), "Occupied pads", "Lot rent" (the average monthly
@@ -4959,7 +5016,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   - the deal context the Claude steps read (`floodContextLine`, passed to
     `dealContextFor` by the pipeline where the lookup has answered by the
     time the step runs): in an SFHA the expense line needs a flood premium
-    the seller's figures may not carry.
+    the seller's figures may not carry. The lookup records whether its
+    point was the building's (`SiteFlagsResult.pointIsBuilding`: a street
+    address placed at the house), and the line says "the building's point"
+    only then, else "the point the address was placed at", as the flood
+    view does; open water, an area the map leaves out and a bare Zone X are
+    said as that view says them.
 
   **The full report prints the map** (#427) on a page of its own, "The
   site", before the portfolio and the terms: `floodMapFor` takes the deal's
