@@ -394,4 +394,33 @@ describe("placeholderReturnsLine — a model on a placeholder prints none of its
     );
     expect(buildSensitivityData(priced.inputs, null, { sources: priced.sources }).withheld).toBeNull();
   });
+
+  it("names a leased fee's ground rent rather than saying no year-1 income was read (research pass 34)", () => {
+    // The memorandum states the ground rent, the leased fee's income; the
+    // model reads no ground rent and ran an assumed NOI.
+    const rent = { provenance: "assumption" as const, note: "", notRun: { label: "ground rent", value: 600_000 } };
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: rent })).toBe(
+      "The IRR grids and the max bid are left out: the model does not run the memorandum's $600,000 ground rent as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.",
+    );
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("assumption"), inPlaceRentAnnual: rent })).toBe(
+      "The IRR grids and the max bid are left out: no price was read from the memorandum, and the model does not run its $600,000 ground rent as its year-1 income, so the model runs on a $10,000,000 placeholder price and an assumed NOI, and its returns would be a placeholder's.",
+    );
+    // The derived model's own sources carry it.
+    const fee = deriveUnderwriteInputs(
+      {
+        dealName: "Leased fee",
+        assetClass: "retail",
+        interest: { kind: "leased_fee", summary: "", share: "", groundLease: "", loan: "", page: "" },
+        metrics: [
+          { label: "Asking price", value: "$15,000,000", flagged: false, page: "p. 2" },
+          { label: "Ground rent", value: "$600,000", flagged: false, page: "p. 4" },
+          { label: "Income before ground rent", value: "$3,000,000", flagged: false, page: "p. 6" },
+        ],
+      },
+      "Leased fee",
+    );
+    const line = buildSensitivityData(fee.inputs, null, { sources: fee.sources }).withheld;
+    expect(line).toContain("the model does not run the memorandum's $600,000 ground rent as its year-1 income");
+    expect(line).not.toContain("no year-1 NOI");
+  });
 });

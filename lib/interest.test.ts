@@ -773,6 +773,48 @@ describe("what the price buys, read by the plausibility check, the deal context 
     expect(plain.sources.purchasePrice?.note).toBe("OM asking / purchase price");
     expect(plain.meta.interest).toBeNull();
   });
+
+  // Research pass 34: the leased fee's price note said "the model runs the
+  // ground rent as the income", and the caveat the same, while no NOI reader
+  // takes the "Ground rent" row — the model ran an assumed 6% of the price,
+  // or the price times the stated cap. Each now says what the model runs
+  // and names the rent the memorandum states beside it.
+  it("a leased fee's notes say the model reads no ground rent, and name the rent the memorandum states", () => {
+    const row = (label: string, value: string, page: string) => ({ label, value, flagged: false, page, basis: "in_place" as const });
+    const fee: ExtractionResult = {
+      ...ex(interest({ kind: "leased_fee" })),
+      metrics: [
+        { label: "Asking price", value: "$15,000,000", flagged: false, page: "p. 2", basis: "na" },
+        row("Ground rent", "$600,000", "p. 4"),
+        row("Income before ground rent", "$3,000,000", "p. 6"),
+      ],
+    };
+    const assumed = deriveUnderwriteInputs(fee, "x");
+    expect(assumed.sources.inPlaceRentAnnual?.provenance).toBe("assumption");
+    expect(assumed.sources.purchasePrice?.note).toBe(
+      "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease. The model reads no ground rent as its income: its year-1 NOI is an assumed 6% of this price, $900,000 a year, not the $600,000 ground rent the OM states, run with a building's assumptions",
+    );
+    expect(assumed.sources.inPlaceRentAnnual?.note).toBe(
+      "No NOI or cap in the OM — assumed 6% going-in. The OM's $600,000 ground rent is the leased fee's income; the model does not read it",
+    );
+    expect(assumed.sources.inPlaceRentAnnual?.notRun).toEqual({ label: "ground rent", value: 600_000 });
+    expect(assumed.meta.interest?.modelCaveat).toMatch(/^The screening model reads no ground rent as its income: its year-1 NOI is the one a building's model reads/);
+    // A stated cap: the model runs the price times it, which comes to the
+    // rent by arithmetic — said as that, never as the rent read.
+    const capped = deriveUnderwriteInputs({ ...fee, metrics: [...fee.metrics, row("Going-in cap rate", "4.00%", "p. 3")] }, "x");
+    expect(capped.sources.inPlaceRentAnnual?.provenance).toBe("derived");
+    expect(capped.sources.purchasePrice?.note).toContain(
+      "its year-1 NOI is this price × the stated going-in cap, $600,000 a year — equal to the $600,000 ground rent the OM states by arithmetic, not read from it",
+    );
+    for (const d of [assumed, capped]) {
+      expect(d.sources.purchasePrice?.note).not.toContain("runs the ground rent");
+      expect(d.meta.interest?.modelCaveat).not.toContain("runs the ground rent");
+    }
+    // No rent stated: nothing named, and the note still says what it runs.
+    const bare = deriveUnderwriteInputs({ ...fee, metrics: fee.metrics.filter((m) => !/rent/i.test(m.label)) }, "x");
+    expect(bare.sources.purchasePrice?.note).toMatch(/its year-1 NOI is an assumed 6% of this price, \$900,000 a year, run with a building's assumptions$/);
+    expect(bare.sources.inPlaceRentAnnual?.notRun).toBeUndefined();
+  });
 });
 
 // Research pass 28: a DST offering "100% of the beneficial interests,

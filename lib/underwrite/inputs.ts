@@ -14,7 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { entityLoanOf, interestOf, interestShortLine, isWholeShare, readInterest, type EquipmentUse } from "@/lib/interest";
+import { entityLoanOf, groundRentOf, interestOf, interestShortLine, isWholeShare, readInterest, type EquipmentUse } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -116,6 +116,11 @@ export interface InputSource {
   /** the document an extracted figure was read from where it is not the
    *  OM ("Rent roll"), so the SOURCE column never credits it to the OM */
   doc?: string;
+  /** a figure the memorandum states for this input that the model does not
+   *  run in its place — a leased fee's ground rent, which is the deal's
+   *  income (#415) while the model reads its NOI as a building's — named so
+   *  a surface that withholds the returns never says no income was read */
+  notRun?: { label: string; value: number };
 }
 
 export interface WorkbookMeta {
@@ -658,6 +663,9 @@ export function deriveUnderwriteInputs(
   // starts, read only where no asking price is stated.
   const saleFloor = readSale(extraction);
 
+  // A leased fee's price note says what the model runs as its income, which
+  // only the NOI's derivation below knows: it is written there.
+  let leasedFeePrice = false;
   if (price != null && interest.kind === "partial_interest" && isWholeShare(interest.sharePct)) {
     // All of the entity's interests (a stated 100%, research pass 28): the
     // price is the whole's as stated, nothing grossed up — said so, never as
@@ -700,8 +708,9 @@ export function deriveUnderwriteInputs(
         : interest.kind === "partial_interest"
           ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
           : interest.kind === "leased_fee"
-            ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease; the model runs the ground rent as the income, with a building's assumptions"
+            ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease"
             : "OM asking / purchase price";
+    leasedFeePrice = interest.kind === "leased_fee" && !priceIsLand;
     mark(
       "purchasePrice",
       "extracted",
@@ -762,8 +771,12 @@ export function deriveUnderwriteInputs(
       : `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} above any going-in cap on this price, so it cannot be year-1 income and does not anchor year 1 here`;
   };
   let noi: number;
+  // What the year-1 NOI was read from, in words — a leased fee's price note
+  // says it, beside the ground rent the model does not read.
+  let noiRead: string;
   if (t12Noi != null) {
     noi = t12Noi;
+    noiRead = "the T-12's actual NOI";
     mark(
       "inPlaceRentAnnual",
       "derived",
@@ -771,6 +784,7 @@ export function deriveUnderwriteInputs(
     );
   } else if (goingFig && plausibleOnPrice(goingFig.value)) {
     noi = goingFig.value;
+    noiRead = `the OM's ${goingFig.label}`;
     mark(
       "inPlaceRentAnnual",
       "derived",
@@ -783,6 +797,7 @@ export function deriveUnderwriteInputs(
     plausibleOnPrice(stabilizedFig.value)
   ) {
     noi = stabilizedFig.value;
+    noiRead = `the OM's ${stabilizedFig.label}`;
     mark(
       "inPlaceRentAnnual",
       "derived",
@@ -791,6 +806,7 @@ export function deriveUnderwriteInputs(
     );
   } else if (capPct) {
     noi = price * capPct;
+    noiRead = "this price × the stated going-in cap";
     const skipped = goingFig ?? stabilizedFig;
     mark(
       "inPlaceRentAnnual",
@@ -801,6 +817,7 @@ export function deriveUnderwriteInputs(
     );
   } else {
     noi = price * 0.06;
+    noiRead = "an assumed 6% of this price";
     const skipped = goingFig ?? stabilizedFig;
     // An operating business's earnings stated where no NOI anchors year 1
     // (research pass 28): said, so the note never reads as if the memorandum
@@ -820,6 +837,40 @@ export function deriveUnderwriteInputs(
           ? `${earnings}; with no NOI or cap in the OM, the model assumed 6% going-in`
           : "No NOI or cap in the OM — assumed 6% going-in",
     );
+  }
+
+  // A leased fee's income is its ground rent (#415), and the model reads no
+  // ground rent: the extraction files it under "Ground rent", a label no NOI
+  // reader takes, so year 1 runs on the NOI a building's model reads — a
+  // stated NOI, else the price × the stated cap, else the assumed 6%. Both
+  // notes say which figure the model runs and name the stated rent beside
+  // it, so the gap is seen; reading the rent as the NOI is the owner's call
+  // (research pass 34).
+  if (interest.kind === "leased_fee") {
+    const rent = groundRentOf(extraction);
+    if (rent != null && sources.inPlaceRentAnnual) {
+      sources.inPlaceRentAnnual = {
+        ...sources.inPlaceRentAnnual,
+        note: `${sources.inPlaceRentAnnual.note}. The OM's ${usd0(rent)} ground rent is the leased fee's income; the model does not read it`,
+        notRun: { label: "ground rent", value: rent },
+      };
+    }
+    if (leasedFeePrice && sources.purchasePrice) {
+      const against =
+        rent == null
+          ? ""
+          : Math.abs(noi - rent) <= rent * 0.005
+            ? ` — equal to the ${usd0(rent)} ground rent the OM states by arithmetic, not read from it`
+            : `, not the ${usd0(rent)} ground rent the OM states`;
+      sources.purchasePrice = {
+        ...sources.purchasePrice,
+        note: `The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease${
+          spanNote ? ` (${usd0(price)}, ${spanNote})` : ""
+        }. The model reads no ground rent as its income: its year-1 NOI is ${noiRead}, ${usd0(noi)} a year${against}, run with a building's assumptions${
+          spanNote ? "; enter the price you would pay" : ""
+        }`,
+      };
+    }
   }
 
   // ── Capital / construction budget ──────────────────────────────────────

@@ -392,21 +392,28 @@ const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
  * IRR and every bid solved on it the placeholder's — printed beside a real
  * deal's grids, "$10M (ask)" read as the ask. Said from the sources alone:
  * an assumed price means no price was read from the memorandum, which is all
- * this line claims.
+ * this line claims. A figure the memorandum states that the model does not
+ * run (`InputSource.notRun`: a leased fee's ground rent, its income) is
+ * named, never said to be unread.
  */
 export function placeholderReturnsLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
   if (!sources) return null;
   const price = sources.purchasePrice?.provenance === "assumption";
   const noi = sources.inPlaceRentAnnual?.provenance === "assumption";
+  const notRun = sources.inPlaceRentAnnual?.notRun ?? null;
   const out = "The IRR grids and the max bid are left out:";
   if (price && noi) {
-    return `${out} no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`;
+    return notRun
+      ? `${out} no price was read from the memorandum, and the model does not run its ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`
+      : `${out} no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`;
   }
   if (price) {
     return `${out} no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns would be the placeholder's.`;
   }
   if (noi) {
-    return `${out} no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.`;
+    return notRun
+      ? `${out} the model does not run the memorandum's ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.`
+      : `${out} no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.`;
   }
   return null;
 }

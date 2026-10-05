@@ -658,6 +658,13 @@ export function noteCaption(n: NoteRead | null): string {
   return "";
 }
 
+// What the screening model does on a leased fee (lib/underwrite/inputs): it
+// reads no ground rent — the rent is filed under a label no NOI reader takes
+// — and runs the year-1 NOI a building's model reads. Research pass 34: this
+// had said the model ran the ground rent as its NOI, and it does not.
+const LEASED_FEE_MODEL =
+  "The screening model reads no ground rent as its income: its year-1 NOI is the one a building's model reads — an NOI the T-12 or the memorandum states, else the price times the stated going-in cap, else an assumed 6% of the price — run with a building's growth, vacancy and expense assumptions.";
+
 // A rent per foot, a monthly figure, a coverage ratio, a bump or a reset is
 // not the year's ground rent.
 const NOT_ANNUAL_RENT = /\bper\b|\/|psf|month|\bmo\b|coverage|ratio|escalat|bump|increase|reset|%|percent|yield|cap|\bterm\b|expir|option/i;
@@ -833,8 +840,7 @@ export function readInterest(
         );
         // A stated right is said below, as stated; with none stated, ask.
         if (!terminationRight) lead.push("Such tenants often hold a right to end the lease early: read the lease for one before trusting its term.");
-        modelCaveat =
-          "The screening model runs the ground rent as a building's NOI, with a building's growth, vacancy and expense assumptions. A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends with the land coming back, not a building — the tenant's equipment is its own; run the ground lease calculator's leased-fee side on the stated terms.";
+        modelCaveat = `${LEASED_FEE_MODEL} A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends with the land coming back, not a building — the tenant's equipment is its own; run the ground lease calculator's leased-fee side on the stated terms.`;
         break;
       }
       lead.push(
@@ -842,8 +848,7 @@ export function readInterest(
         "The buyer collects the ground rent — the income here, not an expense and never the building's NOI — and when the lease ends the building reverts to the buyer.",
         `The rent is safe while the building's own income covers it${coverageClause ? `, and ${coverageClause}` : ""}.`,
       );
-      modelCaveat =
-        "The screening model runs the ground rent as a building's NOI, with a building's growth, vacancy and expense assumptions. A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends in the reversion of the land and the building — run the ground lease calculator's leased-fee side on the stated terms.";
+      modelCaveat = `${LEASED_FEE_MODEL} A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends in the reversion of the land and the building — run the ground lease calculator's leased-fee side on the stated terms.`;
       break;
     default:
       // Either side of the lease: an owner that pays a ground rent under
