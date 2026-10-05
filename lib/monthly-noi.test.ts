@@ -76,6 +76,33 @@ describe("an NOI stated a month at a time is read as the year it makes (research
     expect(classifyNoi({ label: "NOI per unit per month", value: "$850" })).toBeNull();
   });
 
+  it("reads a monthly label's T-12 or average as a month, and annualized words as a year (audit C4, M1 and L11)", () => {
+    // A "T-12" or "trailing" beside the label's own month word is the
+    // period the months were averaged over, not a year's figure.
+    for (const [label, value] of [
+      ["Average monthly NOI (T-12)", "$85,000"],
+      ["NOI (T-12, monthly average)", "$85,000"],
+      ["NOI", "$85,000/mo average"],
+    ] as const) {
+      expect(noiOfRow({ label, value }), `${label}: ${value}`).toEqual({ value: 1_020_000, month: 85_000 });
+    }
+    // The pass's own deal under the label the pass did not catch: no 0.50%
+    // cap, and the model runs the year the month makes.
+    const t12: ExtractionResult = {
+      ...MONTHLY,
+      metrics: [row("Asking price", "$17,000,000", "p. 2"), row("Average monthly NOI (T-12)", "$85,000"), row("Units", "80", "p. 2")],
+    };
+    expect(assessPlausibility(t12, inferStrategy(t12))).toEqual([]);
+    expect(computeUnderwrite(deriveUnderwriteInputs(t12, "x").inputs).cashFlow[0].noi).toBeCloseTo(1_020_000, 4);
+    // Annualized, or a total, in the label is the year's; so is
+    // "annualized" in the figure's own words under a monthly label.
+    expect(noiOfRow({ label: "NOI (T-12, annualized from monthly)", value: "$1,020,000" })).toEqual({ value: 1_020_000 });
+    expect(noiOfRow({ label: "Total NOI, T-12 (monthly statements)", value: "$1,020,000" })).toEqual({ value: 1_020_000 });
+    expect(noiOfRow({ label: "NOI (monthly)", value: "$1,020,000 annualized" })).toEqual({ value: 1_020_000 });
+    // A bare T-12 with no month word stays the year it always was.
+    expect(noiOfRow({ label: "NOI (T-12)", value: "$1,020,000" })).toEqual({ value: 1_020_000 });
+  });
+
   it("holds the plan to the same rule, and leaves a monthly income read as lib/mixed-use read it", () => {
     const conversion: ExtractionResult = {
       dealName: "C",

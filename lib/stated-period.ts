@@ -27,7 +27,7 @@ export const PER_UNIT_WORDS = /\baverage\b|\bavg\b|\bmean\b|\btypical\b/i;
 /** A figure stated a month at a time, by its own words. */
 export const MONTH_WORDS = /\/\s*mo(?:nth)?\b|\bper\s+(?:month|mo)\b|\bmonthly\b|\ba\s+month\b/i;
 /** A figure stated a year at a time, by its own words. */
-const YEAR_WORDS = /\/\s*(?:yr|year)\b|\bper\s+(?:year|annum|yr)\b|\bannual(?:ly)?\b|\byearly\b|\ba\s+year\b/i;
+const YEAR_WORDS = /\/\s*(?:yr|year)\b|\bper\s+(?:year|annum|yr)\b|\bannual(?:ly)?\b|\bannuali[sz]ed\b|\byearly\b|\ba\s+year\b/i;
 /** A rate rather than an income: per foot, per unit or per key. */
 const RATE_WORDS = /\/\s*(?:sf|sq|unit|door|key)\b|\bper\s+(?:sf|sq|square|unit|door|key)\b|psf\b/i;
 /** A second dollar figure, whole: "$91,667", "$1.1", "91,667". */
@@ -37,9 +37,14 @@ const OTHER_FIGURE = /\$\s*\d[\d,]*(?:\.\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?/;
 const CLAUSE_END = new RegExp(String.raw`[();]|,\s+(?=[a-z(])|${OTHER_FIGURE.source}`, "i");
 /** The period words, every one, to set aside before a figure is read. */
 const PERIOD_WORDS = new RegExp(`${MONTH_WORDS.source}|${YEAR_WORDS.source}`, "gi");
-/** A label's words for a year's figure built from months: annualized, a
- *  trailing twelve months. */
-const LABEL_YEAR_WORDS = /annuali[sz]ed|\bt-?12\b|\bttm\b|\btrailing\b/i;
+/** A label's words for a year's figure built from months, whatever month
+ *  word the label carries too: annualized, a total ("NOI (T-12, annualized
+ *  from monthly)" is a year). */
+const LABEL_YEAR_WORDS = /annuali[sz]ed|\btotal\b/i;
+/** A label's words for the trailing twelve months: a year's figure only
+ *  where the label names no month — "Average monthly NOI (T-12)" is the
+ *  average month of the trailing twelve, a month (audit C4, M1). */
+const LABEL_TRAILING_WORDS = /\bt-?12\b|\bttm\b|\btrailing\b/i;
 
 /** The period a figure's own words state: "month", "year", or null for a
  *  figure stated with neither. A year's word wins where both are in the
@@ -208,11 +213,17 @@ export function monthFigureOf(label: string, value: string): MonthFigure | null 
   const v = value.trim();
   if (!v || NOT_STATED.test(v)) return null;
   const { lead, rest } = leadClause(v);
-  if (RATE_WORDS.test(lead) || PER_UNIT_WORDS.test(lead) || /%/.test(lead)) return null;
+  // An average beside the figure's own month word is the average month
+  // ("$85,000/mo average"), never one unit's: an NOI is the building's.
+  if (RATE_WORDS.test(lead) || (PER_UNIT_WORDS.test(lead) && !MONTH_WORDS.test(lead)) || /%/.test(lead)) return null;
   // A label that names a year's figure besides a month — annualized, a
-  // trailing twelve months — is the year's ("NOI (T-12, annualized from
-  // monthly)" is a year), whatever month word it carries too.
-  const labelPeriod = LABEL_YEAR_WORDS.test(label) ? "year" : periodOf(label);
+  // total — is the year's ("NOI (T-12, annualized from monthly)" is a year),
+  // whatever month word it carries too. A trailing twelve months is the
+  // year's only where the label names no month: "Average monthly NOI
+  // (T-12)" and "NOI (T-12, monthly average)" are a month.
+  const labelPeriod = LABEL_YEAR_WORDS.test(label)
+    ? "year"
+    : (periodOf(label) ?? (LABEL_TRAILING_WORDS.test(label) ? "year" : null));
   const period = periodOf(lead) ?? labelPeriod;
   if (period !== "month") return null;
   // The lead clause stops at a bracket, so an accounting loss — "($5,000)" —
