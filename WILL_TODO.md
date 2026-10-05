@@ -654,6 +654,25 @@ after a deeper search each. Three choices are yours to overrule:
 3. **Two credits are account names** as the runner printed them:
    "Wikideas1" (Wausau, CC0) and "AsherHeimermann" (Sheboygan).
 
+**Photographs, round 16.** Nine more: Bloomington, IL (its domed stone
+building), Janesville-Beloit (downtown Beloit), Mankato (the Union Depot),
+Midland, MI (the Tridge at dusk), Owensboro (the Natcher Bridge from the
+air), Parkersburg-Vienna (the Blennerhassett Mansion), Sherman-Denison
+(Denison's Main Street), and two of round 15's drawn covers, Florence-Muscle
+Shoals (the O'Neal Bridge) and Valdosta (the courthouse). Eleven keep the
+drawn cover. Three choices are yours to overrule:
+1. **Two modest picks**: Mankato (the tracks fill half the card) and
+   Valdosta (the deal page's wide header cuts the thin rod above the
+   courthouse's lantern). The drawn cover is the alternative for each.
+2. **Pinehurst-Southern Pines keeps the drawn cover**: its one clean
+   frame is a golf hole among pines that names no place. Say if you would
+   rather have it.
+3. **Four credits are account names** as the runner printed them:
+   "WVhybrid" (Parkersburg-Vienna), "Renelibrary" (Sherman-Denison), "Visit
+   Beloit" (Janesville-Beloit) and "Noahmcdonald1" (Florence-Muscle Shoals,
+   whose file's name says Noah McDonald; the credit is the author Commons
+   names).
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**

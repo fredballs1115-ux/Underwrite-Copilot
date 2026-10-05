@@ -1888,7 +1888,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Two hundred and nine are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Two hundred and eighteen are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -2016,7 +2016,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   page's Author field links and Sheboygan's an account whose user page was
   never created, each as printed (zori probe_url run 37343970376) — with
   Pueblo (the Historic Arkansas Riverwalk, from its category) from a
-  one-market run (37340733360)),
+  one-market run (37340733360); then round 16: Bloomington (Illinois; its
+  domed stone building), Janesville-Beloit (downtown Beloit, the title kept
+  whole) and Mankato (the Union Depot) — run 37349000346 — Owensboro (the
+  Natcher Bridge from the air) and Sherman-Denison (Denison's Main Street,
+  the title kept whole) — run 37349135113 — Parkersburg-Vienna (the
+  Blennerhassett Mansion) — run 37349271496 — Midland (Michigan; the
+  Tridge at dusk, from its category) from a one-market run (37381601175),
+  and, from one-market runs for round 15's markets, Florence-Muscle Shoals
+  (the O'Neal Bridge; 37382918468) and Valdosta (the courthouse, its
+  finial rod cut at 21:9; 37382707897); four credits are account names as
+  printed (WVhybrid, Renelibrary, Visit Beloit and Noahmcdonald1, the
+  last though the file's name says Noah McDonald), each its file page's
+  Author field with no other attribution asked, as zori probe_url runs
+  37382024313 and 37383378486 printed them),
   each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
@@ -2080,9 +2093,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   14's Columbus (Indiana; 37343088880), Grand Island (the courthouse's
   cupola cut at 21:9, and cranes on a Platte that names no place;
   37343351814) and Walla Walla (the Blue Mountains a soft thin line over a
-  field; 37343538606) found nothing better. A one-state
+  field; 37343538606) found nothing better. Round 16 left Oshkosh-Neenah, Muncie, Jackson
+  (Tennessee; one-market run 37381511168, two aerials that read as maps),
+  Texarkana, St. Joseph (two soft panoramas), Rome (Georgia; a monument's
+  finial cut at 21:9, one-market run 37381706466), Williamsport (the city
+  under wires and a washed-out valley, one-market run 37381804176),
+  Lewiston-Auburn (drone frames that read as maps), Lebanon
+  (Pennsylvania), Pocatello and Pinehurst-Southern Pines (a golf hole that
+  names no place) on the drawn cover, and a one-market run each for round
+  15's Abilene (37382378067), Wichita Falls (37382472733), Odessa
+  (37382579601), Paducah (37383040068), Grand Forks (37383135473) and
+  Albany (Georgia; 37383227834) found nothing better. A one-state
   title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); 35 of the 192
+  truncates a long one and the deal page shows it in full); 35 of the 201
   are cut, most to their first city, three to the city the place is known
   by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
   name (Boise, Honolulu). A two-state title is cut to
