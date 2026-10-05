@@ -124,3 +124,16 @@ describe("a copy that says so (research pass 33, items 9 and 25)", () => {
     expect(src).toMatch(/<button\s+ref=\{triggerRef\}[^>]*\n\s*type="button"\n\s*onClick=\{\(\) => setOpen\(\(v\) => !v\)\}/);
   });
 });
+
+describe("a placeholder that can be read (research pass 33, item 19)", () => {
+  // Muted at 70% read 2.97:1 on the field; the muted token itself reads 5.5:1.
+  it.each([
+    "app/(app)/deals/[id]/deal-tasks.tsx",
+    "app/(app)/deals/[id]/decision-log.tsx",
+    "app/(app)/deals/[id]/loi-panel.tsx",
+  ])("%s writes its placeholder in the muted token, never a faded one", (file) => {
+    const src = readFileSync(file, "utf8");
+    expect(src).toContain("placeholder:text-muted ");
+    expect(src).not.toMatch(/placeholder:text-muted\/\d+/);
+  });
+});
