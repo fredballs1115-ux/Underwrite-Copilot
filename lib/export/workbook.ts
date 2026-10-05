@@ -346,12 +346,15 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
     FMT.int,
     "Zero while the loan is still interest-only at sale.",
   );
+  // The closed form divides by the monthly rate, so a 0% loan takes the
+  // mirror's own branch (lib/export/cashflow `balanceAfter`): the loan less
+  // the level payments made, never #DIV/0!.
   derived(
     A.balanceAtExit,
     "Loan balance at exit",
-    `MAX(0,${AR(A.loanAmount)}*(1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-${AR(A.monthlyPayment)}*((1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-1)/${AR(A.monthlyRate)})`,
+    `IF(${AR(A.monthlyRate)}=0,MAX(0,${AR(A.loanAmount)}-${AR(A.monthlyPayment)}*${AR(A.amortizingMonths)}),MAX(0,${AR(A.loanAmount)}*(1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-${AR(A.monthlyPayment)}*((1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-1)/${AR(A.monthlyRate)}))`,
     FMT.usd,
-    "Closed form, so no FV sign ambiguity.",
+    "Closed form, so no FV sign ambiguity; at a 0% rate, the loan less the payments made.",
   );
 }
 
@@ -903,7 +906,16 @@ function buildCashFlow(
   const revCol = colLetter(reversionCol);
   const lastCol = colLetter(lastYearCol);
   single(CF.reversionNoi, "Reversion NOI (forward year)", `${revCol}${CF.noi}`, FMT.usd);
-  single(CF.grossSale, "Gross sale proceeds", `B${CF.reversionNoi}/${AR(A.exitCap)}`, FMT.usd);
+  // No price is struck on an exit cap of 0% or below: the cell reads zero, as
+  // the mirror's `grossSaleProceeds` does, where it had read #DIV/0! and
+  // carried the error into every return below it.
+  single(
+    CF.grossSale,
+    "Gross sale proceeds",
+    `IF(${AR(A.exitCap)}>0,B${CF.reversionNoi}/${AR(A.exitCap)},0)`,
+    FMT.usd,
+  );
+  ws.getCell(CF.grossSale, 2).note = "Forward NOI over the exit cap; zero where the exit cap is 0% or below, which strikes no price.";
   single(CF.saleCosts, "Costs of sale", `-B${CF.grossSale}*${AR(A.saleCostPct)}`, FMT.usd);
   single(CF.loanPayoff, "Loan payoff", `-${AR(A.balanceAtExit)}`, FMT.usd);
   single(
