@@ -8,6 +8,7 @@ import {
   BASEMAPS,
   BASEMAP_ORDER,
   DEFAULT_BASEMAP,
+  OSM_ATTRIBUTION,
   type BasemapId,
 } from "@/lib/basemaps";
 import { safeHttpUrl } from "@/lib/safe-url";
@@ -219,6 +220,12 @@ export function CompsMap({
         maxNativeZoom: base.maxNativeZoom,
         attribution: base.attribution,
       }).addTo(map);
+      // Every pin here was placed by Photon, a geocoder on OpenStreetMap's
+      // data, so the map credits OpenStreetMap over whichever basemap is
+      // drawn (lib/basemaps `OSM_ATTRIBUTION`, the guideline's own form).
+      // The street tiles' credit is the same string, and the control keeps
+      // one of each, so on the street map it reads once.
+      map.attributionControl?.addAttribution(OSM_ATTRIBUTION);
       L.control.scale({ imperial: true, metric: false }).addTo(map);
 
       if (subjectPos) {

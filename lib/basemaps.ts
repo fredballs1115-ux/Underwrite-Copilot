@@ -37,6 +37,29 @@ export interface Basemap {
 
 export type BasemapId = "satellite" | "hybrid" | "streets";
 
+/**
+ * OpenStreetMap's credit. Its attribution guideline
+ * (osmfoundation.org/wiki/Licence/Attribution_Guidelines, as zori probe run
+ * 37263390061 printed it): "Geocoders that use OpenStreetMap data must
+ * credit OpenStreetMap"; "Applications that incorporate such a geocoder
+ * must credit OpenStreetMap"; "The historical forms of attribution “©
+ * OpenStreetMap contributors” or “© OpenStreetMap” are acceptable.";
+ * "Attribution must also make it clear that the data is available under
+ * the Open Database License. This may be done by making the text
+ * “OpenStreetMap” a link to openstreetmap.org/copyright".
+ *
+ * The street tiles carry it, and so does every place the site shows what
+ * Photon — a geocoder on OpenStreetMap's data — found: the address search's
+ * suggestions and the pins the comps map places.
+ */
+export const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
+
+/** The credit as a Leaflet attribution control prints it: "© OpenStreetMap
+ *  contributors", "OpenStreetMap" a link to the copyright page. One string,
+ *  so a map that both draws OpenStreetMap's tiles and places pins with
+ *  OpenStreetMap's data prints it once (the control keeps one of each). */
+export const OSM_ATTRIBUTION = `&copy; <a href="${OSM_COPYRIGHT_URL}" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors`;
+
 const USGS_IMAGERY =
   "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer";
 // The same orthoimagery with the National Map's transportation, boundary and
@@ -75,8 +98,7 @@ export const BASEMAPS: Record<BasemapId, Basemap> = {
     id: "streets",
     label: "Map",
     url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+    attribution: OSM_ATTRIBUTION,
     maxZoom: 19,
     maxNativeZoom: 19,
     photographic: false,
