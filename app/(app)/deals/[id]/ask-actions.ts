@@ -13,6 +13,7 @@ import { omFingerprint } from "@/lib/om-fingerprint";
 import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { regulationForDeal } from "@/lib/rent-regulation";
+import { ASK_QUESTION_CAP } from "@/lib/ask-cap";
 
 export type AskState =
   | { error?: string; ok?: boolean; question?: string }
@@ -21,8 +22,9 @@ export type AskState =
 // Each answer is a full OM read — cap the questions asked of each memorandum
 // so one deal can't become an unbounded Claude bill. A reissued deck is a new
 // document with its own pages, so its questions start again; the same bytes
-// uploaded again are the same memorandum, and keep their count.
-const MAX_QUESTIONS = 25;
+// uploaded again are the same memorandum, and keep their count. The cap is
+// lib/ask-cap's, which the box under the thread says too.
+const MAX_QUESTIONS = ASK_QUESTION_CAP;
 
 /**
  * Ask-the-deal: one question, answered from the stored OM with page cites,

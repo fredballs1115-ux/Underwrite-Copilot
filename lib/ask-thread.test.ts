@@ -83,6 +83,8 @@ import { AskPanel } from "@/app/(app)/deals/[id]/ask-panel";
 import { OM_REPLACED, memorandumReplacedSince, parseDealQa, type AskEntry } from "./deals";
 import { omFingerprint } from "./om-fingerprint";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { ASK_QUESTION_CAP } from "./ask-cap";
+import { readFileSync } from "node:fs";
 
 const ask = (question: string) => {
   const fd = new FormData();
@@ -332,6 +334,13 @@ describe("AskPanel — page chips open the OM only for the memorandum the deal h
     expect(html).not.toContain(`href="${OM_URL}#page=3"`);
     // The earlier answer's page still shows, as the earlier deck's, unlinked.
     expect(html).toMatch(/<span[^>]*title="the cover"[^>]*>p\. 3<\/span>/);
+  });
+
+  it("says the questions asked of the memorandum it holds now, against the cap, before the cap refuses one (research pass 42)", () => {
+    // the earlier memorandum's answer counts toward that deck's cap, not this one's
+    expect(visibleText(html)).toContain("1 of 25 questions asked of this memorandum");
+    expect(ASK_QUESTION_CAP).toBe(25);
+    expect(readFileSync("app/(app)/deals/[id]/ask-actions.ts", "utf8")).toContain("const MAX_QUESTIONS = ASK_QUESTION_CAP;");
   });
 
   it("promises no answer time: nothing measures one", () => {

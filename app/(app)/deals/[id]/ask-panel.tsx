@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { askAnsweredLine, type AskEntry } from "@/lib/deals";
 import { parsePageNumber } from "@/lib/facts";
 import { askDeal, type AskState } from "./ask-actions";
+import { askCountLine } from "@/lib/ask-cap";
 
 // UTC-pinned so server and client render identical strings (hydration).
 const WHEN_FMT = new Intl.DateTimeFormat("en-US", {
@@ -210,6 +211,11 @@ export function AskPanel({
             />
             <AskButton />
           </div>
+          {/* The cap, said before it refuses a question (lib/ask-cap): the
+              questions asked of the memorandum the deal holds now. */}
+          <p data-qa="ask-count" className="mt-1.5 text-[11px] text-muted">
+            {askCountLine(qa.filter((e) => !e.earlier).length)}
+          </p>
           {state?.error && (
             <p className="mt-2 text-sm text-kill" role="alert">
               {state.error}
