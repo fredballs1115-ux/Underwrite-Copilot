@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import rulesFile from "@/data/research/regulatory_rules.json";
 import {
   evaluateRules,
   jurisdictionMatches,
+  OPEN_QUESTION_LABELS,
   vsRange,
   type RegulatoryRule,
   type RuleSubject,
@@ -182,5 +184,53 @@ describe("ranges", () => {
     expect(vsRange(700, 400, 600)).toBe("above");
     expect(vsRange(700, null, null)).toBe("no_range");
     expect(vsRange(700, 400, null)).toBe("within");
+  });
+});
+
+describe("an open question is named as the question it asks", () => {
+  const rules = (Array.isArray(rulesFile) ? rulesFile : (rulesFile as { rules: RegulatoryRule[] }).rules) as RegulatoryRule[];
+
+  it("labels every condition a rule in the file can leave open", () => {
+    const keys = new Set<string>();
+    const walk = (c: unknown) => {
+      if (!c || typeof c !== "object") return;
+      for (const [k, v] of Object.entries(c as Record<string, unknown>)) {
+        if (k === "any_of" && Array.isArray(v)) v.forEach(walk);
+        else keys.add(k);
+      }
+    };
+    for (const r of rules) {
+      walk(r.applies_if);
+      walk(r.exempt_if);
+    }
+    expect(keys.size).toBeGreaterThan(10);
+    for (const k of keys) expect(OPEN_QUESTION_LABELS[k], k).toBeTruthy();
+  });
+
+  it("names an open any-of by the questions inside it, never as 'any of'", () => {
+    const moco = rules.find((r) => r.id === "md-moco-rent-stabilization")!;
+    // A rental building in the county with no year built and no answer on
+    // owner-occupancy: both exemptions are open.
+    const [e] = evaluateRules([moco], {
+      state: "MD",
+      locality: ["Montgomery County"],
+      units: 40,
+      property_type: "rental_housing",
+      current_year: 2026,
+      today: "2026-10-05",
+    });
+    expect(e.unknowns).not.toContain("any_of");
+    expect(e.unknowns).toEqual(expect.arrayContaining(["building_age_years_lt", "owner_occupied_with_units_lte"]));
+    // One branch answered yes: nothing is open.
+    const [old] = evaluateRules([moco], {
+      state: "MD",
+      locality: ["Montgomery County"],
+      units: 40,
+      property_type: "rental_housing",
+      built_year: 2015,
+      current_year: 2026,
+      today: "2026-10-05",
+    });
+    expect(old.unknowns).not.toContain("building_age_years_lt");
   });
 });

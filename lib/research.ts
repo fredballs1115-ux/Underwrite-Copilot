@@ -323,6 +323,16 @@ function evalConditions(
   let acc: Tri = "yes";
   const unknowns: string[] = [];
   for (const [k, v] of Object.entries(conds)) {
+    // An open "any of" is open on the questions its open branches ask, and
+    // is named as those questions: listed as the key itself, the panels
+    // read "Open: any of" where they should have asked for the year built.
+    if (k === "any_of" && Array.isArray(v)) {
+      const branches = v.map((w) => evalConditions(w as Record<string, unknown>, s));
+      const t = branches.map((b) => b.result).reduce<Tri>((a, r) => or(a, r), "no");
+      if (t === "unknown") unknowns.push(...branches.filter((b) => b.result === "unknown").flatMap((b) => b.unknowns));
+      acc = and(acc, t);
+      continue;
+    }
     const t = evalCondition(k, v, s);
     if (t === "unknown") unknowns.push(k);
     acc = and(acc, t);
@@ -349,6 +359,15 @@ export const OPEN_QUESTION_LABELS: Record<string, string> = {
   occupancy: "current occupancy status",
   owner_occupied_with_units_lte: "whether you'll owner-occupy (and unit count)",
   owner_total_rental_units_in_state_lte: "total rental units you own in this state",
+  owner_total_rental_units_in_county_lte: "total rental units you own in this county",
+  owner_other_rental_units_in_dc: "other rental units you own in DC",
+  owner_is_natural_person: "whether the owner is a natural person",
+  owner_natural_persons_lte: "how many natural persons own it",
+  owner_form_any_of: "the owner's legal form",
+  property_type: "whether it is rental housing",
+  transaction: "whether the deal is a sale of rental housing",
+  action: "whether an eviction is at issue",
+  see_rule: "the exemption the rule refers to",
   within_city_limits: "whether the building sits inside the city's limits",
 };
 
