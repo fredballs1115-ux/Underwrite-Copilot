@@ -72,6 +72,7 @@ import { MIN_GROSS_FOR_WEIGHT, readGrid, readGridText } from "@/lib/tools/comp-g
 import {
   breakEvenOccupancyPct,
   capRatePct,
+  loanPastPriceLine,
   noiFromCap,
   per,
   rentQuote,
@@ -471,22 +472,24 @@ function DebtSizer() {
   const [gpr, setGpr] = useShared("gpr", "2,000,000");
   const [opex, setOpex] = useShared("opex", "700,000");
 
-  const s = useMemo(
-    () =>
-      sizeLoan({
-        price: num(price),
-        noi: num(noi),
-        ratePct: num(rate),
-        amortYears: num(amort),
-        io,
-        maxLtvPct: num(ltv),
-        minDscr: num(dscr),
-        minDebtYieldPct: num(dy),
-      }),
+  const sizing = useMemo(
+    () => ({
+      price: num(price),
+      noi: num(noi),
+      ratePct: num(rate),
+      amortYears: num(amort),
+      io,
+      maxLtvPct: num(ltv),
+      minDscr: num(dscr),
+      minDebtYieldPct: num(dy),
+    }),
     [price, noi, rate, amort, io, ltv, dscr, dy],
   );
+  const s = useMemo(() => sizeLoan(sizing), [sizing]);
 
   const breakEven = breakEvenOccupancyPct(num(gpr), num(opex), s.annualDebtService);
+  // A loan past the price, said (research pass 38).
+  const pastPrice = loanPastPriceLine(sizing, s);
   // Every bar is drawn against the most permissive test, so the binding one
   // is visibly the short bar rather than a number you have to compare.
   const widest = s.tests.length ? Math.max(...s.tests.map((t) => t.maxLoan)) : 0;
@@ -579,6 +582,13 @@ function DebtSizer() {
             <Stat label="Debt yield" value={pct(s.debtYieldPct)} />
             <Stat label="LTV" value={pct(s.ltvPct, 1)} />
           </div>
+          {/* A loan past the price reads as a negative equity cheque: one
+              line says why (research pass 38). */}
+          {pastPrice && (
+            <p data-qa="loan-past-price" className="mt-3 text-sm text-kill">
+              {pastPrice}
+            </p>
+          )}
         </>
       )}
 
