@@ -47,6 +47,46 @@ export const SECTOR_LABEL: Record<string, string> = {
  *  day's heading; the "UTC" says why. */
 const fmtDay = (iso: string): string => dayOf(iso) ?? iso;
 
+/** Stories the page reads: the sweep's newest. */
+export const SCORED_READ = 200;
+/** Stories the feed lists, newest first. */
+export const SCORED_SHOWN = 120;
+
+/**
+ * What the feed lists, said where it is a cut (research pass 42): the page
+ * reads the newest SCORED_READ stories and lists the newest SCORED_SHOWN of
+ * them — of a sector, those among the read ones — and the sector chips are
+ * the sectors among the read ones. Null where the list is every story.
+ */
+export function scoredScopeLine({
+  shown,
+  matched,
+  read,
+  total,
+  sector,
+}: {
+  shown: number;
+  /** the read stories in the sector asked for (all of them, with none) */
+  matched: number;
+  read: number;
+  /** every story the sweep has scored, where the count was read */
+  total: number | null;
+  sector: string | null;
+}): string | null {
+  const all = total != null && read >= total;
+  const count = (n: number) => n.toLocaleString("en-US");
+  if (sector) {
+    const label = SECTOR_LABEL[sector] ?? sector;
+    if (all && shown >= matched) return null;
+    if (all) return `The newest ${count(shown)} of the ${count(matched)} ${label} stories the sweep has scored.`;
+    return `The newest ${count(shown)} ${label} stories among the ${count(read)} newest the sweep has scored${total != null ? ` (of ${count(total)})` : ""} — an older one is not read here.`;
+  }
+  if (all && shown >= read) return null;
+  const of = total != null ? `of the ${count(total)} stories the sweep has scored` : `of the stories the sweep has scored`;
+  const chips = all ? "" : `; the sectors are those among the newest ${count(read)}`;
+  return `The newest ${count(shown)} ${of}${chips}.`;
+}
+
 /**
  * The scored feed as a pure view of the sweep's rows: the law-and-rule
  * strip, the sector chips (only when there is more than one sector to
@@ -61,17 +101,29 @@ export function ScoredFeedView({
   items,
   alerts,
   wantSector,
+  total = null,
 }: {
   items: ItemRow[];
   alerts: AlertRow[];
   wantSector: string;
+  /** every story the sweep has scored (an exact count), where it was read */
+  total?: number | null;
 }) {
   const sectors = [...new Set(items.map((i) => i.sector))].sort();
   const want = wantSector.slice(0, 40);
   const active = sectors.includes(want) ? want : null;
   const shown = (active ? items.filter((i) => i.sector === active) : items)
     // High-signal first within the feed, but keep day order dominant below.
-    .slice(0, 120);
+    .slice(0, SCORED_SHOWN);
+  const scope = items.length
+    ? scoredScopeLine({
+        shown: shown.length,
+        matched: active ? items.filter((i) => i.sector === active).length : items.length,
+        read: items.length,
+        total,
+        sector: active,
+      })
+    : null;
 
   // Group by the day the sweep picked the story up.
   const byDay = new Map<string, ItemRow[]>();
@@ -151,6 +203,12 @@ export function ScoredFeedView({
             </Link>
           ))}
         </nav>
+      )}
+
+      {scope && (
+        <p data-qa="scored-scope" className="text-[12px] text-muted">
+          {scope}
+        </p>
       )}
 
       {items.length === 0 ? (
