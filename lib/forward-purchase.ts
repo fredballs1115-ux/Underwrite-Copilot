@@ -90,23 +90,85 @@ export function forwardTermRows<M extends MetricRow>(metrics: ReadonlyArray<M>):
 // ── Dates read on their last day ─────────────────────────────────────────
 
 export interface DeliveryDate {
-  /** the day read: a quarter's, a month's or a year's last */
+  /** the day read: a quarter's, a month's or a year's last — where the
+   *  words name several dates, the latest */
   iso: string;
-  /** what the memorandum wrote */
+  /** what the memorandum wrote — on a phased delivery, the last takedown's
+   *  own words ("Q2 2028") */
   text: string;
   precision: "day" | "month" | "quarter" | "year";
+  /** where the words name several dates, each as written with the day it
+   *  is read as, in the order written: the delivery is the latest, the side
+   *  that does not flatter (research pass 37). Absent on a single date */
+  dates?: { text: string; iso: string }[];
+  /** the words name phases, tranches or takedowns, each date one of them:
+   *  the price is paid in tranches as they deliver */
+  phased?: true;
 }
 
 const lastDayOf = (y: number, mo: number) => new Date(Date.UTC(y, mo, 0)).getUTCDate();
 const isoOf = (y: number, mo: number, d: number) =>
   `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
+// A date a delivery row may name more than one of, in the forms one date is
+// read in: a quarter, a day, a month, a year's end.
+const DATE_MENTION = new RegExp(
+  [
+    String.raw`\b(?:q[1-4]|[1-4]q)\s*[-'’]?\s*\d{4}\b`,
+    String.raw`\b(?:first|second|third|fourth)\s+quarter\s+(?:of\s+)?\d{4}\b`,
+    String.raw`\b\d{4}-\d{1,2}-\d{1,2}\b`,
+    String.raw`\b\d{1,2}\/\d{1,2}\/\d{2,4}\b`,
+    String.raw`\b\d{1,2}\/\d{4}\b`,
+    String.raw`\b[A-Za-z]{3,9}\.?\s+(?:\d{1,2}(?:st|nd|rd|th)?,?\s+)?\d{4}\b`,
+    String.raw`\b(?:year[- ]end|end\s+of|late)\s+\d{4}\b`,
+  ].join("|"),
+  "gi",
+);
+/** Words that make each date a phase's: the price is paid in tranches. */
+const PHASE_WORDS = /\bphases?\b|\btranches?\b|\btake[- ]?downs?\b/i;
+const NAMED_BUILDINGS = /\bBuildings?\s+(?:[A-Z]|\d{1,2})\b/;
+
 /** A date as written, read on its LAST day where it names a quarter, a
  *  month or a year alone. Null for words with no date in them ("upon
- *  completion", "TBD"). */
+ *  completion", "TBD"). Words that name several dates are read at the
+ *  latest — "Phase 1 (60 homes) Q2 2027; Phase 2 (80 homes) Q4 2027; Phase
+ *  3 (60 homes) Q2 2028" is delivered when its last phase is — and each date
+ *  is kept, a phase's where the words name phases. */
 export function readDeliveryDate(text: string | null | undefined, asOf: Date): DeliveryDate | null {
   const s = (text ?? "").trim();
   if (!s) return null;
+  const read = (t: string) => readOneDate(t, asOf);
+  const phased = PHASE_WORDS.test(s) || NAMED_BUILDINGS.test(s);
+  type Found = { text: string; index: number; at: DeliveryDate };
+  const found: Found[] = [];
+  for (const m of s.matchAll(DATE_MENTION)) {
+    const at = read(m[0]);
+    if (at) found.push({ text: m[0], index: m.index ?? 0, at });
+  }
+  // A phase stated by its year alone ("Phase 1 Q4 2027; Phase 2 2028") —
+  // only where the words name phases, so a year in passing elsewhere ("Q3
+  // 2027, permits issued 2025") is no date of delivery.
+  if (phased) {
+    for (const m of s.matchAll(/\b20\d{2}\b/g)) {
+      const index = m.index ?? 0;
+      const at = read(m[0]);
+      if (at && !found.some((f) => index >= f.index && index < f.index + f.text.length)) found.push({ text: m[0], index, at });
+    }
+  }
+  const dates = found.sort((a, b) => a.index - b.index);
+  if (new Set(dates.map((d) => d.at.iso)).size < 2) return read(s);
+  const latest = dates.reduce((a, b) => (b.at.iso >= a.at.iso ? b : a));
+  return {
+    iso: latest.at.iso,
+    text: phased ? latest.text : s,
+    precision: latest.at.precision,
+    dates: dates.map((d) => ({ text: d.text, iso: d.at.iso })),
+    ...(phased ? { phased: true as const } : {}),
+  };
+}
+
+/** One date as written, read on its last day. */
+function readOneDate(s: string, asOf: Date): DeliveryDate | null {
   const minYear = asOf.getUTCFullYear() - 10;
   const maxYear = asOf.getUTCFullYear() + 15;
   const q = s.match(/\b(?:q([1-4])|([1-4])q)\s*[-'’]?\s*(\d{4})\b/i) ?? s.match(/\b(first|second|third|fourth)\s+quarter\s+(?:of\s+)?(\d{4})\b/i);
@@ -136,11 +198,31 @@ function dayText(iso: string): string {
     : iso;
 }
 
+/** The words of the date a delivery is read at: on words that name several
+ *  dates, the latest one's own ("Q2 2028"). */
+export function lastDeliveryWords(d: DeliveryDate): string {
+  return d.dates ? (d.dates.filter((x) => x.iso === d.iso).at(-1)?.text ?? d.text) : d.text;
+}
+
 /** What a delivery is said as: the memorandum's words, with the day they
- *  are read as where they name no day. */
+ *  are read as where they name no day. A phased delivery is said by its
+ *  takedowns and the last of them — "phased: 3 takedowns, the last Q2 2028
+ *  (read as Jun 30, 2028)" — and words that name several dates otherwise
+ *  with the latest of them. */
 export function deliveryText(d: DeliveryDate): string {
+  if (d.dates && d.phased) return `phased: ${d.dates.length} takedowns, the last ${latestDeliveryText(d)}`;
+  if (d.dates) return `${d.text} (read as ${dayText(d.iso)}, the latest date it names)`;
   return d.precision === "day" ? dayText(d.iso) : `${d.text} (read as ${dayText(d.iso)})`;
 }
+
+/** The date a delivery is read at, said alone: "Q2 2028 (read as Jun 30,
+ *  2028)", "Jul 15, 2027". */
+export function latestDeliveryText(d: DeliveryDate): string {
+  return d.precision === "day" ? dayText(d.iso) : `${lastDeliveryWords(d)} (read as ${dayText(d.iso)})`;
+}
+
+/** A phased delivery's count of takedowns; null on one delivery. */
+const takedowns = (d: DeliveryDate | null): number | null => (d?.phased && d.dates ? d.dates.length : null);
 
 function monthsBetweenIso(fromIso: string, toIso: string): number {
   const a = new Date(`${fromIso}T00:00:00Z`);
@@ -262,7 +344,21 @@ export function readForwardPurchase(
   parts.push(
     `${what}: the buyer pays ${price != null ? money(price) : "the price"} ${at}, and the developer funds the works — the price is the buyer's whole cost, never the price plus the developer's budget.`,
   );
-  if (deliveryPassed && delivery) parts.push(`The stated delivery, ${deliveryText(delivery)}, has passed; whether the building was delivered is the memorandum's to say.`);
+  // A phased delivery: the price is paid in tranches, one a takedown, and
+  // the takedowns are said as stated.
+  const phases = takedowns(delivery);
+  if (phases != null && deliveryRow) {
+    parts.push(`The takedowns as stated: ${deliveryRow.value.trim().replace(/[.;]+$/, "")} — the price is paid in tranches as each delivers.`);
+  }
+  // The clock's end: the delivery, or on a phased delivery its last takedown.
+  const end = phases != null ? "the last takedown" : "delivery";
+  if (deliveryPassed && delivery) {
+    parts.push(
+      phases != null
+        ? `The last stated takedown, ${latestDeliveryText(delivery)}, has passed; whether each phase was delivered is the memorandum's to say.`
+        : `The stated delivery, ${deliveryText(delivery)}, has passed; whether the building was delivered is the memorandum's to say.`,
+    );
+  }
   if (deliveryYieldPct != null) {
     parts.push(
       yieldFrom === "stated_cap"
@@ -273,9 +369,9 @@ export function readForwardPurchase(
   if (outside) {
     parts.push(
       slackMonths != null && slackMonths < 0
-        ? `The outside date, ${deliveryText(outside)}, is before the stated delivery: the two cannot both hold, and which governs is the contract's.`
+        ? `The outside date, ${deliveryText(outside)}, is before the ${phases != null ? "last stated takedown" : "stated delivery"}: the two cannot both hold, and which governs is the contract's.`
         : slackMonths != null
-          ? `The outside date is ${deliveryText(outside)}, ${slackMonths} ${slackMonths === 1 ? "month" : "months"} after delivery.`
+          ? `The outside date is ${deliveryText(outside)}, ${slackMonths} ${slackMonths === 1 ? "month" : "months"} after ${end}.`
           : `The outside date is ${deliveryText(outside)}.`,
     );
   }
@@ -316,14 +412,22 @@ export function forwardTag(r: ForwardRead | null): string | null {
   if (!r) return null;
   const word = r.kind === "bts" ? "Build-to-suit" : "Forward";
   if (r.deliveryYieldPct != null) return `${word}, ${pctText(r.deliveryYieldPct)} at delivery`;
-  if (r.delivery && !r.deliveryPassed) return `${word}, delivers ${r.delivery.text}`;
+  const phases = takedowns(r.delivery);
+  if (r.delivery && !r.deliveryPassed) {
+    return phases != null ? `${word}, ${phases} takedowns to ${lastDeliveryWords(r.delivery)}` : `${word}, delivers ${lastDeliveryWords(r.delivery)}`;
+  }
   return `${word} purchase`;
 }
 
 /** The read in one line, for the memo, the workbook's cover and the shared
  *  screen. */
 export function forwardShortLine(r: ForwardRead): string {
-  const bits = [`${r.price != null ? money(r.price) : "the price"} paid at delivery${r.delivery ? ` (${r.delivery.text})` : ""}, the works the developer's`];
+  const phases = takedowns(r.delivery);
+  const when =
+    r.delivery && phases != null
+      ? ` in ${phases} takedowns as its phases deliver, the last ${lastDeliveryWords(r.delivery)}`
+      : ` at delivery${r.delivery ? ` (${r.delivery.text})` : ""}`;
+  const bits = [`${r.price != null ? money(r.price) : "the price"} paid${when}, the works the developer's`];
   if (r.deliveryYieldPct != null) bits.push(`${pctText(r.deliveryYieldPct)} at delivery${r.yieldFrom === "noi_over_price" ? " on the stated NOI" : ""}`);
   if (r.outside) bits.push(`outside date ${deliveryText(r.outside)}`);
   if (r.deposit) bits.push(`deposit ${r.deposit.amount != null ? money(r.deposit.amount) : r.deposit.text}`);
@@ -358,6 +462,9 @@ export function forwardModelLine(
   // Whenever the deposit row says it is paid (the audit of 2026-10-05: "paid
   // at signing" was said of every deposit).
   const deposit = r.deposit ? ", and the deposit sits outside its cash flows" : "";
+  // A phased purchase pays its price in tranches as its phases deliver; the
+  // model runs it as one closing (research pass 37).
+  const phases = takedowns(r.delivery);
   let noi = "";
   if (model?.noi1 != null && r.deliveryNoi != null) {
     const stated = r.deliveryNoi.value;
@@ -366,6 +473,11 @@ export function forwardModelLine(
     const assumed =
       model.noiAssumed && model.price != null && model.price > 0 ? `an assumed ${pctText((model.noi1 / model.price) * 100)} of the price, ` : "";
     noi = ` Its year-one NOI is ${assumed}${money(model.noi1)}, ${rel} the ${money(stated)} the memorandum states at delivery.`;
+  }
+  if (r.delivery && phases != null) {
+    return `The memorandum pays the price in tranches as its phases deliver — ${phases} takedowns, the last ${lastDeliveryWords(r.delivery)} — and the model runs it as one closing, with income from its first year.${
+      r.deposit ? " The deposit sits outside its cash flows." : ""
+    }${noi}`;
   }
   return `The model runs the price as paid at closing with income from its first year: on a forward purchase that day is ${when}${deposit}.${noi}`;
 }

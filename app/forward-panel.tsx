@@ -1,6 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import { Key, KeyItem, MEASURE, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
-import { deliveryText, type ForwardRead } from "@/lib/forward-purchase";
+import { deliveryText, lastDeliveryWords, type ForwardRead } from "@/lib/forward-purchase";
 import { sentencesOf } from "@/lib/first-sentence";
 
 /**
@@ -12,8 +12,9 @@ import { sentencesOf } from "@/lib/first-sentence";
  *
  *   - THE CLOCK: today, the delivery and the outside date on one track — the
  *     run to delivery filled (`fwd-clock`), the delivery and the outside date
- *     ticks (`fwd-delivery`, `fwd-outside`) — only where the delivery is a
- *     date still ahead of the day the page is read.
+ *     ticks (`fwd-delivery`, `fwd-outside`), and on a phased delivery a
+ *     lighter tick a takedown before the last (`fwd-phase`) — only where the
+ *     delivery is a date still ahead of the day the page is read.
  *   - THE DEPOSIT: its share of the price, the price as the track
  *     (`fwd-deposit`) — the buyer's exposure before delivery.
  *   - THE YIELD AT DELIVERY: the cap the price is struck at, or the NOI the
@@ -33,6 +34,8 @@ const pct2 = (n: number) => `${n.toFixed(2)}%`;
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 const dayMs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
 const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
+/** "Q2 2027", "Q2 2027 and Q4 2027", "Q2 2027, Q4 2027 and Q2 2028". */
+const listOf = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 
 /** "Oct 5, 2026" — a day as a page says it. */
 function dayText(iso: string): string {
@@ -62,7 +65,14 @@ export function ForwardPanel({
   // what to settle first: the warning tone.
   const flagged = r.deliveryPassed || (r.slackMonths != null && r.slackMonths < 0);
   const what = r.kind === "bts" ? "Build-to-suit, bought at delivery" : "Forward purchase";
-  const headline = `${r.price != null ? `${money(r.price)} paid` : "Paid"} at delivery${r.delivery ? `, ${r.delivery.text}` : r.deliveryWords ? ` (${r.deliveryWords})` : ""}`;
+  // A phased delivery: the price is paid in tranches, one a takedown, the
+  // delivery the last of them (research pass 37).
+  const phased = r.delivery?.phased && r.delivery.dates ? r.delivery.dates : null;
+  const headline = `${r.price != null ? `${money(r.price)} paid` : "Paid"}${
+    r.delivery && phased
+      ? ` in ${phased.length} takedowns, the last ${lastDeliveryWords(r.delivery)}`
+      : ` at delivery${r.delivery ? `, ${r.delivery.text}` : r.deliveryWords ? ` (${r.deliveryWords})` : ""}`
+  }`;
 
   // The clock, from the day the page is read to the later of the delivery
   // and the outside date.
@@ -75,6 +85,10 @@ export function ForwardPanel({
       ? {
           delivery: clamp(((d - t0) / (end - t0)) * 100),
           outside: Number.isFinite(o) ? clamp(((o - t0) / (end - t0)) * 100) : null,
+          // The takedowns before the last, each a tick, where still ahead.
+          phases: (phased ?? [])
+            .filter((p) => p.iso !== r.delivery!.iso && dayMs(p.iso) > t0)
+            .map((p) => ({ text: p.text, at: clamp(((dayMs(p.iso) - t0) / (end - t0)) * 100) })),
         }
       : null;
 
@@ -103,11 +117,19 @@ export function ForwardPanel({
         <div className="mt-3 text-[11px]" data-qa="forward-clock">
           <div className="relative h-3 rounded-full bg-faint" aria-hidden>
             <div className="h-full rounded-full bg-brand/40" data-bar="fwd-clock" style={{ width: `${clock.delivery}%` }} />
+            {clock.phases.map((p, i) => (
+              <Tick key={i} at={`${p.at}%`} bar="fwd-phase" tone="bg-ink/40" track="secondary" />
+            ))}
             <Tick at={`${clock.delivery}%`} bar="fwd-delivery" />
             {clock.outside != null && <Tick at={`${clock.outside}%`} bar="fwd-outside" tone="border-caution" dashed />}
           </div>
           <Key>
             <KeyItem>{`Today, ${dayText(today)}`}</KeyItem>
+            {clock.phases.length > 0 && (
+              <KeyItem mark="tick" tone="bg-ink/40">
+                {`${clock.phases.length === 1 ? "An earlier takedown" : "Earlier takedowns"}, ${listOf(clock.phases.map((p) => p.text))}`}
+              </KeyItem>
+            )}
             <KeyItem mark="tick" tone="bg-ink">
               {`Delivery, ${deliveryText(r.delivery)}${r.monthsToDelivery != null ? `: ${months(r.monthsToDelivery)} away` : ""}`}
             </KeyItem>

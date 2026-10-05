@@ -305,6 +305,82 @@ describe("a forward purchase, read as stated (pass 28)", () => {
   });
 });
 
+describe("a forward purchase delivered in phases (research pass 37)", () => {
+  const PHASES = "Phase 1 (60 homes) Q2 2027; Phase 2 (80 homes) Q4 2027; Phase 3 (60 homes) Q2 2028";
+  const phased = (metrics: ReturnType<typeof row>[] = []) =>
+    deal(
+      "Forward purchase of a 200-home build-to-rent community in three phased takedowns at certificate of occupancy",
+      [row("Purchase price", "$78,000,000", "p. 2"), row("Homes", "200"), row("Delivery date", PHASES), row("Deposit", "5% at signing, hard after 60 days"), ...metrics],
+      "Build-to-Rent Community",
+    );
+
+  it("reads the last takedown as the delivery, never the first, and keeps each", () => {
+    // It had read the first quarter in the words: "(read as Jun 30, 2027)".
+    const d = readDeliveryDate(PHASES, TODAY)!;
+    expect(d).toEqual({
+      iso: "2028-06-30",
+      text: "Q2 2028",
+      precision: "quarter",
+      dates: [
+        { text: "Q2 2027", iso: "2027-06-30" },
+        { text: "Q4 2027", iso: "2027-12-31" },
+        { text: "Q2 2028", iso: "2028-06-30" },
+      ],
+      phased: true,
+    });
+    expect(deliveryText(d)).toBe("phased: 3 takedowns, the last Q2 2028 (read as Jun 30, 2028)");
+    // A phase stated by its year alone, and named buildings, the same.
+    expect(readDeliveryDate("Phase 1 Q4 2027; Phase 2 2028", TODAY)).toMatchObject({ iso: "2028-12-31", phased: true });
+    expect(readDeliveryDate("Building A Q3 2027; Building B Q1 2028", TODAY)).toMatchObject({ iso: "2028-03-31", text: "Q1 2028", phased: true });
+  });
+
+  it("reads words that name several dates at the latest, said as such, and one date restated as one", () => {
+    const two = readDeliveryDate("Q3 2027, outside date Q1 2028", TODAY)!;
+    expect(two.iso).toBe("2028-03-31");
+    expect(two.phased).toBeUndefined();
+    expect(deliveryText(two)).toBe("Q3 2027, outside date Q1 2028 (read as Mar 31, 2028, the latest date it names)");
+    expect(readDeliveryDate("Q2 2028 (June 30, 2028)", TODAY)).toEqual({ iso: "2028-06-30", text: "Q2 2028 (June 30, 2028)", precision: "quarter" });
+    expect(readDeliveryDate("Q3 2027 (permits issued 2025)", TODAY)).toEqual({ iso: "2027-09-30", text: "Q3 2027 (permits issued 2025)", precision: "quarter" });
+  });
+
+  it("lists the phases wherever the delivery is said: the read, the context, the challenger, the tag and the short line", () => {
+    const r = readForwardPurchase(phased([row("NOI (stabilized, pro forma)", "$4,290,000")]), TODAY)!;
+    expect(r.monthsToDelivery).toBe(20);
+    expect(r.headline).toContain(
+      "the buyer pays $78.0M at delivery, phased: 3 takedowns, the last Q2 2028 (read as Jun 30, 2028), and the developer funds the works",
+    );
+    expect(r.headline).toContain(`The takedowns as stated: ${PHASES} — the price is paid in tranches as each delivers.`);
+    expect(forwardContextLine(r)).toContain("phased: 3 takedowns, the last Q2 2028 (read as Jun 30, 2028)");
+    expect(forwardNote(r)).toContain("phased: 3 takedowns, the last Q2 2028 (read as Jun 30, 2028)");
+    // The yield leads the tag where it is stated; without it, the takedowns.
+    expect(forwardTag(r)).toBe("Forward, 5.50% at delivery");
+    expect(forwardTag(readForwardPurchase(phased(), TODAY))).toBe("Forward, 3 takedowns to Q2 2028");
+    expect(forwardShortLine(r)).toMatch(/^Forward purchase: \$78\.0M paid in 3 takedowns as its phases deliver, the last Q2 2028, the works the developer's;/);
+    expect(forwardModelLine(r, { noi1: 4_680_000, noiAssumed: true, price: 78_000_000 })).toBe(
+      "The memorandum pays the price in tranches as its phases deliver — 3 takedowns, the last Q2 2028 — and the model runs it as one closing, with income from its first year. The deposit sits outside its cash flows. Its year-one NOI is an assumed 6.00% of the price, $4.68M, above the $4.29M the memorandum states at delivery.",
+    );
+    for (const text of [r.headline, forwardShortLine(r), forwardContextLine(r), forwardModelLine(r, null) ?? ""]) expect(gluedWords(text)).toEqual([]);
+    // Past its last takedown, the last is what has passed.
+    expect(readForwardPurchase(phased(), new Date("2028-08-01T12:00:00Z"))!.headline).toContain(
+      "The last stated takedown, Q2 2028 (read as Jun 30, 2028), has passed; whether each phase was delivered is the memorandum's to say.",
+    );
+  });
+
+  it("draws a tick a takedown before the last on the panel's clock, and says them", () => {
+    const r = readForwardPurchase(phased(), TODAY)!;
+    const html = renderToStaticMarkup(React.createElement(ForwardPanel, { forward: r, today: "2026-10-05" }));
+    const text = visibleText(html);
+    expect(text).toContain("$78.0M paid in 3 takedowns, the last Q2 2028");
+    expect(text).toContain("Earlier takedowns, Q2 2027 and Q4 2027");
+    expect(text).toContain("Delivery, phased: 3 takedowns, the last Q2 2028 (read as Jun 30, 2028): 20 months away");
+    expect(html.match(/data-bar="fwd-phase"/g)).toHaveLength(2);
+    expect(html.match(/data-bar="fwd-delivery"/g)).toHaveLength(1);
+    expect(gluedWords(text)).toEqual([]);
+    // One delivery draws no takedown tick.
+    expect(renderToStaticMarkup(React.createElement(ForwardPanel, { forward: readForwardPurchase(bts, TODAY), today: "2026-10-05" }))).not.toContain("fwd-phase");
+  });
+});
+
 describe("the prompt asks for what the reader reads", () => {
   it("names each forward-purchase row by a label the reader's own pattern takes", () => {
     const prompt = extractionInstruction("industrial");
