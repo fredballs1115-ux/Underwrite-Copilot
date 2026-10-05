@@ -39,6 +39,8 @@ import {
   NEAR_REL,
   NEAR_CAP_PT,
   NEAR_IRR_PT,
+  returnWithheldDetail,
+  returnWithheldOf,
   screenYearOf,
   unitCountRow,
 } from "./criteria";
@@ -488,11 +490,16 @@ export function scoreMandateFit(
 
   // ---- Target return / IRR (floor) --------------------------------------
   if (box.minIrrPct != null) {
-    const irr = pctOf(metrics, METRIC_FIND.irr);
+    // Where the price buys no building the IRR the memorandum states is no
+    // return its buyer earns (lib/criteria `returnWithheldOf`): never scored.
+    const withheld = returnWithheldOf(extraction);
+    const irr = withheld ? null : pctOf(metrics, METRIC_FIND.irr);
     const s = scoreFloor(irr, box.minIrrPct, NEAR_IRR_PT, WEIGHTS.irr);
     const detail =
       s.status === "unknown"
-        ? `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen.`
+        ? withheld
+          ? returnWithheldDetail(box.minIrrPct, withheld)
+          : `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen.`
         : s.status === "pass"
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${irr!.toFixed(1)}%. On target (broker figure — verify).`
           : s.status === "partial"

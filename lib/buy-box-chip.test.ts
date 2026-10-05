@@ -488,6 +488,50 @@ describe("the box holds a deal only to the figures its price buys", () => {
     expect(redLines(ex)).toMatchObject({ tripped: [], clear: ["cap rate"], unknown: ["basis / unit"] });
   });
 
+  // Research pass 41's H3: the target-return check read the memorandum's IRR
+  // — the property's — on a note, a position, a share beside its entity's
+  // loan and a leased fee, beside a cap and a basis it held to nothing, so a
+  // note could read "Outside box" on its collateral's IRR.
+  it("holds an IRR the memorandum states to the target only where the price buys the building", () => {
+    const IRR: [string, string][] = [...BUILDING, ["Unlevered IRR", "8.9%"]];
+    const box: BuyBox = { assetClasses: ["multifamily"], minIrrPct: 14 };
+    const readIrr = (ex: ExtractionResult) => buyBoxRead("multifamily", dealCheckSource(ex, null, null), box);
+    const fee = readIrr(deal("fee_simple", [["Asking price", "$80,000,000"], ...IRR]));
+    expect(checkOf(fee, "Target return")).toMatchObject({ status: "miss", onPrice: true });
+    expect(fee.mandate?.dimensions.find((d) => d.key === "irr")?.status).toBe("miss");
+    const withheld: [string, ExtractionResult, string][] = [
+      ["note", deal("note", [["Asking price", "$12,000,000"], ["Unpaid principal balance", "$15,000,000"], ...IRR]), "this is a note: its price is a loan's"],
+      [
+        "position",
+        deal("preferred_equity", [["Asking price", "$15,000,000"], ["Preferred equity amount", "$15,000,000"], ["Preferred return", "12% preferred return"], ...IRR]),
+        "this is a preferred equity position",
+      ],
+      [
+        "share",
+        deal("partial_interest", [["Asking price", "$20,580,000"], ["Entity loan balance", "$56,500,000"], ...IRR], "A 49% limited partnership interest"),
+        "this share's price grossed up is the equity's whole",
+      ],
+      ["leased fee", deal("leased_fee", [["Asking price", "$24,000,000"], ["Ground rent", "$1,200,000"], ...IRR]), "the price buys the land under the ground lease"],
+    ];
+    for (const [name, ex, words] of withheld) {
+      const r = readIrr(ex);
+      const check = checkOf(r, "Target return");
+      expect(check, name).toMatchObject({ status: "unknown", onPrice: true });
+      expect(check?.detail, name).toContain(words);
+      expect(check?.detail, name).not.toContain("8.9%");
+      const dim = r.mandate?.dimensions.find((d) => d.key === "irr");
+      expect(dim?.status, name).toBe("unknown");
+      expect(dim?.detail, name).toBe(check?.detail);
+      // The fit says it was not judged on it.
+      expect(r.chip.note, name).toContain("target return could not be checked");
+      expect(r.chip.label, name).not.toContain("Outside box");
+    }
+    // A share with a stated percentage and no entity loan keeps its cap and
+    // its IRR, as its cap slot does.
+    const share = readIrr(deal("partial_interest", [["Asking price", "$20,580,000"], ...IRR], "A 49% limited partnership interest"));
+    expect(checkOf(share, "Target return")?.status).toBe("miss");
+  });
+
   it("a cap-rate red line the box could not check leaves no green Pursue (HIGH-2)", () => {
     // The note's cap is withheld, so the red line on it cannot be checked;
     // a fee simple that states no cap reads the same.

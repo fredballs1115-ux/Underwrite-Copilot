@@ -780,6 +780,43 @@ export function capWithheldDetail(floorPct: number, why: CapWithheldKind): strin
   return `${head}, but beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
 }
 
+/** Why the target-return check holds no IRR the memorandum states to the
+ *  box's floor: the cap slot's own reasons (`capWithheldOf`: a note, a
+ *  preferred equity position, a share beside the loan its entity carries),
+ *  and a leased fee, whose price buys the land under the ground lease. */
+export type ReturnWithheldKind = CapWithheldKind | "leased_fee";
+
+/**
+ * Why an IRR the memorandum states is no return of this deal's buyer
+ * (research pass 41): where the price buys no building, a stated IRR is the
+ * property's — the collateral's, the building's above a position or the
+ * entity's loan, the building's above the land — or of a kind the screen
+ * does not read, and the box holds none of them to its target, as the cap
+ * and basis checks beside it hold none. One reader for the buy box's check
+ * and the mandate's IRR dimension. Null where the stated IRR is checked.
+ */
+export function returnWithheldOf(ex: ExtractionLike | null | undefined): ReturnWithheldKind | null {
+  if (!ex) return null;
+  return capWithheldOf(ex) ?? (ex.interest?.kind === "leased_fee" ? "leased_fee" : null);
+}
+
+/** The target-return check's words where the IRR is withheld, by the same
+ *  reasons — the buy box's check and the mandate's dimension say the same
+ *  sentence. */
+export function returnWithheldDetail(targetPct: number, why: ReturnWithheldKind): string {
+  const head = `Mandate targets ≥${targetPct}% IRR`;
+  if (why === "note" || why === "under_water") {
+    return `${head}, but this is a note: its price is a loan's, and an IRR the memorandum states is not read as the note's return — the collateral's is not a return the note's buyer earns.`;
+  }
+  if (why === "position") {
+    return `${head}, but this is a preferred equity position: its price buys a rate and a redemption, never a slice of the building, and an IRR the memorandum states is not read as the position's return.`;
+  }
+  if (why === "leased_fee") {
+    return `${head}, but the price buys the land under the ground lease: the screen does not read whether an IRR the memorandum states is the land's or the building's above it, so it is not held to the target.`;
+  }
+  return `${head}, but beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's: an IRR the memorandum states is not read as this share's return.`;
+}
+
 /**
  * Why a per-unit figure the memorandum states is no basis of the building's
  * (lib/deal-strategy `statedBasisIsBuildings`, carried in by the reads), in
@@ -1810,7 +1847,18 @@ export function evaluateBuyBox(
   if (box.minIrrPct != null) {
     const metric = findMetric(metrics, METRIC_FIND.irr.inc);
     const pct = metric ? parsePct(metric.value) : null;
-    if (pct == null) {
+    // Where the price buys no building, the IRR the memorandum states is no
+    // return its buyer earns, as the cap and the basis beside it are not
+    // (research pass 41): the fit says it was not judged on it.
+    const withheld = returnWithheldOf(extraction);
+    if (withheld) {
+      checks.push({
+        label: "Target return",
+        onPrice: true,
+        status: "unknown",
+        detail: returnWithheldDetail(box.minIrrPct, withheld),
+      });
+    } else if (pct == null) {
       checks.push({
         label: "Target return",
         onPrice: true,
