@@ -196,6 +196,9 @@ import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { omSourceFor, releaseOmSource } from "./om-source";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
+import { MAX_OM_PAGES, countPdfPages } from "@/lib/pdf";
+import { incrementalRevision, testMemorandum } from "@/lib/test-memorandum";
+import { pageCapFailure } from "./document-failures";
 
 const EXTRACTION = {
   dealName: "Oakwood Flats",
@@ -1868,16 +1871,40 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(state.jobs.map((j) => j.status).sort()).toEqual(["done", "error"]);
   });
 
-  it("an OM past the provider's page cap stops before any model call, with the count in the message", async () => {
+  it("an OM past the provider's page cap by pdfjs's own count stops before any model call, with the count in the message", async () => {
+    const { downloadOmPdf } = await import("@/lib/storage");
+    const pages = Array.from({ length: MAX_OM_PAGES + 1 }, (_, i) => ({ text: `Page ${i + 1}` }));
+    vi.mocked(downloadOmPdf).mockResolvedValueOnce(Buffer.from(await testMemorandum(pages)));
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().error).toBe(pageCapFailure(MAX_OM_PAGES + 1));
+    expect(readFirstSignal).not.toHaveBeenCalled();
+    expect(extractTerms).not.toHaveBeenCalled();
+  }, 60_000);
+
+  it("an incrementally saved deck the byte counter reads double is screened on pdfjs's count (research pass 30)", async () => {
+    // A 350-page deck with every page revised once — annotated and saved in
+    // Acrobat: the byte counter reads 700, pdfjs reads the page tree's 350,
+    // and the upload's check passed it on that count.
+    const { downloadOmPdf } = await import("@/lib/storage");
+    const pages = Array.from({ length: 350 }, (_, i) => ({ text: `Page ${i + 1}` }));
+    const revised = incrementalRevision(await testMemorandum(pages));
+    expect(countPdfPages(revised)).toBe(700);
+    vi.mocked(downloadOmPdf).mockResolvedValueOnce(revised);
+    await runAnalysis("d1");
+    expect(job().error).toBeNull();
+    expect(job().status).toBe("done");
+    expect(extractTerms).toHaveBeenCalledTimes(1);
+  }, 60_000);
+
+  it("the byte counter alone never refuses a deck: where pdfjs cannot open it, the screen goes on and the service decides", async () => {
     const { downloadOmPdf } = await import("@/lib/storage");
     vi.mocked(downloadOmPdf).mockResolvedValueOnce(
       Buffer.from("%PDF-1.4\n" + "<< /Type /Page >>\n".repeat(700)),
     );
     await runAnalysis("d1");
-    expect(job().status).toBe("error");
-    expect(job().error).toMatch(/runs 700 pages/);
-    expect(readFirstSignal).not.toHaveBeenCalled();
-    expect(extractTerms).not.toHaveBeenCalled();
+    expect(job().status).toBe("done");
+    expect(readFirstSignal).toHaveBeenCalledTimes(1);
   });
 
   it("a resumed run whose checkpoint read fails still writes checkpoints that carry the job's kind", async () => {

@@ -25,6 +25,7 @@ import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
 import { MAX_OM_PAGES, countPdfPages } from "@/lib/pdf";
+import { checkPdfOpens } from "@/lib/pdf-open";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
@@ -162,10 +163,14 @@ const runGate = new RunGate(concurrencyFromEnv);
 // The provider reads a PDF of up to about 600 pages in one request
 // (MAX_OM_PAGES, lib/pdf); a longer deck came back as a raw 400. The upload
 // refuses one first (lib/pdf-open); this stop catches a deck uploaded before
-// that check. The byte counter mostly under-counts, but an incrementally
-// saved file reads high by the pages it revised (lib/pdf), so a count just
-// past the cap could be such a file; the upload's own count is pdfjs's,
-// which reads the page tree.
+// that check. The byte counter is the cheap first look, and it mostly
+// under-counts, but an incrementally saved file reads high by every page it
+// revised (lib/pdf): a 350-page deck annotated and saved in Acrobat read as
+// 700 and was refused, with a false sentence and a retry that failed the
+// same way forever (research pass 30). So a count past the cap is only a
+// reason to ask pdfjs, which reads the page tree — the upload check's own
+// count — and only its count refuses. Where pdfjs cannot open the file the
+// screen goes on, and the service decides.
 
 /** Keep the job row fresh while a run is alive; returns the stop function. */
 function startHeartbeat(dealId: string): () => void {
@@ -841,9 +846,12 @@ async function runAnalysisSteps(
         ? await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId })
         : null;
     if (pdf) {
-      const pages = countPdfPages(pdf);
-      if (pages != null && pages > MAX_OM_PAGES) {
-        throw new ScreenError(pageCapFailure(pages));
+      const counted = countPdfPages(pdf);
+      if (counted != null && counted > MAX_OM_PAGES) {
+        const opened = await checkPdfOpens(pdf);
+        if (opened.verdict === "too_long" && opened.pages != null) {
+          throw new ScreenError(pageCapFailure(opened.pages));
+        }
       }
     }
     // Inline for anything the request cap carries; one Files-API upload for
