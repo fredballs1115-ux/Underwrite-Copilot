@@ -8,7 +8,7 @@
 // verified/sourced status; unknowns render as open questions — a rule is
 // never silently dropped for missing data.
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { signedInBenchmarkRows, signedInRuleRows } from "@/lib/research-read";
 import {
   asOfLabel,
   evaluateRules,
@@ -313,21 +313,14 @@ export async function ResearchPanel({
   // missing table (migration not yet run) degrades silently to the files.
   // A rule's words are always the file's (mergeRules: nothing else writes
   // them); a benchmark's figures may be the steward's correction.
+  // One cached read serves every signed-in reader (lib/research-read): the
+  // deal page is signed in, and the tables are granted to every signed-in
+  // reader alike; each view had read both whole tables again.
   let rules: RegulatoryRule[] = seedRules();
   let benchmarks: Benchmark[] = seedBenchmarks();
-  try {
-    const supabase = await createSupabaseServerClient();
-    const [{ data: dbRules }, { data: dbBench }] = await Promise.all([
-      supabase.from("regulatory_rules").select("*"),
-      supabase.from("benchmarks").select("*"),
-    ]);
-    if (dbRules?.length) rules = mergeRules(dbRules as unknown as RegulatoryRule[]);
-    if (dbBench?.length) {
-      benchmarks = mergeBenchmarks(dbBench as unknown as Benchmark[]);
-    }
-  } catch {
-    // seeds already loaded
-  }
+  const [dbRules, dbBench] = await Promise.all([signedInRuleRows(), signedInBenchmarkRows()]);
+  if (dbRules?.length) rules = mergeRules(dbRules);
+  if (dbBench?.length) benchmarks = mergeBenchmarks(dbBench);
 
   // What the deal IS decides which rules can reach it (lib/asset-words): an
   // office or a hotel is commercial property to the rent-control regimes;
