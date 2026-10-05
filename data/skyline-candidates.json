@@ -8756,6 +8756,366 @@
         "Southern Pines downtown",
         "Pinehurst No. 2 golf course"
       ]
+    },
+    {
+      "metroId": "cbsa:10540",
+      "city": "Albany, Oregon",
+      "area": "Albany, OR",
+      "wikipedia": [
+        "Albany, Oregon",
+        "Willamette River",
+        "Linn County, Oregon"
+      ],
+      "categories": [
+        "Albany, Oregon",
+        "Downtown Albany, Oregon",
+        "Buildings in Albany, Oregon"
+      ],
+      "queries": [
+        "Albany Oregon downtown",
+        "Albany Oregon Willamette River",
+        "Albany Oregon historic district"
+      ]
+    },
+    {
+      "metroId": "cbsa:10780",
+      "city": "Alexandria, Louisiana",
+      "area": "Alexandria, LA",
+      "wikipedia": [
+        "Alexandria, Louisiana",
+        "Red River (Mississippi watershed)",
+        "Pineville, Louisiana"
+      ],
+      "categories": [
+        "Alexandria, Louisiana",
+        "Buildings in Alexandria, Louisiana",
+        "Red River of the South"
+      ],
+      "queries": [
+        "Alexandria Louisiana downtown",
+        "Alexandria Louisiana Red River",
+        "Alexandria Louisiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:11500",
+      "city": "Anniston, Alabama",
+      "area": "Anniston-Oxford, AL",
+      "wikipedia": [
+        "Anniston, Alabama",
+        "Oxford, Alabama",
+        "Calhoun County, Alabama"
+      ],
+      "categories": [
+        "Anniston, Alabama",
+        "Buildings in Anniston, Alabama",
+        "Calhoun County, Alabama"
+      ],
+      "queries": [
+        "Anniston Alabama downtown",
+        "Anniston Alabama Noble Street",
+        "Oxford Alabama"
+      ]
+    },
+    {
+      "metroId": "cbsa:12980",
+      "city": "Battle Creek, Michigan",
+      "area": "Battle Creek, MI",
+      "wikipedia": [
+        "Battle Creek, Michigan",
+        "Kalamazoo River",
+        "Calhoun County, Michigan"
+      ],
+      "categories": [
+        "Battle Creek, Michigan",
+        "Downtown Battle Creek, Michigan",
+        "Buildings in Battle Creek, Michigan"
+      ],
+      "queries": [
+        "Battle Creek Michigan downtown",
+        "Battle Creek Michigan skyline",
+        "Battle Creek Michigan river"
+      ]
+    },
+    {
+      "metroId": "cbsa:13020",
+      "city": "Bay City, Michigan",
+      "area": "Bay City, MI",
+      "wikipedia": [
+        "Bay City, Michigan",
+        "Saginaw River",
+        "Bay County, Michigan"
+      ],
+      "categories": [
+        "Bay City, Michigan",
+        "Downtown Bay City, Michigan",
+        "Saginaw River"
+      ],
+      "queries": [
+        "Bay City Michigan downtown",
+        "Bay City Michigan Saginaw River",
+        "Bay City Michigan skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:15500",
+      "city": "Burlington, North Carolina",
+      "area": "Burlington, NC",
+      "wikipedia": [
+        "Burlington, North Carolina",
+        "Alamance County, North Carolina",
+        "Haw River"
+      ],
+      "categories": [
+        "Burlington, North Carolina",
+        "Buildings in Burlington, North Carolina",
+        "Alamance County, North Carolina"
+      ],
+      "queries": [
+        "Burlington North Carolina downtown",
+        "Burlington NC depot",
+        "Alamance County North Carolina"
+      ]
+    },
+    {
+      "metroId": "cbsa:16020",
+      "city": "Cape Girardeau, Missouri",
+      "area": "Cape Girardeau, MO-IL",
+      "wikipedia": [
+        "Cape Girardeau, Missouri",
+        "Bill Emerson Memorial Bridge",
+        "Mississippi River"
+      ],
+      "categories": [
+        "Cape Girardeau, Missouri",
+        "Bill Emerson Memorial Bridge",
+        "Downtown Cape Girardeau, Missouri"
+      ],
+      "queries": [
+        "Cape Girardeau Missouri riverfront",
+        "Cape Girardeau Missouri downtown",
+        "Bill Emerson Memorial Bridge"
+      ]
+    },
+    {
+      "metroId": "cbsa:16540",
+      "city": "Chambersburg, Pennsylvania",
+      "area": "Chambersburg, PA",
+      "wikipedia": [
+        "Chambersburg, Pennsylvania",
+        "Franklin County, Pennsylvania",
+        "Cumberland Valley"
+      ],
+      "categories": [
+        "Chambersburg, Pennsylvania",
+        "Buildings in Chambersburg, Pennsylvania",
+        "Franklin County, Pennsylvania"
+      ],
+      "queries": [
+        "Chambersburg Pennsylvania downtown",
+        "Chambersburg Pennsylvania square",
+        "Franklin County Pennsylvania"
+      ]
+    },
+    {
+      "metroId": "cbsa:17420",
+      "city": "Cleveland, Tennessee",
+      "area": "Cleveland, TN",
+      "wikipedia": [
+        "Cleveland, Tennessee",
+        "Bradley County, Tennessee",
+        "Ocoee River"
+      ],
+      "categories": [
+        "Cleveland, Tennessee",
+        "Buildings in Cleveland, Tennessee",
+        "Bradley County, Tennessee"
+      ],
+      "queries": [
+        "Cleveland Tennessee downtown",
+        "Cleveland Tennessee courthouse",
+        "Ocoee River Tennessee"
+      ]
+    },
+    {
+      "metroId": "cbsa:19140",
+      "city": "Dalton, Georgia",
+      "area": "Dalton, GA",
+      "wikipedia": [
+        "Dalton, Georgia",
+        "Whitfield County, Georgia",
+        "Murray County, Georgia"
+      ],
+      "categories": [
+        "Dalton, Georgia",
+        "Buildings in Dalton, Georgia",
+        "Whitfield County, Georgia"
+      ],
+      "queries": [
+        "Dalton Georgia downtown",
+        "Dalton Georgia Hamilton Street",
+        "Dalton Georgia mountains"
+      ]
+    },
+    {
+      "metroId": "cbsa:19460",
+      "city": "Decatur, Alabama",
+      "area": "Decatur, AL",
+      "wikipedia": [
+        "Decatur, Alabama",
+        "Tennessee River",
+        "Wheeler National Wildlife Refuge"
+      ],
+      "categories": [
+        "Decatur, Alabama",
+        "Buildings in Decatur, Alabama",
+        "Wheeler National Wildlife Refuge"
+      ],
+      "queries": [
+        "Decatur Alabama downtown",
+        "Decatur Alabama Tennessee River",
+        "Decatur Alabama bridge"
+      ]
+    },
+    {
+      "metroId": "cbsa:19500",
+      "city": "Decatur, Illinois",
+      "area": "Decatur, IL",
+      "wikipedia": [
+        "Decatur, Illinois",
+        "Lake Decatur",
+        "Macon County, Illinois"
+      ],
+      "categories": [
+        "Decatur, Illinois",
+        "Lake Decatur",
+        "Buildings in Decatur, Illinois"
+      ],
+      "queries": [
+        "Decatur Illinois downtown",
+        "Lake Decatur Illinois",
+        "Decatur Illinois skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:20020",
+      "city": "Dothan, Alabama",
+      "area": "Dothan, AL",
+      "wikipedia": [
+        "Dothan, Alabama",
+        "Houston County, Alabama",
+        "Wiregrass Region"
+      ],
+      "categories": [
+        "Dothan, Alabama",
+        "Buildings in Dothan, Alabama",
+        "Houston County, Alabama"
+      ],
+      "queries": [
+        "Dothan Alabama downtown",
+        "Dothan Alabama murals",
+        "Dothan Alabama skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:20940",
+      "city": "El Centro, California",
+      "area": "El Centro, CA",
+      "wikipedia": [
+        "El Centro, California",
+        "Imperial Valley",
+        "Imperial County, California"
+      ],
+      "categories": [
+        "El Centro, California",
+        "Imperial Valley",
+        "Buildings in El Centro, California"
+      ],
+      "queries": [
+        "El Centro California downtown",
+        "Imperial Valley California",
+        "El Centro California skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:21060",
+      "city": "Elizabethtown, Kentucky",
+      "area": "Elizabethtown, KY",
+      "wikipedia": [
+        "Elizabethtown, Kentucky",
+        "Hardin County, Kentucky",
+        "LaRue County, Kentucky"
+      ],
+      "categories": [
+        "Elizabethtown, Kentucky",
+        "Buildings in Elizabethtown, Kentucky",
+        "Hardin County, Kentucky"
+      ],
+      "queries": [
+        "Elizabethtown Kentucky downtown",
+        "Elizabethtown Kentucky courthouse",
+        "Hardin County Kentucky"
+      ]
+    },
+    {
+      "metroId": "cbsa:21300",
+      "city": "Elmira, New York",
+      "area": "Elmira, NY",
+      "wikipedia": [
+        "Elmira, New York",
+        "Chemung River",
+        "Chemung County, New York"
+      ],
+      "categories": [
+        "Elmira, New York",
+        "Downtown Elmira, New York",
+        "Chemung River"
+      ],
+      "queries": [
+        "Elmira New York downtown",
+        "Elmira New York Chemung River",
+        "Elmira New York skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:22540",
+      "city": "Fond du Lac, Wisconsin",
+      "area": "Fond du Lac, WI",
+      "wikipedia": [
+        "Fond du Lac, Wisconsin",
+        "Lake Winnebago",
+        "Fond du Lac County, Wisconsin"
+      ],
+      "categories": [
+        "Fond du Lac, Wisconsin",
+        "Lake Winnebago",
+        "Buildings in Fond du Lac, Wisconsin"
+      ],
+      "queries": [
+        "Fond du Lac Wisconsin downtown",
+        "Fond du Lac Lake Winnebago lighthouse",
+        "Fond du Lac Wisconsin skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:23460",
+      "city": "Gadsden, Alabama",
+      "area": "Gadsden, AL",
+      "wikipedia": [
+        "Gadsden, Alabama",
+        "Coosa River",
+        "Noccalula Falls Park"
+      ],
+      "categories": [
+        "Gadsden, Alabama",
+        "Noccalula Falls",
+        "Buildings in Gadsden, Alabama"
+      ],
+      "queries": [
+        "Gadsden Alabama downtown",
+        "Noccalula Falls Gadsden",
+        "Gadsden Alabama Coosa River"
+      ]
     }
   ]
 }
