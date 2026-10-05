@@ -792,7 +792,7 @@ function PriceCapControls({
               {atBase ? "no price was read — type the price you would pay" : "your price"}
             </span>
           ) : atBase ? (
-            <span className="text-xs text-muted">at the modeled price</span>
+            <span className="text-xs text-muted">at the modelled price</span>
           ) : (
             <span
               className={`text-xs font-medium tabular-nums ${
@@ -800,7 +800,7 @@ function PriceCapControls({
               }`}
             >
               {deltaPct >= 0 ? "+" : "−"}
-              {Math.abs(deltaPct).toFixed(1)}% vs modeled ({fmtUsd0(basePrice)})
+              {Math.abs(deltaPct).toFixed(1)}% vs modelled ({fmtUsd0(basePrice)})
             </span>
           )}
         </div>
@@ -854,7 +854,7 @@ function MaxBidCard({
   /** what the share is called (`PlaygroundData.shareNoun`) */
   shareNoun?: "share" | "interest";
 }) {
-  const vs = against === "yours" ? "your price" : "the modeled price";
+  const vs = against === "yours" ? "your price" : "the modelled price";
   // The share's bid, rounded down as the whole's is, so it still clears.
   const shareBid = (whole: number, atLeast = false): string | null =>
     sharePct != null

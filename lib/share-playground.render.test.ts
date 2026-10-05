@@ -72,6 +72,9 @@ describe("a share's price and max bid on the deal page (research pass 40, M7)", 
     expect(Math.abs(whole * 0.49 - 19_050_982)).toBeLessThan(2);
     expect(text).toContain("$38.87M");
     expect(text).toContain("That is the whole's price, the share grossed up; the 49% share's is $19.05M.");
+    // The site's spelling, the report's (audit C3a, LOW-11).
+    expect(text).toContain("vs the modelled price");
+    expect(text).not.toMatch(/\bmodeled\b/);
     expect(a11yIssues(html)).toEqual([]);
   });
 

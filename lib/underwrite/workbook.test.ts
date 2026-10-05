@@ -1662,9 +1662,11 @@ describe("the workbook reads on paper", () => {
 });
 
 // Research pass 35, F18: the tab said its axes were "centred" above grids
-// whose key reads "Center row/column". One tab, one spelling.
+// whose key reads "Center row/column". One tab, one spelling — the site's
+// (CLAUDE.md: modelled, colour, centre), as the report spells it (audit
+// C3a, LOW-11: 0244ff7 had moved the tab to "centered").
 describe("the Sensitivity tab's words", () => {
-  it("spell centered one way, the key's", async () => {
+  it("spell centred one way, the site's", async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
     const words: string[] = [];
@@ -1673,9 +1675,9 @@ describe("the Sensitivity tab's words", () => {
         if (typeof c.value === "string") words.push(c.value);
       }),
     );
-    expect(words.some((w) => w.includes("its axes centered on the inputs as they stand"))).toBe(true);
-    expect(words.some((w) => w.startsWith("Center row/column"))).toBe(true);
-    expect(words.filter((w) => /centr(e|ed)\b/i.test(w))).toEqual([]);
+    expect(words.some((w) => w.includes("its axes centred on the inputs as they stand"))).toBe(true);
+    expect(words.some((w) => w.startsWith("Centre row/column"))).toBe(true);
+    expect(words.filter((w) => /cent(er|ered)\b/i.test(w))).toEqual([]);
   });
 });
 

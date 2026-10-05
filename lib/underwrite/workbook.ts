@@ -2541,9 +2541,9 @@ function buildSensitivity(
   let r = 2;
   label(
     wsSens.getCell(r, 1),
-    // "centered", the spelling of the "Center row/column" line under the
+    // "centred", the spelling of the "Centre row/column" line under the
     // grids: one tab, one spelling.
-    "Live — every cell is a full re-run of the model, its axes centered on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
+    "Live — every cell is a full re-run of the model, its axes centred on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
     { color: MUTED, size: 9 },
   );
   // On the row the tab leaves blank, so nothing below it moves: where the
@@ -2639,7 +2639,7 @@ function buildSensitivity(
     }
     r += 2;
   }
-  label(wsSens.getCell(r, 1), "Center row/column = the model's base case. Bold cell = base scenario.", { color: MUTED, size: 9 });
+  label(wsSens.getCell(r, 1), "Centre row/column = the model's base case. Bold cell = base scenario.", { color: MUTED, size: 9 });
   // The centre follows the input; the step does not. Said, so a price typed
   // into the file is not expected to rescale the price step.
   const bps = (d: number) => `${Math.round(d * 10_000)} bps`;

@@ -1719,7 +1719,7 @@ describe("the sensitivity playground says whose figures it runs", () => {
     expect(html).not.toContain('value="$10,000,000"');
     expect(html).toMatch(/placeholder="Type a price"/);
     expect(text).toContain("no price was read — type the price you would pay");
-    expect(text).not.toContain("at the modeled price");
+    expect(text).not.toContain("at the modelled price");
     // The box scores the memorandum's own figures, never the placeholder's.
     const at = html.indexOf('data-qa="playground-fit"');
     expect(textOf(html.slice(html.indexOf(">", at) + 1))).toMatch(/mandate fit on the memorandum's figures/);
