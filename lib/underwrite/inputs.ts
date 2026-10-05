@@ -14,7 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { entityLoanOf, interestOf, interestShortLine, readInterest, type EquipmentUse } from "@/lib/interest";
+import { entityLoanOf, interestOf, interestShortLine, isWholeShare, readInterest, type EquipmentUse } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -534,7 +534,22 @@ export function deriveUnderwriteInputs(
   // starts, read only where no asking price is stated.
   const saleFloor = readSale(extraction);
 
-  if (price != null && interest.kind === "partial_interest" && interest.sharePct != null) {
+  if (price != null && interest.kind === "partial_interest" && isWholeShare(interest.sharePct)) {
+    // All of the entity's interests (a stated 100%, research pass 28): the
+    // price is the whole's as stated, nothing grossed up — said so, never as
+    // a share with no stated percentage. Beside the entity's stated loan it
+    // is the equity's whole, and the loan sits on top of it, as below.
+    const entityLoan = entityLoanOf(extraction);
+    const of = `The OM's ${usd0(price)}${spanNote ? ` (${spanNote})` : ""} for all of the owning entity's interests`;
+    mark(
+      "purchasePrice",
+      "extracted",
+      entityLoan != null
+        ? `${of} — the equity's whole, nothing grossed up, not the asset's: the entity's stated ${usd0(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, before the entity's own costs and fees`
+        : `${of} — the whole, nothing grossed up; the model runs the whole building's cash flows, before the entity's own costs and fees`,
+      pageOf(priceMetric),
+    );
+  } else if (price != null && interest.kind === "partial_interest" && interest.sharePct != null) {
     const share = interest.sharePct;
     const stated = price;
     price = stated / (share / 100);

@@ -6311,6 +6311,24 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(render(React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "fee_simple" }), 20_000_000) }))).not.toContain("What is being sold");
   });
 
+  // Research pass 28: "100% of the beneficial interests" (a DST's) read as no
+  // percentage, and the panel said the memorandum "states no single
+  // percentage". It is all of the entity's interests, and no share bar.
+  it("a stated 100%: all of the entity's interests, the price the whole's, and no share filled", () => {
+    const dst = base({ ...blank, kind: "partial_interest", share: "100% of the beneficial interests, offered in $100,000 units" });
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(dst, 20_000_000) }));
+    const text = visibleText(html);
+    expect(text).toContain("All of the owning entity's interests");
+    expect(text).toContain(
+      "This memorandum sells all of the owning entity's interests — 100% as stated, offered in units — so its $20.0M price is the whole's, with nothing to gross up",
+    );
+    expect(text).not.toContain("no single percentage");
+    expect(text).not.toContain("grossed up $");
+    expect(html).not.toContain('data-bar="interest"');
+    expect(a11yIssues(html), "whole-entity panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
   it("a note underwritten as a note (#416): its yield as tiles, the balance and the price against the collateral's value", () => {
     const AS_OF = new Date(Date.UTC(2025, 8, 30));
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 5" });

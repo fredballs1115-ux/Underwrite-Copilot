@@ -28,7 +28,11 @@
 // the entity's loan sits on top of it, and every surface that prints the
 // whole names both figures (research pass 23: a 4.5% share at $1.8M beside
 // a $56.5M loan read "$40.0M for the whole"). The loan is never added to
-// the price here — what the model runs at is the owner's call.
+// the price here — what the model runs at is the owner's call. A stated 100%
+// ("100% of the beneficial interests", a DST's, offered in units) is all of
+// the entity's interests: its price is the whole's, nothing is grossed up,
+// and it is said so — never as a percentage the memorandum does not state
+// (research pass 28).
 //
 // A LEASEHOLD IS A WASTING ASSET. The buyer owns the building and a lease on
 // the land; the ground rent comes ahead of the debt, and at expiry the
@@ -84,7 +88,9 @@ const NOT_A_SHARE =
 // the entity it is a share of ("49% of the LLC").
 const SHARE_WORDS =
   /\binterests?\b|\bstakes?\b|\bown(?:ed|er|ers|ership)\b|\bshares?\b|\bten(?:ant|ants|ancy)[\s-]+in[\s-]+common\b|\btic\b|\bmember(?:s|ships?)?\b|\bpartner(?:s|ships?)?\b|\bllcs?\b|\bentity\b|\b(?:joint[\s-]+)?ventures?\b|\bjv\b/i;
-const PCT_MENTION = /(?<![\d.])(\d{1,2}(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/gi;
+// A percentage up to 100: a stated 100% of the interests is the whole entity
+// (research pass 28), never a figure the reader cannot see.
+const PCT_MENTION = /(?<![\d.])(\d{1,2}(?:\.\d+)?|100(?:\.0+)?)\s*(?:%|percent\b|per cent\b)/gi;
 // Where a percentage's own words end: its clause's end, a sentence's, or a
 // word that starts the next clause.
 const CLAUSE_WORD = String.raw`\s(?:and|with|plus|while|which|whereas|but|at|or|versus|vs\.?|including|excluding|where|when)\s`;
@@ -103,8 +109,11 @@ function readShareWords(words: string): "share" | "not" | null {
 
 /** A partial interest's share, in percent, read off the OM's own words
  *  ("49% limited partnership interest", "a 90 percent stake", "Ownership
- *  interest: 49%"); null where no single percentage under 100 is stated AS a
- *  share. A percentage counts only where the words right after it — or,
+ *  interest: 49%"); null where no single percentage up to 100 is stated AS a
+ *  share. A stated 100% ("100% of the beneficial interests", a DST's) is all
+ *  of the entity's interests (`isWholeShare`): its price is the whole's, and
+ *  nothing is grossed up (research pass 28 — it had read as no percentage at
+ *  all). A percentage counts only where the words right after it — or,
  *  where those name nothing, the words right before it in its clause — name
  *  an ownership share and no return, rate or occupancy; a percentage among
  *  other words that name nothing is withheld, and so is a range ("49–51%").
@@ -116,10 +125,10 @@ export function parseSharePct(text: string | null | undefined): number | null {
   // is nothing but one percentage ("49%", read off a table's "Interest
   // offered" cell) IS the share: there are no words beside it to be a
   // return's or a rate's.
-  const lone = t.trim().match(/^(\d{1,2}(?:\.\d+)?)\s*(?:%|percent|per cent)$/i);
+  const lone = t.trim().match(/^(\d{1,2}(?:\.\d+)?|100(?:\.0+)?)\s*(?:%|percent|per cent)$/i);
   if (lone) {
     const n = Number(lone[1]);
-    return n > 0 && n < 100 ? n : null;
+    return n > 0 && n <= 100 ? n : null;
   }
   const hits = [...t.matchAll(PCT_MENTION)].map((m, i, all) => {
     const start = m.index ?? 0;
@@ -131,7 +140,7 @@ export function parseSharePct(text: string | null | undefined): number | null {
     return { n: Number(m[1]), start, end, tail, cut: tail.search(WORDS_AFTER_END) };
   });
   const shares = hits.flatMap((h, i) => {
-    if (!Number.isFinite(h.n) || !(h.n > 0) || !(h.n < 100)) return [];
+    if (!Number.isFinite(h.n) || !(h.n > 0) || !(h.n <= 100)) return [];
     // A range is no one share.
     if (/\d\s*%?\s*(?:[-–—]|\bto)\s*$/i.test(t.slice(0, h.start)) || /^\s*(?:[-–—]|to\b)\s*\d/i.test(t.slice(h.end))) return [];
     const after = h.cut >= 0 ? h.tail.slice(0, h.cut) : h.tail;
@@ -149,6 +158,22 @@ export function parseSharePct(text: string | null | undefined): number | null {
   // one share: withheld rather than picked.
   return valid.length === 1 ? valid[0] : null;
 }
+
+/** A share stated as 100% — all of the owning entity's interests, like a
+ *  DST's beneficial interests offered in units or an LLC's membership
+ *  interests sold whole (research pass 28). Its price is the whole's, so
+ *  nothing is grossed up, and every surface that says a share's gross-up
+ *  says all of the entity's interests instead; a share under 100% reads as
+ *  before. */
+export function isWholeShare(sharePct: number | null | undefined): boolean {
+  return sharePct != null && sharePct >= 100;
+}
+
+// Interests offered in units, by the memorandum's own words: "offered in
+// $100,000 units", "units of beneficial interest", a minimum investment —
+// never a building's units ("a DST owning 240 units").
+const IN_UNITS =
+  /\b(?:offered|sold|issued|available|marketed)\s+in\s+(?:\$[\d.,]+\s*(?:[km]\b)?\s*)?(?:investment\s+)?units\b|\bunits\s+of\s+(?:beneficial\s+)?interests?\b|\bminimum\s+(?:investment|purchase|subscription)\b/i;
 
 /** The minimum the price readers need: the kind; a partial interest's share
  *  where one percentage is stated as the share (`parseSharePct`); and the
@@ -293,7 +318,8 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
     case "note":
       return "Note";
     case "partial_interest":
-      return sharePct != null ? `${shareText(sharePct)} share` : "Share";
+      // A stated 100% buys all of the entity's interests, never "100% share".
+      return sharePct != null ? (isWholeShare(sharePct) ? "All entity interests" : `${shareText(sharePct)} share`) : "Share";
     case "leasehold":
       return yrs ? `Leasehold, ${yrs} left` : "Leasehold";
     case "leased_fee":
@@ -354,8 +380,12 @@ export interface InterestRead {
   summary: string;
   /** cited only where it parses and falls inside the memorandum */
   page: string;
-  /** a partial interest's share, percent */
+  /** a partial interest's share, percent — 100 where the memorandum states
+   *  all of the entity's interests (`isWholeShare`) */
   sharePct: number | null;
+  /** a partial interest whose own words say its interests are offered in
+   *  units (a DST's "$100,000 units") */
+  inUnits: boolean;
   /** the price the OM asks for what is being sold */
   askingPrice: number | null;
   /** a partial interest: the asking price over the share — the equity's
@@ -595,6 +625,7 @@ export function readInterest(
   const n = parsePageNumber(it.page);
   const page = n != null && pageCount != null && n <= pageCount ? it.page.trim() : "";
   const sharePct = kind === "partial_interest" ? parseSharePct(it.share) : null;
+  const inUnits = kind === "partial_interest" && IN_UNITS.test(`${it.share ?? ""} \n ${it.summary ?? ""}`);
   const price = askingPrice != null && askingPrice > 0 ? askingPrice : null;
   const impliedWhole = sharePct != null && price != null ? price / (sharePct / 100) : null;
   const entityLoan = kind === "partial_interest" ? entityLoanOf(ex) : null;
@@ -637,6 +668,25 @@ export function readInterest(
         "The screening model underwrites the collateral as if it were bought outright at the note's price. That is not the note's return, and its cap rate and IRR are not figures this buyer earns.";
       break;
     case "partial_interest":
+      if (isWholeShare(sharePct)) {
+        // All of the entity's interests (research pass 28): the price is the
+        // whole's, with nothing to gross up — said so, never as a share or as
+        // a percentage the memorandum does not state. Beside the entity's
+        // stated loan it is the equity's whole, and the loan sits on top.
+        const units = inUnits ? ", offered in units" : "";
+        const priced = price != null ? `its ${money(price)} price` : "its price";
+        lead.push(
+          entityLoan != null
+            ? `This memorandum sells all of the owning entity's interests — 100% as stated${units} — so ${priced} is the equity's whole, with nothing to gross up, not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it${price != null ? `, and the screen sets the whole building's income against the ${money(price)} alone` : ""}.`
+            : `This memorandum sells all of the owning entity's interests — 100% as stated${units} — so ${priced} is the whole's, with nothing to gross up${price != null ? ", and the whole building's income is set against it" : ""}.`,
+        );
+        const at = price != null ? `the ${money(price)} price` : "the price";
+        modelCaveat =
+          entityLoan != null
+            ? `The screening model runs the whole asset at ${at} for all of the entity's interests — the equity's whole: the entity's stated ${money(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on it instead.`
+            : `The screening model runs the whole asset at ${at}, which buys all of the entity's interests, so nothing is grossed up; what the interests earn is the entity's cash flow after its own costs and fees, which the model does not carry.`;
+        break;
+      }
       if (sharePct != null && price != null && impliedWhole != null && entityLoan != null) {
         // The entity's loan stated beside the share: the price grossed up is
         // the equity's whole, and the loan sits on top of it. Both figures
@@ -711,10 +761,12 @@ export function readInterest(
   const headline = lead.join(" ");
   return {
     kind,
-    label: INTEREST_LABEL[kind],
+    // All of the entity's interests is no share of it (research pass 28).
+    label: isWholeShare(sharePct) ? "All of the owning entity's interests" : INTEREST_LABEL[kind],
     summary: (it.summary ?? "").trim(),
     page,
     sharePct,
+    inUnits,
     askingPrice: price,
     impliedWhole,
     entityLoan,
@@ -760,12 +812,21 @@ export function interestNote(r: InterestRead): string {
   const traps: Record<InterestKind, string> = {
     note:
       "NOTE TRAPS, checked by name where the OM gives the inputs: (a) THE COLLATERAL IS NOT THE RETURN — the property's cap rate and IRR belong to its owner; underwrite the note's yield on the price paid; (b) THE DISCOUNT IS THE RETURN — on a performing note, the coupon on the price plus the discount accreting to maturity; ask for the payment history; (c) DEFAULT AND FORECLOSURE — a non-performing note is a bet on the time and cost to take the property, which runs by the state's process (judicial or not) and the borrower's resistance; (d) THE DOCUMENTS — guarantees, reserves, the loan agreement's defaults and any intercreditor or participation terms; (e) THE COLLATERAL'S VALUE — the loan-to-value on today's value, not the origination appraisal.",
-    partial_interest:
-      `PARTIAL-INTEREST TRAPS, checked by name where the OM gives the inputs: (a) THE PRICE IS FOR A SHARE — hold the whole asset's income against the price grossed up by the share, never against the share's price${
-        r.entityLoan != null
-          ? `, and read that grossed-up figure as the equity's whole, not the asset's: the entity's stated ${money(r.entityLoan)} loan sits on top of it`
-          : ""
-      }; (b) CONTROL — who decides a sale, a refinance and a budget, and what a minority holder can block; (c) THE WATERFALL — the share's economics after the sponsor's promote and fees, not its pro-rata slice; (d) EXIT RIGHTS — buy-sell, right of first refusal, drag and tag, and how a minority share is ever sold; (e) CAPITAL CALLS — what happens to a holder who does not fund one.`,
+    partial_interest: `PARTIAL-INTEREST TRAPS, checked by name where the OM gives the inputs: ${
+      isWholeShare(r.sharePct)
+        ? // All of the entity's interests: nothing to gross up (research
+          // pass 28).
+          `(a) THE PRICE IS FOR ALL OF THE ENTITY'S INTERESTS — hold the whole asset's income against the price itself, with nothing to gross up${
+            r.entityLoan != null
+              ? `, and read that price as the equity's whole, not the asset's: the entity's stated ${money(r.entityLoan)} loan sits on top of it`
+              : ""
+          }`
+        : `(a) THE PRICE IS FOR A SHARE — hold the whole asset's income against the price grossed up by the share, never against the share's price${
+            r.entityLoan != null
+              ? `, and read that grossed-up figure as the equity's whole, not the asset's: the entity's stated ${money(r.entityLoan)} loan sits on top of it`
+              : ""
+          }`
+    }; (b) CONTROL — who decides a sale, a refinance and a budget, and what a minority holder can block; (c) THE WATERFALL — the share's economics after the sponsor's promote and fees, not its pro-rata slice; (d) EXIT RIGHTS — buy-sell, right of first refusal, drag and tag, and how a minority share is ever sold; (e) CAPITAL CALLS — what happens to a holder who does not fund one.`,
     leasehold:
       "LEASEHOLD TRAPS, checked by name where the OM gives the inputs: (a) THE TERM LEFT — against the loan's term (a lender wants years of margin) and the hold; (b) THE RESETS — a rent struck at a share of then-current land value is an uncapped repricing; (c) SUBORDINATION — an unsubordinated ground rent outranks the mortgage, and a default ends the lease, the building and the loan together; (d) COVERAGE — the building's income before the ground rent over the ground rent, the lender's first test; (e) THE REVERSION — at expiry the building goes to the landowner, so the exit is worth what the remaining term will bear.",
     leased_fee:
@@ -858,6 +919,16 @@ export function interestShortLine(r: InterestRead): string {
       }`;
     }
     case "partial_interest":
+      // All of the entity's interests: the price is the whole's (research
+      // pass 28).
+      if (isWholeShare(r.sharePct)) {
+        const all = `All of the owning entity's interests${r.inUnits ? ", offered in units" : ""}`;
+        return r.askingPrice == null
+          ? all
+          : r.entityLoan != null
+            ? `${all} — ${money(r.askingPrice)} for the equity's whole; the entity's stated ${money(r.entityLoan)} loan sits on top of it`
+            : `${all} — ${money(r.askingPrice)} for the whole, nothing grossed up`;
+      }
       return r.sharePct != null && r.askingPrice != null && r.impliedWhole != null
         ? r.entityLoan != null
           ? `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the equity's whole; the entity's stated ${money(r.entityLoan)} loan sits on top of it`

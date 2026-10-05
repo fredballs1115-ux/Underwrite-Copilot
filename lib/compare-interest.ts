@@ -34,7 +34,7 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
-import { interestOf, interestTag, readInterest } from "@/lib/interest";
+import { interestOf, interestTag, isWholeShare, readInterest } from "@/lib/interest";
 
 export interface CompareModel {
   purchasePrice?: number | null;
@@ -117,7 +117,10 @@ export function modelReturnsRead(
         ? ci.cap != null
           ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
           : interestOf(ex).entityLoan != null
-            ? "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+            ? isWholeShare(interestOf(ex).sharePct)
+              ? // All of the entity's interests (a stated 100%, research pass 28).
+                "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+              : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
             : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
         : null;
   return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", line };

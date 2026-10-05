@@ -25,7 +25,7 @@
  */
 
 import { withArticle } from "@/lib/article";
-import { dealTypeLabel, entityLoanOf, groundRentOf, interestOf } from "@/lib/interest";
+import { dealTypeLabel, entityLoanOf, groundRentOf, interestOf, isWholeShare } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
@@ -775,7 +775,12 @@ export interface PlanSummary {
    *  whole the share's price implies (#415): the equity's whole where the
    *  memorandum states the loan its entity carries (`entityLoan`), since
    *  that loan sits on top of the figure */
-  priceLabel: "Price" | "Land cost" | "Whole price, the share grossed up" | "Equity's whole, the share grossed up";
+  priceLabel:
+    | "Price"
+    | "Land cost"
+    | "Whole price, the share grossed up"
+    | "Equity's whole, the share grossed up"
+    | "Equity's whole, all the entity's interests";
   /** why a price the OM states is not the project's, where it is not — a
    *  note's, the land's under a ground lease, a share with no stated
    *  percentage (#415); null otherwise, and the price then reads "not
@@ -871,6 +876,9 @@ export function planSummary(
   // no total cost is struck on it (said in one sentence, `costWithheld`).
   const entityLoan = equityWhole != null ? interest.entityLoan : null;
   const shown = price ?? equityWhole;
+  // All of the entity's interests (a stated 100%, research pass 28): the
+  // price is the whole's, never "the share grossed up".
+  const allInterests = isWholeShare(interest.sharePct);
   return {
     kind: strategy.kind,
     price,
@@ -879,8 +887,12 @@ export function planSummary(
       ? "Land cost"
       : interest.kind === "partial_interest" && shown != null
         ? entityLoan != null
-          ? "Equity's whole, the share grossed up"
-          : "Whole price, the share grossed up"
+          ? allInterests
+            ? "Equity's whole, all the entity's interests"
+            : "Equity's whole, the share grossed up"
+          : allInterests
+            ? "Price"
+            : "Whole price, the share grossed up"
         : "Price",
     priceWithheld,
     entityLoan,
@@ -932,11 +944,21 @@ export function assessPlausibility(
   // every finding measured on the figure names both (research pass 23). The
   // loan is never added to the price here.
   const entityLoan = interest.sharePct != null ? entityLoanOf(extraction) : null;
-  const priceWord =
-    interest.sharePct != null ? (entityLoan != null ? "whole equity the share implies" : "whole-asset price the share implies") : "price";
+  // All of the entity's interests (a stated 100%, research pass 28): the
+  // price itself, with nothing grossed up.
+  const allInterests = isWholeShare(interest.sharePct);
+  const priceWord = allInterests
+    ? "price for all the entity's interests"
+    : interest.sharePct != null
+      ? entityLoan != null
+        ? "whole equity the share implies"
+        : "whole-asset price the share implies"
+      : "price";
   const wholeNote =
     entityLoan != null
-      ? ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
+      ? allInterests
+        ? ` The ${money(price)} for all the entity's interests is the equity's whole, not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
+        : ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
       : "";
 
   const findings: PlausibilityFinding[] = [];
@@ -1130,7 +1152,9 @@ function planLine(plan: PlanSummary): string {
           // and no building's price to take out of the total.
           `${money(plan.budget.budget)} all-in (${plan.budget.label}; ${
             plan.equityWhole != null
-              ? "the share's price grossed up is the equity's whole, not the building's"
+              ? plan.priceLabel === "Equity's whole, all the entity's interests"
+                ? "the price for all the entity's interests is the equity's whole, not the building's"
+                : "the share's price grossed up is the equity's whole, not the building's"
               : "the OM states no price"
           }, so the acquisition inside it is not separable)`
         : `${plan.budget.allIn ? "budget " : ""}${money(plan.budget.budget)}${plan.budget.allIn ? ` (${plan.budget.label} less the price)` : ` (${plan.budget.label})`}`

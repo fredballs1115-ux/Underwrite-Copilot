@@ -365,6 +365,16 @@ describe("ReportDocument (full report)", () => {
     } as ExtractionResult);
     expect(unstated).toContain("No max bid: the memorandum states no single percentage for the share");
     expect(unstated).not.toMatch(/Max bid (clearing|holding)/);
+    // All of the entity's interests (a stated 100%, research pass 28): the
+    // bid is solved on the price itself, and it is no share's.
+    const whole = await render({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "100% of the beneficial interests, offered in $100,000 units", groundLease: "", loan: "", page: "" },
+    } as ExtractionResult);
+    expect(whole).toMatch(/Max bid holding the 15% screening hurdle: \$[\d.]+M/);
+    expect(whole).not.toContain("no single percentage");
+    expect(whole).not.toContain("not the share's");
+    expect(whole).toContain("All of the owning entity's interests");
   }, 60000);
 
   it("prints the base case the grids are struck around, each input with its source, and the terms every cell runs on under the grid", async () => {

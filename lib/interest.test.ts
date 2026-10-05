@@ -11,6 +11,7 @@ import {
   interestOf,
   interestShortLine,
   interestTag,
+  isWholeShare,
   noteCaption,
   noteCollateralSentence,
   parseSharePct,
@@ -52,7 +53,8 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct("a 49% LP interest and a 2% GP interest")).toBeNull();
     // The same percentage twice is still one.
     expect(parseSharePct("49% interest (49% of the LLC)")).toBe(49);
-    expect(parseSharePct("100% of the membership interests")).toBeNull();
+    // A stated 100% is all of the entity's interests (research pass 28).
+    expect(parseSharePct("100% of the membership interests")).toBe(100);
     expect(parseSharePct("the majority interest")).toBeNull();
     expect(parseSharePct("")).toBeNull();
     expect(parseSharePct(undefined)).toBeNull();
@@ -103,7 +105,7 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct("49%")).toBe(49);
     expect(parseSharePct(" 12.5 percent ")).toBe(12.5);
     expect(parseSharePct("49–51%")).toBeNull();
-    expect(parseSharePct("100%")).toBeNull();
+    expect(parseSharePct("100%")).toBe(100);
     // Two different shares remain two: withheld.
     expect(parseSharePct("a 49% LP interest (the sponsor keeps a 51% GP interest)")).toBeNull();
   });
@@ -641,6 +643,109 @@ describe("what the price buys, read by the plausibility check, the deal context 
     const plain = deriveUnderwriteInputs(ex(undefined, [noi]), "x");
     expect(plain.sources.purchasePrice?.note).toBe("OM asking / purchase price");
     expect(plain.meta.interest).toBeNull();
+  });
+});
+
+// Research pass 28: a DST offering "100% of the beneficial interests,
+// offered in $100,000 units" read as no share at all — the panel said the
+// memorandum "states no single percentage", the model's note that it could
+// not gross the price up, and the report that there was no max bid.
+describe("a stated 100% is all of the entity's interests: the whole, nothing grossed up", () => {
+  const noi = { label: "NOI (in-place)", value: "$2,900,000", flagged: false, page: "p. 9", basis: "in_place" as const };
+  const dst = (over: Partial<ExtractedInterest> = {}, metrics: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    ...ex(
+      interest({
+        kind: "partial_interest",
+        share: "100% of the beneficial interests, offered in $100,000 units",
+        summary: "Beneficial interests in Harbor View DST",
+        ...over,
+      }),
+    ),
+    metrics: [
+      { label: "Asking price", value: "$52,450,000", flagged: false, page: "p. 2", basis: "na" },
+      { label: "Units", value: "240", flagged: false, page: "p. 2", basis: "na" },
+      ...metrics,
+    ],
+  });
+
+  it("reads 100% as the whole and says so on every line, never as no percentage", () => {
+    const e = dst();
+    expect(interestOf(e)).toEqual({ kind: "partial_interest", sharePct: 100, entityLoan: null });
+    expect([isWholeShare(100), isWholeShare(49), isWholeShare(null)]).toEqual([true, false, false]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.impliedWhole).toBe(52_450_000);
+    expect(r.label).toBe("All of the owning entity's interests");
+    expect(r.inUnits).toBe(true);
+    expect(r.headline).toBe(
+      "This memorandum sells all of the owning entity's interests — 100% as stated, offered in units — so its $52.5M price is the whole's, with nothing to gross up, and the whole building's income is set against it.",
+    );
+    expect(r.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $52.5M price, which buys all of the entity's interests, so nothing is grossed up; what the interests earn is the entity's cash flow after its own costs and fees, which the model does not carry.",
+    );
+    expect(interestTag(e)).toBe("All entity interests");
+    expect(interestShortLine(r)).toBe("All of the owning entity's interests, offered in units — $52.5M for the whole, nothing grossed up");
+    expect(interestNote(r)).toContain(
+      "(a) THE PRICE IS FOR ALL OF THE ENTITY'S INTERESTS — hold the whole asset's income against the price itself, with nothing to gross up;",
+    );
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${interestNote(r)} ${dealContextFor(e)}`;
+    expect(said).toContain("What is being sold: all of the owning entity's interests.");
+    expect(said).not.toContain("no single percentage");
+    expect(said).not.toMatch(/grossed up to|100% share|share grossed up/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("says units only where the memorandum's own words offer the interests in them", () => {
+    const llc = dst({ share: "100% of the membership interests in Harbor View LLC", summary: "The sale of the LLC that owns the 240 units" });
+    const r = readInterest(llc, askingPriceOf(llc))!;
+    expect(r.inUnits).toBe(false);
+    expect(r.headline).toContain("sells all of the owning entity's interests — 100% as stated — so its $52.5M price is the whole's");
+    expect(interestShortLine(r)).toBe("All of the owning entity's interests — $52.5M for the whole, nothing grossed up");
+    // No price stated: still the whole, and still never "no single percentage".
+    const unpriced = readInterest(llc, null)!;
+    expect(unpriced.headline).toBe("This memorandum sells all of the owning entity's interests — 100% as stated — so its price is the whole's, with nothing to gross up.");
+    expect(interestShortLine(unpriced)).toBe("All of the owning entity's interests");
+  });
+
+  it("beside the entity's stated loan, the price is the equity's whole and the loan sits on top of it", async () => {
+    const { buildingPriceOf, planSummary } = await import("./deal-strategy");
+    const loan = { label: "Entity loan balance", value: "$43,600,000", flagged: false, page: "p. 9", basis: "in_place" as const };
+    const e = dst({}, [loan]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.headline).toBe(
+      "This memorandum sells all of the owning entity's interests — 100% as stated, offered in units — so its $52.5M price is the equity's whole, with nothing to gross up, not the asset's: the entity's stated $43.6M loan sits on top of it, and the screen sets the whole building's income against the $52.5M alone.",
+    );
+    expect(interestShortLine(r)).toBe(
+      "All of the owning entity's interests, offered in units — $52.5M for the equity's whole; the entity's stated $43.6M loan sits on top of it",
+    );
+    expect(r.modelCaveat).toContain("the entity's stated $43.6M loan sits on top of it, and the model neither adds it to the price nor carries it");
+    expect(interestNote(r)).toContain("read that price as the equity's whole, not the asset's: the entity's stated $43.6M loan sits on top of it");
+    // The building's price is the equity's whole plus a loan nothing adds: no basis, as on any share beside its loan.
+    expect(buildingPriceOf(e, 52_450_000)).toBeNull();
+    const plan = planSummary({ ...e, strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" } })!;
+    expect(plan.priceLabel).toBe("Equity's whole, all the entity's interests");
+    expect(plan.equityWhole).toBe(52_450_000);
+    const plain = planSummary({ ...dst(), strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" } })!;
+    expect(plain.priceLabel).toBe("Price");
+    expect(plain.price).toBe(52_450_000);
+  });
+
+  it("the model runs at the stated price, as it would on the building bought outright, and its note says what it buys", async () => {
+    const { buildingPriceOf } = await import("./deal-strategy");
+    const e = dst({}, [noi]);
+    const d = deriveUnderwriteInputs(e, "x");
+    // Nothing grossed up: the model's figures are the fee simple's at the same price.
+    expect(d.inputs).toEqual(deriveUnderwriteInputs({ ...e, interest: undefined }, "x").inputs);
+    expect(d.inputs.purchasePrice).toBe(52_450_000);
+    expect(d.sources.purchasePrice?.provenance).toBe("extracted");
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $52,450,000 for all of the owning entity's interests — the whole, nothing grossed up; the model runs the whole building's cash flows, before the entity's own costs and fees",
+    );
+    expect(d.meta.interest?.line).toBe("All of the owning entity's interests, offered in units — $52.5M for the whole, nothing grossed up");
+    expect(buildingPriceOf(e, 52_450_000)).toBe(52_450_000);
+    // A share under 100% reads exactly as before.
+    const share = deriveUnderwriteInputs(ex(interest({ kind: "partial_interest", share: "49% LP interest" }), [noi]), "x");
+    expect(share.sources.purchasePrice?.note).toContain("for a 49% share, grossed up to the whole asset");
+    expect(interestTag(ex(interest({ kind: "partial_interest", share: "49% LP interest" })))).toBe("49% share");
   });
 });
 

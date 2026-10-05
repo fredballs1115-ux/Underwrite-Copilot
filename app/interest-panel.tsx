@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import { termEndLabel } from "@/lib/ground-lease-term";
-import { noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
+import { isWholeShare, noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
 
 /**
  * What is being sold (#414) — the pure panel for `lib/interest`, drawn by
@@ -101,7 +101,9 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
           left: `Price ${money(r.askingPrice)}`,
           right: `Unpaid balance ${money(r.balance)}`,
         }
-      : r.kind === "partial_interest" && r.impliedWhole != null && r.askingPrice != null && r.sharePct != null
+      : // All of the entity's interests (a stated 100%) fill no share of a
+        // whole: the sentence says the price is the whole's.
+        r.kind === "partial_interest" && r.impliedWhole != null && r.askingPrice != null && r.sharePct != null && !isWholeShare(r.sharePct)
         ? {
             fill: Math.min(1, r.sharePct / 100),
             left: `The share ${money(r.askingPrice)}`,

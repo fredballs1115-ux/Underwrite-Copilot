@@ -59,7 +59,7 @@ import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
-import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
+import { interestOf, isWholeShare, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
@@ -1236,7 +1236,9 @@ function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestO
     return "No max bid: the memorandum states no single percentage for the share, so the model cannot gross its price up to the whole building, and a bid solved on it would be neither the share's price nor the building's.";
   }
   const line = maxBidSentence(s);
-  return interest.kind === "partial_interest" && s.maxBid && !s.maxBid.unbounded
+  // All of the entity's interests (a stated 100%) is no share: the bid is
+  // for them, as the price is (research pass 28).
+  return interest.kind === "partial_interest" && !isWholeShare(interest.sharePct) && s.maxBid && !s.maxBid.unbounded
     ? `${line} It is the whole building's price, not the share's.`
     : line;
 }
