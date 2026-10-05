@@ -12,6 +12,7 @@ import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import { costAssumptionsLine } from "./cost-note";
 import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
+import { NO_IRR_SHORT, NO_IRR_WHY, noIrrWhy, type NoIrrWhy } from "./no-irr";
 import { floorWords, floorsWords, fmtBid, solveMaxBid, type BidFloors, type BidMetrics } from "./solver";
 
 /** Where each of the model's inputs came from (lib/underwrite/inputs). */
@@ -20,6 +21,9 @@ export type ModelSources = DerivedModel["sources"];
 export interface HeatCell {
   irrPct: number | null; // decimal
   em: number | null;
+  /** where no IRR solved, why (lib/underwrite/no-irr): the cell reads "no
+   *  IRR" and the grid says why under it; absent where it solved */
+  noIrr?: NoIrrWhy | null;
 }
 
 export interface CapGrowthGrid {
@@ -52,7 +56,7 @@ export function buildCapGrowthGrid(inputs: UnderwriteInputs): CapGrowthGrid {
   const cells = capRows.map((cap) =>
     growthCols.map((g) => {
       const m = runScenario(inputs, { exitCapPct: cap, rentGrowthPct: g });
-      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple };
+      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple, ...(m.noIrr ? { noIrr: m.noIrr } : {}) };
     }),
   );
   return {
@@ -90,7 +94,7 @@ export function buildPriceCapGrid(inputs: UnderwriteInputs): PriceCapGrid {
   const cells = priceRows.map((p) =>
     capCols.map((cap) => {
       const m = runScenario(inputs, { purchasePrice: p.price, exitCapPct: cap });
-      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple };
+      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple, ...(m.noIrr ? { noIrr: m.noIrr } : {}) };
     }),
   );
   return {
@@ -171,9 +175,10 @@ export function heatLegend(
 
 // ---- Cell text -------------------------------------------------------------
 
-/** "15.2%" — the cell's headline line ("—" when no IRR exists). */
+/** "15.2%" — the cell's headline line: "no IRR" where none solved and the
+ *  run says why (the grid's note under it, `gridNoIrrNote`), else "—". */
 export function heatCellIrr(cell: HeatCell): string {
-  if (cell.irrPct == null || !Number.isFinite(cell.irrPct)) return "—";
+  if (cell.irrPct == null || !Number.isFinite(cell.irrPct)) return cell.noIrr ? NO_IRR_SHORT : "—";
   const pct = (cell.irrPct * 100).toFixed(1);
   // toFixed keeps the sign of a tiny negative ("-0.0") — print it as zero.
   return `${pct === "-0.0" ? "0.0" : pct}%`;
@@ -191,6 +196,15 @@ export function heatCellEm(cell: HeatCell): string {
 /** Legacy compact form, kept for anything still printing one line. */
 export function heatCellText(cell: HeatCell): string {
   return `${heatCellIrr(cell)} / ${heatCellEm(cell)}`;
+}
+
+/** Under a grid any of whose cells has no IRR: why, once — "Where a cell
+ *  reads no IRR, the sale does not repay the loan." (research pass 38, item
+ *  15). Null where every cell solved. */
+export function gridNoIrrNote(cells: HeatCell[][]): string | null {
+  const whys = [...new Set(cells.flat().map((c) => c.noIrr).filter((w): w is NoIrrWhy => w != null))];
+  if (whys.length === 0) return null;
+  return `Where a cell reads ${NO_IRR_SHORT}, ${whys.map((w) => NO_IRR_WHY[w]).join(", or ")}.`;
 }
 
 // ---- Takeaways -------------------------------------------------------------
@@ -408,6 +422,9 @@ export interface BaseCase {
   reservesPsf: number;
   reservesSource: InputSource | null;
   leveredIrr: number | null;
+  /** where no levered IRR solved, why (lib/underwrite/no-irr) — the tile
+   *  says it in the dash's place; null where it solved */
+  noIrr: NoIrrWhy | null;
   equityMultiple: number | null;
   cocY1: number | null;
   dscrY1: number | null;
@@ -446,6 +463,7 @@ export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): 
     reservesPsf: inputs.reservesPsf,
     reservesSource: sources.reservesPsf ?? null,
     leveredIrr: uw.returns.leveredIrrPct,
+    noIrr: noIrrWhy(uw.returns.leveredIrrPct, uw.residual.netSaleProceeds, uw.leveredVector.slice(1).reduce((a, b) => a + b, 0)),
     equityMultiple: uw.returns.leveredEquityMultiple,
     cocY1: y1 && su.equity > 0 ? y1.leveredCashFlow / su.equity : null,
     dscrY1: y1?.dscrNoi ?? null,

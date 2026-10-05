@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { costAssumptionsLine, defaultExitGap } from "@/lib/underwrite/cost-note";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
+import { NO_IRR_WHY, noIrrText } from "@/lib/underwrite/no-irr";
 import { modelLoanCoverageLine } from "@/lib/sizer-terms";
 import {
   sliderValues,
@@ -84,6 +85,11 @@ export interface PlaygroundData {
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
 
 const finite = (n: number | null): n is number => n != null && Number.isFinite(n);
+
+/** The levered IRR as a tile says it: the rate, or why none solved — "no
+ *  IRR: the sale does not repay the loan" where a dash stood (research pass
+ *  38, lib/underwrite/no-irr). */
+const irrText = (m: ScenarioMetrics): string => (finite(m.leveredIrrPct) ? fmtPct(m.leveredIrrPct) : m.noIrr ? noIrrText(m.noIrr) : fmtPct(null));
 
 /** Swap the scenario's computed IRR / CoC into the metric set the mandate
  *  score reads, replacing the OM's broker figures — same scorer, model basis.
@@ -401,9 +407,9 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         {withheld
           ? "Levered IRR withheld"
           : !finite(current.leveredIrrPct)
-            ? "No levered IRR solves at these levers"
+            ? `No levered IRR solves at these levers${current.noIrr ? `: ${NO_IRR_WHY[current.noIrr]}` : ""}`
             : compare
-              ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${finite(base.leveredIrrPct) ? fmtPct(base.leveredIrrPct) : "none solves"}`
+              ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${irrText(base)}`
               : baseWithheld
                 ? `Levered IRR ${fmtPct(current.leveredIrrPct)} at your price`
                 : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
@@ -428,7 +434,17 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           ))
         ) : (
           <>
-            <Metric label="Levered IRR" value={fmtPct(current.leveredIrrPct)} cur={current.leveredIrrPct} was={base.leveredIrrPct} baseText={fmtPct(base.leveredIrrPct)} dirty={compare} />
+            {/* Where no IRR solves, the tile says why in the dash's place
+                (research pass 38), small, as a withheld tile is. */}
+            <Metric
+              label="Levered IRR"
+              value={irrText(current)}
+              cur={current.leveredIrrPct}
+              was={base.leveredIrrPct}
+              baseText={irrText(base)}
+              dirty={compare}
+              withheld={current.leveredIrrPct == null && current.noIrr != null}
+            />
             <Metric label="Equity multiple" value={fmtX(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtX(base.leveredEquityMultiple)} dirty={compare} />
             <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={compare} />
             <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={compare} />

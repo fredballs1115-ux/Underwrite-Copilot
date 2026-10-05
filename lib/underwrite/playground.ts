@@ -5,6 +5,7 @@
 // (an annual model over a 5-year hold) to recompute on every drag tick.
 
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
+import { noIrrWhy, type NoIrrWhy } from "./no-irr";
 
 /** The levers the playground exposes. Percents are decimals (0.045 = 4.5%);
  *  purchasePrice is dollars. Price is the deep lever: the engine re-sizes the
@@ -20,6 +21,10 @@ export interface PlaygroundLevers {
 export interface ScenarioMetrics {
   /** decimal, null when the cash-flow vector has no IRR root */
   leveredIrrPct: number | null;
+  /** where no IRR solved, why — every surface says it in the "—"'s place
+   *  ("no IRR: the sale does not repay the loan", lib/underwrite/no-irr
+   *  `noIrrText`); absent or null where it solved */
+  noIrr?: NoIrrWhy | null;
   leveredEquityMultiple: number | null;
   /** year-1 levered cash flow ÷ initial equity, decimal */
   cocYr1Pct: number | null;
@@ -116,6 +121,7 @@ export function scenarioMetrics(inputs: UnderwriteInputs): ScenarioMetrics {
   const equity = r.sourcesUses.equity;
   return {
     leveredIrrPct: r.returns.leveredIrrPct,
+    noIrr: noIrrWhy(r.returns.leveredIrrPct, r.residual.netSaleProceeds, r.leveredVector.slice(1).reduce((a, b) => a + b, 0)),
     leveredEquityMultiple: r.returns.leveredEquityMultiple,
     cocYr1Pct: y1 && equity > 0 ? y1.leveredCashFlow / equity : null,
     dscrYr1: y1 ? y1.dscrNoi : null,

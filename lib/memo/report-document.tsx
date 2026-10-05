@@ -34,6 +34,7 @@ export function rangeRead(omSays: string, typicalRange: string): number | null {
   return basePosition({ low: parts[0], base: omSays, high: parts[1] });
 }
 import {
+  gridNoIrrNote,
   gridTakeaway,
   heatBucket,
   heatCellIrr,
@@ -45,6 +46,7 @@ import {
   type SensitivityData,
   type HeatCell,
 } from "@/lib/underwrite/report-grid";
+import { NO_IRR_SHORT, NO_IRR_WHY } from "@/lib/underwrite/no-irr";
 import { withArticle } from "@/lib/article";
 import {
   SPREAD_BG,
@@ -1428,8 +1430,11 @@ export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
  * sources and uses. The workbook's Deal Summary on one strip of paper.
  */
 function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | null }) {
-  const tiles: [string, string][] = [
-    ["Levered IRR", pctOrDash(b.leveredIrr)],
+  // Where no IRR solves, the tile says so and why, small under it, in the
+  // dash's place (research pass 38, lib/underwrite/no-irr).
+  const noIrr = (b.leveredIrr == null || !Number.isFinite(b.leveredIrr)) && b.noIrr ? b.noIrr : null;
+  const tiles: [string, string, string?][] = [
+    noIrr ? ["Levered IRR", NO_IRR_SHORT, NO_IRR_WHY[noIrr]] : ["Levered IRR", pctOrDash(b.leveredIrr)],
     ["Equity multiple", xOrDash(b.equityMultiple)],
     ["Year-1 cash-on-cash", pctOrDash(b.cocY1)],
     ["Year-1 DSCR", xOrDash(b.dscrY1)],
@@ -1463,10 +1468,11 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
     <View style={{ marginBottom: 10 }} wrap={false}>
       <TitleRow title="The base case" count="the ink-bordered cells" marginTop={0} />
       <View style={{ flexDirection: "row", borderTopWidth: 0.7, borderBottomWidth: 0.7, borderColor: C.line, paddingVertical: 5, marginBottom: 6 }}>
-        {tiles.map(([label, value]) => (
-          <View key={label} style={{ width: "20%" }}>
+        {tiles.map(([label, value, why]) => (
+          <View key={label} style={{ width: "20%", paddingRight: 4 }}>
             <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{label.toUpperCase()}</Text>
             <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>{value}</Text>
+            {why ? <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 1 }}>{str(why)}</Text> : null}
           </View>
         ))}
       </View>
@@ -1825,6 +1831,11 @@ function HeatGrid({
           })}
         </View>
       ))}
+      {/* Where a cell has no IRR, why, once under the grid (research pass
+          38, item 15). */}
+      {gridNoIrrNote(cells) ? (
+        <Text style={{ fontSize: 7, color: C.muted, marginTop: 3 }}>{str(gridNoIrrNote(cells))}</Text>
+      ) : null}
     </View>
   );
 }

@@ -25,6 +25,7 @@ import {
 } from "@/lib/model/sensitivity";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { CAP_WITHHELD } from "@/lib/cap-slot";
+import { noIrrText, noIrrWhy } from "@/lib/underwrite/no-irr";
 import { YOC_WITHHELD, modelYieldWithheld } from "@/lib/plan-facts";
 import {
   addDealDocument,
@@ -226,22 +227,29 @@ function Stat({
   label,
   value,
   tone,
+  words = false,
 }: {
   label: string;
   value: string;
   /** colour the figure when it is a warning rather than a result */
   tone?: "kill" | "caution";
+  /** the value is words, not a figure — why none is shown — said small */
+  words?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <p className="text-[11px] uppercase tracking-wide text-muted">{label}</p>
-      <p
-        className={`mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums ${
-          tone === "kill" ? "text-kill" : tone === "caution" ? "text-caution" : ""
-        }`}
-      >
-        {value}
-      </p>
+      {words ? (
+        <p className="mt-1.5 text-sm font-medium leading-snug text-muted">{value}</p>
+      ) : (
+        <p
+          className={`mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums ${
+            tone === "kill" ? "text-kill" : tone === "caution" ? "text-caution" : ""
+          }`}
+        >
+          {value}
+        </p>
+      )}
     </div>
   );
 }
@@ -278,6 +286,10 @@ export function ReturnsHeadline({
   const naWord = withheld ? (interest?.word ?? withheld) : null;
   // A yield on cost no project earns, refused (research pass 38).
   const yieldRefused = modelYieldWithheld(r.yieldOnCostPct);
+  // Where no IRR solves, why, in the dash's place (research pass 38,
+  // lib/underwrite/no-irr): the cash back is the profit plus the equity.
+  const noIrrReason = noIrrWhy(r.leveredIrrPct, r.netSaleProceeds, r.profit + r.equity);
+  const noIrr = noIrrReason ? noIrrText(noIrrReason) : null;
   // The building's NOI over a loan's or a share's price is no misread plan:
   // the price is not the building's, and the line above the figures says so.
   const implausible = !withheld && r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
@@ -347,7 +359,12 @@ export function ReturnsHeadline({
         </p>
       )}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Levered IRR" value={naWord ? `n/a — ${naWord}` : pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
+        <Stat
+          label="Levered IRR"
+          value={naWord ? `n/a — ${naWord}` : (noIrr ?? pct(r.leveredIrrPct))}
+          tone={implausible ? "kill" : undefined}
+          words={!naWord && noIrr != null}
+        />
         <Stat label="Cash-on-cash (Yr 1)" value={naWord ? `n/a — ${naWord}` : pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
         <Stat label="Equity multiple" value={naWord ? `n/a — ${naWord}` : mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
         {withheld === "note" || withheld === "position" ? (

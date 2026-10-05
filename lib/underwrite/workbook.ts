@@ -14,6 +14,7 @@ import { documentNotices } from "@/lib/data-notices";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import { modelReadsWithheld, placeholderWorkbookLine } from "./report-grid";
+import { noIrrText } from "./no-irr";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -1391,9 +1392,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   let r = 3;
   const priceTile =
     model.sources.purchasePrice?.provenance === "assumption" ? "Purchase Price (assumed)" : (meta.priceLabel ?? "Purchase Price");
+  // Where no levered IRR solves, why, live (research pass 38, lib/underwrite/
+  // no-irr): the sale's net proceeds short of the loan, the equity's cash
+  // back nil, or no rate at all — where the tile had said "—" and the
+  // returns block "check inputs". NetSaleProceeds is the Residual block's.
+  const noIrrFormula = `IF(NetSaleProceeds<0,"${noIrrText("sale")}",IF(SUM(${levcfRange})+NetSaleProceeds<=0,"${noIrrText("nothingBack")}","${noIrrText("noRate")}"))`;
+  // Whether it solves on the model as built, so the tile has room for the
+  // words it will show.
+  const irrSolves = computeUnderwrite(model.inputs).returns.leveredIrrPct != null;
   const kpis: [string, string, string][] = [
     [priceTile, "PurchasePrice", FMT.usd],
-    ["Levered IRR", `IFERROR(IRR(${levRange}),"—")`, FMT.pct1],
+    ["Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, FMT.pct1],
     ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult],
     ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, FMT.pct1],
     ["Year-1 DSCR", dscrY1, FMT.ratio],
@@ -1418,12 +1427,14 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     v.font = { name: ARIAL, size: 13, bold: true, color: BRAND };
     v.numFmt = fmt;
     v.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
-    v.alignment = { horizontal: "center", vertical: "middle" };
+    v.alignment = { horizontal: "center", vertical: "middle", ...(lab === "Levered IRR" ? { wrapText: true } : {}) };
     v.border = { bottom: tileEdge, left: tileEdge, right: tileEdge };
+    // The reason no IRR solves is words: smaller, so they sit in the tile.
+    if (lab === "Levered IRR" && !irrSolves) v.font = { name: ARIAL, size: 9, bold: true, color: BRAND };
   });
   // A tile's name past what one line of its tile holds gets the second line.
   ws.getRow(r).height = kpis.some(([lab]) => lab.length > 28) ? 24 : 14;
-  ws.getRow(r + 1).height = 24;
+  ws.getRow(r + 1).height = irrSolves ? 24 : 40;
   const dealKind = meta.strategy ?? "unknown";
   const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
   // What the tiles' returns rest on, said under them before anyone quotes
@@ -1661,7 +1672,14 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     ret(YEAR1_YIELD_LABEL, `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
   }
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
-  ret("Levered IRR", `IFERROR(IRR(${levRange}),"check inputs")`, FMT.pct1, "LeveredIRR");
+  ret("Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, FMT.pct1, "LeveredIRR");
+  // Its words wrap in their column, the row tall enough for them, where no
+  // IRR solves on the model as built.
+  if (!irrSolves) {
+    const c = ws.getCell(rr - 1, 5);
+    c.alignment = { ...c.alignment, wrapText: true, vertical: "top" };
+    ws.getRow(rr - 1).height = 38;
+  }
   ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, FMT.mult);
   ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult, "LeveredEM");
   r = Math.max(r, rr) + 1;
