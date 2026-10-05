@@ -265,6 +265,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         </h2>
         <p className="text-xs text-muted">Live — no re-screen.</p>
       </div>
+      {/* Which model this is, where a second model's returns can be seen
+          beside it (the first-draft model's, on the Financials tab): the
+          one the Excel workbook and the full report carry. */}
+      <p className="mt-1 text-xs text-muted" data-qa="playground-model">
+        The screening model — the one the Excel workbook and the full report carry.
+      </p>
 
       <PriceCapControls
         basePrice={inputs.purchasePrice}

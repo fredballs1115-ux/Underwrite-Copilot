@@ -95,10 +95,13 @@ export function ModelView({
               </Link>
             )}
             {/* Two models, said as two: the card's returns are this
-                first draft's; the workbook's are the OM underwrite's. */}
+                first draft's; the workbook's are the OM underwrite's, and
+                so are the Overview's sensitivity playground's. */}
             <p data-qa="workbook-note" className="max-w-2xl text-xs leading-relaxed text-muted">
               The workbook is a separate model, built from the memorandum’s
-              terms — its returns can differ from the ones above.
+              terms — its returns can differ from the ones above. The
+              Overview’s sensitivity playground runs the workbook’s model,
+              not this one.
             </p>
           </div>
         </>
@@ -273,8 +276,11 @@ export function ReturnsHeadline({
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
+        {/* Named, since the screening model's returns can sit beside it
+            (the Overview's playground, /demo's Sensitivity tab). */}
         <h2 className="text-sm font-semibold tracking-tight">
-          Projected returns
+          Projected returns{" "}
+          <span className="font-normal text-muted">· first-draft model</span>
         </h2>
         <span className="font-mono text-xs tabular-nums text-muted">
           {model.holdYears}-yr hold

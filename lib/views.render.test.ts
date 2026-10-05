@@ -54,7 +54,9 @@ import { PIPELINE_CARD_GRID, PIPELINE_CARD_SIZES, filtersFoldLabel, landingView,
 import { dealAllowance } from "@/lib/deal-allowance";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
-import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
+import { DemoSections, type DemoData } from "@/app/demo/sections";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
@@ -1171,6 +1173,41 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(text).not.toMatch(/same math as the Excel/);
     expect(text).toMatch(/Upgrade to Pro to download the OM underwrite model \(\.xlsx\)/);
     expect(text).toMatch(/The workbook is a separate model, built from the memorandum’s terms/);
+    // Research pass 34: the card named only the workbook as the other model,
+    // never the playground beside it on the Overview tab, which runs it.
+    expect(text).toContain("The Overview’s sensitivity playground runs the workbook’s model, not this one.");
+    expect(text).toContain("Projected returns · first-draft model");
+  });
+
+  it("/demo's Financials & model tab names the first-draft model and the screening model the Sensitivity tab runs", () => {
+    const derived = sampleDerivedInputs();
+    const ex = SAMPLE_DEAL.extraction;
+    const data: DemoData = {
+      extraction: ex,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      model: SAMPLE_DEAL.model,
+      playground: {
+        inputs: derived.inputs,
+        dealAssetClass: SAMPLE_DEAL.asset_class,
+        checkSource: { assetClass: ex.assetClass, market: ex.market, metrics: ex.metrics },
+        box: SAMPLE_DEMO_BOX,
+        sources: derived.sources,
+      },
+      underwrite: derived.inputs,
+    };
+    const financials = visibleText(render(React.createElement(DemoSections, { data, initialTab: "financials" })));
+    expect(financials).toContain("Projected returns · first-draft model");
+    expect(financials).toContain(
+      "The Sensitivity tab and the sample workbook run the screening model, a separate model — their returns differ from these.",
+    );
+    expect(gluedWords(financials)).toEqual([]);
+    const html = render(React.createElement(DemoSections, { data, initialTab: "sensitivity" }));
+    expect(visibleText(html)).toContain("The screening model — the one the Excel workbook and the full report carry.");
+    expect(a11yIssues(html)).toEqual([]);
   });
 
   it("labels its download as the OM underwrite, a separate model from the card's returns", () => {

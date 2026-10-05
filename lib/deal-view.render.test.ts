@@ -1547,6 +1547,12 @@ describe("the sensitivity playground says whose figures it runs", () => {
     expect(modelLoanCoverageLine(Number.NaN, 0.6)).toBeNull();
   });
 
+  it("names its model — the workbook's and the report's — beside the Financials tab's first-draft model (research pass 34)", () => {
+    // The Overview's 9.3% and the Financials tab's 8.72% for one deal, with
+    // no word on either which model it was.
+    expect(textOf(playground(null))).toContain("The screening model — the one the Excel workbook and the full report carry.");
+  });
+
   it("says a plan deal's returns are the screening model's, not the plan's", () => {
     const plan = textOf(playground("conversion"));
     expect(plan).toContain(PLAN_RETURNS_CAVEAT);

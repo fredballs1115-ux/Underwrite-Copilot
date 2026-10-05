@@ -6,7 +6,12 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
+import { renderToStaticMarkup } from "react-dom/server";
 import { a11yIssues } from "./render-lint";
+import { sampleWorkbookPreview } from "./sample-derive";
+import type { SampleLegal } from "./sample-legal";
+import { DemoPanel } from "@/app/landing-interactive";
+import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { SKYLINES, commonsPage } from "./skyline";
@@ -120,4 +125,37 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(values.length).toBe(terms.length);
     for (const t of terms) expect(strip.split(t).length - 1, t).toBe(1);
   }, 60_000);
+});
+
+// Research pass 34: the homepage quoted the sample's two models without
+// saying which — the Excel tile ran the first-draft model beside a link to
+// a workbook that runs the screening model, and the miniature of the deal
+// page printed "8.7%" where the page's own card says "8.72%".
+describe("the homepage's sample figures are the surfaces' own", () => {
+  const words = (html: string) =>
+    html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+
+  it("the Excel tile prints the workbook it links: its base case and two cells of its Sensitivity tab", async () => {
+    const html = await renderHome();
+    const at = html.indexOf("Excel model, live formulas");
+    expect(at).toBeGreaterThan(-1);
+    const tile = words(html.slice(at, html.indexOf("/api/demo/underwrite.xlsx", at)));
+    for (const [k, v, e] of sampleWorkbookPreview()) expect(tile).toContain(`${k} ${v} ${e}`);
+    expect(tile).toContain("Exit cap 5.45% IRR 9.3%");
+    expect(tile).not.toContain("Rent growth");
+  }, 60_000);
+
+  it("the miniature's Financials tab is the deal page's first-draft card: its figures, to its places, and its model's name", () => {
+    const panel = words(renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", legal: {} as SampleLegal })));
+    const card = words(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model })));
+    expect(card).toContain("Projected returns · first-draft model");
+    expect(panel).toContain("Projected returns · first-draft model");
+    for (const label of ["Levered IRR", "Cash-on-cash (Yr 1)", "Equity multiple"]) {
+      const figure = new RegExp(`${label.replace(/[()]/g, "\\$&")} (-?[\\d.]+[%x])`);
+      const onCard = figure.exec(card)?.[1];
+      expect(onCard, label).toBeTruthy();
+      expect(figure.exec(panel)?.[1], label).toBe(onCard);
+    }
+    expect(panel).toContain("Levered IRR 8.72%");
+  });
 });

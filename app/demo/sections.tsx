@@ -65,9 +65,10 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 /** The sample screen, one section at a time — same components the app
- *  renders, driven by the illustrative fixture. */
-export function DemoSections({ data }: { data: DemoData }) {
-  const [tab, setTab] = useState<TabKey>("verdict");
+ *  renders, driven by the illustrative fixture. `initialTab` opens another
+ *  section first (its render test reads the Financials tab). */
+export function DemoSections({ data, initialTab = "verdict" }: { data: DemoData; initialTab?: TabKey }) {
+  const [tab, setTab] = useState<TabKey>(initialTab);
 
   function onKeys(e: React.KeyboardEvent) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -154,7 +155,14 @@ export function DemoSections({ data }: { data: DemoData }) {
           <div className="flex flex-col gap-6">
             <TermsView result={data.extraction} />
             {data.actuals && <PropertyActuals data={data.actuals} />}
-            <ReturnsHeadline model={data.model} />
+            <div className="flex flex-col gap-1.5">
+              <ReturnsHeadline model={data.model} />
+              {/* Two models, said as two: these returns are the first
+                  draft's; the Sensitivity tab's are the sample workbook's. */}
+              <p className="text-xs text-muted" data-qa="demo-two-models">
+                The Sensitivity tab and the sample workbook run the screening model, a separate model — their returns differ from these.
+              </p>
+            </div>
             <DebtSizer
               model={data.model}
               extraction={data.extraction}

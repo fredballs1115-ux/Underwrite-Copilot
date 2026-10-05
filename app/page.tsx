@@ -27,6 +27,7 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { sampleWorkbookPreview } from "@/lib/sample-derive";
 import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
 import { ruleCounts } from "@/lib/research-data";
@@ -260,21 +261,11 @@ const STATS: { value: number; suffix: string; label: string }[] = [
   { value: RULES.all, suffix: "", label: "rules checked by address" },
 ];
 
-// Live-engine rows for the Excel-preview tile: the sample model recomputed
-// at render, so the page can never disagree with what the workbook computes.
-const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
-  const inputs = SAMPLE_DEAL.model.inputs;
-  const irr = (over: Partial<typeof inputs>) => {
-    const r = computeModel({ ...inputs, ...over }).returns.leveredIrrPct;
-    return r == null ? "—" : `IRR ${r.toFixed(1)}%`;
-  };
-  return [
-    ["Purchase price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`, irr({})],
-    ["Exit cap", `${inputs.exitCapPct.toFixed(2)}%`, irr({})],
-    ["Exit cap (flexed)", "5.75%", irr({ exitCapPct: 5.75 })],
-    ["Rent growth (flexed)", "2.5%", irr({ rentGrowthPct: 2.5 })],
-  ];
-})();
+// The Excel-preview tile's rows: the sample workbook's own figures — its
+// engine on the one derivation the demo workbook is built from, and two
+// cells of its Sensitivity tab (lib/sample-derive) — so the tile and the
+// workbook it links can never disagree.
+const XLSX_PREVIEW_ROWS: [string, string, string][] = sampleWorkbookPreview();
 
 // The plan cards' lists are the billing page's too (lib/marketing-constants
 // FREE_PLAN, PRO_PLAN_LINES), each Pro line held to the gate that makes it

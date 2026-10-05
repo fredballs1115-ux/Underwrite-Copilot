@@ -9,7 +9,8 @@ import { join } from "node:path";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import { computeUnderwrite } from "./underwrite/engine";
-import { SAMPLE_ACTUALS, sampleDerivedInputs } from "./sample-derive";
+import { SAMPLE_ACTUALS, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
+import { buildSensitivityGrids } from "./underwrite/sensitivity";
 import { constructionSeedFor, modelMarketFor, modelRatesLine } from "./model-market";
 import type { DebtSeeds } from "./debt-index";
 
@@ -33,6 +34,35 @@ describe("sampleDerivedInputs — the sample deal, actuals included", () => {
       expect(src, rel).toContain("sampleDerivedInputs()");
       expect(src, rel).not.toMatch(/deriveUnderwriteInputs\(/);
     }
+  });
+});
+
+describe("sampleWorkbookPreview — the homepage's Excel tile is the workbook it links", () => {
+  // Research pass 34: the tile ran the first-draft model (lib/model/compute)
+  // — "Exit cap 5.50% IRR 8.7%", a 5.75% flex, a rent-growth flex — under a
+  // comment promising the workbook's figures; the workbook it links runs the
+  // derived model at 5.45% and 9.3%, and its Sensitivity tab flexes no rent
+  // growth at all.
+  it("prints the derived model's base case and two cells of the workbook's Exit Cap × Purchase Price grid, each the engine's", () => {
+    const rows = sampleWorkbookPreview();
+    const { inputs } = sampleDerivedInputs();
+    const grid = buildSensitivityGrids(inputs).find((g) => g.key === "capPrice")!;
+    const irrAt = (over: Partial<typeof inputs>) => `IRR ${(computeUnderwrite({ ...inputs, ...over }).returns.leveredIrrPct! * 100).toFixed(1)}%`;
+    const capStep = grid.colAxis.values[grid.colAxis.baseIndex + 1];
+    const priceStep = grid.rowAxis.values[grid.rowAxis.baseIndex - 1];
+    expect(rows).toEqual([
+      ["Purchase price", "$68M", irrAt({})],
+      ["Exit cap", "5.45%", irrAt({})],
+      ["Exit cap (flexed)", `${(capStep * 100).toFixed(2)}%`, irrAt({ exitCapPct: capStep })],
+      ["Purchase price (flexed)", `$${priceStep / 1e6}M`, irrAt({ purchasePrice: priceStep })],
+    ]);
+    // The base is the figure the demo pins; the flexes are the grid's own
+    // stops, one step each from the base.
+    expect(rows[0][2]).toBe("IRR 9.3%");
+    expect(capStep).toBeCloseTo(inputs.exitCapPct + 0.0025, 10);
+    expect(priceStep).toBe(67_000_000);
+    expect(rows.flat()).not.toContain("5.50%");
+    expect(rows.flat()).not.toContain("IRR 8.7%");
   });
 });
 
