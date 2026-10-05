@@ -343,6 +343,30 @@ export interface LiveMarketBrief {
   placedBy?: CountyPlacedBy | null;
 }
 
+/** How a Census region's rental vacancy line opens: "Rental vacancy, South
+ *  Census region: 9.5% …". */
+const REGION_LINE_LEAD = "Rental vacancy";
+const REGION_LINE = /^Rental vacancy, ([^:]*\bCensus region):/;
+
+/**
+ * The Census region a stored line is for — "South Census region" — or null
+ * for a line of the market's own or the nation's. A block's header, and the
+ * verdict's brief over the stored lines, say a region's line apart from the
+ * metro's, as they count the nation's lines apart (research pass 41: "each is
+ * the metro area's" had stood over a South Census region line).
+ */
+export function regionOfLine(line: string): string | null {
+  return REGION_LINE.exec(line)?.[1] ?? null;
+}
+
+/** " — save the rental vacancy line for the South Census region, which is
+ *  the region's and says so" — or "" where no line is a region's. */
+export function regionClause(lines: readonly string[]): string {
+  const regions = [...new Set(lines.map(regionOfLine).filter((r): r is string => r != null))];
+  if (regions.length === 0) return "";
+  return ` — save the rental vacancy line for the ${regions.join(" and the ")}, which is the region's and says so`;
+}
+
 const signed = (v: number, dp = 1): string => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(dp)}`;
 const whole = (n: number): string => Math.round(n).toLocaleString("en-US");
 
@@ -451,8 +475,11 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
         figures: fig("rental_vacancy_msa", "Rental vacancy, metro area", "pts"),
       };
     case "rental_vacancy":
+      // The Census region's, which the survey publishes at no finer grain
+      // beside the metro area's own: the line names its region, and the
+      // block's header says the line apart (`regionOfLine`).
       return {
-        line: `Rental vacancy${where}: ${r.value.toFixed(1)}% (${when}; ${via})`,
+        line: `${REGION_LINE_LEAD}${where}: ${r.value.toFixed(1)}% (${when}; ${via})`,
         figures: fig("rental_vacancy", "Rental vacancy, Census region", "pts"),
       };
     default:
@@ -720,6 +747,8 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   const lines = said.map((s) => s.line);
   const figures = said.flatMap((s) => s.figures);
   const readOn = input.now.toISOString().slice(0, 10);
+  // A Census region's line among the market's own is said apart from them.
+  const region = regionClause(lines.slice(0, local));
   // The grain is said first: a deal outside the metros the site tracks
   // reads its STATE's figures, and a state figure passed off as a metro's
   // flatters or damns a market the deal is not in.
@@ -752,10 +781,14 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
     const otherHeader =
       grain === "state"
         ? `Published figures for the state of ${input.metro.name}, where ${sit} outside the metros the site tracks, read on ${readOn} from ${sources}.${
-            noneOwn ? noneOwnSentence("those properties' own or the portfolio's") : " Each is dated, and each is the state's — not a metro's, not those properties' own and never the portfolio's."
+            noneOwn
+              ? noneOwnSentence("those properties' own or the portfolio's")
+              : ` Each is dated, and each is the state's — not a metro's, not those properties' own and never the portfolio's${region}.`
           }`
         : `Published figures for the ${input.metro.name} ${isDataMetro(input.metro.id) ? "metro area — a market the site reads but does not brief —" : "market,"} where ${sit}, read on ${readOn} from ${sources}.${
-            noneOwn ? noneOwnSentence("those properties' own or the portfolio's") : " Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's."
+            noneOwn
+              ? noneOwnSentence("those properties' own or the portfolio's")
+              : ` Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's${region}.`
           }`;
     const text = [otherHeader + nationalNote, ...lines.map((l) => `- ${l}`)].join("\n");
     return { metro: input.metro.name, grain, readOn, lines, figures, text, national, portfolio: { here: pf.here, of: pf.properties } };
@@ -768,12 +801,14 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   const placed = grain === "metro" ? (input.metro.placedBy ?? null) : null;
   const placedNote = placed ? `${placedByClause(placed)}, and the address names no place the site's list for this market does` : "";
   const notCounty = placed ? " — not the county's," : " —";
-  const each = noneOwn ? null : ` Each is dated, and each is ${whose}${notCounty} not the submarket's and not the building's.`;
+  const each = noneOwn ? null : ` Each is dated, and each is ${whose}${notCounty} not the submarket's and not the building's${region}.`;
   const header =
     grain === "state"
       ? `Published figures for the state of ${input.metro.name} the deal sits in — the address lies outside the metros the site tracks${
           noneOwn ? "" : ", so these are the state's own figures"
-        } — read on ${readOn} from ${sources}.${noneOwn ? noneOwnSentence("this state's") : " Each is dated, and each is the state's — not the metro's, not the submarket's and not the building's."}`
+        } — read on ${readOn} from ${sources}.${
+          noneOwn ? noneOwnSentence("this state's") : ` Each is dated, and each is the state's — not the metro's, not the submarket's and not the building's${region}.`
+        }`
       : isDataMetro(input.metro.id)
         ? `Published figures for the ${input.metro.name} metro area the deal sits in — a market the site reads but does not brief${
             noneOwn ? "" : ", so these figures are all it holds for it"

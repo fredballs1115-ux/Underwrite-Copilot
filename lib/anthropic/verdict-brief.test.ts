@@ -46,6 +46,26 @@ describe("the verdict's brief carries the figures the market check read", () => 
     expect(two).toContain("The last 2 lines are the nation's figures, not the market's — each says so.");
   });
 
+  // Research pass 41 (L3): "Each is dated and is the metro's" had stood
+  // over a Census region's rental vacancy line.
+  it("says a Census region's line apart from the metro's", () => {
+    const withRegion = {
+      ...market,
+      liveBrief: {
+        ...market.liveBrief!,
+        lines: [market.liveBrief!.lines[0], "Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)", market.liveBrief!.lines[1]],
+        national: 1,
+      },
+    };
+    const brief = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: withRegion });
+    expect(brief).toContain(
+      "Each is dated and is the metro's, not the submarket's or the building's — save the rental vacancy line for the South Census region, which is the region's and says so.",
+    );
+    // A block with no region's line reads as before.
+    const plain = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market });
+    expect(plain).toContain("Each is dated and is the metro's, not the submarket's or the building's. Where a screen range");
+  });
+
   // The pre-merge audit (C1, M3): a block of the nation's lines alone was
   // headed as the state's figures and said "each is dated and is the state's".
   it("heads a block of the nation's lines alone as the nation's, saying none of the market's own was current", () => {
