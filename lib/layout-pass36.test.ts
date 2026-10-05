@@ -74,3 +74,16 @@ describe("the bar that keeps the deal in view (research pass 36, F1)", () => {
   });
 });
 
+describe("what does not tie, right after the plan (research pass 36, F4)", () => {
+  it("draws the plausibility panel after the plan and what is being sold, before every deal-kind panel", () => {
+    // The page's comment and DealHero's doc put "what does not tie" right
+    // after the plan; the deal-kind panels had been inserted between them.
+    const page = src("app/(app)/deals/[id]/page.tsx");
+    const hero = page.slice(page.indexOf("<DealHero"), page.indexOf("</DealHero>"));
+    const tags = [...hero.matchAll(/<([A-Z]\w*)\b/g)].map((m) => m[1]);
+    const panels = tags.slice(tags.indexOf("PlanStrip"));
+    expect(panels.slice(0, 4)).toEqual(["PlanStrip", "InterestPanel", "PlausibilityPanel", "SandwichPanel"]);
+    expect(panels.filter((t) => t === "PlausibilityPanel")).toHaveLength(1);
+  });
+});
+

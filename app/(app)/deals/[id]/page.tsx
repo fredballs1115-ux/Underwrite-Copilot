@@ -1510,6 +1510,10 @@ export default async function DealPage({
             before any figure is believed, since it changes what the price
             buys (lib/interest). Nothing for a plain fee simple. */}
         <InterestPanel interest={interest} />
+        {/* What does not tie comes before the deal-kind panels below, which
+            build on the same figures (research pass 36: it had drifted under
+            every one of them, up to four phone screens below the plan). */}
+        <PlausibilityPanel findings={plausibility} strategy={strategy} />
         {/* A sandwich position (lib/sandwich-lease): the sublease income
             against the master rent with the spread filled, its cover, the
             master lease's term against the model's hold, and what the model
@@ -1644,7 +1648,6 @@ export default async function DealPage({
             the memorandum prints them, a tap to call or write, and the call
             for offers as written (lib/offering). */}
         <ListingTeam team={listingTeam} offersDue={offeringDue} />
-        <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />
 
         {!extraction && firstSignal?.take && (
