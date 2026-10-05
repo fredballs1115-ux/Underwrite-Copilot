@@ -260,6 +260,26 @@ describe("statesRange — the one test of a range behind every reader that refus
       expect(statesRange(raw), raw).toBe(false);
     }
   });
+
+  it("reads two bare figures in a line that marks its dollars as words, whatever the dash (audit C5, MED-4)", () => {
+    for (const raw of [
+      "$450,000 (years 1-10 of the PILOT)",
+      "$1,250,000 (Phase 1-2)",
+      "$1,100,000/yr, 2-3% bumps",
+      "$1,100,000 – 2–3% annual bumps",
+      "$91,667/mo (1-2 BR)",
+      "$650 per unit per month (1-2 BR)",
+      "$15,000 per unit (units 1-48)",
+      "$15,000 (2-3 week turn)",
+    ]) {
+      expect(statesRange(raw), raw).toBe(false);
+    }
+    // A dollar figure on either end is still a range, and a line of bare
+    // figures reads as before.
+    for (const raw of ["$15k-20k", "40-42M", "$40-$42M", "1,950-$2,050", "18-24 months", "600-700", "Units 1-48 at $650 – $700"]) {
+      expect(statesRange(raw), raw).toBe(true);
+    }
+  });
 });
 
 describe("compactUsd — one compact dollar, rounded one way (research pass 34)", () => {

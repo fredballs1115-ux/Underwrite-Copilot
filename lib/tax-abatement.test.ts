@@ -48,6 +48,11 @@ describe("taxBillOf — a year's bill as stated", () => {
     expect(taxBillOf("TBD")).toBeNull();
   });
 
+  it("reads a bill with a hyphenated span of years or phases after it (audit C5, MED-4)", () => {
+    expect(taxBillOf("$450,000 (years 1-10 of the PILOT)")).toBe(450_000);
+    expect(taxBillOf("$1,250,000 (Phase 1-2)")).toBe(1_250_000);
+  });
+
   it("reads a bill with a hyphenated word beside the figure (research pass 37)", () => {
     // "$410,000 (2025-26)" had read as no bill, and the panel said the
     // memorandum states no full tax bill.

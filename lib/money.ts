@@ -104,13 +104,29 @@ const FIGURES = new RegExp(String.raw`\$?\s*(${DIGITS})(?:\s*(${SCALE_WORDS})(?!
  * every reader that refuses a range as no single figure, so none of them
  * drops a stated figure for the words after it ("$610,000 – 2% annual
  * increases", "$520,500 – 2026 estimate", "$650/mo (2025-26 budget)"): a
- * span of years is a label, never a range of the line's figures.
+ * span of years is a label, never a range of the line's figures; and in a
+ * line that marks its dollars, two bare figures are words after the figure.
  */
 export function statesRange(text: string): boolean {
-  for (const m of text.matchAll(FIGURES)) {
+  const figures = [...text.matchAll(FIGURES)];
+  // A line that marks a dollar figure — a "$" or a scale — states its
+  // dollars that way, so a pair of bare figures in it is a count, a span, a
+  // bedroom count or a percentage, never a range of the line's dollars
+  // (audit C5, MED-4): "$450,000 (years 1-10 of the PILOT)", "$1,100,000/yr,
+  // 2-3% bumps", "$650 per unit per month (1-2 BR)", "$15,000 per unit
+  // (units 1-48)" are the figures they state. A line of bare figures ("18-24
+  // months", "600-700") is read as before.
+  const marked = (written: string, scale: string | undefined) => written.includes("$") || !!scale;
+  const lineMarksDollars = figures.some(([written, , scale]) => marked(written, scale));
+  for (const m of figures) {
     const [written, digits, scale] = m;
     if (isYear(written, digits, scale)) continue;
-    if (opensRange(text.slice(m.index + written.length), scaled(digits, scale), false, !!scale)) return true;
+    const after = text.slice(m.index + written.length);
+    if (lineMarksDollars && !marked(written, scale)) {
+      const other = OTHER_END.exec(after);
+      if (!other || !marked(other[3], other[5])) continue;
+    }
+    if (opensRange(after, scaled(digits, scale), false, !!scale)) return true;
   }
   return false;
 }

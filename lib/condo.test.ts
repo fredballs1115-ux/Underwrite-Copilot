@@ -85,6 +85,8 @@ describe("condominium units bought in bulk (pass 28, round 8)", () => {
     expect(monthlyDuesOf("$650/mo")).toBe(650);
     expect(monthlyDuesOf("$1,250 per unit per month")).toBe(1250);
     expect(monthlyDuesOf("$7,800 per year")).toBe(650);
+    // A bedroom count after the dues is no range (audit C5, MED-4).
+    expect(monthlyDuesOf("$650 per unit per month (1-2 BR)")).toBe(650);
     // No period stated: a month's or a year's, so neither.
     expect(monthlyDuesOf("$650")).toBeNull();
     // A year of the block's dues, or a month of them, is no unit's.

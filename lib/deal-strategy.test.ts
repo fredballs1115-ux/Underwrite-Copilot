@@ -419,6 +419,9 @@ describe("renovationProgramBudget — a value-add program stated a door at a tim
     expect(renovationCostPerDoor("$12,000–$15,000")).toBeNull();
     expect(renovationCostPerDoor("$2,880,000")).toBeNull();
     expect(renovationCostPerDoor("$15k per unit")).toBe(15_000);
+    // The doors or the turn after the cost are no range (audit C5, MED-4).
+    expect(renovationCostPerDoor("$15,000 per unit (units 1-48)")).toBe(15_000);
+    expect(renovationCostPerDoor("$15,000 (2-3 week turn)")).toBe(15_000);
     // A year after a dash is words after the cost, never a range (audit C3a).
     expect(renovationCostPerDoor("$15,000 – 2025 pricing, per unit")).toBe(15_000);
     expect(renovationCostPerDoor("$12,000 to $15,000")).toBeNull();
