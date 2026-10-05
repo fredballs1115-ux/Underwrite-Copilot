@@ -193,6 +193,28 @@ describe("deriveInternalComps — what never becomes a comp figure", () => {
     expect(c.kindLabel).toBeNull();
   });
 
+  it("says what the price buys beside it, an acronym kept whole (research pass 37)", () => {
+    const interest = (share: string, summary = "") => ({ kind: "partial_interest" as const, summary, share, groundLease: "", loan: "", page: "" });
+    const [tic, gp, lp] = deriveInternalComps("x", "multifamily", null, [
+      sib("t", "Summit TIC", "multifamily", {
+        assetClass: "multifamily",
+        interest: interest("30% tenant-in-common interest"),
+        metrics: [m("Asking price", "$4,200,000")],
+      }),
+      sib("g", "Crescent GP", "multifamily", {
+        assetClass: "multifamily",
+        interest: interest("50% of the general partner interest"),
+        metrics: [m("Asking price", "$3,200,000")],
+      }),
+      sib("l", "Harbor LP", "multifamily", {
+        assetClass: "multifamily",
+        interest: interest("49% limited partnership interest"),
+        metrics: [m("Asking price", "$20,000,000")],
+      }),
+    ]);
+    expect([tic.priceLabel, gp.priceLabel, lp.priceLabel]).toEqual(["$4.2M · TIC 30%", "$3.2M · GP stake 50%", "$20.0M · 49% share"]);
+  });
+
   it("a plan deal with no stated total cost has no basis — a shell's price per planned unit is not one", () => {
     const [c] = deriveInternalComps("x", "multifamily", null, [
       sib("q", "Conversion, budget unstated", "multifamily", {

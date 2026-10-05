@@ -82,6 +82,12 @@ const priceRangeOf = (stated: string): string | null => {
   return range ? priceRangeShort(range) : null;
 };
 
+/** What the price buys (lib/interest `interestTag`) set inside the price's
+ *  line — "$20.0M · 49% share", "$4.2M · TIC 30%": its first letter lowered,
+ *  never an acronym's ("tic 30%", "gp stake 50%") or a month's further in
+ *  ("Jun 2029"), as lowering the whole tag had (research pass 37). */
+const tagInLine = (tag: string): string => (/^[A-Z]{2,}\b/.test(tag) ? tag : `${tag.charAt(0).toLowerCase()}${tag.slice(1)}`);
+
 /** Price per unit/SF from the extraction, derived only when both sides parse.
  *  A directly extracted "$/unit" metric wins over the derived one. */
 function deriveBasis(
@@ -215,7 +221,7 @@ export function deriveInternalComps(
       // top alone, "$42.0M", read as a price the memorandum never asked.
       priceLabel:
         priceNum != null
-          ? `${priceRangeOf(price!.value) ?? fmtCompact(priceNum)}${interestTag(ext) ? ` · ${interestTag(ext)!.toLowerCase()}` : ""}`
+          ? `${priceRangeOf(price!.value) ?? fmtCompact(priceNum)}${interestTag(ext) ? ` · ${tagInLine(interestTag(ext)!)}` : ""}`
           : null,
       capLabel: capNum != null ? cap!.text : null,
       basisLabel: plan
