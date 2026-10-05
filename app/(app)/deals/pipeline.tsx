@@ -35,7 +35,7 @@ import { OffersDueBit } from "./offers-due";
 import { parseMoney, priceRange, priceRangeShort } from "@/lib/criteria";
 import { compareSortValues, pipelineSortValue, type PipelineSortKey, type SortDir } from "@/lib/pipeline-sort";
 import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
-import { SHARING_OPTIONS, matchesSharing } from "@/lib/personal-deal";
+import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-deal";
 // Why a fit wears "First read": it is judged on the first signal, before the
 // extraction lands — the deal page's buy-box panel says the same, and the
 // CSV and the meeting workbook mark the figure with the same words.
@@ -2968,7 +2968,9 @@ function NewDealForm({
           }
           if (res.ok) {
             writeDraft(draftKey, null);
-            router.push(`/deals/${res.dealId}`);
+            // Where a team member's deal went into their own pipeline, the
+            // deal page says so (lib/personal-deal) — the landing carries it.
+            router.push(dealLanding(res.dealId, !!res.personal));
             return;
           }
           keep();

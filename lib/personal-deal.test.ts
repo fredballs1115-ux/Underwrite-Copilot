@@ -30,6 +30,14 @@ describe("a team member's own deal, said as one", () => {
     expect(dealLanding("d-1", false)).toBe("/deals/d-1");
   });
 
+  it("the OM upload form lands through it too, so its notice is never dropped (research pass 32)", () => {
+    // The form calls createDealFromBatch and pushes the landing itself; it
+    // had pushed `/deals/<id>` and ignored `personal`.
+    const form = read("app/(app)/deals/pipeline.tsx");
+    expect(form).toContain("router.push(dealLanding(res.dealId, !!res.personal))");
+    expect(form).not.toMatch(/router\.push\(`\/deals\/\$\{res\.dealId\}`\)/);
+  });
+
   it("the deal page says it, counting the trial by the constant the action counts by, and only while it is so", () => {
     expect(filedPersonalNotice(TEAM_TRIAL_DEALS)).toContain(`the team's ${TEAM_TRIAL_DEALS} trial deals were in use`);
     const page = read("app/(app)/deals/[id]/page.tsx");
