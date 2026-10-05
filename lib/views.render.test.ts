@@ -2214,6 +2214,7 @@ describe("/market's loading outline, and the metro explorer as its #explorer", (
 
 // ── The shared screen (the one signed-out surface) ─────────────────────────
 import { Expired, ShareView } from "@/app/share/[token]/share-view";
+import { SHARE_AERIAL, SHARE_AERIAL_FRAMES } from "@/lib/image-frames";
 import type { BrokerCompsResult, ExtractionResult, MarketResult, VerdictResult } from "@/lib/anthropic/types";
 
 describe("ShareView — the read-only screen a partner or lender opens", () => {
@@ -2543,6 +2544,48 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     const loader = readSource(joinPath(process.cwd(), "app/share/[token]/page.tsx"), "utf8");
     expect(loader).toMatch(/kind: "aerial" as const,[\s\S]*?ring: !!address\.street\?\.trim\(\),/);
     expect(readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/page.tsx"), "utf8")).toContain("hasStreetAddress={!!dealAddress?.street}");
+  });
+
+  it("draws the shared screen's photograph 16:9 on a phone and 12:5 from sm, the aerial at its one frame's 12:5 (research pass 29)", () => {
+    // On a phone the one picture a partner sees had been a 12:5 strip, 145px
+    // tall at 390px.
+    const base = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      extraction: SAMPLE_DEAL.extraction,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const aerial = {
+      kind: "aerial" as const,
+      src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial?w=960&h=400",
+      credit: "aerial imagery: USGS The National Map (public domain)",
+      ring: true,
+    };
+    const imgClass = (html: string) => (/<figure[^>]*data-share-picture="[a-z]+"[\s\S]*?<img [^>]*class="([^"]*)"/.exec(html)?.[1] ?? "").split(/\s+/);
+    const photo = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        ...base,
+        picture: {
+          sources: [{ kind: "photo" as const, src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/picture?size=hero", credit: "From the offering memorandum" }, aerial],
+          place: "1200 N 31st St, Philadelphia, PA",
+        },
+      }),
+    );
+    expect(photo).toContain('data-share-picture="photo"');
+    expect(imgClass(photo)).toEqual(expect.arrayContaining(["aspect-[16/9]", "sm:aspect-[12/5]", "object-cover", "w-full"]));
+    expect(a11yIssues(photo)).toEqual([]);
+    // The aerial keeps the 12:5 its route draws at every width: one frame
+    // for the page, any other size snapped to it, kept per deal (#491). A
+    // phone's 16:9 would be a second drawing of every shared deal.
+    const overhead = renderToStaticMarkup(React.createElement(ShareView, { ...base, picture: { sources: [aerial], place: "1200 N 31st St, Philadelphia, PA" } }));
+    expect(imgClass(overhead)).toContain("aspect-[12/5]");
+    expect(imgClass(overhead).some((c) => c.includes("16/9"))).toBe(false);
+    expect(SHARE_AERIAL_FRAMES).toEqual([SHARE_AERIAL]);
+    expect(SHARE_AERIAL.w / SHARE_AERIAL.h).toBe(12 / 5);
   });
 
   it("says FEMA's flood zone under the title where the building sits in one, and nothing without a line (#426)", () => {

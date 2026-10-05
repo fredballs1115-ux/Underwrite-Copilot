@@ -40,6 +40,14 @@ export interface SharePictureSource {
  * aerial's own 12:5, so the centre of the picture is the centre it was
  * drawn around. A neighbourhood placement's centre is a district's, and
  * gets no ring; a photograph never does.
+ *
+ * On a phone the photograph is drawn 16:9 (research pass 29: the one
+ * picture a partner sees was a 12:5 strip 145px tall), from `sm` up 12:5 as
+ * before — the stored hero is cut to either by CSS alone. The aerial keeps
+ * its 12:5 at every width: its route draws one frame for the page, any
+ * other size snapped to it, and keeps it per deal (lib/image-frames
+ * `SHARE_AERIAL`, #491), so a phone's 16:9 would be a second drawing of
+ * every shared deal, or this one stretched across the phone.
  */
 export function SharePicture({ sources, place }: { sources: SharePictureSource[]; place: string }) {
   const [at, setAt] = useState(0);
@@ -67,7 +75,7 @@ export function SharePicture({ sources, place }: { sources: SharePictureSource[]
           decoding="async"
           onError={() => setAt((i) => i + 1)}
           style={previewStyle(s.preview)}
-          className="block aspect-[12/5] w-full object-cover"
+          className={`block w-full object-cover ${s.kind === "photo" ? "aspect-[16/9] sm:aspect-[12/5]" : "aspect-[12/5]"}`}
         />
         {s.kind === "aerial" && s.ring ? (
           <span
