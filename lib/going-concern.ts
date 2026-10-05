@@ -42,6 +42,7 @@
 // A BLANK IS NULL.
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { withArticle } from "@/lib/article";
 import { parseMoney } from "@/lib/criteria";
 import { ebitdaFigure, type EbitdaFigure } from "@/lib/deal-strategy";
 import { FINDING_WORDS, readSiteReports } from "@/lib/site-reports";
@@ -278,7 +279,7 @@ function sentencesOf(r: Omit<GoingConcernRead, "sentences" | "headline">): strin
 export function goingConcernModelLine(r: GoingConcernRead | null, m: { noi1: number | null; exitCapPct: number } | null): string | null {
   if (!r || r.branch === "operator_lease" || !m || m.noi1 == null) return null;
   const what = r.business ? BUSINESS_NAME[r.business] : "the operating business";
-  return `The model capitalises its ${money(m.noi1)} year-one income at a ${(m.exitCapPct * 100).toFixed(2)}% exit cap as if it were rent; on ${what} that income is the operation's, which the real estate does not earn without an operator, and the model allocates nothing to the business.`;
+  return `The model capitalises its ${money(m.noi1)} year-one income at ${withArticle(`${(m.exitCapPct * 100).toFixed(2)}% exit cap`)} as if it were rent; on ${what} that income is the operation's, which the real estate does not earn without an operator, and the model allocates nothing to the business.`;
 }
 
 /** The pipeline row's tag: "Going concern", "Operator lease, 2.10x
