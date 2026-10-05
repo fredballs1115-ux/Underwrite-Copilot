@@ -195,7 +195,7 @@ describe("deriveUnderwriteInputs — an operating business's EBITDA is said, nev
   it("beside an NOI that cannot anchor year 1, the note names the EBITDA too", () => {
     const d = deriveUnderwriteInputs(snf([{ label: "NOI (in-place)", value: "$0", flagged: false, page: "p. 9" }, EBITDAR]), "x");
     expect(d.sources.inPlaceRentAnnual?.note).toBe(
-      "The OM's NOI (in-place) is $0 — no income in place to anchor year 1 on. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI. The OM states the business's EBITDAR (T-12) of $2,800,000, which is not the real estate's NOI and is not used",
+      "The OM's NOI (in-place) is $0 — no income in place to anchor year 1 on. No going-in cap in the OM either — assumed 6% going-in; enter the year-1 NOI you would run. The OM states the business's EBITDAR (T-12) of $2,800,000, which is not the real estate's NOI and is not used",
     );
     expect(d.inputs).toEqual(deriveUnderwriteInputs(snf([{ label: "NOI (in-place)", value: "$0", flagged: false, page: "p. 9" }]), "x").inputs);
   });

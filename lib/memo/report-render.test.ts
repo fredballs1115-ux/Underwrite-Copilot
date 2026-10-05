@@ -796,7 +796,9 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Sensitivity analysis");
     expect(text).toContain("left out");
     expect(text).toContain(
-      "The IRR grids and the max bid are left out: no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on a $10,000,000 placeholder price and an assumed NOI, and its returns would be a placeholder's.",
+      // The memorandum's own NOI is named, never said to be unread (research
+      // pass 38).
+      "The IRR grids and the max bid are left out: no price was read from the memorandum, so its $3,880,000 NOI (in-place) has no price to be set against, and the model runs on a $10,000,000 placeholder price and an assumed NOI; its returns would be a placeholder's.",
     );
     expect(text).not.toContain("(ask)");
     expect(text).not.toContain("Max bid");

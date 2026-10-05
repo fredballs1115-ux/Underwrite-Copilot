@@ -2012,6 +2012,20 @@ function buildOperatingMetrics(
     label(ws.getCell(r, 1), `${rows} left out: ${basisWithheld!.why}, so no building basis is struck on it.`, { color: MUTED, size: 9 });
     r++;
   };
+  // Where no price was read, the Purchase Price is the site's placeholder,
+  // and a basis struck on it is the placeholder's ("Price / Unit $35,714"
+  // for 280 apartments, beside a memorandum's own $185,000 a unit —
+  // research pass 38): left out with the reason, as the per-SF block is on
+  // an assumed area.
+  const pricePlaceholder = model.sources.purchasePrice?.provenance === "assumption";
+  const placeholderNote = (rows: string) => {
+    label(
+      ws.getCell(r, 1),
+      `${rows} left out: no price was read from the memorandum, so the Purchase Price is a placeholder and a basis struck on it would be the placeholder's.`,
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  };
   let zebra = false;
   if (units && units > 0) {
     label(ws.getCell(r, 1), nounMany);
@@ -2024,6 +2038,8 @@ function buildOperatingMetrics(
     r++;
     if (basisWithheld) {
       basisNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
+    } else if (pricePlaceholder) {
+      placeholderNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
     } else {
       twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
       // What a finished unit costs all-in — the basis a comp is held against
@@ -2064,6 +2080,8 @@ function buildOperatingMetrics(
   if (model.sources.rsf?.provenance !== "assumption") {
     if (basisWithheld) {
       basisNote("Price / SF and All-in Basis / SF");
+    } else if (pricePlaceholder) {
+      placeholderNote("Price / SF and All-in Basis / SF");
     } else {
       twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
       twoCol(

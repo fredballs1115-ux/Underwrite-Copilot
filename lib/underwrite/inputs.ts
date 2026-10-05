@@ -135,8 +135,9 @@ export interface InputSource {
    *  income (#415) while the model reads its NOI as a building's, or an NOI
    *  of zero or less beside which the model runs the price × the stated cap
    *  (research pass 38) — named so a surface that withholds the returns
-   *  never says no income was read */
-  notRun?: { label: string; value: number };
+   *  never says no income was read; `unpriced` where a positive NOI was not
+   *  run because no price was read to set it against (the placeholder) */
+  notRun?: { label: string; value: number; unpriced?: boolean };
 }
 
 export interface WorkbookMeta {
@@ -911,6 +912,12 @@ export function deriveUnderwriteInputs(
     const whole = Math.round(f.value);
     const amount = `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}`;
     if (!(f.value > 0)) return `The OM's ${f.label} is ${amount} — no income in place to anchor year 1 on`;
+    // No price was read: a stated NOI is set against nothing the memorandum
+    // states, so it is never judged against the placeholder (research pass
+    // 38: "above any going-in cap on this price" of a $10M placeholder).
+    if (statedPrice == null && !isPlanDeal(strategy.kind)) {
+      return `The OM's ${f.label} of ${amount} cannot be set against the ${usd0(price)} placeholder price, which no memorandum stated — enter the price`;
+    }
     if (shareUngrossed && !isPlanDeal(strategy.kind)) {
       return `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the whole building's income against the price of ${
         isGpStake(extraction) ? "a share of the general partner's interest" : "a share the memorandum states no percentage for"
@@ -968,12 +975,20 @@ export function deriveUnderwriteInputs(
     // one not run (research pass 38: an OM's −$310,000 ran as $616,250, a
     // 13.31% IRR with a sizer seeded from it, the finding in another card).
     const noIncome = skipped != null && !(skipped.value > 0);
+    // And where no price is stated, the price × the cap is the site's
+    // placeholder × the cap: the placeholder's NOI, never one derived from
+    // the memorandum, so a price typed over the placeholder never shows
+    // returns on it (the second audit, MED-2).
+    const onPlaceholder = statedPrice == null;
+    const capWords = `the stated ${(Math.round(capPct * 10_000) / 100).toFixed(2)}% going-in cap`;
     mark(
       "inPlaceRentAnnual",
-      noIncome ? "assumption" : "derived",
+      noIncome || onPlaceholder ? "assumption" : "derived",
       skipped
-        ? `${implausible(skipped)}. Year-1 NOI set from price × the stated going-in cap instead`
-        : "From price × going-in cap, at an assumed expense ratio",
+        ? `${implausible(skipped)}. Year-1 NOI set from ${onPlaceholder ? `the ${usd0(price)} placeholder × ${capWords}` : "price × the stated going-in cap"} instead`
+        : onPlaceholder
+          ? `The ${usd0(price)} placeholder × ${capWords}, at an assumed expense ratio — the memorandum states no price or NOI, so this NOI is the placeholder's; enter the price and the in-place NOI`
+          : "From price × going-in cap, at an assumed expense ratio",
     );
     if (noIncome && skipped && sources.inPlaceRentAnnual) {
       sources.inPlaceRentAnnual = { ...sources.inPlaceRentAnnual, notRun: { label: skipped.label, value: skipped.value } };
@@ -1000,6 +1015,15 @@ export function deriveUnderwriteInputs(
     const noneStated = !skipped && !earnings && interest.kind !== "leased_fee";
     const landNoIncome = noneStated && !assetWords(extraction?.assetClass).operating;
     noIncomeInPlace = noneStated && !landNoIncome && rrOcc == null && occupancyPctFromMetrics(metrics) === 0;
+    // What to enter: on the placeholder, the price — a stated NOI is never
+    // asked for again ("enter the in-place NOI" beside the OM's own NOI,
+    // research pass 38) — and beside a stated NOI the price can carry, the
+    // year-1 NOI the reader would run.
+    const onPlaceholder = statedPrice == null;
+    // A positive NOI on an operating asset already asks for the price
+    // (`implausible`); a loss, or a plan's stabilized figure, does not.
+    const priceAsked = skipped != null && onPlaceholder && skipped.value > 0 && !isPlanDeal(strategy.kind);
+    const enter = !skipped || priceAsked ? "" : onPlaceholder ? "; enter the price" : "; enter the year-1 NOI you would run";
     mark(
       "inPlaceRentAnnual",
       "assumption",
@@ -1008,11 +1032,20 @@ export function deriveUnderwriteInputs(
         : noIncomeInPlace
           ? "The memorandum states the building 0% occupied and no NOI: no income is in place, and the 6% is a placeholder"
           : skipped
-            ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI${earnings ? `. ${earnings}` : ""}`
+            ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in${onPlaceholder ? ` on the ${usd0(price)} placeholder` : ""}${enter}${earnings ? `. ${earnings}` : ""}`
             : earnings
               ? `${earnings}; with no NOI or cap in the OM, the model assumed 6% going-in`
               : "No NOI or cap in the OM — assumed 6% going-in",
     );
+    // A stated NOI the model does not run is named wherever the returns are
+    // withheld, never said to be unread — and where it had no stated price to
+    // be set against, said so (research pass 38).
+    if (skipped && sources.inPlaceRentAnnual) {
+      sources.inPlaceRentAnnual = {
+        ...sources.inPlaceRentAnnual,
+        notRun: { label: skipped.label, value: skipped.value, ...(onPlaceholder && skipped.value > 0 ? { unpriced: true } : {}) },
+      };
+    }
   }
 
   // A leased fee's income is its ground rent (#415), and the model reads no

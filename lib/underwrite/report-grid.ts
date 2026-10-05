@@ -564,7 +564,14 @@ export function placeholderReason(
   const noi = sources.inPlaceRentAnnual?.provenance === "assumption";
   const notRun = sources.inPlaceRentAnnual?.notRun ?? null;
   const be = opts.printed ? "are" : "would be";
+  // A stated NOI with no stated price to be set against (`notRun.unpriced`)
+  // is named as stated, never said to be unread (research pass 38: "nor a
+  // year-1 NOI the model could run on" beside the memorandum's $4,000,000).
+  const unpriced = notRun?.unpriced ? notRun : null;
   if (price && noi) {
+    if (unpriced) {
+      return `no price was read from the memorandum, so its ${usd0(unpriced.value)} ${unpriced.label} has no price to be set against, and the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI; its returns ${be} a placeholder's.`;
+    }
     return notRun
       ? `no price was read from the memorandum, and the model does not run its ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns ${be} a placeholder's.`
       : `no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns ${be} a placeholder's.`;
@@ -573,6 +580,11 @@ export function placeholderReason(
     return `no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns ${be} the placeholder's.`;
   }
   if (noi) {
+    // A price typed over the placeholder: the stated NOI was judged against
+    // the placeholder, and the year-1 NOI struck on it stays.
+    if (unpriced) {
+      return `the model set the memorandum's ${usd0(unpriced.value)} ${unpriced.label} against its ${usd0(inputs.purchasePrice)} placeholder price and does not run it, so it runs on an assumed NOI and its returns ${be} the assumption's.`;
+    }
     return notRun
       ? `the model does not run the memorandum's ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so it runs on an assumed NOI and its returns ${be} the assumption's.`
       : `no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns ${be} the assumption's.`;
@@ -595,7 +607,17 @@ export function placeholderPageLine(
   const reason = placeholderReason(inputs, sources, { priceEntered: o.priceEntered });
   if (!reason) return null;
   const typeIt = !o.priceEntered && sources?.purchasePrice?.provenance === "assumption";
-  return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${reason}${typeIt ? " Type the price you would pay above to run the model on it." : ""}`;
+  // A price typed reprices the model, never a year-1 NOI struck on the
+  // placeholder: where both were assumed, the returns stay withheld whatever
+  // is typed, and the line says so rather than promise them (the second
+  // audit, MED-2).
+  const noiAssumed = sources?.inPlaceRentAnnual?.provenance === "assumption";
+  const tail = !typeIt
+    ? ""
+    : noiAssumed
+      ? " A price typed above reprices the model, but not its year-1 NOI, which was struck on the placeholder — so the returns stay withheld."
+      : " Type the price you would pay above to run the model on it.";
+  return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${reason}${tail}`;
 }
 
 /**
@@ -607,7 +629,18 @@ export function placeholderWorkbookLine(inputs: UnderwriteInputs, sources: Model
   const reason = placeholderReason(inputs, sources, { printed: true });
   if (!reason) return null;
   const price = sources?.purchasePrice?.provenance === "assumption";
-  return `${reason[0].toUpperCase()}${reason.slice(1)}${price ? " Enter the price you would pay as the Purchase Price on the Assumptions tab." : ""}`;
+  // The year-1 NOI is the rent line's, an input of its own: a price entered
+  // over the placeholder leaves an NOI struck on it where it was (the second
+  // audit, MED-2), so the line names the NOI too wherever it was assumed.
+  const noi = sources?.inPlaceRentAnnual?.provenance === "assumption";
+  const enter = price
+    ? noi
+      ? " Enter the price you would pay as the Purchase Price on the Assumptions tab, and the In-Place Rental Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves the NOI struck on the placeholder."
+      : " Enter the price you would pay as the Purchase Price on the Assumptions tab."
+    : noi
+      ? " Enter the In-Place Rental Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab."
+      : "";
+  return `${reason[0].toUpperCase()}${reason.slice(1)}${enter}`;
 }
 
 /**
