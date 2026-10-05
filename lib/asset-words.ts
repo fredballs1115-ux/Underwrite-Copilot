@@ -269,7 +269,17 @@ const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent l
 const CARE_WORDS =
   /\b(?:assisted|memory|skilled|nursing|snf|care|independent[\s-]+living|ccrcs?|continuing|life[\s-]+plan|licensed|services?|meals?|post[\s-]+acute|rehabilitation)\b/i;
 const HOUSING_PROGRAM = /\b(?:lihtc|tax[\s-]+credits?|section\s+8|age[\s-]+restricted)\b|\b(?:55|62)\s*\+|\b(?:55|62)[\s-]+and[\s-]+(?:over|older)\b/i;
-const careOrService = (s: string) => CARE_WORDS.test(s) || (/\bsenior[\s-]+living\b/i.test(s) && !HOUSING_PROGRAM.test(s));
+// A care or service word the phrase denies — "no services", "no care
+// provided", "without meals or services", "non-licensed" — is struck before
+// the care rule reads, as lib/site-reports strikes "no RECs" before it reads
+// a finding (audit C3a: "Senior Apartments (55+), no services" had filed as
+// licensed senior housing).
+const DENIED_CARE =
+  /\b(?:no|without|non|not)[\s-]+(?:[a-z]+[\s-]+){0,2}?(?:care|services?|meals?|assisted|licensed|nursing|medical)\b(?:\s+(?:or|and|&)\s+(?:care|services?|meals?)\b)?/gi;
+const careOrService = (phrase: string) => {
+  const s = phrase.replace(DENIED_CARE, " ");
+  return CARE_WORDS.test(s) || (/\bsenior[\s-]+living\b/i.test(s) && !HOUSING_PROGRAM.test(s));
+};
 const seniorApartments = (s: string) =>
   /\bseniors?\b/i.test(s) &&
   (/\b(?:apartments?|affordable|lihtc|tax[\s-]+credit|section\s+8|age[\s-]+restricted|rental\s+housing)\b/i.test(s) || /\b(?:55|62)\s*\+/.test(s)) &&

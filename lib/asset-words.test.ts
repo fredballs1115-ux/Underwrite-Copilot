@@ -277,6 +277,19 @@ describe("the asset-words table", () => {
       expect(assetClassKey(phrase), phrase).toBe("multifamily");
       expect(isResidentialClass(phrase), phrase).toBe(true);
     }
+    // A care or service word the phrase denies names no care (audit C3a:
+    // each had filed as licensed senior housing, losing the rent rules).
+    for (const phrase of [
+      "Senior Apartments (55+), no services",
+      "Age-restricted senior apartments (62+) - no care provided",
+      "Senior apartments without meals or services",
+      "Senior apartments (62+), non-licensed",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("multifamily");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // A care word beside a denial of another is still care.
+    expect(assetClassKey("Senior apartments with assisted living, no meals")).toBe("senior_housing");
     // A care or service word keeps a phrase senior housing — "senior living"
     // among them, the industry's word for a care community, apartments or
     // not (the audit of 2026-10-05: "Senior Living Apartments" filed as
