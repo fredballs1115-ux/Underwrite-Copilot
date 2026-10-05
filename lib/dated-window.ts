@@ -206,10 +206,14 @@ export function datedNotes(text: string | null | undefined, today: string): Date
   for (const w of read.windows) {
     const followed = read.windows.some((v) => v !== w && v.start > w.end);
     if (followed || !(day > w.end)) continue;
+    // A window written "between X and Y" is said from X to Y: its text runs
+    // from the first date to the second, so the "and" in it is the joiner,
+    // and "for X and Y" read as two days rather than a window.
+    const said = /\s+and\s+/.test(w.text) ? `from ${w.text.replace(/\s+and\s+/, " to ")}` : `for ${w.text}`;
     notes.push({
       kind: "window_ended",
       date: w.end,
-      text: `This states its figure for ${w.text}, a window that ended on ${longDay(w.end)}: the figure needs checking.`,
+      text: `This states its figure ${said}, a window that ended on ${longDay(w.end)}: the figure needs checking.`,
     });
   }
   for (const e of read.takesEffect) {

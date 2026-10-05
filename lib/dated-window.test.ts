@@ -139,7 +139,7 @@ describe("datedNotes — what a page says on the day before, of and after each e
         {
           kind: "window_ended",
           date: "2027-12-31",
-          text: "This states its figure for January 1, 2027 and December 31, 2027, a window that ended on Dec 31, 2027: the figure needs checking.",
+          text: "This states its figure from January 1, 2027 to December 31, 2027, a window that ended on Dec 31, 2027: the figure needs checking.",
         },
       ]);
     }
@@ -152,7 +152,7 @@ describe("datedNotes — what a page says on the day before, of and after each e
       {
         kind: "window_ended",
         date: "2027-06-30",
-        text: "This states its figure for July 1, 2026 and June 30, 2027, a window that ended on Jun 30, 2027: the figure needs checking.",
+        text: "This states its figure from July 1, 2026 to June 30, 2027, a window that ended on Jun 30, 2027: the figure needs checking.",
       },
     ]);
   });
