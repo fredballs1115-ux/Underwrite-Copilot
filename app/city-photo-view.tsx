@@ -90,29 +90,21 @@ export function CityPhotoView({
     setMode((m) => (m === "skyline" && hasAerial ? "aerial" : "none"));
   }, [mode, hasAerial]);
 
+  // Neither picture (`shown` null): the band's own colour carries on under
+  // its scrim, and its words with it. The tree keeps the same slots either
+  // way — the picture's slot empty, the scrim where it was — so a picture
+  // that fails swaps nothing but itself (research pass 25 measured the
+  // homepage's hero shifting 0.37 at 1280px when both of its pictures
+  // failed and the scrim was drawn again in a different slot).
   const shown = mode === "skyline" ? skyline : mode === "aerial" ? aerial : null;
-  if (!shown) {
-    // Neither picture: the band's own colour carries on under its scrim,
-    // and its words with it.
-    return layer ? (
-      <>
-        <div className={`pointer-events-none ${layer}`}>{overlay}</div>
-        {children}
-      </>
-    ) : (
-      <>{children}</>
-    );
-  }
+  const credit = !shown ? null : mode === "skyline" && skyline ? (
+    <CreditPartsText parts={skyline.credit} linkClassName="underline decoration-dotted underline-offset-2 hover:text-white" />
+  ) : aerial ? (
+    aerial.credit
+  ) : null;
+  const srcSet = shown && sizes ? shown.srcSet : undefined;
 
-  const credit =
-    mode === "skyline" && skyline ? (
-      <CreditPartsText parts={skyline.credit} linkClassName="underline decoration-dotted underline-offset-2 hover:text-white" />
-    ) : aerial ? (
-      aerial.credit
-    ) : null;
-  const srcSet = sizes ? shown.srcSet : undefined;
-
-  const picture = (
+  const picture = !shown ? null : (
     /* eslint-disable-next-line @next/next/no-img-element -- a proxied route
        that sets its own immutable cache headers; next/image would add a
        second cache layer over it and cannot express the fallback chain */
