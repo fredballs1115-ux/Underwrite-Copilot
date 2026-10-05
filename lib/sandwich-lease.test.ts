@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { interestTag, leaseholdTermOf, readInterest } from "@/lib/interest";
+import { extractionInstruction } from "@/lib/anthropic/prompts";
+import { interestTag, isMasterLeasehold, leaseholdTermOf, readInterest } from "@/lib/interest";
 import { leaseholdExitSentence, leaseholdExitView, leaseholdLenderLine, leaseholdOptionsLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { readGroundLeaseTerm, readMasterLeaseTerm } from "@/lib/ground-lease-term";
 import { gluedWords } from "@/lib/render-lint";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import {
+  MASTER_RENT_ROW,
+  SUBLEASE_INCOME_ROW,
   annualOf,
   readSandwichLease,
   sandwichContextLine,
@@ -162,5 +165,42 @@ describe("the master lease's term is the position's, on every surface that reads
       "The master lease ends Jun 2029, in year 3 of the model's 5-year hold: the position ends with it before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.",
     );
     for (const text of [sentence, leaseholdOptionsLine(r) ?? "", leaseholdLenderLine(r) ?? ""]) expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the prompt asks for what the reader reads", () => {
+  it("names each sandwich row by a label the reader's own pattern takes, and reads each one as the extraction writes it", () => {
+    const prompt = extractionInstruction("auto");
+    for (const label of ["Master lease rent", "Sublease income", "Master lease expiration", "Master lease term remaining", "Master lease options"]) {
+      expect(prompt, label).toContain(`"${label}"`);
+    }
+    expect(MASTER_RENT_ROW.test("Master lease rent")).toBe(true);
+    expect(SUBLEASE_INCOME_ROW.test("Sublease income")).toBe(true);
+    // The current term, never one that assumes an option; a count only where
+    // no date is stated; and never filed under the ground lease's rows.
+    expect(prompt).toContain(
+      '"Master lease expiration" (the current term\'s end exactly as written, with its month and day where stated — never a date that assumes an option is exercised)',
+    );
+    expect(prompt).toContain('"Master lease term remaining" (only where the OM states a count of years rather than a date)');
+    expect(prompt).toContain("never under the ground rent's or a ground lease's labels");
+    // The interest's words the prompt asks for are a master leasehold's, the
+    // only interest the reader reads.
+    expect(prompt).toContain("(a master lease of the building, sublet to its tenants)");
+    const position = (metrics: ReturnType<typeof row>[]) =>
+      deal(metrics, { summary: "A master lease of the building, sublet to its tenants", groundLease: "Master lease through December 31, 2041" });
+    expect(isMasterLeasehold(position([]))).toBe(true);
+    // Each label, as the extraction writes it, is read.
+    const stated = position([
+      row("Master lease rent", "$1,100,000"),
+      row("Sublease income", "$1,820,000"),
+      row("Master lease expiration", "December 31, 2041"),
+      row("Master lease options", "Two 5-year options"),
+    ]);
+    const r = readSandwichLease(stated, TODAY)!;
+    expect(r).toMatchObject({ masterRent: 1_100_000, subleaseIncome: 1_820_000, spread: 720_000 });
+    expect(r.term).toMatchObject({ ends: "2041-12-31", from: "date", options: { years: 10 } });
+    // A count of years, where no date is stated, is counted from today.
+    expect(readSandwichLease(position([row("Master lease term remaining", "15 years")]), TODAY)!.term).toMatchObject({ ends: "2041-10-05", from: "remaining" });
+    expect(sandwichTermRows(stated.metrics).map((m) => m.label)).toEqual(["Master lease rent", "Sublease income", "Master lease expiration", "Master lease options"]);
   });
 });
