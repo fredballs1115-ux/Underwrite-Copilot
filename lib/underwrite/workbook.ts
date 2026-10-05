@@ -69,6 +69,9 @@ const COVER_LINE = 80;
 /** A stabilized deal's year-1 NOI over its total uses, in the Deal
  *  Summary's return block: what it is, never a "stabilized" figure. */
 const YEAR1_YIELD_LABEL = "Year-1 Yield on Total Cost";
+/** About what one line of the Deal Summary's 18-wide value column holds at
+ *  10 pt: a market name past it wraps. */
+const MARKET_LINE = 20;
 
 function sourceText(s: InputSource | undefined): string {
   if (!s) return "";
@@ -1470,7 +1473,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   label(ws.getCell(r, 1), "Building Name"); label(ws.getCell(r, 2), meta.dealName);
   label(ws.getCell(r, 4), "Asset Class"); label(ws.getCell(r, 5), meta.assetClass); r++;
   label(ws.getCell(r, 1), "Address"); label(ws.getCell(r, 2), meta.address || "—");
-  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—"); r++;
+  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—");
+  // A long market name ("Washington-Arlington-Alexandria, DC-VA-MD-WV")
+  // wraps inside its 18-wide column, the row tall enough for its lines,
+  // where it ran past the tab's last column; the row's other cells sit at
+  // its top beside the name's first line.
+  if ((meta.market || "").length > MARKET_LINE) {
+    for (const c of [1, 2, 4]) ws.getCell(r, c).alignment = { ...ws.getCell(r, c).alignment, vertical: "top" };
+    ws.getCell(r, 5).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r).height = Math.ceil(meta.market.length / MARKET_LINE) * 13;
+  }
+  r++;
   // A size the documents do not state is the count × a typical unit or a
   // placeholder (the Assumptions tab names which) — marked here as the
   // Operating Metrics tab marks it by leaving its per-SF figures out.
