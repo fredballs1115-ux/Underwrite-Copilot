@@ -4,7 +4,17 @@
  *
  * Notes for later:
  *  - Model IDs are exact strings (never add a date suffix).
- *  - These models use *adaptive thinking* — there is no `budget_tokens` knob.
+ *  - Thinking is OFF as these calls are made. None sends a `thinking`
+ *    field, and on the model in use (Claude Opus 4.8) no `thinking` field
+ *    means thinking off — Anthropic's thinking documentation tabulates each
+ *    model's default; where thinking is wanted on these models it is
+ *    adaptive (`thinking: { type: "adaptive" }`), and a `budget_tokens`
+ *    setting is refused. On the newer models a lever below could move a
+ *    step to — Claude Opus 5 and Claude Sonnet 5 among them — no `thinking`
+ *    field means adaptive thinking, ON, and `max_tokens` caps the thinking
+ *    and the answer together. `MAX_TOKENS` below is sized for the answers
+ *    alone, so a step moved to such a model needs its cap reviewed, or an
+ *    explicit thinking setting sent, first.
  *  - We default to the flagship everywhere for quality.
  *
  * WHAT A SCREEN COSTS. Each run writes its ledger to the job row
@@ -49,7 +59,8 @@
  *     against the flagship's $5 / $25) bills the same tokens at two fifths
  *     of the flagship's price — near-flagship quality on this kind of read,
  *     but it changes the product; judge a few screens against their saved
- *     verdicts first.
+ *     verdicts first. It thinks by default where the flagship does not (the
+ *     note on thinking above): review the caps before the switch.
  *  4. Fewer tokens per deck — ON by default: the OM goes as its own text
  *     layer, page-tagged, whenever that layer is dense enough to stand in
  *     for the pages (`lib/pdf-text.ts`, `omSourceFor` with `textFirst`),
@@ -110,7 +121,10 @@ export const MODELS = {
   verdict: modelFromEnv("MODEL_VERDICT", reasoning),
 };
 
-/** Output-token caps. Our outputs are compact JSON, so these stay small. */
+/** Output-token caps. Our outputs are compact JSON, so these stay small —
+ *  sized for the answer alone, with thinking off as these calls are made
+ *  (the note above). On a model that thinks by default the thinking counts
+ *  against the same cap. */
 export const MAX_TOKENS = {
   // A portfolio lists every property (up to 150, lib/anthropic/prompts). At
   // an estimated ~65 tokens a property, a tape of 75-odd homes would run
