@@ -1823,7 +1823,7 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Floodway");
     expect(text).toContain("0.2% annual chance flood hazard");
     expect(text).toContain(
-      "FEMA's map puts the building's point in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys — the lender's own flood determination decides — and the premium belongs in the expense line.",
+      "FEMA's map puts the building's point in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees — the lender's own flood determination decides — and the premium belongs in the expense line.",
     );
 
     // One page more than the report without it, carrying the map and the

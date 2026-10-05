@@ -2671,7 +2671,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     const html = renderToStaticMarkup(
       React.createElement(ShareView, {
         ...props,
-        floodLine: "Flood zone AE: a Special Flood Hazard Area, where federal law requires flood insurance on a loan from a regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys (FEMA)",
+        floodLine: "Flood zone AE: a Special Flood Hazard Area, where federal law requires flood insurance on a loan from a regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees (FEMA)",
       }),
     );
     expect(html).toContain('data-qa="share-flood"');
@@ -5163,7 +5163,7 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
       classes: { page: ["floodway", "sfha", "moderate"] as const, full: ["floodway", "sfha", "moderate", "levee-reduced"] as const },
       here: "sfha" as const,
       zone: "Zone AE",
-      line: "FEMA's map puts the building's point in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys — the lender's own flood determination decides — and the premium belongs in the expense line.",
+      line: "FEMA's map puts the building's point in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees — the lender's own flood determination decides — and the premium belongs in the expense line.",
     };
     const props = { ...base, picture: null, flood: { ...flood, classes: { page: [...flood.classes.page], full: [...flood.classes.full] } } };
     const html = renderToStaticMarkup(React.createElement(PropertyVisual, props));
@@ -5191,7 +5191,7 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(html).toContain('data-flood-swatch="sfha"');
     expect(html.indexOf('data-flood-swatch="sfha"')).toBeLessThan(html.indexOf('data-flood-swatch="floodway"'));
     expect(text).toContain("FEMA flood zones · USGS imagery");
-    expect(text).toContain("federal law requires flood insurance on a loan from a federally regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys");
+    expect(text).toContain("federal law requires flood insurance on a loan from a federally regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees");
     // The aerial still leads; the Flood tab waits to be opened.
     expect(html).toMatch(/aria-pressed="true" data-view-thumb="aerial"/);
     // The filmstrip's thumbnail is the frame's own small crop.
@@ -5209,7 +5209,7 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
       React.createElement(PropertyVisual, { ...props, flood: { ...props.flood, classes: null } }),
     );
     expect(pending).not.toContain("data-flood-swatch");
-    expect(visibleText(pending)).toContain("federal law requires flood insurance on a loan from a federally regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys");
+    expect(visibleText(pending)).toContain("federal law requires flood insurance on a loan from a federally regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees");
 
     // No street address, no Flood tab: a neighbourhood's centre is not the building.
     const area = renderToStaticMarkup(
