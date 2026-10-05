@@ -676,6 +676,53 @@ describe("ReportDocument (full report)", () => {
     expect(text).not.toMatch(/puts the balance at \d+% of its value/);
   }, 45000);
 
+  it("on a preferred equity position, prints its own terms under the model's caveat, and no max bid (lib/position)", async () => {
+    // The day its yield to redemption is read on.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "preferred_equity" as const, summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$14,000,000" } : m)),
+        row("Preferred equity amount", "$15,000,000"),
+        row("Preferred return", "12% preferred return, 8% current pay"),
+        row("Current pay rate", "8.0%"),
+        row("Mandatory redemption date", "June 2029"),
+        row("Senior loan balance", "$52,000,000"),
+        row("Whole-asset value", "$80,000,000"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    expect(sensitivity).not.toBeNull();
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity);
+    const buf = await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    // The caveat over the grids, then what the position itself earns.
+    expect(text).toContain("A preferred equity position in the owning entity: The property model runs the whole building at the position's price; that is not this position's return");
+    expect(text).toContain("The position, on its own terms: A preferred equity position of $15.0M at 8.00% current pay and 4.00% accruing");
+    expect(text).toContain("14.3% to redemption at its $14.0M price.");
+    expect(text).toContain("the position's first dollar sits at 65.0% and its last at 86.1% at redemption (83.8% today).");
+    // A bid solved on the building's cash flows at the position's price is
+    // no price for the position.
+    expect(text).toContain("No max bid: the model runs the whole building as if bought at the preferred equity position's price");
+    expect(text).not.toMatch(/Max bid (clearing|holding)/);
+    // The memo page under the title says it in a clause.
+    expect(text).toContain("A preferred equity position in the owning entity, not the property, 14.3% to its Jun 2029 redemption at the $14.0M price");
+  }, 45000);
+
   it("prints the seller's loan offered for assumption beside the model it was priced against (#419)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 25)), toFake: ["Date"] });
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });

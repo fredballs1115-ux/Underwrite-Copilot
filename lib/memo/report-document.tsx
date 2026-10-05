@@ -1303,7 +1303,10 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
 /**
  * The max bid, or why there is none, for what the price buys (lib/interest).
  * A note's model runs the collateral at the loan's price, so a bid solved on
- * it is a price for the building, never for the note: none prints. A share's
+ * it is a price for the building, never for the note: none prints. Nor on a
+ * preferred equity position, whose model runs the whole building at the
+ * position's price (lib/position): a bid solved on it is the building's,
+ * never the position's, which buys a rate and a redemption. A share's
  * model runs the whole asset its price implies, so its bid is the whole
  * building's, and says so. A share whose percentage the memorandum does not
  * state cannot be grossed up to the whole at all, so a bid solved on it is
@@ -1312,6 +1315,9 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
 function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestOf>): string {
   if (interest.kind === "note") {
     return "No max bid: the model's price is the collateral's, run as if the building were bought at the loan's price, so a bid solved on it is not a price for the note.";
+  }
+  if (interest.kind === "preferred_equity") {
+    return "No max bid: the model runs the whole building as if bought at the preferred equity position's price, so a bid solved on it is the building's, not a price for the position, which buys a rate and a redemption.";
   }
   if (interest.kind === "partial_interest" && interest.sharePct == null) {
     return "No max bid: the memorandum states no single percentage for the share, so the model cannot gross its price up to the whole building, and a bid solved on it would be neither the share's price nor the building's.";
@@ -1568,11 +1574,18 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const portfolio = readPortfolio(extraction);
   // What is being sold (#414): on a note or a share the sensitivity grids
   // are the collateral's or the whole asset's, and the page says so — and on
-  // a note, what the note itself earns at its price (#416), beside them.
+  // a note, what the note itself earns at its price (#416), beside them; on
+  // a preferred equity position, the position's own read the same way
+  // (lib/position: its yield to redemption, its cash and accrual, its stack).
   const interest = readInterest(extraction, askingPriceOf(extraction));
   const noteFigures = interest?.note
     ? [noteYieldSentence(interest.note), noteCollateralSentence(interest.note)].filter(Boolean).join(" ")
     : "";
+  const ownTerms = noteFigures
+    ? `The note, on its own terms: ${noteFigures}`
+    : interest?.position
+      ? `The position, on its own terms: ${interest.position.sentences.join(" ")}`
+      : "";
   // A covenant or a contract that sets the rents (#453): the grids grow
   // every rent at one rate, which the restricted units' rents do not.
   const affordable = readAffordable(extraction);
@@ -1903,9 +1916,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               {str(`${interest.label}: ${interest.modelCaveat}`)}
             </Text>
           ) : null}
-          {noteFigures ? (
+          {ownTerms ? (
             <Text style={{ fontSize: 8, color: C.ink, marginBottom: 6 }}>
-              {str(`The note, on its own terms: ${noteFigures}`)}
+              {str(ownTerms)}
             </Text>
           ) : null}
           {caveats}
