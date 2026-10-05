@@ -1242,6 +1242,19 @@ describe("a plan's own figures are held to each other, with or without a price r
     expect(assessPlausibility(leaseUp).map((f) => f.code)).not.toContain("budget_low");
   });
 
+  it("never flags a budget at or over the per-unit floor by its share of the price alone (audit C3a)", () => {
+    // $1.2M over 600 doors is $2,000 a door, a light value-add program; at
+    // 0.8% of a $150M price it had read as a likely misread, and every Claude
+    // step was told the figures do not tie.
+    const light = plan(VA, [["Asking price", "150,000,000"], ["Units", "600"], ["NOI (stabilized, pro forma)", "9,000,000"], ["Renovation budget", "1,200,000"]]);
+    expect(assessPlausibility(light).map((f) => f.code)).not.toContain("budget_low");
+    const s = inferStrategy(light);
+    expect(plausibilityNote(assessPlausibility(light, s), s, planSummary(light, s), light) ?? "").not.toContain("FIGURES THAT DO NOT TIE");
+    // Under the per-unit floor too, both are said.
+    const tiny = plan(VA, [["Asking price", "150,000,000"], ["Units", "600"], ["Renovation budget", "300,000"]]);
+    expect(assessPlausibility(tiny).map((f) => f.title)).toEqual(["Renovation budget of $300k is $500 per unit and 0.20% of the $150.0M price"]);
+  });
+
   it("calls the stabilized NOI \"not a misread\" only where no finding stands and no yield was refused", () => {
     const tied = (e: ExtractionResult) => {
       const s = inferStrategy(e);

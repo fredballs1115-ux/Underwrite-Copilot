@@ -1390,8 +1390,9 @@ function costFindings(
   }
 
   // 4b. A works budget under what any renovation or construction program
-  //     costs: under about $1,000 a unit of the class's own count, or under
-  //     1% of the price — a rule of thumb, said as one. Only a budget for
+  //     costs: under about $1,000 a unit of the class's own count, or —
+  //     where no count is read — under 1% of the price; a rule of thumb,
+  //     said as one. Only a budget for
   //     the works alone (a stated total is the basis's, above) on a plan of
   //     works; a forward purchase's works are the developer's.
   const budget = plan?.budget ?? null;
@@ -1399,7 +1400,11 @@ function costFindings(
     const perUnit = words.basis === "unit" && units != null && units >= 1 ? budget.budget / units : null;
     const share = price != null && price > 0 ? budget.budget / price : null;
     const lowPerUnit = perUnit != null && perUnit < BUDGET_FLOOR_PER_UNIT;
-    const lowShare = share != null && share < BUDGET_FLOOR_SHARE;
+    // The share of the price judges a budget only where no count is read,
+    // or beside a per-unit figure that fails its own floor too: $1.2M over
+    // 600 doors is $2,000 a door, a light program, whatever 0.8% of a
+    // $150M price looks like (audit C3a). The floors are the owner's.
+    const lowShare = share != null && share < BUDGET_FLOOR_SHARE && (perUnit == null || lowPerUnit);
     if (lowPerUnit || lowShare) {
       const shareText = share == null ? "" : share < 0.0001 ? "under 0.01%" : pct(share, 2);
       const said = [
