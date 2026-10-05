@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
-import type { AskEntry } from "@/lib/deals";
+import { askAnsweredLine, type AskEntry } from "@/lib/deals";
 import { parsePageNumber } from "@/lib/facts";
 import { askDeal, type AskState } from "./ask-actions";
 
@@ -81,9 +81,11 @@ export function AskPanel({
     if (state?.ok) formRef.current?.reset();
   }, [state]);
   // The answer lands in the thread with no word to a screen reader; one
-  // polite line says it has (research pass 33). The thread itself is not a
-  // live region, which would read every answer again.
-  const answered = state?.ok ? "The answer is in the thread above." : "";
+  // polite line says it has (research pass 33), keyed to the answer by its
+  // place in the thread so a second answer is said too (lib/deals
+  // `askAnsweredLine`). The thread itself is not a live region, which would
+  // read every answer again.
+  const answered = state?.ok ? askAnsweredLine(qa.length) : "";
 
   const askable = hasOm && !isSample;
   // Who asked, on a team deal, after the date: the reader as "you", a

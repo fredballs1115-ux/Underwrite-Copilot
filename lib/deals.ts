@@ -79,6 +79,15 @@ export interface AskEntry {
   earlier?: boolean;
 }
 
+/** What Ask's status line says once an answer lands (the deal page's Ask
+ *  panel): keyed to the answer by its place in the thread, so each new
+ *  answer is said — a live region that reads the same words again says
+ *  nothing, and "The answer is in the thread above." was heard for the first
+ *  answer alone (the pre-merge audit). */
+export function askAnsweredLine(threadLength: number): string {
+  return threadLength > 0 ? `Answer ${threadLength} is in the thread above.` : "The answer is in the thread above.";
+}
+
 /** What replacing the OM appends to the thread (the deal actions'
  *  `replaceOm`). The thread only grows (migration 0036), so the answers
  *  asked of the old memorandum stay where they are, and this marker after

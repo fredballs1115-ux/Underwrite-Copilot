@@ -7,6 +7,7 @@ import { SensitivityPlayground, type PlaygroundData } from "@/app/(app)/deals/[i
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { a11yIssues } from "@/lib/render-lint";
+import { askAnsweredLine } from "@/lib/deals";
 
 vi.mock("@/app/login/actions", () => {
   const none = async () => null;
@@ -150,7 +151,12 @@ describe("focus never drops to the page, and a status is said (research pass 33,
       expect(b, f).toMatch(/role="status" className="sr-only"/);
       expect(b, f).not.toMatch(/disabled=\{(?:disabled \|\| )?pending\}/);
     }
-    expect(src("app/(app)/deals/[id]/ask-panel.tsx")).toContain("The answer is in the thread above.");
+    // The answer's line is keyed to the answer (the pre-merge audit, C1
+    // L12): the same words again were never heard, so a second answer went
+    // unsaid.
+    expect(src("app/(app)/deals/[id]/ask-panel.tsx")).toContain("const answered = state?.ok ? askAnsweredLine(qa.length) : \"\";");
+    expect(askAnsweredLine(1)).toBe("Answer 1 is in the thread above.");
+    expect(askAnsweredLine(2)).not.toBe(askAnsweredLine(1));
   });
 
   it("says the screen's step as it changes, never a fixed 'Working', and an error that arrives by the address bar", () => {
