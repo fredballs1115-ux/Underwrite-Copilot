@@ -3673,6 +3673,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     same page asks a web app showing the imagery for public Terms of Use
     and a Privacy Policy linked in its footer, so every signed-in page
     ends on Terms, Privacy and Security (`app/(app)/app-shell.tsx`).
+  - **Google's terms, before the key is set** (zori probe run
+    37262665824). The terms page states Google Maps' End User Additional
+    Terms of Service and the Google Privacy Policy, each linked, in the
+    words Google's terms ask for — but only while `googleConfigured()`, so
+    the page never claims a service it does not use. And a customer "will
+    not … display Street View imagery and non-Google Maps on the same
+    screen": `imagePlan`'s `google: false` drops Street View and the
+    satellite frame whatever the key says, the image route reads `?google=0`
+    into it (under a validator of its own), and the pipeline map's hover
+    card and every `DealAvatar` ask for it, since each sits over or beside a
+    Leaflet map of other tiles. Nothing changes until the key is set.
 - Where a deal is, by its county (#447). The markets' keyword lists name
   principal cities and a few counties, so a deal in Frisco, Irvine, Fort
   Lauderdale or Cranberry Township read its STATE's figures.
@@ -5122,6 +5133,47 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   before any model call. `lib/anthropic/pipeline.test.ts` drives the real
   pipeline against a recording fake database — reproduce a failure there
   before fixing it.
+- When a screen stops (research pass 30, 2026-10-05). **One stall rule**:
+  `isStalled` (lib/screen-run) — a live run that has written no progress in
+  `STALE_MS` — feeds the pipeline's `listJobStatus`, the header's shimmer and
+  `verdictBehind`, which answers "stalled" beside "failed" and "running", so
+  no surface says a dead run is running: the memo and report routes refuse
+  with `memostalled` / `reportstalled`, the compare table and the meeting
+  workbook say "Stalled" / "Screen stalled", and on the deal page a stalled
+  run draws no rail, skeletons or pulsing tabs and Replace OM works. A job's
+  age is measured on the SERVER's clock (`JobLike.ageMs`, `jobAgeMs`: the
+  page's own read and the status route hand it over), never the browser's.
+  **A document's failure offers another document**:
+  `lib/anthropic/document-failures.ts` (no imports, so the client page and
+  the stopped-screen email read it) lists the failures a retry reads the
+  same way — no figures, past the page cap, a 413, the OM gone from storage,
+  no OM — and the banner offers Replace OM (or Attach OM) in place of "Try
+  again"; the provider's 400 offers both, until its own wording is printed
+  from the runner. **A deck is refused for length on pdfjs's count only**:
+  the byte counter over-counts an incrementally saved file (a 350-page deck
+  annotated in Acrobat read 700), so a count past the cap only asks
+  `checkPdfOpens`, and a file pdfjs cannot open goes on to the service.
+  **A result that did not save fails the run** (`writeResult` in the
+  pipeline): a write's error had been dropped, leaving the previous call
+  under a job marked done; the verdict is never synthesized over a failed
+  read of the deal's results. Storage and database failures name our
+  storage and our database (lib/anthropic/failure), a start that failed
+  says so (`startfail`, `reconcilestartfail`) and "already running" is said
+  only when a run is. A worker run's last failure names only the
+  interruptions it recorded (`lib/worker-interruptions.ts`: restart,
+  timeout, crash) and says a retry resumes from the last finished step. A
+  market check in a covered market that read none of its figures says so
+  (`MarketResult.liveReadFailed`, `lib/market-read-failed.ts`) on the deal
+  page, the shared screen and the report. The batch upload never offers a
+  retry the plan's limit will refuse (`lib/batch-run.ts`). Two warnings,
+  never refusals: the first signal names the document's kind
+  (`lib/document-kind.ts`: a lease, a rent roll or a T-12 uploaded as the
+  OM is said, with Replace OM), and the same file already on an earlier
+  deal is linked from the newer one (`lib/same-memorandum.ts`, by
+  `omFingerprint`). Past twice the reader's own median screen time — never
+  without a measured median — the progress bar says this one is taking
+  longer than usual, and the support link (`lib/support-link.ts`) carries
+  the deal, its id, the step and the page's sentence.
 - Dates, read on the day they are read (#490, research pass 20's time
   bombs, 2026-10-01: the whole suite was run at twelve future dates).
   - **Every Claude step is told today's date** (`lib/anthropic/today.ts`,
