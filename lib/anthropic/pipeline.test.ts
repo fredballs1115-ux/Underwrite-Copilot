@@ -872,7 +872,10 @@ describe("runAnalysis — the happy path", () => {
     expect(input.firstSignal).toEqual(signal);
     const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
     const brief = buildBrief(input);
-    expect(brief).toContain("DEAL STRATEGY: Conversion");
+    // The deal context says the kind and its reading; the plausibility
+    // section, beside it, says them no more (research pass 41).
+    expect(brief).toContain("Deal type: Conversion — A change of use with construction and downtime first");
+    expect(brief.split("A change of use with construction and downtime first").length - 1).toBe(1);
     expect(brief).not.toContain("Stabilized");
   });
 

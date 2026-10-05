@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { extractionInstruction } from "@/lib/anthropic/prompts";
-import { interestTag, isMasterLeasehold, leaseholdTermOf, readInterest } from "@/lib/interest";
+import { interestContextLine, interestNote, interestTag, isMasterLeasehold, leaseholdTermOf, readInterest } from "@/lib/interest";
+import { dealContextFor } from "@/lib/deal-context";
 import { leaseholdExitSentence, leaseholdExitView, leaseholdLenderLine, leaseholdOptionsLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { readGroundLeaseTerm, readMasterLeaseTerm } from "@/lib/ground-lease-term";
 import { gluedWords } from "@/lib/render-lint";
@@ -195,6 +196,29 @@ describe("a sandwich position's spread and term (pass 28, round 9)", () => {
       "The model capitalises the position's income at its sale as if it ran forever; the master lease ends about Oct 2041, about 10 years after the model's sale, and the position with it — the exit on that term is the one to read.",
     );
     for (const text of [sandwichShortLine(ceiling), ceilingModel, sandwichShortLine(count)]) expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+// Research pass 41 (L5): the interest's line and the sandwich's each said
+// "The master lease ends Dec 2041, …" in the deal context and the
+// challenger's notes.
+describe("the master lease's end said once in a step's input", () => {
+  it("is the sandwich's to say, with what it means for the position; the interest's line leaves it", () => {
+    vi.useFakeTimers({ now: TODAY, toFake: ["Date"] });
+    try {
+      const end = "The master lease ends Dec 2041";
+      const count = (s: string) => s.split(end).length - 1;
+      const context = dealContextFor(SANDWICH) ?? "";
+      expect(count(context)).toBe(1);
+      expect(context).toContain(`${end}, 15.2 years from today, with extension options after it as stated: two of 5 years, 10 years in all. When it ends the position ends with it`);
+      const interest = readInterest(SANDWICH, 6_500_000, TODAY)!;
+      const sandwich = readSandwichLease(SANDWICH, TODAY)!;
+      expect(count(`${interestNote(interest, { term: !sandwich.term })} ${sandwichNote(sandwich)}`)).toBe(1);
+      // Read alone, the interest's line still says it.
+      expect(count(interestContextLine(interest))).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

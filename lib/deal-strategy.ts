@@ -1636,16 +1636,35 @@ export function planWithBasisChecked(
   };
 }
 
+/**
+ * Which of the plan's figures the deal context states (lib/deal-context's
+ * plan sentences): the NOI wherever one is stated, the total cost and the
+ * yield on cost beside it where both are struck, the timeline where one is
+ * stated, and a yield or a cost withheld always, with its sentence. A brief
+ * that carries the context beside the plan's own line leaves these to it, so
+ * each is said once (research pass 41); the verdict brief's test holds the
+ * two to each other.
+ */
+function planFiguresSaidByContext(plan: PlanSummary): { noi: boolean; costAndYield: boolean; timeline: boolean } {
+  const noi = plan.stabilizedNoi != null;
+  return { noi, costAndYield: noi && plan.totalCost != null && plan.yieldOnCost != null, timeline: !!plan.timeline };
+}
+
 /** The plan's figures as one sentence for the brief — what is stated, and
- *  plainly what is not. */
-function planLine(plan: PlanSummary): string {
+ *  plainly what is not. With `contextSays`, only what the deal context beside
+ *  it does not state: the price and the budget, and each figure it leaves
+ *  out. */
+function planLine(plan: PlanSummary, contextSays = false): string {
+  const said = contextSays ? planFiguresSaidByContext(plan) : null;
   const parts: string[] = [];
   // A forward purchase's NOI is the one the memorandum states at delivery,
   // which on a build-to-suit is the lease's first year.
   const noiWord = plan.forward ? "NOI at delivery" : "stabilized NOI";
-  parts.push(
-    plan.stabilizedNoi ? `${noiWord} ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})` : `${noiWord} not stated`,
-  );
+  if (!said?.noi) {
+    parts.push(
+      plan.stabilizedNoi ? `${noiWord} ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})` : `${noiWord} not stated`,
+    );
+  }
   // A share's grossed-up price, either label, reads as it did: the
   // parenthesis below names the equity's whole beside the entity's loan.
   const shareWhole =
@@ -1687,15 +1706,17 @@ function planLine(plan: PlanSummary): string {
           : "no construction budget is the buyer's: the developer funds the works"
         : "construction / renovation budget not stated in the figures",
   );
-  if (plan.totalCost != null) parts.push(plan.forward ? `total cost ${money(plan.totalCost)}, the price` : `total cost ${money(plan.totalCost)}`);
+  if (plan.totalCost != null && !said?.costAndYield) {
+    parts.push(plan.forward ? `total cost ${money(plan.totalCost)}, the price` : `total cost ${money(plan.totalCost)}`);
+  }
   // As the deal page prints it, so a verdict that quotes it quotes the
   // page's own figure.
-  if (plan.yieldOnCost != null) parts.push(`yield on total cost ${yieldOnCostText(plan.yieldOnCost)}`);
+  if (plan.yieldOnCost != null && !said?.costAndYield) parts.push(`yield on total cost ${yieldOnCostText(plan.yieldOnCost)}`);
   // …where none is struck past the ceiling, the page's sentence why…
-  if (plan.yieldWithheld) parts.push(plan.yieldWithheld.replace(/\.$/, "").replace(/^No /, "no "));
+  if (plan.yieldWithheld && !said) parts.push(plan.yieldWithheld.replace(/\.$/, "").replace(/^No /, "no "));
   // …and where none is struck on the equity's whole, the page's sentence why.
-  if (plan.costWithheld) parts.push(plan.costWithheld.replace(/\.$/, "").replace(/^No /, "no "));
-  parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
+  if (plan.costWithheld && !said) parts.push(plan.costWithheld.replace(/\.$/, "").replace(/^No /, "no "));
+  if (!said?.timeline) parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
   if (plan.capitalBudgetText) parts.push(`budget as worded: ${plan.capitalBudgetText}`);
   return parts.join("; ");
 }
@@ -1785,6 +1806,10 @@ export function plausibilityNote(
    *  fee the type is said as whose strategy it is (lib/interest
    *  `dealTypeLabel`), the collateral's or the leaseholder's building's */
   extraction: ExtractionResult | null = null,
+  /** the same input carries the deal context (lib/deal-context), which says
+   *  the deal's type, its summary and the plan's headline figures — the
+   *  verdict's brief: they are left to it, said once (research pass 41) */
+  contextSaysPlan = false,
 ): string {
   const bits: string[] = [];
   if (isPlanDeal(strategy.kind)) {
@@ -1794,12 +1819,19 @@ export function plausibilityNote(
     // print it once.
     const forward = !!plan?.forward || isForwardPurchase(extraction, strategy);
     const reading = forward ? FORWARD_READING : STRATEGY_READING[strategy.kind];
-    const summary =
-      strategy.summary && strategy.summary !== reading && strategy.summary !== STRATEGY_READING[strategy.kind]
-        ? ` — ${strategy.summary}`
-        : "";
-    bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary} ${reading}`);
-    if (plan) bits.push(`THE PLAN AS THE OM STATES IT: ${planLine(plan)}.`);
+    if (contextSaysPlan) {
+      // The context says "Deal type: <type> — <summary>": the reading, only
+      // where that summary is not this very sentence.
+      if (strategy.summary !== reading) bits.push(`DEAL STRATEGY: ${reading}`);
+    } else {
+      const summary =
+        strategy.summary && strategy.summary !== reading && strategy.summary !== STRATEGY_READING[strategy.kind]
+          ? ` — ${strategy.summary}`
+          : "";
+      bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary} ${reading}`);
+    }
+    const figures = plan ? planLine(plan, contextSaysPlan) : "";
+    if (figures) bits.push(`THE PLAN AS THE OM STATES IT: ${figures}.`);
     // A forward purchase (research pass 28): the buyer carries no
     // construction, so the construction paragraph a development gets is the
     // purchase's own — the facts and traps by name follow in the

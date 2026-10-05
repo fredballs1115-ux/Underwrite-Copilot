@@ -1371,7 +1371,10 @@ async function runAnalysisSteps(
         // interest's own traps by name, ahead of everything the challenger
         // reads the figures through (lib/interest).
         const interest = readInterest(ex, askingPriceOf(ex));
-        if (interest) notes.unshift(interestNote(interest));
+        // A sandwich position's own read (below) says the master lease's
+        // end: the interest's note leaves it to that one, said once.
+        const sandwich = readSandwichLease(ex);
+        if (interest) notes.unshift(interestNote(interest, { term: !sandwich?.term }));
 
         // The seller's loan offered for assumption (#417): its terms and the
         // assumable-debt traps by name.
@@ -1489,7 +1492,6 @@ async function runAnalysisSteps(
         // A sandwich position (lib/sandwich-lease): the sublease income
         // against the master rent, the spread, its cover and the master
         // lease's end as stated, then the sandwich-lease traps by name.
-        const sandwich = readSandwichLease(ex);
         if (sandwich) notes.push(sandwichNote(sandwich));
 
         if (flagged.length) {

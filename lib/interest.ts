@@ -1282,15 +1282,24 @@ export function readInterest(
   };
 }
 
+/** How a step's input carries the interest beside the other reads. */
+export interface InterestLineOptions {
+  /** false where another read in the same input says the lease's end — a
+   *  sandwich position's own read (lib/sandwich-lease) says the master
+   *  lease's, with what it means for the position — so it is said once
+   *  (research pass 41) */
+  term?: boolean;
+}
+
 /** The deal context's line: what is being sold, for every step that reads
  *  the OM after the extraction. */
-export function interestContextLine(r: InterestRead): string {
+export function interestContextLine(r: InterestRead, opts: InterestLineOptions = {}): string {
   // The memorandum's own words end a sentence of their own: a period they
   // carry is not doubled ("…$2,000,000 per year..").
   const asStated = (s: string) => `${s.replace(/\.+\s*$/, "")}.`;
   const facts = [
     r.groundLease ? `The ${r.masterLease ? "master" : "ground"} lease as stated: ${asStated(r.groundLease)}` : "",
-    r.termLine ? `${r.termLine}.` : "",
+    r.termLine && opts.term !== false ? `${r.termLine}.` : "",
     r.loan ? `The loan as stated: ${asStated(r.loan)}` : "",
   ]
     .filter(Boolean)
@@ -1302,7 +1311,7 @@ export function interestContextLine(r: InterestRead): string {
  * The traps of the interest, for the challenger — appended to its notes
  * like the portfolio's. The facts first, then the traps by name.
  */
-export function interestNote(r: InterestRead): string {
+export function interestNote(r: InterestRead, opts: InterestLineOptions = {}): string {
   const traps: Record<InterestKind, string> = {
     preferred_equity: POSITION_TRAPS,
     note:
@@ -1371,7 +1380,7 @@ export function interestNote(r: InterestRead): string {
   // waterfall (research pass 37).
   if (r.holding === "gp_stake") traps.partial_interest = GP_STAKE_TRAPS;
   const shared = r.holding === "tic" ? SHARED_TRAPS_TIC : SHARED_TRAPS_READ[r.kind];
-  return `${interestContextLine(r)} ${traps[r.kind]}${terminationTrap}${shared ? ` ${shared}` : ""}`;
+  return `${interestContextLine(r, opts)} ${traps[r.kind]}${terminationTrap}${shared ? ` ${shared}` : ""}`;
 }
 
 /**

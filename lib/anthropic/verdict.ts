@@ -342,6 +342,9 @@ export function buildBrief(input: VerdictInputs): string {
       strategy,
       planSummary(ex, strategy),
       ex,
+      // The deal context above says the type, its summary and the plan's
+      // figures: the note leaves them to it (research pass 41).
+      !!input.dealContext?.trim(),
     );
     if (note) sections.push("## Deal strategy, the plan, and figures that do not tie", note);
   }

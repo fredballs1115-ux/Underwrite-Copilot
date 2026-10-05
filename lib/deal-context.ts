@@ -166,7 +166,9 @@ export function dealContextFor(
   // A price stated as a range (#466): which end every figure is struck at.
   const range = priceRangeLine(extraction, strategy.kind);
   const head = [
-    ...(interest ? [interestContextLine(interest)] : []),
+    // A sandwich position's own read says the master lease's end (and that
+    // the position ends with it): the interest's line leaves it to that one.
+    ...(interest ? [interestContextLine(interest, { term: !sandwich?.term })] : []),
     ...(sandwich ? [sandwichContextLine(sandwich)] : []),
     ...(sale ? [saleContextLine(sale)] : []),
     ...(range ? [range] : []),

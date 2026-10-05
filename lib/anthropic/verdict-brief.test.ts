@@ -328,6 +328,49 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(section(briefOf(office, "office"))).toContain("THE BUILDING'S BASIS, computed in code: $267/SF — the asking price, over the building's area.");
   });
 
+  // Research pass 41 (L5): the plausibility section restated the deal
+  // context's type, summary, NOI, total cost, yield on cost and timeline on
+  // every plan deal. Each is said once, the context's; what the context does
+  // not say — the price, the budget, a figure it leaves out — stays.
+  it("says a plan deal's type, summary and figures once: the deal context's, where the brief has it", () => {
+    const count = (s: string, part: string) => s.split(part).length - 1;
+    const dev = base({
+      dealName: "Riverside — ground-up development site, fully entitled",
+      strategy: { kind: "development", summary: "Build 300 apartments on an entitled site.", capitalBudget: "", timeline: "Delivery Q4 2028" },
+      metrics: [m("Land cost", "$12,000,000"), m("NOI (stabilized, pro forma)", "$9,000,000", "pro_forma"), m("Total development cost", "$120,000,000"), m("Units (proposed)", "300")],
+    });
+    const withContext = buildBrief({ extraction: dev, dealContext: dealContextFor(dev), ...none });
+    expect(count(withContext, "Deal type: Development")).toBe(1);
+    expect(count(withContext, "Build 300 apartments on an entitled site")).toBe(1);
+    expect(withContext).not.toContain("DEAL STRATEGY: Development");
+    expect(count(withContext, "Ground-up or to-be-built; there is no in-place income")).toBe(1);
+    // The NOI, the total cost and its yield, and the timeline: the context's.
+    expect(count(withContext, "7.50%")).toBe(1);
+    expect(count(withContext, "Delivery Q4 2028")).toBe(1);
+    expect(withContext).not.toContain("stabilized NOI $9.0M");
+    expect(withContext).not.toContain("total cost $120.0M");
+    // The price and the budget, which the context does not say, stay.
+    expect(withContext).toContain("THE PLAN AS THE OM STATES IT: price $12.0M; budget $108.0M (Total development cost less the price).");
+    // The plan's own test stays.
+    expect(withContext).toContain("## Deal strategy, the plan, and figures that do not tie");
+    // With no deal context the section says every figure itself, as before.
+    const alone = buildBrief({ extraction: dev, ...none });
+    expect(alone).toContain("DEAL STRATEGY: Development — Build 300 apartments on an entitled site. Ground-up or to-be-built");
+    expect(alone).toContain("THE PLAN AS THE OM STATES IT: stabilized NOI $9.0M (NOI (stabilized, pro forma)); price $12.0M;");
+    expect(alone).toContain("timeline: Delivery Q4 2028");
+
+    // A plan whose context states no NOI says no total cost there: the plan's
+    // line keeps it, and says the NOI is not stated.
+    const reno = base({
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$20,000,000"), m("Units", "100"), m("NOI (in-place)", "$1,200,000", "in_place"), m("Renovation budget", "$2,000,000")],
+    });
+    const renoBrief = buildBrief({ extraction: reno, dealContext: dealContextFor(reno), ...none });
+    expect(count(renoBrief, "Deal type: Value-add")).toBe(1);
+    expect(renoBrief).toContain("DEAL STRATEGY: In-place income plus a renovation program");
+    expect(renoBrief).toContain("THE PLAN AS THE OM STATES IT: stabilized NOI not stated; price $20.0M; $2.0M (Renovation budget); total cost $22.0M; timeline to stabilization not stated.");
+  });
+
   it("a plan deal's basis is its total cost a planned unit, never the land's price", () => {
     const dev = base({
       dealName: "Riverside — ground-up development site, fully entitled",
