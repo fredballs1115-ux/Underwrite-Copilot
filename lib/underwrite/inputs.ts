@@ -375,7 +375,7 @@ function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["intere
  * `buildingPriceOf`). Whether a price is the building's turns on what it
  * buys alone, so any positive figure asks it. Null where it is.
  */
-function basisWithheldOf(extraction: ExtractionResult | null): { word: string; why: string } | null {
+export function basisWithheldOf(extraction: ExtractionResult | null): { word: string; why: string } | null {
   if (buildingPriceOf(extraction, 1) != null) return null;
   const { kind, sharePct, entityLoan } = interestOf(extraction);
   switch (kind) {

@@ -22,6 +22,7 @@ import {
   placeholderReturnsLine,
   placeholderWorkbookLine,
   HEAT_BG,
+  type CapGrowthGrid,
 } from "./report-grid";
 
 function baseInputs(over: Partial<UnderwriteInputs> = {}): UnderwriteInputs {
@@ -235,6 +236,63 @@ describe("gridTakeaway", () => {
   it("is WinAnsi-safe", () => {
     for (const h of [0.1, 12, 15, 99]) {
       expect(gridTakeaway(grid, h)).not.toMatch(/[≥≤→↓]/);
+    }
+  });
+});
+
+describe("gridTakeaway says two full clauses, each with its own subject (research pass 35)", () => {
+  // A grid built by hand: the IRR, in percent, at each exit cap (rows) and
+  // growth rate (columns), the base at the centre.
+  const at = (irr: (r: number, c: number) => number): CapGrowthGrid => ({
+    capRows: [0.05, 0.0525, 0.055, 0.0575, 0.06],
+    growthCols: [0.02, 0.025, 0.03, 0.035, 0.04],
+    cells: [0, 1, 2, 3, 4].map((r) => [0, 1, 2, 3, 4].map((c) => ({ irrPct: irr(r, c) / 100, em: 1.5 }))),
+    baseRow: 2,
+    baseCol: 2,
+  });
+  // Clears 13% up to the 5.25% exit at base growth, and from 3.5% growth at
+  // the base exit.
+  const ordinary = at((r, c) => 13 + (c - 2) - (r - 1));
+
+  it("the ordinary case: the deal holds up to a cap, and needs a growth rate", () => {
+    expect(gridTakeaway(ordinary, 13)).toBe(
+      "At base growth, the deal holds 13%+ up to a 5.25% exit cap; at the base exit cap, it needs at least 3.5% rent growth.",
+    );
+  });
+
+  it("no tested exit cap clears the hurdle: no 'The deal no tested …'", () => {
+    // Neither lever clears it (the pass's portfolio).
+    expect(gridTakeaway(at(() => 5), 13)).toBe(
+      "At base growth, no tested exit cap clears 13%; at the base exit cap, no tested rent growth clears it.",
+    );
+    // No cap clears at base growth, a faster RevPAR does at the base cap (the pass's hotel).
+    expect(gridTakeaway(at((r, c) => 12 - (r - 2) * 0.4 + (c - 2) * 1.5), 13, "RevPAR growth")).toBe(
+      "At base growth, no tested exit cap clears 13%; at the base exit cap, the deal needs at least 3.5% RevPAR growth.",
+    );
+  });
+
+  it("every tested exit cap clears the hurdle: no 'The deal every tested …'", () => {
+    expect(gridTakeaway(at(() => 30), 13)).toBe(
+      "At base growth, every tested exit cap clears 13%; at the base exit cap, every tested growth rate clears it.",
+    );
+  });
+
+  it("after a clause that names the deal, the hurdle is said again rather than as 'it'", () => {
+    expect(gridTakeaway(at((r, c) => 13 - (r - 1) + (c - 2) * 0.1), 13)).toBe(
+      "At base growth, the deal holds 13%+ up to a 5.25% exit cap; at the base exit cap, no tested rent growth clears 13%.",
+    );
+  });
+
+  it("leads with what the grids are of where the price did not buy the building, and never calls it the deal", () => {
+    const subject = "the collateral, run at the note's price";
+    expect(gridTakeaway(ordinary, 13, "rent growth", subject)).toBe(
+      "The collateral, run at the note's price: at base growth, it holds 13%+ up to a 5.25% exit cap; at the base exit cap, it needs at least 3.5% rent growth.",
+    );
+    expect(gridTakeaway(at(() => 5), 13, "rent growth", subject)).toBe(
+      "The collateral, run at the note's price: at base growth, no tested exit cap clears 13%; at the base exit cap, no tested rent growth clears it.",
+    );
+    for (const irr of [() => 5, () => 30, (r: number, c: number) => 13 + (c - 2) - (r - 1)]) {
+      expect(gridTakeaway(at(irr), 13, "rent growth", subject)).not.toMatch(/the deal/i);
     }
   });
 });

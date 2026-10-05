@@ -200,17 +200,27 @@ const clears = (cell: HeatCell, hurdlePct: number): boolean =>
   Number((cell.irrPct * 100).toFixed(1)) >= hurdlePct;
 
 /**
- * One plain-English line an IC can lift verbatim: along the BASE cap row,
- * how little growth still clears the hurdle; along the BASE growth column,
- * how much exit-cap expansion the deal survives.
+ * One plain-English line an IC can lift verbatim: along the BASE growth
+ * column, how much exit-cap expansion the deal survives; along the BASE cap
+ * row, how little growth still clears the hurdle. Two full clauses, each
+ * with its own subject: "The deal no tested exit cap clears 13% at base
+ * growth" printed wherever the base missed the hurdle at every tested cap
+ * or cleared it at every one (research pass 35).
+ *
+ * `subject` names what the grids are of where the price did not buy the
+ * building — a note's collateral, a position's building, an equity's whole
+ * (the report's `gridSubjectOf`) — and leads the line, so it is never
+ * called "the deal"; null for the deal itself.
  */
 export function gridTakeaway(
   grid: CapGrowthGrid,
   hurdlePct: number,
   /** what the growth axis grows: a hotel's is its RevPAR, not a rent */
   growth = "rent growth",
+  subject: string | null = null,
 ): string {
   const p = (n: number) => `${Number(n.toFixed(1))}%`;
+  const hurdle = p(hurdlePct);
   const baseRow = grid.cells[grid.baseRow];
   const growthsClearing = grid.growthCols.filter((_, c) =>
     clears(baseRow[c], hurdlePct),
@@ -218,23 +228,30 @@ export function gridTakeaway(
   const capsClearing = grid.capRows.filter((_, r) =>
     clears(grid.cells[r][grid.baseCol], hurdlePct),
   );
+  // Named once: the deal in the first clause that needs a subject, or the
+  // subject that leads the line; "it" after that.
+  const named = subject ? "it" : "the deal";
 
   // WinAnsi-safe wording (no "≥" — it isn't printable in the PDF's Helvetica).
+  const capSome = capsClearing.length > 0 && capsClearing.length < grid.capRows.length;
   const capPart =
     capsClearing.length === 0
-      ? `no tested exit cap clears ${p(hurdlePct)} at base growth`
-      : capsClearing.length === grid.capRows.length
-        ? `every tested exit cap clears ${p(hurdlePct)} at base growth`
-        : `holds ${p(hurdlePct)}+ up to ${withArticle(fmtPctPt(Math.max(...capsClearing), 2))} exit cap at base growth`;
-
+      ? `no tested exit cap clears ${hurdle}`
+      : !capSome
+        ? `every tested exit cap clears ${hurdle}`
+        : `${named} holds ${hurdle}+ up to ${withArticle(fmtPctPt(Math.max(...capsClearing), 2))} exit cap`;
+  // After a clause with a subject, the hurdle is said again rather than as
+  // an "it" that could be the deal.
+  const target = capSome ? hurdle : "it";
   const growthPart =
     growthsClearing.length === 0
-      ? `no tested ${growth} clears it at the base exit cap`
+      ? `no tested ${growth} clears ${target}`
       : growthsClearing.length === grid.growthCols.length
-        ? `every tested growth rate clears it at the base exit cap`
-        : `needs at least ${fmtPctPt(Math.min(...growthsClearing))} ${growth} at the base exit cap`;
+        ? `every tested growth rate clears ${target}`
+        : `${capSome || subject ? "it" : "the deal"} needs at least ${fmtPctPt(Math.min(...growthsClearing))} ${growth}`;
 
-  return `The deal ${capPart}, and ${growthPart}.`;
+  const line = `at base growth, ${capPart}; at the base exit cap, ${growthPart}.`;
+  return subject ? `${subject[0].toUpperCase()}${subject.slice(1)}: ${line}` : `${line[0].toUpperCase()}${line.slice(1)}`;
 }
 
 // ---- The page's data bundle ------------------------------------------------

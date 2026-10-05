@@ -404,6 +404,69 @@ describe("ReportDocument (full report)", () => {
     expect(whole).toContain("All of the owning entity's interests");
   }, 60000);
 
+  it("names what the grids are of under them where the price did not buy the building, never 'the deal' (research pass 35)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const takeawayOf = async (extraction: ExtractionResult) => {
+      const deal = {
+        name: SAMPLE_DEAL.name,
+        asset_class: SAMPLE_DEAL.asset_class,
+        extraction,
+        challenges: null,
+        comps: null,
+        market: null,
+        reconciliation: null,
+        verdict: SAMPLE_DEAL.verdict,
+        prior_screen: null,
+      } as unknown as DealRow;
+      const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+      const sensitivity = buildSensitivityData(derived.inputs, 13, { sources: derived.sources });
+      const text = pdfTextOf(
+        await renderToBuffer(
+          React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      ).replace(/\s+/g, " ");
+      return { text, sensitivity };
+    };
+    // The sample: the deal's own, in two full clauses.
+    const sample = await takeawayOf(SAMPLE_DEAL.extraction as ExtractionResult);
+    expect(sample.sensitivity.takeaway).toMatch(/^At base growth, /);
+    expect(sample.text).toContain(sample.sensitivity.takeaway);
+    // A note: the collateral, run at the note's price.
+    const note = await takeawayOf({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Unpaid principal balance", "$80,000,000"), row("Note rate", "5.25%"), row("Maturity date", "March 31, 2028")],
+    } as ExtractionResult);
+    const noteLine = gridTakeaway(note.sensitivity.grid, 13, "rent growth", "the collateral, run at the note's price");
+    expect(noteLine).toMatch(/^The collateral, run at the note's price: at base growth, /);
+    expect(note.text).toContain(noteLine);
+    expect(note.text).not.toContain(note.sensitivity.takeaway);
+    // A preferred equity position: the building, run at its price.
+    const position = await takeawayOf({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$14,000,000" } : m)),
+        row("Preferred equity amount", "$15,000,000"),
+        row("Preferred return", "12% preferred return, 8% current pay"),
+        row("Mandatory redemption date", "June 2029"),
+      ],
+    } as ExtractionResult);
+    expect(position.text).toContain(gridTakeaway(position.sensitivity.grid, 13, "rent growth", "the building, run at the position's price"));
+    // A share beside the loan its entity carries: the equity's whole.
+    const share = await takeawayOf({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
+        row("Entity loan balance", "$56,500,000"),
+      ],
+    } as ExtractionResult);
+    expect(share.text).toContain(gridTakeaway(share.sensitivity.grid, 13, "rent growth", "the whole building, run at the equity's whole"));
+    for (const t of [note.text, position.text, share.text]) expect(t).not.toMatch(/the deal (holds|needs)/i);
+  }, 60000);
+
   it("prints the base case the grids are struck around, each input with its source, and the terms every cell runs on under the grid", async () => {
     const extraction = { ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 };
     const deal = {

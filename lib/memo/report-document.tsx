@@ -79,7 +79,7 @@ import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
 import { condoShortLine, readCondo } from "@/lib/condo";
 import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
 import type { AssumableView } from "@/lib/assumable-debt";
-import type { InputSource } from "@/lib/underwrite/inputs";
+import { basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
@@ -1331,6 +1331,29 @@ function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestO
     : line;
 }
 
+/**
+ * What the sensitivity grids are of where the price did not buy the
+ * building — the derived model's `meta.interest.basisWithheld`, the one rule
+ * every surface reads (lib/underwrite/inputs `basisWithheldOf`): the grid's
+ * takeaway names it rather than calling a note's collateral, a position's
+ * building or an equity's whole "the deal", as the caveat over the grids
+ * already says (research pass 35). Null where the price is the building's.
+ */
+export function gridSubjectOf(extraction: ExtractionResult | null): string | null {
+  const withheld = basisWithheldOf(extraction);
+  if (!withheld) return null;
+  switch (withheld.word) {
+    case "note":
+      return "the collateral, run at the note's price";
+    case "position":
+      return "the building, run at the position's price";
+    case "leased fee":
+      return "a building's model, run at the leased fee's price";
+    default:
+      return interestOf(extraction).entityLoan != null ? "the whole building, run at the equity's whole" : "the whole building, run at the share's price";
+  }
+}
+
 /** What the overrun axis and sentence call the figure they stress. When the
  *  OM stated only an all-in total and no price, the "budget" IS that total
  *  with the acquisition inside it — the strip above declines to call it a
@@ -1585,6 +1608,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     : interest?.position
       ? `The position, on its own terms: ${interest.position.sentences.join(" ")}`
       : "";
+  // What the grids are of where the price did not buy the building; null
+  // where they are the deal's own (research pass 35).
+  const gridSubject = gridSubjectOf(extraction);
   // A covenant or a contract that sets the rents (#453): the grids grow
   // every rent at one rate, which the restricted units' rents do not.
   const affordable = readAffordable(extraction);
@@ -1945,8 +1971,14 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               baseCol={sensitivity.grid.baseCol}
               hurdlePct={sensitivity.hurdlePct}
             />
+            {/* What the grids are of, said as the caveat above says it: a
+                note's collateral or an equity's whole is never "the deal". */}
             <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-              {str(hotelGrid ? gridTakeaway(sensitivity.grid, sensitivity.hurdlePct, "RevPAR growth") : sensitivity.takeaway)}
+              {str(
+                hotelGrid || gridSubject
+                  ? gridTakeaway(sensitivity.grid, sensitivity.hurdlePct, hotelGrid ? "RevPAR growth" : "rent growth", gridSubject)
+                  : sensitivity.takeaway,
+              )}
             </Text>
 
             {/* Legend — shared by both grids. */}
