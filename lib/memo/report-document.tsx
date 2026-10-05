@@ -1,6 +1,6 @@
 import "server-only";
 import { compactUsd } from "@/lib/money";
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
@@ -1083,6 +1083,40 @@ export interface ReportInput {
    *  credited (lib/memo/cover-aerial `galleryPhotosFor`, #459); fewer than
    *  two is no page */
   photos?: MemoCover[] | null;
+  /** the page the memo's target-return chip names for the model's IRR —
+   *  the sensitivity page's, counted from the pages before it on a
+   *  one-page memo and call; `renderReportPdf` draws again where the page
+   *  landed elsewhere. Null where the chip names none. */
+  targetReturnPage?: number | null;
+}
+
+/** The chip the target-return check prints, as the memo clamps its label. */
+const TARGET_RETURN = "Target return";
+
+/**
+ * The memo page's target-return chip, where the buy-box check read no IRR
+ * from the screen ("—") and the report grades the model's own against the
+ * same target a few pages on: the chip names the model's figure and its
+ * page ("— Target return · model 9.3%, p. 3"; research pass 35: one PDF
+ * printed an unknown target return on page 1 and graded a 9.3% IRR against
+ * it on page 4). Only where the grids are the deal's own returns
+ * (`gridSubjectOf`), never a note's collateral's. The check itself is
+ * unchanged: reading the model's IRR into it is the owner's call.
+ */
+function withTargetReturnNote(memo: MemoData, irr: number | null, page: number | null): MemoData {
+  if (irr == null || !Number.isFinite(irr) || page == null) return memo;
+  return {
+    ...memo,
+    buyBox: memo.buyBox.map((c) =>
+      c.label === TARGET_RETURN && c.status === "unknown" ? { ...c, note: `model ${(irr * 100).toFixed(1)}%, p. ${page}` } : c,
+    ),
+  };
+}
+
+/** The model's levered IRR the sensitivity page grades: the base case's
+ *  tile, else the ink-bordered cell it equals. */
+function gradedIrrOf(s: SensitivityData): number | null {
+  return s.baseCase?.leveredIrr ?? s.grid.cells[s.grid.baseRow]?.[s.grid.baseCol]?.irrPct ?? null;
 }
 
 /** The deal's first signal, which the deal page reads beside the
@@ -1141,6 +1175,17 @@ export function buildReportData(
   // plan deal's page already says why its IRR page is left out.
   const withheld = planDeal ? null : (sensitivity?.withheld ?? null);
   const modelRead = <T,>(v: T | null | undefined): T | null => (withheld ? null : (v ?? null));
+  // The grids the report prints, and the page they land on where the memo
+  // and the call each take one: the memo's target-return chip names it.
+  const graded = planDeal || withheld ? null : (sensitivity ?? null);
+  const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover);
+  const irr = graded ? gradedIrrOf(graded) : null;
+  const chip = memo.buyBox.some((c) => c.label === TARGET_RETURN && c.status === "unknown");
+  const targetReturnPage =
+    graded && chip && irr != null && Number.isFinite(irr) && gridSubjectOf(extraction) == null
+      ? 2 + ((deal.verdict as VerdictResult | null) ? 1 : 0) + (plan ? 1 : 0)
+      : null;
+  const annotated = targetReturnPage != null ? withTargetReturnNote(memo, irr, targetReturnPage) : memo;
   return {
     modelVsMarket: modelVsMarket ?? null,
     assumable: modelRead(assumable),
@@ -1171,12 +1216,38 @@ export function buildReportData(
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
     // report as they do with the standalone memo.
-    memo: buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover),
-    sensitivity: planDeal || withheld ? null : (sensitivity ?? null),
+    memo: annotated,
+    sensitivity: graded,
     withheld,
     plan: plan ?? null,
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
+    targetReturnPage,
   };
+}
+
+/**
+ * The full report as PDF bytes — what the report routes serve. The memo's
+ * target-return chip names the sensitivity page by number, and that page
+ * moves where the memo or the call runs to a second page; the page is
+ * recorded where it lands as the report is laid out, and where it is not
+ * the one the chip names, the report is drawn once more naming it (the
+ * same length of words, so nothing else moves).
+ */
+export async function renderReportPdf(input: ReportInput): Promise<Buffer> {
+  let landed: number | null = null;
+  const draw = (i: ReportInput) =>
+    renderToBuffer(
+      <ReportDocument
+        input={i}
+        onSensitivityPage={(n) => {
+          landed = n;
+        }}
+      />,
+    );
+  const first = await draw(input);
+  const named = input.targetReturnPage ?? null;
+  if (named == null || landed == null || landed === named || !input.sensitivity) return first;
+  return draw({ ...input, memo: withTargetReturnNote(input.memo, gradedIrrOf(input.sensitivity), landed), targetReturnPage: landed });
 }
 
 /** A metric's page for the page column — the citation as extracted when it
@@ -1639,7 +1710,15 @@ function HeatGrid({
   );
 }
 
-export function ReportDocument({ input }: { input: ReportInput }) {
+export function ReportDocument({
+  input,
+  onSensitivityPage,
+}: {
+  input: ReportInput;
+  /** told the page the sensitivity analysis lands on as the report is laid
+   *  out (`renderReportPdf`, which the memo's target-return chip names) */
+  onSensitivityPage?: (page: number) => void;
+}) {
   const { deal, memo, sensitivity, plan, modelVsMarket } = input;
   // Older callers built the input by hand without a page count: then no
   // citation validates, and none prints (the rule in lib/facts.ts).
@@ -2000,6 +2079,17 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           dealName={dealName}
           branding={memo.branding}
         >
+          {/* Where this page lands, for the memo's target-return chip that
+              names it: drawn as nothing, out of the page's flow. */}
+          {onSensitivityPage ? (
+            <Text
+              style={{ position: "absolute", top: 0, left: 0, fontSize: 1 }}
+              render={({ pageNumber }) => {
+                if (typeof pageNumber === "number") onSensitivityPage(pageNumber);
+                return "";
+              }}
+            />
+          ) : null}
           <Text style={s.sub}>
             {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Color marks distance from the ${
               sensitivity.hurdleSource === "buybox"

@@ -474,7 +474,9 @@ export type MemoData = {
   sensitivity: { scenario: string; call: string; note: string }[];
   nextSteps: string[];
   // The buyer's standing criteria, checked deterministically (empty = no box set).
-  buyBox: { label: string; status: "pass" | "near" | "miss" | "unknown" }[];
+  // `note`: what the full report adds beside a chip — the model's own IRR
+  // and its page, where the screen read none (research pass 35).
+  buyBox: { label: string; status: "pass" | "near" | "miss" | "unknown"; note?: string }[];
   // One-line retrade summary ("Caution → Go · Price −$1.8M (−2.5%) · …"), or null.
   sinceLast: string | null;
   /**
@@ -1401,6 +1403,9 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                     {chip.mark}
                   </Text>
                   <Text style={s.buyBoxLabel}>{c.label}</Text>
+                  {/* A margin, not a space: a text box's leading space is
+                      trimmed where it meets the label's. */}
+                  {c.note ? <Text style={[s.buyBoxLabel, { color: C.muted, marginLeft: 3 }]}>{`· ${c.note}`}</Text> : null}
                 </View>
               );
             })}

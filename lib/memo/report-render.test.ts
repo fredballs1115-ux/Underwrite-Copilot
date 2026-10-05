@@ -9,7 +9,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, proseDays, rangeRead, readDay, ReportDocument } from "./report-document";
+import { buildReportData, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument } from "./report-document";
 import { MemoDocument, buildMemoData } from "./memo-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
@@ -332,6 +332,63 @@ describe("ReportDocument (full report)", () => {
     const name = memo[0].filter((r) => r.text === "Underwrite Copilot").map((r) => r.y);
     expect(Math.min(...name)).toBeLessThan(40);
   }, 60000);
+
+  it("names the model's IRR and its page on the memo's unknown target-return chip, the page where it lands (research pass 35)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    // The screen reads no IRR off the sample's memorandum: the check is unknown.
+    expect(checks.find((c) => c.label === "Target return")?.status).toBe("unknown");
+    const derived = sampleDerivedInputs();
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) });
+    const irr = `${(sensitivity.baseCase!.leveredIrr! * 100).toFixed(1)}%`;
+    // The memo and the call take a page each: the grids land on page 3.
+    const input = buildReportData(deal, "October 5, 2026", checks, sensitivity);
+    expect(input.targetReturnPage).toBe(3);
+    expect(input.memo.buyBox.find((c) => c.label === "Target return")).toEqual({ label: "Target return", status: "unknown", note: `model ${irr}, p. 3` });
+    const pages = pdfPageTextsOf(await renderReportPdf(input)).map((p) => p.replace(/\s+/g, " "));
+    expect(pages[0]).toContain(`Target return · model ${irr}, p. 3`);
+    expect(pages[2]).toContain("Sensitivity analysis");
+    expect(pages[2]).toContain(`LEVERED IRR ${irr}`);
+    // Two overrides run the memo onto a second page: the grids land on
+    // page 4, and the chip is drawn again naming it.
+    const overridden = buildReportData(deal, "October 5, 2026", checks, sensitivity, undefined, null, [
+      "Rent growth check dismissed: the renovated comps support 4% for two years (analyst)",
+      "Supply check dismissed: the pipeline counts a project that broke ground in 2019 and delivered last spring (analyst)",
+    ]);
+    expect(overridden.targetReturnPage).toBe(3);
+    const moved = pdfPageTextsOf(await renderReportPdf(overridden)).map((p) => p.replace(/\s+/g, " "));
+    expect(moved[1]).toContain("screening memo, continued");
+    expect(moved[3]).toContain("Sensitivity analysis");
+    expect(moved[0]).toContain(`Target return · model ${irr}, p. 4`);
+    expect(moved.join(" ")).not.toContain(", p. 3");
+    // On a note the grids are the collateral's: the chip names nothing.
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const noteEx = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Unpaid principal balance", "$80,000,000")],
+    } as ExtractionResult;
+    const noteDerived = deriveUnderwriteInputs(noteEx, SAMPLE_DEAL.name);
+    const note = buildReportData({ ...deal, extraction: noteEx } as unknown as DealRow, "October 5, 2026", checks, buildSensitivityData(noteDerived.inputs, 13, { sources: noteDerived.sources }));
+    expect(note.targetReturnPage).toBeNull();
+    expect(note.memo.buyBox.find((c) => c.label === "Target return")?.note).toBeUndefined();
+    // The standalone memo has no model: no note either.
+    expect(buildMemoData(deal, "October 5, 2026", checks).buyBox.some((c) => c.note)).toBe(false);
+  }, 90000);
 
   it("says the challenges run most severe first, the order the challenger is asked for, never the order deals die", async () => {
     // The prompt's own order, so the subtitle cannot drift from it again.

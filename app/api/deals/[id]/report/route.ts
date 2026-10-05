@@ -1,8 +1,6 @@
-import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
-import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
+import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
@@ -390,10 +388,9 @@ export async function GET(
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
     const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich);
-    const element = React.createElement(ReportDocument, {
-      input,
-    }) as unknown as Parameters<typeof renderToBuffer>[0];
-    const buffer = await renderToBuffer(element);
+    // The memo's target-return chip names the page the model's IRR is
+    // graded on, which the helper checks against where it lands.
+    const buffer = await renderReportPdf(input);
 
     const safe =
       (deal.name || "deal")

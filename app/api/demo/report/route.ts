@@ -1,6 +1,4 @@
-import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
+import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
@@ -63,12 +61,9 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
   });
 
   const input = buildReportData(deal, dateStr, checks, sensitivity, undefined, plan);
-  const element = React.createElement(ReportDocument, {
-    input,
-  }) as unknown as Parameters<typeof renderToBuffer>[0];
   const next = {
     dateStr,
-    pdf: renderToBuffer(element).catch((err) => {
+    pdf: renderReportPdf(input).catch((err) => {
       if (cachedRender === next) cachedRender = null;
       throw err;
     }),
