@@ -243,7 +243,7 @@ export type CapWithheld = OwnYield | "share";
 export const SHARE_CAP_WORDS = {
   na: "n/a — share",
   title:
-    "Beside the loan its entity carries, a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
+    "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
 } as const;
 
 /**
