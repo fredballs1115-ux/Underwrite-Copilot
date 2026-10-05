@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
-import { costAssumptionsLine, defaultExitGap } from "@/lib/underwrite/cost-note";
+import { costAssumptionsLine, defaultExitGap, yearOneCapitalLine } from "@/lib/underwrite/cost-note";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import { NO_IRR_WHY, noIrrText } from "@/lib/underwrite/no-irr";
 import { modelLoanCoverageLine } from "@/lib/sizer-terms";
@@ -324,6 +324,9 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // The DSCR the tile shows, against the coverage the debt sizer tests —
   // none where the tile withholds it.
   const coverageLine = withheld ? null : modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
+  // What the multiple and the year-1 return are net of, where the model
+  // spends capital in year 1 (lib/underwrite/cost-note).
+  const capitalLine = yearOneCapitalLine(inputs.capitalImprovementsYr1);
   // Where the memorandum states no going-in cap, the exit at rest is the
   // model's default: its gap to the model's own entry — the year-1 NOI over
   // the price the tiles run on, both the memorandum's — said under the tiles
@@ -478,6 +481,13 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       {!withheld && (
         <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
           {costAssumptionsLine(inputs)}
+        </p>
+      )}
+      {/* Where the model spends capital in year 1, what the multiple and the
+          year-1 return are net of (research pass 40, M6). */}
+      {!withheld && capitalLine && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted" data-qa="playground-capital">
+          {capitalLine}
         </p>
       )}
       {exitGap && entry != null && (

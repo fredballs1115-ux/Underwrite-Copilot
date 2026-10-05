@@ -14,6 +14,7 @@ import { documentNotices } from "@/lib/data-notices";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import { WORKBOOK_WITHHELD_WORD, modelReadsWithheld, placeholderWorkbookLine, withheldWorkbookRead } from "./report-grid";
+import { yearOneCapitalLine } from "./cost-note";
 import { noIrrText } from "./no-irr";
 import type { PlausibilityFinding } from "@/lib/deal-strategy";
 
@@ -1521,6 +1522,10 @@ function buildDealSummary(
     meta.interest?.modelCaveat ?? null,
     placeholderWorkbookLine(model.inputs, model.sources),
     withheld?.line ?? null,
+    // What the multiple and the year-1 return are net of, where the model
+    // spends capital in year 1 (research pass 40, M6) — not under returns
+    // the band withholds.
+    withheld ? null : yearOneCapitalLine(model.inputs.capitalImprovementsYr1),
   ].filter((s): s is string => !!s);
   bandNotes.forEach((text, i) => {
     const row = r + 2 + i;

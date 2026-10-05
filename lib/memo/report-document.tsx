@@ -1484,6 +1484,9 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
           </View>
         ))}
       </View>
+      {/* What the multiple and the year-1 return are net of, where the model
+          spends capital in year 1 (research pass 40, M6). */}
+      {b.capitalLine ? <Text style={{ fontSize: 7, color: C.muted, marginBottom: 6 }}>{str(b.capitalLine)}</Text> : null}
       <View style={{ flexDirection: "row" }}>
         <View style={{ width: "58%", paddingRight: 14 }}>
           {line("Price", `${fmtUsd0(b.price)} · ${provenanceOf(b.priceSource, totalPages)}`)}

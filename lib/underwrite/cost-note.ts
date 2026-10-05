@@ -7,6 +7,7 @@
 // read one sentence; it states the inputs, never changes them.
 
 import { withArticle } from "@/lib/article";
+import { compactUsd } from "@/lib/money";
 
 export interface CostInputs {
   transferTaxPct: number;
@@ -31,6 +32,22 @@ export function costAssumptionsLine(i: CostInputs): string {
   return tax > 0
     ? `These returns carry ${hold}, ${sale} and ${pct(tax)} of the price in transfer and recordation tax on the purchase. Set each in the Excel model.`
     : `These returns carry ${hold} and ${sale}, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.`;
+}
+
+/**
+ * Where the model spends capital in year 1 — a renovation budget, a PIP, a
+ * PCA's immediate repairs — it pays it from the year's cash flow, not from
+ * the equity at closing, so the equity multiple counts it against the
+ * distributions and the year-1 cash-on-cash falls by it (research pass 40,
+ * M6: a deal with $2,000,000 of year-1 repairs read a 1.52x multiple where
+ * its distributions over its contributions are 1.42x, and a −23.1% year-1
+ * return). Said beside each, on the deal page's tiles, the report's base
+ * case and the workbook's Deal Summary; how the multiple should count it is
+ * the owner's. Null where the model spends none in year 1.
+ */
+export function yearOneCapitalLine(capitalImprovementsYr1: number): string | null {
+  if (!(capitalImprovementsYr1 > 0) || !Number.isFinite(capitalImprovementsYr1)) return null;
+  return `The equity multiple and the year-1 cash-on-cash are net of the ${compactUsd(capitalImprovementsYr1)} of year-1 capital, which the model pays from the year's cash flow, not from the equity at closing.`;
 }
 
 /**

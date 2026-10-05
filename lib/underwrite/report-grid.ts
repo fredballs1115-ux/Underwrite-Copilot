@@ -9,7 +9,7 @@ import type { CompareModel, ModelReturnsRead } from "@/lib/compare-interest";
 import { findingWithholdsReturns, type PlausibilityFinding } from "@/lib/deal-strategy";
 import { moneyCompact } from "@/lib/plan-facts";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
-import { costAssumptionsLine } from "./cost-note";
+import { costAssumptionsLine, yearOneCapitalLine } from "./cost-note";
 import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
 import { NO_IRR_SHORT, NO_IRR_WHY, noIrrWhy, type NoIrrWhy } from "./no-irr";
@@ -443,6 +443,10 @@ export interface BaseCase {
   totalUses: number;
   /** what the returns carry for buying and selling (lib/underwrite/cost-note) */
   costLine: string;
+  /** what the multiple and the year-1 cash-on-cash are net of, where the
+   *  model spends capital in year 1 (lib/underwrite/cost-note
+   *  `yearOneCapitalLine`); null where it spends none */
+  capitalLine: string | null;
 }
 
 export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): BaseCase {
@@ -481,6 +485,7 @@ export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): 
     financingCosts: su.financingCosts,
     totalUses: su.totalUses,
     costLine: costAssumptionsLine(inputs),
+    capitalLine: yearOneCapitalLine(inputs.capitalImprovementsYr1),
   };
 }
 
