@@ -27,7 +27,7 @@ import {
 } from "./rent-regulation";
 import { readAffordable } from "./affordable";
 import { unitCountFromMetrics } from "./criteria";
-import { gluedWords, visibleText } from "./render-lint";
+import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { extractionInstruction } from "./anthropic/prompts";
 
 type Row = ExtractionResult["metrics"][number];
@@ -421,6 +421,24 @@ describe("Washington DC and Los Angeles", () => {
     // The tag names both caps, never the elderly or disabled tenant's 2.1%
     // as the building's (the audit of 2026-10-05).
     expect(regulationTag(r)).toBe("DC rent control, 2.1–4.1% cap");
+  });
+
+  // The audit of 2026-10-05: the panel linked only the RULE's source (the
+  // D.C. Code) beside figures the Office of the Tenant Advocate published.
+  it("links each allowance's own source beside its figures on the panel, and the rule's beside the regime", () => {
+    const dc = { address: { state: "DC", city: "Washington" }, classKey: "multifamily" };
+    const r = readRegulation(ex([row("Units", "24"), row("Year built", "1962")]), dc, "2026-10-05")!;
+    const html = renderToStaticMarkup(React.createElement(RegulationPanel, { regulation: r, today: "2026-10-05", modelGrowthPct: 3 }));
+    const text = visibleText(html);
+    const ota = ALLOWANCES.find((a) => a.rule_id === "dc-rent-stab-coverage")!.source;
+    expect(html).toContain(`href="${ota}"`);
+    expect(text).toContain("Allowance source: ota.dc.gov");
+    expect(html).toContain('href="https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05"');
+    expect(text).toContain("Source: code.dccouncil.gov");
+    expect(a11yIssues(html)).toEqual([]);
+    // No allowance in force, no allowance source drawn.
+    const ended = readRegulation(ex([row("Units", "24"), row("Year built", "1962")]), dc, "2027-06-01")!;
+    expect(renderToStaticMarkup(React.createElement(RegulationPanel, { regulation: ended, today: "2027-06-01" }))).not.toContain('data-qa="allowance-source"');
   });
 
   it("puts the city's own regime before the state's cap", () => {

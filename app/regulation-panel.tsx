@@ -16,8 +16,9 @@ import { sentencesOf } from "@/lib/first-sentence";
  *   - THE REGULATED SHARE: the memorandum's regulated units as a share of
  *     its count, one bar, only where both are stated and agree.
  *   - THE ALLOWANCE AGAINST THE MODEL: each figure the regime allows for
- *     the period in force, and — on the deal page, which has the model —
- *     the model's one rent growth rate, all on one scale.
+ *     the period in force, its own source linked beside it, and — on the
+ *     deal page, which has the model — the model's one rent growth rate, all
+ *     on one scale.
  *   - THE PERIOD: each filed allowance's period with today's tick, so an
  *     allowance about to end, ended or not yet begun is seen as one.
  *
@@ -186,6 +187,16 @@ export function RegulationPanel({
                     <span className="text-right font-mono tabular-nums">{pctText(f.pct)}</span>
                   </div>
                 ))}
+                {/* The figures' own source — the publisher of the allowance, which is
+                    not always the rule's (DC's caps are the Office of the Tenant
+                    Advocate's release, its rule the D.C. Code). */}
+                {hostOf(a.source) && (
+                  <p>
+                    <a href={a.source} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline" data-qa="allowance-source">
+                      {`Allowance source: ${hostOf(a.source)}`}
+                    </a>
+                  </p>
+                )}
               </div>
             );
           })}
