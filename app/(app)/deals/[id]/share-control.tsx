@@ -23,10 +23,14 @@ export interface ShareRow {
 export function ShareControl({
   dealId,
   shares,
+  sharesUnread = false,
   appUrl,
 }: {
   dealId: string;
   shares: ShareRow[];
+  /** The read of the live links failed: said, never shown as none beside
+   *  "revocable here anytime" (audit C5, LOW-5). */
+  sharesUnread?: boolean;
   /** absolute origin for copyable links (from the server, not window) */
   appUrl: string;
 }) {
@@ -126,7 +130,14 @@ export function ShareControl({
             </button>
           </form>
 
-          {shares.length > 0 && (
+          {sharesUnread && (
+            <p className="mt-3 border-t border-line pt-3 text-[11px] text-caution" role="status" data-qa="share-unread">
+              Couldn&rsquo;t list this deal&rsquo;s live links just now, so none can be revoked here until the page is
+              reloaded.
+            </p>
+          )}
+
+          {!sharesUnread && shares.length > 0 && (
             // Every live link, so each can be revoked here; a long list
             // scrolls inside the panel rather than past the screen.
             <div className="mt-3 border-t border-line pt-3">

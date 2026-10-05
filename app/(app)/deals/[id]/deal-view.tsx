@@ -354,6 +354,7 @@ export function DealView({
   screenDiff,
   stageHistory,
   internalComps = [],
+  internalCompsUnread = false,
   omUrl,
   facts = {},
   discrepancies = null,
@@ -441,6 +442,8 @@ export function DealView({
   screenDiff: ScreenDiff | null;
   stageHistory: StageChange[];
   internalComps?: InternalComp[];
+  /** the read of the reader's other screens failed (audit C5, LOW-5) */
+  internalCompsUnread?: boolean;
   omUrl: string | null;
   facts?: Record<string, DealFact>;
   discrepancies?: ReconcileResult | null;
@@ -1038,6 +1041,7 @@ export function DealView({
             modelError={modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null}
             supplements={supplements}
             internalComps={internalComps}
+            internalCompsUnread={internalCompsUnread}
             omUrl={omUrl}
             marketSince={marketSince}
             metroDemand={metroDemand}
@@ -1512,6 +1516,7 @@ function AnalysesPanel({
   modelError,
   supplements,
   internalComps,
+  internalCompsUnread = false,
   omUrl,
   staleVerdict = false,
   staleWhy = "failed",
@@ -1536,6 +1541,8 @@ function AnalysesPanel({
   modelError: string | null;
   supplements: SupplementsMap;
   internalComps: InternalComp[];
+  /** the read of the reader's other screens failed: said, never as none */
+  internalCompsUnread?: boolean;
   omUrl: string | null;
   /** the latest screen has not re-run the verdict (lib/screen-run) */
   staleVerdict?: boolean;
@@ -1577,6 +1584,14 @@ function AnalysesPanel({
           it's useful even before this deal's own comps scrutiny has run. */}
       {analysis === "comps" && internalComps.length > 0 && (
         <InternalCompsBlock comps={internalComps} />
+      )}
+      {analysis === "comps" && internalComps.length === 0 && internalCompsUnread && (
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-card" data-qa="internal-comps-unread">
+          <h2 className="text-sm font-semibold tracking-tight">From your pipeline</h2>
+          <p className="mt-1 text-sm text-caution" role="status">
+            Couldn&rsquo;t read your other screens just now, so none are listed here; reload the page to try again.
+          </p>
+        </section>
       )}
       {supp && <Supplements dealId={dealId} tab={analysis} data={supp} />}
       <AddData dealId={dealId} tab={analysis} />

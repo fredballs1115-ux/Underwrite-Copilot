@@ -280,9 +280,9 @@ export default async function DealPage({
           .order("id")
           .range(from, to),
       ).then((data) => ({ data })),
-      // Every live share link (pre-0017 schema: the query errors and data
-      // reads null — the Share button simply shows an empty list). All of
-      // them, newest first, a page at a time: the panel says a link is
+      // Every live share link (a read that fails is null, and the panel says
+      // it could not list them — never none beside "revocable here", audit
+      // C5, LOW-5). All of them, newest first, a page at a time: the panel says a link is
       // "revocable here anytime", and the newest five had left the sixth and
       // older live and out of view until their thirty days ran out
       // (research pass 42). A link lives thirty days, so they are few.
@@ -385,7 +385,10 @@ export default async function DealPage({
     (deal.asset_class as string | null) ?? "auto",
     extraction,
   );
-  const internalCompsRead: Promise<InternalComp[]> = compIds.length
+  // A read that fails is said as one, never as no comps (audit C5, LOW-5):
+  // the light read of the keys, or the full read of the candidates.
+  const compKeysUnread = siblings.data == null;
+  const internalCompsRead: Promise<{ comps: InternalComp[]; unread: boolean }> = compIds.length
     ? readByIds(compIds, (ids) =>
         supabase
           .from("deals")
@@ -393,14 +396,18 @@ export default async function DealPage({
           .in("id", ids),
       )
         .then((rows) => {
+          if (rows == null) return { comps: [], unread: true };
           const order = new Map(compIds.map((x, i) => [x, i]));
-          const sorted = ((rows ?? []) as Parameters<typeof deriveInternalComps>[3]).sort(
+          const sorted = (rows as Parameters<typeof deriveInternalComps>[3]).sort(
             (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
           );
-          return deriveInternalComps(deal.id, (deal.asset_class as string | null) ?? "auto", extraction, sorted, 8, user?.id ?? null);
+          return {
+            comps: deriveInternalComps(deal.id, (deal.asset_class as string | null) ?? "auto", extraction, sorted, 8, user?.id ?? null),
+            unread: false,
+          };
         })
-        .catch(() => [])
-    : Promise.resolve([]);
+        .catch(() => ({ comps: [], unread: true }))
+    : Promise.resolve({ comps: [], unread: compKeysUnread });
 
   // Deal memory (Feature 6): the account's OWN prior screens of this exact
   // market + asset class, aggregated — found in the reader's own deals
@@ -1191,7 +1198,7 @@ export default async function DealPage({
 
   const floodLegendEntries = await floodLegendRead;
   const marketMemory = await memoryRead;
-  const internalComps = await internalCompsRead;
+  const { comps: internalComps, unread: internalCompsUnread } = await internalCompsRead;
   const typicalScreen = await typicalScreenRead;
   const sameFile = await twinRead;
 
@@ -1371,6 +1378,7 @@ export default async function DealPage({
               <ShareControl
                 dealId={id}
                 shares={((sharesRes.data ?? []) as ShareRow[])}
+                sharesUnread={sharesRes.data == null}
                 appUrl={
                   process.env.NEXT_PUBLIC_APP_URL ??
                   "https://underwrite-copilot.onrender.com"
@@ -1814,6 +1822,7 @@ export default async function DealPage({
         screenDiff={screenDiff}
         stageHistory={stageHistory}
         internalComps={internalComps}
+        internalCompsUnread={internalCompsUnread}
         omUrl={omUrl}
         facts={factsByField}
         discrepancies={

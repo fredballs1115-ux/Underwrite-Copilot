@@ -815,6 +815,15 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(a11yIssues(html)).toEqual([]);
   });
 
+  it("says a failed read of the reader's other screens, never shows it as no comps (audit C5, LOW-5)", () => {
+    const failed = render({ ...sampleProps("analyses", "comps"), internalComps: [], internalCompsUnread: true } as unknown as Props);
+    expect(failed).toContain('data-qa="internal-comps-unread"');
+    expect(textOf(failed)).toContain("Couldn’t read your other screens just now, so none are listed here");
+    expect(a11yIssues(failed)).toEqual([]);
+    // Read and none: nothing is said, as before.
+    expect(render({ ...sampleProps("analyses", "comps"), internalComps: [] } as unknown as Props)).not.toContain("internal-comps-unread");
+  });
+
   it("grades a reconciliation gap on the actuals card's band — the NOI gap that card calls In line is never HIGH (2026-09-30)", () => {
     // The research pass: Property actuals called the OM's NOI 4.7% over the
     // T-12 "In line", and the Risk digest beneath it ranked the same $174k

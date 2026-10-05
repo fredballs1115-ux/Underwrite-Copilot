@@ -55,6 +55,19 @@ describe("every live link can be revoked here (research pass 42, M2)", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 
+  it("says a failed read of the live links, never none beside \"revocable here\" (audit C5, LOW-5)", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ShareControl, { dealId: "d1", shares: [], sharesUnread: true, appUrl: "https://example.com" }),
+    );
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toContain("Couldn’t list this deal’s live links just now, so none can be revoked here until the page is reloaded.");
+    expect(html).not.toContain('data-qa="share-live"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
+    expect(page).toContain("sharesUnread={sharesRes.data == null}");
+  });
+
   it("is handed every live link: the deal page reads them all, never the newest five", () => {
     const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
     const read = page.slice(page.indexOf('.from("deal_shares")') - 200, page.indexOf('.from("deal_shares")') + 500);
