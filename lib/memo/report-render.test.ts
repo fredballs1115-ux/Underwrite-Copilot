@@ -526,7 +526,7 @@ describe("ReportDocument (full report)", () => {
       interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest", groundLease: "", loan: "", page: "" },
       metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
     } as ExtractionResult);
-    expect(share).toMatch(/Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modeled price\)\..* It is the whole building's price, not the share's\./);
+    expect(share).toMatch(/Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modelled price\)\..* It is the whole building's price, not the share's\./);
     const unstated = await render({
       ...SAMPLE_DEAL.extraction,
       interest: { kind: "partial_interest", summary: "", share: "A minority interest in the owning entity", groundLease: "", loan: "", page: "" },
@@ -681,7 +681,7 @@ describe("ReportDocument (full report)", () => {
     );
   }, 60000);
 
-  it("labels the retrade grid's base row the modeled price, never the ask, and says what the model priced it at", async () => {
+  it("labels the retrade grid's base row the modelled price, never the ask, and says what the model priced it at", async () => {
     const render = async (extraction: ExtractionResult) => {
       const deal = {
         name: extraction.dealName ?? SAMPLE_DEAL.name,
@@ -705,10 +705,18 @@ describe("ReportDocument (full report)", () => {
     // beside "$61.2M (-10%)" (research pass 35).
     expect(sample).toContain("$61.2M (-10%) ");
     expect(sample).toContain("$64.6M (-5%) ");
-    expect(sample).toContain("$68.0M (modeled) ");
+    expect(sample).toContain("$68.0M (modelled) ");
     expect(sample).toContain("$71.4M (+5%) ");
     expect(sample).toContain("$74.8M (+10%) ");
-    expect(sample).toContain("The modeled price is $68,000,000: OM asking / purchase price (p. 3).");
+    expect(sample).toContain("The modelled price is $68,000,000: OM asking / purchase price (p. 3).");
+    // One spelling on the page, the one the site uses more of: it printed
+    // "modeled" and "Color marks distance" beside the cost line's "none is
+    // modelled" and the flood page's "colours" and "centred" (research pass
+    // 35).
+    expect(sample).toContain("Colour marks distance from the");
+    expect(sample).toContain("The ink-bordered cell is the modelled base case.");
+    expect(sample).toContain("none is modelled on the purchase");
+    expect(sample).not.toMatch(/\bmodeled\b|\bColor\b|\bcolors?\b|\bcolored\b|\bcenter(ed|s)?\b|\bcapitalized\b/i);
     expect(sample).not.toContain("(ask)");
     // A 49% share: the $33.3M ask grossed up to the $68M whole the model runs.
     const share = await render({
@@ -717,8 +725,8 @@ describe("ReportDocument (full report)", () => {
       interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
       metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
     } as ExtractionResult);
-    expect(share).toContain("$68.0M (modeled)");
-    expect(share).toContain("The modeled price is $68,000,000: The OM's $33,320,000 for a 49% share, grossed up to the whole asset");
+    expect(share).toContain("$68.0M (modelled)");
+    expect(share).toContain("The modelled price is $68,000,000: The OM's $33,320,000 for a 49% share, grossed up to the whole asset");
     expect(share).toContain("(derived).");
     expect(share).not.toContain("(ask)");
   }, 60000);

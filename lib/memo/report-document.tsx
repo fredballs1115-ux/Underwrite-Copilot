@@ -1458,7 +1458,7 @@ function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestO
     if (bid.onTerm) {
       const lead = bid.unbounded ? "That is on the model's capitalised exit" : "That IRR runs on the model's capitalised exit";
       const where = `on the term the ${lease} has left at the sale`;
-      const at = bid.unbounded ? "at twice the modeled price" : "at that price";
+      const at = bid.unbounded ? "at twice the modelled price" : "at that price";
       return `${line} ${lead}; ${
         bid.onTerm.irr != null
           ? `${where} the levered IRR ${at} is ${pctOrDash(bid.onTerm.irr)}`
@@ -1586,7 +1586,7 @@ const fmtCompactUsd = (n: number): string => compactUsd(n, { millions: "auto", t
 
 /**
  * The retrade grid's prices, one precision down the column and its zeros
- * kept, so the modeled row reads "$36.0M" beside "$32.4M", never "$36M"
+ * kept, so the modelled row reads "$36.0M" beside "$32.4M", never "$36M"
  * (research pass 35). The unit and the places are the smallest row's: one
  * place in millions from $10M, two from $1M (a $1.2M deal's 5% steps would
  * otherwise round two rows to one figure), else whole thousands.
@@ -1604,7 +1604,7 @@ export function retradePrices(prices: readonly number[]): string[] {
 /**
  * One sensitivity grid: a spanning axis title over the column values, a
  * left axis label over bold row labels, and two-line cells (IRR bold, EM
- * muted) colored by distance from the buyer's hurdle. The base cell wears
+ * muted) coloured by distance from the buyer's hurdle. The base cell wears
  * an ink border. Shared by the cap × growth grid and the retrade grid so
  * they can never drift apart visually.
  */
@@ -2098,7 +2098,7 @@ export function ReportDocument({
 
       {/* Sensitivity page (Feature 5): where the deal thrives, where it
           breaks — two grids from the same engine as the workbook and the
-          on-screen playground, colored against the BUYER'S hurdle. */}
+          on-screen playground, coloured against the BUYER'S hurdle. */}
       {sensitivity && (
         <PageChrome
           title="Sensitivity analysis"
@@ -2118,11 +2118,11 @@ export function ReportDocument({
             />
           ) : null}
           <Text style={s.sub}>
-            {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Color marks distance from the ${
+            {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Colour marks distance from the ${
               sensitivity.hurdleSource === "buybox"
                 ? `${fmtHurdle(sensitivity.hurdlePct)} IRR target in your buy box`
                 : `${fmtHurdle(sensitivity.hurdlePct)} screening hurdle`
-            } — deeper green clears it by more, deeper red misses by more. The ink-bordered cell is the modeled base case.`}
+            } — deeper green clears it by more, deeper red misses by more. The ink-bordered cell is the modelled base case.`}
           </Text>
           {interest?.modelCaveat ? (
             <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
@@ -2199,14 +2199,14 @@ export function ReportDocument({
             returns at each exit cap. Rows re-size the loan, fees, and equity
             from the new price.
           </Text>
-          {/* The base row is the MODELED price, which is the ask only where
+          {/* The base row is the MODELLED price, which is the ask only where
               the ask is what the model runs at: a share's price grossed up
               to the whole, an auction's floor and a price backed out of NOI
               and the cap are not. The source says which. */}
           {sensitivity.priceSource ? (
             <Text style={{ fontSize: 7.5, color: C.muted, marginTop: -6, marginBottom: 4 }}>
               {str(
-                `The modeled price is ${fmtUsd0(sensitivity.priceGrid.priceRows[sensitivity.priceGrid.baseRow]?.price ?? 0)}: ${sourceSays(
+                `The modelled price is ${fmtUsd0(sensitivity.priceGrid.priceRows[sensitivity.priceGrid.baseRow]?.price ?? 0)}: ${sourceSays(
                   sensitivity.priceSource,
                   totalPages,
                 )}.`,
@@ -2219,7 +2219,7 @@ export function ReportDocument({
             colLabels={sensitivity.priceGrid.capCols.map((cap) => `${(cap * 100).toFixed(2)}%`)}
             rowLabels={retradePrices(sensitivity.priceGrid.priceRows.map((p) => p.price)).map((price, i) => {
               const d = sensitivity.priceGrid.priceRows[i].deltaPct;
-              return `${price}  ${d === 0 ? "(modeled)" : `(${d > 0 ? "+" : ""}${Math.round(d * 100)}%)`}`;
+              return `${price}  ${d === 0 ? "(modelled)" : `(${d > 0 ? "+" : ""}${Math.round(d * 100)}%)`}`;
             })}
             cells={sensitivity.priceGrid.cells}
             baseRow={sensitivity.priceGrid.baseRow}

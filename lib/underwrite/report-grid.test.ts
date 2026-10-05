@@ -350,7 +350,7 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
     const line = maxBidSentence(s);
     expect(line).toMatch(
       new RegExp(
-        `^Max bid clearing your buy box's floors \\(13% IRR, 5% cash-on-cash, 5\\.75% going-in cap\\): \\${fmtBid(s.maxBid!.price).replace(".", "\\.")} \\(-\\d+\\.\\d% vs the modeled price\\); your 5% cash-on-cash floor binds\\. At that price: IRR \\d+\\.\\d%, year-1 cash-on-cash 5\\.0%, going-in cap \\d\\.\\d\\d%\\.$`,
+        `^Max bid clearing your buy box's floors \\(13% IRR, 5% cash-on-cash, 5\\.75% going-in cap\\): \\${fmtBid(s.maxBid!.price).replace(".", "\\.")} \\(-\\d+\\.\\d% vs the modelled price\\); your 5% cash-on-cash floor binds\\. At that price: IRR \\d+\\.\\d%, year-1 cash-on-cash 5\\.0%, going-in cap \\d\\.\\d\\d%\\.$`,
       ),
     );
   });
@@ -358,7 +358,7 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
   it("falls back to the screening hurdle's IRR where the box sets no floor, and says whose it is", () => {
     const none = buildSensitivityData(inputs, null, { floors: null });
     expect(none.maxBidFloors).toEqual({ floors: { minIrr: 0.15 }, from: "screening" });
-    expect(maxBidSentence(none)).toMatch(/^Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modeled price\)\./);
+    expect(maxBidSentence(none)).toMatch(/^Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modelled price\)\./);
     // A caller that passes the box's IRR as the hurdle and no floors says
     // it is the buyer's target, not the screening default.
     expect(maxBidSentence(buildSensitivityData(inputs, 13))).toMatch(/^Max bid holding your 13% IRR target: /);

@@ -65,10 +65,10 @@ export function buildCapGrowthGrid(inputs: UnderwriteInputs): CapGrowthGrid {
 }
 
 /** The retrade grid: purchase price (rows, ±10% in 5% steps around the
- *  modeled price) × exit cap (columns, the same stops as the cap/growth
+ *  modelled price) × exit cap (columns, the same stops as the cap/growth
  *  grid). This is the page's second question — "what does paying less do?" */
 export interface PriceCapGrid {
-  /** dollar price per row + its % delta vs the modeled base */
+  /** dollar price per row + its % delta vs the modelled base */
   priceRows: { price: number; deltaPct: number }[];
   capCols: number[];
   cells: HeatCell[][];
@@ -349,7 +349,7 @@ export interface SensitivityData {
   /** why the report leaves the model's returns out, or null where it may
    *  print them (`placeholderReturnsLine`); null where no sources were given */
   withheld?: string | null;
-  /** what the modeled price is — the ask, a share grossed up to the whole,
+  /** what the modelled price is — the ask, a share grossed up to the whole,
    *  an auction's floor, NOI over the going-in cap — as the derived model
    *  marks it; null where no sources were given */
   priceSource?: ModelSources["purchasePrice"] | null;
@@ -651,7 +651,7 @@ function noBidSentence(floors: BidFloors, nb: NoBidRead | null): string | null {
 /**
  * The max bid in the deal page's words (the playground's max-bid card): the
  * floors it clears and whose they are, the bid as the page prints it
- * (rounded down, `fmtBid`), its distance from the modeled price, the floor
+ * (rounded down, `fmtBid`), its distance from the modelled price, the floor
  * that binds, and the model's IRR, year-1 cash-on-cash and going-in cap at
  * that price. A bundle with no recorded floors reads as the screening
  * hurdle's IRR, which is what it was solved on.
@@ -672,10 +672,10 @@ export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors
   }
   if (bid.unbounded) {
     return box
-      ? `Max bid: ${what} hold even at twice the modeled price, so the box is not the constraint on this deal.`
+      ? `Max bid: ${what} hold even at twice the modelled price, so the box is not the constraint on this deal.`
       : `Max bid holding ${what}: clears at every tested price — the constraint never binds inside the search range.`;
   }
-  const delta = `${bid.deltaPct > 0 ? "+" : ""}${(bid.deltaPct * 100).toFixed(1)}% vs the modeled price`;
+  const delta = `${bid.deltaPct > 0 ? "+" : ""}${(bid.deltaPct * 100).toFixed(1)}% vs the modelled price`;
   const binds = box && bid.binding ? `; your ${floorWords(bid.binding, f.floors)} floor binds` : "";
   const at = bid.at
     ? ` At that price: IRR ${pct1(bid.at.irr)}, year-1 cash-on-cash ${pct1(bid.at.coc)}, going-in cap ${pct1(bid.at.cap, 2)}.`
