@@ -28,7 +28,7 @@ const deal = (over: Partial<ExportDeal> = {}): ExportDeal => ({
   ...over,
 });
 
-const ctx: ExportRowContext = { box: null, job: null, offersDue: null, addedBy: null };
+const ctx: ExportRowContext = { box: null, job: null, offersDue: null, addedBy: null, today: "2026-09-08" };
 
 async function classCell(d: ExportDeal): Promise<unknown> {
   const buf = await buildPipelineWorkbook([pipelineExportRow(d, ctx)], new Date("2026-09-08T12:00:00Z"), null);
@@ -39,6 +39,30 @@ async function classCell(d: ExportDeal): Promise<unknown> {
 }
 
 describe("pipelineExportRow — the meeting workbook reads a deal as every surface does", () => {
+  it("says the rent rules that reach the building, read on the route's day, and carries them in the price cell's note (lib/rent-regulation)", async () => {
+    const walkUp = {
+      dealName: "The Walk-up",
+      assetClass: "multifamily",
+      market: "Brooklyn, NY",
+      address: "",
+      metrics: [m("Asking price", "$14,000,000"), m("Units", "48"), m("Year built", "1931"), m("Rent-regulated units", "41")],
+    } as ExtractionResult;
+    const brooklyn = { label: "100 Walk-up St, Brooklyn, NY 11215", street: "100 Walk-up St", city: "Brooklyn", state: "NY", zip: "11215", county: "Kings County", submarket: "" };
+    const row = pipelineExportRow(deal({ extraction: walkUp, address: brooklyn }), { ...ctx, today: "2026-10-05" });
+    // The pipeline card's own slot, for the same deal on the same day.
+    expect(row.regulation).toBe("Rent-stabilized, 41 of 48");
+    expect(row.regulation).toBe(pickSlots(walkUp, null, "auto", { address: brooklyn, siteFlags: null, today: "2026-10-05" }).regulation);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 7 its price.
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain(
+      "Rent-stabilized, 41 of 48: the rent rules that reach the building",
+    );
+    // A deal no rule reaches carries none.
+    expect(pipelineExportRow(deal(), ctx).regulation).toBeNull();
+  });
+
   it("prints the deal's one class: the deck's on a deal filed Auto, the analyst's where they filed one", async () => {
     expect(pipelineExportRow(deal(), ctx).assetClass).toBe("multifamily");
     expect(pipelineExportRow(deal({ asset_class: "office" }), ctx).assetClass).toBe("office");

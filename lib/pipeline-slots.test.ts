@@ -49,7 +49,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
+    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, basis: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -144,6 +144,20 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).mh).toBeNull();
   });
 
+  it("says the rent rules that reach the building where the caller hands its place and day (lib/rent-regulation), and nothing where none reach it", () => {
+    const walkUp = ex([m("Asking price", "$14,000,000"), m("Units", "48"), m("Year built", "1931"), m("Rent-regulated units", "41")]);
+    const brooklyn = { address: { state: "NY", city: "Brooklyn", county: "Kings County", label: "100 Walk-up St, Brooklyn, NY 11215" }, siteFlags: null, today: "2026-10-05" };
+    expect(pickSlots(walkUp, null, "multifamily", brooklyn).regulation).toBe("Rent-stabilized, 41 of 48");
+    // A year the memorandum does not state leaves the rules' question open.
+    const noYear = ex([m("Asking price", "$14,000,000"), m("Units", "48")]);
+    expect(pickSlots(noYear, null, "multifamily", brooklyn).regulation).toBe("Rent rules: check");
+    // Filed as an office: no rent rules read, and the memorandum names none.
+    expect(pickSlots(noYear, null, "office", brooklyn).regulation).toBeNull();
+    // Outside every regime the site's rules hold, and with no place handed in.
+    expect(pickSlots(noYear, null, "multifamily", { address: { state: "TX", city: "Austin" }, siteFlags: null, today: "2026-10-05" }).regulation).toBeNull();
+    expect(pickSlots(walkUp, null, "multifamily").regulation).toBeNull();
+  });
+
   it("says a storage facility's lease-up or premium over street (#471), and nothing on anything else", () => {
     const rows = [m("Asking price", "$9,800,000"), m("Occupancy", "72%"), m("In-place rent", "$1.20/SF/mo"), m("Street rate", "$1.00/SF/mo")];
     expect(pickSlots({ ...ex(rows), assetClass: "self_storage" }, null).storage).toBe("Lease-up, 72% occupied, In-place 20% over street");
@@ -236,7 +250,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
+    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

@@ -156,6 +156,10 @@ describe("the signed-in pages count from the reader's day", () => {
       // The day an imported pipeline file's rows are stored as of: shared
       // data, dated as every job and feed dates its rows.
       "app/(app)/submarkets/actions.ts": "the import's stored as-of day",
+      // The day Ask's deal context reads the rent allowance in force on: a
+      // Claude step's day, the UTC day every step is told it is
+      // (lib/anthropic/today), as the screen's own steps read it.
+      "app/(app)/deals/[id]/ask-actions.ts": "the rent rules in Ask's context, on a Claude step's UTC day",
     };
     const found = files(join(root, "app/(app)"))
       .map((p) => p.slice(root.length + 1))

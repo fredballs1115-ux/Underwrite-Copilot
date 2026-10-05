@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { dealContextFor } from "./deal-context";
+import { regulationForDeal } from "./rent-regulation";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
 
@@ -334,6 +335,33 @@ describe("dealContextFor — a self-storage facility (#471)", () => {
     const ctx = dealContextFor(storage)!;
     expect(ctx).toContain("Self-storage: It is 91% occupied by units, 84% economically: the 7 points between the units let and the rent collected");
     expect(ctx).toContain("21.1% over it, the premium years of rate increases built");
+  });
+});
+
+describe("dealContextFor — the rent rules that reach the building (lib/rent-regulation)", () => {
+  const walkUp: ExtractionResult = {
+    dealName: "The Walk-up",
+    assetClass: "multifamily",
+    metrics: [m("Asking price", "$14,000,000"), m("Units", "48"), m("Year built", "1931"), m("Rent-regulated units", "41")],
+  };
+  const address = { state: "NY", city: "Brooklyn", county: "Kings County", label: "100 Walk-up St, Brooklyn, NY 11215" };
+
+  it("says the regime, the regulated share as stated and the allowance in force, beside a covenant on the rents", () => {
+    const regulation = regulationForDeal({ extraction: walkUp, address, siteFlags: null, assetClass: "multifamily" }, "2026-10-05");
+    const ctx = dealContextFor(walkUp, null, null, regulation)!;
+    expect(ctx).toContain("Rent regulation: NYC rent stabilization applies by the site's rules.");
+    expect(ctx).toContain("The memorandum states 41 of the 48 units are rent-regulated (85%).");
+    expect(ctx).toContain("the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease");
+    // Said before the deal's type, beside what sets the rents.
+    expect(ctx.indexOf("Rent regulation:")).toBeLessThan(ctx.indexOf("Deal type:"));
+  });
+
+  it("says nothing of rent rules where the caller read none, or none reached the building and the memorandum names none", () => {
+    expect(dealContextFor(walkUp)).toBe("Deal type: Stabilized.");
+    const unstated = { ...walkUp, metrics: walkUp.metrics.filter((r) => r.label !== "Rent-regulated units") };
+    const austin = regulationForDeal({ extraction: unstated, address: { state: "TX", city: "Austin" }, siteFlags: null, assetClass: "multifamily" }, "2026-10-05");
+    expect(austin).toBeNull();
+    expect(dealContextFor(unstated, null, null, austin)).toBe("Deal type: Stabilized.");
   });
 });
 

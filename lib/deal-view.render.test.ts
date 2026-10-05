@@ -36,6 +36,8 @@ import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
 import { SIZER_LENDER_TESTS, modelLoanCoverageLine } from "@/lib/sizer-terms";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
+import { regulationForDeal } from "./rent-regulation";
+import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -740,6 +742,56 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/ahead of the published figures/);
     expect(text).toMatch(/assumes cap compression/);
     expect(text).toMatch(/Cap compression is not a plan/);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("the financials' rent-growth row names a regime's allowance first, beside the market's figures (lib/rent-regulation)", () => {
+    const deck = {
+      dealName: "The Walk-up",
+      assetClass: "multifamily",
+      metrics: [
+        { label: "Asking price", value: "$14,000,000", flagged: false, page: "" },
+        { label: "Units", value: "48", flagged: false, page: "" },
+        { label: "Year built", value: "1931", flagged: false, page: "" },
+        { label: "Rent-regulated units", value: "41", flagged: false, page: "" },
+      ],
+    };
+    const regulation = regulationForDeal(
+      { extraction: deck, address: { state: "NY", city: "Brooklyn", county: "Kings County" }, siteFlags: null, assetClass: "multifamily" },
+      "2026-10-05",
+    );
+    // The page's read: one market figure (Zillow's asking rents), the model's
+    // 3% default, and the regime's allowance in force on the reader's day.
+    const read = modelVsMarket({
+      inputs: { rentGrowthPct: 0.03, expenseGrowthPct: 0.03, vacancyPct: 0.05, exitCapPct: 0.06 },
+      sources: { rentGrowthPct: { provenance: "assumption", note: "Default 3.0%/yr — set your view" } },
+      assetClass: "multifamily",
+      metro: { id: "nyc", name: "New York City" },
+      zori: {
+        rent: 3400,
+        yoyPct: 2.6,
+        asOf: "2026-08-31",
+        note: "Zillow Observed Rent Index (ZORI), all homes, smoothed, New York, NY metro area, month ending 2026-08-31. Data: Zillow Research.",
+        shared: false,
+        mfrRent: null,
+        mfrYoyPct: null,
+        homeValue: null,
+        homeValueYoyPct: null,
+        priceToRentYears: null,
+      },
+      rates: [],
+      national: [],
+      regulation,
+      now: new Date("2026-10-05T12:00:00Z"),
+    });
+    const html = render({ ...sampleProps("financials"), modelVsMarket: read });
+    const text = textOf(html);
+    expect(text).toContain(
+      "Under NYC rent stabilization, the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease and 0% on a two-year lease",
+    );
+    expect(text).toContain("That is the regime's allowance for the units it regulates, not a market figure: the model's 3.0%/yr runs 3.0 points over both.");
+    expect(text).toContain("For the market-rate units, over the past year the metro's asking rents moved +2.6%");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });

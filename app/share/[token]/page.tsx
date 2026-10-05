@@ -19,6 +19,7 @@ import { SHARE_AERIAL } from "@/lib/image-frames";
 import { SITE_NAME } from "@/lib/page-meta";
 import { PLAIN_CARD } from "@/lib/public-pages";
 import type { SharePictureSource } from "./share-picture";
+import { regulationForDeal } from "@/lib/rent-regulation";
 
 /** The aerial's credit on the public screen: The National Map is a US
  *  federal work in the public domain, and the line says so. */
@@ -119,6 +120,21 @@ export default async function SharePage({
   const picture = sources.length > 0 ? { sources, place: address?.label || deal.name } : null;
   const behind = verdictBehind(latestJob);
   const previous = previousScreenResults(latestJob);
+  // The rent rules that reach the building (lib/rent-regulation), through the
+  // one call every surface makes, at the address the sender's page reads the
+  // deal at, on this page's UTC day — handed to the view with that day, since
+  // the view reads no clock.
+  const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const regulation = regulationForDeal(
+    {
+      extraction,
+      address: addressUpgrade(deal.address, extraction) ?? address,
+      siteFlags: (deal.site_flags as SiteFlagsResult | null) ?? null,
+      assetClass: (deal.asset_class as string | null) ?? null,
+    },
+    today,
+  );
 
   return (
     <ShareView
@@ -146,6 +162,8 @@ export default async function SharePage({
         (deal.site_flags as SiteFlagsResult | null) ?? null,
         (addressUpgrade(deal.address, (deal.extraction as ExtractionResult | null) ?? null) ?? address)?.label,
       )}
+      regulation={regulation}
+      today={today}
     />
   );
 }

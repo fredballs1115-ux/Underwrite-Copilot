@@ -221,6 +221,34 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("the rent rules lead after the count they are a share of, each row only where stated (lib/rent-regulation)", () => {
+    const walkUp = [
+      { label: "Occupancy", value: "97%", flagged: true },
+      { label: "Preferential rent", value: "$1,480", flagged: false },
+      { label: "Rent-regulated units", value: "41", flagged: false },
+      { label: "Units", value: "48", flagged: false },
+      { label: "Going-in cap rate", value: "5.10%", flagged: false },
+      { label: "Rent regulation", value: "Rent stabilization", flagged: false },
+      { label: "Asking price", value: "$14,000,000", flagged: false },
+    ];
+    expect(keyTermRows(walkUp, "stabilized", SCREEN_YEAR, 6).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Units",
+      "Rent regulation",
+      "Rent-regulated units",
+      "Preferential rent",
+    ]);
+    // No legal rent is stated, so none leads; a market-rate building's terms
+    // read as before.
+    expect(keyTermRows(walkUp.filter((m) => !/^Rent|Preferential/.test(m.label)), "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Units",
+      "Occupancy",
+    ]);
+  });
+
   it("a student building's pre-leasing and walk lead after the price (#468)", () => {
     const student = [
       { label: "Occupancy", value: "96%", flagged: false },

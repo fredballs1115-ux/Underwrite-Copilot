@@ -16,6 +16,8 @@ import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
+import { RegulationPanel } from "@/app/regulation-panel";
+import { regulationForDeal } from "@/lib/rent-regulation";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
 import { StudentHousingPanel } from "@/app/student-housing-panel";
@@ -737,6 +739,20 @@ export default async function DealPage({
   // print a different rate for one deal on one day. Never on the sample,
   // whose figures are pinned (lib/model-market).
   const debt = await liveDebtSeeds(HOLD_MONTHS);
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once here and handed to what the page
+  // draws: the offers-due countdown in the header, the tasks' due dates, the
+  // Opportunity Zone round's line and the rent allowance in force.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  // The rent rules that reach the building (lib/rent-regulation), read once
+  // through the one call every surface makes — at the address the page reads
+  // the deal at, with the Census place and county only from flags answered
+  // for it, in the deal's one class, on the reader's day — for the panel, the
+  // model's cover lines and its rent-growth check against the market.
+  const regulation = regulationForDeal(
+    { extraction, address: dealAddress, siteFlags, assetClass: deal.asset_class as string | null },
+    todayIso,
+  );
   const derived = extraction
     ? deriveUnderwriteInputs(
         extraction,
@@ -750,6 +766,7 @@ export default async function DealPage({
             : null,
         },
         modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+        { regulation },
       )
     : null;
   // The seller's loan, where the memorandum offers it for assumption
@@ -946,6 +963,7 @@ export default async function DealPage({
           storedAssetClass: deal.asset_class as string | null,
           metro: liveMarket,
           reads,
+          regulation,
         })
       : null;
   // Year built feeds the rules engine's age-based coverage tests (NYC
@@ -1052,11 +1070,6 @@ export default async function DealPage({
     ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
     : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
   const noteCap = noteCapSlot(extraction);
-  // Today on the reader's own calendar (their browser's zone, from its
-  // cookie — lib/reader-day), read once here and handed to what the page
-  // draws: the offers-due countdown in the header, the tasks' due dates and
-  // the Opportunity Zone round's line.
-  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   return (
     <div className="flex flex-col gap-6">
@@ -1382,6 +1395,16 @@ export default async function DealPage({
             binds, until when, each tier against its limit — said before any
             rent growth is believed (lib/affordable). */}
         <AffordablePanel affordable={readAffordable(extraction)} />
+        {/* The rent rules that reach the building (lib/rent-regulation):
+            each regime and whether it applies, the regulated share as
+            stated, the allowance in force against the model's one growth
+            rate on one scale, and the period with today's tick. */}
+        <RegulationPanel
+          regulation={regulation}
+          today={todayIso}
+          modelGrowthPct={derived ? derived.inputs.rentGrowthPct * 100 : null}
+          modelLine={derived?.meta.regulation?.read ?? ""}
+        />
         {/* One tenant leases the whole property (#454): its guarantor, the
             term left today and at the model's sale, the options, and the
             lease's increases against the model's growth (lib/single-tenant). */}

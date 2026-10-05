@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       // The first signal and the address too: the row reads the deal's kind
       // and its buy-box fit on the pipeline page's own inputs.
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, first_signal, address, user_id, team_id, stage, is_sample",
+        "id, name, asset_class, created_at, verdict, extraction, first_signal, address, site_flags, user_id, team_id, stage, is_sample",
       )
       .order("created_at", { ascending: false }),
     getTeam(supabase, user.id).catch(() => null),
@@ -53,6 +53,7 @@ export async function GET(req: Request) {
     extraction: unknown;
     first_signal: unknown;
     address: unknown;
+    site_flags: unknown;
     user_id: string;
     team_id: string | null;
     stage: string | null;
@@ -120,7 +121,11 @@ export async function GET(req: Request) {
   }
 
   // Each row read through the readers every other surface uses
-  // (lib/pipeline-export-row, pure and tested).
+  // (lib/pipeline-export-row, pure and tested), on the route's UTC day —
+  // the day the file is named for — which decides the rent allowance in
+  // force.
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const exportRows: PipelineExportRow[] = rows.map((d) =>
     pipelineExportRow(d, {
       box: d.team_id ? teamBox : personalBox,
@@ -130,6 +135,7 @@ export async function GET(req: Request) {
         d.team_id && d.user_id !== user.id
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
+      today,
     }),
   );
 
@@ -142,7 +148,6 @@ export async function GET(req: Request) {
     branding = null;
   }
 
-  const now = new Date();
   const buffer = await buildPipelineWorkbook(exportRows, now, branding);
   return new Response(new Uint8Array(buffer), {
     headers: {

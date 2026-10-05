@@ -22,6 +22,8 @@ import { sellerFinancingDocLine } from "@/lib/seller-financing";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
+import { RegulationPanel } from "@/app/regulation-panel";
+import type { RegulationRead } from "@/lib/rent-regulation";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { HotelPanel } from "@/app/hotel-panel";
@@ -87,6 +89,13 @@ export interface ShareViewProps {
    *  `floodShortLine`, #426); null for minimal hazard, no digital map or a
    *  lookup that has not answered */
   floodLine?: string | null;
+  /** the rent rules that reach the building (lib/rent-regulation), read by
+   *  the loader through `regulationForDeal` on its UTC day; absent or null
+   *  where no rule reaches it and the memorandum names no regime */
+  regulation?: RegulationRead | null;
+  /** the loader's day, an ISO day: today's tick on a rent allowance's
+   *  period — the view itself reads no clock */
+  today?: string | null;
 }
 
 // A range's confidence, in the deal page's colours (RANGE_CONF there).
@@ -271,6 +280,8 @@ export function ShareView({
   market,
   verdict,
   floodLine = null,
+  regulation = null,
+  today = null,
 }: ShareViewProps) {
   const vmeta = VERDICT_META[verdict.verdict] ?? UNKNOWN_VERDICT;
   const call: VerdictCall | null = VERDICT_META[verdict.verdict] ? verdict.verdict : null;
@@ -344,6 +355,12 @@ export function ShareView({
       {/* A covenant or a contract that sets the rents (#453): how much of the
           building is restricted, until when, and what the model is not. */}
       <AffordablePanel affordable={readAffordable(safeExtraction)} />
+
+      {/* The rent rules that reach the building (lib/rent-regulation): each
+          regime, the regulated share as stated and the allowance in force —
+          the model's growth beside it needs the model, which the sender's
+          deal page carries. */}
+      <RegulationPanel regulation={regulation} today={today} />
 
       {/* One tenant leases the whole property (#454): the guarantor, the
           term left and the options, the increases — the lease is the deal. */}

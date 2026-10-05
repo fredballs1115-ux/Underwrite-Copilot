@@ -11,6 +11,8 @@ import { parseDealQa } from "@/lib/deals";
 import { locatedPage } from "@/lib/facts";
 import { omFingerprint } from "@/lib/om-fingerprint";
 import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { regulationForDeal } from "@/lib/rent-regulation";
 
 export type AskState =
   | { error?: string; ok?: boolean; question?: string }
@@ -69,7 +71,7 @@ export async function askDeal(
 
   const { data: deal, error: readErr } = await supabase
     .from("deals")
-    .select("id, om_storage_path, is_sample, qa, extraction, first_signal, site_flags, address")
+    .select("id, om_storage_path, is_sample, qa, extraction, first_signal, site_flags, address, asset_class")
     .eq("id", dealId)
     .maybeSingle();
   if (readErr) {
@@ -120,6 +122,18 @@ export async function askDeal(
       extraction,
       flags ? { flood: flags.flood } : null,
       (deal.first_signal as FirstSignal | null | undefined) ?? null,
+      // The rent rules that reach the building, read as the screen's steps
+      // read them (lib/rent-regulation `regulationForDeal`), on the UTC day
+      // every Claude step is told it is (lib/anthropic/today).
+      regulationForDeal(
+        {
+          extraction,
+          address: addressUpgrade(deal.address, extraction) ?? ((deal.address as StructuredAddress | null) ?? null),
+          siteFlags: (deal.site_flags as SiteFlagsResult | null) ?? null,
+          assetClass: (deal.asset_class as string | null) ?? null,
+        },
+        new Date().toISOString().slice(0, 10),
+      ),
     );
     const result = await askDealQuestion(pdf, question, context, {
       dealId,

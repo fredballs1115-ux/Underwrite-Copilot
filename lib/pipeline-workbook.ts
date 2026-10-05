@@ -91,6 +91,10 @@ export interface PipelineExportRow {
    *  economic occupancy (lib/self-storage `selfStorageTag`, #471); carried
    *  in the price cell's note */
   storage?: string | null;
+  /** the rent rules that reach the building — "Rent-stabilized, 41 of 48",
+   *  "Rent rules: check" (lib/rent-regulation `regulationTag`); carried in
+   *  the price cell's note */
+  regulation?: string | null;
   /** the going-in cap on today's income — always null on a plan deal, and
    *  on a note (`capWithheld`) */
   cap: string | null;
@@ -283,6 +287,7 @@ export async function buildPipelineWorkbook(
         d.student ? `${d.student}: a student building's leasing for the coming year — the deal page reads the pace, the beds and the walk to campus.` : null,
         d.mh ? `${d.mh}: a manufactured-housing park — the deal page reads the lot rent against the market's, the park-owned homes and the water and sewer.` : null,
         d.storage ? `${d.storage}: a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate.` : null,
+        d.regulation ? `${d.regulation}: the rent rules that reach the building — the deal page reads the regime, the regulated share and the allowance in force against the model's growth.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
+import { regulationForDeal } from "@/lib/rent-regulation";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 
 const metric = (
@@ -498,6 +499,44 @@ describe("deriveUnderwriteInputs — a self-storage facility's premium over stre
     expect(m.meta.storage?.read).toMatch(/^The model grows today's rent, the rate increases' premium included; with every tenant at street its year-one rent would be \$\d+k lower/);
     expect(m.meta.storage?.read).toContain(`Its ${Math.round(m.inputs.vacancyPct * 1000) / 10}% vacancy is held flat across its years`);
     expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.storage).toBeNull();
+  });
+});
+
+describe("deriveUnderwriteInputs — the rent rules that reach the building, beside the model's one growth rate (lib/rent-regulation)", () => {
+  const walkUp = ex([
+    metric("Asking price", "$14,000,000"),
+    metric("NOI (in-place)", "$700,000"),
+    metric("Units", "48"),
+    metric("Year built", "1931"),
+    metric("Rent-regulated units", "41"),
+  ]);
+  const regulation = regulationForDeal(
+    { extraction: walkUp, address: { state: "NY", city: "Brooklyn", county: "Kings County" }, siteFlags: null, assetClass: "multifamily" },
+    "2026-10-05",
+  );
+
+  it("says the read in a line and sets the model's growth beside the allowance in force, never changing it", () => {
+    const m = deriveUnderwriteInputs(walkUp, "fallback", undefined, undefined, { regulation });
+    expect(m.meta.regulation?.line).toBe(
+      "Rent regulation: NYC rent stabilization applies; 41 of the 48 units rent-regulated as stated (85%); 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027",
+    );
+    expect(m.meta.regulation?.read).toBe(
+      `The model grows every rent ${Math.round(m.inputs.rentGrowthPct * 10000) / 100}% a year; NYC rent stabilization allows 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027 (the Rent Guidelines Board's Apartment/Loft Order #58), and 41 of the 48 units are regulated as the memorandum states. The model's one growth rate is the market-rate units', not the regulated ones'.`,
+    );
+    // The model is the same model: no input moves for the regulation.
+    expect(m.inputs).toEqual(deriveUnderwriteInputs(walkUp, "fallback").inputs);
+    // Absent where the caller read none.
+    expect(deriveUnderwriteInputs(walkUp, "fallback").meta.regulation).toBeNull();
+  });
+
+  it("carries the memorandum's own claim with no model read where no rule the site holds reaches the building", () => {
+    const claim = regulationForDeal(
+      { extraction: walkUp, address: { state: "TX", city: "Austin" }, siteFlags: null, assetClass: "multifamily" },
+      "2026-10-05",
+    );
+    const m = deriveUnderwriteInputs(walkUp, "fallback", undefined, undefined, { regulation: claim });
+    expect(m.meta.regulation?.line).toMatch(/^Rent regulation: The memorandum states regulated rents, which no rule the site holds reaches here/);
+    expect(m.meta.regulation?.read).toBe("");
   });
 });
 

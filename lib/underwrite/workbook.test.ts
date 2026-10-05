@@ -8,6 +8,7 @@ import { buildSensitivityGrids } from "./sensitivity";
 import type { UnderwriteInputs } from "./engine";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { regulationForDeal } from "@/lib/rent-regulation";
 
 /**
  * Proof that the generated workbook's formulas are LIVE and compute the same
@@ -1462,6 +1463,36 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model grows today's rent, the rate increases' premium included/);
     const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The facility")).toThrow();
+  });
+
+  it("the rent rules (lib/rent-regulation): the regime, the regulated share and the allowance in force, then the model's growth beside it", async () => {
+    const walkUp: ExtractionResult = {
+      ...extraction,
+      assetClass: "multifamily",
+      metrics: [
+        ...extraction.metrics,
+        { label: "Units", value: "48", flagged: false, page: "p. 3" },
+        { label: "Year built", value: "1931", flagged: false, page: "p. 3" },
+        { label: "Rent-regulated units", value: "41", flagged: false, page: "p. 9" },
+      ],
+    };
+    const regulation = regulationForDeal(
+      { extraction: walkUp, address: { state: "NY", city: "Brooklyn", county: "Kings County" }, siteFlags: null, assetClass: "multifamily" },
+      "2026-10-05",
+    );
+    const regulated = deriveUnderwriteInputs(walkUp, "fallback", undefined, undefined, { regulation });
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(regulated));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The rent rules");
+    expect(String(cover.getCell(r, 3).value)).toBe(
+      "Rent regulation: NYC rent stabilization applies; 41 of the 48 units rent-regulated as stated (85%); 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027",
+    );
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model grows every rent [\d.]+% a year; NYC rent stabilization allows 0% on a one-year lease/);
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("The model's one growth rate is the market-rate units', not the regulated ones'.");
+    // The model's Rent Growth input is the same with the rules read or not.
+    expect(regulated.inputs.rentGrowthPct).toBe(deriveUnderwriteInputs(walkUp, "fallback").inputs.rentGrowthPct);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The rent rules")).toThrow();
   });
 
   it("the third-party reports (#465): what they found, then what the model does with the immediate repairs", async () => {

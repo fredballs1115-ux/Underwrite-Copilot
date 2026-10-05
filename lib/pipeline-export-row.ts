@@ -21,6 +21,8 @@ import { siteReportsTag } from "@/lib/site-reports";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
+import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
 import { shownAssetClass, statedCapSlot } from "@/lib/pipeline-slots";
 import type { PipelineExportRow } from "@/lib/pipeline-workbook";
@@ -38,6 +40,10 @@ export interface ExportDeal {
   /** the deal's address as stored (StructuredAddress), which widens the
    *  buy box's geography as it does on the pipeline page */
   address?: unknown;
+  /** the deal's stored site-flags lookup (SiteFlagsResult): the Census place
+   *  and county the rent rules read, only where it answered for the address
+   *  the deal has now */
+  site_flags?: unknown;
   stage: string | null;
 }
 
@@ -50,6 +56,9 @@ export interface ExportRowContext {
   offersDue: string | null;
   /** the teammate who added the deal, where it is not the reader's own */
   addedBy: string | null;
+  /** the day the rows are read on, an ISO day — the route's own UTC day:
+   *  it decides the rent allowance in force (lib/rent-regulation) */
+  today: string;
 }
 
 export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): PipelineExportRow {
@@ -100,6 +109,20 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     student: studentHousingTag(extraction),
     mh: manufacturedHousingTag(extraction),
     storage: selfStorageTag(extraction),
+    // The rent rules that reach the building, read through the one call
+    // every surface makes (lib/rent-regulation `regulationForDeal`), at the
+    // address the row is placed at, as the pipeline card reads them.
+    regulation: regulationTag(
+      regulationForDeal(
+        {
+          extraction,
+          address,
+          siteFlags: (d.site_flags as SiteFlagsResult | null | undefined) ?? null,
+          assetClass: d.asset_class,
+        },
+        ctx.today,
+      ),
+    ),
     // The pipeline card's own cap reader: none on a plan deal, none on a
     // note (its collateral's cap is not the buyer's figure, and the cell
     // says the cap is withheld).

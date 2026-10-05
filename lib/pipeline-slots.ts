@@ -26,6 +26,8 @@ import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
+import { regulationForDeal, regulationTag, type DealForRegulation } from "@/lib/rent-regulation";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
 export interface PipelineSlots {
@@ -106,6 +108,12 @@ export interface PipelineSlots {
    *  Economic 84%", "Lease-up, 72% occupied" (lib/self-storage
    *  `selfStorageTag`, #471); absent or null on anything else */
   storage?: string | null;
+  /** the rent rules that reach the building — "Rent-stabilized, 41 of 48",
+   *  "LA RSO, 3% cap", "Rent rules: check" where a regime possibly applies,
+   *  "Rent-regulated (OM)" where only the memorandum says so
+   *  (lib/rent-regulation `regulationTag`); absent or null where none reaches
+   *  it, and where the caller passed no place to read the rules at */
+  regulation?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -177,13 +185,31 @@ export function readingTerms(status: ListJobStatus | undefined, hasExtraction: b
   return status === "running" && !hasExtraction && hasOm;
 }
 
+/** Where a deal is, and the day it is read on, for the slot that reads the
+ *  rent rules at the building (lib/rent-regulation): the deal's address as
+ *  the page reads it, its stored site flags (the Census place and county are
+ *  read only from a lookup answered for that address) and the reader's own
+ *  day (lib/reader-day `readerToday`), which decides the allowance in force. */
+export interface SlotPlace {
+  address: DealForRegulation["address"];
+  siteFlags: SiteFlagsResult | null;
+  today: string;
+}
+
 /** The row's slots. `storedClass` is the class the deal was filed under
  *  ("auto" where the analyst left it to the deck), read with the
  *  extraction's through `shownAssetClass` wherever a slot speaks in the
  *  class's terms. Before the extraction lands — a first screen's first
  *  minute — the first signal is all there is: its ask fills the price, as
- *  on the deal page, and every other slot waits for the terms. */
-export function pickSlots(extraction: ExtractionResult | null, signal: FirstSignal | null, storedClass?: string | null): PipelineSlots {
+ *  on the deal page, and every other slot waits for the terms. `place` is
+ *  where the deal is and the day it is read on: the rent rules are read only
+ *  where it is given, and the slot is null where it is not. */
+export function pickSlots(
+  extraction: ExtractionResult | null,
+  signal: FirstSignal | null,
+  storedClass?: string | null,
+  place?: SlotPlace | null,
+): PipelineSlots {
   if (!extraction) return { cap: null, price: signalAskPrice(signal), yoc: null };
   const metrics = extraction.metrics ?? [];
   // The same read the deal page makes — extraction plus the first signal —
@@ -244,6 +270,14 @@ export function pickSlots(extraction: ExtractionResult | null, signal: FirstSign
     mh: manufacturedHousingTag(extraction),
     // A storage facility's lease-up and the premium over street (#471).
     storage: selfStorageTag(extraction),
+    // The rent rules that reach the building, read through the one call
+    // every surface makes (lib/rent-regulation `regulationForDeal`): a
+    // regime that applies, one to check, or the memorandum's own claim.
+    regulation: place
+      ? regulationTag(
+          regulationForDeal({ extraction, address: place.address, siteFlags: place.siteFlags, assetClass: storedClass ?? null }, place.today),
+        )
+      : null,
     // The price by the unit or the foot, as a listing card shows it (#469),
     // in the deal's one class.
     basis: basisTag(extraction, strategy.kind, storedClass),

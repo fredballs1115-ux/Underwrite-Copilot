@@ -150,6 +150,10 @@ export type Col = {
    *  3rd-party managed" — lib/self-storage `selfStorageTag`, #471); absent
    *  otherwise */
   storage?: string | null;
+  /** the rent rules that reach the building ("Rent-stabilized, 41 of 48",
+   *  "Rent rules: check" — lib/rent-regulation `regulationTag`); absent
+   *  where none reaches it and the memorandum names no regime */
+  regulation?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -329,6 +333,10 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A dash, never "market-rate": a screen saved before the restriction
     // was read did not look.
     { label: "Affordability", get: (c) => c.affordable || "—" },
+    // The rent rules that reach the building (lib/rent-regulation): a dash,
+    // never "none", for a deal with no read — the site's rules not reaching
+    // a regime here is not a finding that the building has none.
+    { label: "Rent regulation", get: (c) => c.regulation || "—" },
     { label: "Tenancy", get: (c) => c.tenancy || "—" },
     // A shadow anchor is not bought, and a roll before the sale is income
     // the model counts and the buyer may not keep (#457).

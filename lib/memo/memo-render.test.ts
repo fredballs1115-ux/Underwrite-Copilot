@@ -476,6 +476,43 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).storageLine).toBe("");
   }, 30000);
 
+  it("says the rent rules that reach the building under the title, on the day it is given (lib/rent-regulation), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Year built", value: "1931", flagged: false, page: "", basis: "na" },
+        { label: "Rent-regulated units", value: "180", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      address: { label: "100 Walk-up St, Brooklyn, NY 11215", street: "100 Walk-up St", city: "Brooklyn", state: "NY", zip: "11215", county: "Kings County", submarket: "" },
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.regulationLine).toBe(
+      "Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%); 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027",
+    );
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%)");
+    // Past the period's end the allowance is no longer said as in force.
+    expect(buildMemoData(deal, "November 15, 2027", [], null, null, null, "2027-11-15").regulationLine).toBe(
+      "Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%)",
+    );
+    // The sample, in Philadelphia, sits under no regime the site holds.
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").regulationLine).toBe("");
+  }, 30000);
+
   it("says what the third-party reports found under the title (#465), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

@@ -994,6 +994,14 @@ export interface ReportInput {
    *  printed over the grids; absent where the caller built no model, and
    *  then the line prints alone */
   storage?: { line: string; read: string } | null;
+  /** the rent rules that reach the building — the regime, the regulated
+   *  share as stated and the allowance in force — and the model's one growth
+   *  rate set beside the allowance (lib/rent-regulation, read by the route
+   *  through `regulationForDeal`, with the derived model's
+   *  `meta.regulation`) — printed over the grids; the line alone where the
+   *  model built nothing worth printing, and nothing where the caller read
+   *  no regulation */
+  regulation?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427,
    *  #472): the deal's flood frame cut to the band, the key of the zones it
    *  shows and the zone sentence; null for no page */
@@ -1036,6 +1044,7 @@ export function buildReportData(
   student?: { line: string; read: string } | null,
   mh?: { line: string; read: string } | null,
   storage?: { line: string; read: string } | null,
+  regulation?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -1071,6 +1080,10 @@ export function buildReportData(
     student: modelRead(student),
     mh: modelRead(mh),
     storage: modelRead(storage),
+    // The rent rules are the site's rules and the memorandum's words, not
+    // the model's: where the model's reads are withheld, the line still
+    // prints, without the model's growth set beside the allowance.
+    regulation: regulation ? (withheld ? { line: regulation.line, read: "" } : regulation) : null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1527,6 +1540,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A self-storage facility (#471), the same way.
   const storageRead = readSelfStorage(extraction);
   const storage = input.storage ?? (storageRead ? { line: storageShortLine(storageRead), read: "" } : null);
+  // The rent rules that reach the building, as the route read them: the
+  // rules need the deal's place and a day, which the route holds.
+  const regulation = input.regulation ?? null;
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1743,6 +1759,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {/* The plan deal has no sensitivity page, so its assumptions read
               lands here, under the grid it is judged on. */}
           {!sensitivity && <AffordableCaveat read={affordable} />}
+          {!sensitivity && <SingleTenantCaveat lease={regulation} />}
           {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
           {!sensitivity && <SingleTenantCaveat lease={hotel} />}
           {!sensitivity && <SingleTenantCaveat lease={sale} />}
@@ -1788,6 +1805,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             </Text>
           ) : null}
           <AffordableCaveat read={affordable} />
+          <SingleTenantCaveat lease={regulation} />
           <SingleTenantCaveat lease={singleTenant} />
           <SingleTenantCaveat lease={hotel} />
           <SingleTenantCaveat lease={sale} />

@@ -267,6 +267,13 @@ export default async function DealsPage({
     }
   }
 
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once per request and handed to the list:
+  // every offers-due countdown counts from it, on the server and in the
+  // browser alike (the deal page reads its own the same way), and each
+  // row's rent rules read the allowance in force on it.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+
   const deals: DealCard[] = rows.map((d) => {
     const extraction = d.extraction as ExtractionResult | null;
     const verdict = d.verdict as { verdict?: string } | null;
@@ -338,8 +345,14 @@ export default async function DealsPage({
       readCounty: placement.placedBy?.county ?? null,
       offersDue: dueById.get(d.id) ?? null,
       // Before the extraction lands the first signal's ask fills the price,
-      // as on the deal page (lib/pipeline-slots).
-      slots: pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class),
+      // as on the deal page (lib/pipeline-slots). The rent rules are read at
+      // the address the row now holds, with the site flags stored for it,
+      // on the reader's own day.
+      slots: pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class, {
+        address: rowAddress,
+        siteFlags: storedFlags,
+        today: todayIso,
+      }),
       jobStatus,
       // A first screen before its terms are read: an empty slot is "not
       // read yet" and shimmers, never the dash that says "not stated"
@@ -456,12 +469,6 @@ export default async function DealsPage({
       }),
     ),
   };
-
-  // Today on the reader's own calendar (their browser's zone, from its
-  // cookie — lib/reader-day), read once per request and handed to the list:
-  // every offers-due countdown counts from it, on the server and in the
-  // browser alike (the deal page reads its own the same way).
-  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   return (
     <>

@@ -17,6 +17,7 @@ import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { readPortfolio } from "@/lib/portfolio";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
+import { regulationForDeal } from "@/lib/rent-regulation";
 
 export const runtime = "nodejs";
 
@@ -117,7 +118,21 @@ export async function GET(
     // cell and its Sources note match the page the download came from —
     // and, as there, none for the sample (lib/model-market).
     const debt = await liveDebtSeeds(HOLD_MONTHS);
-    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt));
+    // Where the deal is, as the page and the report read it: a blank address
+    // the memorandum's, a typed line its own fields (#441).
+    const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
+    const siteFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+    // The rent rules that reach the building (lib/rent-regulation), through
+    // the one call every surface makes, on the route's UTC day — the day the
+    // cover says the workbook was built: the cover's "The rent rules" and the
+    // Market Read's rent-growth row read the same regulation.
+    const regulation = regulationForDeal(
+      { extraction, address, siteFlags, assetClass: deal.asset_class as string | null },
+      new Date().toISOString().slice(0, 10),
+    );
+    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt), {
+      regulation,
+    });
     // An auction's ceiling bid (#456) is said at the buyer's own hurdle, the
     // buy box's IRR floor, as the deal page and the report say it; the
     // model's own read is at the screening default. Asked only of a deal
@@ -139,11 +154,7 @@ export async function GET(
     try {
       // The covered metro, the metro area its county sits in (#447), or the
       // state's own series — the same market the page and the report read.
-      const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
-      const metro = placeDeal(
-        address,
-        countyOf(address, (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
-      ).live;
+      const metro = placeDeal(address, countyOf(address, siteFlags)).live;
       marketRead = modelVsMarketFor({
         derived: model,
         extraction,
@@ -153,6 +164,7 @@ export async function GET(
         storedAssetClass: deal.asset_class as string | null,
         metro,
         reads: await todayReads(metro),
+        regulation,
       });
     } catch (err) {
       console.warn(`workbook market read failed for ${id}:`, err instanceof Error ? err.message : err);

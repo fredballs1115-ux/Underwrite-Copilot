@@ -31,6 +31,7 @@ import { siteReportTermRows } from "./site-reports";
 import { studentTermRows } from "./student-housing";
 import { mhTermRows } from "./manufactured-housing";
 import { storageTermRows } from "./self-storage";
+import { regulationTermRows } from "./rent-regulation";
 
 /** A cap rate on the property's income, whatever its qualifier: "Cap rate
  *  (T-12)", "Stabilized cap rate", "Going-in cap", "Exit cap". Never an
@@ -106,6 +107,10 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A covenant or a contract that sets the rents (#453): how many units it
   // binds and until when, right after the count it is a share of.
   for (const row of affordableTermRows(rows)) lead(row);
+  // The rent rules (lib/rent-regulation): the regime as the memorandum
+  // names it, the units under it, and the legal and preferential rents —
+  // after the count the regulated units are a share of.
+  for (const row of regulationTermRows(rows)) lead(row);
   // The one lease a single-tenant property is (#454): when it ends, how its
   // rent grows and the tenant's options — what the price is paid for.
   for (const row of singleTenantTermRows(rows)) lead(row);

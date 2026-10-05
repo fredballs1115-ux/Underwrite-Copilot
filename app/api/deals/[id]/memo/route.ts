@@ -177,7 +177,9 @@ export async function GET(
       (deal.address as StructuredAddress | null) ?? null,
       ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
     );
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover);
+    // The rent allowance in force is read on the route's UTC day — the day
+    // the file is named for (lib/rent-regulation).
+    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, new Date().toISOString().slice(0, 10));
     // MemoDocument renders a <Document>; cast to the element type renderToBuffer
     // expects (it's typed for a Document element, not a wrapping component).
     const element = React.createElement(MemoDocument, {

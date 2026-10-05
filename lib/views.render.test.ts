@@ -1403,7 +1403,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const bare = (label: string) => label.replace(/ · model$/, "");
     const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => bare(m[1]));
     const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => bare(m[1]));
-    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
+    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
     // Four deals none of which states a hotel, a sale, a restriction or any
     // of the other deal-type facts: no column of dashes for any of them.
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
@@ -1437,6 +1437,19 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(visibleText(noYoc)).toContain("judged on yield on cost");
     expect(tableRows(noYoc)).toContain("Yield on cost (stabilized)");
     expect(visibleText(noYoc)).toContain("not stated");
+  });
+
+  it("sets the rent rules side by side (lib/rent-regulation): the tag where a regime reaches, a dash — never \"none\" — beside a deal with no read", () => {
+    const cols: Col[] = [COLS[0], { ...COLS[2] }, { ...COLS[1], regulation: "Rent-stabilized, 41 of 48" }];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const row = html.match(/<tr\b(?:(?!<\/tr>)[\s\S])*?>Rent regulation<\/td>[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(row).not.toBe("");
+    const cells = visibleText(row);
+    expect(cells).toContain("Rent-stabilized, 41 of 48");
+    expect(cells.match(/—/g)).toHaveLength(2);
+    expect(cells).not.toMatch(/\bnone\b/i);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("reads a note's and a share's price for what it buys (#423): the note's yield, the share's cap on the whole, returns withheld", () => {
@@ -8194,6 +8207,168 @@ describe("Pipeline — a self-storage facility's tag (#471)", () => {
       expect(text, initialView).toContain("Lease-up, 72% occupied, In-place 20% over street");
       const tag = html.match(/<span[^>]*title="Lease-up, 72% occupied, In-place 20% over street:[^"]*"[^>]*>/)?.[0] ?? "";
       expect(tag, initialView).toContain("text-caution");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});
+
+import { RegulationPanel } from "@/app/regulation-panel";
+import { readRegulation, regulationForDeal, regulationModelLine } from "@/lib/rent-regulation";
+
+describe("RegulationPanel (lib/rent-regulation) — the regimes, the regulated share, the allowance against the model's growth, the period with today's tick", () => {
+  const row = (label: string, value: string, page = "p. 9") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const deck = (metrics: ReturnType<typeof row>[]) =>
+    ({ dealName: "The Walk-up", assetClass: "multifamily", totalPages: 40, metrics: [row("Asking price", "$14,000,000", "p. 2"), ...metrics] }) as unknown as ExtractionResult;
+  const BROOKLYN = {
+    address: { state: "NY", city: "Brooklyn", county: "Kings County" },
+    census: { place: { name: "New York city" }, county: { name: "Kings County" } },
+    classKey: "multifamily",
+  };
+
+  it("draws the share, each allowance figure and the model's rate on one scale, the period with today's tick and a tile a stated figure", () => {
+    const r = readRegulation(
+      deck([
+        row("Units", "48"),
+        row("Year built", "1931"),
+        row("Rent-regulated units", "41"),
+        row("Rent regulation", "Rent stabilization"),
+        row("Legal regulated rent", "$1,650 / month avg"),
+        row("Preferential rent", "$1,480"),
+      ]),
+      BROOKLYN,
+      "2026-10-05",
+    )!;
+    const html = render(React.createElement(RegulationPanel, { regulation: r, today: "2026-10-05", modelGrowthPct: 3, modelLine: regulationModelLine(r, 3)! }));
+    dumpView("regulation-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="regulation-panel"');
+    expect(text).toContain("NYC rent stabilization applies");
+    expect(html).toContain('data-regime="ny-nyc-rent-stabilization-coverage"');
+    expect(text).toContain("Source: rentguidelinesboard.cityofnewyork.us");
+    expect(html.match(/data-bar="reg-units"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="reg-allowance"/g)).toHaveLength(2);
+    expect(html.match(/data-bar="reg-model-growth"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="reg-period"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="reg-today"/g)).toHaveLength(1);
+    expect(text).toContain("41 of the 48 units rent-regulated, as the memorandum states (85%)");
+    expect(text).toContain("NYC rent stabilization allows, for leases commencing Oct 1, 2026 to Sep 30, 2027:");
+    expect(text).toContain("The model grows every rent");
+    expect(text).toContain("In force Oct 1, 2026 to Sep 30, 2027");
+    expect(text).toContain("Today, Oct 5, 2026");
+    for (const key of ["stated", "legal-rent", "preferential-rent"]) expect(html).toContain(`data-reg="${key}"`);
+    // The read's first sentence in the open, the rest one click away.
+    expect(text).toContain("NYC rent stabilization applies by the site's rules.");
+    expect(html).toContain("Read the rest (5 more)");
+    expect(text).toContain("The model's one growth rate is the market-rate units', not the regulated ones'.");
+    expect(a11yIssues(html), "regulation panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("says a regime that possibly applies with its open question, draws the allowance alone with no model, nothing in force past its end, and the memorandum's claim where no rule reaches", () => {
+    const possibly = readRegulation(deck([row("Units", "48")]), BROOKLYN, "2026-10-05")!;
+    const html = render(React.createElement(RegulationPanel, { regulation: possibly, today: "2026-10-05" }));
+    const text = visibleText(html);
+    expect(text).toContain("NYC rent stabilization possibly applies");
+    expect(text).toContain("Open: year built");
+    expect(html.match(/data-bar="reg-allowance"/g)).toHaveLength(2);
+    expect(html).not.toContain('data-bar="reg-model-growth"');
+    expect(html).not.toContain('data-bar="reg-units"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    // Past the filed period's end: no figure is drawn as in force, and the
+    // period says it ended.
+    const ended = readRegulation(deck([row("Units", "48"), row("Year built", "1931")]), BROOKLYN, "2027-11-15")!;
+    const endedHtml = render(React.createElement(RegulationPanel, { regulation: ended, today: "2027-11-15", modelGrowthPct: 3 }));
+    expect(endedHtml).not.toContain('data-bar="reg-allowance"');
+    expect(endedHtml).not.toContain('data-bar="reg-model-growth"');
+    expect(visibleText(endedHtml)).toContain("Ended Sep 30, 2027: the figure in force now needs checking");
+    // No rule the site holds reaches Austin: the memorandum's own words, said as its claim.
+    const claim = readRegulation(
+      deck([row("Units", "120"), row("Rent regulation", "Rent stabilized under a city program")]),
+      { address: { state: "TX", city: "Austin" }, classKey: "multifamily" },
+      "2026-10-05",
+    )!;
+    const claimHtml = render(React.createElement(RegulationPanel, { regulation: claim, today: "2026-10-05" }));
+    expect(visibleText(claimHtml)).toContain("Rent stabilized under a city program, as the memorandum states");
+    expect(claimHtml).not.toContain('data-qa="regulation-regimes"');
+    expect(a11yIssues(claimHtml)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(RegulationPanel, { regulation: null }))).toBe("");
+  });
+});
+
+describe("ShareView — the rent rules that reach the building (lib/rent-regulation)", () => {
+  it("draws the panel without the model's growth, leads the key terms with the regulated count, and nothing on the sample", () => {
+    const withRules = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Year built", value: "1931", flagged: false, page: "", basis: "na" as const },
+        { label: "Rent-regulated units", value: "180", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const regulation = regulationForDeal(
+      {
+        extraction: withRules,
+        address: { state: "NY", city: "Brooklyn", county: "Kings County", label: "100 Walk-up St, Brooklyn, NY 11215" },
+        siteFlags: null,
+        assetClass: "multifamily",
+      },
+      "2026-10-05",
+    );
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: "multifamily",
+      expiresAt: "2026-10-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      today: "2026-10-05",
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withRules, regulation }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="regulation-panel"');
+    expect(text).toContain("180 of the 248 units rent-regulated, as the memorandum states (73%)");
+    expect(html.match(/data-bar="reg-allowance"/g)).toHaveLength(2);
+    expect(html).not.toContain('data-bar="reg-model-growth"');
+    // The key terms lead with the regulated count, after the building's.
+    expect(text).toContain("Rent-regulated units");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("regulation-panel");
+  });
+});
+
+describe("Pipeline — the rent rules' tag (lib/rent-regulation)", () => {
+  const stabilized = card({
+    id: "r1",
+    name: "The Walk-up",
+    verdict: "caution",
+    slots: { cap: "5.1%", price: "$14,000,000", yoc: null, regulation: "Rent-stabilized, 41 of 48" },
+    market: "Brooklyn, NY",
+    coveredMarket: null,
+  });
+  const toCheck = card({
+    id: "r2",
+    name: "Seattle Commons",
+    verdict: "pass",
+    slots: { cap: "5.4%", price: "$30,000,000", yoc: null, regulation: "Rent rules: check" },
+    market: "Seattle, WA",
+    coveredMarket: null,
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says a regime that applies in the warning tone and one to check in the muted tone, on the row and the card", () => {
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([stabilized, toCheck]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Rent-stabilized, 41 of 48");
+      expect(text, initialView).toContain("Rent rules: check");
+      const tag = (words: string) => html.match(new RegExp(`<span[^>]*title="${words}:[^"]*"[^>]*>`))?.[0] ?? "";
+      expect(tag("Rent-stabilized, 41 of 48"), initialView).toContain("text-caution");
+      expect(tag("Rent rules: check"), initialView).toContain("text-muted");
       expect(gluedWords(text), initialView).toEqual([]);
       expect(a11yIssues(html), initialView).toEqual([]);
     }

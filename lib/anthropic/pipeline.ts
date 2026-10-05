@@ -59,6 +59,7 @@ import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageNote } from "@/lib/self-storage";
+import { regulationForDeal, regulationNote, type RegulationRead } from "@/lib/rent-regulation";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -364,6 +365,35 @@ async function todaysRatesLine(
 }
 
 /**
+ * The deal's rent regulation for a screen step (lib/rent-regulation), through
+ * the one call every surface makes (`regulationForDeal`), on the UTC day the
+ * worker keeps (lib/reader-day): the regimes the site's rules say reach the
+ * building at the address the deal page reads it at (a blank one the
+ * memorandum's, a typed line its own fields — `addressUpgrade`), the Census
+ * place and county only from site flags answered for that address, and the
+ * deal's one class (the analyst's, else the deck's). Null where no regime
+ * reaches the building and the memorandum names none.
+ */
+function screenRegulation(
+  row: { extraction?: unknown; address?: unknown; asset_class?: unknown } | null | undefined,
+  flags: SiteFlagsResult | null,
+): RegulationRead | null {
+  const ex = (row?.extraction as ExtractionResult | null | undefined) ?? null;
+  const raw = row?.address;
+  const address: Partial<StructuredAddress> | null =
+    addressUpgrade(raw, ex) ??
+    (raw && typeof raw === "object"
+      ? (raw as Partial<StructuredAddress>)
+      : typeof raw === "string"
+        ? parseStructuredAddress(raw)
+        : null);
+  return regulationForDeal(
+    { extraction: ex, address, siteFlags: flags, assetClass: (row?.asset_class as string | null | undefined) ?? null },
+    new Date().toISOString().slice(0, 10),
+  );
+}
+
+/**
  * What the screen established about the deal — its kind and, on a plan deal,
  * the plan's figures — for the steps that read the OM after the extraction.
  * Best-effort: with no extraction stored, the step runs on the OM alone.
@@ -374,14 +404,21 @@ async function dealContextFromDb(
   flags: SiteFlagsResult | null,
 ): Promise<string | null> {
   try {
-    const { data } = await admin.from("deals").select("extraction, first_signal").eq("id", dealId).single();
+    const { data } = await admin
+      .from("deals")
+      .select("extraction, first_signal, address, asset_class")
+      .eq("id", dealId)
+      .single();
     // Where the FEMA lookup has answered (`siteFlagsForScreen`), the step
     // reads the flood zone too (#426). The deal's kind is read with the
     // first signal beside the extraction, as the market figures read it.
+    // The rent rules are read after the lookup, so a city's regime reads the
+    // building's own municipality where the Census geocoder named it.
     return dealContextFor(
       (data?.extraction as ExtractionResult | null) ?? null,
       flags && flags.status !== "pending" ? { flood: flags.flood } : null,
       (data?.first_signal as FirstSignal | null | undefined) ?? null,
+      screenRegulation(data, flags),
     );
   } catch {
     return null;
@@ -1086,7 +1123,7 @@ async function runAnalysisSteps(
       try {
         const { data: dr } = await admin
           .from("deals")
-          .select("discrepancies, extraction, first_signal")
+          .select("discrepancies, extraction, first_signal, address")
           .eq("id", dealId)
           .single();
         const disc = (dr?.discrepancies as {
@@ -1195,6 +1232,17 @@ async function runAnalysisSteps(
         // pro forma that marks restricted units to market is a misread.
         const affordable = readAffordable(ex);
         if (affordable) notes.push(affordableNote(affordable));
+
+        // The rent rules that reach the building (lib/rent-regulation): the
+        // regime, the regulated share as stated and the allowance in force,
+        // then the regulation traps by name. The challenger runs BEFORE the
+        // site flags are read (the comps step reads them), so this read is
+        // the address's alone, with no Census place or county: a city's
+        // regime it cannot place inside the city's limits reads "possibly
+        // applies", that question named — the deal context, built after the
+        // lookup, reads the building's own municipality.
+        const regulation = screenRegulation({ extraction: ex, address: dr?.address, asset_class: assetClass }, null);
+        if (regulation) notes.push(regulationNote(regulation));
 
         // One tenant leases the whole property (#454): the lease's facts,
         // then the single-tenant traps keyed to them by name — the
@@ -1421,7 +1469,7 @@ async function runReconciliationSteps(
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
-      .select("id, om_storage_path, extraction, first_signal")
+      .select("id, om_storage_path, extraction, first_signal, address, asset_class")
       .eq("id", dealId)
       .single();
 
@@ -1450,6 +1498,8 @@ async function runReconciliationSteps(
       (deal.extraction as ExtractionResult | null) ?? null,
       flags ? { flood: flags.flood } : null,
       (deal.first_signal as FirstSignal | null | undefined) ?? null,
+      // The rent rules, read as the screen's own context reads them.
+      screenRegulation(deal, flags),
     );
     const reconciliation = await reconcileModel(omSource, parsed, dealContext);
 

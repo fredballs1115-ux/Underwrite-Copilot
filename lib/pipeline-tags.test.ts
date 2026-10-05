@@ -47,6 +47,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         debt: "Assumable 3.45%",
         sellerNote: "Seller financing 5.00%",
         affordable: "LIHTC, 75% restricted",
+        regulation: "Rent-stabilized, 41 of 48",
         tenancy: "Single tenant, 6 yrs left",
         roster: "Shadow-anchored",
         valueAdd: "Reno $250/mo, 20% on cost",
@@ -62,7 +63,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "debt", "sellerNote", "affordable", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage",
+      "flood", "sale", "interest", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -73,9 +74,17 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     expect(tags.find((t) => t.key === "interest")?.title).toBe("49% share: the price does not buy the building outright — the deal page says what it buys");
     // The tone warns where the words do.
     const tone = (key: string) => tags.find((t) => t.key === key)?.tone;
-    expect([tone("sale"), tone("roster"), tone("abatement"), tone("reports"), tone("student"), tone("mh"), tone("storage")]).toEqual(Array(7).fill("caution"));
+    expect([tone("sale"), tone("regulation"), tone("roster"), tone("abatement"), tone("reports"), tone("student"), tone("mh"), tone("storage")]).toEqual(Array(8).fill("caution"));
     expect([tone("interest"), tone("debt"), tone("sellerNote"), tone("affordable"), tone("tenancy"), tone("valueAdd"), tone("hotel")]).toEqual(Array(7).fill("brand"));
     expect(dealTags(slots({ student: "Pre-leased 87%, +5 pts y/y", mh: "Lot rent $430 vs $525 mkt", storage: "In-place 21.1% over street" })).map((t) => t.tone)).toEqual(["brand", "brand", "brand"]);
+  });
+
+  it("says a regime that applies, or the memorandum's claim of one, in the warning tone, and one to check in the muted tone (lib/rent-regulation)", () => {
+    const tone = (regulation: string) => dealTags(slots({ regulation }))[0];
+    expect(tone("Rent-stabilized, 41 of 48")).toMatchObject({ key: "regulation", tone: "caution" });
+    expect(tone("LA RSO, 3% cap").tone).toBe("caution");
+    expect(tone("Rent-regulated (OM)").tone).toBe("caution");
+    expect(tone("Rent rules: check")).toMatchObject({ tone: "muted", title: expect.stringMatching(/^Rent rules: check: the rent rules that reach the building/) });
   });
 
   it("a deal with nothing to flag carries no tags, and a flood lookup outside a hazard area adds none", () => {

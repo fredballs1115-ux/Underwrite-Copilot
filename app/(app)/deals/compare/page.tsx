@@ -34,6 +34,9 @@ import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
+import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
@@ -59,6 +62,9 @@ function toCol(
   tenYearPct: number | null,
   googleEnabled: boolean,
   job: JobLike | null,
+  /** the reader's own day (lib/reader-day), which decides the rent
+   *  allowance in force */
+  today: string,
 ): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
@@ -74,6 +80,10 @@ function toCol(
     (stored as StructuredAddress | null) ??
     null;
   const picture = ((deal as { photo?: unknown }).photo as DealVisualCache | null)?.picture ?? null;
+  // The class the deal was filed under ("auto" where the analyst left it to
+  // the deck) — never printed as it stands: the column shows the deal's one
+  // class through `shownAssetClass`.
+  const filedClass = (deal.asset_class as string | null) ?? null;
 
   // A plan deal's generated model books dark years first, so its year-1 cap
   // is negative or a default — not a figure to compare on, and not one to
@@ -180,6 +190,21 @@ function toCol(
     student: studentHousingTag(ex),
     mh: manufacturedHousingTag(ex, Infinity),
     storage: selfStorageTag(ex, Infinity),
+    // The rent rules that reach the building, read through the one call
+    // every surface makes (lib/rent-regulation `regulationForDeal`) at the
+    // address the column is placed at. It is handed the class the deal was
+    // filed under and reads the deal's one class itself (`shownAssetClass`).
+    regulation: regulationTag(
+      regulationForDeal(
+        {
+          extraction: ex,
+          address,
+          siteFlags: (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null,
+          assetClass: filedClass,
+        },
+        today,
+      ),
+    ),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: figs.noteYtmPct,
@@ -277,6 +302,9 @@ export default async function ComparePage({
     seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"),
   );
   const tenYearPct = debt.tenYear?.pct ?? null;
+  // Today on the reader's own calendar (lib/reader-day), read once per
+  // request: each column's rent rules read the allowance in force on it.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   const cols = (rows as Scoped[]).map((d) =>
     toCol(
@@ -286,6 +314,7 @@ export default async function ComparePage({
       tenYearPct,
       !!process.env.GOOGLE_MAPS_API_KEY,
       jobByDeal.get(d.id) ?? null,
+      todayIso,
     ),
   );
 

@@ -24,6 +24,7 @@ import { readSiteReports, siteReportsContextLine } from "@/lib/site-reports";
 import { readStudentHousing, studentContextLine } from "@/lib/student-housing";
 import { mhContextLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageContextLine } from "@/lib/self-storage";
+import { regulationContextLine, type RegulationRead } from "@/lib/rent-regulation";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -64,11 +65,18 @@ function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind)
  * pipeline does; it had passed neither, so a deal the signal calls a
  * conversion read "Stabilized" there. A caller with no signal reads as
  * before.
+ *
+ * The rent regulation (lib/rent-regulation) is read by the caller, which
+ * holds what the extraction does not — the deal's address, the Census place
+ * and county its answered site flags carry, and its class — through
+ * `regulationForDeal`, and handed in: said beside a covenant on the rents,
+ * since a regime's allowance, not the market, sets a regulated unit's rent.
  */
 export function dealContextFor(
   extraction: ExtractionResult | null,
   site?: { flood?: SiteFlagsResult["flood"] } | null,
   signal?: { take?: string; dealName?: string | null } | null,
+  regulation?: RegulationRead | null,
 ): string | null {
   const strategy = inferStrategy(extraction, signal ?? null);
   // A portfolio is said whatever the strategy: several properties in one
@@ -136,6 +144,9 @@ export function dealContextFor(
     ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
     ...(noteFinancing ? [notePurchaseFinancingContextLine(noteFinancing)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
+    // The rent rules that reach the building (lib/rent-regulation): the
+    // regime, the regulated share as stated and the allowance in force.
+    ...(regulation ? [regulationContextLine(regulation)] : []),
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(roster ? [rosterContextLine(roster)] : []),
     ...(valueAdd ? [valueAddContextLine(valueAdd)] : []),

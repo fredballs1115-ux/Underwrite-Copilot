@@ -64,6 +64,7 @@ import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/l
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
 import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
+import { regulationModelLine, regulationShortLine, type RegulationRead } from "@/lib/rent-regulation";
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -82,6 +83,15 @@ export interface ActualsForModel {
  *  sample deal, a test, a read that failed. */
 export interface MarketForModel {
   debtIndex?: DebtIndex | null;
+}
+
+/** What the model is told about the deal that its extraction alone cannot
+ *  say: the rent rules that reach the building (lib/rent-regulation), read
+ *  by the caller through `regulationForDeal` from the deal row's address,
+ *  site flags and class on the caller's own day. Absent or null, the cover
+ *  says nothing of rent rules — the sample, a test, the bridge's read. */
+export interface DealForModel {
+  regulation?: RegulationRead | null;
 }
 
 /** The model's hold, months — one constant, because the tenor the rate is
@@ -180,6 +190,13 @@ export interface WorkbookMeta {
    *  premium sitting tenants pay over street and with a lease-up. Absent on
    *  anything else. */
   storage?: { line: string; read: string } | null;
+  /** the rent rules that reach the building (lib/rent-regulation): the
+   *  regime, the regulated share as stated and the allowance in force in a
+   *  line, then this model's one rent growth rate set beside the allowance
+   *  ("" where no regime reaches it and only the memorandum names one).
+   *  Absent where no rule reaches the building and the memorandum names
+   *  none. */
+  regulation?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -364,6 +381,14 @@ function storageMeta(extraction: ExtractionResult | null, inputs: UnderwriteInpu
   };
 }
 
+/** The cover's lines about the rent rules that reach the building
+ *  (lib/rent-regulation): the read in a line, then this model's one rent
+ *  growth rate set beside the allowance in force — never changed by it. */
+function regulationMeta(r: RegulationRead | null | undefined, inputs: Pick<UnderwriteInputs, "rentGrowthPct">): WorkbookMeta["regulation"] {
+  if (!r) return null;
+  return { line: regulationShortLine(r), read: regulationModelLine(r, inputs.rentGrowthPct * 100) ?? "" };
+}
+
 /** The cover's lines about a multi-tenant property's listed tenants
  *  (#457): the roster, then what this model does not carry for its roll.
  *  Null where the memorandum lists fewer than two tenants. */
@@ -436,6 +461,7 @@ export function deriveUnderwriteInputs(
   fallbackName: string,
   actuals?: ActualsForModel,
   market?: MarketForModel,
+  deal?: DealForModel,
 ): DerivedModel {
   const metrics = extraction?.metrics ?? [];
   const assetClass = normalizeClass(extraction?.assetClass ?? "auto");
@@ -985,6 +1011,7 @@ export function deriveUnderwriteInputs(
       student: studentMeta(extraction, inputs),
       mh: mhMeta(extraction, inputs),
       storage: storageMeta(extraction, inputs),
+      regulation: regulationMeta(deal?.regulation, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

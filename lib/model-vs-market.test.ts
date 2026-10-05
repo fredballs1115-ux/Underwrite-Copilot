@@ -1147,3 +1147,123 @@ describe("a deal outside the covered metros anchors its vacancy check on the sta
     expect(modelVsMarket(pa)!.metro).toBe("Pennsylvania");
   });
 });
+
+// ── A rent-regulated building: the regime's allowance beside the market's ─────
+import { regulationForDeal } from "./rent-regulation";
+
+describe("a rent-regulated building's allowance, shown beside the market's figures and never folded into them (lib/rent-regulation)", () => {
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "" });
+  const deck = (...metrics: ReturnType<typeof row>[]): ExtractionResult => ({
+    dealName: "The Walk-up",
+    assetClass: "multifamily",
+    metrics: [row("Asking price", "$14,000,000"), ...metrics],
+  });
+  const BROOKLYN = { state: "NY", city: "Brooklyn", county: "Kings County" };
+  const OCT_5 = new Date("2026-10-05T12:00:00Z");
+  const stabilized = regulationForDeal(
+    { extraction: deck(row("Units", "48"), row("Year built", "1931"), row("Rent-regulated units", "41")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+    "2026-10-05",
+  );
+
+  it("a NYC stabilized deal at a 3% model growth never reads only 'inside the published range': the allowance is named first, as a figure of its own kind", () => {
+    const plain = check({ ...base, now: OCT_5 }, "rent_growth")!;
+    expect(plain.read).toContain("The model sits inside the published range.");
+    const c = check({ ...base, now: OCT_5, regulation: stabilized }, "rent_growth")!;
+    // The chip is the market's: the allowance never joins its range.
+    expect(c.tone).toBe("inside");
+    expect(c.toneLabel).toBe("inside the published range");
+    // The sentence names the allowance first, as the regime's for the units
+    // it regulates, with the model's growth against it.
+    expect(c.read).toBe(
+      "Under NYC rent stabilization, the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease and 0% on a two-year lease (the Rent Guidelines Board's Apartment/Loft Order #58). That is the regime's allowance for the units it regulates, not a market figure: the model's 3.0%/yr runs 3.0 points over both. For the market-rate units, over the past year the metro's asking rents moved +2.3% (apartments alone +1.1%) over the year to Aug 2026 (Zillow) and sitting tenants' rents +5.0% over the year to Aug 2026 (CPI rent, BLS). The model sits inside the published range. A trailing year is what the assumption is being asked to beat, not a forecast.",
+    );
+    expect(c.read.startsWith("The model grows rents")).toBe(false);
+    // The allowance's figures lead the published list; the market's follow,
+    // as they were.
+    expect(c.published.slice(0, 2)).toEqual([
+      {
+        label: "NYC rent stabilization: allowance on the regulated units, a one-year lease",
+        text: "0% for leases commencing Oct 1, 2026 to Sep 30, 2027",
+        value: 0,
+        asOf: "2026-10-01",
+        publisher: "The Rent Guidelines Board's Apartment/Loft Order #58",
+      },
+      {
+        label: "NYC rent stabilization: allowance on the regulated units, a two-year lease",
+        text: "0% for leases commencing Oct 1, 2026 to Sep 30, 2027",
+        value: 0,
+        asOf: "2026-10-01",
+        publisher: "The Rent Guidelines Board's Apartment/Loft Order #58",
+      },
+    ]);
+    expect(c.published.slice(2)).toEqual(plain.published);
+    expect(gluedWords(c.read)).toEqual([]);
+  });
+
+  it("keeps the tone the market's: a model behind every market figure stays behind beside a 0% allowance", () => {
+    // 0.5% against the market's 1.1–5.0% is behind; with the 0% allowance
+    // folded into the range it would have read inside.
+    const behind = check({ ...base, now: OCT_5, inputs: { ...base.inputs, rentGrowthPct: 0.005 }, regulation: stabilized }, "rent_growth")!;
+    expect(behind.tone).toBe("behind");
+    expect(behind.read).toContain("the model's 0.5%/yr runs 0.5 points over both.");
+    expect(behind.read).toContain("For the market-rate units, over the past year");
+    expect(behind.read).toContain("The model runs behind every published figure, by 0.6 to 4.5 points.");
+  });
+
+  it("names a DC rent-controlled building's two caps, a regime that only possibly applies as such, and nothing for an allowance not in force", () => {
+    const dc = regulationForDeal(
+      { extraction: deck(row("Units", "24"), row("Year built", "1962")), address: { state: "DC", city: "Washington" }, siteFlags: null, assetClass: "multifamily" },
+      "2026-09-21",
+    );
+    const c = check({ ...base, regulation: dc }, "rent_growth")!;
+    expect(c.read).toMatch(
+      /^Under DC rent stabilization, the allowance for increases taking effect May 1, 2026 to Apr 30, 2027 is 4\.1% on a rent-controlled unit and 2\.1% on a unit with a registered elderly or disabled tenant \(the Rental Housing Commission's caps for Rent Control Year 2026\)\. That is the regime's allowance for the units it regulates, not a market figure: the model's 3\.0%\/yr runs over 2\.1% and under 4\.1%\. For the market-rate units,/,
+    );
+    // A building whose year the memorandum does not state: the regime only
+    // possibly applies, and the sentence says so.
+    const possibly = regulationForDeal(
+      { extraction: deck(row("Units", "48")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+      "2026-10-05",
+    );
+    expect(check({ ...base, now: OCT_5, regulation: possibly }, "rent_growth")!.read).toContain(
+      "That is the regime's allowance for the units it regulates, where it applies (the site's rules say it possibly does here), not a market figure",
+    );
+    // Before the filed period begins and after it ends, no allowance is in
+    // force: the check reads as it would without the regulation.
+    const before = regulationForDeal(
+      { extraction: deck(row("Units", "48"), row("Year built", "1931")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+      "2026-09-21",
+    );
+    expect(check({ ...base, regulation: before }, "rent_growth")).toEqual(check(base, "rent_growth"));
+    const after = regulationForDeal(
+      { extraction: deck(row("Units", "48"), row("Year built", "1931")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+      "2027-11-15",
+    );
+    expect(check({ ...base, regulation: after }, "rent_growth")).toEqual(check(base, "rent_growth"));
+  });
+
+  it("draws the allowance first on the card, clean", () => {
+    const html = renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read: modelVsMarket({ ...base, now: OCT_5, regulation: stabilized }) }));
+    const text = visibleText(html);
+    expect(text).toContain("Under NYC rent stabilization, the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease");
+    expect(text).toContain("inside the published range");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("is handed through the one read every surface calls", () => {
+    const extraction = deck(row("Units", "48"), row("Year built", "1931"), row("Rent-regulated units", "41"), row("NOI (in-place)", "$700,000"));
+    const derived = deriveUnderwriteInputs(extraction, "fallback");
+    const read = modelVsMarketFor({
+      derived,
+      extraction,
+      storedAssetClass: "multifamily",
+      metro: { id: "dc", name: "Washington DC" },
+      reads: { rates, zori, national, now: OCT_5 },
+      regulation: stabilized,
+    })!;
+    expect(read.checks.find((x) => x.key === "rent_growth")!.read.startsWith("Under NYC rent stabilization")).toBe(true);
+    const without = modelVsMarketFor({ derived, extraction, storedAssetClass: "multifamily", metro: { id: "dc", name: "Washington DC" }, reads: { rates, zori, national, now: OCT_5 } })!;
+    expect(without.checks.find((x) => x.key === "rent_growth")!.read.startsWith("The model grows rents")).toBe(true);
+  });
+});

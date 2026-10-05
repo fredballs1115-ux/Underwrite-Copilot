@@ -1272,6 +1272,47 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a rent-regulated building: the challenger and the deal context read the rules that reach it, the allowance in force and the regulation traps (lib/rent-regulation)", async () => {
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Units", value: "24", flagged: false, page: "", basis: "na" },
+        { label: "Year built", value: "1962", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    // The challenger, from the address alone (it runs before the site flags).
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("Rent regulation: DC rent stabilization applies by the site's rules.");
+    expect(note).toContain("REGULATION TRAPS, checked by name");
+    expect(note).toContain("(c) THE ALLOWANCE");
+    // The deal context the comps, the market check and the verdict are told,
+    // with the allowance in force on the screen's day.
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Rent regulation: DC rent stabilization applies by the site's rules.");
+    expect(context).toContain(
+      "the allowance for increases taking effect May 1, 2026 to Apr 30, 2027 is 4.1% on a rent-controlled unit and 2.1% on a unit with a registered elderly or disabled tenant",
+    );
+    expect(context).not.toContain("REGULATION TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+
+    // Outside every regime the site's rules hold, neither says a word of it.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    state.deals.d1.address = { city: "Dallas", state: "TX" };
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("Rent regulation");
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "").not.toContain("Rent regulation");
+  });
+
   it("the third-party reports: the challenger reads what they found and the site-report traps (#465)", async () => {
     vi.mocked(extractTerms).mockResolvedValue({
       ...EXTRACTION,

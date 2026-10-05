@@ -1,8 +1,10 @@
 // The tags a pipeline deal carries beside its figures — a flood zone, how
 // it is sold, what the price buys, the seller's loan, a covenant on the
-// rents, the one lease, the listed tenants, a renovation program, a tax
-// abatement, a hotel's contracts, the third-party reports, and the reads of
-// a student building, a park and a storage facility — in ONE order, each
+// rents, the rent rules, the one lease, the listed tenants, a renovation
+// program, a tax abatement, a hotel's contracts, the third-party reports,
+// and the reads of a student building, a park and a storage facility (no
+// tag reads a module's tables here: the pipeline's client draws these, so
+// each tone is read off the slot's own words) — in ONE order, each
 // with its tone and its tooltip, so the list row and the card draw one list
 // (lib/pipeline-slots reads each slot). And the card's rule for which of
 // them its picture carries: a chip there is never cut, so one that cannot
@@ -56,6 +58,16 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
     tag("sellerNote", slots.sellerNote, "brand", "the seller offers to carry financing — the deal page prices the note against today's rate"),
     // A covenant or a contract that sets the rents (#453).
     tag("affordable", slots.affordable, "brand", "a covenant or a contract sets these rents — the deal page says until when"),
+    // The rent rules that reach the building (lib/rent-regulation): a regime
+    // that applies, or the memorandum's claim of one, warns; one the rules
+    // say possibly applies ("Rent rules: check") is a question to answer,
+    // in the muted tone.
+    tag(
+      "regulation",
+      slots.regulation,
+      slots.regulation && /^Rent rules: check/.test(slots.regulation) ? "muted" : "caution",
+      "the rent rules that reach the building — the deal page reads the regime, the regulated share and the allowance in force against the model's growth",
+    ),
     // One tenant leases the whole property (#454).
     tag("tenancy", slots.tenancy, "brand", "one lease is the whole income — the deal page reads its guarantor, its term and its increases"),
     // An anchor not in the sale, a roll before the model's sale (#457).

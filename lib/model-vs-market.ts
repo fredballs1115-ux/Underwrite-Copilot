@@ -30,6 +30,7 @@ import {
   type TrackerRead,
 } from "@/lib/tracker-read";
 import { staleMark, staleReason, type ResearchAge } from "@/lib/research-age";
+import { allowanceSentence, dayText, pctText, type AllowanceRead, type RegimeRead, type RegulationRead } from "@/lib/rent-regulation";
 
 /**
  * The model's assumptions against the published figures — pure, no model
@@ -192,6 +193,14 @@ export interface ModelVsMarketInput {
    * well as against the 10-year.
    */
   tracker?: TrackerRead | null;
+  /**
+   * The rent rules that reach the building (lib/rent-regulation, read through
+   * `regulationForDeal`): where a regime's allowance is in force today, the
+   * rent-growth check shows it as a figure of its own kind — the regime's
+   * allowance for the units it regulates — and names it first, and never
+   * folds it into the market's range or the tone.
+   */
+  regulation?: RegulationRead | null;
   now: Date;
 }
 
@@ -465,6 +474,57 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
   };
 }
 
+/** The regimes reaching the building whose allowance is in force on the day,
+ *  with figures to read — the ones the rent-growth check sets beside the
+ *  market's. */
+function allowancesInForce(r: RegulationRead | null | undefined): { regime: RegimeRead; allowance: AllowanceRead }[] {
+  return (r?.regimes ?? []).flatMap((regime) =>
+    regime.allowance?.state === "current" && regime.allowance.figures.length > 0 ? [{ regime, allowance: regime.allowance }] : [],
+  );
+}
+
+/** "runs 3.0 points over both", "runs 6.7 points under it", "runs over 2.1%
+ *  and under 4.1%" — where the model's growth sits against an allowance's
+ *  figures. */
+function againstAllowance(g: number, a: AllowanceRead): string {
+  const pcts = a.figures.map((f) => f.pct);
+  const hi = Math.max(...pcts);
+  const lo = Math.min(...pcts);
+  const them = pcts.length === 1 ? "it" : pcts.length === 2 ? "both" : `each of its ${pcts.length} figures`;
+  if (g > hi + SAME) return `runs ${pts(g - hi)} over ${them}`;
+  if (g < lo - SAME) return `runs ${pts(lo - g)} under ${them}`;
+  if (hi - lo >= SAME && g > lo + SAME && g < hi - SAME) return `runs over ${pctText(lo)} and under ${pctText(hi)}`;
+  return `sits at ${them}`;
+}
+
+/**
+ * Each allowance in force as published figures of its own kind — the
+ * regime's, for the units it regulates, dated by its period's start — and
+ * the sentences that name them, first, with the model's growth against
+ * them. The model is not changed and the market's range is not widened:
+ * the figures are shown beside the market's, and the tone is the market's.
+ */
+function allowanceRead(input: ModelVsMarketInput, g: number): { published: PublishedFigure[]; lead: string } | null {
+  const inForce = allowancesInForce(input.regulation);
+  if (inForce.length === 0) return null;
+  const published: PublishedFigure[] = inForce.flatMap(({ regime, allowance: a }) =>
+    a.figures.map((f) => ({
+      label: `${initialCap(regime.name)}: allowance on the regulated units, ${f.label}`,
+      text: `${pctText(f.pct)} for ${a.applies_to} ${dayText(a.period_start)} to ${dayText(a.period_end)}`,
+      value: f.pct,
+      asOf: a.period_start,
+      publisher: initialCap(a.order),
+    })),
+  );
+  const lead = inForce
+    .map(({ regime, allowance: a }) => {
+      const where = regime.outcome === "applies" ? "" : ", where it applies (the site's rules say it possibly does here)";
+      return `${allowanceSentence(regime.name, { ...a, next: null })} That is the regime's allowance for the units it regulates${where}, not a market figure: the model's ${g.toFixed(1)}%/yr ${againstAllowance(g, a)}.`;
+    })
+    .join(" ");
+  return { published, lead };
+}
+
 function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const words = assetWords(input.assetClass ?? undefined);
   const g = input.inputs.rentGrowthPct * 100;
@@ -487,24 +547,34 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     phrases.push(`sitting tenants' rents ${signed(cpiRent.value)}% over the year to ${when} (CPI rent, ${publisherOf(cpiRent)})`);
   }
   if (published.length === 0) return null;
+  // The range and the tone are the market's figures' alone: an allowance is
+  // the regime's, for the units it regulates, and folding it in would let a
+  // 3% model read "inside" a 0–4% band on a building whose regulated rents
+  // may rise 0%.
   const values = published.map((p) => p.value);
   const tone = rangeTone(g, values);
+  const regulated = allowanceRead(input, g);
   const clause =
     tone === "ahead"
       ? `The model runs ahead of every published figure, ${byPoints(g, values)}.`
       : tone === "behind"
         ? `The model runs behind every published figure, ${byPoints(g, values)}.`
         : "The model sits inside the published range.";
+  const trailing = "A trailing year is what the assumption is being asked to beat, not a forecast.";
   return {
     key: "rent_growth",
     title: "Rent growth",
     model: `${g.toFixed(1)}%/yr`,
     modelSource: sourceWords(input.sources?.rentGrowthPct),
-    published,
+    // Where a regime's allowance is in force it is named first, before the
+    // market's figures, which speak for the market-rate units.
+    published: regulated ? [...regulated.published, ...published] : published,
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
-    read: `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} A trailing year is what the assumption is being asked to beat, not a forecast.`,
+    read: regulated
+      ? `${regulated.lead} For the market-rate units, over the past year ${joinWords(phrases)}. ${clause} ${trailing}`
+      : `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} ${trailing}`,
   };
 }
 
@@ -896,6 +966,10 @@ export function modelVsMarketFor(args: {
    *  research tracker's */
   metro: { id: string; name: string; placedBy?: unknown } | null;
   reads: MarketReads;
+  /** the rent rules that reach the building (lib/rent-regulation
+   *  `regulationForDeal`), read by the caller on its own day — the page's
+   *  reader day, a route's UTC day */
+  regulation?: RegulationRead | null;
 }): ModelVsMarket | null {
   const { derived, extraction, storedAssetClass, metro, reads } = args;
   const planDeal = isPlanDeal(inferStrategy(extraction, args.firstSignal ?? null).kind);
@@ -925,6 +999,7 @@ export function modelVsMarketFor(args: {
     // deck's own class words ride along, so a lab, a yard or a cold-storage
     // warehouse the analyst filed as plain office or industrial reads none.
     tracker: metro && !metro.placedBy ? trackerFor(metro.id, assetClass, extraction?.assetClass ?? null) : null,
+    regulation: args.regulation ?? null,
     now: reads.now,
   });
 }

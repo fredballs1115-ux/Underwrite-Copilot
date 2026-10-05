@@ -31,6 +31,7 @@ import { coverPictureFor, galleryPhotosFor } from "@/lib/memo/cover-aerial";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { floodMapFor } from "@/lib/flood-map";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
+import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 
 export const runtime = "nodejs";
 
@@ -178,6 +179,20 @@ export async function GET(
   let student: { line: string; read: string } | null = null;
   let mh: { line: string; read: string } | null = null;
   let storage: { line: string; read: string } | null = null;
+  // The rent rules that reach the building (lib/rent-regulation), through the
+  // one call every surface makes, on the route's UTC day — the day the file
+  // is named for. Read apart from the model, so its line prints even where
+  // the model is not built; the model's read is added where it is.
+  const regulationRead = regulationForDeal(
+    {
+      extraction: (deal.extraction as ExtractionResult | null) ?? null,
+      address: addressUpgrade(deal.address, (deal.extraction as ExtractionResult | null) ?? null) ?? (deal.address as StructuredAddress | null) ?? null,
+      siteFlags: (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null,
+      assetClass: deal.asset_class as string | null,
+    },
+    new Date().toISOString().slice(0, 10),
+  );
+  let regulation: { line: string; read: string } | null = regulationRead ? { line: regulationShortLine(regulationRead), read: "" } : null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -218,6 +233,7 @@ export async function GET(
             : null,
         },
         modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+        { regulation: regulationRead },
       );
       // The sources say whether the price and the year-1 NOI are the
       // documents' or placeholders; on a placeholder's model the report
@@ -261,6 +277,9 @@ export async function GET(
       student = derived.meta.student ?? null;
       mh = derived.meta.mh ?? null;
       storage = derived.meta.storage ?? null;
+      // The rent rules, with this model's one growth rate set beside the
+      // allowance in force (the workbook cover's own two lines).
+      regulation = derived.meta.regulation ?? regulation;
       // How it is sold (#456): the ceiling bid at this report's own hurdle,
       // the buy box's where set — the same one its grids are coloured by.
       sale = derived.meta.sale
@@ -289,6 +308,7 @@ export async function GET(
           storedAssetClass: deal.asset_class as string | null,
           metro,
           reads: await todayReads(metro),
+          regulation: regulationRead,
         });
       } catch (err) {
         console.warn(`report assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
@@ -350,7 +370,7 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

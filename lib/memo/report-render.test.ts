@@ -20,6 +20,7 @@ const tinyDataUri = (rgb: [number, number, number]) => `data:image/png;base64,${
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { regulationForDeal } from "@/lib/rent-regulation";
 import { buildSensitivityData, gridTakeaway, pageBaseLevers } from "@/lib/underwrite/report-grid";
 import { bidFloors, fmtBid, solveMaxBid } from "@/lib/underwrite/solver";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
@@ -1040,6 +1041,100 @@ describe("ReportDocument (full report)", () => {
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("in-place $1.38/SF a month against street $1.14/SF a month (+21.1%)");
     expect(text).toContain("a downside it does not run");
+  }, 60000);
+
+  it("prints the rent rules over the grids, and the model's one growth rate beside the allowance in force (lib/rent-regulation)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Year built", value: "1931", flagged: false, page: "", basis: "na" as const },
+        { label: "Rent-regulated units", value: "180", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const address = { label: "100 Walk-up St, Brooklyn, NY 11215", street: "100 Walk-up St", city: "Brooklyn", state: "NY", zip: "11215", county: "Kings County", submarket: "" };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      address,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // As the route reads it: through the one call, on the route's day.
+    const read = regulationForDeal({ extraction, address, siteFlags: null, assetClass: SAMPLE_DEAL.asset_class }, "2026-10-05");
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name, undefined, undefined, { regulation: read });
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(
+      deal,
+      "October 5, 2026",
+      [],
+      sensitivity,
+      undefined,
+      null,
+      null,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      derived.meta.regulation ?? null,
+    );
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.regulation?.read).toMatch(/^The model grows every rent /);
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%)");
+    expect(text).toContain("NYC rent stabilization allows 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027");
+    expect(text).toContain("The model's one growth rate is the market-rate units', not the regulated ones'.");
+    // A model on a placeholder figure prints no read of its own: the rules'
+    // line stands alone.
+    const withheld = buildReportData(
+      deal,
+      "October 5, 2026",
+      [],
+      { ...sensitivity, withheld: "The model runs on a placeholder price." },
+      undefined,
+      null,
+      null,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      derived.meta.regulation ?? null,
+    );
+    expect(withheld.regulation).toEqual({ line: derived.meta.regulation!.line, read: "" });
   }, 60000);
 
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {

@@ -47,6 +47,7 @@ import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
+import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -229,6 +230,28 @@ function storageLineFor(extraction: ExtractionResult | null): string {
   return r ? storageShortLine(r) : "";
 }
 
+/** The rent rules that reach the building (lib/rent-regulation), in one
+ *  line for the memo's header: the regime, the regulated share as stated
+ *  and the allowance in force on `today`. Read through the one call every
+ *  surface makes, at the address the deal page reads the deal at, with the
+ *  site flags stored for it. "" where no rule reaches the building and the
+ *  memorandum names no regime. */
+function regulationLineFor(deal: DealRow, extraction: ExtractionResult | null, today: string): string {
+  const address =
+    ((deal as { is_sample?: boolean }).is_sample ? null : addressUpgrade(deal.address, extraction)) ??
+    ((deal.address as StructuredAddress | null | undefined) ?? null);
+  const r = regulationForDeal(
+    {
+      extraction,
+      address,
+      siteFlags: (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null,
+      assetClass: typeof deal.asset_class === "string" ? deal.asset_class : null,
+    },
+    today,
+  );
+  return r ? regulationShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -316,6 +339,10 @@ export type MemoData = {
   /** a self-storage facility's occupancies, rates and platform
    *  (lib/self-storage, #471), in one line; "" on anything else */
   storageLine?: string;
+  /** the rent rules that reach the building — the regime, the regulated
+   *  share as stated and the allowance in force (lib/rent-regulation), in
+   *  one line; "" where none reaches it and the memorandum names none */
+  regulationLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -457,6 +484,10 @@ export function buildMemoData(
   branding?: MemoData["branding"],
   overrides?: string[] | null,
   cover?: MemoCover | null,
+  /** the day the memo is read on, an ISO day — the route's UTC day; it
+   *  decides the rent allowance in force. The clock's UTC day where a caller
+   *  passes none (the full report's first page, built on the same day). */
+  today: string = new Date().toISOString().slice(0, 10),
 ): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -619,6 +650,7 @@ export function buildMemoData(
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
+    regulationLine: pdfSafe(regulationLineFor(deal, extraction ?? null, today)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
@@ -1113,6 +1145,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A covenant or a contract that sets the rents (#453): the
                 restricted units' rents move with the limits, not the market. */}
             {data.affordableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.affordableLine}</Text>}
+            {/* The rent rules that reach the building: a regulated unit's
+                rent rises at the regime's allowance, not the market's. */}
+            {data.regulationLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.regulationLine}</Text>}
             {/* The one lease a single-tenant property is (#454): the
                 tenant, its guarantor, the term and the increases. */}
             {data.singleTenantLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.singleTenantLine}</Text>}

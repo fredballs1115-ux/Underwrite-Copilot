@@ -356,6 +356,23 @@ function buildCover(
       r++;
     }
   }
+  // The rent rules that reach the building (lib/rent-regulation): the
+  // regime, the regulated share as stated and the allowance in force, then
+  // this model's one rent growth rate set beside the allowance — the Rent
+  // Growth input stays the model's.
+  if (meta.regulation) {
+    fact("The rent rules", meta.regulation.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.regulation.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.regulation.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // The one lease a single-tenant property is (#454): the tenant, the
   // term and the increases, then what they mean for this model — the years
   // left at its sale, and "enter 1.92% as the rent growth" where the
