@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { FREE_DEALS, FREE_DEALS_LINE, FREE_PLAN, PRO_PLAN, PRO_PLAN_LINES, PRO_UPSELL } from "./marketing-constants";
+import { COMPS_JURISDICTIONS, FREE_DEALS, FREE_DEALS_LINE, FREE_PLAN, PRO_PLAN, PRO_PLAN_LINES, PRO_UPSELL } from "./marketing-constants";
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -124,6 +124,12 @@ describe("the free allowance is said as the cap counts it", () => {
   it("the team trial is counted by its own constant, never the personal one", () => {
     expect(APP.filter((f) => /\$\{FREE_DEALS\} shared deals/.test(read(f)))).toEqual([]);
     expect(read("app/page.tsx")).toContain("`Up to ${TEAM_TRIAL_DEALS} shared deals free to try it`");
+  });
+
+  it("the free card promises comps and local rules only where they run (research pass 32)", () => {
+    expect(FREE_PLAN).toContain(`Recorded-sales comps in ${COMPS_JURISDICTIONS}`);
+    expect(FREE_PLAN.some((f) => /local in the covered markets, statewide elsewhere/.test(f))).toBe(true);
+    expect(FREE_PLAN.some((f) => /comps \+ local rent-rule check by address/.test(f))).toBe(false);
   });
 
   it("the plan card and the calls to sign up read one line", () => {

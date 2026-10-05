@@ -42,7 +42,8 @@ export const SLIDER_SWEEP_BPS = 200;
 // Public-record comp jurisdictions: RE-EXPORTED from the provider registry
 // itself (lib/public-comps/core.ts COVERAGE_SUMMARY, derived from configured
 // providers) so marketing copy can never claim coverage the code doesn't have.
-export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS } from "@/lib/public-comps/core";
+import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
+export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS };
 // The FRED series the weekday cron tracks are counted from the one table
 // both the cron and the page read (data/fred-series.json via
 // lib/live-rates.ts SERIES) — nothing here restates the number.
@@ -120,7 +121,12 @@ export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
 export const FREE_PLAN: readonly string[] = [
   `Up to ${FREE_DEALS} deals, the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers",
-  "Recorded-sales comps + local rent-rule check by address",
+  // Each said where it holds: the card had promised recorded-sales comps and
+  // a local rule check by every address, where the comps run only where a
+  // county publishes its sales to the registry and local rules only in the
+  // covered markets (research pass 32).
+  "Rent-rule check by address: local in the covered markets, statewide elsewhere",
+  `Recorded-sales comps in ${COVERAGE_SUMMARY}`,
   "Risk digest and side-by-side deal comparison",
   "Reconcile your own underwriting model",
 ];
