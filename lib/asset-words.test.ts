@@ -193,6 +193,36 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Something else entirely")).toBeNull();
   });
 
+  // Research pass 28: a medical tenant's outpatient space named by its own
+  // use filed as no class — the generic defaults, and every class's traps.
+  it("files a dialysis center, an urgent care, a surgery center, a freestanding ER and a veterinary clinic as medical office", () => {
+    for (const phrase of [
+      "Dialysis Center",
+      "Urgent Care",
+      "Urgent care clinic",
+      "Ambulatory Surgery Center",
+      "Ambulatory surgical center (ASC)",
+      "ASC",
+      "Surgery center",
+      "Freestanding ER",
+      "Free-standing emergency department",
+      "Veterinary Clinic",
+      "Veterinary hospital",
+      "Animal hospital",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("medical_office");
+    }
+    // The net-lease rule reads first, as it did: one tenant on a net lease.
+    for (const phrase of ["Dialysis Center (NNN)", "Single-tenant urgent care", "Net lease dialysis clinic", "NNN veterinary clinic"]) {
+      expect(assetClassKey(phrase), phrase).toBe("net_lease");
+    }
+    // A strip an urgent care anchors is retail, and a medical office is as before.
+    expect(assetClassKey("Retail strip (urgent care anchored)")).toBe("retail");
+    expect(assetClassKey("NNN medical office")).toBe("medical_office");
+    // "Vet" inside another word names no clinic.
+    expect(assetClassKey("Veteran housing")).toBe("multifamily");
+  });
+
   it("files a site as land only where no lease comes with it, and scattered-site housing as housing", () => {
     // The land rule's bare "site" ran first and filed all three as land: no
     // NOI, no rate seed, the land traps.

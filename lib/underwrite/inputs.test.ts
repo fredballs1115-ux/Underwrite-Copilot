@@ -121,6 +121,30 @@ describe("deriveUnderwriteInputs — an operating business's EBITDA is said, nev
   });
 });
 
+// Research pass 28: a dialysis center filed as no class ran on the generic
+// defaults; filed as medical office it runs on the class's own. The model is
+// anchored on the stated NOI, so its returns do not move — the expense line
+// it reconstructs and the default vacancy do.
+describe("deriveUnderwriteInputs — a dialysis center runs on medical office's defaults", () => {
+  it("takes medical office's 42% expense ratio and 8% vacancy where it took 40% and 7%", () => {
+    const deck = (assetClass: string): ExtractionResult => ({
+      dealName: "Riverside Dialysis",
+      assetClass,
+      metrics: [
+        { label: "Asking price", value: "$5,000,000", flagged: false, page: "p. 2" },
+        { label: "NOI (in-place)", value: "$350,000", flagged: false, page: "p. 2" },
+        { label: "Total SF", value: "8,000 SF", flagged: false, page: "p. 2" },
+      ],
+    });
+    const dialysis = deriveUnderwriteInputs(deck("Dialysis Center"), "x");
+    expect(dialysis.inputs.vacancyPct).toBe(0.08);
+    expect(dialysis.inputs).toEqual(deriveUnderwriteInputs(deck("medical_office"), "x").inputs);
+    const generic = deriveUnderwriteInputs(deck("Something else entirely"), "x");
+    expect(generic.inputs.vacancyPct).toBe(0.07);
+    expect(computeUnderwrite(dialysis.inputs).returns.leveredIrrPct).toBeCloseTo(computeUnderwrite(generic.inputs).returns.leveredIrrPct!, 10);
+  });
+});
+
 describe("deriveUnderwriteInputs — the cap the workbook reads is the going-in cap the page shows", () => {
   it("a residual or at-completion cap never backs a price out, and never seeds the exit cap", () => {
     for (const label of ["Residual cap rate", "Cap rate at completion", "Cap rate (Year 3)"]) {

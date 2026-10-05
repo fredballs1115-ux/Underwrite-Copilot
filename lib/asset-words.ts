@@ -350,6 +350,17 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   [/\b(office|creative|life sciences?|labs?|laborator(?:y|ies))\b/i, "office"],
   [/\b(industrial|warehouse|logistics|distribution|flex|manufacturing|cold storage|ios|outdoor storage)\b/i, "industrial"],
   [/\b(retail|shopping|strip|grocery|restaurant|qsr)\b/i, "retail"],
+  // A medical tenant's outpatient space by its own name — a dialysis center,
+  // an urgent care, an ambulatory surgery center, a freestanding ER, a
+  // veterinary clinic — is medical office (research pass 28: each filed as
+  // no class, so every class's traps and the generic defaults). Read after
+  // the net-lease rule, so "Dialysis Center (NNN)" or a single-tenant urgent
+  // care stays the net lease it filed as, and after the retail rule, so a
+  // strip an urgent care anchors stays retail.
+  [
+    /\b(?:dialysis|urgent[\s-]+care|ambulatory[\s-]+(?:surgery|surgical|care)|asc|surg(?:ery|ical)[\s-]+cent(?:er|re)s?|free[\s-]?standing[\s-]+(?:er|emergency)|veterinary|vet[\s-]+clinics?|animal[\s-]+hospitals?)\b/i,
+    "medical_office",
+  ],
   // "Apartments" in the plural too: the bare word ran past the rule's end
   // and filed nowhere, a building of apartments read as no class at all.
   [/\b(multifamily|multi[- ]family|apartments?|residential|condo|garden|mid[- ]rise|high[- ]rise|walk[- ]up)\b/i, "multifamily"],
