@@ -28,3 +28,21 @@ export function photoControlOn(
   if (!f.ownPhoto) return true;
   return f.photos.includes(view) && !(f.mosaic && view === "photo");
 }
+
+/**
+ * The views the filmstrip leaves out from the header's @2xl, where the
+ * mosaic draws the cover and the two photographs beside it (`mosaic`, the
+ * cover first): a listing shows a photograph once, and the strip had shown
+ * Photo 1–3 again under the mosaic. Only while the mosaic is the view on
+ * screen — with another view open the mosaic is not drawn, and the strip
+ * keeps every photograph, the way back to them included. Every other view
+ * stays; below @2xl, where there is no mosaic, the page shows the strip
+ * whole whatever this says.
+ */
+export function mosaicRepeats(
+  views: readonly PictureView[],
+  f: { mosaic: readonly PictureView[]; active: PictureView },
+): Set<PictureView> {
+  const onScreen = f.mosaic.length > 0 && f.active === f.mosaic[0];
+  return new Set(onScreen ? views.filter((v) => f.mosaic.includes(v)) : []);
+}

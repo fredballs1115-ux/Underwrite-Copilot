@@ -16,7 +16,7 @@ import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 import { previewStyle } from "@/lib/photo-preview";
-import { photoControlOn } from "@/lib/property-views";
+import { mosaicRepeats, photoControlOn } from "@/lib/property-views";
 import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER } from "@/lib/image-frames";
 import {
   headerPhotoSizes,
@@ -451,6 +451,15 @@ export function PropertyVisual({
   const tiles = photoPossible ? galleryLive.slice(0, 2) : [];
   const mosaic = tiles.length === 2;
   const moreCount = photoIds.length - 3;
+  // The filmstrip leaves out what the mosaic shows, from the header's @2xl
+  // (the mosaic's own breakpoint, on the same @container) and only while the
+  // mosaic is on screen (lib/property-views); a strip left with nothing to
+  // add there goes too.
+  const repeats = mosaicRepeats(
+    views.map((v) => v.id),
+    { mosaic: mosaic ? ["photo", ...tiles.map((g) => g.id)] : [], active },
+  );
+  const stripAt2xl = views.length - repeats.size;
   // The Flood view's key (#472): the zones the view's crop actually shows,
   // read off the frame when it was drawn, the building's own first.
   const floodKeyList: { key: FloodClassKey; here: boolean }[] | null = floodClasses
@@ -854,9 +863,14 @@ export function PropertyVisual({
 
       {/* The views as a filmstrip (#432), the way a listing shows its
           photographs: each one's own picture under its name, the one on
-          screen ringed. */}
+          screen ringed — and, beside the mosaic, only the views the mosaic
+          does not already show (research pass 29). */}
       {views.length > 1 && (
-        <div role="group" aria-label="Views of the property" className="flex gap-2 overflow-x-auto border-t border-line bg-faint/60 px-3 py-2.5">
+        <div
+          role="group"
+          aria-label="Views of the property"
+          className={`flex gap-2 overflow-x-auto border-t border-line bg-faint/60 px-3 py-2.5${stripAt2xl === 0 ? " @2xl:hidden" : ""}`}
+        >
           {views.map((v) => {
             const t = thumbs[v.id];
             const on = active === v.id;
@@ -869,7 +883,7 @@ export function PropertyVisual({
                 data-view-thumb={v.id}
                 className={`group relative h-14 w-24 shrink-0 overflow-hidden rounded-lg border bg-surface text-left transition ${
                   on ? "border-brand ring-2 ring-brand" : "border-line opacity-80 hover:opacity-100"
-                }`}
+                }${repeats.has(v.id) ? " @2xl:hidden" : ""}`}
               >
                 {t.src ? (
                   // eslint-disable-next-line @next/next/no-img-element -- the view's own URL, cached by the browser once for both

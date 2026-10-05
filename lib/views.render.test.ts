@@ -4590,7 +4590,7 @@ describe("a metro's for-sale market, from Realtor.com", () => {
 // ── The deal page's picture ─────────────────────────────────────────────────
 import { PropertyVisual } from "@/app/(app)/deals/[id]/property-visual";
 import { PhotoViewerBody } from "@/app/(app)/deals/[id]/photo-viewer";
-import { photoControlOn } from "@/lib/property-views";
+import { mosaicRepeats, photoControlOn } from "@/lib/property-views";
 import type { SiteFlagsResult as SiteFlagsResultForTest } from "@/lib/site-flags/core";
 import { photographerParts } from "@/lib/credit-parts";
 
@@ -4959,6 +4959,48 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     // lead, so there is no mosaic either.
     const none = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, gallery }));
     expect(none).not.toContain('data-picture="mosaic"');
+  });
+
+  it("leaves the mosaic's photographs out of the filmstrip beside it, from the mosaic's own @2xl, and only while it is on screen (research pass 29)", () => {
+    // The rule: the cover and the two beside it, while the cover is the view
+    // on screen; nothing once another view is open, so the way back stays.
+    const views = ["photo", "g1", "g2", "g3", "aerial", "flood", "map"];
+    const mosaicIds = ["photo", "g1", "g2"];
+    expect([...mosaicRepeats(views, { mosaic: mosaicIds, active: "photo" })]).toEqual(["photo", "g1", "g2"]);
+    expect(mosaicRepeats(views, { mosaic: mosaicIds, active: "aerial" }).size).toBe(0);
+    expect(mosaicRepeats(views, { mosaic: mosaicIds, active: "g3" }).size).toBe(0);
+    expect(mosaicRepeats(views, { mosaic: [], active: "photo" }).size).toBe(0);
+    // Drawn: the strip under the mosaic starts after its photographs from
+    // @2xl, the breakpoint the mosaic itself is drawn from, and keeps every
+    // other view; below it the strip is whole (the classes apply from @2xl
+    // only, and every thumbnail is still in the page).
+    const four = [...gallery, { page: 9, credit: "From the offering memorandum, page 9" }];
+    const html = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...base, picture: { credit: "From the offering memorandum", source: "om" as const }, gallery: four }),
+    );
+    expect(html).toContain('data-picture="mosaic"');
+    expect(html).toContain("@2xl:grid");
+    const thumb = (id: string) => new RegExp(`<button[^>]*data-view-thumb="${id}"[^>]*>`).exec(html)?.[0] ?? "";
+    for (const id of ["photo", "g1", "g2"]) expect(thumb(id), id).toMatch(/class="[^"]*\s@2xl:hidden"/);
+    for (const id of ["g3", "aerial", "map"]) {
+      expect(thumb(id), id).not.toBe("");
+      expect(thumb(id), id).not.toContain("@2xl:hidden");
+    }
+    const strip = /<div role="group" aria-label="Views of the property" class="([^"]*)"/.exec(html)?.[1] ?? "";
+    expect(strip).not.toContain("@2xl:hidden");
+    expect(a11yIssues(html)).toEqual([]);
+    // A deal whose only views are the mosaic's photographs has no strip
+    // beside it from @2xl, and the whole strip below it.
+    const only = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...base, hasAddress: false, picture: { credit: "From the offering memorandum", source: "om" as const }, gallery }),
+    );
+    expect(only).toContain('data-picture="mosaic"');
+    expect(/<div role="group" aria-label="Views of the property" class="([^"]*)"/.exec(only)?.[1]).toMatch(/\s@2xl:hidden$/);
+    // No mosaic, no repeat: the strip is as it was.
+    const two = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...base, picture: { credit: "From the offering memorandum", source: "om" as const }, gallery: gallery.slice(0, 1) }),
+    );
+    expect(two).not.toContain("@2xl:hidden");
   });
 
   it("offers the photographs from a view that is not one, and never leads with them", () => {
