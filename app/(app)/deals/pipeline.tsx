@@ -22,7 +22,7 @@ import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
-import { PIPELINE_CARD_GRID, PIPELINE_CARD_SIZES, PIPELINE_VIEW_COOKIE, remembersView, type PipelineView } from "@/lib/pipeline-view";
+import { PIPELINE_CARD_GRID, PIPELINE_CARD_SIZES, PIPELINE_VIEW_COOKIE, filtersFoldLabel, remembersView, type PipelineView } from "@/lib/pipeline-view";
 import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
@@ -609,6 +609,21 @@ export function Pipeline({
     market !== "all" ||
     mfit !== "all" ||
     (onTeam && sharing !== "all");
+  // The filters a phone folds behind one row, counted for its summary
+  // ("Filters · 2 set"): the selects and the dead deals' toggle — never the
+  // search beside it, or the verdict chips above it, which show their own.
+  const filtersSet = [
+    stage !== "all",
+    asset !== "all",
+    market !== "all",
+    mfit !== "all",
+    onTeam && sharing !== "all",
+    deadCount > 0 && showDead,
+  ].filter(Boolean).length;
+  // Open when any is set (a saved view restored, a rung tapped), and as the
+  // reader leaves it once they have opened or closed it themselves.
+  const [foldOpen, setFoldOpen] = useState<boolean | null>(null);
+  const filtersOpen = foldOpen ?? filtersSet > 0;
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
     // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
@@ -851,7 +866,7 @@ export function Pipeline({
 
       {deals.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+          <div className="relative max-sm:min-w-0 max-sm:flex-1">
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -872,108 +887,137 @@ export function Pipeline({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search deals…  ( / )"
               aria-label="Search deals"
-              className="w-48 rounded-lg border border-line bg-surface py-1.5 pl-9 pr-3 text-sm shadow-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="w-48 rounded-lg border border-line bg-surface py-1.5 pl-9 pr-3 text-sm shadow-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40 max-sm:w-full"
             />
           </div>
-          {/* The verdict filter is the split's chips above; the stage filter
-              is the funnel's rungs — this select is the keyboard-and-phone
-              route to the same thing. */}
-          <FilterSelect
-            label="Filter by stage"
-            value={stage}
-            onChange={setStage}
-            options={[
-              ["all", "All stages"],
-              ...STAGES.map((s) => [s, STAGE_LABEL[s]] as [string, string]),
-            ]}
-          />
-          {assets.length > 1 && (
-            <FilterSelect
-              label="Filter by asset class"
-              value={asset}
-              onChange={setAsset}
-              className="max-w-40"
-              options={[
-                ["all", "All assets"],
-                ...assets.map((a) => [a, assetClassLabel(a)] as [string, string]),
-              ]}
-            />
-          )}
-          {/* A select is as wide as its longest option, and a market name can
-              run to a whole line ("Washington, DC (DC Proper / Fort Totten …)")
-              — capped, so the row keeps every filter on one line at desktop
-              width instead of stranding the next one below. */}
-          {markets.length > 1 && (
-            <FilterSelect
-              label="Filter by market"
-              value={market}
-              onChange={setMarket}
-              className="max-w-48"
-              options={[
-                ["all", "All markets"],
-                ...markets.map((m) => [m, m] as [string, string]),
-              ]}
-            />
-          )}
-          {hasScores && (
-            <FilterSelect
-              label="Filter by mandate fit"
-              value={mfit}
-              onChange={setMfit}
-              options={[
-                ["all", "All fit"],
-                ["PURSUE", "Pursue · 75+"],
-                ["WATCH", "Watch · 50–74"],
-                ["PASS", "Pass · <50"],
-              ]}
-            />
-          )}
-          {/* On a team the list holds the shared pipeline's deals beside the
-              reader's own, which the team does not see (lib/personal-deal). */}
-          {onTeam && (
-            <FilterSelect
-              label="Filter by sharing"
-              value={sharing}
-              onChange={setSharing}
-              options={SHARING_OPTIONS}
-            />
-          )}
-          {deadCount > 0 && (
-            <button
-              type="button"
-              aria-pressed={showDead}
-              onClick={() => setShowDead((v) => !v)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors ${
-                showDead
-                  ? "border-brand bg-brand/5 text-brand"
-                  : "border-line bg-surface text-muted hover:bg-faint hover:text-ink"
+          {/* Below sm the filters fold behind one row (research pass 29: four
+              selects stacked two by two pushed a phone's first photograph
+              off its first screen): this summary, saying how many are set,
+              opens the selects that follow it, and is open when any is set.
+              From sm up it is gone and the selects sit in the row as ever
+              (`sm:contents`) — they follow the details rather than sit in it,
+              since a closed details hides its contents at every width. */}
+          <details
+            data-filters="fold"
+            open={filtersOpen}
+            onToggle={(e) => setFoldOpen(e.currentTarget.open)}
+            className="peer/filters group/filters sm:hidden"
+          >
+            <summary
+              className={`inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 [&::-webkit-details-marker]:hidden ${
+                filtersSet > 0 ? "border-brand bg-brand/5 text-brand" : "border-line bg-surface text-ink hover:bg-faint"
               }`}
             >
-              {showDead ? "Hide dead" : `Show dead (${deadCount})`}
-            </button>
-          )}
-          {/* Below md the column headers are hidden, and the cards have none
-              at any width, so sorting lives here. */}
-          <FilterSelect
-            label="Sort deals"
-            value={`${sortKey}:${sortDir}`}
-            onChange={(v) => {
-              const [k, dir] = v.split(":") as [SortKey, SortDir];
-              setSortKey(k);
-              setSortDir(dir);
-            }}
-            className={`ml-auto ${view === "list" ? "md:hidden" : ""}`}
-            options={[
-              ["added:desc", "Newest"],
-              ["added:asc", "Oldest"],
-              ["due:asc", "Offers due, earliest"],
-              ["price:desc", "Price: high to low"],
-              ["cap:desc", "Cap: high to low"],
-              ["fit:desc", "Mandate fit: high to low"],
-              ["status:desc", "By status"],
-              ["name:asc", "Name A–Z"],
-            ]}
-          />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
+                <path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" />
+              </svg>
+              {filtersFoldLabel(filtersSet)}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-3.5 w-3.5 transition-transform group-open/filters:rotate-180">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+          </details>
+          <div data-filters="selects" className="hidden w-full flex-wrap items-center gap-2 max-sm:peer-open/filters:flex sm:contents">
+            {/* The verdict filter is the split's chips above; the stage filter
+                is the funnel's rungs — this select is the keyboard-and-phone
+                route to the same thing. */}
+            <FilterSelect
+              label="Filter by stage"
+              value={stage}
+              onChange={setStage}
+              options={[
+                ["all", "All stages"],
+                ...STAGES.map((s) => [s, STAGE_LABEL[s]] as [string, string]),
+              ]}
+            />
+            {assets.length > 1 && (
+              <FilterSelect
+                label="Filter by asset class"
+                value={asset}
+                onChange={setAsset}
+                className="max-w-40"
+                options={[
+                  ["all", "All assets"],
+                  ...assets.map((a) => [a, assetClassLabel(a)] as [string, string]),
+                ]}
+              />
+            )}
+            {/* A select is as wide as its longest option, and a market name can
+                run to a whole line ("Washington, DC (DC Proper / Fort Totten …)")
+                — capped, so the row keeps every filter on one line at desktop
+                width instead of stranding the next one below. */}
+            {markets.length > 1 && (
+              <FilterSelect
+                label="Filter by market"
+                value={market}
+                onChange={setMarket}
+                className="max-w-48"
+                options={[
+                  ["all", "All markets"],
+                  ...markets.map((m) => [m, m] as [string, string]),
+                ]}
+              />
+            )}
+            {hasScores && (
+              <FilterSelect
+                label="Filter by mandate fit"
+                value={mfit}
+                onChange={setMfit}
+                options={[
+                  ["all", "All fit"],
+                  ["PURSUE", "Pursue · 75+"],
+                  ["WATCH", "Watch · 50–74"],
+                  ["PASS", "Pass · <50"],
+                ]}
+              />
+            )}
+            {/* On a team the list holds the shared pipeline's deals beside the
+                reader's own, which the team does not see (lib/personal-deal). */}
+            {onTeam && (
+              <FilterSelect
+                label="Filter by sharing"
+                value={sharing}
+                onChange={setSharing}
+                options={SHARING_OPTIONS}
+              />
+            )}
+            {deadCount > 0 && (
+              <button
+                type="button"
+                aria-pressed={showDead}
+                onClick={() => setShowDead((v) => !v)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors ${
+                  showDead
+                    ? "border-brand bg-brand/5 text-brand"
+                    : "border-line bg-surface text-muted hover:bg-faint hover:text-ink"
+                }`}
+              >
+                {showDead ? "Hide dead" : `Show dead (${deadCount})`}
+              </button>
+            )}
+            {/* Below md the column headers are hidden, and the cards have none
+                at any width, so sorting lives here. */}
+            <FilterSelect
+              label="Sort deals"
+              value={`${sortKey}:${sortDir}`}
+              onChange={(v) => {
+                const [k, dir] = v.split(":") as [SortKey, SortDir];
+                setSortKey(k);
+                setSortDir(dir);
+              }}
+              className={`ml-auto ${view === "list" ? "md:hidden" : ""}`}
+              options={[
+                ["added:desc", "Newest"],
+                ["added:asc", "Oldest"],
+                ["due:asc", "Offers due, earliest"],
+                ["price:desc", "Price: high to low"],
+                ["cap:desc", "Cap: high to low"],
+                ["fit:desc", "Mandate fit: high to low"],
+                ["status:desc", "By status"],
+                ["name:asc", "Name A–Z"],
+              ]}
+            />
+          </div>
           {/* The two exports travel together at the right edge: when the
               filters wrap, the last line ends with them, never with one
               stranded select beside them. */}

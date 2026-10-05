@@ -50,7 +50,7 @@ import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table"
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
-import { PIPELINE_CARD_GRID, PIPELINE_CARD_SIZES, landingView, remembersView } from "@/lib/pipeline-view";
+import { PIPELINE_CARD_GRID, PIPELINE_CARD_SIZES, filtersFoldLabel, landingView, remembersView } from "@/lib/pipeline-view";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
@@ -643,6 +643,49 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(field).not.toMatch(/readonly|disabled/i);
     expect(html).toContain('accept="application/pdf"');
     expect(html).toContain('data-qa="batch-upload"');
+  });
+
+  it("folds a phone's filters behind one row that says how many are set, the row unchanged from sm up (research pass 29)", () => {
+    // Four selects stacked two by two pushed a phone's first photograph to
+    // y≈883 of an 844px screen.
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withThumbs(CARDS),
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
+        billing: BILLING, todayIso: TODAY,
+        onTeam: true,
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    // The fold: a details gone from sm up, its summary naming the filters —
+    // closed, since none is set yet.
+    const fold = /<details data-filters="fold"[^>]*>[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
+    expect(fold).not.toBe("");
+    expect(fold).toMatch(/^<details data-filters="fold" class="[^"]*\bpeer\/filters\b[^"]*\bsm:hidden\b/);
+    expect(fold).not.toMatch(/^<details[^>]*\sopen/);
+    expect(fold).toMatch(/<summary\b/);
+    expect(visibleText(fold).trim()).toBe("Filters");
+    // The selects follow it — where it can show them below sm, and where
+    // they dissolve into the row as ever from sm up.
+    expect(html).toContain('</details><div data-filters="selects"');
+    const group = /<div data-filters="selects" class="([^"]*)"/.exec(html)?.[1].split(/\s+/) ?? [];
+    for (const cls of ["hidden", "w-full", "flex-wrap", "max-sm:peer-open/filters:flex", "sm:contents"]) expect(group, cls).toContain(cls);
+    // Every select the row draws, the dead deals' toggle and the sort are in
+    // the fold; the search before it, the view and the exports after it.
+    const at = (s: string) => html.indexOf(s);
+    const from = at('<div data-filters="selects"');
+    const to = at('aria-label="Pipeline view"');
+    expect(at('aria-label="Search deals"')).toBeLessThan(at('data-filters="fold"'));
+    for (const l of ["Filter by stage", "Filter by asset class", "Filter by market", "Filter by mandate fit", "Filter by sharing", "Sort deals"]) {
+      expect(at(`aria-label="${l}"`), l).toBeGreaterThan(from);
+      expect(at(`aria-label="${l}"`), l).toBeLessThan(to);
+    }
+    expect(at("Show dead (1)")).toBeGreaterThan(from);
+    expect(at("Show dead (1)")).toBeLessThan(to);
+    // The summary says how many are set.
+    expect([0, 1, 2].map(filtersFoldLabel)).toEqual(["Filters", "Filters · 1 set", "Filters · 2 set"]);
   });
 
   it("opens on the cards unless the reader chose the list, and never lands on the map (#438)", () => {

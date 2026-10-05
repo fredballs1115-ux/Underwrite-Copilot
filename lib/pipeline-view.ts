@@ -33,6 +33,12 @@ export function remembersView(view: PipelineView): boolean {
   return view !== "map";
 }
 
+/** What the phone's folded filters say (research pass 29): "Filters", and
+ *  how many of them are set — "Filters · 2 set". */
+export function filtersFoldLabel(set: number): string {
+  return set > 0 ? `Filters · ${set} set` : "Filters";
+}
+
 /**
  * The cards view's grid (#428), and its loading state's column for column
  * (app/(app)/deals/loading.tsx): as many columns as hold a card of 17.5rem
