@@ -86,6 +86,17 @@
       "read": "the rule's own verification: Commerce's page read from the runner by zori probe run 37240367657, 'between 1/1/2027 and 12/31/2027 is 10%.'"
     },
     {
+      "rule_id": "md-moco-rent-stabilization",
+      "order": "Montgomery County's maximum allowable rent increase",
+      "applies_to": "increases taking effect",
+      "period_start": "2026-07-01",
+      "period_end": "2027-06-30",
+      "figures": [{ "label": "a covered unit", "pct": 5.2 }],
+      "source": "https://www.montgomerycountymd.gov/department-housing-community-affairs/rent-stabilization",
+      "as_of": "2026-10-05",
+      "read": "printed from DHCA's rent stabilization page by zori probe run 37258453291: 'The current CPI-U is 2.2%, and the maximum allowable rent increase is 5.2%. These rates will be in effect from July 1, 2026, through June 30, 2027.'"
+    },
+    {
       "rule_id": "md-takoma-park-rent-stabilization",
       "order": "Takoma Park's published allowance",
       "applies_to": "increases taking effect",
