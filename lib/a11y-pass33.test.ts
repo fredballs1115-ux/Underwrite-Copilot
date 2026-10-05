@@ -4,15 +4,26 @@
 // timer, focus moving) is held where it can be — a handler's own effect on
 // the markup it returns — and every render goes through the lint's
 // accessibility floor (`a11yIssues`).
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
+
+// The app shell's two server-side imports — never called in a render.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {}, back: () => {} }),
+  usePathname: () => "/deals",
+  useSearchParams: () => new URLSearchParams(),
+}));
+vi.mock("@/app/login/actions", () => ({ signOut: async () => {} }));
 import { CompName, CompsMap, type MapComp } from "@/app/(app)/deals/[id]/comps-map";
 import { ScrollRegion } from "@/app/scroll-region";
 import { ToastProvider, toastLifetime } from "@/app/(app)/toaster";
 import { ScreenRunStrip } from "@/app/screen-run-strip";
+import { FileField } from "@/app/(app)/file-field";
+import { StageFunnel, timelineName } from "@/app/(app)/analytics/charts";
+import { AppShell } from "@/app/(app)/app-shell";
 import { a11yIssues } from "./render-lint";
 
 const h = React.createElement;
@@ -279,5 +290,53 @@ describe("text that reads at 4.5:1 where the pass measured it under (research pa
     expect(s).toContain('className="-my-1 inline-flex items-center gap-1.5 py-1 hover:text-brand"');
     expect(s).toContain('className="-my-1 inline-flex py-1 hover:text-brand"');
     expect(s).toContain('className="-mt-2.5 inline-block pt-2.5 text-ink hover:text-brand"');
+  });
+});
+
+describe("smaller semantics (research pass 33, item 25)", () => {
+  it("a file field is one Tab stop, its button, while the hidden input keeps its name", () => {
+    const html = renderToStaticMarkup(h(FileField, { name: "doc", accept: "application/pdf" }));
+    const input = html.match(/<input[^>]*type="file"[^>]*>/)?.[0] ?? "";
+    expect(input).toContain('tabindex="-1"');
+    expect(input).toContain('aria-label="Choose file"');
+    expect(input).toContain("required");
+    expect(html).toMatch(/<button type="button"[^>]*>Choose file<\/button>/);
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("the stage funnel's bars stay out of the accessibility tree, the label and count beside each read as text", () => {
+    const html = renderToStaticMarkup(
+      h(StageFunnel, { rows: [{ label: "Screening", count: 4 }, { label: "Underwriting", count: 2 }, { label: "LOI", count: 1 }] }),
+    );
+    const svgs = html.match(/<svg[^>]*>/g) ?? [];
+    expect(svgs).toHaveLength(3);
+    for (const svg of svgs) expect(svg).toContain('aria-hidden="true"');
+    // The hover readout stays, and the figures are text.
+    expect(html).toContain("<title>Screening: 4</title>");
+    expect(html).toMatch(/>Screening<\/span>[\s\S]*?>4<\/span>/);
+  });
+
+  it("names the scatter by its span and range where the points give them, and by its count and median always", () => {
+    const pct = (v: number) => `${v.toFixed(1)}%`;
+    const p = (at: string, value: number) => ({ at, value });
+    expect(timelineName([p("2026-01-12T12:00:00Z", 5.7), p("2026-04-02T12:00:00Z", 8.1), p("2026-09-20T12:00:00Z", 5.9)], pct)).toBe(
+      "3 deals over time, from Jan 2026 to Sep 2026; median 5.9%, lowest 5.7%, highest 8.1%",
+    );
+    // One month is no span; one value is no range.
+    expect(timelineName([p("2026-08-11T12:00:00Z", 6), p("2026-08-12T12:00:00Z", 6), p("2026-08-13T12:00:00Z", 6)], pct)).toBe(
+      "3 deals over time, in Aug 2026; median 6.0%",
+    );
+  });
+
+  it("names the sidebar's links the primary navigation, inside the aside that also holds the account", () => {
+    const html = renderToStaticMarkup(h(AppShell, { userEmail: "analyst@example.com", children: h("p", null, "page") }));
+    const aside = html.slice(html.indexOf("<aside"), html.indexOf("</aside>"));
+    expect(aside).toMatch(/<nav aria-label="Primary"[^>]*>[\s\S]*?href="\/deals"[\s\S]*?<\/nav>/);
+    expect(aside).toContain("Sign out");
+    // The phone's header carries the same links under the same name; the
+    // two are never displayed at once (hidden md:flex / md:hidden).
+    expect(html.match(/<nav aria-label="Primary"/g)).toHaveLength(2);
+    expect(html).toContain('<nav aria-label="Terms and policies"');
+    expect(html.match(/<nav(?![^>]*aria-label)/g)).toBeNull();
   });
 });

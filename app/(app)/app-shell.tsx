@@ -176,7 +176,11 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="mt-1 flex-1 space-y-1 overflow-y-auto px-3">
+        {/* The app's primary navigation, named as its own landmark: the
+            aside around it also holds the logo, the palette and the
+            account, so a screen reader's list of landmarks had shown only an
+            unnamed navigation inside a "complementary" region. */}
+        <nav aria-label="Primary" className="mt-1 flex-1 space-y-1 overflow-y-auto px-3">
           {(
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],
@@ -286,8 +290,9 @@ export function AppShell({
               </form>
             </div>
           </div>
-          {/* Mobile nav — the sidebar is desktop-only, so these live here. */}
-          <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2">
+          {/* Mobile nav — the sidebar is desktop-only, so these live here,
+              under the same name; only one of the two is ever displayed. */}
+          <nav aria-label="Primary" className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2">
             {[
               { href: "/deals", label: "Pipeline", active: inPipeline },
               { href: "/criteria", label: "Buy box", active: inCriteria },
