@@ -49,6 +49,9 @@ const FMT = {
   int: "#,##0",
   num1: "#,##0.0",
   mult: '0.00"x"',
+  /** a price that is none (lib/underwrite/workbook's own): the model's
+   *  figure stays in the cell and reads as no price until one is typed */
+  usdNoPrice: '$#,##0;"no price: enter one";"no price: enter one"',
   date: "mm/dd/yyyy",
   /** a calendar year, never "2,027" */
   year: "0",
@@ -194,13 +197,14 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
   });
   // What the export assumes and leaves to the reader, said before any figure
   // is read — words only: the cells below and every formula are unchanged.
+  const priceNote = inputs.notes?.price ?? null;
   label(
     ws.getCell(3, 1),
     `Before you read the IRR: general vacancy (row ${A.vacancy}) comes off every year's revenue on top of the space the lease-up leaves empty${
       inputs.reimbursementPct === 0
         ? `, and expense recovery (row ${A.reimbursement}) is 0% — no tenant reimburses an expense`
         : ""
-    }. Set both to your own view.`,
+    }. Set both to your own view.${priceNote ? ` ${priceNote}` : ""}`,
     { bold: true, color: CAUTION },
   );
   const notes = inputs.notes ?? {};
@@ -234,7 +238,7 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
   // a roll that states none starts from the day the file was made.
   row(A.asOf, "Analysis start date", isoToSerial(inputs.asOf), FMT.date, notes.asOf ?? "Years to expiry are counted from it.");
   row(A.holdYears, "Hold period (years)", inputs.holdYears, FMT.int, "Sale at the end of this year, on forward NOI.");
-  row(A.price, "Purchase price", inputs.purchasePrice, FMT.usd, "");
+  row(A.price, "Purchase price", inputs.purchasePrice, notes.priceIsNone ? FMT.usdNoPrice : FMT.usd, notes.price ?? "");
   row(A.closingPct, "Closing costs (% of price)", inputs.closingCostPct, FMT.pct2, "");
 
   sectionHeader(ws, 11, "Market leasing assumptions", 1, 3);

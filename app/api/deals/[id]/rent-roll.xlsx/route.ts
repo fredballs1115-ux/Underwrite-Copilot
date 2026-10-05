@@ -9,6 +9,7 @@ import { openingProfile } from "@/lib/rentroll/profiles";
 import { DEFAULT_LEASE_UP_MONTHS, analyzeRentRoll, defaultAbsorptionSfPerMonth } from "@/lib/rentroll/analytics";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { currentDealModel } from "@/lib/bridge/deal-assumptions";
+import { unstatedPrice } from "@/lib/underwrite/report-grid";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export const runtime = "nodejs";
@@ -115,6 +116,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // words only: the figures and every formula are the export's as before.
   const vacancySource = model?.sources.vacancyPct;
   const rateSeed = model?.meta.rateSeed ?? null;
+  // The model's price where no memorandum stated one, said beside the price
+  // cell and above the IRR, never printed as if a memorandum had stated it
+  // (research pass 40, item 15).
+  const priceMark = model ? unstatedPrice(model.inputs, model.sources) : null;
   const notes: WorkbookNotes = {
     asOf: record.asOfDate
       ? `The rent roll's as-of date, ${longDay(asOf)}. Drives years-to-expiry.`
@@ -135,6 +140,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         : `The deal model's ${vacancySource?.note ?? "vacancy"}, taken off every year's revenue on top of the lease-up — set your own.`,
     reimbursement:
       "0%: this export assumes no tenant reimburses an operating expense. On net or base-year leases, enter the share they recover.",
+    ...(priceMark ? { price: priceMark.cell, priceIsNone: priceMark.kind === "none" } : {}),
   };
 
   const inputs: WorkbookInputs = {

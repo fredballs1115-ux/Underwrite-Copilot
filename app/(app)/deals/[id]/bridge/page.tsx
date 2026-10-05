@@ -6,7 +6,8 @@ import { bridgeSentence } from "@/lib/bridge/attribution";
 import { screeningModelCaveat } from "@/lib/bridge/model-caveat";
 import { getOrBuildBridge, listDealVersions, snapshotVersion } from "@/lib/bridge/versions";
 import { currentVersionId, defaultPair } from "@/lib/bridge/version-rules";
-import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
+import { currentDealModel } from "@/lib/bridge/deal-assumptions";
+import { unstatedPrice } from "@/lib/underwrite/report-grid";
 import {
   SCENARIO_LEVERS,
   leverFor,
@@ -78,7 +79,15 @@ export default async function BridgePage({
   // On a note or a plan deal the screening model's IRRs are not the buyer's:
   // said above them, and on the end of the line a reader copies.
   const caveat = screeningModelCaveat(extraction, (deal.first_signal as FirstSignal | null) ?? null);
-  const current = await currentDealAssumptions(supabase, id, deal.name as string, extraction);
+  const model = await currentDealModel(supabase, id, deal.name as string, extraction);
+  const current = model?.inputs ?? null;
+  // The model's price where no memorandum stated one — the site's
+  // placeholder, or a figure backed out of an NOI of zero or less, which is
+  // no price — said beside the price lever and under the form's heading, and
+  // never prefilled as if a memorandum had stated it (research pass 40, item
+  // 15; lib/underwrite/report-grid `unstatedPrice`). A blank lever keeps the
+  // model's figure, as every untouched lever does.
+  const priceMark = model ? unstatedPrice(model.inputs, model.sources) : null;
 
   // Every visit snapshots the deal's live assumptions — but only when they
   // moved from its latest base snapshot (a saved scenario is never one), so
@@ -209,23 +218,45 @@ export default async function BridgePage({
             Starts from this deal&apos;s current assumptions; change only what you&apos;re testing,
             so the bridge attributes the move to that alone.
           </p>
+          {priceMark ? (
+            <p className="mt-2 max-w-2xl text-sm text-caution" data-qa="bridge-price-unstated">
+              {priceMark.line}
+            </p>
+          ) : null}
           <form action={saveScenarioVersion} className="mt-4 flex flex-col gap-4">
             <input type="hidden" name="dealId" value={id} />
             {/* Each lever prefilled at the input's own precision; a price is
                 typed as people type it ("$12.5M"), so it keeps a keyboard
                 with letters, and the rest take numbers. */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {SCENARIO_LEVERS.map((lever) => (
-                <label key={lever.field} className="flex flex-col gap-1 text-xs text-muted">
-                  {lever.label}
-                  <input
-                    name={lever.field}
-                    defaultValue={leverText(lever, current[lever.field])}
-                    inputMode={lever.kind === "usd" ? undefined : "decimal"}
-                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
-                  />
-                </label>
-              ))}
+              {SCENARIO_LEVERS.map((lever) => {
+                // The price no memorandum stated waits blank for the
+                // reader's, its chip saying what the model runs on.
+                const unstated = lever.field === "purchasePrice" ? priceMark : null;
+                return (
+                  <label key={lever.field} className="flex flex-col gap-1 text-xs text-muted">
+                    <span>
+                      {lever.label}
+                      {unstated ? (
+                        <span
+                          className="ml-1 rounded bg-caution/10 px-1 text-[10px] font-medium text-caution"
+                          title={unstated.line}
+                          data-qa="bridge-price-chip"
+                        >
+                          {unstated.chip}
+                        </span>
+                      ) : null}
+                    </span>
+                    <input
+                      name={lever.field}
+                      defaultValue={unstated ? "" : leverText(lever, current[lever.field])}
+                      placeholder={unstated ? "Type a price" : undefined}
+                      inputMode={lever.kind === "usd" ? undefined : "decimal"}
+                      className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
+                    />
+                  </label>
+                );
+              })}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <label className="flex flex-col gap-1 text-xs text-muted sm:w-44">

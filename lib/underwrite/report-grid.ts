@@ -656,6 +656,48 @@ export function placeholderReason(
 }
 
 /**
+ * The model's price where no memorandum stated one, as a surface that prints
+ * the model's price as an input or a column says it (research pass 40, item
+ * 15: the Assumption Bridge's scenario form, the valuations page's "Our UW"
+ * column and the rent-roll workbook's price cell printed the site's
+ * $10,000,000 placeholder, or a figure backed out of an NOI of zero or less,
+ * as if a memorandum had stated it). `kind`: "placeholder", the site's
+ * figure on an unpriced deal; "none", a quotient that is no price, which no
+ * surface shows (lib/underwrite/inputs `noPrice`). `chip` goes beside the
+ * figure, `line` is the report's own reason (`placeholderReason`), and
+ * `cell` the note an input cell carries. Null where the price is the
+ * memorandum's or worked from its figures.
+ */
+export interface UnstatedPrice {
+  kind: "placeholder" | "none";
+  chip: string;
+  line: string;
+  cell: string;
+}
+
+export function unstatedPrice(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): UnstatedPrice | null {
+  const noPrice = sources?.purchasePrice?.noPrice ?? null;
+  const placeholder = sources?.purchasePrice?.provenance === "assumption";
+  if (!noPrice && !placeholder) return null;
+  const reason = placeholderReason(inputs, sources);
+  if (!reason) return null;
+  const line = `${reason[0].toUpperCase()}${reason.slice(1)}`;
+  return noPrice
+    ? {
+        kind: "none",
+        chip: "no price",
+        line,
+        cell: `No price was read from the memorandum, and its ${usd0(noPrice.value)} ${noPrice.label} is not a year's income to price on, so no price is struck on it — enter the price you would pay.`,
+      }
+    : {
+        kind: "placeholder",
+        chip: "placeholder",
+        line,
+        cell: `No price was read from the memorandum: ${usd0(inputs.purchasePrice)} is the site's placeholder, not a price — enter the price you would pay.`,
+      };
+}
+
+/**
  * Why the model's own reads are left out — the assumable loan's and the
  * seller's note's pricing, the leasehold's exit, the sale's ceiling bid,
  * every panel's model line — or null where they print. The full report's

@@ -335,6 +335,20 @@ export function ValuationsView({
             <span className="font-medium">edited</span>
             {" = a figure you entered over the document’s, so it carries no page reference."}
           </>
+        ) : null}
+        {columns.some((c) => c.notes?.headlineValue?.chip === "placeholder") ? (
+          <>
+            {" "}
+            <span className="font-medium">placeholder</span>
+            {" = no price was read from the memorandum, so your model runs on the site’s placeholder; its IRR is withheld."}
+          </>
+        ) : null}
+        {columns.some((c) => c.notes?.headlineValue?.chip === "no price") ? (
+          <>
+            {" "}
+            <span className="font-medium">no price</span>
+            {" = no price was read from the memorandum, and the figure the model backs out of its NOI is none; its IRR is withheld."}
+          </>
         ) : null}{" "}
         A dash = the source is silent. The IRR row runs each price through your model; its
         superscript counts borrowed assumptions.

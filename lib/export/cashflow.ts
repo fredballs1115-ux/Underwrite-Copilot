@@ -77,6 +77,15 @@ export interface WorkbookNotes {
   vacancy?: string;
   /** expense recovery: what this export assumes */
   reimbursement?: string;
+  /** the purchase price where no memorandum stated one: the site's
+   *  placeholder, or a figure backed out of an NOI of zero or less, said as
+   *  that beside the cell and above the IRR (lib/underwrite/report-grid
+   *  `unstatedPrice`, research pass 40) */
+  price?: string;
+  /** the price is no price (`noPrice`): the cell keeps the model's figure,
+   *  which no surface shows, and reads "no price: enter one" until the
+   *  reader types a price — the underwrite workbook's own format */
+  priceIsNone?: boolean;
 }
 
 /** Everything read off the rent roll, resolved once so the workbook writes the
