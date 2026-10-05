@@ -41,6 +41,7 @@ import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-dea
 // CSV and the meeting workbook mark the figure with the same words.
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
+import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
@@ -1777,7 +1778,7 @@ const DealRow = memo(function DealRow({
     // This bit only shows below `md` (the cap column takes over there), so
     // it wears the column's "yoc" micro-label: "7.2% yield on cost" was the
     // part a phone's one-line truncation cut.
-    <span title="Yield on total cost — a plan deal has no going-in cap">
+    <span title={PLAN_YOC_TITLE}>
       <span className="font-mono tabular-nums">{d.slots.yoc}</span>{" "}
       <span className="text-[9px] font-medium uppercase">yoc</span>
     </span>
@@ -1989,7 +1990,7 @@ const DealRow = memo(function DealRow({
         <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
           {d.slots.cap ??
             (d.slots.yoc ? (
-              <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
+              <span title={PLAN_YOC_TITLE} className="text-brand">
                 {d.slots.yoc}
                 <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
               </span>

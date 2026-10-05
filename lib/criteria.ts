@@ -1479,7 +1479,7 @@ export function evaluateBuyBox(
         label: "Going-in cap",
         status: "unknown",
         detail: planKind
-          ? `Mandate wants ≥${box.minCapPct}% going-in, but ${withArticle(planKind)} deal has no going-in cap — its stabilized figure is the finished project's, judged on yield on total cost, not on a cap against the price.`
+          ? `Mandate wants ≥${box.minCapPct}% going-in, but ${withArticle(planKind)} deal is judged on its yield on total cost, not on a going-in cap — its stabilized figure is the finished project's, never a cap against the price.`
           : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`,
       });
     } else if (pct >= box.minCapPct) {

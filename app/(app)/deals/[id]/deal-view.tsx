@@ -88,6 +88,7 @@ import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MAX_OM_PAGES } from "@/lib/pdf";
 import { needsOperator } from "@/lib/anthropic/operator-failures";
 import { documentFailure } from "@/lib/anthropic/document-failures";
+import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
@@ -2018,7 +2019,7 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
                       (c.yieldOnCostLabel ? (
                         <span
                           className="text-brand"
-                          title="Yield on cost — a plan deal has no going-in cap; this is its stabilized NOI over total cost"
+                          title={PLAN_YOC_TITLE}
                         >
                           {c.yieldOnCostLabel}
                           <span className="ml-0.5 font-sans text-[9px] font-medium uppercase">

@@ -1,4 +1,28 @@
-import type { PlanSummary } from "@/lib/deal-strategy";
+import type { PlanSummary, StrategyKind } from "@/lib/deal-strategy";
+import { withArticle } from "@/lib/article";
+
+/**
+ * Why a plan deal's cap slot holds its yield on total cost, as a tooltip on
+ * the pipeline's card and list and the internal comps. A value-add, a
+ * lease-up or a conversion of an occupied building can carry an in-place
+ * cap — the memorandum's key terms print it — so the words never say the
+ * deal has none: they had read "a plan deal has no going-in cap".
+ */
+export const PLAN_YOC_TITLE =
+  "Yield on total cost — a plan deal is judged on its stabilized NOI over everything the plan costs, not on its in-place cap";
+
+/**
+ * How a plan deal is read, in one sentence under its facts on the shared
+ * screen: judged on its yield on total cost. "A value-add deal has no
+ * going-in cap" had stood beside the key terms' "Going-in cap rate 5.50%",
+ * the memorandum's in-place cap, and a lender reads both lines; the
+ * sentence now says which one the plan is judged on. A development has no
+ * income in place to strike a cap on, so it is not named for one.
+ */
+export function planReadLine(kind: StrategyKind, label: string, landPrice: boolean): string {
+  const notCap = kind === "development" ? "" : ", not on its in-place cap";
+  return `${withArticle(label.toLowerCase(), true)} deal is judged on its yield on total cost${notCap}: the stabilized NOI is the finished project's figure, set over everything the plan costs — never a cap rate on the ${landPrice ? "land" : "acquisition"} price.`;
+}
 
 /** $21.0M / $850k / $400 — the compact money the plan's facts print in. */
 export const moneyCompact = (n: number): string =>

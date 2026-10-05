@@ -259,7 +259,11 @@ describe("SharePlan — the plan on the shared screen", () => {
     expect(html).toContain("$180.0M"); // total cost
     expect(html).toContain("11.67%"); // yield on cost
     expect(html).toContain("24 months of construction");
-    expect(html).toContain("A conversion deal has no going-in cap");
+    // Judged on its yield on total cost, never "has no going-in cap": a
+    // value-add's or an occupied conversion's key terms beside the plan can
+    // print the memorandum's in-place cap (research pass 34).
+    expect(html).toContain("A conversion deal is judged on its yield on total cost, not on its in-place cap");
+    expect(html).not.toContain("has no going-in cap");
     expect(html).toContain("never a cap rate on the acquisition price");
     // Nothing from the deal page that has no counterpart here.
     expect(html).not.toContain("challenger");

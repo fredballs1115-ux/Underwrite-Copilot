@@ -20,7 +20,7 @@ import { SHARE_CAP_WORDS, capSlotWithheld, goingInCapFigure } from "./compare-in
 import { capCellText } from "./cap-slot";
 import { interestTag } from "./interest";
 import { deriveInternalComps } from "./internal-comps";
-import { pctText, yieldOnCostText } from "./plan-facts";
+import { PLAN_YOC_TITLE, pctText, planReadLine, yieldOnCostText } from "./plan-facts";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { visibleText } from "./render-lint";
 
@@ -275,6 +275,32 @@ describe("the research panel's per-unit read is the card's basis, in the deal's 
     const panel = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/research-panel.tsx"), "utf8");
     expect(panel).toContain("{vsMarketHeading(basis)}");
     expect(panel).not.toMatch(/pricePerUnit|\/unit` : ""/);
+  });
+});
+
+describe("a plan deal is judged on its yield on total cost — never said to have no going-in cap (finding 12)", () => {
+  it("the shared screen's sentence names the in-place cap a value-add's key terms print beside it", () => {
+    expect(planReadLine("value_add", "Value-add", false)).toBe(
+      "A value-add deal is judged on its yield on total cost, not on its in-place cap: the stabilized NOI is the finished project's figure, set over everything the plan costs — never a cap rate on the acquisition price.",
+    );
+    expect(planReadLine("lease_up", "Lease-up", false)).toMatch(/^A lease-up deal is judged on its yield on total cost, not on its in-place cap:/);
+    // A development has no income in place to strike a cap on.
+    expect(planReadLine("development", "Development", true)).toBe(
+      "A development deal is judged on its yield on total cost: the stabilized NOI is the finished project's figure, set over everything the plan costs — never a cap rate on the land price.",
+    );
+    for (const k of ["value_add", "lease_up", "conversion", "development"] as const) {
+      expect(planReadLine(k, "Plan", false)).not.toMatch(/has no going-in cap/);
+    }
+  });
+
+  it("the pipeline's tooltips, the internal comps' and the analytics' notes read the same way", () => {
+    expect(PLAN_YOC_TITLE).toMatch(/judged on .* not on its in-place cap/);
+    for (const file of ["app/(app)/deals/pipeline.tsx", "app/(app)/deals/[id]/deal-view.tsx", "app/(app)/analytics/page.tsx", "app/share/[token]/plan-facts.tsx", "app/(app)/deals/[id]/research-panel.tsx"]) {
+      const src = readFileSync(join(process.cwd(), file), "utf8");
+      // Visible words only: a comment may still describe the old reading.
+      const visible = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      expect(visible, file).not.toMatch(/(?:has|have|carry) no going-in cap/i);
+    }
   });
 });
 

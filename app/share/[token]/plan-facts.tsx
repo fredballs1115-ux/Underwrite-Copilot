@@ -1,6 +1,5 @@
-import { withArticle } from "@/lib/article";
 import type { DealStrategy, PlanSummary } from "@/lib/deal-strategy";
-import { planFacts } from "@/lib/plan-facts";
+import { planFacts, planReadLine } from "@/lib/plan-facts";
 
 /**
  * The plan, on the shared screen. The person holding the link — a partner,
@@ -20,7 +19,6 @@ export function SharePlan({
   noun?: string;
 }) {
   if (!plan) return null;
-  const kind = strategy.label.toLowerCase();
   return (
     <section
       aria-label="The plan"
@@ -45,9 +43,7 @@ export function SharePlan({
       </dl>
       <p className="mt-3 text-xs leading-relaxed text-muted">
         {plan.timeline ? `Timeline as stated: ${plan.timeline}. ` : ""}
-        {withArticle(kind, true)}{" "}deal has no going-in cap: the stabilized NOI is the finished project&apos;s
-        figure, judged on yield on total cost — never a cap rate on the{" "}
-        {plan.priceLabel === "Land cost" ? "land" : "acquisition"} price.
+        {planReadLine(strategy.kind, strategy.label, plan.priceLabel === "Land cost")}
         {plan.costWithheld ? ` ${plan.costWithheld}` : ""}
       </p>
     </section>

@@ -572,9 +572,9 @@ export async function ResearchPanel({
             </span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            No going-in cap to spread against debt until the works are done; the
-            plan is judged on yield on total cost (the stressed grid under the
-            plan strip) and its debt is sized to cost.
+            The plan is judged on its yield on total cost, not on a cap against
+            its price (the stressed grid under the plan strip reads it), and its
+            debt is sized to cost.
           </p>
         </div>
       )}

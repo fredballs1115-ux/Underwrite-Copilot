@@ -183,7 +183,7 @@ export default async function AnalyticsPage() {
                 <p className="mb-2 mt-0.5 text-xs text-muted">
                   One dot per deal — hover for the name.
                   {planDeals.length > 0 &&
-                    " Plan deals have no going-in cap and are not plotted."}
+                    " Plan deals are judged on yield on total cost and are not plotted."}
                 </p>
                 <DotTimeline points={capPoints} format={pct} medianLabel="median" />
               </div>
@@ -271,7 +271,7 @@ export default async function AnalyticsPage() {
                 Deals whose figures didn&rsquo;t parse are counted in Screens
                 but not in the figures.
                 {planDeals.length > 0 &&
-                  " Plan deals carry no going-in cap and sit outside the cap figures."}
+                  " Plan deals are judged on yield on total cost and sit outside the cap figures."}
               </p>
             </section>
           )}

@@ -2846,7 +2846,8 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).toContain("Conversion");
     expect(text).toContain("$21.0M");
     expect(text).toContain("11.67%");
-    expect(text).toContain("A conversion deal has no going-in cap");
+    expect(text).toContain("A conversion deal is judged on its yield on total cost, not on its in-place cap");
+    expect(text).not.toContain("has no going-in cap");
     expect(text).toContain("verify vs. source");
     expect(text).toContain("Exit");
     expect(text).not.toContain("Breaks if:");

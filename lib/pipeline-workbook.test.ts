@@ -77,7 +77,10 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     const ws = (await load([STABILIZED, CONVERSION])).getWorksheet("Pipeline")!;
     const head = HEADERS.map((_, i) => ws.getRow(4).getCell(i + 2).value);
     expect(head).toEqual(HEADERS);
-    expect(JSON.stringify(ws.getRow(4).getCell(9).note)).toContain("no going-in cap");
+    // Judged on yield on total cost — never "no going-in cap", which a
+    // value-add's in-place cap contradicts (research pass 34).
+    expect(JSON.stringify(ws.getRow(4).getCell(9).note)).toContain("judged on yield on total cost");
+    expect(JSON.stringify(ws.getRow(4).getCell(9).note)).not.toContain("no going-in cap");
   });
 
   it("a stabilized asset shows its cap and no yield; a conversion says n/a — plan and shows its yield on cost", async () => {

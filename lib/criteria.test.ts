@@ -590,8 +590,11 @@ describe("findGoingInCap — never the finished project's figure", () => {
     };
     const c = check(evaluateBuyBox("multifamily", conversion, box), "Going-in cap")!;
     expect(c.status).toBe("unknown");
-    expect(c.detail).toMatch(/a conversion deal has no going-in cap/);
-    expect(c.detail).toMatch(/yield on total cost/);
+    // Judged on its yield on total cost — never "has no going-in cap", which
+    // a value-add's in-place cap in its key terms contradicts (research
+    // pass 34).
+    expect(c.detail).toMatch(/a conversion deal is judged on its yield on total cost, not on a going-in cap/);
+    expect(c.detail).not.toMatch(/has no going-in cap/);
     // A stabilized asset with the same missing figure keeps the plain wording.
     const plain = check(evaluateBuyBox("multifamily", ex([["Purchase price", "$20,000,000"]]), box), "Going-in cap")!;
     expect(plain.status).toBe("unknown");

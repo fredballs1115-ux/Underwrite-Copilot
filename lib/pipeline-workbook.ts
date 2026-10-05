@@ -226,9 +226,9 @@ export async function buildPipelineWorkbook(
     };
     if (h === "Yield on cost") {
       c.note =
-        "Plan deals — value-add, lease-up, conversion, development — have no going-in cap. " +
-        "This is the OM's stabilized NOI over total cost (price plus the capital budget), " +
-        "the figure such a deal is judged on.";
+        "Plan deals — value-add, lease-up, conversion, development — are judged on yield on total cost, " +
+        "not on an in-place cap. This is the OM's stabilized NOI over total cost (price plus the " +
+        "capital budget).";
     }
   });
   headRow.height = 18;
