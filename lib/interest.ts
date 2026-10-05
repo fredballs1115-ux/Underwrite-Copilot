@@ -497,11 +497,15 @@ export function noteYieldSentence(n: NoteRead | null): string {
 /** The note's cushion (#416): the loan-to-value at the balance and at the
  *  price, over the value the OM states for the collateral — "" where it
  *  states none. On a note behind other debt (a mezzanine loan, a junior
- *  lien, a B-note) the loan-to-value is withheld and the sentence says why:
- *  at its last dollar it needs the senior loan's balance, which the
- *  memorandum does not state. Every surface that prints the cushion — the
- *  headline the deal context and the challenger read, the panel, the
- *  report's note terms — prints this sentence. */
+ *  lien, a B-note) the cushion sits on top of the senior loan's balance:
+ *  where the memorandum states it ("Senior loan balance", research pass 28)
+ *  the sentence reads the stack off it, and where the screen read none it
+ *  withholds the loan-to-value and says why — never that the memorandum
+ *  states none, which its own words may (C4: "behind a $52M senior
+ *  mortgage" was printed beside "which the memorandum does not state").
+ *  Every surface that prints the cushion — the headline the deal context
+ *  and the challenger read, the panel, the report's note terms — prints
+ *  this sentence. */
 export function noteCollateralSentence(n: NoteRead | null): string {
   if (!n || n.terms.collateralValue == null) return "";
   // Named beside other debt with no order stated: said as that, never as a
@@ -511,7 +515,11 @@ export function noteCollateralSentence(n: NoteRead | null): string {
     return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: the memorandum names other debt on the property without saying which loan comes first, so a loan-to-value at this note's last dollar cannot be read from it.`;
   }
   if (n.terms.subordinate) {
-    return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.`;
+    const senior = n.terms.seniorBalance;
+    if (senior != null && n.seniorLtvPct != null && n.stackAtBalancePct != null && n.stackAtPricePct != null) {
+      return `The collateral's stated ${money(n.terms.collateralValue)}, with the senior loan's stated ${money(senior)} ahead of this note, puts the senior loan at ${Math.round(n.seniorLtvPct)}% of its value, the senior loan and the balance at ${Math.round(n.stackAtBalancePct)}%, and the senior loan and the price at ${Math.round(n.stackAtPricePct)}%.`;
+    }
+    return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the screen did not read as a figure of its own.`;
   }
   if (n.ltvAtBalancePct == null || n.ltvAtPricePct == null) return "";
   return `The collateral's stated ${money(n.terms.collateralValue)} puts the balance at ${Math.round(n.ltvAtBalancePct)}% of its value and the price at ${Math.round(n.ltvAtPricePct)}%.`;

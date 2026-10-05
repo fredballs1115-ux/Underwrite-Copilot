@@ -634,7 +634,7 @@ describe("ReportDocument (full report)", () => {
       React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
-    expect(text).toContain("it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.");
+    expect(text).toContain("it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the screen did not read as a figure of its own.");
     // $80M over $300M alone would read 27%: never printed.
     expect(text).not.toMatch(/puts the balance at \d+% of its value/);
   }, 45000);

@@ -24,9 +24,9 @@ import { noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRe
  * at each, and the empty remainder the cushion. A note that is not paying,
  * or is past its maturity, keeps its sentence: a large yield there is one
  * nobody earns. A note behind other debt draws no collateral track — its
- * cushion sits on top of a senior balance the memorandum does not state —
- * so its price is drawn against its balance, and the sentence under it
- * says why the loan-to-value is withheld.
+ * cushion sits on top of the senior loan's balance — so its price is drawn
+ * against its balance, and the sentence under it reads the stack where the
+ * memorandum states that balance, or says why the loan-to-value is withheld.
  *
  * A ground lease's term is drawn under the lead where the memorandum states
  * when it ends (#421): the years left today, and the extension options
@@ -68,8 +68,9 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
   // deal-type panel reads.
   const said = n && tiles.length === 0 ? [...r.leadSentences, noteYieldSentence(n)].filter(Boolean) : r.leadSentences;
   const caption = tiles.length > 0 ? noteCaption(n) : "";
-  // Behind a senior loan the loan-to-value is withheld (lib/note-yield), and
-  // the reason stands where the collateral's track would.
+  // Behind a senior loan the note's own loan-to-value is withheld
+  // (lib/note-yield), and the sentence stands where the collateral's track
+  // would: the stack on the senior's stated balance, or why there is none.
   const ltvWithheld = n?.terms.subordinate ? noteCollateralSentence(n) : "";
   const collateral =
     n && n.terms.collateralValue != null && n.ltvAtBalancePct != null && n.ltvAtPricePct != null

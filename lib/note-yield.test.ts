@@ -206,6 +206,49 @@ describe("a note behind other debt — its loan-to-value needs a senior balance 
     expect(first.subordinate).toBe(false);
     expect(readNote(first, 15_000_000, AS_OF)!.ltvAtBalancePct).toBeCloseTo((15 / 70) * 100, 6);
   });
+
+  // Research pass 28: the memorandum's own words stated the senior balance
+  // ("behind a $52M senior mortgage") and the screen had no row to read it
+  // from. The extraction labels it "Senior loan balance" now, and the stack
+  // is read off it: the senior alone, with the note's balance, with the price.
+  it("reads the stack on a senior balance the memorandum states, and only behind it", () => {
+    const rows = [
+      // Listed first, the senior loan's rows are never the note's own terms.
+      row("Senior loan balance", "$52,000,000"),
+      row("Senior loan maturity", "June 30, 2031"),
+      row("Unpaid principal balance", "$15,000,000"),
+      row("Note rate", "11.0%"),
+      row("Maturity date", "March 31, 2028"),
+      row("Whole-asset value", "$70,000,000"),
+    ];
+    const words = { summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $52M senior mortgage" };
+    const mezz = readNoteTerms({ metrics: rows, interest: words });
+    expect(mezz.balance).toBe(15_000_000);
+    expect(mezz.maturity).toBe("2028-03-31");
+    expect(mezz.position).toBe("behind");
+    expect(mezz.seniorBalance).toBe(52_000_000);
+    const r = readNote(mezz, 12_000_000, AS_OF)!;
+    // The note's own loan-to-value stays withheld; the stack is read instead.
+    expect(r.ltvAtBalancePct).toBeNull();
+    expect(r.seniorLtvPct).toBeCloseTo((52 / 70) * 100, 6);
+    expect(r.stackAtBalancePct).toBeCloseTo((67 / 70) * 100, 6);
+    expect(r.stackAtPricePct).toBeCloseTo((64 / 70) * 100, 6);
+    // No senior row: the stack is withheld, as before.
+    const bare = readNote(readNoteTerms({ metrics: rows.slice(2), interest: words }), 12_000_000, AS_OF)!;
+    expect(bare.terms.seniorBalance).toBeUndefined();
+    expect([bare.seniorLtvPct, bare.stackAtBalancePct, bare.stackAtPricePct]).toEqual([null, null, null]);
+    // Read only beside words that place the note behind it: a first-lien
+    // note, and one whose words leave its place unclear, read no stack.
+    const first = readNoteTerms({ metrics: rows, interest: { summary: "Sale of the first mortgage note", loan: "" } });
+    expect(first.seniorBalance).toBeUndefined();
+    expect(readNote(first, 12_000_000, AS_OF)!.stackAtBalancePct).toBeNull();
+    const unclear = readNoteTerms({ metrics: rows, interest: { summary: "Performing note", loan: "The property also carries $5M of mezzanine financing" } });
+    expect(unclear.position).toBe("unclear");
+    expect(unclear.seniorBalance).toBeUndefined();
+    // A share of value is no balance, and a senior loan's other terms are not one.
+    expect(readNoteTerms({ metrics: [row("Senior loan balance", "65% LTV"), ...rows.slice(2)], interest: words }).seniorBalance).toBeUndefined();
+    expect(readNoteTerms({ metrics: [row("Senior loan rate", "$52,000,000"), ...rows.slice(2)], interest: words }).seniorBalance).toBeUndefined();
+  });
 });
 
 describe("readNoteTerms — an amortization, an interest-only period and a maturity, each only as stated", () => {
@@ -247,8 +290,14 @@ describe("the extraction asks for the rows this reads (#416)", () => {
   it("every note label the prompt names is one the reader takes", async () => {
     const { extractionInstruction } = await import("./anthropic/prompts");
     const prompt = extractionInstruction("multifamily");
-    const labels = ["Unpaid principal balance", "Note rate", "Maturity date", "Amortization", "Payment status", "Whole-asset value"];
+    const labels = ["Unpaid principal balance", "Note rate", "Maturity date", "Amortization", "Payment status", "Whole-asset value", "Senior loan balance"];
     for (const label of labels) expect(prompt).toContain(`"${label}"`);
+    expect(
+      readNoteTerms({
+        metrics: [row("Unpaid principal balance", "$15,000,000"), row("Senior loan balance", "$52,000,000")],
+        interest: { summary: "Sale of a mezzanine loan", loan: "behind a $52M senior mortgage" },
+      }).seniorBalance,
+    ).toBe(52_000_000);
     const t = readNoteTerms({
       metrics: [
         row("Unpaid principal balance", "$24,400,000"),

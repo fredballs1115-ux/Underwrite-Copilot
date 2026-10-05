@@ -6406,9 +6406,26 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(text).toContain("Price $15.0M");
     expect(text).toContain("Unpaid balance $16.0M");
     expect(html).toContain('data-qa="note-ltv-withheld"');
-    expect(text).toContain("its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.");
+    expect(text).toContain("its loan-to-value at its last dollar needs that loan's balance, which the screen did not read as a figure of its own.");
     expect(a11yIssues(html), "mezzanine note panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+    // Where the memorandum states the senior loan's balance (research pass
+    // 28), the sentence under the bar reads the stack off it.
+    const stated = base({ ...blank, kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $60M senior loan", page: "p. 5" }, [
+      row("Senior loan balance", "$60,000,000"),
+      row("Unpaid principal balance", "$16,000,000"),
+      row("Note rate", "11.0%"),
+      row("Maturity date", "March 31, 2028"),
+      row("Whole-asset value", "$70,000,000"),
+      row("Payment status", "Performing"),
+    ]);
+    const stack = render(React.createElement(InterestPanel, { interest: readInterestFor(stated, 15_000_000, AS_OF) }));
+    expect(stack).not.toContain('data-bar="note-balance"');
+    expect(visibleText(stack)).toContain("Unpaid balance $16.0M");
+    expect(visibleText(stack)).toContain(
+      "with the senior loan's stated $60.0M ahead of this note, puts the senior loan at 86% of its value, the senior loan and the balance at 109%, and the senior loan and the price at 107%.",
+    );
+    expect(gluedWords(visibleText(stack))).toEqual([]);
   });
 
   it("a leased fee: the building's income as the track, the ground rent filled, and the calculator's leased-fee side", () => {

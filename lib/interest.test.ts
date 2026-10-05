@@ -467,7 +467,7 @@ describe("a note, underwritten as a note (#416)", () => {
 
   it("a note behind a senior loan: no loan-to-value, and every surface says why", () => {
     // $15M of mezzanine behind a $60M senior loan on a $70M value read "21%"
-    // when the stack is 107%. The memorandum states no senior balance.
+    // when the stack is 107%. The screen read no senior balance as a row.
     const mezz = ex(
       interest({ kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $60M senior loan", page: "p. 5" }),
       [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "11.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$70,000,000"), row("Payment status", "Performing")],
@@ -476,8 +476,12 @@ describe("a note, underwritten as a note (#416)", () => {
     expect(r.note!.terms.subordinate).toBe(true);
     expect(r.note!.ltvAtBalancePct).toBeNull();
     expect(r.note!.ltvAtPricePct).toBeNull();
+    // Research pass 28 (C4): the memorandum's own loan sentence states the
+    // $60M, so "which the memorandum does not state" was not true of it —
+    // what is true is that the screen did not read it as a figure.
     const WITHHELD =
-      "The collateral's stated $70.0M is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.";
+      "The collateral's stated $70.0M is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the screen did not read as a figure of its own.";
+    expect(r.headline).not.toContain("which the memorandum does not state");
     expect(noteCollateralSentence(r.note)).toBe(WITHHELD);
     expect(r.headline).toContain(WITHHELD);
     expect(r.headline).not.toMatch(/puts the balance at \d+%/);
@@ -490,6 +494,36 @@ describe("a note, underwritten as a note (#416)", () => {
     vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
     expect(dealContextFor(mezz)).toContain(WITHHELD);
     expect(interestNote(readInterest(mezz, askingPriceOf(mezz))!)).toContain(WITHHELD);
+  });
+
+  it("a note behind a senior loan whose balance the memorandum states: the stack, read off the stated figures", () => {
+    // $15M of mezzanine behind a $52M senior mortgage on a $70M value,
+    // bought for $12M: the senior is 74% of the value, the senior and the
+    // note's balance 96%, the senior and the price 91%.
+    const base = ex(
+      interest({ kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $52M senior mortgage", page: "p. 5" }),
+      [
+        row("Senior loan balance", "$52,000,000"),
+        row("Unpaid principal balance", "$15,000,000"),
+        row("Note rate", "11.0%"),
+        row("Maturity date", "March 31, 2028"),
+        row("Whole-asset value", "$70,000,000"),
+        row("Payment status", "Performing"),
+      ],
+    );
+    const mezz = { ...base, metrics: [row("Asking price", "$12,000,000"), ...base.metrics.filter((m) => m.label !== "Asking price")] };
+    expect(askingPriceOf(mezz)).toBe(12_000_000);
+    const r = readInterest(mezz, 12_000_000, AS_OF)!;
+    expect(r.balance).toBe(15_000_000);
+    const STACK =
+      "The collateral's stated $70.0M, with the senior loan's stated $52.0M ahead of this note, puts the senior loan at 74% of its value, the senior loan and the balance at 96%, and the senior loan and the price at 91%.";
+    expect(noteCollateralSentence(r.note)).toBe(STACK);
+    expect(r.headline).toContain(STACK);
+    expect(r.headline).not.toContain("needs that loan's balance");
+    expect(gluedWords(r.headline)).toEqual([]);
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
+    expect(dealContextFor(mezz)).toContain(STACK);
+    expect(interestNote(readInterest(mezz, askingPriceOf(mezz))!)).toContain(STACK);
   });
 
   it("a note named beside other debt with no order stated says so, and asserts no senior loan (the audit of 2026-10-01)", () => {
