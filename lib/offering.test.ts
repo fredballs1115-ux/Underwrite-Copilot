@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { extractionInstruction } from "@/lib/anthropic/prompts";
+import { ListingTeam } from "@/app/(app)/deals/[id]/listing-team";
 import {
   brokerageOf,
   initialsOf,
   listingTeamOf,
+  mailtoAddressOf,
   offersDueEventText,
   offersDueOf,
   offersDueTimeOf,
@@ -12,6 +16,7 @@ import {
   telOf,
 } from "./offering";
 import { allDayEventIcs, foldLine, icsText } from "./ics";
+import { a11yIssues, visibleText } from "./render-lint";
 
 const row = (label: string, value: string, page = "p. 2") => ({ label, value, page, flagged: false });
 const deal = (over: Partial<ExtractionResult> & { metrics?: ReturnType<typeof row>[] } = {}): ExtractionResult =>
@@ -76,6 +81,41 @@ describe("the listing team (#467)", () => {
     expect(initialsOf("Jane Q. Doe")).toBe("JD");
     expect(initialsOf("Madonna")).toBe("M");
     expect(initialsOf("J. R. Smith, CCIM")).toBe("JS");
+  });
+
+  // Research pass 39: an address carrying a character a mailto link reads
+  // as more than an address had been linked as printed.
+  it("links an email only where it is one plain address, and prints one carrying more as written", () => {
+    const carrying = ["broker?team@firm.example", "broker&team@firm.example", "broker=team@firm.example", "broker%2Eteam@firm.example"];
+    for (const email of carrying) {
+      const [b] = listingTeamOf(deal({ listingTeam: [{ name: "A Broker", title: "", firm: "Firm", phone: "", email, page: "" }] } as never));
+      expect(b.email, email).toBeNull();
+      expect(b.emailText, email).toBe(email);
+      expect(mailtoAddressOf(email), email).toBeNull();
+      expect(mailtoAddressOf(`mailto:${email}`), email).toBeNull();
+    }
+    expect(mailtoAddressOf(" mailto:jane.doe@firm.example ")).toBe("jane.doe@firm.example");
+    expect(mailtoAddressOf("jane+om@firm.example")).toBe("jane+om@firm.example");
+    expect(mailtoAddressOf("not an email")).toBeNull();
+    // Words with no address in them are no email to print.
+    const [none] = listingTeamOf(deal({ listingTeam: [{ name: "C Broker", title: "", firm: "Firm", phone: "", email: "not an email", page: "" }] } as never));
+    expect(none).toMatchObject({ email: null, emailText: "" });
+
+    // On the card: the plain address is a link, the other printed and never one.
+    const team = listingTeamOf(
+      deal({
+        listingTeam: [
+          { name: "A Broker", title: "", firm: "Firm", phone: "", email: carrying[0], page: "" },
+          { name: "B Broker", title: "", firm: "Firm", phone: "", email: "b.broker@firm.example", page: "" },
+        ],
+      } as never),
+    );
+    const html = renderToStaticMarkup(React.createElement(ListingTeam, { team, offersDue: null }));
+    expect(html).toContain('href="mailto:b.broker@firm.example"');
+    expect(html.match(/href="mailto:/g)).toHaveLength(1);
+    expect(html).toContain('data-qa="email-unlinked"');
+    expect(visibleText(html)).toContain(carrying[0]);
+    expect(a11yIssues(html)).toEqual([]);
   });
 });
 

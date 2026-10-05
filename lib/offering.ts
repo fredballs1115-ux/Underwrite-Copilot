@@ -23,7 +23,8 @@
 // A BROKER IS AS PRINTED. A name, a title, a firm, a phone and an email as
 // the memorandum prints them — never looked up. A phone becomes a link only
 // where it has a whole North American number's ten digits; an email only
-// where it is one.
+// where it is one plain address (`mailtoAddressOf`), and one carrying more
+// than an address is printed as written, unlinked.
 //
 // A BLANK IS NULL. No team is an empty list, and no stated date is none.
 
@@ -140,8 +141,12 @@ export interface ListingBroker {
   phone: string;
   /** "tel:+12155550100" where the phone is a whole number, else null */
   tel: string | null;
-  /** the email where it is one, else null */
+  /** the email where it is one plain address, else null: the only one a
+   *  page links */
   email: string | null;
+  /** the email as printed wherever it names an address (it carries an @),
+   *  linked or not; "" where it names none */
+  emailText: string;
   page: string;
 }
 
@@ -149,6 +154,18 @@ export interface ListingBroker {
 export const LISTING_TEAM_MAX = 6;
 
 const EMAIL = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[a-z]{2,}$/i;
+/** Characters a mailto link reads as more than an address. The
+ *  memorandum's words are not ours, so an address carrying any of them is
+ *  printed as written and never linked (research pass 39): a link writes to
+ *  the address it shows, and nothing else. */
+const MAILTO_EXTRA = /[?&=%]/;
+
+/** The address a page may link a "mailto:" to, or null: one plain address,
+ *  as printed, with nothing a mail link reads beyond it. */
+export function mailtoAddressOf(printed: string): string | null {
+  const email = printed.trim().replace(/^mailto:/i, "");
+  return EMAIL.test(email) && !MAILTO_EXTRA.test(email) ? email : null;
+}
 
 /** A North American number's link: ten digits, or eleven after a leading
  *  1; an extension is dropped from the link and kept in the words. */
@@ -182,7 +199,8 @@ export function listingTeamOf(ex: ExtractionResult | null | undefined): ListingB
       firm: (b.firm ?? "").trim(),
       phone: NOT_STATED.test(phone) ? "" : phone,
       tel: phone ? telOf(phone) : null,
-      email: EMAIL.test(email) ? email : null,
+      email: mailtoAddressOf(email),
+      emailText: email.includes("@") ? email : "",
       page: n != null && pages != null && n <= pages ? (b.page ?? "").trim() : "",
     });
     if (out.length >= LISTING_TEAM_MAX) break;

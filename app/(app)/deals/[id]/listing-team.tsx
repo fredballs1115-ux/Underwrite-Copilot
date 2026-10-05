@@ -72,7 +72,7 @@ export function ListingTeam({ team, offersDue }: { team: ListingBroker[]; offers
                     wrapped under the phone (820, 320 — research pass 36):
                     10px apart now, so their 24px circles never meet, and
                     32px tall to a finger. */}
-                {(b.phone || b.email) && (
+                {(b.phone || b.email || b.emailText) && (
                   <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-2.5 text-xs">
                     {b.phone &&
                       (b.tel ? (
@@ -82,10 +82,19 @@ export function ListingTeam({ team, offersDue }: { team: ListingBroker[]; offers
                       ) : (
                         <span className="font-mono tabular-nums">{b.phone}</span>
                       ))}
-                    {b.email && (
+                    {/* Linked only where it is one plain address
+                        (lib/offering's mailtoAddressOf); anything more is
+                        printed as written, as an undialable phone is. */}
+                    {b.email ? (
                       <a href={`mailto:${b.email}`} className="break-all text-brand hover:underline pointer-coarse:py-2">
                         {b.email}
                       </a>
+                    ) : (
+                      b.emailText && (
+                        <span className="break-all" data-qa="email-unlinked">
+                          {b.emailText}
+                        </span>
+                      )
                     )}
                   </span>
                 )}
