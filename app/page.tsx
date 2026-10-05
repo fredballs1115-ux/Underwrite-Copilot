@@ -532,7 +532,7 @@ export default function Home() {
           on the dark hero and the light body alike). */}
       <ScrollProgress />
       {/* Nav — dark, so it reads as one piece with the hero. */}
-      <header className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
+      <header data-home-bar className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
           {/* min-w-0 + truncate: on narrow phones the wordmark gives way
               instead of colliding with the CTA (the logo always stays). */}
@@ -736,7 +736,7 @@ export default function Home() {
 
         {/* The problem, drawn: two analysts, one deal, the spread between
             them. Both ends are neutral on purpose — the spread is the problem. */}
-        <section id="problem" className="scroll-mt-16">
+        <section id="problem">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="The problem" title={`Same deal, same data room, ${SPREAD_BPS} bps apart.`} />
             <Reveal>
@@ -785,7 +785,7 @@ export default function Home() {
         </section>
 
         {/* The six-stage screen — a rail of icons, then the trace of it running. */}
-        <section id="screen" className="scroll-mt-16 border-t border-line bg-faint">
+        <section id="screen" className="border-t border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="How it works" title="Six stages, same order." />
             <Reveal delay={60}>
@@ -831,7 +831,7 @@ export default function Home() {
         </section>
 
         {/* Break it yourself — the deterministic engine, live in the browser. */}
-        <section id="stress" className="band-dark scroll-mt-16 text-white">
+        <section id="stress" className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
               <SectionHead eyebrow="Try the engine" title="Break it yourself." dark />
@@ -1041,7 +1041,7 @@ export default function Home() {
         </section>
 
         {/* Everything else, as icons. */}
-        <section id="toolkit" className="scroll-mt-16">
+        <section id="toolkit">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
               <SectionHead eyebrow="Also in the box" title="Everything else, at a glance." />
@@ -1067,7 +1067,7 @@ export default function Home() {
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="scroll-mt-16 border-t border-line">
+        <section id="pricing" className="border-t border-line">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <Reveal>
             <SectionHead eyebrow="Pricing" title="Start free. Upgrade when the screen earns it." />
@@ -1193,7 +1193,7 @@ export default function Home() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="scroll-mt-16 border-y border-line bg-faint">
+        <section id="faq" className="border-y border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="FAQ" title="The questions we'd ask too." />
             <div className="mx-auto mt-8 max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">

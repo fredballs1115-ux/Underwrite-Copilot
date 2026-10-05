@@ -536,7 +536,7 @@ export function PropertyVisual({
                         }
                         title={g.credit}
                         data-mosaic-tile={g.i}
-                        className="group/tile relative min-h-0 cursor-zoom-in overflow-hidden bg-faint focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
+                        className="group/tile relative min-h-0 cursor-zoom-in overflow-hidden bg-faint"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- proxied, auth-scoped route serving the stored derivative */}
                         <img
@@ -818,7 +818,7 @@ export function PropertyVisual({
             aria-label={`See the pictures of ${label} full screen`}
             title="Full screen"
             data-picture="expand"
-            className="absolute left-2 top-2 z-[5] flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className="absolute left-2 top-2 z-[5] flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-on-photo"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
               <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
@@ -839,7 +839,7 @@ export function PropertyVisual({
                 : `See the ${photoIds.length} photographs of ${label}`
             }
             data-picture="photo-count"
-            className="absolute left-12 top-2 z-[5] flex h-8 items-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className="absolute left-12 top-2 z-[5] flex h-8 items-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-on-photo"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-3.5 w-3.5">
               <path d="M4 8h3l2-3h6l2 3h3v11H4z" />

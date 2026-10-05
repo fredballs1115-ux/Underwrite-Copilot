@@ -14,7 +14,7 @@ export type PickTone = "plain" | "overlay";
 
 const TONE: Record<PickTone, string> = {
   plain: "border border-line hover:bg-faint",
-  overlay: "bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/70",
+  overlay: "bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/70 focus-on-photo",
 };
 
 function PickButton({ hasPicture, tone }: { hasPicture: boolean; tone: PickTone }) {

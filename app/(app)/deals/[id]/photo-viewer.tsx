@@ -170,7 +170,7 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden className="h-4 w-4">
             <path d="M6 6l12 12M18 6 6 18" />
@@ -231,7 +231,7 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
               type="button"
               onClick={() => step(-1)}
               aria-label="Previous picture"
-              className="pointer-events-auto absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white sm:left-4"
+              className="pointer-events-auto absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 hover:bg-black/70 sm:left-4"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-5 w-5">
                 <path d="m15 6-6 6 6 6" />
@@ -241,7 +241,7 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
               type="button"
               onClick={() => step(1)}
               aria-label="Next picture"
-              className="pointer-events-auto absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white sm:right-4"
+              className="pointer-events-auto absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 hover:bg-black/70 sm:right-4"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-5 w-5">
                 <path d="m9 6 6 6-6 6" />

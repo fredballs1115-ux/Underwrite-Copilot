@@ -247,7 +247,7 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — mobile */}
-        <header className="sticky top-0 z-10 bg-sidebar text-white md:hidden">
+        <header data-app-topbar className="sticky top-0 z-10 bg-sidebar text-white md:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <Link href="/deals" className="flex items-center gap-2">
               <LogoMark className="h-7 w-7" />

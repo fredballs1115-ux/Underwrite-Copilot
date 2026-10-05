@@ -48,8 +48,37 @@
   font-variant-numeric: tabular-nums;
 }
 
-html {
-  scroll-behavior: smooth;
+/* Smooth in-page jumps, only for a reader who has not asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* A control the keyboard reaches is scrolled clear of a bar that stays on
+   screen (WCAG 2.4.11, research pass 33): the homepage's sticky header, and
+   on a phone the app's top bar and the deal's bar at the foot, which covered
+   whole controls on Shift+Tab and Tab. The homepage's sections take their
+   anchor offset from here too, so a jump lands under the header as before. */
+html:has([data-home-bar]) {
+  scroll-padding-top: 4rem;
+}
+@media (max-width: 47.99rem) {
+  html:has([data-app-topbar]) {
+    scroll-padding-top: 7.5rem;
+  }
+  html:has([data-deal-sticky]:not([inert])) {
+    scroll-padding-bottom: 4.5rem;
+  }
+}
+
+/* A placeholder reads at the muted text's contrast (5.6:1 on white), not
+   Tailwind's half-strength default (3.2:1). In the base layer, so an input
+   that sets its own placeholder colour keeps it. */
+@layer base {
+  ::placeholder {
+    color: var(--color-muted);
+  }
 }
 
 body {
@@ -61,9 +90,15 @@ body {
   background: color-mix(in oklab, var(--color-brand) 16%, transparent);
 }
 
-/* Keyboard-visible focus everywhere. Elements that opt into Tailwind ring
-   utilities set `outline-none`, so this is the baseline, not a double ring.
-   The sidebar is deep teal, so its focus ring flips to white. */
+/* Keyboard-visible focus everywhere. This rule is UNLAYERED, so it beats
+   every Tailwind utility, `outline-none` and the `focus-visible:outline-*`
+   ones included: an element that adds a ring utility draws the ring and
+   this outline both, and a colour or offset a utility asks for never
+   applies. A context that needs another ring says so below, unlayered too.
+   Never move this into @layer base: some sixty controls set `outline-none`
+   and would lose the only ring they have.
+   The sidebar and the dark bands are deep teal, so the ring flips to white;
+   a white card inside a dark band (the sign-in card) takes the teal back. */
 :focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
@@ -71,6 +106,48 @@ body {
 .bg-sidebar :focus-visible,
 .band-dark :focus-visible {
   outline-color: rgba(255, 255, 255, 0.85);
+}
+.band-dark .bg-surface :focus-visible {
+  outline-color: var(--color-brand);
+}
+/* A control that sits on a photograph, and everything in the full-screen
+   viewer: a white ring with a dark halo inside and out, which reads over any
+   picture, a night sky or a snowfield. */
+.focus-on-photo:focus-visible,
+[data-photo-viewer] :focus-visible {
+  outline-color: #fff;
+  box-shadow: 0 0 0 6px rgb(0 0 0 / 0.6);
+}
+/* A mosaic tile clips whatever is drawn outside it, so its ring is drawn
+   inside, over the photograph. */
+[data-mosaic-tile]:focus-visible {
+  outline: none;
+}
+[data-mosaic-tile]:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 3px #fff,
+    inset 0 0 0 6px rgb(0 0 0 / 0.6);
+}
+
+/* Windows High Contrast and other forced-colour settings repaint every
+   background to the system's colour, and every chart here is a background:
+   the bars keep their own colours, and a selected tab, toggle or page is
+   outlined, since its fill alone no longer tells it apart. */
+@media (forced-colors: active) {
+  [data-bar] {
+    forced-color-adjust: none;
+  }
+  [aria-selected="true"],
+  [aria-pressed="true"],
+  [aria-current="page"] {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 
 /* Elevation — soft, layered shadows so cards sit *on* the canvas. */
