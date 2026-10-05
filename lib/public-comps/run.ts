@@ -7,6 +7,7 @@ import {
   finalizeComps,
   HONESTY_NOTE,
   providerFor,
+  STORED_COMPS,
   type RecordComp,
   type RecordCompsResult,
 } from "./core";
@@ -178,7 +179,7 @@ export async function computeRecordComps(input: {
   }
   if (db && db.length > 0) {
     const comps = finalizeComps(db, subject, radiusKm);
-    const stored = comps.slice(0, 40);
+    const stored = comps.slice(0, STORED_COMPS);
     return {
       ...base,
       status: stored.length ? "ok" : "no_sales",
@@ -193,6 +194,11 @@ export async function computeRecordComps(input: {
       },
       comps: stored,
       stats: compStats(stored),
+      // The lookup answers its nearest sales, at most RECORDED_SALES.limit:
+      // a full answer is a set that stops short of the radius asked.
+      capped: db.length >= RECORDED_SALES.limit,
+      sourceOrder: "nearest",
+      found: comps.length,
     };
   }
 
@@ -223,23 +229,27 @@ export async function computeRecordComps(input: {
     if (!res.ok) {
       throw new Error(`${provider.id}: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`);
     }
-    return finalizeComps(provider.parse(await res.json()), subject, rKm);
+    const json = await res.json();
+    // How many rows came back, parsed or not: a full answer is a source that
+    // stopped at its limit, with more sales inside the radius and the window.
+    return { comps: finalizeComps(provider.parse(json), subject, rKm), returned: provider.rowCount(json) };
   };
   try {
     let rKm = RADIUS_KM;
     let mBack = MONTHS_BACK;
-    let comps = await attempt(rKm, mBack);
+    let { comps, returned } = await attempt(rKm, mBack);
     if (comps.length < MIN_COMPS_BEFORE_WIDENING) {
       try {
         const widened = await attempt(WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
         rKm = WIDE_RADIUS_KM;
         mBack = WIDE_MONTHS_BACK;
-        comps = widened;
+        comps = widened.comps;
+        returned = widened.returned;
       } catch {
         if (comps.length === 0) throw new Error(`${provider.id}: widened query failed`);
       }
     }
-    const stored = comps.slice(0, 40);
+    const stored = comps.slice(0, STORED_COMPS);
     return {
       ...base,
       status: stored.length ? "ok" : "no_sales",
@@ -254,6 +264,9 @@ export async function computeRecordComps(input: {
       },
       comps: stored,
       stats: compStats(stored),
+      capped: returned >= RECORDED_SALES.limit,
+      sourceOrder: provider.order,
+      found: comps.length,
     };
   } catch (err) {
     return { ...base, status: "provider_error", error: String(err).slice(0, 500) };

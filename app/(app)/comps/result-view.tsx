@@ -6,11 +6,13 @@
 // not a blank.
 
 import { compactUsd } from "@/lib/money";
-import { fmtMiles, kmToMiles } from "@/lib/geo";
+import { fmtMiles } from "@/lib/geo";
 import {
   COVERAGE_DISCOVERY,
   COVERAGE_SUMMARY,
   compEvidence,
+  compsCutNote,
+  compsScope,
   evidenceNote,
   medianLabel,
   salesPhrase,
@@ -63,10 +65,11 @@ export function CompsResultView({
     );
   }
 
-  const miles = result.params ? kmToMiles(result.params.radiusKm) : null;
-  const scope = result.params
-    ? `within ${miles && miles < 1.1 ? "1 mi" : `${Math.round(miles ?? 0)} mi`} · last ${result.params.monthsBack} months · ${result.params.classFilter}`
-    : "";
+  // What the sales cover — less than the search asked where the source
+  // stopped at its limit (lib/public-comps/core `compsScope`) — and what the
+  // result left out, said under the readout (`compsCutNote`).
+  const scope = compsScope(result);
+  const cutNote = compsCutNote(result);
 
   if (result.status === "no_sales" || !result.stats) {
     return (
@@ -137,6 +140,12 @@ export function CompsResultView({
           </>
         )}
       </p>
+
+      {cutNote && (
+        <p className="mt-1.5 text-xs leading-relaxed text-caution" data-qa="comps-cut">
+          {cutNote}
+        </p>
+      )}
 
       {note && (
         <p className="mt-1.5 text-xs leading-relaxed text-caution">{note}</p>
