@@ -1,9 +1,10 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
-import { STAGES, STAGE_LABEL, normalizeStage, type Stage } from "@/lib/stages";
+import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 import { assetClassLabel } from "@/lib/asset-class";
 import { parsePct, parsePrice, priceRange } from "@/lib/criteria";
+import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -86,12 +87,29 @@ export interface PipelineExportRow {
    *  (lib/manufactured-housing `manufacturedHousingTag`, #470); carried in
    *  the price cell's note */
   mh?: string | null;
-  /** the going-in cap on today's income — always null on a plan deal */
+  /** a self-storage facility's lease-up, the premium over street and its
+   *  economic occupancy (lib/self-storage `selfStorageTag`, #471); carried
+   *  in the price cell's note */
+  storage?: string | null;
+  /** the going-in cap on today's income — always null on a plan deal, and
+   *  on a note (`capWithheld`) */
   cap: string | null;
+  /** "note" where the going-in cap is withheld because the price is a
+   *  loan's: the collateral's income over it is a cap nobody earns
+   *  (lib/compare-interest `noteCapSlot`) — the cell says "n/a — note" */
+  capWithheld?: "note" | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
   yieldOnCost: string | null;
   fit: "fits" | "near" | "outside" | null;
+  /** the fit is judged on the screen's first signal, the extraction not
+   *  landed yet — the pipeline card's "First read" (lib/first-read); the
+   *  cell says so beside the fit it shows */
+  fitFirstRead?: boolean | null;
   verdict: string | null; // pass | caution | pass_on
+  /** the call on file is the previous screen's: a re-screen is running, or
+   *  the latest screen failed before its verdict (lib/screen-run
+   *  `verdictBehind`) — the cell says so beside the call it shows */
+  verdictBehind?: "running" | "failed" | null;
   offersDue: string | null; // YYYY-MM-DD
   createdAt: string; // ISO
   addedBy: string | null;
@@ -225,6 +243,10 @@ export async function buildPipelineWorkbook(
         d.planDeal && !isDead
           ? { size: 10, bold: true, color: { argb: BRAND } }
           : baseFont;
+      // A note's or a leased fee's type says whose strategy it is
+      // ("Stabilized (the collateral)"), longer than the column: wrapped,
+      // so the row grows to print it whole.
+      row.getCell(5).alignment = { wrapText: true };
       row.getCell(6).value = d.market || "—";
       row.getCell(6).font = baseFont;
 
@@ -260,6 +282,7 @@ export async function buildPipelineWorkbook(
         d.reports ? `${d.reports}: from the third-party reports the memorandum cites — the deal page reads them.` : null,
         d.student ? `${d.student}: a student building's leasing for the coming year — the deal page reads the pace, the beds and the walk to campus.` : null,
         d.mh ? `${d.mh}: a manufactured-housing park — the deal page reads the lot rent against the market's, the park-owned homes and the water and sewer.` : null,
+        d.storage ? `${d.storage}: a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 
@@ -272,7 +295,7 @@ export async function buildPipelineWorkbook(
         capCell.value = capNum / 100;
         capCell.numFmt = PCT2;
       } else {
-        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : "—");
+        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : d.capWithheld === "note" ? "n/a — note" : "—");
       }
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };
@@ -288,16 +311,28 @@ export async function buildPipelineWorkbook(
       yocCell.font = baseFont;
       yocCell.alignment = { horizontal: "right" };
 
+      // A fit judged on the first signal is the card's "First read": said on
+      // the cell, in italic as a call not yet the screen's own is, and
+      // explained in its note — never passed off as the full screen's fit.
       const fit = d.fit ? FIT_LABEL[d.fit] : null;
-      row.getCell(10).value = fit?.label ?? "—";
+      const firstRead = !!fit && !!d.fitFirstRead;
+      row.getCell(10).value = fit ? markFirstRead(fit.label, firstRead) : "—";
       row.getCell(10).font = fit
-        ? { size: 10, bold: true, color: { argb: fit.color } }
+        ? firstRead
+          ? { size: 10, italic: true, color: { argb: fit.color } }
+          : { size: 10, bold: true, color: { argb: fit.color } }
         : baseFont;
+      if (firstRead) row.getCell(10).note = FIRST_READ_TITLE;
 
       const v = d.verdict ? VERDICT_LABEL[d.verdict] : null;
-      row.getCell(11).value = v?.label ?? "—";
+      // A call the latest screen has not re-run is the previous screen's,
+      // printed beside this run's terms — said, never passed off as current.
+      const behind = v && d.verdictBehind ? (d.verdictBehind === "running" ? "Re-screening" : "Screen failed") : null;
+      row.getCell(11).value = behind ? `${behind} (was ${v!.label})` : (v?.label ?? "—");
       row.getCell(11).font = v
-        ? { size: 10, bold: true, color: { argb: v.color } }
+        ? behind
+          ? { size: 10, italic: true, color: { argb: v.color } }
+          : { size: 10, bold: true, color: { argb: v.color } }
         : baseFont;
 
       const dueCell = row.getCell(12);
@@ -392,14 +427,17 @@ export async function buildPipelineWorkbook(
   sum.getCell(`F${vr}`).value = rows.filter((d) => !d.verdict).length;
   sum.getCell(`F${vr}`).font = { size: 10, bold: true, color: { argb: INK } };
 
-  // Live-pipeline value: sum of parsed asking prices, dead excluded.
-  const live = rows.filter((d) => normalizeStage(d.stage) !== "dead");
+  // Live-pipeline value: sum of parsed asking prices over the deals still in
+  // play (lib/stages `isOpenStage`, the digest's rule). A closed deal is
+  // neither live nor dead — it had been counted live here and its price
+  // added to the asking value — and the By-stage table above counts it.
+  const live = rows.filter((d) => isOpenStage(normalizeStage(d.stage)));
   const prices = live
     .map((d) => (d.price ? parsePrice(d.price) : null))
     .filter((n): n is number => n != null && n > 0);
   const totalRow = r + 1;
   header(`B${totalRow}`, "Live pipeline");
-  sum.getCell(`B${totalRow + 1}`).value = "Deals (Dead excluded)";
+  sum.getCell(`B${totalRow + 1}`).value = "Deals (Closed and Dead excluded)";
   sum.getCell(`B${totalRow + 1}`).font = { size: 10, color: { argb: INK } };
   sum.getCell(`C${totalRow + 1}`).value = live.length;
   sum.getCell(`C${totalRow + 1}`).font = { size: 10, bold: true, color: { argb: INK } };

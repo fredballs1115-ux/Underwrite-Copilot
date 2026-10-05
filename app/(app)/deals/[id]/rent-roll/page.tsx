@@ -1,17 +1,29 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { isPro } from "@/lib/billing";
 import { downloadDealFile } from "@/lib/storage";
 import { readGrid } from "@/lib/rentroll/parse";
 import {
   analyzeRentRoll,
+  defaultAbsorptionSfPerMonth,
   leaseUpCurve,
   markToMarket,
   rolloverCostForecast,
   rolloverSchedule,
 } from "@/lib/rentroll/analytics";
-import { defaultProfileFor, type ProfileDraft } from "@/lib/rentroll/profiles";
+import {
+  MARKET_DEFAULT_ID,
+  defaultProfileFor,
+  leasesShort,
+  openingProfile,
+  profileFamilyOf,
+  type ProfileDraft,
+} from "@/lib/rentroll/profiles";
 import { getRentRollImport, latestRentRollImport, listProfiles } from "@/lib/rentroll/store";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import { RentRollDashboard } from "./dashboard";
 import { MappingForm } from "./mapping-form";
 import { deleteRentRollImport, saveLeasingProfile, uploadRentRoll } from "./actions";
@@ -31,11 +43,6 @@ const ERRORS: Record<string, string> = {
   exportfail: "Couldn't build the workbook just now — please try again in a moment.",
 };
 
-/** Absorption pace used for the lease-up curve until the user overrides it:
- *  the vacancy leased over three years, which is a screening placeholder and
- *  is labelled as one on screen. */
-const defaultAbsorption = (vacantSf: number) => (vacantSf > 0 ? Math.round(vacantSf / 36) : 0);
-
 export default async function RentRollPage({
   params,
   searchParams,
@@ -51,24 +58,36 @@ export default async function RentRollPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { data: deal, error } = await supabase
+  const { data, error } = await supabase
     .from("deals")
-    .select("id, name, asset_class")
+    .select("id, name, asset_class, extracted_class:extraction->>assetClass")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load the deal: ${error.message}`);
-  if (!deal) notFound();
+  if (!data) notFound();
+  const deal = data as { name: string | null; asset_class: string | null; extracted_class: string | null };
 
-  const assetClass = String(deal.asset_class ?? "office");
-  const [record, profiles] = await Promise.all([
+  // The deal's one class, as every surface reads it: the analyst's where they
+  // filed one, the deck's where they left "Auto-detect" — so an apartment
+  // deal filed Auto leases like an apartment building, not like an office.
+  const assetClass = shownAssetClass(deal.asset_class, { assetClass: deal.extracted_class });
+  const [record, profiles, pro] = await Promise.all([
     importParam
       ? getRentRollImport(supabase, importParam)
       : latestRentRollImport(supabase, id),
     listProfiles(supabase, user.id, assetClass),
+    // Only to mark the download: a failed check shows the badge, and the
+    // route makes the real check.
+    isPro(supabase, user.id).catch(() => false),
   ]);
 
-  const activeProfile: ProfileDraft =
-    profiles.find((p) => p.id === profileParam) ?? profiles[0] ?? defaultProfileFor(assetClass);
+  const activeProfile: ProfileDraft = openingProfile(profiles, assetClass, profileParam);
+  // A saved profile picked by hand is the one Save updates; the market default
+  // and a profile the page opened on by itself are saved as new.
+  const pickedProfileId =
+    profileParam && profileParam !== MARKET_DEFAULT_ID && profiles.some((p) => p.id === profileParam)
+      ? profileParam
+      : null;
 
   // The mapping UI needs the file's own header row and a couple of sample rows.
   // Read straight from storage — the file is the source of truth for what the
@@ -100,10 +119,13 @@ export default async function RentRollPage({
     }
   }
 
+  // A roll with no as-of date counts its years to expiry from today — the
+  // reader's own day (lib/reader-day), as the page says it.
   const analytics = record
     ? analyzeRentRoll(record.leases, {
-        asOf: record.asOfDate ?? new Date().toISOString().slice(0, 10),
+        asOf: record.asOfDate ?? readerToday((await cookies()).get(TZ_COOKIE)?.value),
         nra: record.nra,
+        leasesShort: leasesShort(assetClass),
       })
     : null;
 
@@ -117,13 +139,15 @@ export default async function RentRollPage({
         FSG: activeProfile.marketRentPsf,
       })
     : null;
+  // The lease-up runs at the placeholder pace (the vacancy over three years)
+  // until the user sets one in the workbook, and the dashboard says so.
   const curve =
     analytics && schedule
       ? leaseUpCurve({
           vacantSf: schedule.vacantSf,
           occupiedSf: analytics.occupiedSf,
           nra: analytics.totalSf,
-          absorptionSfPerMonth: defaultAbsorption(schedule.vacantSf),
+          absorptionSfPerMonth: defaultAbsorptionSfPerMonth(schedule.vacantSf),
         })
       : null;
 
@@ -171,8 +195,8 @@ export default async function RentRollPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Upload a rent roll</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          CSV or XLSX; the header row and columns are found for you, and you confirm the mapping
-          before anything is computed.
+          CSV or XLSX — a workbook&apos;s first worksheet only; the header row and columns are found
+          for you, and you confirm the mapping before anything is computed.
         </p>
         <form action={uploadRentRoll} className="mt-4 flex flex-wrap items-end gap-3">
           <input type="hidden" name="dealId" value={id} />
@@ -214,6 +238,15 @@ export default async function RentRollPage({
           Client data: stored under this deal with row-level security, never logged, never shared
           across accounts.
         </p>
+        {/* Two readers of one file, said plainly: the deal's model never reads
+            this page (lib/anthropic/actuals-ingest reads the document the
+            upload files, at the next screen). */}
+        <p data-qa="rent-roll-reader" className="mt-1 max-w-2xl text-xs text-muted">
+          The deal&apos;s model does not read this page. Its next screen reads the newest rent roll
+          filed on the deal — an upload here files one — with its own extraction, not this column
+          mapping, for the model&apos;s occupancy, area and unit count (the Property actuals card), so
+          those can differ from the figures here.
+        </p>
       </section>
 
       {record ? (
@@ -232,18 +265,37 @@ export default async function RentRollPage({
 
           {/* ── Download ──────────────────────────────────────────────── */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand/30 bg-brand/5 p-4">
+            {/* The page is free; the workbook is Pro, and says so before the
+                click rather than after it (the route sends a free reader to
+                billing). */}
             <a
               href={`/api/deals/${id}/rent-roll.xlsx?import=${record.id}${
                 profileParam ? `&profile=${profileParam}` : ""
               }`}
-              className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong"
+              title={pro ? undefined : "The live-formula Excel model is part of Pro"}
+              className="flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong"
             >
               Download Excel model
+              {pro ? null : (
+                <>
+                  {" "}
+                  <span className="rounded-full bg-white/20 px-1.5 py-px text-[10px] font-semibold text-white">
+                    Pro
+                  </span>
+                </>
+              )}
             </a>
             <p className="text-sm text-muted">
               Four tabs, live formulas. Assumptions, Rent Roll, Rollover, and a ten-year Cash Flow
               with native <code className="font-mono text-xs">IRR</code>,{" "}
               <code className="font-mono text-xs">XIRR</code> and equity multiple.
+            </p>
+            {/* What the export assumes and does not set — said where it is
+                downloaded, so nobody takes its IRR for a finished underwrite. */}
+            <p data-qa="export-caveat" className="basis-full text-xs text-muted">
+              It takes the deal model&apos;s general vacancy off every year&apos;s revenue on top of the
+              lease-up, and assumes no tenant reimburses an expense: set both on its Assumptions tab
+              before you read the IRR.
             </p>
           </div>
 
@@ -255,6 +307,8 @@ export default async function RentRollPage({
               leaseUp={curve}
               issues={record.issues}
               filename={record.filename}
+              asOfFrom={record.asOfDate ? "roll" : "today"}
+              paceIsDefault
             />
           ) : null}
 
@@ -263,9 +317,10 @@ export default async function RentRollPage({
             <input type="hidden" name="importId" value={record.id} />
             <button
               type="submit"
+              title="Removes the import and the rent-roll file it filed on the deal; the model drops what it read from that file at its next screen"
               className="text-xs text-muted underline-offset-2 hover:text-kill hover:underline"
             >
-              Delete this import
+              Delete this import and its file
             </button>
           </form>
         </>
@@ -275,15 +330,16 @@ export default async function RentRollPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-semibold text-ink">Market leasing assumptions</h2>
-          {profiles.length > 1 ? (
+          {profiles.length > 0 ? (
             <form method="get" className="flex items-center gap-2">
               {importParam ? <input type="hidden" name="import" value={importParam} /> : null}
               <select
                 name="profile"
                 aria-label="Market leasing profile"
-                defaultValue={profileParam ?? profiles[0]?.id}
+                defaultValue={"id" in activeProfile ? String(activeProfile.id) : MARKET_DEFAULT_ID}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               >
+                <option value={MARKET_DEFAULT_ID}>{defaultProfileFor(assetClass).name} (default)</option>
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -298,12 +354,14 @@ export default async function RentRollPage({
         </div>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           How a lease rolls: renewal, rent, TI and LC, downtime and free rent. Profiles are yours
-          and reusable across deals; the defaults are market convention.
+          and reusable across deals of the same kind; the defaults are market convention.
         </p>
         <form action={saveLeasingProfile} className="mt-4 flex flex-col gap-4">
           <input type="hidden" name="dealId" value={id} />
-          <input type="hidden" name="assetClass" value={assetClass} />
-          {profileParam ? <input type="hidden" name="profileId" value={profileParam} /> : null}
+          {/* The class it is saved for decides which deals it opens: a class
+              nothing has read is saved as the family its defaults came from. */}
+          <input type="hidden" name="assetClass" value={assetClass || profileFamilyOf(assetClass)} />
+          {pickedProfileId ? <input type="hidden" name="profileId" value={pickedProfileId} /> : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <label className="flex flex-col gap-1 text-xs text-muted">
               Profile name
@@ -329,7 +387,7 @@ export default async function RentRollPage({
             type="submit"
             className="w-fit rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand hover:text-white"
           >
-            {profileParam ? "Update profile" : "Save profile"}
+            {pickedProfileId ? "Update profile" : "Save profile"}
           </button>
         </form>
       </section>

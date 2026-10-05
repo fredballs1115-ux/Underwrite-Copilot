@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CAPTION_SCRIM } from "@/app/place-band";
+import {
+  CAPTION_SCRIM,
+  HERO_SIDE_SCRIM,
+  MARKET_BAND_CREDIT,
+  MARKET_BAND_CREDIT_ROW,
+  MARKET_BAND_PICTURE,
+} from "@/app/place-band";
 
 /**
  * The scrim over a market photograph, held to the contrast floor.
@@ -291,6 +297,31 @@ describe("the caption scrim, for a market's own band on /market", () => {
     }
   });
 
+  it("draws the photograph's credit in a row of its own under the picture, never over the words", () => {
+    // Measured in Chromium on 2026-10-01: drawn at the picture's foot, the
+    // credit wrapped to two or three lines at 390px and climbed over the
+    // name on 40 of the 45 bands /market draws (St. Louis's at 820px too).
+    // The band is a grid now: the picture and the words share the first row,
+    // the credit has the second.
+    expect(band).toContain("layer={MARKET_BAND_PICTURE}");
+    expect(band).toContain("creditLayer={MARKET_BAND_CREDIT_ROW}");
+    expect(band).toContain("creditClassName={MARKET_BAND_CREDIT}");
+    expect(band).toMatch(/className="band-dark relative grid /);
+    // The picture's box ends at its own row: an absolutely placed box whose
+    // end line is `auto` reaches the grid's padding edge, over the credit.
+    expect(MARKET_BAND_PICTURE).toMatch(/\brow-start-1\b/);
+    expect(MARKET_BAND_PICTURE).toMatch(/\brow-end-2\b/);
+    expect(MARKET_BAND_CREDIT_ROW).toMatch(/\brow-start-2\b/);
+    // The words are in the picture's row, and the credit is not placed over it.
+    expect(band).toMatch(/className="on-photo band-words relative col-start-1 row-start-1 /);
+    expect(MARKET_BAND_CREDIT).not.toMatch(/\b(absolute|bottom-\d|top-\d)\b/);
+    // On the band's own colour, with no photograph under it: its tier is
+    // measured against the solid band.
+    const tier = Number(/text-white\/(\d+)/.exec(MARKET_BAND_CREDIT)?.[1]) / 100;
+    expect(tier).toBeGreaterThan(0);
+    expect(contrast(over(WHITE, tier, SIDEBAR), SIDEBAR)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("leaves the band above the words to the photograph", () => {
     // The whole point of anchoring in px: the band's height goes to the
     // picture, not to a proportional veil.
@@ -305,5 +336,60 @@ describe("the caption scrim, for a market's own band on /market", () => {
     expect(shownAt(desk / 2)).toBeGreaterThanOrEqual(0.5);
     // …and the words' own zone is still mostly scrim.
     expect(shownAt(0)).toBeLessThan(0.05);
+  });
+});
+
+describe("the homepage hero, whose words sit at the TOP of its band", () => {
+  // Measured in Chromium over a white frame before this shape existed: the
+  // "band" scrim is clear at the top by design, so the hero's headline read
+  // 1.9:1 on a phone and 3.0:1 on a laptop, its eyebrow about 1:1.
+  const PAGE = readFileSync(join(process.cwd(), "app/page.tsx"), "utf8");
+  const ACCENT = (() => {
+    const hex = /--color-accent:\s*#([0-9a-f]{6})/i.exec(CSS)?.[1] ?? "";
+    return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+  })();
+  const hero = /<section className="band-dark relative overflow-hidden text-white">[\s\S]*?<\/section>/.exec(PAGE)?.[0] ?? "";
+  // The words' column: everything the hero draws before the sample card.
+  const words = hero.indexOf("<DealPreview") > 0 ? hero.slice(0, hero.indexOf("<DealPreview")) : "";
+  const tiers = [...words.matchAll(/\btext-white\/(\d+)\b/g)].map((m) => Number(m[1]) / 100);
+
+  it("draws the hero through the hero scrim, the words starting at the strip's foot below lg", () => {
+    expect(hero, "the hero section").not.toBe("");
+    expect(words, "the words' column, before the sample card").not.toBe("");
+    expect(PAGE).toMatch(/scrim="hero"/);
+    expect(hero).toContain("${HERO_WORDS_TOP}");
+    const strip = /export const HERO_STRIP = "([^"]+)"/.exec(SOURCE)?.[1] ?? "";
+    const top = /export const HERO_WORDS_TOP = "([^"]+)"/.exec(SOURCE)?.[1] ?? "";
+    // The same heights on each side, at each width the stack has.
+    expect(/(?:^| )h-\[(\d+)rem\]/.exec(strip)?.[1]).toBe(/(?:^| )pt-\[(\d+)rem\]/.exec(top)?.[1]);
+    expect(/sm:h-\[(\d+)rem\]/.exec(strip)?.[1]).toBe(/sm:pt-\[(\d+)rem\]/.exec(top)?.[1]);
+    expect(strip).toContain("lg:inset-0");
+  });
+
+  it("fades the strip into the band itself at its foot, so the words start on the band's own colour", () => {
+    const m = /bg-gradient-to-b from-sidebar\/0 from-(\d+)% to-sidebar to-100% lg:hidden/.exec(SOURCE);
+    expect(m, "the strip's gradient below lg").not.toBeNull();
+    // …and the top of the strip is photograph: nothing but the veil there.
+    expect(Number(m![1])).toBeGreaterThanOrEqual(35);
+    expect(1 - veilAlpha()).toBeGreaterThan(0.7);
+    const bg = scrimOverWhite(1);
+    expect(contrast(WHITE, bg)).toBeGreaterThanOrEqual(7);
+    expect(contrast(ACCENT, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("holds the words' column to the floor from lg, at the right edge the column can reach", () => {
+    const stops = HERO_SIDE_SCRIM.map((s) => [s.at, s.alpha] as [number, number]);
+    // The 72rem container's left column ends at 48–49% of the width at
+    // every screen from lg up (1024px: 488/1024; 1920px: 936/1920).
+    for (const x of [0, 0.25, 0.49]) {
+      const bg = scrimOverWhite(rampAt(x, stops));
+      expect(contrast(WHITE, bg), `white at ${x}`).toBeGreaterThanOrEqual(7);
+      expect(contrast(ACCENT, bg), `accent at ${x}`).toBeGreaterThanOrEqual(4.5);
+      expect(tiers.length).toBeGreaterThan(0);
+      for (const t of tiers) expect(contrast(over(WHITE, t, bg), bg), `white/${t * 100} at ${x}`).toBeGreaterThanOrEqual(4.5);
+    }
+    // …and the right of the band is the photograph's.
+    expect(rampAt(0.8, stops)).toBe(0);
+    expect(SOURCE).toMatch(/HERO_SIDE_SCRIM\.map\(/);
   });
 });

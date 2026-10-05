@@ -12,6 +12,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+// The one FMR row builder the app's seeds use (plain Node strips its types).
+import { fmrBenchmarkRows } from "../lib/fmr.ts";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = async (f) =>
@@ -46,11 +48,14 @@ const rules = rulesDoc.rules.map((r) => ({
   console.log(`regulatory_rules: upserted ${rules.length}`);
 }
 
-// Benchmarks here cover the CORE subset (metro medians, DC FMRs, PMMS).
-// lib/research-data.ts#seedBenchmarks is the CANONICAL, larger set (adds
-// sector cap-rate bands + metro FMRs) and the app always merges it in — DB
-// rows override per key, so this script seeding fewer rows is safe.
+// Benchmarks here cover the CORE subset (metro medians, HUD's fair market
+// rents, PMMS). lib/research-data.ts#seedBenchmarks is the CANONICAL, larger
+// set (adds sector cap-rate bands) and the app always merges it in — DB rows
+// override per key, so this script seeding fewer rows is safe. The FMR rows
+// are the app's own: both call lib/fmr's `fmrBenchmarkRows` on the same two
+// files, so the two cannot write different rows for a fiscal year.
 const mf = await read("multifamily.json");
+const metrosDoc = await read("metros.json");
 const cap = await read("capital_markets.json");
 const benchmarks = [];
 const metroLabel = {
@@ -69,17 +74,7 @@ for (const [k, row] of Object.entries(md?.value ?? {})) {
     });
   }
 }
-const fmr = mf.supply_demand?.rents_fy2026_hud_fmr_dc_area;
-for (const [br, v] of Object.entries(fmr?.value ?? {})) {
-  if (typeof v === "number") {
-    benchmarks.push({
-      sector: "multifamily", metro: "Washington DC area", metric: `hud_fmr_fy2026_${br}`,
-      low: v, high: v, unit: "usd_month", source: fmr.sources?.[0] ?? "",
-      as_of: "2026-08-21", status: fmr.status ?? "sourced",
-      note: ["FY2026, effective 2025-10-01 through 2026-09-30", fmr.note].filter(Boolean).join(". "),
-    });
-  }
-}
+benchmarks.push(...fmrBenchmarkRows(metrosDoc, mf));
 const pmms = cap.snapshot?.mortgage_30y_pmms;
 if (typeof pmms?.value === "number") {
   benchmarks.push({

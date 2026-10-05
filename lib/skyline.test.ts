@@ -3,19 +3,24 @@ import {
   SKYLINES,
   SKYLINE_SRCSET,
   SKYLINE_WIDTH,
+  SKYLINE_WIDTHS,
   commonsPage,
   commonsUrl,
   creditLine,
+  galleryCreditParts,
   hasSkyline,
   headerSafe,
   skylineFor,
   skylineSrcSet,
   skylineTag,
+  skylineWidth,
 } from "./skyline";
 import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
 import candidateFile from "@/data/skyline-candidates.json";
 import { DATA_METROS } from "@/lib/market-match";
+import { BRIEFED_CBSA, cbsaOfMarket } from "@/lib/market-county";
+import delineation from "@/data/cbsa-counties.json";
 
 const METRO_IDS = new Set([
   ...(metrosSeed.metros ?? []).map((m) => (m as { id: string }).id),
@@ -25,8 +30,20 @@ const METRO_IDS = new Set([
 ]);
 
 describe("the market photograph table", () => {
-  it("only names markets the research layer actually covers", () => {
-    for (const id of Object.keys(SKYLINES)) {
+  it("only names markets the research layer actually covers, or a metro area by its Census code (#472)", () => {
+    const titles = (delineation as { titles: Record<string, string> }).titles;
+    // The metro areas the site reads: their own markets' entries serve them.
+    const read = new Set([...Object.values(BRIEFED_CBSA), ...[...METRO_IDS].map((id) => cbsaOfMarket(id))].filter(Boolean));
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      const code = /^cbsa:(\d{5})$/.exec(id)?.[1];
+      if (code) {
+        expect(titles[code], `${id} is not a metro area in the Census delineation`).toBeTruthy();
+        // A card names the place it shows: "San Jose, CA" — in the Census
+        // title's own letters, so "San Juan-Bayamón-Caguas, PR" keeps its ó.
+        expect(shot.name ?? "", `${id} has no name for its card`).toMatch(/^\p{Lu}[\p{L} .'-]+, [A-Z]{2}$/u);
+        expect(read.has(code), `${id} is a metro area the site reads: its market's own entry serves it`).toBe(false);
+        continue;
+      }
       expect(METRO_IDS.has(id), `${id} is not a covered market`).toBe(true);
     }
   });
@@ -60,6 +77,15 @@ describe("the market photograph table", () => {
     for (const id of Object.keys(SKYLINES)) {
       expect(hasSkyline(id)).toBe(true);
       expect(skylineFor(id)?.file).toBe(SKYLINES[id].file);
+    }
+  });
+
+  it("reads an id off a URL that names what every object inherits as no market at all", () => {
+    for (const id of ["constructor", "__proto__", "toString", "hasOwnProperty", "valueOf"]) {
+      expect(skylineFor(id), id).toBeNull();
+      expect(hasSkyline(id), id).toBe(false);
+      expect(skylineTag(id), id).toBe("0");
+      expect(galleryCreditParts([id]), id).toBeNull();
     }
   });
 });
@@ -108,6 +134,30 @@ describe("the Commons URLs", () => {
     );
   });
 
+  it("serves only the widths the pages ask for, snapping any other to the nearest (the security review, 2026-09-30)", () => {
+    // The srcset's steps and the route's default and ceiling are all served
+    // as asked, and each is inside the range Commons is asked within.
+    for (const w of [...SKYLINE_SRCSET, SKYLINE_WIDTH.default, SKYLINE_WIDTH.max]) expect(SKYLINE_WIDTHS).toContain(w);
+    for (const w of SKYLINE_WIDTHS) {
+      expect(skylineWidth(w)).toBe(w);
+      expect(skylineWidth(String(w))).toBe(w);
+      expect(w).toBeGreaterThanOrEqual(SKYLINE_WIDTH.min);
+      expect(w).toBeLessThanOrEqual(SKYLINE_WIDTH.max);
+    }
+    expect(skylineWidth(1234)).toBe(1400);
+    expect(skylineWidth("1599")).toBe(1600);
+    expect(skylineWidth(700)).toBe(480);
+    // A tie goes to the larger, so a picture is never softer than asked.
+    expect(skylineWidth(720)).toBe(960);
+    expect(skylineWidth(99_999)).toBe(2400);
+    expect(skylineWidth(-5)).toBe(480);
+    // A missing or unreadable width is the default, never the smallest.
+    for (const raw of [null, undefined, "", "  ", "abc", Number.NaN]) expect(skylineWidth(raw)).toBe(SKYLINE_WIDTH.default);
+    // However many widths a caller types, the route serves the handful.
+    const served = new Set(Array.from({ length: 5_000 }, (_, i) => skylineWidth(i)));
+    expect([...served].sort((a, b) => a - b)).toEqual([...SKYLINE_WIDTHS]);
+  });
+
   it("escapes a name on the way into the file's own page", () => {
     expect(commonsPage("Foo Bar.jpg")).toBe(
       "https://commons.wikimedia.org/wiki/File:Foo%20Bar.jpg",
@@ -148,7 +198,7 @@ describe("the credit line", () => {
       license: "CC BY-SA 4.0",
       licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     });
-    expect(line).toBe("Downtown Dallas · Jane Roe · CC BY-SA 4.0");
+    expect(line).toBe("Downtown Dallas · Jane Roe · CC BY-SA 4.0 · cropped to fit");
   });
 
   it("falls back to the archive rather than printing the word unknown", () => {

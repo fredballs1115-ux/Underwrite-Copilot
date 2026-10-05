@@ -7,9 +7,38 @@
  *
  * Pure.
  */
+import { assetWords } from "@/lib/asset-words";
+import type { ParseResult } from "./parse";
 import type { Lease } from "./schema";
 
-export type IssueSeverity = "error" | "warning";
+/**
+ * The rent per SF a year past which no building charges a foot, so a lease
+ * read above it is a column read wrong — flagged, never corrected. Rental
+ * housing counted by the unit tops out near $150 (a Manhattan penthouse), so
+ * $250 is past it; anything else is held to $1,000, past every office,
+ * industrial and apartment building, which only the dearest retail streets
+ * pass. A typical apartment export once mapped its monthly "Actual Rent" to
+ * Rent $/SF and the page marked $1,886.74/SF against a $32 market with no
+ * warning, because the only check compared the rows with their own median.
+ */
+export const RENT_PSF_CEILING = 1_000;
+export const RESIDENTIAL_RENT_PSF_CEILING = 250;
+
+/** The ceiling for a deal's class (lib/asset-words): rental housing priced by
+ *  the unit gets the residential one; a mixed-use building, whose shops can
+ *  let for more, and every other class, the general one. */
+export function rentPsfCeiling(assetClass: string | null | undefined): number {
+  const words = assetWords(assetClass);
+  return words.residential && words.basis === "unit" ? RESIDENTIAL_RENT_PSF_CEILING : RENT_PSF_CEILING;
+}
+
+/** "$1.36M", "$2,150" — a figure in a message. */
+const dollars = (n: number): string =>
+  Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+
+/** "info" says what the import did on purpose (a totals line left out), so
+ *  the page shows it without calling it a problem. */
+export type IssueSeverity = "error" | "warning" | "info";
 
 export interface ValidationIssue {
   severity: IssueSeverity;
@@ -17,10 +46,16 @@ export interface ValidationIssue {
     | "sf_exceeds_nra"
     | "expiry_before_start"
     | "rent_psf_outlier"
+    | "rent_psf_implausible"
+    | "rent_psf_mismatch"
     | "duplicate_suite"
     | "missing_expiry"
     | "missing_sf"
     | "mixed_rent_basis"
+    | "skipped_totals"
+    | "unread_date"
+    | "unread_escalation"
+    | "dates_day_first"
     | "no_leases";
   message: string;
   /** source rows the issue points at */
@@ -32,7 +67,29 @@ export interface ValidateOptions {
   nra?: number | null;
   /** how far off the median rent PSF counts as an outlier (multiplicative) */
   outlierFactor?: number;
+  /** what the parser left out of the leases or would not read, so the stored
+   *  issues say it */
+  parse?: Partial<Pick<ParseResult, "skippedTotals" | "unreadDates" | "unreadEscalations" | "dayFirst">>;
+  /** the deal's class (lib/pipeline-slots `shownAssetClass`), which sets the
+   *  rent-per-SF ceiling */
+  assetClass?: string | null;
 }
+
+/** "31 December 2028" — the day said in words, so a date read day first is
+ *  unmistakable whichever way the reader writes dates. */
+const dayInWords = (isoDate: string): string =>
+  new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/** Up to three labels, quoted, for a message naming what it points at. */
+const quoted = (labels: string[]): string => {
+  const unique = [...new Set(labels)];
+  return `${unique.slice(0, 3).map((l) => `“${l}”`).join(", ")}${unique.length > 3 ? "…" : ""}`;
+};
 
 const median = (xs: number[]): number | null => {
   if (!xs.length) return null;
@@ -48,6 +105,63 @@ export function validateLeases(
   const issues: ValidationIssue[] = [];
   const outlierFactor = options.outlierFactor ?? 10;
 
+  // What the parser left out, said so the count is never a silent loss.
+  const parseIssues: ValidationIssue[] = [];
+  const skipped = options.parse?.skippedTotals ?? [];
+  if (skipped.length) {
+    parseIssues.push({
+      severity: "info",
+      code: "skipped_totals",
+      message: `Left out ${skipped.length} totals line${skipped.length === 1 ? "" : "s"} — the roll's own sums, not leases: ${quoted(
+        skipped.map((s) => s.label),
+      )}.`,
+      rows: skipped.map((s) => s.row),
+    });
+  }
+  const unreadDates = options.parse?.unreadDates ?? [];
+  if (unreadDates.length) {
+    parseIssues.push({
+      severity: "warning",
+      code: "unread_date",
+      message: `${unreadDates.length} date${unreadDates.length === 1 ? "" : "s"} could not be read and ${
+        unreadDates.length === 1 ? "is" : "are"
+      } left blank rather than guessed (${quoted(unreadDates.map((u) => u.text))}): no month and day that exist, or no year. A lease whose expiry is blank stays out of WALT and the rollover schedule.`,
+      rows: [...new Set(unreadDates.map((u) => u.row))],
+    });
+  }
+  const unreadEscalations = options.parse?.unreadEscalations ?? [];
+  if (unreadEscalations.length) {
+    const why = {
+      dollar: "a dollar bump, not a percent",
+      ambiguous: "1%, 100% or a dollar bump?",
+      text: "not one annual percent",
+      implausible: "past any annual bump",
+    } as const;
+    const examples = unreadEscalations
+      .slice(0, 3)
+      .map((u) => `row ${u.row} “${u.text}” (${why[u.reason]})`)
+      .join(", ");
+    parseIssues.push({
+      severity: "warning",
+      code: "unread_escalation",
+      message: `${unreadEscalations.length} escalation${
+        unreadEscalations.length === 1 ? " was" : "s were"
+      } not read as an annual percent and left blank rather than guessed: ${examples}${
+        unreadEscalations.length > 3 ? "…" : ""
+      }.`,
+      rows: unreadEscalations.map((u) => u.row),
+    });
+  }
+  const dayFirst = options.parse?.dayFirst;
+  if (dayFirst) {
+    parseIssues.push({
+      severity: "info",
+      code: "dates_day_first",
+      message: `Dates read day first, as the file writes them: “${dayFirst.text}” is ${dayInWords(dayFirst.date)}.`,
+      rows: [],
+    });
+  }
+
   if (leases.length === 0) {
     return [
       {
@@ -57,6 +171,7 @@ export function validateLeases(
           "No lease rows were found. Check the header row and the column mapping — the file may have a title block above the real header.",
         rows: [],
       },
+      ...parseIssues,
     ];
   }
 
@@ -108,6 +223,53 @@ export function validateLeases(
     }
   }
 
+  // A rent per foot no building charges is a column read wrong, however the
+  // rows agree with each other.
+  const ceiling = rentPsfCeiling(options.assetClass);
+  const pastCeiling = leases.filter((l) => !l.vacant && l.rentPsf != null && l.rentPsf > ceiling);
+  if (pastCeiling.length) {
+    const top = Math.max(...pastCeiling.map((l) => l.rentPsf!));
+    const who =
+      ceiling === RESIDENTIAL_RENT_PSF_CEILING
+        ? "any rental housing"
+        : "any office, industrial or apartment building";
+    issues.push({
+      severity: "error",
+      code: "rent_psf_implausible",
+      message: `${pastCeiling.length} lease${pastCeiling.length === 1 ? "" : "s"} read above $${ceiling.toLocaleString(
+        "en-US",
+      )}/SF a year (up to $${top.toLocaleString("en-US", { maximumFractionDigits: 2 })}) — past what ${who} charges a foot, so a column is read wrong: usually a monthly or per-unit rent mapped to Rent $/SF, or a monthly figure read as a year's. Nothing was corrected; check the mapping.`,
+      rows: pastCeiling.map((l) => l.sourceRow),
+    });
+  }
+
+  // The rent per foot times the area is the base rent, where the file states
+  // both: two columns that disagree cannot both be right.
+  const disagree = leases.filter((l) => {
+    if (l.vacant || l.rentPsf == null || l.sf == null || l.baseRentAnnual == null) return false;
+    if (l.rentPsf <= 0 || l.sf <= 0 || l.baseRentAnnual <= 0) return false;
+    const ratio = (l.rentPsf * l.sf) / l.baseRentAnnual;
+    return ratio > 1.5 || ratio < 1 / 1.5;
+  });
+  if (disagree.length) {
+    const l = disagree[0];
+    const implied = l.rentPsf! * l.sf!;
+    const ratio = implied / l.baseRentAnnual!;
+    const twelve = Math.abs(ratio - 12) / 12 < 0.15 || Math.abs(1 / ratio - 12) / 12 < 0.15;
+    issues.push({
+      severity: "warning",
+      code: "rent_psf_mismatch",
+      message: `On ${disagree.length} lease${disagree.length === 1 ? "" : "s"} the Rent $/SF column times the area is not the base rent (row ${
+        l.sourceRow
+      }: $${l.rentPsf!.toLocaleString("en-US", { maximumFractionDigits: 2 })}/SF × ${Math.round(l.sf!).toLocaleString(
+        "en-US",
+      )} SF is ${dollars(implied)} a year, against ${dollars(l.baseRentAnnual!)}) — one of the two columns is mapped wrong${
+        twelve ? ", or one is a month's figure and the other a year's" : ""
+      }. Check the mapping.`,
+      rows: disagree.map((x) => x.sourceRow),
+    });
+  }
+
   const bySuite = new Map<string, number[]>();
   for (const l of leases) {
     const key = l.suite.trim().toLowerCase();
@@ -127,7 +289,9 @@ export function validateLeases(
     });
   }
 
-  const missingExpiry = leases.filter((l) => !l.vacant && !l.leaseExpiry);
+  // An expiry the reader refused is said once, by the unread-date note above.
+  const refusedExpiry = new Set(unreadDates.filter((u) => u.field === "leaseExpiry").map((u) => u.row));
+  const missingExpiry = leases.filter((l) => !l.vacant && !l.leaseExpiry && !refusedExpiry.has(l.sourceRow));
   if (missingExpiry.length) {
     issues.push({
       severity: "warning",
@@ -155,10 +319,12 @@ export function validateLeases(
     issues.push({
       severity: "warning",
       code: "mixed_rent_basis",
-      message: `This roll mixes ${[...bases].join(" and ")} leases. A single mark-to-market across them compares different things — set market rents per basis, or split the analysis.`,
+      // The page holds one market rent (the leasing profile's), so the
+      // message says what can be done with that, not a field there is not.
+      message: `This roll mixes ${[...bases].join(" and ")} leases, and the mark to market prices them all against the leasing profile's one market rent, quoted on one basis — so a lease on another is set against a rent that is not its own. Read those rows apart, or save a profile at their basis's market rent and apply it to read them.`,
       rows: [],
     });
   }
 
-  return issues;
+  return [...issues, ...parseIssues];
 }

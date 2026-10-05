@@ -38,9 +38,10 @@
 import { parsePageNumber } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, parseMaturity } from "@/lib/note-yield";
+import { daysBetween, monthsBetween, readStatedDate, sameMonth } from "@/lib/note-yield";
 import { readAssumption, type AssumptionRead } from "@/lib/tools/loan-assumption";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
+import { assumableRows } from "@/lib/loan-rows";
 
 export interface AssumableTerms {
   /** today's unpaid balance, as stated */
@@ -48,8 +49,14 @@ export interface AssumableTerms {
   /** the coupon, percent */
   ratePct: number | null;
   /** the maturity as an ISO date (lib/note-yield's reader); null where the
-   *  OM states none, or only a year */
+   *  OM states none, or only a year. A month alone is its FIRST day: the
+   *  earliest the loan can come due, so no month is run at the coupon that
+   *  the loan may not have (the reading that does not flatter it) */
   maturity: string | null;
+  /** the OM states the maturity's month and no day: the loan comes due in
+   *  that month, never "at or past" a day the memorandum did not name;
+   *  absent where it states the day */
+  maturityIsMonth?: boolean;
   /** true where the OM says interest-only; false where it states an
    *  amortization; null where it says neither — or both */
   interestOnly: boolean | null;
@@ -98,9 +105,15 @@ export interface ModelForAssumption {
 
 export interface AssumableRead {
   terms: AssumableTerms;
-  /** whole months from the reading's day to the stated maturity */
+  /** whole months from the reading's day to the stated maturity — the
+   *  arithmetic's count */
   monthsLeft: number | null;
-  /** at or past its maturity on the reading's day */
+  /** days from the reading's day to the stated maturity, negative once it
+   *  has gone by */
+  daysLeft: number | null;
+  /** at or past its maturity on the reading's day: the day has come, by the
+   *  day, never by whole months (inside its last month a loan is due within
+   *  the month, not come due) */
   matured: boolean;
   /** the full years it runs at its coupon — the months left rounded DOWN,
    *  so a part-year is never run at the coupon (the reading that does not
@@ -122,9 +135,8 @@ export interface AssumableRead {
 type MetricRows = { metrics?: Array<{ label: string; value: string; page?: string }>; totalPages?: number } | null | undefined;
 type Extraction = Parameters<typeof interestOf>[0];
 
-const LOAN = "assumable (?:loan|debt|mortgage|financing)";
-const rowOf = (ex: MetricRows, re: RegExp, not?: RegExp) =>
-  (ex?.metrics ?? []).find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
+// The loan's rows are found by lib/loan-rows, the one finder the deal
+// page's debt sizer reads too.
 
 const money = (text: string): number | null => {
   const n = parseUsd(text);
@@ -143,18 +155,9 @@ const percentOf = (text: string): number | null => {
  * assumption (no balance row), so a deal financed fresh reads nothing.
  */
 export function readAssumableTerms(ex: MetricRows): AssumableTerms | null {
-  const balanceRow = rowOf(
-    ex,
-    new RegExp(LOAN, "i"),
-    /rate|coupon|maturity|matures|amorti[sz]|\bterm\b|fee|debt service|payment|interest[- ]only|\bi\/?o\b|ltv|loan[- ]to[- ]value|dscr/i,
-  );
+  const { balanceRow, rateRow, maturityRow, amortRow, dsRow, feeRow } = assumableRows(ex?.metrics ?? []);
   const balance = balanceRow ? money(balanceRow.value) : null;
   if (!balanceRow || balance == null) return null;
-  const rateRow = rowOf(ex, new RegExp(`${LOAN} (?:interest )?(?:rate|coupon)`, "i"));
-  const maturityRow = rowOf(ex, new RegExp(`${LOAN} (?:maturity|matures)`, "i"), /extension|extended/i);
-  const amortRow = rowOf(ex, new RegExp(`${LOAN} (?:amorti[sz]ation|interest[- ]only)`, "i"));
-  const dsRow = rowOf(ex, new RegExp(`${LOAN} (?:annual )?(?:debt service|payment)`, "i"));
-  const feeRow = rowOf(ex, /assumption fee/i);
 
   const amortText = amortRow?.value ?? "";
   const statesIo = /interest[- ]only|\bi\/?o\b/i.test(amortText);
@@ -171,10 +174,12 @@ export function readAssumableTerms(ex: MetricRows): AssumableTerms | null {
 
   const pageCount = typeof ex?.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
   const n = parsePageNumber(balanceRow.page);
+  const maturity = maturityRow ? readStatedDate(maturityRow.value, 1990, 2100, "first") : null;
   return {
     balance,
     ratePct: rateRow ? percentOf(rateRow.value) : null,
-    maturity: maturityRow ? parseMaturity(maturityRow.value) : null,
+    maturity: maturity?.iso ?? null,
+    ...(maturity?.month ? { maturityIsMonth: true } : {}),
     // Both stated is neither: the OM does not say when one gives way.
     interestOnly: statesIo ? (amortYears != null ? null : true) : amortYears != null ? false : null,
     amortYears,
@@ -288,7 +293,13 @@ export function readAssumable(
   if (!terms) return null;
   const today = asOf.toISOString().slice(0, 10);
   const monthsLeft = terms.maturity ? monthsBetween(today, terms.maturity) : null;
-  const matured = monthsLeft != null && monthsLeft < 1;
+  // At or past maturity by the day: whole months read a loan due next month
+  // as come due (the time audit of 2026-10-01). A maturity stated as a month
+  // alone comes due in that month, and is past it only once the month is
+  // out — never "at or past" on a day the memorandum did not name.
+  const daysLeft = terms.maturity ? daysBetween(today, terms.maturity) : null;
+  const thisMonth = !!terms.maturityIsMonth && !!terms.maturity && sameMonth(today, terms.maturity);
+  const matured = !thisMonth && daysLeft != null && daysLeft <= 0;
   const model = inputs ? modelForAssumption(inputs) : null;
   const schedule = scheduleOf(terms, model?.newLoanAmortYears ?? 30);
   const underMarketBps =
@@ -302,7 +313,7 @@ export function readAssumable(
   // left at the end is refinanced with the rest rather than run at the
   // coupon, and a loan with under a year to run is a refinance, not an
   // assumption.
-  const couponYears = monthsLeft != null && !matured ? Math.floor(monthsLeft / 12) : null;
+  const couponYears = monthsLeft != null && !matured ? Math.floor(Math.max(0, monthsLeft) / 12) : null;
 
   let read: AssumptionRead | null = null;
   if (model && terms.ratePct != null && couponYears != null && couponYears >= 1 && schedule) {
@@ -330,7 +341,7 @@ export function readAssumable(
     });
     read = r.assume && r.newLoan ? r : null;
   }
-  return { terms, monthsLeft, matured, couponYears, schedule, model, underMarketBps, read, missing };
+  return { terms, monthsLeft, daysLeft, matured, couponYears, schedule, model, underMarketBps, read, missing };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct, parsePrice } from "@/lib/criteria";
+import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   buildingPriceOf,
   findPriceMetric,
@@ -9,8 +9,10 @@ import {
   type StrategyKind,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { dealClassKey } from "@/lib/asset-words";
+import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { normalizeStage, type Stage } from "@/lib/stages";
+import { isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 
 /**
  * Portfolio analytics: every screened deal leaves extracted figures behind —
@@ -78,7 +80,7 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     const capPct = capMetric ? parsePct(capMetric.value) : null;
 
     // The asking / purchase price — or, on a development, the land cost.
-    const priceMetric = findPriceMetric(metrics, strategy.kind);
+    const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
     const price = priceMetric ? parsePrice(priceMetric.value) : null;
 
     // A $/unit only for multifamily — the class the series is named for.
@@ -86,8 +88,10 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     // per locker are not the same basis, and one of them pooled into the
     // "Price per unit" chart rescales it for every apartment deal on it.
     // (lib/market-memory and lib/internal-comps branch on class the same
-    // way; the other classes are $/SF there.)
-    const cls = (extraction.assetClass ?? r.asset_class ?? "").toLowerCase();
+    // way; the other classes are $/SF there.) The deal's one class, the
+    // analyst's first, filed by its words (lib/asset-words `dealClassKey`):
+    // a deck's "Garden-style multifamily" is multifamily.
+    const cls = dealClassKey(r.asset_class, extraction);
     let perUnit: number | null = null;
     if (cls !== "multifamily") {
       perUnit = null;
@@ -135,11 +139,82 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
+/** Where the screened deals stand: live — still in play, on the ladder
+ *  short of Closed (lib/stages `isOpenStage`, the digest's and the meeting
+ *  workbook's rule) — closed, and dead. A closed deal is neither live nor
+ *  dead: the headline tile had counted it live. */
+export interface StageCounts {
+  live: number;
+  closed: number;
+  dead: number;
+}
+
+export function stageCounts(deals: readonly Pick<AnalyticsDeal, "stage">[]): StageCounts {
+  const out: StageCounts = { live: 0, closed: 0, dead: 0 };
+  for (const d of deals) {
+    if (isOpenStage(d.stage)) out.live++;
+    else if (d.stage === "closed") out.closed++;
+    else out.dead++;
+  }
+  return out;
+}
+
+/** "5 live · 2 closed · 3 dead" — the closed said only where a deal is. */
+export function stageCountLine(c: StageCounts): string {
+  return [`${c.live} live`, ...(c.closed > 0 ? [`${c.closed} closed`] : []), `${c.dead} dead`].join(" · ");
+}
+
 export function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const s = [...values].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/**
+ * What a handful of figures is strong enough to be called — the site's rule
+ * for a median (lib/public-comps `MEDIAN_FLOOR`): three figures before the
+ * middle one is a median at all. Under that there is no middle: one deal's
+ * figure is that deal's, and two are the two, low and high — never a
+ * "median" of one deal dressed as a portfolio's.
+ */
+export type MiddleRead =
+  | { kind: "none"; n: 0 }
+  | { kind: "one"; n: 1; value: number }
+  | { kind: "two"; n: 2; low: number; high: number }
+  | { kind: "median"; n: number; value: number };
+
+export function middleRead(values: readonly number[]): MiddleRead {
+  const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  if (v.length === 0) return { kind: "none", n: 0 };
+  if (v.length === 1) return { kind: "one", n: 1, value: v[0] };
+  if (v.length < MEDIAN_FLOOR) return { kind: "two", n: 2, low: v[0], high: v[1] };
+  return { kind: "median", n: v.length, value: median(v)! };
+}
+
+/** The read as a page prints it: the median, the one deal's figure, or the
+ *  two deals' "low–high" (one figure where the two agree); null for none. */
+export function middleText(r: MiddleRead, fmt: (n: number) => string): string | null {
+  switch (r.kind) {
+    case "none":
+      return null;
+    case "two": {
+      const lo = fmt(r.low);
+      const hi = fmt(r.high);
+      return lo === hi ? lo : `${lo}–${hi}`;
+    }
+    default:
+      return fmt(r.value);
+  }
+}
+
+/** "3 deals parsed", "the one deal that parsed", "the two deals that
+ *  parsed", "none parsed" — the count behind a read, said as what it is. */
+export function parsedPhrase(n: number): string {
+  if (n <= 0) return "none parsed";
+  if (n === 1) return "the one deal that parsed";
+  if (n === 2) return "the two deals that parsed";
+  return `${n} deals parsed`;
 }
 
 export const fmtUsdCompact = (dollars: number): string =>

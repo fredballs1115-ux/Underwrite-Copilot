@@ -91,8 +91,9 @@ export function DealTasks({
   dealId: string;
   tasks: DealTask[];
   assignees: TaskAssignee[];
-  /** yyyy-mm-dd (UTC), computed on the server once — keeps "overdue" and
-   *  date labels identical between server and client render. */
+  /** yyyy-mm-dd, the reader's own day (lib/reader-day), computed on the
+   *  server once — keeps "overdue" and date labels identical between server
+   *  and client render. */
   todayIso: string;
   /** the verdict's raw nextSteps (unknown shape — normalized here) */
   verdictSteps?: unknown;

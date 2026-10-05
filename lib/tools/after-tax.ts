@@ -11,11 +11,15 @@
  *
  *   2. **The gain at the sale does not have one tax rate.** It has three.
  *      What you took as depreciation on the BUILDING comes back as
- *      unrecaptured section 1250 gain at 25%; what you took on personal
- *      property carved out by a cost segregation study comes back under
- *      section 1245 at your ORDINARY rate; only the appreciation above the
- *      original price is taxed at the long-term capital gains rate. Running
- *      the whole gain at 20% understates the bill on a long hold, badly.
+ *      unrecaptured section 1250 gain, taxed at your ordinary rate but never
+ *      above 25% — a ceiling, not a flat rate, so an owner in a lower bracket
+ *      pays their own rate on it (the first version charged 25% to every
+ *      owner, and at a 22% bracket printed a $163,636 loss on a shelter that
+ *      nets to nothing); what you took on personal property carved out by a
+ *      cost segregation study comes back under section 1245 at your ORDINARY
+ *      rate; only the appreciation above the original price is taxed at the
+ *      long-term capital gains rate. Running the whole gain at 20%
+ *      understates the bill on a long hold, badly.
  *
  *   3. **Depreciation is a timing benefit, not a permanent one.** The
  *      shelter is real while you hold and most of it is handed back when
@@ -26,9 +30,11 @@
  *
  * A cost segregation study is therefore NOT a free lunch, which the numbers
  * here say plainly: it accelerates the deduction into the early years and
- * recaptures the accelerated part at the ordinary rate rather than at 25%.
- * Whether that is worth doing depends on the hold and on the spread between
- * those rates, which is exactly the comparison the card draws.
+ * recaptures the accelerated part at the ordinary rate rather than at the
+ * section 1250 rate — the ordinary rate capped at 25%, so the two differ
+ * only for an owner taxed above 25%. Whether that is worth doing depends on
+ * the hold and on the spread between those rates, which is exactly the
+ * comparison the card draws.
  *
  * Screening arithmetic, federal only. No state tax, no passive-activity
  * limits, no 1031 exchange, no net investment income tax, and the
@@ -83,7 +89,8 @@ export interface AfterTaxTerms {
   ordinaryRatePct: number | null;
   /** the long-term capital gains rate, in % */
   capGainsRatePct: number | null;
-  /** the unrecaptured section 1250 rate, in % — 25% federal */
+  /** the CEILING on unrecaptured section 1250 gain, in % — 25% federal. The
+   *  gain is taxed at the ordinary rate where that is lower. */
   recaptureRatePct: number | null;
 }
 
@@ -108,8 +115,22 @@ export interface AfterTaxRead {
   shelterValue: number | null;
   /** price less everything written off */
   adjustedBasis: number | null;
+  /** the rate the building's depreciation comes back at: the ordinary rate,
+   *  capped at the section 1250 ceiling */
+  recaptureRatePct: number | null;
   /** sale price less adjusted basis */
   totalGain: number | null;
+  /** the rate the capital gain is taxed at: the one entered, else 20% */
+  capGainsRatePct: number | null;
+  /** how the rates the depreciation comes back at stand against the capital
+   *  gains rate, over the parts of the gain that ARE depreciation: "higher"
+   *  where one is taxed above it and none below, "lower" where one is below
+   *  it and none above, "same" where each is at it, "mixed" where one is
+   *  above and one below; null with none in the gain.
+   *  Since the building's depreciation comes back at the ordinary rate,
+   *  capped at 25%, an owner taxed under the capital gains rate pays LESS on
+   *  it than on the gain, and the card said "a higher rate" regardless. */
+  recaptureVsGains: "higher" | "lower" | "same" | "mixed" | null;
   /** the three pieces of that gain, each with its own rate */
   sale: {
     ordinaryRecapture: number;
@@ -133,7 +154,10 @@ const EMPTY: AfterTaxRead = {
   totalDepreciation: null,
   shelterValue: null,
   adjustedBasis: null,
+  recaptureRatePct: null,
   totalGain: null,
+  capGainsRatePct: null,
+  recaptureVsGains: null,
   sale: null,
   netOfRecapture: null,
   note: null,
@@ -188,6 +212,13 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
   // zero, because the shelter IS the answer people come here for.
   const yearOneTax = pctOf(yearOneTaxable, ordinary);
 
+  // Unrecaptured section 1250 gain is taxed at the owner's ordinary rate,
+  // capped at 25% (IRC §1(h)(1)(E)) — the 25% is a ceiling, not the rate.
+  // Where no ordinary rate is given there is nothing to compare, and the
+  // ceiling stands, as it did before.
+  const ceiling1250 = real(t.recaptureRatePct) ? t.recaptureRatePct : 25;
+  const recapRate = real(t.ordinaryRatePct) ? Math.min(ceiling1250, ordinary) : ceiling1250;
+
   const hold = positive(t.holdYears) ? t.holdYears : null;
   if (hold === null) {
     return {
@@ -199,6 +230,7 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
       steadyDepreciation: round(steadyDepreciation),
       yearOneTaxable: round(yearOneTaxable),
       yearOneTax: round(yearOneTax),
+      recaptureRatePct: recapRate,
       note: "Set the hold and the sale price to see what recapture takes back.",
     };
   }
@@ -224,6 +256,7 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
       totalDepreciation: round(totalDepreciation),
       shelterValue: round(shelterValue),
       adjustedBasis: round(adjustedBasis),
+      recaptureRatePct: recapRate,
       note: "Set the sale price to see what recapture takes back.",
     };
   }
@@ -233,8 +266,8 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
   // RULE TWO. The gain is three pieces, each with its own rate, and they
   // are filled in a fixed order: section 1245 property first (recaptured at
   // the ordinary rate), then unrecaptured section 1250 gain on the building
-  // (25%), and only what is left above the original price is capital gain.
-  const recapRate = real(t.recaptureRatePct) ? t.recaptureRatePct : 25;
+  // (the ordinary rate, capped at 25%), and only what is left above the
+  // original price is capital gain.
   const capRate = real(t.capGainsRatePct) ? t.capGainsRatePct : 20;
 
   let left = Math.max(0, totalGain);
@@ -257,6 +290,18 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
     pctOf(ordinaryRecapture, ordinary) + pctOf(unrecaptured1250, recapRate);
   const netOfRecapture = shelterValue - recaptureCost;
 
+  // Each part of the gain that is depreciation, by the rate it comes back
+  // at, against the capital gains rate — so the card says "higher" only
+  // where it is.
+  const recapturedAt = [
+    ...(round(ordinaryRecapture) > 0 ? [ordinary] : []),
+    ...(round(unrecaptured1250) > 0 ? [recapRate] : []),
+  ];
+  const above = recapturedAt.some((rate) => rate > capRate);
+  const below = recapturedAt.some((rate) => rate < capRate);
+  const recaptureVsGains: AfterTaxRead["recaptureVsGains"] =
+    recapturedAt.length === 0 ? null : above && below ? "mixed" : above ? "higher" : below ? "lower" : "same";
+
   return {
     depreciableBasis: round(depreciableBasis),
     buildingBasis: round(buildingBasis),
@@ -268,7 +313,10 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
     totalDepreciation: round(totalDepreciation),
     shelterValue: round(shelterValue),
     adjustedBasis: round(adjustedBasis),
+    recaptureRatePct: recapRate,
     totalGain: round(totalGain),
+    capGainsRatePct: capRate,
+    recaptureVsGains,
     sale: {
       ordinaryRecapture: round(ordinaryRecapture),
       unrecaptured1250: round(unrecaptured1250),

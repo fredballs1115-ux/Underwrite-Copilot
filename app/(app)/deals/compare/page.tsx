@@ -5,17 +5,20 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxCheckSource, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
-import { CompareTable, usd, type Col } from "./compare-table";
+import { buyBoxCheckSource, evaluateBuyBox, screenYearOf, type BuyBox } from "@/lib/criteria";
+import { CompareTable, MODEL_ROWS_NOTE, usd, type Col } from "./compare-table";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { benchmark30 } from "@/lib/debt-index";
+import { fmrToday } from "@/lib/fmr";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
-import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { asOfLabel } from "@/lib/research";
+import { findPriceMetric, inferStrategy, noiFigures } from "@/lib/deal-strategy";
+import { dealTypeLabel } from "@/lib/interest";
 import { bannerSources } from "@/lib/deal-banner";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { affordableTag } from "@/lib/affordable";
@@ -30,9 +33,12 @@ import { siteReportsTag } from "@/lib/site-reports";
 import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
-import { compareInterest } from "@/lib/compare-interest";
+import { selfStorageTag } from "@/lib/self-storage";
+import { compareReturns } from "@/lib/compare-figures";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
+import { verdictBehind, type JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -52,6 +58,7 @@ function toCol(
   bench30: number | null,
   tenYearPct: number | null,
   googleEnabled: boolean,
+  job: JobLike | null,
 ): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
@@ -72,14 +79,25 @@ function toCol(
   // is negative or a default — not a figure to compare on, and not one to
   // spread against debt. The yield-on-cost row is its answer.
   const strat = inferStrategy(ex, signal);
-  const planDeal = isPlanDeal(strat.kind);
   // What the price buys (#423): the model runs at the documents' price, and
   // on a note that is a loan's and on a share the share's — so a note shows
   // its yield to maturity where a building shows a cap, a share's cap is
   // struck on the whole its price implies, and returns the price did not
   // buy are withheld rather than set beside buildings' (lib/compare-interest).
-  const ci = compareInterest(ex, r ?? null);
-  const cap = planDeal ? null : ci.cap;
+  // Where the first-draft model has no figure, the memorandum's own: the
+  // header's yield on cost, the pipeline card's going-in cap, each said as
+  // the memorandum's (lib/compare-figures).
+  const figs = compareReturns(ex, r ?? null, strat);
+  const planDeal = figs.planDeal;
+  const cap = figs.cap;
+  // The price and the year-1 NOI: the model's, else the memorandum's — the
+  // shared price reader (never a per-unit price or a prior trade; a
+  // development's land cost is its price), read against the year the screen
+  // read the memorandum, and its in-place or year-1 NOI.
+  const modelPrice = usd(r?.purchasePrice);
+  const statedPrice = findPriceMetric(ex?.metrics ?? [], strat.kind, screenYearOf(ex))?.value ?? null;
+  const modelNoi = usd(r?.year1Noi);
+  const statedNoi = goingInNoiText(ex);
 
   // Mandate fit — same engine, the same inputs and the same inferred kind
   // as the pipeline and deal page, so a development's land cost is judged
@@ -105,7 +123,10 @@ function toCol(
   return {
     id: deal.id,
     name: deal.name,
-    assetClass: deal.asset_class,
+    // The deal's one class, as every surface shows it: the analyst's where
+    // they filed one, the deck's where they left "Auto" — never a dash for
+    // a deal the extraction has read.
+    assetClass: shownAssetClass(deal.asset_class, ex),
     market: ex?.market || "—",
     // The same placement the pipeline and the deal page make (lib/market-
     // county, #447) — all three surfaces agree, a county-placed deal naming
@@ -122,23 +143,32 @@ function toCol(
     })(),
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
+    // A re-screen still running, or one that failed before its verdict,
+    // leaves the call on file the previous screen's (lib/screen-run, the
+    // reader the memo, the report, the shared screen and the meeting
+    // workbook ask): marked as the run, never crowned "best".
+    behind: verdictBehind(job),
     hasModel: model != null,
     fit,
     fitNote,
-    strategy: strat.kind === "unknown" ? null : strat.label,
+    // Whose strategy it is on a note or a leased fee, as the deal header
+    // says it (lib/interest `dealTypeLabel`).
+    strategy: strat.kind === "unknown" ? null : dealTypeLabel(strat.label, ex),
     planDeal,
-    irr: ci.withheld ? null : (r?.leveredIrrPct ?? null),
-    em: ci.withheld ? null : (r?.equityMultiple ?? null),
-    coc: ci.withheld ? null : (r?.cashOnCashPct ?? null),
+    irr: figs.withheld ? null : (r?.leveredIrrPct ?? null),
+    em: figs.withheld ? null : (r?.equityMultiple ?? null),
+    coc: figs.withheld ? null : (r?.cashOnCashPct ?? null),
     cap,
-    yoc: r?.yieldOnCostPct ?? null,
+    capFrom: figs.capFrom,
+    yoc: figs.yoc,
+    yocFrom: figs.yocFrom,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap
     // this table shows one row above — never a differently-sourced number.
     leverage: cap != null && bench30 != null ? leverageRead(cap, bench30) : null,
     // The same cap over today's 10-year (lib/debt-index reads it off the
     // rates table the strip draws from) — a fact with a date, no verdict.
     capOverTenYear: cap != null && tenYearPct != null ? capSpreadRead(cap, tenYearPct) : null,
-    interest: ci.tag,
+    interest: figs.tag,
     affordable: affordableTag(ex),
     tenancy: singleTenantTag(ex),
     roster: rosterTag(ex),
@@ -149,10 +179,11 @@ function toCol(
     broker: brokerageOf(ex),
     student: studentHousingTag(ex),
     mh: manufacturedHousingTag(ex, Infinity),
+    storage: selfStorageTag(ex, Infinity),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
-    noteYtm: ci.noteYtmPct,
-    withheld: ci.withheld,
+    noteYtm: figs.noteYtmPct,
+    withheld: figs.withheld,
     // FEMA's zone at the building from the stored site-flags lookup (#426);
     // blank before it has answered, never a guess.
     flood: floodCell(
@@ -161,10 +192,10 @@ function toCol(
         return f && f.status !== "pending" && !siteFlagsStale(f, address?.label) ? f.flood : undefined;
       })(),
     ),
-    // The shared price reader — never a per-unit price or a prior trade; a
-    // development's land cost is its price.
-    price: usd(r?.purchasePrice) ?? findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null,
-    noi: usd(r?.year1Noi) ?? goingInNoiText(ex),
+    price: modelPrice ?? statedPrice,
+    priceFrom: modelPrice ? "model" : statedPrice ? "om" : null,
+    noi: modelNoi ?? statedNoi,
+    noiFrom: modelNoi ? "model" : statedNoi ? "om" : null,
     // Each building pictured at the head of its column (#418): its own
     // photograph where the deal has one cached, then Street View, then the
     // USGS aerial — each pinned, so its credit is the picture on screen.
@@ -198,6 +229,26 @@ export default async function ComparePage({
     (a, b) => ids.indexOf(a.id) - ids.indexOf(b.id),
   );
 
+  // Each deal's latest job, read the way the pipeline page reads it: a
+  // re-screen running, or one that failed before its verdict, leaves the
+  // call on file the previous screen's beside this run's terms.
+  const { data: jobRows } = rows.length
+    ? await supabase
+        .from("analysis_jobs")
+        .select("deal_id, status, step, updated_at, created_at")
+        .in(
+          "deal_id",
+          rows.map((d) => d.id),
+        )
+        .order("created_at", { ascending: false })
+        .limit(Math.max(100, rows.length * 3))
+    : { data: [] as ({ deal_id: string } & JobLike)[] };
+  // The newest job per deal (rows arrive newest first).
+  const jobByDeal = new Map<string, JobLike>();
+  for (const j of (jobRows ?? []) as ({ deal_id: string } & JobLike)[]) {
+    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
+  }
+
   // One buy box per owning scope (team or personal) — fetch each scope once.
   type Scoped = DealRow & { user_id: string; team_id: string | null };
   const scopeKey = (d: Scoped) => (d.team_id ? `t:${d.team_id}` : `u:${d.user_id}`);
@@ -227,7 +278,14 @@ export default async function ComparePage({
   const tenYearPct = debt.tenYear?.pct ?? null;
 
   const cols = (rows as Scoped[]).map((d) =>
-    toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null, tenYearPct, !!process.env.GOOGLE_MAPS_API_KEY),
+    toCol(
+      d,
+      boxByScope.get(scopeKey(d)) ?? null,
+      bench30?.value ?? null,
+      tenYearPct,
+      !!process.env.GOOGLE_MAPS_API_KEY,
+      jobByDeal.get(d.id) ?? null,
+    ),
   );
 
   const backLink = (
@@ -258,8 +316,7 @@ export default async function ComparePage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Compare</h1>
         <p className="mt-1 text-sm text-muted">
-          {cols.length}{" "}deals side by side. Returns come from each deal&apos;s
-          generated model where present.
+          {cols.length}{" "}deals side by side.{" "}{MODEL_ROWS_NOTE}
         </p>
       </div>
 
@@ -268,7 +325,7 @@ export default async function ComparePage({
       {bench30 && cols.some((c) => c.leverage) && (
         <p className="text-xs leading-relaxed text-muted">
           Leverage row: each deal&apos;s going-in cap against the 30-yr fixed
-          ({bench30.value}%, {bench30.source}, as of {bench30.asOf}) — an
+          ({bench30.value}%, {bench30.source}, {asOfLabel(bench30.asOf, bench30.live ? undefined : fmrToday())}) — an
           owner-occupier benchmark; investor debt usually prices above it, so
           a thin spread here is thinner in practice.
         </p>
@@ -276,7 +333,8 @@ export default async function ComparePage({
 
       <p className="text-xs leading-relaxed text-muted">
         First-pass screen, not investment advice. &ldquo;Best&rdquo; is only
-        awarded among deals the screen didn&apos;t reject.
+        awarded among deals the screen didn&apos;t reject
+        {cols.some((c) => c.behind) ? ", and never to a call a re-screen is replacing" : ""}.
         {cols.every((c) => !c.fit) && (
           <>
             {" "}

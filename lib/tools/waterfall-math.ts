@@ -43,9 +43,16 @@ function positive(n: number | null | undefined): n is number {
   return real(n) && n > 0;
 }
 
-/** One promote tier: a hurdle, and the LP's share of cash above it. */
+/**
+ * One promote tier: a hurdle, and the LP's share of the cash distributed UP
+ * TO it — from the hurdle before until the LP's IRR reaches this one, which
+ * is how a term sheet says "80/20 to a 12% IRR". (These lines once said
+ * "above it", and the cards labelled the field "LP above it"; the loop below
+ * has always split up to the hurdle, as the result rows' "To 12% — 80/20"
+ * says.)
+ */
 export interface Tier {
-  /** the LP IRR that must be reached before this tier's split applies, in % */
+  /** the LP IRR this tier's split runs until, in % */
   hurdlePct: number;
   /** the LP's share of cash distributed in this tier, 0–100 */
   lpSharePct: number;

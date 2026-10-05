@@ -6,22 +6,14 @@ import {
   createDealFromBatch,
   type CreateDealResult,
 } from "./actions";
+// Each file's deal is named from its file name — a starting point the user
+// can edit before the batch runs; the single upload pre-fills the same way.
+import { nameFromFile } from "@/lib/deal-name";
+import { MAX_OM_PAGES } from "@/lib/pdf";
+import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 
 const MAX_FILES = 4;
 const MAX_BYTES = 32 * 1024 * 1024;
-
-/** "the-maddox_OM_v2.pdf" → "The maddox OM v2" — a starting point the user
- *  can edit before the batch runs. */
-function nameFromFile(fileName: string): string {
-  const base = fileName
-    .replace(/\.pdf$/i, "")
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80);
-  if (!base) return "Untitled OM";
-  return base.charAt(0).toUpperCase() + base.slice(1);
-}
 
 const ERROR_COPY: Record<string, string> = {
   name: "Needs a deal name.",
@@ -31,6 +23,8 @@ const ERROR_COPY: Record<string, string> = {
   file: "The file didn't arrive — try again.",
   pdf: "Not a valid PDF.",
   size: "Over the 32 MB limit.",
+  locked: "Needs a password to open — upload an unlocked copy.",
+  pages: `Over ${MAX_OM_PAGES} pages — upload the financial sections.`,
   save: "Couldn't save the deal — try again.",
   upload: "Upload failed — try again.",
 };
@@ -38,7 +32,9 @@ const ERROR_COPY: Record<string, string> = {
 type ItemStatus =
   | { kind: "ready" }
   | { kind: "uploading" }
-  | { kind: "queued"; dealId: string; deduped: boolean }
+  // personal: filed in the member's own pipeline, which the team does not
+  // see (lib/personal-deal).
+  | { kind: "queued"; dealId: string; deduped: boolean; personal: boolean }
   | { kind: "error"; message: string }
   | { kind: "skipped"; message: string };
 
@@ -146,13 +142,16 @@ export function BatchUpload({
         fd.set("om", item.file);
         const res = await submit(fd);
         if (res.ok) {
-          status = { kind: "queued", dealId: res.dealId, deduped: !!res.deduped };
+          status = { kind: "queued", dealId: res.dealId, deduped: !!res.deduped, personal: !!res.personal };
         } else {
           if (res.error === "limit" || res.error === "teamlimit") hitCap = true;
           status = { kind: "error", message: ERROR_COPY[res.error] ?? "Something went wrong." };
         }
       } catch {
-        status = { kind: "error", message: "Upload failed — check your connection and retry." };
+        // No answer came back: the connection dropped or the server failed
+        // first, so the deal may exist — a retry after 15 seconds would make
+        // a twin (the create action merges a repeat only inside that window).
+        status = { kind: "error", message: "No answer came back — it may have been created. Check the pipeline before retrying." };
       }
       setItems((prev) => prev.map((it, j) => (j === i ? { ...it, status } : it)));
     }
@@ -328,6 +327,15 @@ export function BatchUpload({
                 )}
                 {item.status.kind === "queued" && (
                   <span className="flex shrink-0 items-center gap-2">
+                    {item.status.personal && (
+                      <span
+                        title={PERSONAL_TITLE}
+                        data-qa="batch-personal"
+                        className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted"
+                      >
+                        {PERSONAL_CHIP}
+                      </span>
+                    )}
                     {TRIAGE_CHIP[triage[item.status.dealId]?.fit ?? ""] && (
                       <span
                         title={

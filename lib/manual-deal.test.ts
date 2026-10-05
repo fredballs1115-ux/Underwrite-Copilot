@@ -11,9 +11,10 @@ import {
   manualFactSheet,
   manualCompsStub,
   NOTES_MAX,
+  typedByHand,
   type ManualDealFacts,
 } from "./manual-deal";
-import { buildingSfRow, evaluateBuyBox, findMetric, METRIC_FIND } from "./criteria";
+import { buildingSfRow, evaluateBuyBox, findMetric, METRIC_FIND, screenYearOf } from "./criteria";
 import { scoreMandateFit } from "./mandate";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import { computeUnderwrite } from "./underwrite/engine";
@@ -131,13 +132,20 @@ describe("buildManualExtraction", () => {
     expect(ex.totalPages).toBe(0);
   });
 
+  it("is stamped with the day the facts were read, which a price label's year is judged against", () => {
+    const ex = buildManualExtraction(QUAD, new Date(Date.UTC(2027, 2, 9, 15)));
+    expect(ex.screenedOn).toBe("2027-03-09");
+    expect(screenYearOf(ex)).toBe(2027);
+  });
+
   // THE load-bearing contract: the labels must keep matching the shared
   // metric matchers, or manual deals silently vanish from the buy box,
   // the pipeline columns, and the workbook.
   it("labels match METRIC_FIND (buy box + mandate score read them)", () => {
-    const { metrics } = buildManualExtraction(QUAD);
+    const ex = buildManualExtraction(QUAD);
+    const { metrics } = ex;
     expect(
-      findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc)?.value,
+      findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc(screenYearOf(ex)))?.value,
     ).toBe("$1,250,000");
     expect(findMetric(metrics, METRIC_FIND.goingInCap.inc)?.value).toBe("6.2%");
     expect(findMetric(metrics, METRIC_FIND.perUnit.inc)?.value).toBe(
@@ -155,7 +163,7 @@ describe("buildManualExtraction", () => {
     expect(ex.metrics.some((m) => /context/i.test(m.label))).toBe(false);
     // Figures stay exactly where the matchers expect them.
     expect(
-      findMetric(ex.metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc)?.value,
+      findMetric(ex.metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc(screenYearOf(ex)))?.value,
     ).toBe("$1,250,000");
     expect(buildingSfRow(ex.metrics)?.value).toBe("3,600 SF");
   });
@@ -250,6 +258,35 @@ describe("pipeline artifacts", () => {
     expect(stub.leaseComps).toEqual([]);
     expect(stub.redFlags).toEqual([]);
     expect(stub.summary).toMatch(/entered by hand/i);
+  });
+});
+
+describe("typedByHand — the facts typed in, told from a memorandum's read", () => {
+  it("knows what buildManualExtraction writes, stamped or stored before the stamp", () => {
+    const typed = buildManualExtraction(QUAD);
+    expect(typedByHand(typed)).toBe(true);
+    const unstamped = buildManualExtraction(QUAD);
+    delete unstamped.screenedOn;
+    expect(typedByHand(unstamped)).toBe(true);
+  });
+
+  it("a memorandum's read carries its page count, its pages, how it was read or its bytes' fingerprint", () => {
+    const read = { ...buildManualExtraction(QUAD), totalPages: 38 };
+    expect(typedByHand(read)).toBe(false);
+    // Stored before the page count was kept: no count at all, never 0.
+    const uncounted = buildManualExtraction(QUAD);
+    delete uncounted.totalPages;
+    expect(typedByHand(uncounted)).toBe(false);
+    const cited = buildManualExtraction(QUAD);
+    cited.metrics[0] = { ...cited.metrics[0], page: "p. 3" };
+    expect(typedByHand(cited)).toBe(false);
+    expect(typedByHand({ ...buildManualExtraction(QUAD), omRead: "text" })).toBe(false);
+    expect(typedByHand({ ...buildManualExtraction(QUAD), omFingerprint: "abc123def4567890" })).toBe(false);
+  });
+
+  it("nothing, or a shape with no figures, is no typed facts", () => {
+    expect(typedByHand(null)).toBe(false);
+    expect(typedByHand({ old: true } as never)).toBe(false);
   });
 });
 

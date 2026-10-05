@@ -34,6 +34,32 @@ export async function isStaleCustomer(
   }
 }
 
+/**
+ * What each setup problem means to the operator — said in the server log,
+ * never on a customer's page: the billing and team pages had printed "Site
+ * owner — STRIPE_SECRET_KEY is missing…" to whoever tried to pay (pass 14,
+ * 2026-10-01). A customer reads only that checkout is not available and
+ * where to write.
+ */
+export const STRIPE_CONFIG_DIAGNOSIS: Record<StripeConfigErrorCode, string> = {
+  stripekey:
+    "Stripe rejected the API key: STRIPE_SECRET_KEY is missing, truncated, or from the wrong account — paste the full live secret key and save.",
+  price:
+    "Stripe couldn't find a configured price: almost always a Test-mode price ID used with a Live key — copy the live price_… IDs into STRIPE_PRICE_ID (and STRIPE_TEAM_PRICE_ID / STRIPE_TEAM_SEAT_PRICE_ID for the team plan).",
+  pricetype:
+    "A configured Stripe price is one-time, but subscriptions need Recurring · Monthly — recreate the price as recurring and update the ID.",
+  appurl: "The app's public URL is misconfigured — set NEXT_PUBLIC_APP_URL to the full https:// address of this site.",
+};
+
+/** The page's error code for a failed Stripe call: a setup problem's own
+ *  code, its diagnosis written to the server log for the operator, else the
+ *  caller's generic code. */
+export function stripeErrorCode(err: unknown, fallback: string): string {
+  const code = classifyStripeError(err);
+  if (code) console.error(`[billing] Stripe setup problem (${code}): ${STRIPE_CONFIG_DIAGNOSIS[code]}`);
+  return code ?? fallback;
+}
+
 export function classifyStripeError(err: unknown): StripeConfigErrorCode | null {
   const e = err as {
     type?: string;

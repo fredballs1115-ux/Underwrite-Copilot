@@ -9,7 +9,6 @@ import {
   SPREAD_LOW_IRR_PCT,
   SPREAD_HIGH_IRR_PCT,
   SPREAD_BPS,
-  FIRST_READ_CLAIM,
   ANALYSIS_STAGES,
   DEAL_KILLERS,
   COMPS_JURISDICTIONS,
@@ -17,15 +16,20 @@ import {
   PRICE_TEAM_BASE_MONTHLY,
   PRICE_TEAM_MEMBER_MONTHLY,
   FREE_DEALS,
+  FREE_DEALS_LINE,
+  FREE_PLAN,
+  PRO_PLAN_LINES,
   SAMPLE_COMP_PREMIUM_LINE,
 } from "@/lib/marketing-constants";
+import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 // The Excel-preview rows are COMPUTED from the live engine on the sample
 // model at render time — hardcoded copies of these figures are exactly what
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
-import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
-import { seedRules } from "@/lib/research-data";
+import { ruleCounts } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { latestChange } from "@/lib/changelog";
 import { StressBench } from "./landing-stress";
@@ -34,8 +38,9 @@ import { StressBench } from "./landing-stress";
 import { TOOL_COUNT, groupedTools } from "@/lib/tools/catalog";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
+import { DATA_METROS } from "@/lib/market-match";
 import { MarketsGallery } from "./markets-gallery";
-import { PhotoScrim, PlaceBackdrop } from "./place-band";
+import { HERO_STRIP, HERO_WORDS_TOP, PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
 
@@ -43,13 +48,18 @@ import { photosOnDisk } from "@/lib/photos-fs";
 // — the homepage can never claim coverage the rules engine doesn't have.
 // (Server component only: these pull the research JSONs, which must not ride
 // into client bundles via marketing-constants.)
-const RULE_COUNT = seedRules().length;
+const RULES = ruleCounts();
+// "29 rules, 28 source-linked" — a rule filed without a source is never
+// counted as linked (the pre-ship audit of 2026-09-30).
+const RULES_PHRASE =
+  RULES.sourced === RULES.all ? `${RULES.all} source-linked` : `${RULES.all}, ${RULES.sourced} of them source-linked`;
 // The sample deal's legal read through the REAL rules engine — feeds the
-// walkthrough widget's Regulation block.
-const LEGAL = sampleLegal();
-const WIRED_MARKETS = (metrosSeed.metros ?? [])
-  .filter((m) => (m as { ingest_market?: string }).ingest_market)
-  .map((m) => m.name);
+// walkthrough widget's Regulation block. Read for the day the page renders
+// (the page is ISR), since a rule's date is marked stale past the research
+// rule's limit (lib/research-age) — never on the day the process started.
+function legalToday() {
+  return sampleLegal(new Date().toISOString().slice(0, 10));
+}
 // Deliberately FOCUSED coverage (per direction): FIFTEEN markets, full stop
 // — the DMV core (one market, four jurisdiction entries) + the rest of the
 // Mid-Atlantic + the biggest US markets. Research and website coverage stop
@@ -95,9 +105,10 @@ function Icon({ children, className = "h-5 w-5" }: { children: ReactNode; classN
   );
 }
 
-// The actual six-stage pipeline every OM runs through — a word or two each;
-// the trace band under the rail shows what each stage produces.
-const STAGES: { title: string; icon: ReactNode }[] = [
+// The actual six-stage pipeline — a word or two each; the trace band under
+// the rail shows what each stage produces. Reconcile runs only where the
+// buyer adds their own model (lib/screen-run), and its tile says so.
+const STAGES: { title: string; note?: string; icon: ReactNode }[] = [
   {
     title: "Extract",
     icon: (
@@ -128,6 +139,7 @@ const STAGES: { title: string; icon: ReactNode }[] = [
   },
   {
     title: "Reconcile",
+    note: "with your model",
     icon: (
       <Icon>
         <path d="M12 4v16M5 20h14M6 8h12" />
@@ -245,7 +257,7 @@ const STATS: { value: number; suffix: string; label: string }[] = [
   { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages" },
   { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
   { value: MARKET_COUNT, suffix: "", label: "covered markets" },
-  { value: 0, suffix: "", label: "black-box numbers" },
+  { value: RULES.all, suffix: "", label: "rules checked by address" },
 ];
 
 // Live-engine rows for the Excel-preview tile: the sample model recomputed
@@ -264,39 +276,26 @@ const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
   ];
 })();
 
-const FREE_FEATURES = [
-  `${FREE_DEALS} deals, the full six-stage screen on each`,
-  "Sourced ranges + the three deal-killers",
-  "Recorded-sales comps + local rent-rule check by address",
-  "Risk digest and side-by-side deal comparison",
-  "Reconcile your own underwriting model",
-];
-
-const PRO_FEATURES = [
-  "Unlimited deals",
-  "Excel models — first-draft + institutional underwrite.xlsx",
-  "IC memo, full PDF report, and LOI draft",
-  "Your firm's branding on memos, reports, workbooks & LOI",
-  "Public-web comp search",
-  "Everything in Free",
-];
+// The plan cards' lists are the billing page's too (lib/marketing-constants
+// FREE_PLAN, PRO_PLAN_LINES), each Pro line held to the gate that makes it
+// Pro by lib/plan-features.test.ts.
 
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: `Just an offering memorandum as a PDF. Upload it and the screen runs on its own — a first read with the headline numbers lands in ${FIRST_READ_CLAIM}, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.`,
+    a: "Just an offering memorandum as a PDF. Upload it and the screen runs on its own — the headline numbers first, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
-    a: "Every figure traces to a named source — an OM page, your rent roll, a market norm — and conflicting sources are reconciled openly (actuals beat pro forma), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
+    a: "Every figure says where it came from — an OM page, your rent roll, a dated published figure, or a rule of thumb named as one — and conflicting sources are reconciled openly (actuals beat pro forma), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
   },
   {
     q: "Which markets does it cover?",
-    a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and the ${MAJOR_MARKET_COUNT} biggest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULE_COUNT} statute-linked, machine-evaluated at every address), market notes, and data coverage with sources. Outside those markets the screener says "unscreened — not unregulated" and stops; it never guesses. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
+    a: `${MARKET_COUNT} markets with research briefs, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. ${DATA_METROS.length} more metro areas are read without a brief — their published rents, vacancy, jobs and, where FRED carries them, permits, each dated, with no local rules or notes on file: ${DATA_METROS.map((m) => m.name).join(", ")}. Outside all of them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}.`,
   },
   {
     q: "Why not just ask ChatGPT?",
-    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, every assumption is a sourced range, and every OM runs the same six stages in the same order. The AI reads documents; it never does the arithmetic.",
+    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, every assumption is a sourced range, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
   },
   {
     q: "Are my documents private?",
@@ -308,11 +307,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: "A multi-tab first-draft workbook: deal summary with sources & uses and returns, an exit-cap × price IRR sensitivity grid, a year-by-year cash flow, every assumption with its source and confidence, and a conflicts sheet showing how disagreements between your documents were resolved.",
+    a: "A live-formula workbook: a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.",
   },
   {
     q: "Can my team share one pipeline?",
-    a: `Yes. Create a team, send teammates an invite link, and every deal anyone uploads lands in one shared pipeline — same screens, verdicts, models, and memos for everyone. The Team plan is ${PRICE_TEAM_BASE_MONTHLY} per month — which includes the account owner — plus ${PRICE_TEAM_MEMBER_MONTHLY} per month for each added member, on one subscription that adjusts automatically as people join or leave.`,
+    a: `Yes. Create a team, send teammates an invite link, and the deals you all add land in one shared pipeline, with the same screens, verdicts, models, and memos for everyone: up to ${TEAM_TRIAL_DEALS} shared deals free to try it, and every one on the Team plan. The Team plan is ${PRICE_TEAM_BASE_MONTHLY} per month — which includes the account owner — plus ${PRICE_TEAM_MEMBER_MONTHLY} per month for each added member, on one subscription that adjusts automatically as people join or leave.`,
   },
   {
     q: "Can I cancel anytime?",
@@ -333,7 +332,9 @@ const JSON_LD = {
       "@id": `${SITE_URL}/#organization`,
       name: "Underwrite Copilot",
       url: SITE_URL,
-      logo: `${SITE_URL}/icon`,
+      // The 180px touch icon (app/apple-icon.tsx): Google wants a logo of
+      // 112px at least, and the favicon is 32.
+      logo: `${SITE_URL}/apple-icon`,
       email: "underwritecopilot.support@gmail.com",
     },
     {
@@ -448,22 +449,38 @@ function SectionHead({
  * bands). Both draw at full strength under the SAME scrim (PhotoScrim):
  * dark under the left-hand type, clear over the picture. A photograph the
  * treatment washes out costs the same bytes and says nothing.
+ *
+ * The hero's words are its `children`, drawn after the picture and, where
+ * the picture owes a credit, before it: the credit sits at the band's foot,
+ * and first in the markup it was the first thing Tab reached, ahead of "Get
+ * started free" (PlaceBackdrop).
  */
-function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
-  if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} />;
+function HeroBackdrop({ photo, children }: { photo: PhotoSlot | undefined; children: ReactNode }) {
+  // The first picture on the page, so it is asked for first (`eager`).
+  if (!photo) {
+    return (
+      <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} scrim="hero" eager>
+        {children}
+      </PlaceBackdrop>
+    );
+  }
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0">
-      {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
-      <img
-        src={photoSrc(photo)}
-        alt=""
-        width={photo.width}
-        height={photo.height}
-        decoding="async"
-        className="h-full w-full object-cover object-[50%_42%]"
-      />
-      <PhotoScrim />
-    </div>
+    <>
+      <div aria-hidden className={`pointer-events-none ${HERO_STRIP}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
+        <img
+          src={photoSrc(photo)}
+          alt=""
+          width={photo.width}
+          height={photo.height}
+          fetchPriority="high"
+          decoding="async"
+          className="h-full w-full object-cover object-[50%_42%]"
+        />
+        <PhotoScrim scrim="hero" />
+      </div>
+      {children}
+    </>
   );
 }
 
@@ -502,6 +519,7 @@ function PeopleStrip({ photos }: { photos: PhotoSlot[] }) {
 
 export default function Home() {
   const photos = photosOnDisk();
+  const legal = legalToday();
   return (
     <div className="flex flex-1 flex-col">
       <script
@@ -604,106 +622,114 @@ export default function Home() {
         {/* Hero — dark navy with soft accent glows; the product is the visual. */}
         <section className="band-dark relative overflow-hidden text-white">
           {/* A real photograph behind the headline — the operator's, or a
-              USGS aerial of a covered downtown until it arrives. */}
-          <HeroBackdrop photo={photos.hero} />
-          {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}
-          <div
-            aria-hidden
-            className="glow-drift pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
-            style={{
-              background:
-                "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
-            }}
-          />
-          <div
-            aria-hidden
-            className="glow-drift-2 pointer-events-none absolute bottom-[-8rem] left-[-6%] h-[22rem] w-[22rem] rounded-full opacity-15 blur-3xl"
-            style={{
-              background:
-                "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
-            }}
-          />
-          <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
-            {/* grid-cols-1 matters (same as the walkthrough section): the
-                implicit mobile track is `auto` and cannot shrink below the
-                sample card's intrinsic width, which pushed the whole hero
-                wider than small phones — masked by the section's
-                overflow-hidden, so the page didn't scroll, it just clipped. */}
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div className="on-photo">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                  AI deal screening for CRE acquisitions
-                </span>
-                <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                  Stop underwriting like a{" "}
-                  <span className="relative inline-block whitespace-nowrap">
-                    coin flip.
-                    <svg
-                      viewBox="0 0 220 12"
-                      preserveAspectRatio="none"
-                      className="absolute -bottom-2 inset-x-0 h-3 w-full"
-                      aria-hidden
-                    >
-                      <path
-                        d="M3 9c40-6 84-7 112-4s72 5 102-3"
-                        fill="none"
-                        stroke="#7fd6cc"
-                        strokeWidth="4"
-                        strokeLinecap="round"
-                        opacity="0.75"
-                      />
-                    </svg>
+              covered market's photograph until it arrives — and the words
+              through it, so its credit comes after them and Tab reaches
+              "Get started free" first. */}
+          <HeroBackdrop photo={photos.hero}>
+            {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}
+            <div
+              aria-hidden
+              className="glow-drift pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
+              style={{
+                background:
+                  "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
+              }}
+            />
+            <div
+              aria-hidden
+              className="glow-drift-2 pointer-events-none absolute bottom-[-8rem] left-[-6%] h-[22rem] w-[22rem] rounded-full opacity-15 blur-3xl"
+              style={{
+                background:
+                  "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
+              }}
+            />
+            {/* The words start at the foot of the photograph's strip below lg
+                (HERO_WORDS_TOP), so they sit on the band, never on the sky. */}
+            <div className={`relative mx-auto max-w-6xl px-6 pb-14 ${HERO_WORDS_TOP}`}>
+              {/* grid-cols-1 matters (same as the walkthrough section): the
+                  implicit mobile track is `auto` and cannot shrink below the
+                  sample card's intrinsic width, which pushed the whole hero
+                  wider than small phones — masked by the section's
+                  overflow-hidden, so the page didn't scroll, it just clipped. */}
+              <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
+                <div className="on-photo">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                    AI deal screening for CRE acquisitions
                   </span>
-                </h1>
-                <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                  Upload the OM. Every figure sourced, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
-                </p>
-                <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <Link
-                    href="/login?mode=signup"
-                    className="cta-breathe rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
-                  >
-                    Get started free
-                  </Link>
-                  <Link
-                    href="/demo"
-                    className="rounded-lg border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
-                  >
-                    See a full screen
-                  </Link>
+                  <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
+                    Stop underwriting like a{" "}
+                    <span className="relative inline-block whitespace-nowrap">
+                      coin flip.
+                      <svg
+                        viewBox="0 0 220 12"
+                        preserveAspectRatio="none"
+                        className="absolute -bottom-2 inset-x-0 h-3 w-full"
+                        aria-hidden
+                      >
+                        <path
+                          d="M3 9c40-6 84-7 112-4s72 5 102-3"
+                          fill="none"
+                          stroke="#7fd6cc"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          opacity="0.75"
+                        />
+                      </svg>
+                    </span>
+                  </h1>
+                  <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
+                    Upload the OM. Every figure labelled with where it came from, the three deal-killers stressed, a Go / Caution / No-go.
+                  </p>
+                  <div className="mt-8 flex flex-wrap items-center gap-3">
+                    <Link
+                      href="/login?mode=signup"
+                      className="cta-breathe rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
+                    >
+                      Get started free
+                    </Link>
+                    <Link
+                      href="/demo"
+                      className="rounded-lg border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                    >
+                      See a full screen
+                    </Link>
+                  </div>
+                  <p className="mt-4 text-xs text-white/70">{FREE_DEALS_LINE} · no card</p>
                 </div>
-                <p className="mt-4 text-xs text-white/55">First {FREE_DEALS} deals free · no card</p>
+
+                {/* Product preview */}
+                <div>
+                  <DealPreview />
+                  <p className="mt-4 text-center text-[11px] text-white/55">
+                    Illustrative sample deal ·{" "}
+                    <Link
+                      href="/demo"
+                      className="font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
+                    >
+                      open the whole screen →
+                    </Link>
+                  </p>
+                </div>
               </div>
 
-              {/* Product preview */}
-              <div>
-                <DealPreview />
-                <p className="mt-4 text-center text-[11px] text-white/55">
-                  Illustrative sample deal ·{" "}
-                  <Link
-                    href="/demo"
-                    className="font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    open the whole screen →
-                  </Link>
-                </p>
-              </div>
+              {/* Stat strip — the screen, quantified, two words each. */}
+              <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
+                {/* Each stat read once: the label is the term, the figure
+                    its value, and the column reversed so the figure still
+                    sits on top. (A hidden term above a second copy of the
+                    label as a value had a screen reader say it twice.) */}
+                {STATS.map((st) => (
+                  <div key={st.label} className="flex flex-col-reverse">
+                    <dt className="mt-1 text-xs text-white/60">{st.label}</dt>
+                    <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
+                      <CountUp value={st.value} suffix={st.suffix} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-
-            {/* Stat strip — the screen, quantified, two words each. */}
-            <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
-              {STATS.map((st) => (
-                <div key={st.label}>
-                  <dt className="sr-only">{st.label}</dt>
-                  <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
-                    <CountUp value={st.value} suffix={st.suffix} />
-                  </dd>
-                  <dd className="mt-1 text-xs text-white/60">{st.label}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          </HeroBackdrop>
         </section>
 
         <PeopleStrip photos={stripPhotos(photos)} />
@@ -761,7 +787,7 @@ export default function Home() {
         {/* The six-stage screen — a rail of icons, then the trace of it running. */}
         <section id="screen" className="scroll-mt-16 border-t border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <SectionHead eyebrow="How it works" title="Six stages, same order, every OM." />
+            <SectionHead eyebrow="How it works" title="Six stages, same order." />
             <Reveal delay={60}>
               <ol className="stage-rail mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {STAGES.map((s, i) => (
@@ -777,6 +803,7 @@ export default function Home() {
                       {s.icon}
                     </span>
                     <span className="text-sm font-medium">{s.title}</span>
+                    {s.note && <span className="-mt-2 text-[11px] leading-tight text-muted">{s.note}</span>}
                   </li>
                 ))}
               </ol>
@@ -798,7 +825,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={LEGAL} />
+              <DemoTabs legal={legal} />
             </Reveal>
           </div>
         </section>
@@ -960,7 +987,7 @@ export default function Home() {
                     {[
                       ["The Brixton", "Supports", "text-pass bg-pass/10"],
                       ["Parkside", "Leans favorable", "text-caution bg-caution/10"],
-                      ["Vue at Legacy", "Stretched", "text-kill bg-kill/10"],
+                      ["Vue at Girard", "Stretched", "text-kill bg-kill/10"],
                     ].map(([n, r, c]) => (
                       <div
                         key={n}
@@ -981,10 +1008,12 @@ export default function Home() {
                   <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-medium">
                     {(
                       [
-                        ["✓", "Market", "text-pass border-line"],
-                        ["✓", "Price", "text-pass border-line"],
+                        // The sample deal's own checks against its demo buy box
+                        // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
                         ["✓", "Asset class", "text-pass border-line"],
+                        ["✓", "Units", "text-pass border-line"],
                         ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
+                        ["—", "Target return", "text-muted border-line"],
                       ] as const
                     ).map(([mark, label, cls]) => (
                       <span
@@ -1042,9 +1071,9 @@ export default function Home() {
                 <p className="mt-2 flex items-baseline gap-1">
                   <span className="text-4xl font-semibold tracking-tight">$0</span>
                 </p>
-                <p className="mt-1 text-sm text-muted">The full screen on your next {FREE_DEALS} deals.</p>
+                <p className="mt-1 text-sm text-muted">The full screen on up to {FREE_DEALS} deals.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
-                  {FREE_FEATURES.map((f) => (
+                  {FREE_PLAN.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
                       <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-faint text-[10px] font-bold text-muted">
                         ✓
@@ -1073,7 +1102,7 @@ export default function Home() {
                 </p>
                 <p className="mt-1 text-sm text-muted">Unlimited screens, plus the exports for your IC.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
-                  {PRO_FEATURES.map((f) => (
+                  {PRO_PLAN_LINES.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
                       <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
                         ✓
@@ -1082,8 +1111,11 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
+                {/* The plan rides through sign-up and its confirmation link
+                    (lib/auth-flow's confirmationRedirect), so a new account
+                    lands on Billing rather than an empty pipeline. */}
                 <Link
-                  href="/login?mode=signup"
+                  href="/login?mode=signup&next=%2Fbilling"
                   className="mt-6 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-brand-strong"
                 >
                   Start with Pro
@@ -1107,7 +1139,7 @@ export default function Home() {
                     "One shared pipeline — same deals, same verdicts",
                     "Invite teammates with a link",
                     "Billing follows your seat count automatically",
-                    `${FREE_DEALS} shared deals free to try it`,
+                    `Up to ${TEAM_TRIAL_DEALS} shared deals free to try it`,
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
                       <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
@@ -1118,7 +1150,7 @@ export default function Home() {
                   ))}
                 </ul>
                 <Link
-                  href="/login?mode=signup"
+                  href="/login?mode=signup&next=%2Fteam"
                   className="mt-6 rounded-lg border border-brand/40 px-4 py-2.5 text-center text-sm font-medium text-brand transition-colors hover:bg-brand/5"
                 >
                   Start a team
@@ -1203,7 +1235,7 @@ export default function Home() {
               </Link>
             </div>
             <p className="mt-4 text-xs text-white/50">
-              First {FREE_DEALS} deals free · no credit card
+              {FREE_DEALS_LINE} · no credit card
             </p>
           </div>
         </section>
@@ -1318,6 +1350,21 @@ function DealPreview() {
       : SAMPLE_DEAL.verdict.verdict === "pass_on"
         ? "No-go"
         : "Caution";
+  // The sample against its demo buy box, read the way the deal page's
+  // header reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, and a
+  // criterion the box misses outright winning the chip — so the card never
+  // says what the product's own header would not.
+  const fitChip = buyBoxRead(
+    SAMPLE_DEAL.asset_class,
+    dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
+    SAMPLE_DEMO_BOX,
+  ).chip;
+  const FIT_TONE: Record<BuyBoxChipTone, string> = {
+    pass: "bg-pass/10 text-pass",
+    caution: "bg-caution/10 text-caution",
+    kill: "bg-kill/10 text-kill",
+    muted: "bg-faint text-muted",
+  };
   return (
     <div className="relative">
       {/* Glow + a second sheet behind, so the card reads as a stack. */}
@@ -1330,11 +1377,15 @@ function DealPreview() {
           <p className="text-sm font-semibold tracking-tight">
             The Maddox at Brewerytown
           </p>
+          {/* Two chips, each named for a screen reader: the call, and the
+              buy-box fit, which says "Fit" on its face. */}
           <span className="stamp-in rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution ring-1 ring-caution/30">
+            <span className="sr-only">Verdict: </span>
             {verdictWord}
           </span>
-          <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[10px] font-semibold text-caution">
-            WATCH
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FIT_TONE[fitChip.tone]}`}>
+            <span className="sr-only">Buy-box </span>
+            {fitChip.label}
           </span>
         </div>
         <p className="mt-0.5 text-xs text-muted">
@@ -1426,9 +1477,11 @@ async function FooterTrustLine() {
   // so "is the site actually on the latest code" is answerable by comparing
   // this stamp to the repo's main tip. Absent locally; omitted then.
   const buildSha = (process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7);
+  // The year is the render's, never typed: a typed one goes stale on Jan 1.
+  const rendered = new Date();
   return (
     <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
-      © 2026 Underwrite Copilot · page rendered {fmt(new Date())}
+      {`© ${rendered.getFullYear()} Underwrite Copilot · page rendered ${fmt(rendered)}`}
       {buildSha && (
         <>
           {" · build "}

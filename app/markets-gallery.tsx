@@ -1,38 +1,52 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
-import { METRO_VIEWS } from "@/lib/metro-imagery";
-import { MARKET_COUNT, metroFact } from "./markets-marquee";
+import { metroView } from "@/lib/metro-imagery";
+import { MARKET_COUNT, marketsResearch, metroFact } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
 import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
+import { GalleryCreditText } from "./photo-credit";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
 
+/** Today as an ISO day, read outside the render — the homepage is ISR, so
+ *  the day is the render's, never the process's first. */
+function galleryToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /**
- * The covered markets, as real aerial photographs of the actual downtowns.
+ * The covered markets, as real photographs of the actual places.
  *
  * The homepage had no photography at all — 2,300 lines of drawn icons, CSS
  * bands and text. This is the honest fix for a product about real buildings
  * in real places: show the places.
  *
- * Every tile is a real USGS frame of that market's business district (see
- * lib/metro-imagery for why USGS is sharp at this scale and needs no key),
- * carrying the same live research fact the marquee shows, and linking to the
- * same market brief. It is navigation with a picture on it, not decoration.
+ * Every tile is the photograph its market is known by (lib/skyline), or,
+ * where none is chosen, a USGS frame of its business district from above
+ * (see lib/metro-imagery for why USGS is sharp at this scale and needs no
+ * key), carrying the same research fact the marquee shows, each figure with
+ * its own period (dated research, not a feed) and the tile's title naming
+ * who published it, and linking to the same market brief. It is navigation
+ * with a picture on it, not decoration.
  *
  * A tile whose image 404s still renders: the name and the fact are the
  * content, the photograph is the context. That is also why the <img> sits
  * behind the text rather than above it.
  */
-export function MarketsGallery() {
+export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
   const items = (metrosSeed.metros ?? [])
     .map((m, i) => {
       const entry = m as { id: string; name: string; region?: string };
+      const fact = metroFact(m, i);
       return {
         id: entry.id,
         name: entry.name,
-        fact: metroFact(m, i) ?? entry.region ?? "covered market",
-        place: METRO_VIEWS[entry.id]?.place ?? null,
+        fact: fact?.text ?? entry.region ?? "covered market",
+        cite: fact?.cite ?? null,
+        readOn: fact?.readOn ?? null,
+        place: metroView(entry.id)?.place ?? null,
+        dmv: entry.region === "DMV core",
       };
     })
     // A market with no coordinates would render an empty frame — leave it to
@@ -44,6 +58,19 @@ export function MarketsGallery() {
   // a photographer's name behind on the page.
   const credit = galleryCredit(items.map((m) => m.id));
   const anyOverhead = items.some((m) => !hasSkyline(m.id));
+  // The heading counts markets and the grid shows briefs: the Washington
+  // area is one market with four briefs (the District, two Maryland counties
+  // and Northern Virginia, itself several jurisdictions), so the line under
+  // the heading says why there are more tiles than markets.
+  const dmv = items.filter((m) => m.dmv).length;
+  // The tiles carry each figure's own period and never the day the research
+  // was read; past the research rule's limit (lib/research-age) that day is
+  // said once under the heading, with its age and the stale mark — the
+  // band's own reading (`marketsResearch`), so the two never disagree.
+  const research = marketsResearch(
+    items.map((m) => (m.cite ? { text: m.fact, cite: m.cite, readOn: m.readOn } : null)),
+    today,
+  );
 
   if (!items.length) return null;
 
@@ -53,15 +80,26 @@ export function MarketsGallery() {
       <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
         The {MARKET_COUNT} covered markets.
       </h2>
+      {/* Not "a skyline": a market is shown by the photograph it is known
+          by (a memorial, a wheel on the river) or, where none is chosen,
+          from above (Montgomery County). */}
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        The skyline behind each set of benchmarks — tap one for its brief.
+        {dmv > 1
+          ? `${items.length} briefs, ${dmv} of them for the Washington area. Tap one to read it.`
+          : "Tap one to read its brief."}
       </p>
+      {research.stale && research.span && (
+        <p className="mt-1 max-w-2xl text-xs text-caution" data-qa="research-stale">
+          {`Research ${research.span} (${research.stale}).`}
+        </p>
+      )}
 
       <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((m) => (
           <li key={m.id}>
             <Link
               href={`/market?metro=${m.id}`}
+              title={m.cite ?? undefined}
               className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {/* A 4:3 tile filled by a panorama up to 2.5:1 wide is covered by
@@ -77,7 +115,9 @@ export function MarketsGallery() {
                 width={480}
                 height={360}
                 sizes="(min-width: 1200px) 400px, (min-width: 1024px) calc(37.5vw - 32px), (min-width: 640px) calc(50vw - 36px), calc(94vw - 56px)"
-                alt={`${m.name} skyline`}
+                // What the tile shows, following its fallback: never
+                // "skyline" over an overhead.
+                describe
                 showCredit={false}
                 className="aspect-[4/3] w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"
               />
@@ -88,7 +128,9 @@ export function MarketsGallery() {
                 <p className="text-sm font-semibold leading-tight text-white">
                   {m.name}
                 </p>
-                <p className="mt-0.5 font-mono text-[11px] leading-snug text-white/80">
+                {/* Each figure with its own period, never the day the
+                    research was read. */}
+                <p className="mt-0.5 font-mono text-[11px] leading-snug text-white/80" data-qa="fact">
                   {m.fact}
                 </p>
               </div>
@@ -104,7 +146,11 @@ export function MarketsGallery() {
           publication that runs a photo grid handles it. The USGS line stays
           only while some market still shows its overhead frame. */}
       <p className="mt-4 text-[11px] leading-relaxed text-muted">
-        {credit ? <>{credit} </> : null}
+        {credit ? (
+            <>
+              <GalleryCreditText ids={items.map((m) => m.id)} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />{" "}
+            </>
+          ) : null}
         {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
       </p>
     </section>

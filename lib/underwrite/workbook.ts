@@ -1,4 +1,5 @@
 import "server-only";
+import { dealTypeLabelFor } from "@/lib/interest";
 import ExcelJS from "exceljs";
 import type { UnderwriteInputs } from "./engine";
 import { computeUnderwrite } from "./engine";
@@ -7,7 +8,10 @@ import type { DerivedModel, InputSource } from "./inputs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strategy";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
+import { datedLong } from "@/lib/debt-index";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
+import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -55,6 +59,10 @@ const FMT = {
 
 function sourceText(s: InputSource | undefined): string {
   if (!s) return "";
+  // A figure read from a document other than the OM (a rent roll) is said
+  // as that document's: the writer had put "OM" before every extracted
+  // figure, so a rent roll's occupancy read "OM — Rent roll actual …".
+  if (s.provenance === "extracted" && s.doc) return s.note.startsWith(s.doc) ? s.note : `${s.doc} — ${s.note}`;
   const tag = s.provenance === "extracted" ? "OM" : s.provenance === "derived" ? "Derived" : "Assumption";
   const page = s.provenance === "extracted" && s.page ? ` ${s.page}` : "";
   return `${tag}${page} — ${s.note}`;
@@ -135,6 +143,10 @@ export async function buildUnderwriteWorkbook(
   /** a portfolio memorandum's properties (lib/portfolio) — a tab of their
    *  own after the Deal Summary; no tab for a single property */
   portfolio?: PortfolioRead | null,
+  /** when the workbook was built — the day its cover's "from today" lines
+   *  were read on, printed on the cover and set as the file's created and
+   *  modified time (it was 1970) */
+  builtAt: Date = new Date(),
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
@@ -142,7 +154,8 @@ export async function buildUnderwriteWorkbook(
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
-  wb.created = new Date(0);
+  wb.created = builtAt;
+  wb.modified = builtAt;
 
   const wsCover = wb.addWorksheet("Cover", { views: [{ showGridLines: false }] });
   const wsSummary = wb.addWorksheet("Deal Summary", { views: [{ showGridLines: false }] });
@@ -174,8 +187,8 @@ export async function buildUnderwriteWorkbook(
   wsSummary.properties.tabColor = { argb: HEADFILL };
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
-  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead });
-  buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy);
+  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead }, builtAt);
+  buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy, model.meta.interest);
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
@@ -223,6 +236,8 @@ function buildCover(
   branding?: ExportBranding | null,
   /** which of the optional tabs this workbook carries, for the Contents */
   optional: { portfolio: boolean; marketRead: boolean } = { portfolio: false, marketRead: false },
+  /** when it was built: the day "years from today" on this cover counts from */
+  builtAt: Date = new Date(),
 ) {
   const { meta } = model;
   ws.getColumn(1).width = 3;
@@ -263,13 +278,24 @@ function buildCover(
   fact("Asset class", meta.assetClass);
   fact("Market", meta.market);
   fact("Address", meta.address);
+  // The day the workbook was built: every "years from today" below — a
+  // ground lease's term, an abatement's end — counts from it, and a file
+  // opened months later would otherwise read them as this year's.
+  fact(
+    "Built",
+    builtAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }),
+  );
   // The deal's strategy decides what its figures mean. On a plan deal
   // (value-add, conversion, development, lease-up) the cover says so, because
   // the OM's stabilized NOI is the finished project's figure — never this
   // model's year 1 — and a reader opening the file cold has to know that.
   const dealKind = meta.strategy ?? "unknown";
   if (dealKind !== "unknown") {
-    fact("Deal type", STRATEGY_LABEL[dealKind]);
+    // Whose strategy it is on a note or a leased fee, the deal header's own
+    // label (lib/interest): the type describes the collateral, the
+    // leaseholder's building or the lessee's equipment, never what the
+    // price buys.
+    fact("Deal type", dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment));
     const reading = ws.getCell(r, 3);
     reading.value = isPlanDeal(dealKind)
       ? `${STRATEGY_READING[dealKind]} This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.`
@@ -425,6 +451,21 @@ function buildCover(
       r++;
     }
   }
+  // A self-storage facility (#471): its occupancies, rates and platform,
+  // then what the model does with the premium over street and a lease-up.
+  if (meta.storage) {
+    fact("The facility", meta.storage.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.storage.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.storage.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 40;
+      r++;
+    }
+  }
   // What the third-party reports found (#465): the Phase I, the immediate
   // repairs, the seismic PML and the zoning, then what this model does with
   // the repairs.
@@ -507,6 +548,7 @@ function buildCover(
     ["Cash Flow", "Annual property and investment cash flow through exit"],
     ["Monthly Cash Flow", "Monthly operating detail with per-year ties to the annual tab"],
     ["Debt Schedule", "Month-by-month amortization; exit payoff ties to Deal Summary"],
+    ["Operating Metrics", "Margins, coverage and breakeven occupancy by year; year-1 yardsticks per unit and per SF where the count and size are stated"],
     ["Sensitivity", "Live IRR and equity-multiple matrices across 75 scenarios"],
   ];
   for (const [name, desc] of toc) {
@@ -550,6 +592,10 @@ function buildAssumptions(
   inp: UnderwriteInputs,
   sources: DerivedModel["sources"],
   strategy: DerivedModel["meta"]["strategy"],
+  /** what the price buys (the cover's `meta.interest`): its kind, and on a
+   *  leased fee the lessee's equipment where the memorandum names one, say
+   *  whose strategy the deal type is on a note or a leased fee */
+  interest?: DerivedModel["meta"]["interest"],
 ) {
   ws.getColumn(1).width = 36;
   ws.getColumn(2).width = 16;
@@ -574,12 +620,14 @@ function buildAssumptions(
     if (key) src(r, key);
     r++;
   };
+  // A formula over this tab's own inputs: black, per the cover's legend —
+  // green is a link pulled from another tab, which none of these is.
   const derived = (lab: string, formula: string, name: string, fmt: string, bold = false) => {
     label(ws.getCell(r, 1), lab, { bold, indent: 1 });
     const c = ws.getCell(r, 2);
     c.value = { formula } as ExcelJS.CellFormulaValue;
     c.name = name;
-    styleFormula(c, fmt, bold ? INK : GREEN, bold);
+    styleFormula(c, fmt, INK, bold);
     r++;
   };
   const header = (t: string) => { sectionHeader(ws, r, t, 1, 3); r++; };
@@ -591,41 +639,60 @@ function buildAssumptions(
   const dealKind = strategy ?? "unknown";
   if (dealKind !== "unknown") {
     label(ws.getCell(r, 1), "Deal Type", { indent: 1 });
-    label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind]);
+    // Whose strategy it is on a note or a leased fee, as the cover says it
+    // (lib/interest): the collateral's, the leaseholder's building's, or
+    // the lessee's tower's, sign's or array's.
+    const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], interest?.kind, interest?.equipment);
+    label(ws.getCell(r, 2), kindLabel);
     const note = ws.getCell(r, 3);
     note.value = isPlanDeal(dealKind)
       ? `${STRATEGY_READING[dealKind]} Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.`
       : STRATEGY_READING[dealKind];
     note.font = { name: ARIAL, size: 9, color: MUTED };
+    if (kindLabel !== STRATEGY_LABEL[dealKind]) {
+      // The qualified label is longer than the column: wrapped, with the
+      // row's three cells set at its top.
+      ws.getCell(r, 1).alignment = { indent: 1, vertical: "top" };
+      ws.getCell(r, 2).alignment = { wrapText: true, vertical: "top" };
+      ws.getCell(r, 3).alignment = { vertical: "top" };
+      ws.getRow(r).height = 40;
+    }
     r++;
   }
   input("Purchase Price", inp.purchasePrice, "PurchasePrice", FMT.usd, "purchasePrice", true);
   // Hold is STRUCTURAL: it sets the number of cash-flow years and the sale
   // year, which are baked at export. Not a flex input — editing it in the file
-  // would only partially recalc (a longer-hold IRR would be wrong). Re-export
-  // to change it.
-  input("Hold Period (months) — fixed; re-export to change", inp.holdMonths, "HoldMonths", FMT.int, "holdMonths", false);
+  // would only partially recalc (a longer-hold IRR would be wrong). Nor does a
+  // re-export change it: every export runs the model's one hold
+  // (lib/underwrite/inputs HOLD_MONTHS), so the cell says it is fixed and why.
+  input("Hold Period (months) — fixed", inp.holdMonths, "HoldMonths", FMT.int);
   ws.getCell(r - 1, 2).font = { name: ARIAL, size: 10, color: INK }; // black (formula-like), not blue input
+  {
+    const sc = ws.getCell(r - 1, 3);
+    const said = sources.holdMonths ? `${sourceText(sources.holdMonths)}. ` : "";
+    sc.value = `${said}Fixed: the Cash Flow tab's years and the sale year are built for this hold, so typing over it recalculates only part of the model.`;
+    sc.font = { name: ARIAL, size: 9, color: provColor(sources.holdMonths?.provenance) };
+  }
+  // A default of none says so in its SOURCE (lib/underwrite/inputs marks
+  // each zero), so no $0 here reads as a figure a document stated.
   input("Acquisition Fee %", inp.acqFeePct, "AcqFeePct", FMT.pct2, "acqFeePct");
-  input("Acquisition Fee Cap", inp.acqFeeCap, "AcqFeeCap", FMT.usd);
+  input("Acquisition Fee Cap", inp.acqFeeCap, "AcqFeeCap", FMT.usd, "acqFeeCap");
 
   header("Closing Cost Detail");
-  input("Transfer Tax % of price", inp.transferTaxPct, "TransferTaxPct", FMT.pct2);
-  label(ws.getCell(r - 1, 3), "Enter your jurisdiction's transfer-tax rate", { color: MUTED, size: 9 });
-  input("Recordation Tax % of price", inp.recordationTaxPct, "RecordationTaxPct", FMT.pct2);
-  label(ws.getCell(r - 1, 3), "Enter your jurisdiction's recordation-tax rate", { color: MUTED, size: 9 });
+  input("Transfer Tax % of price", inp.transferTaxPct, "TransferTaxPct", FMT.pct2, "transferTaxPct");
+  input("Recordation Tax % of price", inp.recordationTaxPct, "RecordationTaxPct", FMT.pct2, "recordationTaxPct");
   input("General Hold % of price", inp.generalHoldPct, "GeneralHoldPct", FMT.pct2, "generalHoldPct");
-  input("Buyer Legal", inp.buyerLegal, "BuyerLegal", FMT.usd);
-  input("Lender Legal", inp.lenderLegal, "LenderLegal", FMT.usd);
-  input("Appraisal / PCA / Phase I", inp.thirdPartyReports, "ThirdPartyReports", FMT.usd);
-  input("3rd Party / Misc.", inp.miscClosing, "MiscClosing", FMT.usd);
+  input("Buyer Legal", inp.buyerLegal, "BuyerLegal", FMT.usd, "buyerLegal");
+  input("Lender Legal", inp.lenderLegal, "LenderLegal", FMT.usd, "lenderLegal");
+  input("Appraisal / PCA / Phase I", inp.thirdPartyReports, "ThirdPartyReports", FMT.usd, "thirdPartyReports");
+  input("3rd Party / Misc.", inp.miscClosing, "MiscClosing", FMT.usd, "miscClosing");
   derived("Total Closing Costs", "PurchasePrice*(TransferTaxPct+RecordationTaxPct+GeneralHoldPct)+BuyerLegal+LenderLegal+ThirdPartyReports+MiscClosing", "ClosingCostsTotal", FMT.usd, true);
   derived("Closing Costs % of price", "ClosingCostsTotal/PurchasePrice", "ClosingCostPct_Buy", FMT.pct2);
 
   header("Income");
   input("In-Place Rental Revenue (annual)", inp.inPlaceRentAnnual, "InPlaceRent", FMT.usd, "inPlaceRentAnnual");
-  input("Expense Recoveries (annual)", inp.expenseRecoveriesAnnual, "Recoveries", FMT.usd);
-  input("Other Revenue (annual)", inp.otherRevenueAnnual, "OtherRev", FMT.usd);
+  input("Expense Recoveries (annual)", inp.expenseRecoveriesAnnual, "Recoveries", FMT.usd, "expenseRecoveriesAnnual");
+  input("Other Revenue (annual)", inp.otherRevenueAnnual, "OtherRev", FMT.usd, "otherRevenueAnnual");
   input("General Vacancy & Credit Loss %", inp.vacancyPct, "VacancyPct", FMT.pct1, "vacancyPct", true);
   input("Rent Growth %", inp.rentGrowthPct, "RentGrowth", FMT.pct1, "rentGrowthPct", true);
 
@@ -647,14 +714,23 @@ function buildAssumptions(
   input("Rentable SF", inp.rsf, "RSF", FMT.int, "rsf");
   input("Capital Reserves $/SF/yr", inp.reservesPsf, "ReservesPSF", FMT.psf, "reservesPsf");
   input("Capital Improvements (yr 1)", inp.capitalImprovementsYr1, "CapImprovements", FMT.usd, "capitalImprovementsYr1");
-  input("Tenant Improvements $/SF", inp.tiPsf, "TIPSF", FMT.psf);
-  input("Leasing Commission % of rent", inp.lcPct, "LCPct", FMT.pct1);
+  // The engine charges TI × the building's whole rentable SF in every year
+  // (the Cash Flow tab's Tenant Improvements line) — so the label says so,
+  // and a per-lease allowance on the space that rolls is not typed in here.
+  input("TI $/SF/yr, whole building", inp.tiPsf, "TIPSF", FMT.psf);
+  label(ws.getCell(r - 1, 3), "Charged on every SF of the building, every year — not a per-lease allowance", { color: MUTED, size: 9 });
+  // The same for the commission: the Cash Flow tab charges it on the year's
+  // whole rent, every year, not on the leases that roll.
+  input("Leasing Commission % of all rent, every year", inp.lcPct, "LCPct", FMT.pct1);
+  label(ws.getCell(r - 1, 3), "Charged on the year's whole rent, every year — not a commission on the leases that roll", { color: MUTED, size: 9 });
 
   header("Fees");
   input("Asset Management Fee % of equity/yr", inp.amFeePctEquity, "AMFeePctEquity", FMT.pct2, "amFeePctEquity");
 
   header("Financing");
-  input("Loan to Cost", inp.ltc, "LTC", FMT.pct1, "ltc", true);
+  // Struck on the acquisition cost — price, closing costs and fee (the Deal
+  // Summary's Loan Basis); the capital plan is paid from year-1 cash flow.
+  input("Loan to Cost (acquisition cost)", inp.ltc, "LTC", FMT.pct1, "ltc", true);
   input("All-in Rate (index + spread)", inp.allInRatePct, "AllInRate", FMT.pct2, "allInRatePct", true);
   input("Interest-Only Period (months; 999 = full)", inp.ioMonths, "IOMonths", FMT.int, "ioMonths");
   input("Amortization (months)", inp.amortMonths, "AmortMonths", FMT.int, "amortMonths");
@@ -798,8 +874,10 @@ function buildPortfolio(ws: ExcelJS.Worksheet, p: PortfolioRead, noun: { one: st
   });
   formula(ws.getCell(gap, 9), `IF(AND(ISNUMBER(I${total}),ISNUMBER(I${ask}),I${ask}>0),I${total}/I${ask}-1,"")`, FMT.pct1, true);
 
-  // Excel's own data bars on the three shares, from zero so a property's bar
-  // is its share's length against the largest.
+  // Excel's own data bars on the three shares, from zero to the whole (1,
+  // 100%), so a property's bar fills its share of the cell — a 53% share
+  // half the cell, as on the deal page's card and the report's page. Scaled
+  // to the column's largest share, a 53% share filled 97% of it.
   for (const letter of ["L", "M", "N"]) {
     ws.addConditionalFormatting({
       ref: `${letter}${first}:${letter}${last}`,
@@ -812,7 +890,10 @@ function buildPortfolio(ws: ExcelJS.Worksheet, p: PortfolioRead, noun: { one: st
           maxLength: 100,
           showValue: true,
           border: false,
-          cfvo: [{ type: "num", value: 0 }, { type: "max" }],
+          cfvo: [
+            { type: "num", value: 0 },
+            { type: "num", value: 1 },
+          ],
           color: { argb: "FFB5CDC9" },
         } as unknown as ExcelJS.ConditionalFormattingRule,
       ],
@@ -834,15 +915,13 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
     ws.getColumn(i + 1).width = w;
   });
   titleRow(ws, "Assumptions against the published figures");
-  const titles = read.checks.map((c) => c.title.toLowerCase());
-  const what = titles.length <= 1 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
-  const scope = read.metro
-    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
-    : `The model's ${what}, set against the national series, read on ${read.readOn}.`;
-  label(ws.getCell(2, 1), scope, { color: MUTED, size: 9 });
+  // The deal page's card's own words (lib/model-vs-market-scope): the
+  // published figures for the market or the state, and the nation's — the
+  // day in the card's own format ("Sep 21, 2026"), never the ISO key.
+  label(ws.getCell(2, 1), readScope(read, datedLong(read.readOn)), { color: MUTED, size: 9 });
   label(
     ws.getCell(3, 1),
-    "A trailing year is what an assumption is being asked to beat, not a forecast; a metro figure is the metro area's, not the submarket's or the building's. The model's figures are the Assumptions tab's as built; change them there.",
+    `A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)} The model's figures are the Assumptions tab's as built; change them there.`,
     { color: MUTED, size: 9 },
   );
   const headers = ["Assumption", "Model", "Model source", "Published figure", "Figure", "As of", "Publisher", "Read", "What the figures say"];
@@ -870,10 +949,25 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
       if (p) {
         label(ws.getCell(r, 4), `${p.label}: ${p.text}`, { size: 9 });
         const v = ws.getCell(r, 5);
+        // Raw, so it sorts and computes, and shown in its unit: a published
+        // figure is a percent change or a level in percent (PublishedFigure),
+        // so the format's "%" is a literal, never Excel's ×100 percent.
         v.value = p.value;
-        v.numFmt = "0.00";
+        v.numFmt = '0.00"%"';
         v.font = { name: ARIAL, size: 10, color: INK };
-        label(ws.getCell(r, 6), p.asOf, { size: 9 });
+        // A feed's observation day is a date, so the column sorts by it; a
+        // research figure's period ("Q1 2026", "undated") stays as written,
+        // and so does a day that does not exist, never rolled into another.
+        const day = /^\d{4}-\d{2}-\d{2}$/.test(p.asOf) ? Date.parse(`${p.asOf}T00:00:00Z`) : NaN;
+        const asOf = ws.getCell(r, 6);
+        if (Number.isFinite(day) && new Date(day).toISOString().slice(0, 10) === p.asOf) {
+          asOf.value = new Date(day);
+          asOf.numFmt = "mmm d, yyyy";
+          asOf.font = { name: ARIAL, size: 9, color: INK };
+          asOf.alignment = { horizontal: "left" };
+        } else {
+          label(asOf, p.asOf, { size: 9 });
+        }
         label(ws.getCell(r, 7), p.publisher, { size: 9, color: MUTED });
       }
       r++;
@@ -900,7 +994,10 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
   label(ws.getCell(2, 1), "Year", { bold: true });
   for (let y = 0; y <= holdYears + 1; y++) {
     const c = ws.getCell(2, y0Col + y);
-    c.value = { formula: `"Yr "&${y}` } as ExcelJS.CellFormulaValue;
+    // The year after the hold is not a year owned: its NOI is the one the
+    // exit cap capitalises into the sale (the Deal Summary's Residual NOI),
+    // and the header says so.
+    c.value = { formula: y === holdYears + 1 ? `"Yr "&${y}&" (exit NOI)"` : `"Yr "&${y}` } as ExcelJS.CellFormulaValue;
     c.font = { name: ARIAL, size: 8, color: MUTED };
     c.alignment = { horizontal: "right" };
   }
@@ -1080,26 +1177,48 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   });
   ws.getRow(r).height = 14;
   ws.getRow(r + 1).height = 24;
-  r += 3;
+  const dealKind = meta.strategy ?? "unknown";
+  const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
+  if (planDeal) {
+    // On a plan deal the tiles are the screening model's returns, struck
+    // with the whole budget in year 1 — the deal page's own caveat, said
+    // under them before anyone quotes one.
+    const row = r + 2;
+    ws.mergeCells(row, 1, row, 5);
+    const c = ws.getCell(row, 1);
+    c.value = PLAN_RETURNS_CAVEAT_WORKBOOK;
+    c.font = { name: ARIAL, size: 9, color: MUTED };
+    c.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(row).height = 36;
+    r += 4;
+  } else {
+    r += 3;
+  }
 
   // ── PROJECT OVERVIEW ──
   sectionHeader(ws, r, "Project Overview", 1, 5); r++;
-  label(ws.getCell(r, 1), "Building Name"); label(ws.getCell(r, 2), meta.dealName, { color: GREEN });
-  label(ws.getCell(r, 4), "Asset Class"); label(ws.getCell(r, 5), meta.assetClass, { color: GREEN }); r++;
-  label(ws.getCell(r, 1), "Address"); label(ws.getCell(r, 2), meta.address || "—", { color: GREEN });
-  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—", { color: GREEN }); r++;
-  label(ws.getCell(r, 1), "Rentable SF");
+  // The deal's facts are text written into the file, as the Cover prints
+  // them — plain, never the green the legend keeps for a link to another tab.
+  label(ws.getCell(r, 1), "Building Name"); label(ws.getCell(r, 2), meta.dealName);
+  label(ws.getCell(r, 4), "Asset Class"); label(ws.getCell(r, 5), meta.assetClass); r++;
+  label(ws.getCell(r, 1), "Address"); label(ws.getCell(r, 2), meta.address || "—");
+  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—"); r++;
+  // A size the documents do not state is the count × a typical unit or a
+  // placeholder (the Assumptions tab names which) — marked here as the
+  // Operating Metrics tab marks it by leaving its per-SF figures out.
+  label(ws.getCell(r, 1), model.sources.rsf?.provenance === "assumption" ? "Rentable SF (assumed)" : "Rentable SF");
   ws.getCell(r, 2).value = { formula: "RSF" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 2), FMT.int);
   label(ws.getCell(r, 4), "In-Place Occupancy");
-  if (meta.occupancyPct != null) { ws.getCell(r, 5).value = meta.occupancyPct; styleLink(ws.getCell(r, 5), FMT.pct1); }
+  // The documents' figure, typed in: an input's blue (it is read for the
+  // vacancy at export; nothing in the book reads this cell).
+  if (meta.occupancyPct != null) { ws.getCell(r, 5).value = meta.occupancyPct; styleInput(ws.getCell(r, 5), FMT.pct1); }
   else label(ws.getCell(r, 5), "n/a", { color: MUTED });
   // Deal type, and on a plan deal the budget the returns have to pay for —
   // a live link to the Assumptions cell, so flexing it flows through.
-  const dealKind = meta.strategy ?? "unknown";
-  const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
   if (dealKind !== "unknown") {
     r++;
-    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind], { color: GREEN });
+    // Whose strategy it is on a note or a leased fee, as the cover says it.
+    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment));
     if (planDeal) {
       label(ws.getCell(r, 4), "Capital Budget (yr 1)");
       ws.getCell(r, 5).value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 5), FMT.usd);
@@ -1112,9 +1231,9 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
       label(ws.getCell(r, 1), "OM Stabilized NOI (pro forma)");
       const noiCell = ws.getCell(r, 2);
       if (meta.stabilizedNoi) {
+        // The OM's figure typed in, which the yield below reads: an input.
         noiCell.value = meta.stabilizedNoi.value;
-        noiCell.numFmt = FMT.usd;
-        noiCell.font = { name: ARIAL, size: 10, color: GREEN };
+        styleInput(noiCell, FMT.usd);
         noiCell.alignment = { horizontal: "right" };
         label(ws.getCell(r, 3), meta.stabilizedNoi.page ? `OM ${meta.stabilizedNoi.page}` : "OM", { color: MUTED, size: 9 });
       } else {
@@ -1178,6 +1297,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
       { type: "cellIs", operator: "equal", priority: 2, formulae: ['TRUE'], style: { font: { color: { argb: "FF1B7A5E" }, bold: true } } },
     ],
   });
+  // The capital plan is neither a source nor a use here: the engine spends
+  // it in year 1's cash flow (the Cash Flow tab's Capital Improvements line),
+  // so the loan is struck on the acquisition cost and the equity above
+  // leaves it out. Said under Sources, with the budget linked.
+  sr++;
+  label(ws.getCell(sr, 1), "Capital Plan (yr 1)", { indent: 1 });
+  const capPlan = ws.getCell(sr, 2);
+  capPlan.value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue;
+  styleLink(capPlan, FMT.usd);
+  sr++;
+  label(ws.getCell(sr, 1), "paid from year-1 cash flow, not these sources", { indent: 1, size: 9, color: MUTED });
   r = Math.max(r, sr) + 2;
 
   // Monthly payment helper (named), mirrors engine.monthlyPayment.
@@ -1221,18 +1351,22 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   if (planDeal) {
     // A plan deal has no going-in cap: year-1 income here is in-place or
     // assumed, so the cell says what it is. The yield the plan is judged on
-    // is the OM's stabilized NOI over total cost (uses + the capital plan) —
-    // the same figure the deal page, the memo and the report print — never
-    // year-1 NOI over uses that leave the budget out.
+    // is the OM's stabilized NOI over total cost — never year-1 NOI over
+    // uses that leave the budget out. This cell's total cost is the uses
+    // (price, closing, fees) plus the capital plan, so it reads a little
+    // under the deal page's, the memo's and the report's, which divide by
+    // the price plus the budget; the label says which.
     ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
     ret(
-      "Yield on Cost (OM stabilized NOI / total cost)",
+      "Yield on Cost (OM stabilized NOI / uses + capital plan)",
       `IF(OR(NOT(ISNUMBER(StabilizedNOI)),TotalCost=0),"n/a",StabilizedNOI/TotalCost)`,
       FMT.pct2,
       "YieldOnCost",
     );
   } else {
-    ret("Going-In Cap", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // The model's year-1 NOI over the price — not the OM's stated cap, which
+    // the deal's header and cards print; the label says which it is.
+    ret("Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
     ret("Stabilized Yield (on cost)", `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
   }
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
@@ -1461,6 +1595,13 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
  * years beyond it are 0, and trailing zeros don't change IRR — so a single
  * fixed-height block (tall enough for the longest hold) serves every scenario.
  *
+ * The axes are live too: each axis cell on the visible tab is a formula off
+ * its named input (the centre is the input itself, the steps are written at
+ * export), and every override row reads its axis cell or the named input —
+ * never a number — so an input typed into the file re-centres every grid
+ * on it. A price scenario strikes its closing costs and fee at its own
+ * price, as the engine does.
+ *
  * LOAD-BEARING LAYOUT: workbook.test.ts reads the engine tab directly —
  * scenarios start at column C in grid order (index = gi*25 + ri*5 + ci), the
  * IRR sits on sheet row 23 and the EM on row 24. Do not add rows to a block.
@@ -1553,7 +1694,9 @@ function buildOperatingMetrics(
   r++;
   label(
     ws.getCell(r, 1),
-    "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — where cash flow crosses zero. Screen it against the market's actual vacancy, not the pro forma's.",
+    // What the formula covers, said: the row leaves reserves, capital and
+    // the asset management fee out, so it is not where cash flow crosses zero.
+    "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
     { color: MUTED, size: 9 },
   );
   r += 2;
@@ -1591,7 +1734,8 @@ function buildOperatingMetrics(
     const u = ws.getCell(r, 2);
     u.value = units;
     u.name = "UnitsCount";
-    styleLink(u, FMT.int);
+    // The documents' count typed in, which every per-unit row reads: an input.
+    styleInput(u, FMT.int);
     u.alignment = { horizontal: "right" };
     r++;
     twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
@@ -1655,6 +1799,26 @@ function buildOperatingMetrics(
   bottomBorder(ws, r - 1, 1, 2);
 }
 
+/**
+ * One sensitivity axis: the named input it varies, the step between its five
+ * values and the floor under them (lib/underwrite/sensitivity's
+ * `centeredAxis`). The axis cells are LIVE formulas off the input — the
+ * centre is the input itself, so it stays the model's base case whatever is
+ * typed into the file — while the step stays the one written at export.
+ */
+interface SensAxisDef {
+  name: string;
+  step: number;
+  min: number;
+  fmt: string;
+}
+
+/** The axis's value at k steps from the input, as a formula. */
+function axisFormula(a: SensAxisDef, k: number): string {
+  if (k === 0) return a.name;
+  return `MAX(${a.min},${a.name}${k > 0 ? "+" : "-"}${Math.abs(k)}*${a.step})`;
+}
+
 function buildSensitivity(
   wsSens: ExcelJS.Worksheet,
   eng: ExcelJS.Worksheet,
@@ -1662,11 +1826,16 @@ function buildSensitivity(
 ) {
   const inc = defaultIncrements(inp);
   const steps = [-2, -1, 0, 1, 2];
-  const capVals = steps.map((k) => Math.max(0.0025, inp.exitCapPct + k * inc.capStep));
+  const AXES = {
+    cap: { name: "ExitCap", step: inc.capStep, min: 0.0025, fmt: FMT.pct2 },
+    hold: { name: "HoldMonths", step: inc.monthsStep, min: 12, fmt: FMT.int },
+    price: { name: "PurchasePrice", step: inc.priceStep, min: 0, fmt: FMT.usd },
+    ltc: { name: "LTC", step: inc.ltcStep, min: 0, fmt: FMT.pct2 },
+    rate: { name: "AllInRate", step: inc.rateStep, min: 0.0025, fmt: FMT.pct2 },
+  } satisfies Record<string, SensAxisDef>;
+  // The hold is structural (the Assumptions tab says so): the engine blocks
+  // are sized for the longest hold its axis reaches at export.
   const holdVals = steps.map((k) => Math.max(12, inp.holdMonths + k * inc.monthsStep));
-  const priceVals = steps.map((k) => Math.max(0, inp.purchasePrice + k * inc.priceStep));
-  const ltcVals = steps.map((k) => Math.max(0, inp.ltc + k * inc.ltcStep));
-  const rateVals = steps.map((k) => Math.max(0.0025, inp.allInRatePct + k * inc.rateStep));
   const maxHoldM = Math.max(...holdVals, inp.holdMonths);
   const maxYears = Math.max(1, Math.ceil(maxHoldM / 12));
 
@@ -1703,7 +1872,7 @@ function buildSensitivity(
   // ── one scenario column; returns its IRR / EM cell addresses ──
   let col = 3; // scenarios start at column C
   const scenario = (o: {
-    price?: number; ltc?: number; rate?: number; cap?: number; holdM?: number;
+    price?: string; ltc?: string; rate?: string; cap?: string; holdM?: string;
   }): { irr: string; em: string } => {
     const c = col++;
     const A1 = (row: number) => `${eng.getCell(row, c).address}`;
@@ -1714,20 +1883,20 @@ function buildSensitivity(
       row++;
       return a;
     };
-    const putN = (n: number): string => {
-      eng.getCell(row, c).value = n;
-      const a = A1(row);
-      row++;
-      return a;
-    };
-    // overrides (a literal when perturbed, else the global named range)
-    const price = o.price != null ? putN(o.price) : put("PurchasePrice");
-    const ltc = o.ltc != null ? putN(o.ltc) : put("LTC");
-    const rate = o.rate != null ? putN(o.rate) : put("AllInRate");
-    const cap = o.cap != null ? putN(o.cap) : put("ExitCap");
-    const holdM = o.holdM != null ? putN(o.holdM) : put("HoldMonths");
-    // derived
-    const loanBasis = put(`${price}+ClosingCostsTotal+MIN(AcqFeePct*${price},AcqFeeCap)`);
+    // overrides: the visible tab's axis cell where this scenario varies the
+    // input, else the global named range — a formula either way, so a
+    // scenario follows its axis when the input it is centred on changes
+    const price = put(o.price ?? "PurchasePrice");
+    const ltc = put(o.ltc ?? "LTC");
+    const rate = put(o.rate ?? "AllInRate");
+    const cap = put(o.cap ?? "ExitCap");
+    const holdM = put(o.holdM ?? "HoldMonths");
+    // derived — the closing costs and the fee struck at THIS scenario's
+    // price (the Assumptions tab's ClosingCostsTotal formula with the price
+    // swapped), as the engine strikes them at each price it is run at
+    const loanBasis = put(
+      `${price}+${price}*(TransferTaxPct+RecordationTaxPct+GeneralHoldPct)+BuyerLegal+LenderLegal+ThirdPartyReports+MiscClosing+MIN(AcqFeePct*${price},AcqFeeCap)`,
+    );
     const loan = put(`${ltc}*${loanBasis}`);
     const equity = put(`${loanBasis}+FinCostPct*${loan}-${loan}`);
     const mpmt = put(`IF(${rate}=0,${loan}/AmortMonths,${loan}*(${rate}/12)/(1-(1+${rate}/12)^(-AmortMonths)))`);
@@ -1756,28 +1925,51 @@ function buildSensitivity(
   };
 
   // ── the visible matrices ──
-  interface GridDef { title: string; rowLabel: string; colLabel: string; rowVals: number[]; colVals: number[]; override: (rv: number, cv: number) => Parameters<typeof scenario>[0]; }
+  interface GridDef {
+    title: string;
+    rowLabel: string;
+    colLabel: string;
+    rowAxis: SensAxisDef;
+    colAxis: SensAxisDef;
+    /** a scenario's overrides, from its row's and its column's axis cells */
+    override: (rowRef: string, colRef: string) => Parameters<typeof scenario>[0];
+  }
   const grids: GridDef[] = [
-    { title: "Exit Cap × Hold Period", rowLabel: "Hold (months)", colLabel: "Exit cap", rowVals: holdVals, colVals: capVals, override: (h, cp) => ({ holdM: h, cap: cp }) },
-    { title: "Exit Cap × Purchase Price", rowLabel: "Price", colLabel: "Exit cap", rowVals: priceVals, colVals: capVals, override: (p, cp) => ({ price: p, cap: cp }) },
-    { title: "Leverage × Rate", rowLabel: "All-in rate", colLabel: "LTC", rowVals: rateVals, colVals: ltcVals, override: (rt, lt) => ({ rate: rt, ltc: lt }) },
+    { title: "Exit Cap × Hold Period", rowLabel: "Hold (months)", colLabel: "Exit cap", rowAxis: AXES.hold, colAxis: AXES.cap, override: (h, cp) => ({ holdM: h, cap: cp }) },
+    { title: "Exit Cap × Purchase Price", rowLabel: "Price", colLabel: "Exit cap", rowAxis: AXES.price, colAxis: AXES.cap, override: (p, cp) => ({ price: p, cap: cp }) },
+    { title: "Leverage × Rate", rowLabel: "All-in rate", colLabel: "LTC", rowAxis: AXES.rate, colAxis: AXES.ltc, override: (rt, lt) => ({ rate: rt, ltc: lt }) },
   ];
-  const axisFmt = (vals: number[]) => (vals.every((v) => v < 1) ? FMT.pct2 : vals.every((v) => v < 1000) ? FMT.int : FMT.usd);
+  // An axis cell as a scenario on the hidden tab reads it.
+  const axisRef = (row: number, c: number) => `'${wsSens.name}'!${cellA1(row, c).replace(/^([A-Z]+)(\d+)$/, "$$$1$$$2")}`;
 
   wsSens.getColumn(1).width = 16;
   for (let c = 2; c <= 13; c++) wsSens.getColumn(c).width = 11;
   titleRow(wsSens, "Sensitivity");
   let r = 2;
-  label(wsSens.getCell(r, 1), "Live — every cell is a full re-run of the model. Change any assumption and all 75 scenarios recompute.", { color: MUTED, size: 9 });
+  label(
+    wsSens.getCell(r, 1),
+    "Live — every cell is a full re-run of the model, its axes centred on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
+    { color: MUTED, size: 9 },
+  );
   r += 2;
 
   const IRR_COLS = { from: 2, to: 6 }; // B..F
   const EM_COLS = { from: 8, to: 12 }; // H..L
+  const axisStyle = (cell: ExcelJS.Cell, fmt: string, base: boolean) => {
+    cell.numFmt = fmt;
+    cell.font = { name: ARIAL, size: 9, bold: base, color: MUTED };
+  };
 
   for (const g of grids) {
-    // One scenario per cell, shared by the IRR matrix and the EM matrix.
-    const cells: { irr: string; em: string }[][] = g.rowVals.map((rv) =>
-      g.colVals.map((cv) => scenario(g.override(rv, cv))),
+    // This grid's rows — its title, the matrices' labels, the column axis,
+    // then five rows of scenarios — are fixed before any scenario is
+    // written, so each scenario reads its own axis cells.
+    const axisRow = r + 2;
+    const bodyTop = r + 3;
+    // One scenario per cell, shared by the IRR matrix and the EM matrix, in
+    // grid order (the engine tab's load-bearing layout).
+    const cells: { irr: string; em: string }[][] = steps.map((_k, ri) =>
+      steps.map((_c, ci) => scenario(g.override(axisRef(bodyTop + ri, 1), axisRef(axisRow, IRR_COLS.from + ci)))),
     );
 
     sectionHeader(wsSens, r, g.title, 1, 12);
@@ -1787,26 +1979,25 @@ function buildSensitivity(
     label(wsSens.getCell(r, 1), `${g.rowLabel} ↓ · ${g.colLabel} →`, { color: MUTED, size: 8 });
     r++;
 
-    // Column axis (shared header row for both matrices).
-    g.colVals.forEach((cv, ci) => {
-      for (const base of [IRR_COLS.from, EM_COLS.from]) {
-        const cell = wsSens.getCell(r, base + ci);
-        cell.value = cv;
-        cell.numFmt = axisFmt(g.colVals);
+    // Column axis (shared header row for both matrices): a live formula off
+    // the input over the IRR matrix, which the EM matrix's header reads.
+    steps.forEach((k, ci) => {
+      const ic = wsSens.getCell(r, IRR_COLS.from + ci);
+      ic.value = { formula: axisFormula(g.colAxis, k) } as ExcelJS.CellFormulaValue;
+      const ec = wsSens.getCell(r, EM_COLS.from + ci);
+      ec.value = { formula: cellA1(r, IRR_COLS.from + ci) } as ExcelJS.CellFormulaValue;
+      for (const cell of [ic, ec]) {
+        axisStyle(cell, g.colAxis.fmt, ci === 2);
         cell.alignment = { horizontal: "center" };
-        cell.font = { name: ARIAL, size: 9, bold: ci === 2, color: MUTED };
       }
     });
     r++;
 
-    const bodyTop = r;
-    g.rowVals.forEach((rv, ri) => {
+    steps.forEach((k, ri) => {
       const rl = wsSens.getCell(r, 1);
-      rl.value = rv;
-      rl.numFmt = axisFmt(g.rowVals);
-      rl.font = { name: ARIAL, size: 9, bold: ri === 2, color: MUTED };
-      g.colVals.forEach((cv, ci) => {
-        void cv;
+      rl.value = { formula: axisFormula(g.rowAxis, k) } as ExcelJS.CellFormulaValue;
+      axisStyle(rl, g.rowAxis.fmt, ri === 2);
+      steps.forEach((_c, ci) => {
         const { irr, em } = cells[ri][ci];
         const ic = wsSens.getCell(r, IRR_COLS.from + ci);
         ic.value = { formula: `IF(${irr}="","",${irr})` } as ExcelJS.CellFormulaValue;
@@ -1841,4 +2032,12 @@ function buildSensitivity(
     r += 2;
   }
   label(wsSens.getCell(r, 1), "Center row/column = the model's base case. Bold cell = base scenario.", { color: MUTED, size: 9 });
+  // The centre follows the input; the step does not. Said, so a price typed
+  // into the file is not expected to rescale the price step.
+  const bps = (d: number) => `${Math.round(d * 10_000)} bps`;
+  label(
+    wsSens.getCell(r + 1, 1),
+    `Each axis steps from the input as it stands, by the steps set at export: exit cap ${bps(inc.capStep)}, hold ${inc.monthsStep} months, price $${inc.priceStep.toLocaleString("en-US")}, LTC ${(inc.ltcStep * 100).toFixed(1)} points, rate ${bps(inc.rateStep)}.`,
+    { color: MUTED, size: 9 },
+  );
 }

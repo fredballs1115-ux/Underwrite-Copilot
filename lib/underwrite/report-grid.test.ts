@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
-import { runScenario } from "./playground";
+import { deriveUnderwriteInputs } from "./inputs";
+import { runScenario, sliderValues } from "./playground";
+import { bidFloors, fmtBid, solveMaxBid } from "./solver";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
+import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import {
+  buildBaseCase,
   buildCapGrowthGrid,
   buildPriceCapGrid,
   buildSensitivityData,
@@ -11,6 +16,8 @@ import {
   heatCellIrr,
   heatCellEm,
   heatCellText,
+  maxBidSentence,
+  placeholderReturnsLine,
   HEAT_BG,
 } from "./report-grid";
 
@@ -249,5 +256,142 @@ describe("buildSensitivityData", () => {
     const s = buildSensitivityData(inputs, null);
     expect(s.hurdlePct).toBe(15);
     expect(s.hurdleSource).toBe("default");
+  });
+});
+
+describe("the report's max bid is the deal page's — the buy box's every floor, the binding one named", () => {
+  // The demo page's own model and mandate (lib/sample-derive, SAMPLE_DEMO_BOX).
+  const derived = sampleDerivedInputs();
+  const inputs = derived.inputs;
+
+  it("solves the page's own call: every floor the box sets, under the sliders' base stops", () => {
+    const floors = bidFloors(SAMPLE_DEMO_BOX)!;
+    // The playground's call, spelled out as it makes it.
+    const stop = (lever: "exitCapPct" | "rentGrowthPct" | "vacancyPct") => {
+      const s = sliderValues(lever, inputs[lever]);
+      return s.values[s.baseIdx];
+    };
+    const page = solveMaxBid(inputs, floors, { exitCapPct: stop("exitCapPct"), rentGrowthPct: stop("rentGrowthPct"), vacancyPct: stop("vacancyPct") });
+    const report = buildSensitivityData(inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { floors });
+    expect(report.maxBid?.price).toBe(page.price);
+    expect(report.maxBid?.binding).toBe(page.binding);
+    expect(report.maxBidFloors).toEqual({ floors, from: "buybox" });
+    // The IRR floor alone — what the report solved before — clears a higher
+    // price: the cash-on-cash floor binds first on the sample.
+    const irrOnly = solveMaxBid(inputs, { minIrr: 0.13 });
+    expect(page.binding).toBe("minCoc");
+    expect(irrOnly.price!).toBeGreaterThan(page.price!);
+  });
+
+  it("says the bid as the page prints it, with the floors it clears and the one that binds", () => {
+    const s = buildSensitivityData(inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { floors: bidFloors(SAMPLE_DEMO_BOX) });
+    const line = maxBidSentence(s);
+    expect(line).toMatch(
+      new RegExp(
+        `^Max bid clearing your buy box's floors \\(13% IRR, 5% cash-on-cash, 5\\.75% going-in cap\\): \\${fmtBid(s.maxBid!.price).replace(".", "\\.")} \\(-\\d+\\.\\d% vs the modeled price\\); your 5% cash-on-cash floor binds\\. At that price: IRR \\d+\\.\\d%, year-1 cash-on-cash 5\\.0%, going-in cap \\d\\.\\d\\d%\\.$`,
+      ),
+    );
+  });
+
+  it("falls back to the screening hurdle's IRR where the box sets no floor, and says whose it is", () => {
+    const none = buildSensitivityData(inputs, null, { floors: null });
+    expect(none.maxBidFloors).toEqual({ floors: { minIrr: 0.15 }, from: "screening" });
+    expect(maxBidSentence(none)).toMatch(/^Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modeled price\)\./);
+    // A caller that passes the box's IRR as the hurdle and no floors says
+    // it is the buyer's target, not the screening default.
+    expect(maxBidSentence(buildSensitivityData(inputs, 13))).toMatch(/^Max bid holding your 13% IRR target: /);
+    // Nothing clears: the box's floors named, and why.
+    expect(maxBidSentence({ ...none, maxBid: null, maxBidFloors: { floors: { minCoc: 0.5 }, from: "buybox" } })).toBe(
+      "No price inside the tested range clears your buy box's floors (50% cash-on-cash) under these assumptions: the deal's economics, not its price, are the blocker.",
+    );
+  });
+});
+
+describe("buildBaseCase — the base case the grids are struck around, as the workbook's Deal Summary holds it", () => {
+  it("carries the engine's own figures and the derived model's own sources", () => {
+    const derived = sampleDerivedInputs();
+    const b = buildBaseCase(derived.inputs, derived.sources);
+    const uw = computeUnderwrite(derived.inputs);
+    const y1 = uw.cashFlow[0];
+    expect(b.price).toBe(derived.inputs.purchasePrice);
+    expect(b.loan).toBe(uw.sourcesUses.loanAmount);
+    expect(b.equity).toBe(uw.sourcesUses.equity);
+    expect(b.totalUses).toBe(uw.sourcesUses.totalUses);
+    expect(b.loan + b.equity).toBeCloseTo(b.totalUses, 6);
+    expect(b.price + b.closingCosts + b.acqFee + b.financingCosts).toBeCloseTo(b.totalUses, 6);
+    expect(b.noiY1).toBe(y1.noi);
+    expect(b.leveredIrr).toBe(uw.returns.leveredIrrPct);
+    expect(b.equityMultiple).toBe(uw.returns.leveredEquityMultiple);
+    expect(b.cocY1).toBeCloseTo(y1.leveredCashFlow / uw.sourcesUses.equity, 12);
+    expect(b.dscrY1).toBe(y1.dscrNoi);
+    expect(b.debtYieldY1).toBe(y1.debtYield);
+    expect(b.holdYears).toBe(5);
+    // Each input's own source: the ask the OM states, the defaults said as
+    // defaults, the NOI from the T-12 the sample carries.
+    expect(b.priceSource?.provenance).toBe("extracted");
+    expect(b.ltcSource?.provenance).toBe("assumption");
+    expect(b.holdSource?.provenance).toBe("assumption");
+    expect(b.rateSource?.provenance).toBe("assumption");
+    expect(b.noiSource?.note).toMatch(/^Grossed up from the T-12 actual NOI/);
+    expect(b.costLine).toMatch(/^These returns carry a 1\.0% closing hold and a 2\.0% cost of sale/);
+    // Only a caller that gives the sources gets one.
+    expect(buildSensitivityData(derived.inputs, 13).baseCase).toBeNull();
+    expect(buildSensitivityData(derived.inputs, 13, { sources: derived.sources }).baseCase).toEqual(b);
+  });
+});
+
+describe("placeholderReturnsLine — a model on a placeholder prints none of its returns", () => {
+  const x = (provenance: "extracted" | "derived" | "assumption") => ({ provenance, note: "" });
+  const inputs = baseInputs();
+
+  it("says why from the sources alone: a placeholder price, an assumed NOI, or both", () => {
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("assumption"), inPlaceRentAnnual: x("derived") })).toBe(
+      "The IRR grids and the max bid are left out: no price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns would be the placeholder's.",
+    );
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: x("assumption") })).toBe(
+      "The IRR grids and the max bid are left out: no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.",
+    );
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("assumption"), inPlaceRentAnnual: x("assumption") })).toMatch(
+      /^The IRR grids and the max bid are left out: no price was read from the memorandum, nor a year-1 NOI the model could run on/,
+    );
+  });
+
+  it("prints the returns of a model whose price and NOI came from the documents, a derivation included", () => {
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: x("derived") })).toBeNull();
+    // An auction's floor, a share grossed up, NOI over the going-in cap.
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("derived"), inPlaceRentAnnual: x("derived") })).toBeNull();
+    // A caller that passed no sources is read as before.
+    expect(placeholderReturnsLine(inputs, null)).toBeNull();
+    expect(buildSensitivityData(inputs, null).withheld).toBeNull();
+  });
+
+  it("reads the derived model's own sources: an unpriced memorandum's model is a placeholder's", () => {
+    const unpriced = deriveUnderwriteInputs(
+      {
+        dealName: "Unpriced",
+        assetClass: "multifamily",
+        metrics: [
+          { label: "Asking price", value: "Unpriced — call for offers", flagged: false, page: "p. 2" },
+          { label: "NOI (in-place)", value: "$3,880,000", flagged: false, page: "p. 8" },
+        ],
+      },
+      "Unpriced",
+    );
+    expect(unpriced.sources.purchasePrice?.provenance).toBe("assumption");
+    expect(buildSensitivityData(unpriced.inputs, null, { sources: unpriced.sources }).withheld).toMatch(
+      /^The IRR grids and the max bid are left out: no price was read/,
+    );
+    const priced = deriveUnderwriteInputs(
+      {
+        dealName: "Priced",
+        assetClass: "multifamily",
+        metrics: [
+          { label: "Asking price", value: "$60,000,000", flagged: false, page: "p. 2" },
+          { label: "NOI (in-place)", value: "$3,300,000", flagged: false, page: "p. 8" },
+        ],
+      },
+      "Priced",
+    );
+    expect(buildSensitivityData(priced.inputs, null, { sources: priced.sources }).withheld).toBeNull();
   });
 });

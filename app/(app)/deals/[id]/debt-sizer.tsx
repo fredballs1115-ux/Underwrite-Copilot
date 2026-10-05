@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { findMetric, parseMoney, parsePrice } from "@/lib/criteria";
+import { findMetric, parseMoney, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
   buildingPriceOf,
@@ -13,9 +13,14 @@ import {
 } from "@/lib/deal-strategy";
 import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
+import { statedModelRate } from "@/lib/model/stated-rate";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
+import { interestOf } from "@/lib/interest";
+import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
+import { assetWords } from "@/lib/asset-words";
+import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -119,21 +124,49 @@ function amortPreview(
   return rows;
 }
 
-/** Loan terms the OM itself states — shown with their page references. */
-function omLoanTerms(extraction: ExtractionResult | null) {
+type OmTerm = { label: string; value: string; page?: string };
+
+/**
+ * Loan terms the OM itself states — shown with their page references, each
+ * under whose loan it is. The seller's loan offered for assumption (#417)
+ * and the note the seller offers to carry (#462) are read by their own
+ * finders and listed as theirs, never as the buyer's new financing. On a
+ * note the loan's terms are the asset being sold (#416), and on a leased
+ * fee the property's debt is the leaseholder's building's (`assumableApplies`)
+ * — neither is financing this buyer takes, so neither lists any.
+ */
+export function omLoanTerms(extraction: ExtractionResult | null): {
+  offered: OmTerm[];
+  assumable: OmTerm[];
+  seller: OmTerm[];
+} {
+  const none = { offered: [], assumable: [], seller: [] };
+  const { kind } = interestOf(extraction);
+  if (kind === "note" || kind === "leased_fee") return none;
   const metrics = extraction?.metrics ?? [];
-  const picks: { label: string; value: string; page?: string }[] = [];
+  const as = (term: string, m: { value: string; page?: string }): OmTerm => ({ label: term, value: m.value, page: m.page });
+  const assumableRows = assumableStatedRows(metrics);
+  const sellerRows = sellerNoteStatedRows(metrics);
+  const claimed = new Set<unknown>([...assumableRows, ...sellerRows].map((e) => e.row));
+  // The rest is what the OM states of a loan with no owner named: its own
+  // financing assumptions (the LTV it underwrites, the rate it quotes).
+  const rest = metrics.filter((m) => !claimed.has(m));
+  const offered: OmTerm[] = [];
   const take = (label: string, inc: RegExp, exc?: RegExp) => {
-    const m = findMetric(metrics, inc, exc);
-    if (m) picks.push({ label, value: m.value, page: (m as { page?: string }).page });
+    const m = findMetric(rest, inc, exc);
+    if (m) offered.push(as(label, m as { value: string; page?: string }));
   };
-  take("Loan amount", /loan amount|existing (debt|loan)|assumable (debt|loan)|first mortgage/i, /rate|ltv/i);
+  take("Loan amount", /loan amount|existing (debt|loan)|first mortgage/i, /rate|ltv/i);
   take("LTV", /loan[- ]to[- ]value|\bltv\b/i);
   take("Rate", /interest rate|\bloan rate\b|\bcoupon\b/i, /cap ?rate|growth|tax|vacancy/i);
   take("Amortization", /amortiz/i);
   take("Interest-only", /interest[- ]only|\bi\/?o\b period/i);
   take("Maturity", /maturity|loan term/i, /amortiz/i);
-  return picks;
+  return {
+    offered,
+    assumable: assumableRows.map((e) => as(e.term, e.row)),
+    seller: sellerRows.map((e) => as(e.term, e.row)),
+  };
 }
 
 interface Seed {
@@ -142,22 +175,34 @@ interface Seed {
   ratePct: number;
   amortYears: number;
   seededFrom: "model" | "extraction" | "defaults";
-  /** the sentence behind a rate that came off today's curve — null where
-   *  the generated model's own loan set it, or nothing could seed one */
+  /** the rate is the first-draft model's, as a loan's own paper states it */
+  rateStated: boolean;
+  /** the amortization is the first-draft model's own, not the 30-year default */
+  amortFromModel: boolean;
+  /** the sentence under the rate field saying where the rate came from
+   *  (lib/sizer-terms) — null where a loan's own paper states it */
   rateNote: string | null;
 }
 
-/** The rate a sizer starts from when the documents state none: today's
- *  index plus the class spread where the table could seed one (the same
- *  figure the screening model runs on, so the two agree), else the old
- *  flat placeholder. */
-const FLAT_RATE_PCT = 6.5;
-
+/** The rate a sizer starts from (lib/sizer-terms `sizerStartingRate`): a
+ *  rate a document states, then the day's seed, then the derived screening
+ *  model's own rate — so the sizer and the workbook print one rate for one
+ *  loan on a day the table seeds nothing — and a flat placeholder only where
+ *  there is no derived model at all, each said under the field. */
 function deriveSeed(
   model: UnderwritingModel | null,
   extraction: ExtractionResult | null,
   today: RateSeed | null,
+  underwrite: UnderwriteInputs | null,
 ): Seed {
+  const rate = (statedPct: number | null) =>
+    sizerStartingRate({
+      statedPct,
+      seed: today,
+      modelRateDec: underwrite?.allInRatePct ?? null,
+      // The model's own test for a class that carries a permanent loan.
+      operating: assetWords(extraction?.assetClass).operating,
+    });
   // An NOI at or above a quarter of the price is not the building's income —
   // it is a stabilized pro forma (the finished conversion) or a misread. A
   // lender sizes off in-place income; seeding the sizer with the pro forma
@@ -165,17 +210,28 @@ function deriveSeed(
   const plausible = (noi: number | null, price: number | null) =>
     noi != null && noi > 0 && (price == null || noi / price < IMPLIED_CAP_CEILING) ? noi : null;
   if (model?.inputs) {
-    const price = model.inputs.purchasePrice || null;
+    // A note's or the land's price is no property loan's basis (#415), and a
+    // share's is not the building's: the first-draft model runs at the
+    // share's price while its NOI is the whole building's, so the price the
+    // loan is tested on is the whole the share implies — the same reader
+    // the branch without a model takes below.
+    const modelPrice = model.inputs.purchasePrice || null;
+    const price = buildingPriceOf(extraction, modelPrice);
     // A loan the documents state outranks the day's index: a term sheet's
-    // rate is a quote, and a quote beats a benchmark.
-    const stated = model.inputs.loan?.ratePct ?? null;
+    // rate is a quote, and a quote beats a benchmark. The first-draft model
+    // carries a rate whether or not a document states one, so only a rate a
+    // document states is taken as the quote (lib/model/stated-rate).
+    const r = rate(statedModelRate(model));
+    const modelAmort = model.inputs.loan?.amortYears ?? null;
     return {
       price,
       noi: plausible(model.cashFlow?.[0]?.noi ?? null, price),
-      ratePct: stated ?? today?.pct ?? FLAT_RATE_PCT,
-      amortYears: model.inputs.loan?.amortYears ?? 30,
+      ratePct: r.pct,
+      amortYears: modelAmort ?? 30,
       seededFrom: "model",
-      rateNote: stated == null && today ? today.note : null,
+      rateStated: r.from === "stated",
+      amortFromModel: modelAmort != null,
+      rateNote: r.note,
     };
   }
   const metrics = extraction?.metrics ?? [];
@@ -183,20 +239,38 @@ function deriveSeed(
   // the price the building's own figures describe (#415): a lender sizes
   // the whole asset, so a share's price is grossed up, and a note's or a
   // leased fee's seeds no price the property's loan could be tested on.
-  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
+  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind, screenYearOf(extraction));
   const price = buildingPriceOf(extraction, priceMetric ? parsePrice(priceMetric.value) : null);
   // The in-place or Year-1 NOI, never the stabilized pro forma.
   const figs = noiFigures(metrics);
   const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;
   const noi = plausible(going?.value ?? null, price);
+  const r = rate(null);
   return {
     price,
     noi,
-    ratePct: today?.pct ?? FLAT_RATE_PCT,
+    ratePct: r.pct,
     amortYears: 30,
     seededFrom: price != null || noi != null ? "extraction" : "defaults",
-    rateNote: today ? today.note : null,
+    rateStated: false,
+    amortFromModel: false,
+    rateNote: r.note,
   };
+}
+
+/** A loan's stated terms as chips, each with its page. */
+function TermChips({ terms, qa }: { terms: OmTerm[]; qa: string }) {
+  return (
+    <ul className="mt-2 flex flex-wrap gap-1.5" data-qa={qa}>
+      {terms.map((t) => (
+        <li key={t.label} className="rounded-full border border-line bg-paper px-2.5 py-1 text-xs">
+          <span className="text-muted">{t.label}:</span>{" "}
+          <span className="font-mono font-medium tabular-nums">{t.value}</span>
+          {t.page && <span className="text-muted"> · {t.page}</span>}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function SubHead({ children }: { children: React.ReactNode }) {
@@ -220,12 +294,14 @@ export function DebtSizer({
   underwrite?: UnderwriteInputs | null;
   /** today's starting rates off the rates table (lib/debt-index): the
    *  permanent loan's, which is the screening model's own seeded rate, and
-   *  the construction loan's; null keeps the flat placeholders */
+   *  the construction loan's; null starts the sizer from the derived
+   *  model's own rate (`underwrite`), and the construction panel from its
+   *  flat placeholder */
   rateSeeds?: DealRateSeeds | null;
 }) {
   const seed = useMemo(
-    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null),
-    [model, extraction, rateSeeds],
+    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null, underwrite),
+    [model, extraction, rateSeeds, underwrite],
   );
   const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
   // A plan deal's debt is construction or bridge debt sized to cost, paid off
@@ -244,9 +320,11 @@ export function DebtSizer({
   const [ratePct, setRatePct] = useState(seed.ratePct);
   const [amortYears, setAmortYears] = useState(seed.amortYears);
   const [io, setIo] = useState(false);
-  const [maxLtvPct, setMaxLtvPct] = useState(65);
-  const [minDscr, setMinDscr] = useState(1.25);
-  const [minDebtYieldPct, setMinDebtYieldPct] = useState(8);
+  // The lender tests start at the screening defaults (lib/sizer-terms) the
+  // opening sentence names as defaults; the playground reads the same DSCR.
+  const [maxLtvPct, setMaxLtvPct] = useState<number>(SIZER_LENDER_TESTS.maxLtvPct);
+  const [minDscr, setMinDscr] = useState<number>(SIZER_LENDER_TESTS.minDscr);
+  const [minDebtYieldPct, setMinDebtYieldPct] = useState<number>(SIZER_LENDER_TESTS.minDebtYieldPct);
 
   const price = parseMoney(priceRaw) ?? null;
   const noi = parseMoney(noiRaw) ?? null;
@@ -420,29 +498,43 @@ export function DebtSizer({
         </span>
       </summary>
       <div className="border-t border-line p-5">
+        {/* What each starting figure is: the model's or the OM's, named as
+            theirs, and the lender tests named as screening defaults
+            (lib/sizer-terms). The summary line already says the math is
+            deterministic. */}
         <p className="text-sm text-muted">
-          {seed.seededFrom === "model"
-            ? "No AI here — seeded from your model."
-            : seed.seededFrom === "extraction"
-              ? "No AI here — seeded from the OM extraction."
-              : "No AI here — enter the deal's figures."}
+          {sizerSourceLine({
+            from: seed.seededFrom,
+            price: seed.price != null,
+            noi: seed.noi != null,
+            rate: seed.rateStated,
+            amortization: seed.amortFromModel,
+          })}
         </p>
 
-        {omTerms.length > 0 && (
+        {/* What the OM states of a loan, under whose loan it is: its own
+            financing assumptions, the seller's loan offered for assumption,
+            the note the seller offers to carry. A note's terms and a leased
+            fee's debt are never listed here (omLoanTerms). */}
+        {omTerms.offered.length > 0 && (
           <>
             <SubHead>Financing stated in the OM</SubHead>
-            <ul className="mt-2 flex flex-wrap gap-1.5">
-              {omTerms.map((t) => (
-                <li
-                  key={t.label}
-                  className="rounded-full border border-line bg-paper px-2.5 py-1 text-xs"
-                >
-                  <span className="text-muted">{t.label}:</span>{" "}
-                  <span className="font-mono font-medium tabular-nums">{t.value}</span>
-                  {t.page && <span className="text-muted"> · {t.page}</span>}
-                </li>
-              ))}
-            </ul>
+            <TermChips terms={omTerms.offered} qa="om-financing" />
+          </>
+        )}
+        {omTerms.assumable.length > 0 && (
+          <>
+            <SubHead>The loan in place, offered for assumption</SubHead>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              {"The seller's loan, as the OM states it — not a quote for new financing."}
+            </p>
+            <TermChips terms={omTerms.assumable} qa="om-assumable" />
+          </>
+        )}
+        {omTerms.seller.length > 0 && (
+          <>
+            <SubHead>{"The seller's note, offered to carry the price"}</SubHead>
+            <TermChips terms={omTerms.seller} qa="om-seller-note" />
           </>
         )}
 
@@ -512,7 +604,9 @@ export function DebtSizer({
           </label>
         </div>
         {seed.rateNote && (
-          <p className="mt-1.5 text-xs text-muted">Rate seeded from the live curve: {seed.rateNote}</p>
+          <p className="mt-1.5 text-xs text-muted" data-qa="sizer-rate-note">
+            {seed.rateNote}
+          </p>
         )}
 
         <ul className="mt-4 space-y-1.5">
@@ -591,15 +685,15 @@ export function DebtSizer({
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
                         <th className="py-1.5 pr-3 font-medium">Rate</th>
                         <th className="py-1.5 pr-3 text-right font-medium">Max loan re-sized</th>
-                        <th className="py-1.5 pr-3 text-right font-medium">Δ vs today</th>
-                        <th className="py-1.5 text-right font-medium">DSCR holding today&rsquo;s loan</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Δ vs entered rate</th>
+                        <th className="py-1.5 text-right font-medium">DSCR holding the sized loan</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {rateStrip.map((s) => (
                         <tr key={s.rate} className={s.d === 0 ? "bg-faint/60" : undefined}>
                           <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-xs tabular-nums">
-                            {s.rate.toFixed(2)}%{s.d === 0 ? " (today)" : ""}
+                            {s.rate.toFixed(2)}%{s.d === 0 ? " (entered)" : ""}
                           </td>
                           <td className="whitespace-nowrap py-1.5 pr-3 text-right font-mono text-xs tabular-nums">
                             {s.sizedLoan != null ? fmtUsdCol(s.sizedLoan) : "—"}

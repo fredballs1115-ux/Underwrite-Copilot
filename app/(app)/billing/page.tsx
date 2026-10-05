@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
   getBilling,
   FREE_DEAL_LIMIT,
@@ -11,43 +11,32 @@ import {
   fmtUsd,
 } from "@/lib/billing";
 import { getTeam, TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { PRICE_PRO_MONTHLY } from "@/lib/marketing-constants";
+import { dealAllowance, type AllowancePool } from "@/lib/deal-allowance";
+import { FREE_PLAN, PRICE_PRO_MONTHLY, PRO_PLAN_LINES, PRO_UPSELL } from "@/lib/marketing-constants";
 import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Billing" };
 
-// Benefit-framed: what the feature does for you, not what it's called.
-const FREE_FEATURES = [
-  `${FREE_DEAL_LIMIT} deals with the full six-stage screen on each`,
-  "Sourced ranges + the three deal-killers, stressed first",
-  "Side-by-side deal comparison",
-  "Reconcile the screen against your own model",
-];
+// The plan cards draw the homepage's own lists (lib/marketing-constants),
+// each Pro line held to the gate that makes it Pro.
 
-const PRO_FEATURES = [
-  "Unlimited deals — screen every OM that hits your inbox",
-  "Institutional Excel model — live formulas, monthly detail, debt schedule, sensitivity matrices",
-  "One-page PDF screening memo you can hand to your IC",
-  "Public-web comp search beyond the broker's comps",
-  "Per-tab uploads and multi-document reconciliation",
-];
-
-// Billing failures name their actual cause. The four config codes come from
-// lib/stripe/diagnose.ts — they only occur when the site's Stripe setup is
-// wrong, so the copy speaks to the operator; transient failures keep the
-// generic retry line.
+// Billing failures, in a customer's words. A setup problem on our side —
+// the config codes from lib/stripe/diagnose.ts — reads as checkout not being
+// available, with where to write; which knob is wrong goes to the server log
+// for the operator (`stripeErrorCode`), never onto a customer's page.
+const UNAVAILABLE = { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." };
 const BILLING_ERRORS: Record<string, { cls: string; text: string }> = {
-  config: { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." },
+  config: UNAVAILABLE,
+  stripekey: UNAVAILABLE,
+  price: UNAVAILABLE,
+  pricetype: UNAVAILABLE,
+  appurl: UNAVAILABLE,
   nocustomer: { cls: "bg-faint text-muted", text: "No subscription on file yet — start with Upgrade to Pro below." },
   save: { cls: "bg-kill/10 text-kill", text: "Couldn't save your billing profile — please try again." },
   exists: { cls: "bg-faint text-muted", text: "You already have an active subscription — if it still shows Free, activation can take a moment; refresh shortly." },
   checkout: { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again in a moment." },
-  stripekey: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe rejected the API key. Site owner — STRIPE_SECRET_KEY is missing, truncated, or from the wrong account; paste the full live secret key and save." },
-  price: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe couldn't find the configured price. Site owner — this is almost always a Test-mode price ID used with a Live key; copy the price_… ID from Live mode into STRIPE_PRICE_ID." },
-  pricetype: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the configured Stripe price is one-time, but subscriptions need Recurring · Monthly. Site owner — recreate the price as recurring and update the ID." },
-  appurl: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the app's public URL is misconfigured. Site owner — set NEXT_PUBLIC_APP_URL to the full https:// address of this site." },
 };
 
 export default async function BillingPage({
@@ -56,35 +45,44 @@ export default async function BillingPage({
   searchParams: Promise<{ status?: string; error?: string; upsell?: string }>;
 }) {
   const { status, error, upsell } = await searchParams;
-  // Which Pro feature bounced the user here, for a contextual upsell line.
-  const UPSELL_LABELS: Record<string, string> = {
-    memo: "export the one-page IC memo",
-    report: "export the full multi-page report",
-    underwrite: "export the institutional Excel model",
-    loi: "export the LOI draft",
-    branding: "put your firm's name and logo on exported reports",
-    rentroll: "export the live-formula rent-roll workbook",
-  };
+  // Which Pro feature bounced the user here, for a contextual upsell line —
+  // a key the refusals send, and an own key only: a link naming
+  // "constructor" had printed Object's source into the banner.
+  const upsellWords =
+    upsell && Object.hasOwn(PRO_UPSELL, upsell) ? PRO_UPSELL[upsell as keyof typeof PRO_UPSELL] : null;
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
   const billing = user ? await getBilling(supabase, user.id) : null;
   const isPro = billing?.isPro ?? false;
-  const dealCount = billing?.dealCount ?? 0;
-  const atLimit = !isPro && dealCount >= FREE_DEAL_LIMIT;
+  // The pools the next deal comes out of, by the create action's own rule
+  // (lib/deal-allowance): a team's trial first, then the reader's own. The
+  // page had counted the reader's own deals alone, and told a team-trial
+  // member "the next OM needs Pro" while the pipeline's meter, and the
+  // create action, still had team deals left (the audit of 2026-10-01).
+  const allowance = billing ? dealAllowance(billing) : null;
+  const atLimit = !isPro && allowance?.next === null;
+  const pools = [
+    allowance?.teamTrial ? { label: "Team trial deals", pool: allowance.teamTrial } : null,
+    allowance?.personal ? { label: allowance.teamTrial ? "Your own free deals" : "Deals used", pool: allowance.personal } : null,
+  ].filter((x): x is { label: string; pool: AllowancePool } => x !== null);
   // Full team detail (roster, seat count, renewal) for the Team section.
   const team = user && billing?.team ? await getTeam(supabase, user.id) : null;
 
   const banner =
+    // Stripe returns the buyer here when checkout completes, which can be a
+    // moment before its webhook switches the plan: "You're on Pro" waits for
+    // the plan to say so.
     status === "success"
-      ? { cls: "bg-pass/10 text-pass", text: "You're on Pro — everything's unlocked. Thank you!" }
+      ? isPro
+        ? { cls: "bg-pass/10 text-pass", text: "You're on Pro — everything's unlocked. Thank you!" }
+        : { cls: "bg-faint text-muted", text: "Checkout complete — your plan switches to Pro as soon as Stripe confirms it, usually within a minute. Refresh shortly." }
       : status === "cancelled"
         ? { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." }
         : upsell
           ? {
               cls: "bg-brand/5 text-brand",
-              text: `Upgrade to Pro to ${UPSELL_LABELS[upsell] ?? "unlock that"} — choose a plan below.`,
+              text: `Upgrade to Pro to ${upsellWords ?? "unlock that"} — choose a plan below.`,
             }
         : error
           ? (BILLING_ERRORS[error] ?? null)
@@ -164,25 +162,29 @@ export default async function BillingPage({
             </form>
           </>
         ) : (
-          <div className="mt-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted">Deals used</span>
-              <span className="font-mono tabular-nums">
-                {dealCount} / {FREE_DEAL_LIMIT}
-              </span>
-            </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-faint">
-              <div
-                className={`h-full rounded-full ${atLimit ? "bg-caution" : "bg-brand"}`}
-                style={{
-                  width: `${Math.min(100, (dealCount / FREE_DEAL_LIMIT) * 100)}%`,
-                }}
-              />
-            </div>
+          <div className="mt-4 space-y-3">
+            {pools.map(({ label, pool }) => (
+              <div key={label}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted">{label}</span>
+                  <span className="font-mono tabular-nums">
+                    {pool.used} / {pool.of}
+                  </span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-faint">
+                  <div
+                    className={`h-full rounded-full ${pool.used >= pool.of ? "bg-caution" : "bg-brand"}`}
+                    style={{ width: `${Math.min(100, (pool.used / pool.of) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
             {atLimit && (
-              <p className="mt-3 rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
-                You&apos;ve screened all {FREE_DEAL_LIMIT} free deals — the next
-                OM needs Pro. Your existing deals stay right where they are.
+              <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
+                {allowance?.teamTrial
+                  ? `Your team's ${TEAM_TRIAL_DEALS} trial deals and your own ${FREE_DEAL_LIMIT} free deals are all in use — the next OM needs Pro.`
+                  : `Your ${FREE_DEAL_LIMIT} free deals are all in use — the next OM needs Pro.`}{" "}
+                Your existing deals stay right where they are.
               </p>
             )}
           </div>
@@ -205,10 +207,10 @@ export default async function BillingPage({
             <span className="text-3xl font-semibold tracking-tight">$0</span>
           </p>
           <p className="mt-1 text-sm text-muted">
-            The full screen, on your first {FREE_DEAL_LIMIT} deals.
+            The full screen, on up to {FREE_DEAL_LIMIT} deals.
           </p>
           <ul className="mt-5 flex-1 space-y-2.5">
-            {FREE_FEATURES.map((f) => (
+            {FREE_PLAN.map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm">
                 <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-faint text-[10px] font-bold text-muted">
                   ✓
@@ -240,7 +242,7 @@ export default async function BillingPage({
             Unlimited screening, plus the artifacts you hand to your IC.
           </p>
           <ul className="mt-5 flex-1 space-y-2.5">
-            {PRO_FEATURES.map((f) => (
+            {PRO_PLAN_LINES.map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm">
                 <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
                   ✓

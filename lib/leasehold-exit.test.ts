@@ -127,9 +127,11 @@ describe("readLeaseholdExit — the model's exit on the term left at its sale", 
       "Were every extension option exercised (four of 10 years, as stated), 80.3 years would be left at the sale and the term would bear 98% of the capitalised exit ($81.2M). An option adds years only if the leaseholder exercises it, and its rent usually resets to market when it does, so that is the ceiling.",
     );
     // Where the lease ends inside the hold, the options are the way past it.
+    // "March 2029" is read as its first day: 29 whole months from Sep 25,
+    // 2026, plus the 40 years of options, less the 5-year hold.
     const ends = read("March 2029", [row("Ground lease extension options", "Four 10-year options")]);
     expect(ends.onTerm).toBeNull();
-    expect(leaseholdOptionsLine(ends)).toContain("37.5 years would be left at the sale");
+    expect(leaseholdOptionsLine(ends)).toContain("37.4 years would be left at the sale");
   });
 
   it("asks whether the buyer at the sale can finance the term that is left", () => {
@@ -178,10 +180,20 @@ describe("readLeaseholdExit — the model's exit on the term left at its sale", 
 });
 
 describe("the term, wherever the deal is read after the extraction", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("the deal context says when the ground lease ends", () => {
+    // The context reads today off the clock, so the day is pinned: read in
+    // December the years left are a whole 45, and the sentence says "45
+    // years" — a test that read the real clock failed every December.
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
     const ex = leasehold([row("Ground lease expiration", "December 31, 2071"), row("Ground lease extension options", "Four 10-year options")]);
     const ctx = dealContextFor(ex)!;
-    expect(ctx).toMatch(/The ground lease ends Dec 2071, \d+\.\d years from today, with extension options after it as stated: four of 10 years, 40 years in all\./);
+    expect(ctx).toContain("The ground lease ends Dec 2071, 45.3 years from today, with extension options after it as stated: four of 10 years, 40 years in all.");
+    vi.setSystemTime(new Date(Date.UTC(2026, 11, 15)));
+    expect(dealContextFor(ex)!).toContain("The ground lease ends Dec 2071, 45 years from today, with extension options");
   });
 });
 

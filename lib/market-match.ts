@@ -108,6 +108,13 @@ const NAME_BY_ID = new Map(
 /** States that contain at least one covered market. */
 export const COVERED_STATES = new Set(MATCHERS.map((m) => m.state));
 
+/** The states a briefed market's matchers place a deal in — "VA" for
+ *  Northern Virginia, "PA" and "DE" for Philadelphia; empty for an id the
+ *  matchers do not know. */
+export function marketStates(id: string): string[] {
+  return [...new Set(MATCHERS.filter((m) => m.id === id).map((m) => m.state))];
+}
+
 /** An address as the matchers take it: the structured fields, and the
  *  line itself for an address that has nothing else. */
 export interface AddressLike {

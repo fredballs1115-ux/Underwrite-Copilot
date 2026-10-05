@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { competitionRanks, rankLabel } from "@/lib/rank";
 import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori";
+import { metroSeriesFor } from "@/lib/live-rates";
 import type { BoardMarket } from "./sector-jobs-board";
 
 /**
@@ -8,7 +10,7 @@ import type { BoardMarket } from "./sector-jobs-board";
  * and the ones read without a brief, forty-four of them — each against the
  * same month a year earlier, ranked fastest first with a signed bar from a
  * centre line, and beside each the typical home's price in years of the
- * all-homes asking rent, the arithmetic that keeps a renter renting. The
+ * all-homes asking rent, the price-to-rent ratio. The
  * apartment figure ranks the board because an apartment underwrite should
  * read it; the all-homes one adds houses and condos and runs higher
  * wherever the houses are dear.
@@ -18,8 +20,13 @@ import type { BoardMarket } from "./sector-jobs-board";
  * row and is not listed twice (`shared`); a metro whose read lacks the
  * apartment figure is listed after the ranked ones with its all-homes
  * change, never ranked on a different measure; nothing renders until the
- * monthly pull has written a row. Zillow's condition for the data is the
- * credit, which is part of the note and not the page's to forget.
+ * monthly pull has written a row. The board is one month's — the newest any
+ * read is of, named in its header — and a metro whose read is of an older
+ * month (the pull missed its row this time) is named after the ranked ones
+ * with its own month rather than ranked under a month it is not of (it had
+ * been left off, which made the heading's "every metro area" untrue).
+ * Zillow's condition for the data is the credit, which is part of the note
+ * and not the page's to forget.
  */
 export function RentBoard({
   markets,
@@ -30,19 +37,35 @@ export function RentBoard({
   /** `liveZoriAll(names)`, keyed by the market's name */
   reads: ReadonlyMap<string, ZoriRead | null>;
 }) {
-  const rows = markets.flatMap((market) => {
+  const read = markets.flatMap((market) => {
     const z = reads.get(market.name);
     return z && !z.shared ? [{ market, z }] : [];
   });
+  // The board's month: the newest any read is of. Each read's figures are
+  // all of its own month (lib/zori), so a read of another month is left off
+  // whole rather than said under this one.
+  const newest = read.map((x) => x.z.asOf).sort().at(-1) ?? null;
+  const rows = read.filter((x) => x.z.asOf === newest);
+  // …and named after the ranked ones with its own month, so the heading's
+  // "every metro area the site reads" stays true of the board.
+  const older = read.filter((x) => x.z.asOf !== newest);
   const ranked = rows
     .filter((x): x is typeof x & { z: ZoriRead & { mfrYoyPct: number } } => x.z.mfrYoyPct !== null && Number.isFinite(x.z.mfrYoyPct))
     .sort((a, b) => b.z.mfrYoyPct - a.z.mfrYoyPct);
-  if (ranked.length === 0) return null;
+  if (!newest || ranked.length === 0) return null;
   const unranked = rows.filter((x) => !ranked.includes(x as (typeof ranked)[number]));
+  // Each row is the metro area's figure, named for the metro area as the
+  // series table names it ("Washington MSA"): the board's "Washington DC"
+  // and "New York City" were the metro areas' rents under the city's name.
+  const areaOf = (m: BoardMarket) => metroSeriesFor(m.id).series.find((s) => s.metro === m.id)?.area ?? m.name;
   const widest = Math.max(0.5, ...ranked.map((x) => Math.abs(x.z.mfrYoyPct)));
   const half = (v: number) => `${Math.min(50, (Math.abs(v) / widest) * 50)}%`;
-  const newest = ranked.map((x) => x.z.asOf).sort().at(-1) ?? ranked[0].z.asOf;
   const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%`;
+  // The pull stores each change to one decimal, so two metro areas often
+  // print the same figure: they share one place, "=2" (lib/rank), never
+  // numbered apart by the order the sort happened to leave them in (the
+  // audit of 2026-10-04: Washington's +1.2% second, Atlanta's +1.2% third).
+  const places = competitionRanks(ranked, (a, b) => signed(a.z.mfrYoyPct) === signed(b.z.mfrYoyPct));
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5" data-qa="rent-board">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -52,18 +75,19 @@ export function RentBoard({
       <ol className="mt-3 space-y-1.5">
         {ranked.map(({ market, z }, i) => (
           <li key={market.id} className="grid grid-cols-[1.25rem_minmax(7rem,11rem)_1fr_auto_auto] items-center gap-2 text-xs">
-            <span className="font-mono text-[10px] tabular-nums text-muted">{i + 1}</span>
+            <span className="font-mono text-[10px] tabular-nums text-muted">{rankLabel(places[i], true)}</span>
             {market.briefed === false ? (
               <span className="truncate font-medium text-ink" title="Read without a brief — the same Zillow figure, no market page behind it">
-                {market.name}
+                {areaOf(market)}
               </span>
             ) : (
               <Link
                 href={`/market?metro=${market.id}`}
                 prefetch={false}
+                title={`${market.name}'s market page; the rent is the ${areaOf(market)}'s`}
                 className="truncate font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
               >
-                {market.name}
+                {areaOf(market)}
               </Link>
             )}
             <div
@@ -86,12 +110,17 @@ export function RentBoard({
       </ol>
       {unranked.length > 0 && (
         <p className="mt-2 text-[11px] text-muted">
-          {"No apartment figure this month, all homes shown rather than ranked: "}
-          {unranked.map((x, i) => `${i > 0 ? "; " : ""}${x.market.name}${x.z.yoyPct !== null ? ` ${signed(x.z.yoyPct)}` : ""}`).join("")}
+          {`No apartment figure for ${monthOf(newest)}, all homes shown rather than ranked: `}
+          {unranked.map((x, i) => `${i > 0 ? "; " : ""}${areaOf(x.market)}${x.z.yoyPct !== null ? ` ${signed(x.z.yoyPct)}` : ""}`).join("")}
+        </p>
+      )}
+      {older.length > 0 && (
+        <p className="mt-1 text-[11px] text-muted" data-qa="rent-board-older">
+          {`An older month, not ranked against ${monthOf(newest)}: ${older.map((x) => `${areaOf(x.market)} (${monthOf(x.z.asOf)})`).join("; ")}`}
         </p>
       )}
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        {`Zillow's Observed Rent Index over multifamily listings alone — this month's listings before concessions, each against the same month a year earlier — ranks the board; a suburb shares its metro area's row and is not listed twice. The years beside each bar are the typical home's price in years of the all-homes asking rent, and the sitting-tenant rent index on the metro tiles is a different measure: what leases already signed pay, where this is what a vacant unit re-lets at. ${ZORI_CREDIT}.`}{" "}
+        {`Zillow's Observed Rent Index over multifamily listings alone — a smoothed index of asking rents, dated by its month, each against the same month a year earlier — ranks the board; metro areas with the same change share a place ("=2"), and a suburb shares its metro area's row and is not listed twice. The years beside each bar are the typical home's price in years of the all-homes asking rent, and the sitting-tenant rent index on the metro tiles is a different measure: what leases already signed pay, where this is what landlords are asking for a vacant unit. ${ZORI_CREDIT}.`}{" "}
         <a href={ZORI_SOURCE_URL} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-ink">
           Zillow Research
         </a>

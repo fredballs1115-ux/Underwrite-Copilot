@@ -57,6 +57,7 @@
  */
 
 import { loanConstant } from "./deal-math";
+import { usdExact } from "./format";
 
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -350,7 +351,7 @@ export function readStack(input: StackInputs): CapitalStackRead {
   const notes: string[] = [];
   if (commonEquity < 0) {
     notes.push(
-      `The funded layers come to ${round(-commonEquity)} dollars MORE than the deal costs. ` +
+      `The funded layers come to ${usdExact(-commonEquity)} MORE than the deal costs. ` +
         "That is not a stack; one of the layers is oversized.",
     );
   }
@@ -388,8 +389,8 @@ export function readStack(input: StackInputs): CapitalStackRead {
   }
   if (prefAccrued !== null && accrualCost !== null) {
     notes.push(
-      `The preferred pays nothing now and is owed ${prefBalanceAtExit} at the sale — ` +
-        `${prefAccrued} of accrual, of which ${accrualCost} is the compounding alone.`,
+      `The preferred pays nothing now and is owed ${usdExact(prefBalanceAtExit)} at the sale — ` +
+        `${usdExact(prefAccrued)} of accrual, of which ${usdExact(accrualCost)} is the compounding alone.`,
     );
   }
   if (combinedDscr !== null && seniorDscr !== null && combinedDscr < seniorDscr) {

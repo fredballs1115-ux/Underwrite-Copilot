@@ -1,10 +1,19 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { bridgeSentence } from "@/lib/bridge/attribution";
+import { screeningModelCaveat } from "@/lib/bridge/model-caveat";
 import { getOrBuildBridge, listDealVersions, snapshotVersion } from "@/lib/bridge/versions";
+import { currentVersionId, defaultPair } from "@/lib/bridge/version-rules";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
+import {
+  SCENARIO_LEVERS,
+  leverFor,
+  leverRefusalSentence,
+  leverText,
+  type LeverRefusal,
+} from "@/lib/bridge/scenario-form";
 import { BridgeView, type VersionOption } from "./bridge-view";
 import { saveScenarioVersion, deleteDealVersion } from "./actions";
 import { DealCrumb } from "../deal-crumb";
@@ -15,22 +24,38 @@ const pct1 = (v: number | null | undefined) =>
   v == null ? "—" : `${(v * 100).toFixed(1)}%`;
 
 const ERRORS: Record<string, string> = {
-  save: "Couldn't save that scenario. Check the label isn't already used on this deal.",
+  labeltaken: "That label is already used by a version on this deal — pick another. Nothing was saved.",
+  denied: "This account can't add versions to this deal. Nothing was saved.",
+  save: "The version could not be saved — the database refused the write. Nothing was saved; try again.",
+  delete: "That version could not be deleted. Try again.",
+  current: "That version is the deal's assumptions as they stand, so it is kept: a view of this page would only take it again.",
   noextraction: "This deal hasn't been screened yet, so there are no assumptions to version.",
 };
 
-/** Percent inputs are typed as whole numbers; the engine stores decimals. */
-const asPct = (v: number) => (v * 100).toFixed(2);
+const REFUSALS: readonly LeverRefusal[] = ["unreadable", "range", "whole_years"];
+
+/** The sentence an error code is answered with; a refused lever's is built
+ *  from the lever's own label (lib/bridge/scenario-form). */
+function errorSentence(code: string | undefined, field: string | undefined, why: string | undefined): string | null {
+  if (!code) return null;
+  if (code === "lever") {
+    const lever = leverFor(field);
+    const refusal = REFUSALS.find((r) => r === why);
+    return lever && refusal ? leverRefusalSentence(lever, refusal) : null;
+  }
+  return ERRORS[code] ?? null;
+}
 
 export default async function BridgePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string; to?: string; error?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; error?: string; field?: string; why?: string }>;
 }) {
   const { id } = await params;
-  const { from: fromParam, to: toParam, error: errorCode } = await searchParams;
+  const { from: fromParam, to: toParam, error: errorCode, field, why } = await searchParams;
+  const errorText = errorSentence(errorCode, field, why);
 
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
@@ -38,18 +63,21 @@ export default async function BridgePage({
 
   const { data: deal, error } = await supabase
     .from("deals")
-    .select("id, name, extraction")
+    .select("id, name, extraction, first_signal")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load the deal: ${error.message}`);
   if (!deal) notFound();
 
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+  // On a note or a plan deal the screening model's IRRs are not the buyer's:
+  // said above them, and on the end of the line a reader copies.
+  const caveat = screeningModelCaveat(extraction, (deal.first_signal as FirstSignal | null) ?? null);
   const current = await currentDealAssumptions(supabase, id, deal.name as string, extraction);
 
   // Every visit snapshots the deal's live assumptions — but only when they
-  // actually moved since the last version, so the list is a record of changes
-  // rather than a record of page views.
+  // moved from its latest base snapshot (a saved scenario is never one), so
+  // the list is a record of changes rather than a record of page views.
   if (current) {
     await snapshotVersion(supabase, {
       dealId: id,
@@ -59,6 +87,9 @@ export default async function BridgePage({
   }
 
   const versions = await listDealVersions(supabase, id);
+  // The version that is the deal as it stands: kept, so not offered for
+  // deletion — a view would only take it again.
+  const liveId = currentVersionId(current, versions);
 
   const options: VersionOption[] = versions.map((v) => ({
     id: v.id,
@@ -69,12 +100,9 @@ export default async function BridgePage({
     leveredIrrPct: v.results?.leveredIrrPct ?? null,
   }));
 
-  // Default to the latest two, oldest of the pair on the left.
-  const toVersion = versions.find((v) => v.id === toParam) ?? versions[0] ?? null;
-  const fromVersion =
-    versions.find((v) => v.id === fromParam && v.id !== toVersion?.id) ??
-    versions.find((v) => v.id !== toVersion?.id) ??
-    null;
+  // A scenario opens against the base it was saved from, a base against the
+  // base before it — never a scenario against a later base, backwards.
+  const { from: fromVersion, to: toVersion } = defaultPair(versions, toParam, fromParam);
 
   const bridge =
     fromVersion && toVersion
@@ -92,9 +120,18 @@ export default async function BridgePage({
         </p>
       </header>
 
-      {errorCode && ERRORS[errorCode] ? (
+      {errorText ? (
         <p className="rounded-lg border border-kill/30 bg-kill/5 px-4 py-3 text-sm text-kill">
-          {ERRORS[errorCode]}
+          {errorText}
+        </p>
+      ) : null}
+
+      {caveat ? (
+        <p
+          data-caveat={caveat.kind}
+          className="rounded-lg border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-ink"
+        >
+          {caveat.text}
         </p>
       ) : null}
 
@@ -152,7 +189,7 @@ export default async function BridgePage({
 
           <BridgeView
             bridge={bridge}
-            sentence={bridgeSentence(bridge)}
+            sentence={caveat ? `${bridgeSentence(bridge)} ${caveat.copy}` : bridgeSentence(bridge)}
             fromVersion={options.find((o) => o.id === fromVersion.id)!}
             toVersion={options.find((o) => o.id === toVersion.id)!}
           />
@@ -169,25 +206,17 @@ export default async function BridgePage({
           </p>
           <form action={saveScenarioVersion} className="mt-4 flex flex-col gap-4">
             <input type="hidden" name="dealId" value={id} />
+            {/* Each lever prefilled at the input's own precision; a price is
+                typed as people type it ("$12.5M"), so it keeps a keyboard
+                with letters, and the rest take numbers. */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(
-                [
-                  ["purchasePrice", "Purchase price ($)", String(Math.round(current.purchasePrice))],
-                  ["exitCapPct", "Exit cap (%)", asPct(current.exitCapPct)],
-                  ["rentGrowthPct", "Rent growth (%)", asPct(current.rentGrowthPct)],
-                  ["vacancyPct", "Vacancy (%)", asPct(current.vacancyPct)],
-                  ["expenseGrowthPct", "Expense growth (%)", asPct(current.expenseGrowthPct)],
-                  ["holdMonths", "Hold (months)", String(current.holdMonths)],
-                  ["ltc", "Loan to cost (%)", asPct(current.ltc)],
-                  ["allInRatePct", "All-in rate (%)", asPct(current.allInRatePct)],
-                ] as const
-              ).map(([name, label, value]) => (
-                <label key={name} className="flex flex-col gap-1 text-xs text-muted">
-                  {label}
+              {SCENARIO_LEVERS.map((lever) => (
+                <label key={lever.field} className="flex flex-col gap-1 text-xs text-muted">
+                  {lever.label}
                   <input
-                    name={name}
-                    defaultValue={value}
-                    inputMode="decimal"
+                    name={lever.field}
+                    defaultValue={leverText(lever, current[lever.field])}
+                    inputMode={lever.kind === "usd" ? undefined : "decimal"}
                     className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
                   />
                 </label>
@@ -249,16 +278,26 @@ export default async function BridgePage({
                   })}
                 </span>
                 {v.note ? <span className="text-xs text-muted">{v.note}</span> : null}
-                <form action={deleteDealVersion} className="ml-auto">
-                  <input type="hidden" name="dealId" value={id} />
-                  <input type="hidden" name="versionId" value={v.id} />
-                  <button
-                    type="submit"
-                    className="text-xs text-muted underline-offset-2 hover:text-kill hover:underline"
+                {v.id === liveId ? (
+                  <span
+                    className="ml-auto rounded bg-faint px-1.5 py-px text-xs text-muted"
+                    title="The deal's assumptions as they stand. It is kept while they do — a visit would only take it again — so it has no Delete."
                   >
-                    Delete
-                  </button>
-                </form>
+                    current
+                  </span>
+                ) : (
+                  <form action={deleteDealVersion} className="ml-auto">
+                    <input type="hidden" name="dealId" value={id} />
+                    <input type="hidden" name="versionId" value={v.id} />
+                    <button
+                      type="submit"
+                      aria-label={`Delete version ${v.version_label}`}
+                      className="text-xs text-muted underline-offset-2 hover:text-kill hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                )}
               </li>
             ))}
           </ul>

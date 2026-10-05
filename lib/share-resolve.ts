@@ -31,11 +31,13 @@ export const SHARE_REFUSAL_COPY: Record<ShareRefusal, string> = {
   sender_lost_access: "The sender no longer has access to this deal.",
 };
 
-/** The deal columns a share may read: the screen's results, the address
- *  and the visual cache (for the aerial), and the ownership the sender check
- *  needs. Never the OM's storage path, the notes, the model or the buy box. */
+/** The deal columns a share may read: the screen's results (the first
+ *  signal among them, which the kind of deal is read from beside the
+ *  extraction), the address and the visual cache (for the aerial), and the
+ *  ownership the sender check needs. Never the OM's storage path, the notes,
+ *  the model or the buy box. */
 export const SHARED_DEAL_COLUMNS =
-  "name, asset_class, address, photo, extraction, comps, market, verdict, updated_at, user_id, team_id, site_flags";
+  "name, asset_class, address, photo, extraction, first_signal, comps, market, verdict, updated_at, user_id, team_id, site_flags";
 
 export interface SharedDealRow {
   name: string;
@@ -43,6 +45,9 @@ export interface SharedDealRow {
   address: unknown;
   photo: unknown;
   extraction: unknown;
+  /** the screen's fast first read (FirstSignal); null on a row screened
+   *  before it existed */
+  first_signal?: unknown;
   comps: unknown;
   market: unknown;
   verdict: unknown;

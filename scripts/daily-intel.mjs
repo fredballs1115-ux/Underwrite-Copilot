@@ -17,6 +17,15 @@
 // dates only), and the Anthropic call goes through fetch.
 
 import { createClient } from "@supabase/supabase-js";
+// A failure said on the run's page, not only in its log (plain Node strips its types).
+import { missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
+// Today's date, as every Claude step is told it (lib/anthropic/today): a law
+// "about to" change is judged against the day, never the model's training.
+import { todayLine } from "../lib/anthropic/today.ts";
+
+// The run's own year, for the watch that names one: a year typed into the
+// query went on asking for that year's market after it ended.
+const RUN_YEAR = new Date().getUTCFullYear();
 
 // One watch query per jurisdiction rule-set + per sector the buyer tracks.
 // Keep queries SPECIFIC — Google News RSS returns ~100 items per query and
@@ -28,7 +37,7 @@ const WATCHES = [
   { sector: "regulation-md", q: '"rent stabilization" Maryland "Prince George" OR Montgomery OR "Takoma Park"' },
   { sector: "regulation-va", q: 'Virginia "rent control" OR "rent stabilization" General Assembly landlord' },
   { sector: "regulation-east", q: '"rent control" ordinance New Jersey OR Connecticut OR "New York" landlord small' },
-  { sector: "multifamily", q: '"small multifamily" OR "duplex" OR "fourplex" investor market 2026' },
+  { sector: "multifamily", q: `"small multifamily" OR "duplex" OR "fourplex" investor market ${RUN_YEAR}` },
   { sector: "capital-markets", q: 'mortgage rates multifamily "cap rates" commercial real estate lending' },
   { sector: "tax", q: '"bonus depreciation" OR "opportunity zone" OR "1031 exchange" real estate investor' },
   { sector: "housing-policy", q: 'HUD "fair market rent" OR "FHA loan limit" OR "Section 8" payment standard' },
@@ -43,8 +52,17 @@ const DIGEST_THRESHOLD = 6; // relevance >= this makes the digest
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const anthropicKey = process.env.ANTHROPIC_API_KEY;
-if (!url || !key || !anthropicKey) {
-  console.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY are required.");
+// A missing secret is a failed run, never a quiet one: all three are needed
+// (the stories are scored by Claude before they are written).
+const unset = missingSecrets({ SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key, ANTHROPIC_API_KEY: anthropicKey });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "daily-intel",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets, or the Render cron's environment).",
+    ),
+  );
   process.exit(1);
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });
@@ -144,7 +162,9 @@ Items:
 ${fresh.map((c, i) => `${i}. [${c.sector}] ${c.title} (${c.source ?? "?"})`).join("\n")}
 
 Reply with ONLY a JSON array, one object per item, same order:
-[{"i":0,"relevance":7,"summary":"one sentence","action":"imperative next step or null","rule_change":false,"rule_id":null}, ...]`;
+[{"i":0,"relevance":7,"summary":"one sentence","action":"imperative next step or null","rule_change":false,"rule_id":null}, ...]
+
+${todayLine()}`;
 
 async function callClaude(prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {

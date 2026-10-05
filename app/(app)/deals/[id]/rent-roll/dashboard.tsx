@@ -1,4 +1,10 @@
-import type { RentRollAnalytics, MarkToMarket, RolloverCostForecast, LeaseUpCurve } from "@/lib/rentroll/analytics";
+import {
+  DEFAULT_LEASE_UP_MONTHS,
+  type RentRollAnalytics,
+  type MarkToMarket,
+  type RolloverCostForecast,
+  type LeaseUpCurve,
+} from "@/lib/rentroll/analytics";
 import type { ValidationIssue } from "@/lib/rentroll/validate";
 
 /**
@@ -17,6 +23,14 @@ const usd = (n: number): string => {
 const sf = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
 const pct1 = (n: number | null) => (n == null ? "—" : `${(n * 100).toFixed(1)}%`);
 const psf = (n: number | null) => (n == null ? "—" : `$${n.toFixed(2)}`);
+/** "Oct 1, 2026" — the day a figure is counted from. */
+const day = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 
 function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
@@ -76,7 +90,8 @@ function RolloverChart({
           const x = 8 + i * COL_W + (COL_W - BAR_W) / 2;
           const h = Math.max(2, (y.sfExpiring / maxSf) * PLOT_H);
           const top = PAD_T + PLOT_H - h;
-          const heavy = (y.pctOfNra ?? 0) > 0.3;
+          // A year's expiries on a roll of one-year leases is no cliff.
+          const heavy = !analytics.leasesShort && (y.pctOfNra ?? 0) > 0.3;
           return (
             <g key={y.year}>
               <title>{`${y.year}: ${sf(y.sfExpiring)}, ${usd(y.rentExpiring)} rent, ${y.leaseCount} lease${
@@ -118,6 +133,8 @@ export function RentRollDashboard({
   leaseUp,
   issues,
   filename,
+  asOfFrom = "roll",
+  paceIsDefault = false,
 }: {
   analytics: RentRollAnalytics;
   mtm: MarkToMarket;
@@ -125,9 +142,39 @@ export function RentRollDashboard({
   leaseUp: LeaseUpCurve;
   issues: ValidationIssue[];
   filename: string;
+  /** where the day years-to-expiry count from came from: the roll's own
+   *  as-of date, or today, where the roll states none */
+  asOfFrom?: "roll" | "today";
+  /** the lease-up runs at the placeholder pace (the vacancy over
+   *  DEFAULT_LEASE_UP_MONTHS), not one anybody set */
+  paceIsDefault?: boolean;
 }) {
+  // Occupancy is over the stated NRA where there is one; where it is not the
+  // roll's own area, say both, so 69% is never read as 90,000 of 96,000.
+  const nra = analytics.nra ?? analytics.totalSf;
+  const nraDiffers =
+    analytics.nraStated && Math.abs(nra - analytics.totalSf) > Math.max(1, analytics.totalSf * 0.005);
+  const occupancyNote = nraDiffers
+    ? `${sf(analytics.occupiedSf)} of the stated ${sf(nra)} NRA — the roll lists ${sf(analytics.totalSf)}`
+    : `${sf(analytics.occupiedSf)} of ${sf(nra)}`;
+  const asOfLine =
+    asOfFrom === "today"
+      ? `Years to expiry are counted from today, ${day(analytics.asOf)} — the roll states no as-of date; set one under Column mapping.`
+      : `Years to expiry are counted from ${day(analytics.asOf)}, the roll's as-of date.`;
+  const leaseUpLine = `${sf(leaseUp.vacantSf)} vacant at ${sf(leaseUp.absorptionSfPerMonth)}/month${
+    paceIsDefault
+      ? ` — an assumed pace, the vacancy leased over ${DEFAULT_LEASE_UP_MONTHS} months: a placeholder, not the market's absorption`
+      : ""
+  }. ${
+    leaseUp.monthsToStabilize == null
+      ? `It never reaches ${pct1(leaseUp.stabilizedOccupancyPct)} occupancy at this pace.`
+      : `${pct1(leaseUp.stabilizedOccupancyPct)} occupancy${nraDiffers ? ` of the roll's ${sf(analytics.totalSf)}` : ""} in month ${leaseUp.monthsToStabilize}.`
+  }`;
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
+  // What the import did on purpose (a totals line left out) — shown, in a
+  // neutral dot, after anything that needs fixing.
+  const notes = issues.filter((i) => i.severity === "info");
 
   // Mark to market, once for both layouts: each lease's gap as a share of
   // its market rent, scaled to the widest on the page. A market rent of
@@ -151,11 +198,11 @@ export function RentRollDashboard({
             What the import found in {filename}
           </h2>
           <ul className="mt-2 flex flex-col gap-2">
-            {[...errors, ...warnings].map((issue) => (
+            {[...errors, ...warnings, ...notes].map((issue) => (
               <li key={issue.code} className="flex gap-2 text-sm">
                 <span
                   className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
-                    issue.severity === "error" ? "bg-kill" : "bg-caution"
+                    issue.severity === "error" ? "bg-kill" : issue.severity === "warning" ? "bg-caution" : "bg-muted/50"
                   }`}
                   aria-hidden
                 />
@@ -176,7 +223,7 @@ export function RentRollDashboard({
 
       {/* ── Headline ──────────────────────────────────────────────────── */}
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Occupancy" value={pct1(analytics.occupancyPct)} note={`${sf(analytics.occupiedSf)} of ${sf(analytics.totalSf)}`} />
+        <Stat label="Occupancy" value={pct1(analytics.occupancyPct)} note={occupancyNote} />
         <Stat
           label="WALT (SF)"
           value={analytics.walt.bySf == null ? "—" : `${analytics.walt.bySf.toFixed(1)} yr`}
@@ -199,10 +246,22 @@ export function RentRollDashboard({
         />
         <Stat label="In-place rent" value={usd(analytics.inPlaceRentAnnual)} note={`${psf(analytics.weightedInPlacePsf)}/SF weighted`} />
       </dl>
+      <p data-qa="walt-as-of" className="-mt-3 text-xs text-muted">
+        {asOfLine}
+      </p>
 
       {/* ── Concentration flags ───────────────────────────────────────── */}
-      {analytics.flags.length ? (
+      {analytics.leasesShort || analytics.flags.length ? (
         <section className="flex flex-col gap-2">
+          {/* A roll of leases that run a year: the rollover and WALT flags
+              describe commercial leases, so in their place it says how
+              this roll is read. */}
+          {analytics.leasesShort ? (
+            <p data-qa="loss-to-lease-note" className="rounded-lg border border-line bg-faint px-4 py-2.5 text-sm text-muted">
+              Leases here run a year or less, so this roll is read for loss to lease — the mark to market
+              below — not for WALT: a short WALT and a year of expiries are routine, not a cliff.
+            </p>
+          ) : null}
           {analytics.flags.map((f) => (
             <p
               key={`${f.code}-${f.value.toFixed(4)}`}
@@ -348,11 +407,8 @@ export function RentRollDashboard({
       {leaseUp.vacantSf > 0 ? (
         <section className="rounded-lg border border-line bg-surface p-4">
           <h2 className="text-sm font-semibold text-ink">Lease-up</h2>
-          <p className="mt-1 text-sm text-muted">
-            {sf(leaseUp.vacantSf)} vacant at {sf(leaseUp.absorptionSfPerMonth)}/month —{" "}
-            {leaseUp.monthsToStabilize == null
-              ? `never reaches ${pct1(leaseUp.stabilizedOccupancyPct)} occupancy at this pace.`
-              : `${pct1(leaseUp.stabilizedOccupancyPct)} occupancy in month ${leaseUp.monthsToStabilize}.`}
+          <p data-qa="lease-up-line" className="mt-1 text-sm text-muted">
+            {leaseUpLine}
           </p>
         </section>
       ) : null}

@@ -1,11 +1,23 @@
-// Red banner for undismissed regulatory alerts (research build, Phase 2
-// item 5): when the daily intel job flags a likely law/regulation change,
-// it stays visible on every signed-in screen until someone dismisses it.
+// Red banner for regulatory alerts (research build, Phase 2 item 5): when
+// the daily intel job flags a likely law/regulation change, it shows on every
+// signed-in screen until the reader dismisses it.
 // Server component + server action — no client JS.
+//
+// THE RULE: an alert shows where it was detected in the last
+// ALERT_WINDOW_DAYS (30) days and THIS READER has not dismissed it. The
+// shared row's `dismissed_at` is ignored: every signed-in user could write it
+// (migration 0034's column grant, until 0036 took it back), so it was one
+// reader's click — or anyone's direct PATCH — hiding an alert from every
+// customer. A dismissal is the
+// alert's id in a cookie named for the reader's account (lib/dismissed-
+// alerts), so a second account on the same browser keeps its own; nothing
+// shared is written, and /news keeps every alert whatever a banner did.
 
-import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { safeHttpUrl } from "@/lib/safe-url";
+import { ruleName } from "@/lib/research-data";
+import { alertWindowStart, dismissedCookie, dismissedFor, undismissed } from "@/lib/dismissed-alerts";
 
 interface AlertRow {
   id: string;
@@ -15,31 +27,46 @@ interface AlertRow {
   detail: string | null;
 }
 
+/** The banner shows the newest few. */
+const SHOWN = 3;
+
 async function dismissAlert(formData: FormData) {
   "use server";
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const user = await getCurrentUser();
   if (!user) return;
-  const supabase = await createSupabaseServerClient();
-  await supabase
-    .from("regulatory_alerts")
-    .update({ dismissed_at: new Date().toISOString(), dismissed_by: user.id })
-    .eq("id", id);
-  revalidatePath("/", "layout");
+  const store = await cookies();
+  // The list so far — the account's cookie, else what this reader dismissed
+  // under the old shared one — so a first dismissal carries the earlier ones.
+  const next = dismissedCookie(
+    dismissedFor((name) => store.get(name)?.value, user.id).join(","),
+    id,
+    process.env.NODE_ENV === "production",
+    user.id,
+  );
+  // Setting a cookie in a server action re-renders the page it was called
+  // from, so the banner redraws without the alert — for this reader only.
+  if (next) store.set(next.name, next.value, next.options);
 }
 
 export async function RegulatoryAlertBanner() {
   let alerts: AlertRow[] = [];
   try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const store = await cookies();
+    const dismissed = dismissedFor((name) => store.get(name)?.value, user.id);
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase
       .from("regulatory_alerts")
       .select("id, rule_id, headline, url, detail")
-      .is("dismissed_at", null)
+      .gte("detected_at", alertWindowStart(new Date()))
       .order("detected_at", { ascending: false })
-      .limit(3);
-    alerts = (data as AlertRow[] | null) ?? [];
+      // Enough rows that the newest few this reader has not dismissed are
+      // among them.
+      .limit(SHOWN + dismissed.length);
+    alerts = undismissed((data as AlertRow[] | null) ?? [], dismissed, SHOWN);
   } catch {
     // 0023 not migrated yet — no banner, no crash.
   }
@@ -51,6 +78,9 @@ export async function RegulatoryAlertBanner() {
         // The row is shared state written outside this request — only a real
         // web URL ever becomes a link (the same allowlist the comps map uses).
         const href = safeHttpUrl(a.url);
+        // The rule by its name in the research file, never its raw id; an
+        // id the file does not hold says nothing.
+        const rule = ruleName(a.rule_id);
         return (
         <div
           key={a.id}
@@ -67,9 +97,7 @@ export async function RegulatoryAlertBanner() {
             ) : (
               a.headline
             )}
-            {a.rule_id && (
-              <span className="ml-2 text-white/80">affects rule: {a.rule_id}</span>
-            )}
+            {rule && <span className="ml-2 text-white/80">affects {rule}</span>}
           </span>
           <form action={dismissAlert}>
             <input type="hidden" name="id" value={a.id} />

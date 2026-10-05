@@ -290,8 +290,14 @@ function LegalBlock({ legal }: { legal: SampleLegal }) {
             <span className="text-[9px] uppercase tracking-wide text-muted">
               {rule.typeLabel}
             </span>
-            <span className="ml-auto rounded bg-emerald-500/10 px-1.5 py-px text-[9px] font-medium text-emerald-600">
-              {rule.status} · {rule.asOf}
+            {/* Past the research rule's limit the date keeps its place, with
+                its age and the stale mark (lib/research-age via sampleLegal). */}
+            <span
+              className={`ml-auto rounded px-1.5 py-px text-[9px] font-medium ${
+                rule.stale ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"
+              }`}
+            >
+              {`${rule.status} · ${rule.asOf}${rule.stale ? ` · ${rule.stale}` : ""}`}
             </span>
           </div>
           <p className="mt-1 text-[10px] leading-relaxed text-muted">
@@ -299,6 +305,13 @@ function LegalBlock({ legal }: { legal: SampleLegal }) {
               ? rule.effect.slice(0, 149).trimEnd() + "…"
               : rule.effect}
           </p>
+          {/* A window the rule states its figure for, ended, or a date it
+              gives, come (lib/dated-window via sampleLegal) — never clamped. */}
+          {rule.dated.length > 0 && (
+            <p className="mt-1 text-[9px] font-medium text-caution" data-qa="window-ended">
+              {rule.dated.join(" ")}
+            </p>
+          )}
           {rule.dormantNote && (
             <p className="mt-1 text-[9px] font-medium text-caution">{rule.dormantNote}</p>
           )}
@@ -332,7 +345,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
           <Killer
             n={2}
             name="Exit"
-            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
+            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — a return that leans on cap compression."
             severity="caution"
           />
           <LegalBlock legal={legal} />
@@ -360,7 +373,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
             low="5.25%"
             base={`${INPUTS.exitCapPct.toFixed(2)}%`}
             high="5.75%"
-            src="submarket trades 5.25–5.75%; broker holds 5.25%."
+            src="the market check's typical range, a rule of thumb; the OM holds 5.25%."
           />
           <RangeRow
             label="Market rent / unit"
@@ -389,10 +402,12 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
           <div className="flex flex-wrap gap-1.5 text-[10px] font-medium">
             {(
               [
-                ["✓", "Market", "text-pass border-line"],
-                ["✓", "Price", "text-pass border-line"],
+                // The sample deal's own checks against its demo buy box
+                // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
                 ["✓", "Asset class", "text-pass border-line"],
+                ["✓", "Units", "text-pass border-line"],
                 ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
+                ["—", "Target return", "text-muted border-line"],
               ] as const
             ).map(([mark, label, cls]) => (
               <span
@@ -442,7 +457,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
             ))}
           </div>
           <CompRow name="The Brixton" meta="comparable vintage · 2.1 mi" rating="support" />
-          <CompRow name="Vue at Legacy" meta="newer, amenitized · 4.0 mi" rating="stretched" />
+          <CompRow name="Vue at Girard" meta="newer, amenitized · 4.0 mi" rating="stretched" />
           <p className="text-[10px] leading-relaxed text-muted">
             Five analyses, one rubric — the verdict flips across scenarios, and
             that spread <em>is</em> the finding.

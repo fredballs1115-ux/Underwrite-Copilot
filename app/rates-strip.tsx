@@ -2,8 +2,10 @@ import {
   formatMove,
   formatValue,
   groupRates,
+  periodLabel,
+  periodOf,
+  publisherTag,
   seriesUrl,
-  shortDate,
   yieldCurve,
   type LiveRate,
   type Observation,
@@ -79,8 +81,7 @@ export function RatesStrip({
           Rates today
         </h2>
         <p className="text-[11px] text-muted">
-          FRED, pulled every weekday · {rates.length} series · each figure links to
-          its source
+          {`The latest figure each series has posted, dated by its own day, month or quarter · FRED, pulled every weekday · ${rates.length} series · each figure links to its source`}
         </p>
       </div>
 
@@ -223,7 +224,7 @@ export function RateTile({
           rel="noreferrer"
           className="underline decoration-dotted underline-offset-2 hover:text-ink"
         >
-          {`${short ?? r.meta.short} as of ${shortDate(r.obsDate)}${r.meta.source === "bls" ? " · BLS" : r.meta.source === "census" ? " · Census" : ""}`}
+          {`${short ?? r.meta.short} as of ${periodOf(r)}${publisherTag(r.meta) ? ` · ${publisherTag(r.meta)}` : ""}`}
         </a>
         {!r.fresh && <span className="ml-1 text-amber-700">· not updating</span>}
       </p>
@@ -303,7 +304,7 @@ function CurveFigure({ curve }: { curve: YieldCurve }) {
         .join(" ")
     : null;
   const label =
-    `The Treasury curve as of ${shortDate(curve.asOf)}: ` +
+    `The Treasury curve as of ${periodLabel(curve.asOf, "daily")}: ` +
     curve.points.map((p) => `${p.short} ${p.value.toFixed(2)}%`).join(", ") +
     ".";
   const slope =
@@ -400,10 +401,13 @@ function CurveFigure({ curve }: { curve: YieldCurve }) {
           </g>
         ))}
       </svg>
+      {/* One string, so the date and the words are one text node. The solid
+          line is the page's read today of the curve as last posted, dated —
+          a weekend or a holiday posts nothing, and the strip never claims a
+          figure is today's.
+          ("Solid is today" is what live-verify's #362 marker greps.) */}
       <figcaption className="mt-1 text-[11px] text-muted">
-        Solid is today{weekAgo ? ", dashed a week earlier" : ""}, as of{" "}
-        {shortDate(curve.asOf)}. Each tenor is a field&apos;s Treasury where a clause
-        names one.
+        {`Solid is today's read of the curve, as last posted ${periodLabel(curve.asOf, "daily")}${weekAgo ? "; dashed a week earlier" : ""}. Each tenor is a field's Treasury where a clause names one.`}
       </figcaption>
     </figure>
   );

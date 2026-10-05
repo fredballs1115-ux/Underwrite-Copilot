@@ -1,14 +1,32 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  answeredSiteFlags,
   isHighRiskZone,
+  opportunityZoneFrom,
+  opportunityZoneRead,
+  OZ_2018_ROUND_LAST_DAY,
+  OZ_CURRENT_NUMBER_CAVEAT,
+  OZ_CURRENT_NUMBER_CAVEAT_ENDED,
+  OZ_NEXT_ROUND_EFFECTIVE,
+  OZ_STATE_RULE_V,
+  ozRoundNote,
+  ozRoundPhase,
   parseCensusCounty,
   parseCensusPlace,
   parseCensusTract,
   parseNfhlFlood,
   resolveNfhlLayerId,
+  SITE_FLAGS_V,
   siteFlagsOutdated,
   siteFlagsStale,
+  storedFloodShortLine,
+  tractStateFips,
+  type SiteFlagsResult,
 } from "./core";
+
+/** A day before the next round of Opportunity Zones takes effect. */
+const BEFORE_NEXT_ROUND = "2026-10-04";
 
 describe("isHighRiskZone", () => {
   it("flags A- and V-prefixed SFHA zones", () => {
@@ -174,36 +192,42 @@ describe("legendEntryFor and floodZoneLine — what the map says at the building
     expect(floodZoneLine(undefined, legend)).toBeNull();
     // Without the legend the zone is still said, without FEMA's name for it.
     expect(floodZoneLine(flag("VE", null))).toBe(
-      "The building sits in Zone VE, a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
+      "The building sits in Zone VE, a coastal high-hazard area where storm waves add to the flood, a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
     );
   });
-});
 
-import { floodKey } from "./core";
-
-describe("floodKey — the key under the Flood tab's map", () => {
-  const legend = parseNfhlLegend(LEGEND_JSON, 28);
-  const flag = (zone: string, subtype: string | null) => ({ zone, subtype, isHighRisk: /^[AV]/.test(zone) });
-
-  it("leads with the building's own zone, marked, then FEMA's common three, each once", () => {
-    const key = floodKey(legend, flag("X", "AREA WITH REDUCED FLOOD RISK DUE TO LEVEE"));
-    expect(key.map((k) => [k.label, k.here])).toEqual([
-      ["Area with Reduced Risk Due to Levee", true],
-      ["1% Annual Chance Flood Hazard", false],
-      ["Regulatory Floodway", false],
-      ["0.2% Annual Chance Flood Hazard", false],
-    ]);
-    // A building in the 1% zone is not listed twice.
-    const ae = floodKey(legend, flag("AE", null));
-    expect(ae.map((k) => k.label)).toEqual(["1% Annual Chance Flood Hazard", "Regulatory Floodway", "0.2% Annual Chance Flood Hazard"]);
-    expect(ae[0].here).toBe(true);
+  it("says open water, an area the map leaves out, an unstudied Zone D and a plain Zone X as what they are (#472)", () => {
+    // A building's point in the river is a point off the building.
+    const water = floodZoneLine(flag("OPEN WATER", null), legend)!;
+    expect(water).toContain("open water");
+    expect(water).not.toContain("Zone OPEN WATER");
+    const excluded = floodZoneLine(flag("AREA NOT INCLUDED", null), legend)!;
+    expect(excluded).toContain("does not include");
+    expect(excluded).not.toContain("Zone AREA");
+    // Zone D is a hazard FEMA has not studied — never "mapped".
+    const d = floodZoneLine(flag("D", null), legend)!;
+    expect(d).toContain("where FEMA has not determined the flood hazard");
+    expect(d).not.toContain("the hazard is mapped");
+    // A Zone X with no subtype is not one of the shaded hazards.
+    const x = floodZoneLine(flag("X", null), legend)!;
+    expect(x).toBe("The building sits in Zone X, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender.");
+    // The regulatory floodway says what it is.
+    expect(floodZoneLine(flag("AE", "FLOODWAY"), legend)).toContain("in the regulatory floodway, a Special Flood Hazard Area where new building and fill are restricted");
   });
 
-  it("marks nothing where the building's zone is not drawn, and is empty with no legend", () => {
-    expect(floodKey(legend, flag("X", "AREA OF MINIMAL FLOOD HAZARD")).some((k) => k.here)).toBe(false);
-    expect(floodKey(legend, null).length).toBe(3);
-    expect(floodKey(legend, "unavailable").some((k) => k.here)).toBe(false);
-    expect(floodKey([], flag("AE", null))).toEqual([]);
+  it("says FEMA's base flood elevation where FEMA states one, and nothing where it writes -9999 (#472)", () => {
+    // The runner's frame query (flood-sheet run 36745937081): Hoboken's AE
+    // at 9 feet NAVD88, New Orleans' at -1, a Philadelphia AE with none.
+    const hoboken = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AE", ZONE_SUBTY: null, STATIC_BFE: 9, LEN_UNIT: "Feet", V_DATUM: "NAVD88", DEPTH: -9999 } }] })!;
+    expect(hoboken.bfe).toEqual({ value: 9, unit: "Feet", datum: "NAVD88" });
+    expect(floodZoneLine(hoboken, legend)).toContain("FEMA's base flood elevation there is 9 feet (NAVD88).");
+    const nola = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AE", STATIC_BFE: -1, LEN_UNIT: "Feet", V_DATUM: "NAVD88", DEPTH: -9999 } }] })!;
+    expect(floodZoneLine(nola, legend)).toContain("there is -1 foot (NAVD88).");
+    const none = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AE", STATIC_BFE: -9999, LEN_UNIT: null, V_DATUM: null, DEPTH: -9999 } }] })!;
+    expect(none.bfe).toBeUndefined();
+    expect(floodZoneLine(none, legend)).not.toContain("base flood elevation");
+    const ao = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AO", STATIC_BFE: -9999, DEPTH: 2, LEN_UNIT: "Feet" } }] })!;
+    expect(floodZoneLine(ao, legend)).toContain("FEMA maps the flood there at 2 feet deep.");
   });
 });
 
@@ -289,6 +313,55 @@ describe("siteFlagsStale — flags looked up for an address the deal no longer h
   });
 });
 
+describe("answeredSiteFlags — the lookup a step reads the flood zone from (the screen's steps and Ask)", () => {
+  const lookup = (label: string, status: SiteFlagsResult["status"] = "ok"): SiteFlagsResult => ({
+    status,
+    subject: { lat: 32.8, lng: -96.8, label },
+    tractGeoid: null,
+    opportunityZone: null,
+    flood: { zone: "AE", subtype: null, isHighRisk: true },
+    retrievedAt: "2026-10-01T00:00:00.000Z",
+    note: "",
+  });
+  it("takes a lookup that answered for the address the deal has now", () => {
+    const flags = lookup("100 Elm St, Dallas, TX 75201");
+    expect(answeredSiteFlags(flags, "100 Elm St, Dallas, TX 75201")).toBe(flags);
+    expect(answeredSiteFlags(lookup("100 Elm St, Dallas, TX 75201", "lookup_failed"), "100 Elm St, Dallas, TX 75201")).not.toBeNull();
+  });
+  it("takes none that is pending, made for another address, or absent", () => {
+    expect(answeredSiteFlags(lookup("100 Elm St, Dallas, TX 75201", "pending"), "100 Elm St, Dallas, TX 75201")).toBeNull();
+    expect(answeredSiteFlags(lookup("100 Elm St, Dallas, TX 75201"), "5000 Main St, Frisco, TX 75034")).toBeNull();
+    expect(answeredSiteFlags(null, "100 Elm St, Dallas, TX 75201")).toBeNull();
+  });
+});
+
+describe("storedFloodShortLine — a document's flood line holds to the deal page's rule (the audit of 2026-09-30)", () => {
+  const lookup = (label: string | null, status: SiteFlagsResult["status"] = "ok"): SiteFlagsResult => ({
+    status,
+    ...(label ? { subject: { lat: 32.8, lng: -96.8, label } } : {}),
+    tractGeoid: null,
+    opportunityZone: null,
+    flood: { zone: "AE", subtype: null, isHighRisk: true },
+    retrievedAt: "2026-09-25T00:00:00Z",
+    note: "",
+  });
+  const ELM = "100 Elm St, Dallas, TX 75201";
+
+  it("says the zone where the lookup was made for the address the deal is read at", () => {
+    expect(storedFloodShortLine(lookup(ELM), ELM)).toBe(
+      "Flood zone AE: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)",
+    );
+    // A lookup that names no address cannot be judged, and stands.
+    expect(storedFloodShortLine(lookup(null), ELM)).toMatch(/^Flood zone AE/);
+  });
+
+  it("says nothing for a lookup made for an address the deal has since changed from, as for a pending one", () => {
+    expect(storedFloodShortLine(lookup(ELM), "5000 Main St, Frisco, TX 75034")).toBeNull();
+    expect(storedFloodShortLine(lookup(ELM, "pending"), ELM)).toBeNull();
+    expect(storedFloodShortLine(null, ELM)).toBeNull();
+  });
+});
+
 describe("the building's municipality and county from the Census geocoder (#452)", () => {
   // The shapes the runner printed (zori.yml probe run 36658903671), trimmed
   // to the layers read.
@@ -323,11 +396,167 @@ describe("the building's municipality and county from the Census geocoder (#452)
     expect(parseCensusCounty({ result: {} })).toBeNull();
   });
 
-  it("an answered lookup made before the place was read is made again; one that never geocoded is not", () => {
+  it("an answered lookup made under older rules is made again; one that never geocoded is not", () => {
     expect(siteFlagsOutdated({ status: "ok" })).toBe(true);
-    expect(siteFlagsOutdated({ status: "ok", v: 2 })).toBe(false);
+    // v2 read the place, but looked up at the address's own geocode (#472)
+    // and said "not in a zone" against any state's zones.
+    expect(siteFlagsOutdated({ status: "ok", v: 2 })).toBe(true);
+    expect(siteFlagsOutdated({ status: "ok", v: SITE_FLAGS_V })).toBe(false);
     expect(siteFlagsOutdated({ status: "geocode_failed" })).toBe(false);
     expect(siteFlagsOutdated({ status: "pending" })).toBe(false);
     expect(siteFlagsOutdated(null)).toBe(false);
+  });
+
+  it("asks FEMA again for a flood zone it did not answer, once the retry wait has passed (#472)", () => {
+    const at = "2026-09-30T00:00:00.000Z";
+    const missed = { status: "ok" as const, v: 3, flood: "unavailable" as const, retrievedAt: at };
+    expect(siteFlagsOutdated(missed, Date.parse(at) + 60 * 60 * 1000)).toBe(false);
+    expect(siteFlagsOutdated(missed, Date.parse(at) + 7 * 60 * 60 * 1000)).toBe(true);
+    // An answered zone is not asked again.
+    const answered = { ...missed, flood: { zone: "AE", subtype: null, isHighRisk: true } };
+    expect(siteFlagsOutdated(answered, Date.parse(at) + 7 * 60 * 60 * 1000)).toBe(false);
+  });
+});
+
+describe("the Opportunity Zone check — not on the list only where the list holds the tract's state", () => {
+  it("reads a tract's state off its GEOID's first two digits, and nothing off anything else", () => {
+    expect(tractStateFips("24033805903")).toBe("24"); // Maryland
+    expect(tractStateFips("48085030100")).toBe("48"); // Texas
+    expect(tractStateFips("06037")).toBeNull(); // a county, not a tract
+    expect(tractStateFips("2403380590X")).toBeNull();
+    expect(tractStateFips(null)).toBeNull();
+    expect(tractStateFips(undefined)).toBeNull();
+  });
+
+  it("a tract off a list that holds its state's zones is not listed; a list without them did not check", () => {
+    const md = { sourceDataset: "Maryland Opportunity Zones (Socrata hu7s-ph9b)" };
+    expect(opportunityZoneFrom({ hit: md, zonesInState: null })).toEqual({ opportunityZone: md });
+    expect(opportunityZoneFrom({ hit: null, zonesInState: 149 })).toEqual({ opportunityZone: null });
+    // A Texas tract against a registry of Maryland's zones: no answer.
+    expect(opportunityZoneFrom({ hit: null, zonesInState: 0 })).toEqual({
+      opportunityZone: "unchecked",
+      opportunityZoneUnchecked: "state_not_loaded",
+    });
+    // The state's count could not be read: no answer either.
+    expect(opportunityZoneFrom({ hit: null, zonesInState: null })).toEqual({
+      opportunityZone: "unchecked",
+      opportunityZoneUnchecked: "lookup_failed",
+    });
+  });
+
+  it("says a miss was checked by the tract's current number, and never that the site is outside a zone", () => {
+    const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V }, BEFORE_NEXT_ROUND);
+    expect(off.kind).toBe("not_listed");
+    expect(off.label).toBe("Tract's current number not on the 2018 Opportunity Zone list");
+    expect(off.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
+    expect(off.caveat).toContain("checked by the tract's current number");
+    for (const text of [off.label, off.caveat ?? ""]) {
+      expect(text).not.toMatch(/not in an opportunity zone/i);
+      expect(text).not.toMatch(/outside (an|the) opportunity zone/i);
+    }
+    expect(opportunityZoneRead({ opportunityZone: { sourceDataset: "x" }, v: SITE_FLAGS_V }, BEFORE_NEXT_ROUND)).toEqual({
+      kind: "listed",
+      label: "Opportunity Zone tract (2018 designations)",
+      caveat: null,
+      phase: "ahead",
+      note: ozRoundNote(BEFORE_NEXT_ROUND),
+    });
+  });
+
+  it("a miss read by the 2010 tract the zones were designated on owes no caveat (#473)", () => {
+    const off = opportunityZoneRead(
+      { opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "2010" } },
+      BEFORE_NEXT_ROUND,
+    );
+    expect(off).toMatchObject({ kind: "not_listed", label: "Tract not on the 2018 Opportunity Zone list", caveat: null });
+    // Read by the current number, it keeps the caveat.
+    const current = opportunityZoneRead(
+      { opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "current" } },
+      BEFORE_NEXT_ROUND,
+    );
+    expect(current.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
+  });
+
+  it("a 'not on the list' stored before the state rule is no answer, and a check that did not run says why", () => {
+    // v2 and earlier read the miss against whatever state the registry held.
+    expect(OZ_STATE_RULE_V).toBeLessThanOrEqual(SITE_FLAGS_V);
+    const unchecked = { kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null, note: null };
+    expect(opportunityZoneRead({ opportunityZone: null, v: 2 }, BEFORE_NEXT_ROUND)).toMatchObject(unchecked);
+    expect(opportunityZoneRead({ opportunityZone: null }, BEFORE_NEXT_ROUND)).toMatchObject(unchecked);
+    const why = (r: "no_tract" | "tract_failed" | "state_not_loaded" | "lookup_failed") =>
+      opportunityZoneRead({ opportunityZone: "unchecked", opportunityZoneUnchecked: r, v: SITE_FLAGS_V }, BEFORE_NEXT_ROUND).label;
+    expect(why("state_not_loaded")).toBe("Opportunity Zone: not checked (no zones on file for this state)");
+    expect(why("no_tract")).toBe("Opportunity Zone: not checked (no census tract for this point)");
+    expect(why("tract_failed")).toBe("Opportunity Zone: not checked (the census tract lookup failed)");
+    expect(why("lookup_failed")).toBe("Opportunity Zone: not checked (the zone list could not be read)");
+    // An older "unchecked" carries no reason: it names none rather than guess one.
+    expect(opportunityZoneRead({ opportunityZone: "unchecked", v: 2 }, BEFORE_NEXT_ROUND).label).toBe("Opportunity Zone: not checked");
+  });
+});
+
+// The site holds only the 2018 list, so what an answer from it means turns on
+// two days the research file states: the next round takes effect, then the
+// 2018 designations end. Each page hands the reader today's date.
+describe("opportunityZoneRead — the 2018 round's wording at three dates", () => {
+  const listed = { opportunityZone: { sourceDataset: "CDFI Fund QOZ list" }, v: SITE_FLAGS_V } as const;
+  const offByCurrent = { opportunityZone: null, v: SITE_FLAGS_V } as const;
+  const offBy2010 = { opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "2010" as const } };
+
+  it("takes both days from data/research/tax_law.json, in its own words", () => {
+    const summary = (JSON.parse(readFileSync("data/research/tax_law.json", "utf8")) as { opportunity_zones_2: { summary: string } })
+      .opportunity_zones_2.summary;
+    const words = (iso: string) =>
+      new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+    // "…its zones take EFFECT January 1, 2027; old zones overlap until December 31, 2028."
+    expect(summary).toContain(`zones take EFFECT ${words(OZ_NEXT_ROUND_EFFECTIVE)}`);
+    expect(summary).toContain(`old zones overlap until ${words(OZ_2018_ROUND_LAST_DAY)}`);
+    expect(words(OZ_NEXT_ROUND_EFFECTIVE)).toBe("January 1, 2027");
+    expect(words(OZ_2018_ROUND_LAST_DAY)).toBe("December 31, 2028");
+  });
+
+  it("turns on the day the next round takes effect and the day after the 2018 round's last", () => {
+    expect(ozRoundPhase("2026-12-31")).toBe("ahead");
+    expect(ozRoundPhase("2027-01-01")).toBe("overlap");
+    expect(ozRoundPhase("2028-12-31")).toBe("overlap");
+    expect(ozRoundPhase("2029-01-01")).toBe("ended");
+  });
+
+  it("before 2027: as it read when the round was announced", () => {
+    const r = opportunityZoneRead(listed, BEFORE_NEXT_ROUND);
+    expect(r).toMatchObject({ kind: "listed", label: "Opportunity Zone tract (2018 designations)", phase: "ahead" });
+    expect(r.note).toBe(
+      "This checks the 2018 round's zones. The next round's zones take effect January 1, 2027 and the 2018 zones run to December 31, 2028, so a deal closing from 2027 should be checked against the new round's maps too.",
+    );
+    expect(opportunityZoneRead(offByCurrent, BEFORE_NEXT_ROUND).note).toBe(r.note);
+  });
+
+  it("from January 1, 2027: the next round took effect, and this checks only the 2018 list", () => {
+    const r = opportunityZoneRead(listed, "2027-06-30");
+    expect(r).toMatchObject({ kind: "listed", label: "Opportunity Zone tract (2018 designations)", phase: "overlap" });
+    expect(r.note).toBe(
+      "This checks only the 2018 round's zones. The next round's zones took effect January 1, 2027 and are not on this list; the 2018 zones run to December 31, 2028, so check the new round's maps too.",
+    );
+    expect(r.note).not.toMatch(/take effect/);
+    expect(opportunityZoneRead(offBy2010, "2027-06-30")).toMatchObject({ label: "Tract not on the 2018 Opportunity Zone list", note: r.note });
+    expect(opportunityZoneRead(offByCurrent, "2027-06-30").caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
+  });
+
+  it("after December 31, 2028: no chip or line reads as a zone in force", () => {
+    const r = opportunityZoneRead(listed, "2029-03-15");
+    expect(r).toMatchObject({
+      kind: "listed",
+      label: "In a 2018 Opportunity Zone tract; those designations ended Dec 31, 2028",
+      phase: "ended",
+    });
+    expect(r.note).toBe(
+      "The 2018 round's zones ended December 31, 2028, and this checks only that round's list — not the round that took effect January 1, 2027. Check the current round's maps.",
+    );
+    const off = opportunityZoneRead(offByCurrent, "2029-03-15");
+    expect(off.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT_ENDED);
+    for (const text of [r.label, r.note ?? "", off.label, off.caveat ?? "", off.note ?? ""]) {
+      expect(text).not.toMatch(/Opportunity Zone tract \(2018 designations\)/);
+      expect(text).not.toMatch(/\b(sit|sits) in a zone\b/);
+      expect(text).not.toMatch(/\b(run|runs) to\b|take effect/);
+    }
   });
 });

@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, brokerCompsInstruction } from "./prompts";
+import { todayLine } from "./today";
 import type { BrokerCompsResult } from "./types";
 
 const CompSchema = z.object({
@@ -55,6 +56,9 @@ export async function scrutinizeComps(
           // context rides after it so the cached prefix stays identical.
           omDocument(om),
           { type: "text", text: brokerCompsInstruction(context) },
+          // Today's date, which a comp's age is judged against
+          // (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

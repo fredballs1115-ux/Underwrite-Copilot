@@ -129,6 +129,19 @@ describe("runWaterfall — the hurdles are really hurdles", () => {
     expect(jumbled.gp.distributed).toBeCloseTo(sorted.gp.distributed, 0);
   });
 
+  it("splits a tier's cash at its ratio UP TO its hurdle, not above it", () => {
+    // The cash between the 8% pref and 12% goes 80/20 — the tier named
+    // "To 12% — 80/20" — and the cash from 12% on goes 70/30. A field
+    // labelled "LP above it" read the same inputs as 80/20 above 12%.
+    const w = runWaterfall(DEAL);
+    const toTwelve = w.byTier.find((t) => t.label === "To 12% — 80/20")!;
+    const toEighteen = w.byTier.find((t) => t.label === "To 18% — 70/30")!;
+    expect(toTwelve.toLp / toTwelve.total).toBeCloseTo(0.8, 6);
+    expect(toEighteen.toLp / toEighteen.total).toBeCloseTo(0.7, 6);
+    expect(w.promote).toBe(400_565);
+    expect(w.gp.irrPct).toBe(20.61);
+  });
+
   it("keeps splitting above the last hurdle at the last tier's ratio", () => {
     const w = runWaterfall({
       ...DEAL,

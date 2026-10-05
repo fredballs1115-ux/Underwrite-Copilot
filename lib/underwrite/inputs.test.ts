@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HOLD_MONTHS, deriveUnderwriteInputs } from "./inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DebtIndex } from "@/lib/debt-index";
@@ -330,6 +330,19 @@ describe("deriveUnderwriteInputs — the rate starts from today's curve", () => 
     expect(land.inputs.allInRatePct).toBe(0.06);
     expect(land.sources.allInRatePct?.note).toMatch(/^Land carries no permanent loan/);
     expect(land.meta.rateSeed).toBeNull();
+  });
+
+  // Research pass 18: the rates line a Claude step reads names the spread
+  // the model adds; the reader must be the one the seed is built from.
+  it("permanentLoanSpread names the spread the seeded rate adds, class for class, and none on land", () => {
+    for (const cls of ["multifamily", "office", "industrial", "hospitality_str", "self_storage", "Boutique hotel", "auto"]) {
+      const spread = permanentLoanSpread(cls);
+      const note = deriveUnderwriteInputs(withClass(cls), "x", undefined, { debtIndex: five }).sources.allInRatePct?.note ?? "";
+      expect(spread.bps, cls).not.toBeNull();
+      expect(note, cls).toContain(`+ ${spread.bps} bps ${spread.label}, a screening default`);
+    }
+    expect(permanentLoanSpread("multifamily")).toEqual({ bps: 200, label: "multifamily spread" });
+    expect(permanentLoanSpread("land_infill").bps).toBeNull();
   });
 
   it("the seeded rate is what the engine runs on — the debt service moves with the curve", () => {

@@ -10,6 +10,8 @@
 // a few at a time); a deal no geocoder could place, or with no address,
 // is counted and never guessed at.
 
+import { PIPELINE_MAP_PICTURE } from "@/lib/image-frames";
+
 export type LocationPrecision = "street" | "block" | "area";
 
 export interface MapPlace {
@@ -97,22 +99,62 @@ export function pinHtml(verdict: string | null, precision: LocationPrecision, se
   );
 }
 
+/** The card's inside, shared by the hover card and the touch preview. */
+function cardBody(d: MapDeal): string {
+  const call = d.verdict && PIN_LABEL[d.verdict] ? PIN_LABEL[d.verdict] : "Not screened";
+  const figures = [d.price, d.figure].filter((x): x is string => !!x).map(escapeHtml).join(" · ");
+  // The route's own frame for the card (lib/image-frames), twice its 48px.
+  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=${PIPELINE_MAP_PICTURE.w}&amp;h=${PIPELINE_MAP_PICTURE.h}&amp;fallback=cover`;
+  return (
+    `<img src="${img}" alt="" width="48" height="48" class="uc-maptip-img"/>` +
+    `<div class="uc-maptip-body">` +
+    `<div class="uc-maptip-name">${escapeHtml(d.name)}</div>` +
+    `<div class="uc-maptip-meta"><span style="color:${pinColor(d.verdict)};font-weight:600">${call}</span>${figures ? ` · ${figures}` : ""}</div>` +
+    `</div>`
+  );
+}
+
 /** The hover card: the building's picture, its name, its call and figures —
  *  every string escaped, since a deal's name is whatever its owner typed.
  *  The picture is the building's photograph or the deal's cover, never an
  *  overhead (#443): the map is already the view from above. */
 export function tooltipHtml(d: MapDeal): string {
-  const call = d.verdict && PIN_LABEL[d.verdict] ? PIN_LABEL[d.verdict] : "Not screened";
-  const figures = [d.price, d.figure].filter((x): x is string => !!x).map(escapeHtml).join(" · ");
-  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=96&amp;h=96&amp;fallback=cover`;
+  return `<div class="uc-maptip">${cardBody(d)}</div>`;
+}
+
+/** The same card on a touch screen, which has no hover: a pin's first tap
+ *  opens it as a popup, and the whole card is a link into the deal, its
+ *  chevron saying so. Escaped as the hover card is; the id is encoded. */
+export function previewHtml(d: MapDeal): string {
   return (
-    `<div class="uc-maptip">` +
-    `<img src="${img}" alt="" width="48" height="48" class="uc-maptip-img"/>` +
-    `<div class="uc-maptip-body">` +
-    `<div class="uc-maptip-name">${escapeHtml(d.name)}</div>` +
-    `<div class="uc-maptip-meta"><span style="color:${pinColor(d.verdict)};font-weight:600">${call}</span>${figures ? ` · ${figures}` : ""}</div>` +
-    `</div></div>`
+    `<a class="uc-maptip" href="/deals/${encodeURIComponent(d.id)}" data-maptip-link>` +
+    cardBody(d) +
+    `<svg class="uc-maptip-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>` +
+    `</a>`
   );
+}
+
+/**
+ * What a click on a pin does. On a device whose main pointer is a mouse the
+ * card shows on hover and a click opens the deal — or picks it, in compare
+ * mode. A touch screen (a coarse pointer) has no hover, so a finger's first
+ * tap on a pin shows the card, and a second tap — on the same pin, or on the
+ * card — opens the deal. A click with no finger behind it (a keyboard, a
+ * screen reader, a mouse on a touch-first tablet, which gets no hover card)
+ * opens at once, and compare mode picks at once, with no card, as it always
+ * has.
+ */
+export function pinTapAction(t: {
+  /** the device's main pointer is coarse: `(pointer: coarse)` */
+  coarse: boolean;
+  compare: boolean;
+  /** the pointer that pressed this pin ("touch", "mouse", "pen"), or null */
+  pointer: string | null;
+  /** this pin's card was already open when the finger came down */
+  previewOpen: boolean;
+}): "preview" | "open" {
+  if (!t.coarse || t.compare) return "open";
+  return t.pointer === "touch" && !t.previewOpen ? "preview" : "open";
 }
 
 /** The counts said under the map, in plain words: every deal the filters

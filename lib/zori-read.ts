@@ -2,7 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fetchBenchRows, fetchBenchRowsFor } from "@/lib/live-rates-query";
-import { ZILLOW_METRICS, zoriFor, type BenchRow, type ZoriRead } from "@/lib/zori";
+import { ZILLOW_METRICS, zillowFileMonths, zoriFor, type BenchRow, type FileMonth, type ZoriRead } from "@/lib/zori";
 
 /**
  * The Zillow rows for one covered metro — the asking rent, the apartment
@@ -10,7 +10,9 @@ import { ZILLOW_METRICS, zoriFor, type BenchRow, type ZoriRead } from "@/lib/zor
  * have no one signed in: the same reason and the same shape as the
  * live-rates read. `benchmarks` is granted to authenticated users, `/market`
  * is public, and a Zillow figure is Zillow's to publish, not anybody's
- * data. Cached an hour per metro; the pull writes once a month.
+ * data. Cached an hour per metro; the pull writes once a month. The rows
+ * are cached and the read is made on them each time, on the caller's day,
+ * so a figure stops being said the day it stops being current.
  */
 const cachedRows = unstable_cache(
   async (metroName: string): Promise<BenchRow[]> => {
@@ -29,8 +31,14 @@ const cachedRows = unstable_cache(
   { revalidate: 3600, tags: ["benchmarks"] },
 );
 
-export async function liveZori(metroName: string): Promise<ZoriRead | null> {
-  return zoriFor(await cachedRows(metroName), metroName);
+export async function liveZori(metroName: string, now: Date = new Date()): Promise<ZoriRead | null> {
+  return zoriFor(await cachedRows(metroName), metroName, now);
+}
+
+/** Each Zillow file's month for one metro, current or not — the feeds
+ *  card's read, from the same cached rows the pages read. */
+export async function liveZillowFiles(metroName: string): Promise<FileMonth[]> {
+  return zillowFileMonths(await cachedRows(metroName), metroName);
 }
 
 /**
@@ -54,7 +62,7 @@ const cachedRowsFor = unstable_cache(
   { revalidate: 3600, tags: ["benchmarks"] },
 );
 
-export async function liveZoriAll(metroNames: readonly string[]): Promise<Map<string, ZoriRead | null>> {
+export async function liveZoriAll(metroNames: readonly string[], now: Date = new Date()): Promise<Map<string, ZoriRead | null>> {
   const rows = await cachedRowsFor([...metroNames]);
-  return new Map(metroNames.map((name) => [name, zoriFor(rows, name)]));
+  return new Map(metroNames.map((name) => [name, zoriFor(rows, name, now)]));
 }

@@ -1,4 +1,4 @@
-import { abatementEndLabel, type TaxAbatementRead } from "@/lib/tax-abatement";
+import { abatementEndLabel, abatementEnded, type TaxAbatementRead } from "@/lib/tax-abatement";
 
 /**
  * A property-tax abatement (#461) — the pure panel for `lib/tax-abatement`,
@@ -37,12 +37,19 @@ export function TaxAbatementPanel({
 }) {
   if (!abatement) return null;
   const r = abatement;
-  const left = r.end && r.end.yearsLeft > 0 ? r.end.yearsLeft : null;
+  // Ended and inside the hold by the DAY (lib/tax-abatement
+  // `abatementEnded`): inside its last month the whole months count none,
+  // and the chip had said "Already ended" four weeks early.
+  const ended = r.end ? abatementEnded(r.end) : null;
+  const left = r.end && !ended ? r.end.yearsLeft : null;
+  // The panel's own years ("1.0 year"); inside the last month, where the
+  // whole months count none, "under a month".
+  const leftWords = r.end && !ended ? (Math.round(r.end.yearsLeft * 12) < 1 ? "under a month" : years1(r.end.yearsLeft)) : null;
   const chip = !r.end
     ? { text: "No end stated", tone: "border-caution/40 text-caution" }
-    : r.end.yearsLeft <= 0
+    : ended
       ? { text: "Already ended", tone: "border-caution/40 text-caution" }
-      : holdYears != null && r.end.yearsLeft < holdYears
+      : holdYears != null && r.end.yearsToTheDay < holdYears
         ? { text: "Ends inside the model's hold", tone: "border-caution/40 text-caution" }
         : holdYears != null
           ? { text: "Ends after the model's sale", tone: "border-line text-muted" }
@@ -58,7 +65,7 @@ export function TaxAbatementPanel({
     >
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-caution">Tax abatement</span>
-        {left != null && <span className="text-sm font-semibold">{`${years1(left)} left`}</span>}
+        {leftWords != null && <span className="text-sm font-semibold">{`${leftWords.charAt(0).toUpperCase()}${leftWords.slice(1)} left`}</span>}
         {chip && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${chip.tone}`}>{chip.text}</span>}
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
@@ -91,7 +98,7 @@ export function TaxAbatementPanel({
           <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
             <li className="flex items-center gap-1.5">
               <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
-              {`Abated, ${years1(left)} from today`}
+              {`Abated, ${leftWords} from today`}
             </li>
             <li className="flex items-center gap-1.5">
               <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-caution/40" />

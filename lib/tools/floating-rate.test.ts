@@ -120,6 +120,43 @@ describe("the floor and the cap are different instruments", () => {
     expect(r.allInRatePct).toBeLessThan(r.rateBandHighPct!);
   });
 
+  it("takes the worst case at the floor where the floor sits above the strike", () => {
+    // A 4.50% floor over a 4.00% strike on SOFR + 300: below the strike the
+    // cap pays nothing and the floor is paid, so the loan can pay 7.50% —
+    // the worst case read 7.00%, the strike's. And the band runs from the
+    // strike (an index past the floor, reimbursed down to it) to the floor.
+    const r = readFloating({ ...SEED, indexFloorPct: 4.5, capStrikePct: 4.0 });
+    expect(r.worstCaseRatePct).toBe(7.5);
+    expect(r.worstCaseAt).toBe("floor");
+    // $1,660,000 over 7.50% interest-only on $20M, $1,500,000: 1.11×, where
+    // the strike's 7.00% had read 1.19×.
+    expect(r.worstCaseDscr).toBe(1.11);
+    expect(r.rateBandHighPct).toBe(7.5);
+    expect(r.rateBandLowPct).toBe(7);
+    // The index the loan pays at today sits inside it.
+    expect(r.allInRatePct).toBe(7.5);
+    // With the floor under the strike nothing moves.
+    expect(readFloating(SEED).worstCaseRatePct).toBe(7);
+    expect(readFloating(SEED).worstCaseAt).toBe("strike");
+    expect(readFloating({ ...SEED, capStrikePct: null }).worstCaseAt).toBeNull();
+  });
+
+  it("never calls the rate fixed at the strike while a floor above it is paid", () => {
+    // SOFR at 4.20% between a 4.00% strike and a 4.50% floor: the note
+    // charges 4.50%, the cap pays back 0.20%, so the loan pays 7.30% — 30
+    // bps over the strike's 7.00%, and a fall to 4.10% would make it 7.40%.
+    const between = { ...SEED, indexPct: 4.2, indexFloorPct: 4.5, capStrikePct: 4.0, noi: 2_000_000 };
+    const r = readFloating(between);
+    expect(r.allInRatePct).toBe(7.3);
+    expect(r.atCap).toBe(true);
+    expect(r.atFloor).toBe(true);
+    expect(r.note).not.toContain("fixed at the strike");
+    expect(r.note).toContain("30 bps over the strike's");
+    expect(readFloating({ ...between, indexPct: 4.1 }).allInRatePct).toBe(7.4);
+    // Past the floor the cap holds the rate at the strike, and says so.
+    expect(readFloating({ ...between, indexPct: 4.8 }).note).toContain("fixed at the strike");
+  });
+
   it("has no ceiling to the band with no cap", () => {
     const r = readFloating({ ...SEED, capStrikePct: null });
     expect(r.rateBandHighPct).toBeNull();
@@ -181,6 +218,7 @@ describe("whether the cap reaches the breach", () => {
     expect(r.breachIndexPct).toBe(3.92);
     expect(SEED.capStrikePct).toBe(4.0);
     expect(r.capProtects).toBe(false);
+    expect(r.headline).toBe("The cap is on the wrong side of the covenant.");
     expect(r.note).toBe(
       "The cap is struck at 4.00% and the covenant breaks at 3.92% — the loan fails before the cap pays anything.",
     );
@@ -199,6 +237,7 @@ describe("whether the cap reaches the breach", () => {
     const r = readFloating({ ...SEED, noi: 2_000_000 });
     expect(r.breachIndexPct).toBe(5.33);
     expect(r.capProtects).toBe(true);
+    expect(r.headline).toBe("The cap engages before the covenant does.");
     expect(r.worstCaseDscr!).toBeGreaterThan(SEED.covenantDscr!);
     expect(r.note).toContain("engages before the covenant");
   });
@@ -207,10 +246,88 @@ describe("whether the cap reaches the breach", () => {
     const r = readFloating({ ...SEED, capStrikePct: null, capPremium: null });
     expect(r.capProtects).toBe(false);
     expect(r.note).toContain("No cap");
+    // The headline says there is none, as the note does, not that a cap the
+    // loan does not have sits on the wrong side.
+    expect(r.headline).toBe("No cap: the covenant is the only limit.");
   });
 
   it("cannot be judged without a breach point", () => {
     expect(readFloating({ ...SEED, noi: null }).capProtects).toBeNull();
+    expect(readFloating({ ...SEED, noi: null }).headline).toBeNull();
+  });
+});
+
+describe("a floor above the strike and the breach point (audit c66)", () => {
+  // The audit's loan: a 4.50% floor over a 4.00% strike on SOFR + 300, $20M
+  // interest-only, $1,760,000 of NOI against a 1.20× covenant — which breaks
+  // at an index of 4.33%. The strike is under the breach point, and the
+  // headline said the cap engages first, beside a note and a tile that said
+  // the loan was already through the covenant at the floor.
+  const FLOOR: FloatingTerms = { ...SEED, indexPct: 3.0, indexFloorPct: 4.5, capStrikePct: 4.0, noi: 1_760_000 };
+
+  it("is not protected by a cap struck under the breach point, and the headline says the floor", () => {
+    const r = readFloating(FLOOR);
+    expect(r.breachIndexPct).toBe(4.33);
+    expect(r.capProtects).toBe(false);
+    expect(r.headline).toBe("The floor is on the wrong side of the covenant.");
+    expect(r.note).toBe("Already through the covenant: 1.17× against a 1.20× test, at today's index.");
+    expect(r.worstCaseAt).toBe("floor");
+    expect(r.worstCaseDscr).toBe(1.17);
+  });
+
+  it("says where the floor breaks it while the index sits above the floor, never blaming the strike", () => {
+    const r = readFloating({ ...FLOOR, indexPct: 5.0 });
+    expect(r.dscr).toBe(1.26);
+    expect(r.capProtects).toBe(false);
+    expect(r.headline).toBe("The floor is on the wrong side of the covenant.");
+    expect(r.note).toBe(
+      "The 4.50% floor sits above the 4.33% index at which the covenant breaks: should the index fall under 4.17%, " +
+        "the note charges the floor, the cap pays back too little, and the loan fails the covenant — the cap cannot hold it.",
+    );
+    // The 4.17%: the floor less the run over the strike, against the debt
+    // service the covenant allows ($1,760,000 over 1.20).
+    const allowed = 1_760_000 / 1.2;
+    expect(readFloating({ ...FLOOR, indexPct: 4.16 }).debtServiceAnnual!).toBeGreaterThan(allowed);
+    expect(readFloating({ ...FLOOR, indexPct: 4.18 }).debtServiceAnnual!).toBeLessThan(allowed);
+  });
+
+  // With the strike over the breach point too, no index keeps the loan
+  // inside the covenant: below the strike the floor alone is charged, and
+  // above the floor the cap holds the index at the strike. The note said it
+  // failed "should the index fall under" the strike plus the floor less the
+  // breach — as if an index above that were safe. At 4.50% and 5.00% over a
+  // 4.33% breach every index is already through the covenant, and the note
+  // says that first; a strike a hundredth over the breach is the one that
+  // reached the sentence: the index sits over the floor, the covenant reads
+  // met at two decimals (1.1989× shows as 1.20×), and the note named 5.01%.
+  it("says the loan fails at every index where the strike sits over the breach point too", () => {
+    for (const indexPct of [3.0, 4.6, 5.0, 5.2, 6.0]) {
+      expect(readFloating({ ...FLOOR, indexPct, indexFloorPct: 5.0, capStrikePct: 4.5 }).note, String(indexPct)).toMatch(
+        /^Already through the covenant: 1\.1\d× against a 1\.20× test/,
+      );
+    }
+    const r = readFloating({ ...FLOOR, indexPct: 5.5, indexFloorPct: 5.0, capStrikePct: 4.34 });
+    expect(r.breachIndexPct).toBe(4.33);
+    expect(r.dscr).toBe(1.2);
+    expect(r.headline).toBe("The floor is on the wrong side of the covenant.");
+    expect(r.note).toBe(
+      "The 5.00% floor and the 4.34% strike both sit above the 4.33% index at which the covenant breaks, so the loan fails the covenant at every index: " +
+        "below the strike the floor alone puts the rate past it, between the two the cap pays back too little, and above the floor the cap holds the rate at the strike's, still past it.",
+    );
+    // Every index pays more than the covenant allows ($1,760,000 over 1.20).
+    const allowed = 1_760_000 / 1.2;
+    for (const indexPct of [2.0, 4.34, 4.8, 5.0, 5.01, 5.5, 9.0]) {
+      const ds = readFloating({ ...FLOOR, indexPct, indexFloorPct: 5.0, capStrikePct: 4.34 }).debtServiceAnnual!;
+      expect(ds, String(indexPct)).toBeGreaterThan(allowed);
+    }
+  });
+
+  it("still protects where a floor over the strike sits under the breach point", () => {
+    // A 4.20% floor: the worst the loan pays is 7.20%, inside the covenant.
+    const r = readFloating({ ...FLOOR, indexFloorPct: 4.2 });
+    expect(r.capProtects).toBe(true);
+    expect(r.headline).toBe("The cap engages before the covenant does.");
+    expect(r.worstCaseDscr!).toBeGreaterThanOrEqual(1.2);
   });
 });
 

@@ -5,7 +5,8 @@ import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
-import { ANALYST_SYSTEM, challengerInstruction } from "./prompts";
+import { ANALYST_SYSTEM, challengerInstruction, type KeyedTrapList } from "./prompts";
+import { todayLine } from "./today";
 import type { AssetClass, ChallengerResult } from "./types";
 
 const ChallengerSchema = z.object({
@@ -31,10 +32,13 @@ export async function challengeAssumptions(
   assetClass: AssetClass,
   /** cross-document reconciliation red flags for the skeptic to reference */
   reconNote?: string,
+  /** the trap lists the memorandum's own words call for (prompts
+   *  `keyedTrapsFor`), read after the class's own */
+  keyed: readonly KeyedTrapList[] = [],
 ): Promise<ChallengerResult> {
   const client = getAnthropic();
   const instruction =
-    challengerInstruction(assetClass) +
+    challengerInstruction(assetClass, keyed) +
     (reconNote?.trim()
       ? `\n\n${reconNote.trim()} Where a figure the OM relies on is contradicted by the rent roll or T-12, treat that as a first-order challenge and put the exact discrepancy to the broker.`
       : "");
@@ -50,6 +54,8 @@ export async function challengeAssumptions(
           // Reads the OM from the prompt cache the extraction step wrote.
           omDocument(om),
           { type: "text", text: instruction },
+          // Today's date, after the cached document (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

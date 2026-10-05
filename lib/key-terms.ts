@@ -26,9 +26,22 @@ import { rosterTermRows } from "./tenant-roster";
 import { valueAddTermRows } from "./value-add";
 import { taxAbatementTermRows } from "./tax-abatement";
 import { sellerFinancingTermRows } from "./seller-financing";
+import { sellerNoteStatedRows } from "./loan-rows";
 import { siteReportTermRows } from "./site-reports";
 import { studentTermRows } from "./student-housing";
 import { mhTermRows } from "./manufactured-housing";
+import { storageTermRows } from "./self-storage";
+
+/** A cap rate on the property's income, whatever its qualifier: "Cap rate
+ *  (T-12)", "Stabilized cap rate", "Going-in cap", "Exit cap". Never an
+ *  interest rate cap ("Interest rate cap", "Rate cap strike"), which is a
+ *  term of a floating-rate loan. */
+const COLLATERAL_CAP =
+  /\bcap(?:italization)?\s+rates?\b|\b(?:going[- ]?in|entry|exit|terminal|reversion(?:ary)?|in[- ]place|stabili[sz]ed|pro ?forma|implied|trailing|current|market)\s+cap\b/i;
+
+function isCollateralCap(row: { label: string; value: string }): boolean {
+  return COLLATERAL_CAP.test(row.label) || findGoingInCap([row]) === row;
+}
 
 export interface KeyTermMetric {
   label: string;
@@ -46,12 +59,16 @@ export interface KeyTermMetric {
  * flagged rows; then everything else in the OM's order. On a note (#416)
  * the loan's own terms follow the price — the balance, the coupon, the
  * maturity, whether it pays — and the collateral's cap is not led with,
- * since it is not the buyer's. Rows that are not objects (analysis output
- * can carry nulls) are dropped.
+ * since it is not the buyer's; financing the seller offers on a note
+ * follows them, labelled as the note purchase's. Rows that are not objects
+ * (analysis output can carry nulls) are dropped. `screenYear` is the year
+ * the screen read the memorandum (lib/criteria `screenYearOf`), which the
+ * price row's label is read against, as on every other surface.
  */
 export function keyTermRows<M extends KeyTermMetric>(
   metrics: ReadonlyArray<M | null | undefined>,
   kind: StrategyKind,
+  screenYear: number,
   limit = 8,
   interest?: InterestKind,
 ): M[] {
@@ -61,13 +78,17 @@ export function keyTermRows<M extends KeyTermMetric>(
     const hit = row ? rows.find((m) => m === row || (m.label === row.label && m.value === row.value)) : undefined;
     if (hit && !head.includes(hit)) head.push(hit);
   };
-  const price = findPriceMetric(rows, kind);
+  const price = findPriceMetric(rows, kind, screenYear);
   lead(price);
   // An auction has no asking price (#456): its starting bid, the buyer's
   // premium, the reserve and the deadline stand where the price would.
   for (const row of saleTermRows(rows)) lead(row);
   if (interest === "note") {
     for (const row of noteTermRows(rows)) lead(row);
+    // Financing the seller offers on a note is of the note's purchase: it
+    // leads beside the note's own terms, so the block's limit never cuts
+    // it, and is labelled as that below.
+    for (const row of sellerFinancingTermRows(rows)) lead(row);
   } else if (isPlanDeal(kind)) {
     const stabilized = noiFigures(rows).find((f) => f.kind === "stabilized");
     if (stabilized) lead(rows.find((m) => m.label === stabilized.label));
@@ -109,6 +130,19 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A manufactured-housing park (#470): the lot rent and the market's, the
   // park-owned homes, the water and sewer and the age restriction.
   for (const row of mhTermRows(rows)) lead(row);
-  const rest = rows.filter((m) => !head.includes(m));
-  return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
+  // A self-storage facility (#471): the economic occupancy, the street rate
+  // and the in-place rent.
+  for (const row of storageTermRows(rows)) lead(row);
+  // On a note no cap on the collateral's income is printed at all — the
+  // going-in, the in-place, the stabilized, the exit: among the rows a
+  // reader would take any of them for a cap on the note's price, which none
+  // is. An interest rate cap is a term of the loan and stays.
+  const rest = rows.filter((m) => !head.includes(m) && !(interest === "note" && isCollateralCap(m)));
+  const out = [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
+  if (interest !== "note") return out;
+  // On a note every row of the seller's financing is the note purchase's,
+  // and says so — never the property's financing, and not run against the
+  // model (research pass 23 found it listed with nothing to say whose).
+  const purchase = new Set<unknown>(sellerNoteStatedRows(rows).map((e) => e.row));
+  return out.map((m) => (purchase.has(m) ? { ...m, label: `${m.label} (for the note purchase; not run against the model)` } : m));
 }

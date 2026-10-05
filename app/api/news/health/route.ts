@@ -11,22 +11,37 @@
 // Public: nothing here is secret — publisher names, HTTP outcomes, latency,
 // the top headlines with their links — and live-verify reads it after every
 // deploy, so an empty section is diagnosed from the deployment's own
-// network, not from a sandbox that cannot reach the publishers. Signed-in
-// callers may add `?refresh=1` to drop this process's fresh copies first and
-// exercise every feed; anonymous callers read what the page would show.
+// network, not from a sandbox that cannot reach the publishers. Every caller
+// reads what the page would show, this process's copies as they stand. Only
+// the site's operators (OPERATOR_EMAILS, lib/operator-server) may add
+// `?refresh=1` to drop those copies first and ask every feed again (research
+// pass 22): any signed-in account could, and a loop of it sent every
+// publisher and search host a request per source per ask from the site's
+// own address. Anyone else's `refresh=1` is read as no refresh, and
+// `refreshed` says which it was.
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { isSiteOperator } from "@/lib/operator-server";
 import { fetchLiveHeadlines, forgetLiveHeadlines, heldHosts, lastWarmUp } from "@/lib/news/live";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
-  const refresh = new URL(req.url).searchParams.get("refresh") === "1";
-  if (refresh) {
-    const user = await getCurrentUser();
-    if (user) forgetLiveHeadlines();
+/** Whether the caller is one of the site's operators; a session that cannot
+ *  be read is no operator's. */
+async function operatorAsking(): Promise<boolean> {
+  try {
+    return isSiteOperator(await getCurrentUser());
+  } catch {
+    return false;
   }
+}
+
+export async function GET(req: Request) {
+  // The session is read only for a refresh: the light read that live-verify
+  // makes, with no session, asks the auth service nothing.
+  const refresh = new URL(req.url).searchParams.get("refresh") === "1" && (await operatorAsking());
+  if (refresh) forgetLiveHeadlines();
 
   const live = await fetchLiveHeadlines();
   const answered = live.sources.filter((s) => s.ok).length;
@@ -35,6 +50,9 @@ export async function GET(req: Request) {
     {
       fetchedAt: live.fetchedAt,
       summary: `${answered} of ${live.sources.length} sources answered${stale ? ` (${stale} from an earlier copy)` : ""}; ${live.headlines.length} headlines ranked.`,
+      // Whether this process's copies were dropped and every feed asked
+      // again first: an operator's `?refresh=1`, and nobody else's.
+      refreshed: refresh,
       // Which process answered, and for how long it has been up: a `warm`
       // of null on a process minutes old is a defect, on one seconds old
       // it is the boot.

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ruleName } from "@/lib/research-data";
+import { dayOf } from "@/lib/utc-day";
 
 /** One story the weekday intel sweep gathered and scored for this buyer. */
 export interface ItemRow {
@@ -13,7 +15,8 @@ export interface ItemRow {
   created_at: string;
 }
 
-/** A law or rule change the sweep detected and the user has not dismissed. */
+/** A law or rule change the sweep detected — dismissed from a banner or not;
+ *  this strip is the record. */
 export interface AlertRow {
   id: string;
   rule_id: string | null;
@@ -37,13 +40,12 @@ export const SECTOR_LABEL: Record<string, string> = {
   "construction-supply": "construction",
 };
 
-const fmtDay = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+/** "Sep 14, 2026 UTC" — the day the sweep picked a story up, as its
+ *  group's heading says it, and the day an alert was detected: the sweep's
+ *  days are UTC's, said so (lib/utc-day, the helper every feed's date
+ *  prints through). A story picked up at 9 pm Eastern sits under the next
+ *  day's heading; the "UTC" says why. */
+const fmtDay = (iso: string): string => dayOf(iso) ?? iso;
 
 /**
  * The scored feed as a pure view of the sweep's rows: the law-and-rule
@@ -91,26 +93,34 @@ export function ScoredFeedView({
             Law &amp; rule changes
           </h2>
           <ul className="mt-2 space-y-1.5 text-sm">
-            {alerts.map((a) => (
-              <li key={a.id} className="leading-snug">
-                {a.url ? (
-                  <a
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-dotted underline-offset-2 hover:text-brand"
-                  >
-                    {a.headline}
-                  </a>
-                ) : (
-                  a.headline
-                )}{" "}
-                <span className="ml-1 text-[11px] text-muted">
-                  {a.detected_at.slice(0, 10)}
-                  {a.rule_id ? ` · affects ${a.rule_id}` : ""}
-                </span>
-              </li>
-            ))}
+            {alerts.map((a) => {
+              // The rule the sweep matched, by its name in the research file
+              // (lib/research-data `ruleName`) — an id the file does not hold
+              // says nothing rather than print itself.
+              const rule = ruleName(a.rule_id);
+              return (
+                <li key={a.id} className="leading-snug">
+                  {a.url ? (
+                    <a
+                      href={a.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline decoration-dotted underline-offset-2 hover:text-brand"
+                    >
+                      {a.headline}
+                    </a>
+                  ) : (
+                    a.headline
+                  )}{" "}
+                  <span className="ml-1 text-[11px] text-muted">
+                    <time dateTime={a.detected_at} className="whitespace-nowrap">
+                      {fmtDay(a.detected_at)}
+                    </time>
+                    {rule ? ` · affects ${rule}` : ""}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
@@ -147,10 +157,10 @@ export function ScoredFeedView({
         // No box for what has not started: the headlines above are the
         // page; one quiet line says what the sweep will add.
         <p className="text-[12px] leading-relaxed text-muted">
-          The scored feed — every story rated 0–10 for your buy box, law and
-          rule changes flagged — starts with the weekday sweep once its
-          GitHub secret is set. Until then the headlines above are the news,
-          unscored.
+          The scored feed — every story rated 0–10 for a small East Coast
+          buyer of 2–4 unit buildings, law and rule changes flagged — starts
+          with the weekday sweep once its GitHub secret is set. Until then the
+          headlines above are the news, unscored.
         </p>
       ) : (
         [...byDay.entries()].map(([day, list]) => (
@@ -172,7 +182,7 @@ export function ScoredFeedView({
                             ? "bg-brand/10 text-brand"
                             : "bg-faint text-muted"
                         }`}
-                        title={`Relevance to your buy box, ${it.relevance} of 10`}
+                        title={`Relevance ${it.relevance} of 10, scored for one buyer profile (a small East Coast buyer of 2–4 unit buildings), not your buy box`}
                       >
                         {it.relevance}/10
                       </span>

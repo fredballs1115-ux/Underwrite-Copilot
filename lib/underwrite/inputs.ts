@@ -14,7 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
+import { entityLoanOf, interestOf, interestShortLine, readInterest, type EquipmentUse } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -25,7 +25,13 @@ import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { readRoster, rosterModelLine, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddModelLine, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementModelLine, taxAbatementShortLine } from "@/lib/tax-abatement";
-import { readSellerFinancing, sellerFinancingLine, sellerFinancingSentence } from "@/lib/seller-financing";
+import {
+  notePurchaseFinancing,
+  notePurchaseFinancingLine,
+  readSellerFinancing,
+  sellerFinancingLine,
+  sellerFinancingSentence,
+} from "@/lib/seller-financing";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -35,6 +41,7 @@ import {
   parsePrice,
   parseSf,
   priceRange,
+  screenYearOf,
 } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
@@ -49,13 +56,14 @@ import {
   type StrategyKind,
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
 import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
-import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
+import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
+import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
 
@@ -87,6 +95,9 @@ export interface InputSource {
   note: string;
   /** OM page, ONLY when the extraction metric actually carried one */
   page?: string;
+  /** the document an extracted figure was read from where it is not the
+   *  OM ("Rent roll"), so the SOURCE column never credits it to the OM */
+  doc?: string;
 }
 
 export interface WorkbookMeta {
@@ -99,8 +110,10 @@ export interface WorkbookMeta {
   unitNoun?: { one: string; many: string };
   /** what is being sold (lib/interest, #414) — a note, a share, a
    *  leasehold: the cover says it in one line and what the model is and is
-   *  not; absent for a plain fee simple */
-  interest?: { line: string; modelCaveat: string | null } | null;
+   *  not; absent for a plain fee simple. `equipment` is a ground lease's
+   *  tower, billboard or solar array where the memorandum names one, which
+   *  the deal type names on a leased fee in place of a building */
+  interest?: { line: string; modelCaveat: string | null; kind?: InterestKind; equipment?: EquipmentUse | null } | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -161,6 +174,11 @@ export interface WorkbookMeta {
    *  does with the gap to market, the park-owned homes and a private
    *  system. Absent on anything else. */
   mh?: { line: string; read: string } | null;
+  /** a self-storage facility (lib/self-storage, #471): its occupancies,
+   *  rates and platform in a line, then what the model does with the
+   *  premium sitting tenants pay over street and with a lease-up. Absent on
+   *  anything else. */
+  storage?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -248,11 +266,26 @@ const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS => {
   return key && CLASS_DEFAULTS[key] ? key : "auto";
 };
 
+/**
+ * The spread the model adds to the day's index for a deal's class, read as
+ * `deriveUnderwriteInputs` reads it (the extraction's class, the class's
+ * `spreadBps`, none where the class operates nothing), with the words its
+ * note uses — so a Claude step handed the day's rates (lib/debt-index
+ * `ratesPromptLine`) is told the spread the site's own model adds, as the
+ * screening default it is, instead of inventing one. A read of the table,
+ * never a change to it.
+ */
+export function permanentLoanSpread(assetClass: string | null | undefined): PermanentSpread {
+  const key = normalizeClass(assetClass ?? "auto");
+  const bps = assetWords(assetClass).operating ? (CLASS_DEFAULTS[key].spreadBps ?? null) : null;
+  return { bps, label: `${(assetClassLabel(key) || "generic").toLowerCase()} spread` };
+}
+
 /** The cover's line about what is being sold, and what the model is and
  *  is not on it — null for a plain fee simple. */
 function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
   const r = readInterest(extraction, askingPriceOf(extraction));
-  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat } : null;
+  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat, kind: r.kind, equipment: r.equipment } : null;
 }
 
 /** The cover's lines about the seller's loan offered for assumption
@@ -260,7 +293,16 @@ function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["intere
  *  this model's new loan. Null where none is offered. */
 function sellerNoteMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["sellerNote"] {
   const s = extraction ? readSellerFinancing(extraction, inputs) : null;
-  return s ? { line: sellerFinancingLine(s.terms), read: sellerFinancingSentence(s) } : null;
+  if (s) return { line: sellerFinancingLine(s.terms), read: sellerFinancingSentence(s) };
+  // On a note the seller's financing is of the note's purchase: listed as
+  // that, and never run against this model's property loan.
+  const t = notePurchaseFinancing(extraction);
+  return t
+    ? {
+        line: notePurchaseFinancingLine(t),
+        read: "It finances the purchase of the loan, not the property, so this model — the collateral's, run with a property loan of its own — does not run it.",
+      }
+    : null;
 }
 
 function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {
@@ -308,6 +350,17 @@ function mhMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): 
   const r = readManufacturedHousing(extraction);
   if (!r) return null;
   return { line: mhShortLine(r), read: mhModelLine(r, { rentGrowthPct: inputs.rentGrowthPct, exitCapPct: inputs.exitCapPct }) };
+}
+
+/** The cover's lines about a self-storage facility (#471): the read, then
+ *  what the model does with the premium over street and with a lease-up. */
+function storageMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["storage"] {
+  const r = readSelfStorage(extraction);
+  if (!r) return null;
+  return {
+    line: storageShortLine(r),
+    read: storageModelLine(r, { rentAnnual: inputs.inPlaceRentAnnual, exitCapPct: inputs.exitCapPct, vacancyPct: inputs.vacancyPct * 100 }),
+  };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -426,8 +479,9 @@ export function deriveUnderwriteInputs(
     provenance: Provenance,
     note: string,
     page?: string,
+    doc?: string,
   ) => {
-    sources[key] = { provenance, note, page: page && page.trim() ? page : undefined };
+    sources[key] = { provenance, note, page: page && page.trim() ? page : undefined, ...(doc ? { doc } : {}) };
   };
 
   // ── Purchase price ─────────────────────────────────────────────────────
@@ -435,7 +489,9 @@ export function deriveUnderwriteInputs(
   // "oPERating" and silently disqualify "Net operating income" itself.
   // The shared price reader: the asking / purchase price, else — on a ground-up
   // development only — the land or site cost, which is what is being bought.
-  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
+  // A label's year is read against the year the screen read the memorandum,
+  // so a stored deal's model keeps its price in a later year.
+  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind, screenYearOf(extraction));
   const priceIsLand = priceMetric != null && /\b(land|site)\b/i.test(priceMetric.label);
   // The shared going-in cap reader — the same call the deal page, the buy
   // box and the mandate score make — so the workbook never backs a price
@@ -482,10 +538,17 @@ export function deriveUnderwriteInputs(
     const share = interest.sharePct;
     const stated = price;
     price = stated / (share / 100);
+    // Beside the entity's stated loan the figure grossed up is the equity's
+    // whole, not the asset's (research pass 23). The note names both; the
+    // loan is not added to the price — that is the model's arithmetic, and
+    // the owner's call.
+    const entityLoan = entityLoanOf(extraction);
     mark(
       "purchasePrice",
       "derived",
-      `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
+      entityLoan != null
+        ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to ${usd0(price)} — the equity's whole, not the asset's: the entity's stated ${usd0(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, and the share earns ${share}% of them before the promote and the sponsor's fees`
+        : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
       pageOf(priceMetric),
     );
   } else if (price != null) {
@@ -661,7 +724,7 @@ export function deriveUnderwriteInputs(
   const typicalSf = units != null && units > 0 && cd.sfPerUnit ? Math.round(units * cd.sfPerUnit) : null;
   const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : (typicalSf ?? 100_000));
   if (rrSf != null) {
-    mark("rsf", "extracted", `Rent roll total SF${rrAsOf ? ` (as of ${rrAsOf})` : ""}`);
+    mark("rsf", "extracted", `Rent roll total SF${rrAsOf ? ` (as of ${rrAsOf})` : ""}`, undefined, "Rent roll");
   } else if (sfParsed && sfParsed > 100) {
     mark("rsf", "extracted", "OM building size", pageOf(sfMetric));
   } else if (typicalSf != null) {
@@ -757,17 +820,23 @@ export function deriveUnderwriteInputs(
 
   // Remaining provenance notes.
   mark("holdMonths", "assumption", "Underwrite Copilot default — 5-year hold");
+  // Read off a stated occupancy, the workbook's "General Vacancy & Credit
+  // Loss %" row holds 1 − that occupancy and nothing for credit or
+  // collection loss — the note says so, so the label is not read as both.
+  const noCreditLoss = "the vacancy is what it leaves and carries no credit or collection loss";
   if (rrOcc != null) {
     mark(
       "vacancyPct",
       "extracted",
-      `Rent roll actual — ${(rrOcc * 100).toFixed(1)}% SF-weighted occupancy${rrAsOf ? ` as of ${rrAsOf}` : ""}`,
+      `Rent roll actual — ${(rrOcc * 100).toFixed(1)}% SF-weighted occupancy${rrAsOf ? ` as of ${rrAsOf}` : ""} — ${noCreditLoss}`,
+      undefined,
+      "Rent roll",
     );
   } else if (occPct != null) {
     mark(
       "vacancyPct",
       "extracted",
-      `OM in-place occupancy ${occPct}% — the vacancy is what it leaves`,
+      `OM in-place occupancy ${occPct}% — ${noCreditLoss}`,
       (occupancyRow(metrics) as { page?: string } | null)?.page,
     );
   } else {
@@ -842,6 +911,20 @@ export function deriveUnderwriteInputs(
   mark("amortMonths", "assumption", "Default 30-year amortization");
   mark("financingCostPct", "assumption", "Default 1.0% of loan");
   mark("generalHoldPct", "assumption", "Placeholder DD/closing hold (1.0%) — enter itemized costs");
+  // A default of none is a claim, said as one in the SOURCE column: the
+  // costs the model holds at zero (none is ever read from a document), and
+  // the income its one rent line carries — that line is grossed up from the
+  // NOI, so a recovery or other income added beside it counts twice.
+  mark("acqFeePct", "assumption", "None modelled — enter it with its cap: the fee is the lesser of the two");
+  mark("acqFeeCap", "assumption", "None modelled — the fee is the lesser of its % of the price and this cap, so enter both");
+  mark("transferTaxPct", "assumption", "None modelled — enter the jurisdiction's transfer-tax rate where it levies one");
+  mark("recordationTaxPct", "assumption", "None modelled — enter the jurisdiction's recordation-tax rate where it levies one");
+  for (const key of ["buyerLegal", "lenderLegal", "thirdPartyReports", "miscClosing"] as const) {
+    mark(key, "assumption", "None itemized — the general hold stands in for it; enter it to itemize");
+  }
+  for (const key of ["expenseRecoveriesAnnual", "otherRevenueAnnual"] as const) {
+    mark(key, "assumption", "Folded into the in-place rental revenue — split it out of that line, never add it on top");
+  }
   mark("exitCapPct", capPct ? "derived" : "assumption",
     capPct ? "Defaulted to the going-in cap — set your exit view" : "Default 6.0% — set your exit view",
     capPct ? pageOf(capMetric) : undefined);
@@ -874,6 +957,7 @@ export function deriveUnderwriteInputs(
         : null,
       student: studentMeta(extraction, inputs),
       mh: mhMeta(extraction, inputs),
+      storage: storageMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

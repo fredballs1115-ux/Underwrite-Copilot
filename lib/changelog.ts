@@ -39,6 +39,28 @@ export function latestChange(): ChangelogEntry | null {
   return changelogEntries(1)[0] ?? null;
 }
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The oldest entry the log holds, by its date whatever the file's order —
+ *  the day the log reaches back to. An entry with no readable date is none. */
+export function oldestChange(): ChangelogEntry | null {
+  let oldest: ChangelogEntry | null = null;
+  for (const e of changelogEntries(Number.MAX_SAFE_INTEGER)) {
+    if (ISO_DAY.test(e.date) && (!oldest || e.date < oldest.date)) oldest = e;
+  }
+  return oldest;
+}
+
+/** "September 2026": the month the log reaches back to, read off its
+ *  oldest entry — the log does not reach back to launch, so nothing may
+ *  say "every improvement". Null for a log with no dated entry. */
+export function changelogSince(): string | null {
+  const oldest = oldestChange();
+  return oldest
+    ? new Date(`${oldest.date}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
+    : null;
+}
+
 /** A note longer than this reads as a wall of text on a phone; /whats-new
  *  folds it behind its opening. */
 export const LONG_NOTE = 600;

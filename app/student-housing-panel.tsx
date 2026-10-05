@@ -62,8 +62,9 @@ export function StudentHousingPanel({
     tiles.push({
       key: "walk",
       label: "To campus",
-      value: r.walk.pedestrian === true ? "Pedestrian" : r.walk.pedestrian === false ? "Drive-to" : "As stated",
-      sub: r.walk.stated,
+      // A distance the reader cannot place is headlined in its own words.
+      value: r.walk.pedestrian === true ? "Pedestrian" : r.walk.pedestrian === false ? "Drive-to" : r.walk.stated,
+      sub: r.walk.pedestrian == null ? "As stated" : r.walk.stated,
       tone: r.walk.pedestrian === true ? "pass" : r.walk.pedestrian === false ? "caution" : "neutral",
     });
   }

@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import {
-  DEAL_KILLERS,
-  SAMPLE_RECONCILE_ROWS,
-} from "@/lib/marketing-constants";
+import { DEAL_KILLERS } from "@/lib/marketing-constants";
 
 /** The screen, running — a looping six-stage trace band. Every line is
  *  DERIVED from the same sample fixture the demo renders — counts and the
@@ -12,6 +9,9 @@ import {
  *  screen readers get one static sentence. Shared by the homepage and /why. */
 export function ScreenRunStrip() {
   const metricCount = SAMPLE_DEAL.extraction.metrics.length;
+  // The gaps the sample's own reconciliation calls — a row in agreement is
+  // not a gap.
+  const gapCount = SAMPLE_DEAL.reconciliation.rows.filter((r) => r.direction !== "neutral").length;
   const verdictWord =
     SAMPLE_DEAL.verdict.verdict === "pass"
       ? "Go"
@@ -22,7 +22,7 @@ export function ScreenRunStrip() {
     ["extract", `${metricCount} figures pulled — each carrying its OM page cite`],
     ["challenge", `${DEAL_KILLERS} deal-killers stressed first: basis · exit · debt`],
     ["comps", "broker comps ranked: supports · leans favorable · stretched"],
-    ["reconcile", `${SAMPLE_RECONCILE_ROWS.length} gaps called against your own model`],
+    ["reconcile", `${gapCount} gaps called against your own model`],
     ["market", "assumptions graded vs typical ranges — labeled, never dressed as comps"],
     ["verdict", `${verdictWord} — reasons attached, honest edges shown`],
   ];

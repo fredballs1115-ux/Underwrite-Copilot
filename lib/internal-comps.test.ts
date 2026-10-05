@@ -66,6 +66,27 @@ describe("deriveInternalComps — the unit count is the row that counts units", 
   });
 });
 
+describe("deriveInternalComps — a deal's one class, filed by its words (lib/asset-words dealClassKey)", () => {
+  it("a sibling filed Auto whose deck says 'Garden-style multifamily' is a multifamily comp, priced per unit", () => {
+    const comps = deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [
+      sib("g", "Garden Court", "auto", { ...STABILIZED, assetClass: "Garden-style multifamily" }),
+      sib("o", "Tysons", "auto", { ...STABILIZED, assetClass: "Class A office" }),
+    ]);
+    expect(comps.map((c) => c.dealId)).toEqual(["g"]);
+    expect(comps[0].basisLabel).toBe("$202k/unit");
+  });
+
+  it("the current deal's own phrase is read the same way, and the analyst's class ahead of its deck's", () => {
+    expect(
+      deriveInternalComps("current", "auto", { assetClass: "Garden-style multifamily" }, [sib("a", "Maddox", "multifamily", STABILIZED)]).map(
+        (c) => c.dealId,
+      ),
+    ).toEqual(["a"]);
+    // Filed an office by the analyst: no multifamily comps, whatever its deck said.
+    expect(deriveInternalComps("current", "office", { assetClass: "Apartments" }, [sib("a", "Maddox", "multifamily", STABILIZED)])).toEqual([]);
+  });
+});
+
 describe("deriveInternalComps — the sibling's kind is read first", () => {
   const comps = deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [
     sib("current", "This deal", "multifamily", STABILIZED),
@@ -128,6 +149,33 @@ describe("deriveInternalComps — the basis follows the asset class before any p
       }),
     ]);
     expect(c.basisLabel).toBe("$201,613");
+  });
+});
+
+describe("deriveInternalComps — an outdoor-storage yard has no per-SF basis", () => {
+  it("shows the yard's price and cap, and no price over its shop building", () => {
+    const yard = {
+      dealName: "Lot 9 yard",
+      assetClass: "Industrial Outdoor Storage (IOS)",
+      market: "Dallas, TX",
+      metrics: [m("Asking price", "$12,000,000"), m("Going-in cap rate", "6.0%"), m("Building SF", "4,000")],
+    };
+    const warehouse = {
+      dealName: "Dock 4",
+      assetClass: "industrial",
+      market: "Dallas, TX",
+      metrics: [m("Asking price", "$20,000,000"), m("Total SF", "100,000 SF")],
+    };
+    const comps = deriveInternalComps("current", "industrial", { assetClass: "industrial" }, [
+      sib("y", "Lot 9 yard", "industrial", yard),
+      sib("w", "Dock 4", "industrial", warehouse),
+    ]);
+    const by = Object.fromEntries(comps.map((c) => [c.dealId, c]));
+    // It had read "$3000/SF".
+    expect(by.y.basisLabel).toBeNull();
+    expect(by.y.priceLabel).toBe("$12.0M");
+    expect(by.y.capLabel).toBe("6.0%");
+    expect(by.w.basisLabel).toBe("$200/SF");
   });
 });
 

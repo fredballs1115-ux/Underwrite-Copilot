@@ -1,9 +1,10 @@
 import sharp from "sharp";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { fetchSkylinePhoto, lighten } from "./skyline-fetch";
+import { COMMONS_IN_FLIGHT, fetchSkylinePhoto, forgetSkylinePhotos, lighten } from "./skyline-fetch";
+import { SKYLINES } from "./skyline";
 import { testPixels } from "./test-memorandum";
 
 const photo = (quality: number, w = 1200, h = 800) =>
@@ -20,6 +21,33 @@ describe("a market's photograph, encoded again to be served (#451)", () => {
     expect(got.body.byteLength).toBeLessThan(heavy.byteLength * 0.75);
     const m = await sharp(Buffer.from(got.body)).metadata();
     expect({ w: m.width, h: m.height, format: m.format }).toEqual({ w: 1200, h: 800, format: "jpeg" });
+  });
+
+  it("brings a copy wider than the width asked down to it, and never enlarges one (2026-10-01)", async () => {
+    // Commons snaps a thumbnail's width up to its own sizes: the contact
+    // sheets asked for 640px and were sent 960px.
+    const wide = await photo(80, 1600, 1000);
+    const got = await lighten(ab(wide), "image/jpeg", 960);
+    const m = await sharp(Buffer.from(got.body)).metadata();
+    expect({ w: m.width, h: m.height }).toEqual({ w: 960, h: 600 });
+    // Asked wider than it is: the same size, never stretched.
+    const same = await lighten(ab(wide), "image/jpeg", 2400);
+    expect((await sharp(Buffer.from(same.body)).metadata()).width).toBe(1600);
+    // A light copy wider than asked is still brought down, whatever its bytes.
+    const lightWide = await photo(30, 1600, 1000);
+    const down = await lighten(ab(lightWide), "image/jpeg", 480);
+    expect((await sharp(Buffer.from(down.body)).metadata()).width).toBe(480);
+    // Stored on its side with an EXIF turn: judged by the width it is shown
+    // at (1,000 upright), so a 1,200 ask leaves it as it is, upright.
+    const turned = await sharp(testPixels(1600, 1000, 2), { raw: { width: 1600, height: 1000, channels: 3 } })
+      .jpeg({ quality: 30 })
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    const upright = await lighten(ab(turned), "image/jpeg", 1200);
+    expect(upright.body.byteLength).toBe(turned.byteLength);
+    const turnedDown = await lighten(ab(turned), "image/jpeg", 500);
+    const t = await sharp(Buffer.from(turnedDown.body)).metadata();
+    expect({ w: t.width, h: t.height }).toEqual({ w: 500, h: 800 });
   });
 
   it("keeps what Commons sent where encoding again would not help or cannot run", async () => {
@@ -44,5 +72,64 @@ describe("a market's photograph, encoded again to be served (#451)", () => {
     const again = await fetchSkylinePhoto("dc", 1234);
     expect(again!.body.byteLength).toBe(first!.body.byteLength);
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a market's photograph, asked of Commons once and a few at a time (the security review, 2026-09-30)", () => {
+  beforeEach(() => forgetSkylinePhotos());
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** A fetch that answers a small JPEG after `ms`, recording each width asked. */
+  async function commons(ms = 15) {
+    const body = await photo(80, 64, 48);
+    const widths: string[] = [];
+    let active = 0;
+    const seen = { peak: 0 };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        widths.push(new URL(url).searchParams.get("width") ?? "");
+        active++;
+        seen.peak = Math.max(seen.peak, active);
+        await new Promise((r) => setTimeout(r, ms));
+        active--;
+        return new Response(new Uint8Array(body), { headers: { "content-type": "image/jpeg" } });
+      }),
+    );
+    return { widths, seen };
+  }
+
+  it("asks once for a photograph several visitors ask for at once, and keeps it", async () => {
+    const { widths } = await commons();
+    const [a, b, c] = await Promise.all([
+      fetchSkylinePhoto("chicago", 1600),
+      fetchSkylinePhoto("chicago", 1600),
+      fetchSkylinePhoto("chicago", 1600),
+    ]);
+    expect(a).not.toBeNull();
+    expect(b).toBe(a);
+    expect(c).toBe(a);
+    // The held copy: the same bytes, not asked for again.
+    expect((await fetchSkylinePhoto("chicago", 1600))?.body).toBe(a!.body);
+    expect(widths).toEqual(["1600"]);
+  });
+
+  it("snaps a width a caller typed to one the route serves, so nearby widths are one fetch", async () => {
+    const { widths } = await commons();
+    const [a, b] = await Promise.all([fetchSkylinePhoto("chicago", 1599), fetchSkylinePhoto("chicago", 1601)]);
+    expect(b).toBe(a);
+    expect((await fetchSkylinePhoto("chicago", 1600))?.body).toBe(a!.body);
+    await fetchSkylinePhoto("chicago", 12_345);
+    await fetchSkylinePhoto("chicago", 1);
+    await fetchSkylinePhoto("chicago", 1234);
+    expect(widths).toEqual(["1600", "2400", "480", "1400"]);
+  });
+
+  it(`asks Commons for at most ${COMMONS_IN_FLIGHT} photographs at once, and answers every ask`, async () => {
+    const { seen } = await commons();
+    const ids = Object.keys(SKYLINES).slice(0, COMMONS_IN_FLIGHT * 3);
+    const got = await Promise.all(ids.map((id) => fetchSkylinePhoto(id, 480)));
+    expect(got.every((g) => g !== null)).toBe(true);
+    expect(seen.peak).toBe(COMMONS_IN_FLIGHT);
   });
 });

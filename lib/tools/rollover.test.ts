@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readRoll, readRollover, MAX_YEARS, type RollInput } from "@/lib/tools/rollover";
+import { readRoll, readRollover, rollYearOf, MAX_YEARS, type RollInput } from "@/lib/tools/rollover";
 
 /**
  * A 200,000-foot flex building, 86% leased, with one long cheap distribution
@@ -127,6 +127,18 @@ describe("rule 3 — an average hides a cliff", () => {
     expect(readRollover({ rows: smooth.rows, holdYears: 5 }).note).toContain(
       "even enough that the average describes it",
     );
+  });
+
+  it("sets the even roll over the term the roll spans, past the schedule's fifteen years", () => {
+    // Twenty years of leases, one a year: an even roll is 5% a year. Held to
+    // the schedule's fifteen years it read 6.7%, and a 9% year sat under the
+    // 1.5x line that names a cliff.
+    const lines = Array.from({ length: 20 }, (_, i) => `T${i + 1}\t10,000\t30\t${i + 1}`);
+    const r = readRollover({ rows: readRoll(lines.join("\n"), 2026).rows, holdYears: 5 });
+    expect(r.evenYearSharePct).toBe(5);
+    // A mistyped expiry is held to the longest lease the cards read.
+    const typo = readRoll(["A\t10,000\t30\t3", "B\t10,000\t30\t500"].join("\n"), 2026);
+    expect(readRollover({ rows: typo.rows, holdYears: 5 }).evenYearSharePct).toBe(1);
   });
 
   it("names the worst year on the seeded roll and what stands behind it", () => {
@@ -272,9 +284,44 @@ describe("what it refuses", () => {
     expect(readRollover({ rows: [] }).note).toContain("Paste the rent roll");
   });
 
-  it("rolls a tenant already in holdover in year one — they can leave today", () => {
+  it("rolls a tenant already in holdover, or whose break is already open, in year one — they can leave today", () => {
     const r = readRollover({ rows: readRoll("A\t10,000\t30\t0", 2026).rows, holdYears: 5 });
     expect(r.years[0].sfExpiring).toBe(10_000);
+    // A break is an expiry (rule 2), never counted at the lease's end once it
+    // is open (the audit of 2026-10-04): a break of 0 years is open today,
+    // and a break dated 2025 in a calendar-year roll read in 2026 opened
+    // last year.
+    for (const roll of ["A\t10,000\t30\t7\t0\nB\t10,000\t30\t9", "A\t10,000\t30\t2033\t2025\nB\t10,000\t30\t2035"]) {
+      const { rows } = readRoll(roll, 2026);
+      const open = readRollover({ rows, holdYears: 5 });
+      expect(open.years[0].sfExpiring, roll).toBe(10_000);
+      expect(open.years.slice(1).every((y) => y.sfExpiring === 0), roll).toBe(true);
+      expect(rollYearOf(rows[0]), roll).toBe(1);
+      // Equal rents: seven and nine years by the expiries, nought and nine
+      // to the first date each may leave.
+      expect(open.waltByRent, roll).toBe(8);
+      expect(open.waltToBreak, roll).toBe(4.5);
+    }
+    // A lease with no break stated rolls at its expiry, as before.
+    expect(rollYearOf({ expiryYears: 3.5, breakYears: null })).toBe(4);
+  });
+
+  // In a calendar-year roll a break column's "0" is no year — it is how a
+  // sheet says the lease has no break. It was read as the year 0, two
+  // thousand years before the roll, an open break that rolled a 2033 lease in
+  // year one.
+  it("reads a 0 or a blank in a calendar-year roll's break column as no break", () => {
+    for (const roll of ["A\t10,000\t30\t2033\t0\nB\t10,000\t30\t2035", "A\t10,000\t30\t2033\t\nB\t10,000\t30\t2035\t"]) {
+      const read = readRoll(roll, 2026);
+      expect(read.expiryWasCalendar, roll).toBe(true);
+      expect(read.rows[0].breakYears, roll).toBeNull();
+      expect(rollYearOf(read.rows[0]), roll).toBe(7);
+      const r = readRollover({ rows: read.rows, holdYears: 5 });
+      expect(r.years.every((y) => y.sfExpiring === 0), roll).toBe(true);
+      expect(r.waltToBreak, roll).toBe(r.waltByRent);
+    }
+    // A break of 0 years in a years-remaining roll is still open today.
+    expect(readRoll("A\t10,000\t30\t7\t0", 2026).rows[0].breakYears).toBe(0);
   });
 
   it("counts a lease past the horizon in the totals and not in the table", () => {

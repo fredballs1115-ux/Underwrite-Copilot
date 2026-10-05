@@ -1,16 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PlaceBackdrop } from "@/app/place-band";
+import { PAGE_COLUMN_SIZES, PlaceBackdrop } from "@/app/place-band";
 import { rateSeeds, treasuryForTerm } from "@/lib/live-rates";
 import { liveRates } from "@/lib/live-rates-read";
+import { publicMetadata } from "@/lib/page-meta";
 import { SEED_MONTHS_REMAINING } from "@/lib/tools/prepayment";
 import { DealMathTools } from "./deal-math-tools";
 import { RatesStrip } from "@/app/rates-strip";
 
+// The layout's template adds the site's name. The canonical is the bare
+// page: a sizing travels as a link with its figures in the query string,
+// and every such link is this one page. The jump index and the cards say
+// what each calculator answers; the description is a search result's line.
 export const metadata: Metadata = {
-  title: "Deal math — Underwrite Copilot",
-  description:
-    "Forty-eight calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, what a construction loan's interest reserve really costs once the draw is run month by month, whether a bridge loan's rate cap reaches its own covenant, what an interest rate swap is worth to get out of once rates have moved the way nobody stress-tested, what yield maintenance or defeasance costs to get out early, what it is worth to step into the loan somebody else signed once the smaller balance's cost in equity is netted against the coupon's benefit, sources and uses, the capital stack with the cost of every layer against what the building earns, what a below-market lease is worth to end, which line of the zoning code a site actually runs into once floor area is measured gross, the rent a new building would need before anyone competes with yours, what the land can be worth, what the entitlement period costs to wait through and whether to option the land instead of buying it, the LP/GP waterfall, what the sponsor's three fees take out of that split before the preferred return is reached, a pasted cash flow, the growth rate a price is quietly assuming, whether to hold it another year or sell it and what the answer costs when the cost of selling is charged to the wrong side, what you can pay and still earn what the equity needs, solved rather than scaled because the price is circular through the debt, which trailing window the memorandum chose and what that choice is worth at the stated cap, what a building with 95% of its doors full actually banks against market rent, what a value-add renovation program really returns once the quoted premium is split from the gap to a better building and the pace is set by turnover rather than ambition, what the reserve and the leasing capital below the NOI line do to the advertised cap, what the insurance line costs once it is your policy rather than the seller's and what one named-storm deductible retains, an OM's unit mix, what a hotel actually earns once the penetration index is taken apart into rate and occupancy and the FF&E reserve is charged against revenue rather than NOI, when the income rolls and what a tenant's break option takes off the weighted average term, how long an empty building takes to fill and why a slower lease-up never shows up in the reserve, the site's density and floor area ratio, why an audited statement's rent is never the rent the building collected and which way the error runs, net effective rent, rentable against usable feet, depreciation and what recapture takes back, what a 1031 exchange actually defers, the operating-expense reconciliation with its gross-up, percentage rent and the natural breakpoint, the self-storage rate increase with the move-out response it breaks even at and the runway each one spends, a sales comparison grid where the adjustments are signed from the comp and the three ways of getting one wrong are priced against each other, what the property taxes become once the sale resets the assessment, what a leasehold is really worth when the ground lease ends, what a sale-leaseback's rent is really buying once it reverts to market, the settlement statement at closing, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
+  ...publicMetadata({
+    title: "Deal math",
+    canonical: "/tools",
+    description:
+      "Forty-eight calculators for a commercial real estate deal: size the loan, test the refinance, run the LP/GP waterfall, value the land. No account needed.",
+  }),
+  // Those figures are in the page's own address, and a Referer header
+  // would hand them to every request the page makes — a prefetch, a
+  // chunk, a link out.
+  referrer: "no-referrer",
 };
 
 /**
@@ -42,18 +54,22 @@ export default async function ToolsPage() {
   return (
     <div className="space-y-8">
       <section className="relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[18rem]">
-        <PlaceBackdrop metro="chicago" height={420} />
-        <div className="on-photo band-words relative w-full px-6 pb-8 pt-12 sm:px-10 sm:pb-10 sm:pt-16">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-accent">
-            Deal math
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            The numbers, before the deal
-          </h1>
-          <p className="mt-3 text-sm text-white">
-            Runs in your browser. Nothing is sent anywhere, nothing is stored.
-          </p>
-        </div>
+        {/* Inside the page's 72rem column, so it asks for that width, not
+            the screen's; and it opens the page, so it comes first. The
+            words go through it, so its credit follows them. */}
+        <PlaceBackdrop metro="chicago" height={420} sizes={PAGE_COLUMN_SIZES} eager>
+          <div className="on-photo band-words relative w-full px-6 pb-8 pt-12 sm:px-10 sm:pb-10 sm:pt-16">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-accent">
+              Deal math
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+              The numbers, before the deal
+            </h1>
+            <p className="mt-3 text-sm text-white">
+              Runs in your browser, and nothing is saved. What you type stays in this page&apos;s link, so a sizing travels as a URL; a field left at today&apos;s rate reads the rate of the day it is opened.
+            </p>
+          </div>
+        </PlaceBackdrop>
       </section>
 
       <RatesStrip rates={rates} seeds={seeded} />

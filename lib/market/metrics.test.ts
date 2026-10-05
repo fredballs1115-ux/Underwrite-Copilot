@@ -6,7 +6,9 @@ import {
   rentTrend,
   submarketMetrics,
   trailing12Absorption,
+  trailingYearBasis,
   ucShareOfInventory,
+  unverifiedMark,
 } from "./metrics";
 import {
   applyExclusionRules,
@@ -16,9 +18,31 @@ import {
   staleVerdict,
 } from "./exclusions";
 import { assumptionWarnings, memoLinesFor } from "./checks";
-import { parseRentBasis, parsePeriodLabel, parseStatus, suggestMarketMapping, toPeriods, toPipeline, PERIOD_FIELDS, PIPELINE_FIELDS } from "./import";
+import {
+  importSentence,
+  mappingSentence,
+  mappingSummary,
+  packMapping,
+  parseRentBasis,
+  parsePeriodLabel,
+  parseStatus,
+  pipelineIdentity,
+  pipelineRowsToReplace,
+  suggestMarketMapping,
+  toPeriods,
+  toPipeline,
+  unpackMapping,
+  PERIOD_FIELDS,
+  PIPELINE_FIELDS,
+} from "./import";
 import { parseCsv } from "@/lib/rentroll/parse";
-import { EMPTY_RULES, type PipelineProperty, type Submarket, type SubmarketPeriod } from "./types";
+import {
+  EMPTY_RULES,
+  parseDismissals,
+  type PipelineProperty,
+  type Submarket,
+  type SubmarketPeriod,
+} from "./types";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 
 // ---------------------------------------------------------------------------
@@ -249,17 +273,165 @@ describe("monthsOfSupply", () => {
 });
 
 describe("trailing12Absorption", () => {
-  it("sums the most recent four quarters and names them", () => {
+  it("sums the four quarters to the newest period and names them", () => {
     const t = trailing12Absorption(PERIODS);
     expect(t.sf).toBe(120_000 + 180_000 + 90_000 + 110_000);
-    expect(t.quartersUsed).toBe(4);
+    expect(t.cadenceMonths).toBe(3);
+    expect(t.reason).toBeNull();
     expect(t.periods).toEqual(["2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"]);
+    expect(trailingYearBasis(t)).toBe("4 quarters to 2025-12-31");
   });
 
-  it("sums what exists rather than annualizing one quarter", () => {
-    const t = trailing12Absorption(PERIODS.slice(0, 1));
-    expect(t.sf).toBe(120_000);
-    expect(t.quartersUsed).toBe(1);
+  it("takes the year by date: older quarters loaded beside it are left out", () => {
+    const t = trailing12Absorption([
+      period({ period: "2024-09-30", netAbsorptionSf: 999_000 }),
+      period({ period: "2024-12-31", netAbsorptionSf: 999_000 }),
+      ...PERIODS,
+    ]);
+    expect(t.sf).toBe(120_000 + 180_000 + 90_000 + 110_000);
+  });
+
+  it("reads no year off one quarter — neither the quarter as a year nor annualized", () => {
+    const t = trailing12Absorption(PERIODS.slice(-1));
+    expect(t.sf).toBeNull();
+    expect(t.reason).toContain("One period loaded");
+    expect(t.periods).toEqual(["2025-12-31"]);
+  });
+
+  it("reads annual rows as years: the year to the newest is that one row", () => {
+    // An import reads a bare "2025" as 2025-12-31. Four year-end rows of
+    // 600,000 SF each are 600,000 SF a year — not 2.4M SF of "T12".
+    const t = trailing12Absorption(
+      ["2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"].map((d) =>
+        period({ period: d, netAbsorptionSf: 600_000 }),
+      ),
+    );
+    expect(t.cadenceMonths).toBe(12);
+    expect(t.sf).toBe(600_000);
+    expect(t.periods).toEqual(["2025-12-31"]);
+    expect(trailingYearBasis(t)).toBe("1 year to 2025-12-31");
+  });
+
+  it("names the missing quarter rather than summing a year with a gap in it", () => {
+    const gap = PERIODS.filter((p) => p.period !== "2025-09-30");
+    const t = trailing12Absorption(gap);
+    expect(t.sf).toBeNull();
+    expect(t.reason).toContain("quarter ending Sep 2025");
+    expect(t.reason).toContain("needs all 4 quarters");
+  });
+
+  it("counts a quarter loaded without its absorption as a gap", () => {
+    const t = trailing12Absorption(
+      PERIODS.map((p) => (p.period === "2025-06-30" ? { ...p, netAbsorptionSf: null } : p)),
+    );
+    expect(t.sf).toBeNull();
+    expect(t.reason).toContain("Jun 2025");
+  });
+
+  it("refuses periods that are not evenly spaced or share a month", () => {
+    const uneven = trailing12Absorption([
+      period({ period: "2025-01-31" }),
+      period({ period: "2025-03-31" }),
+      period({ period: "2025-08-31" }),
+      period({ period: "2025-12-31" }),
+    ]);
+    expect(uneven.sf).toBeNull();
+    const twice = trailing12Absorption([...PERIODS, period({ period: "2025-12-15" })]);
+    expect(twice.sf).toBeNull();
+    expect(twice.reason).toContain("Two periods end in Dec 2025");
+  });
+
+  it("counts the unverified periods it summed", () => {
+    const t = trailing12Absorption(
+      PERIODS.map((p) => (p.period === "2025-06-30" ? { ...p, unverified: true } : p)),
+    );
+    expect(t.unverified).toBe(1);
+  });
+});
+
+describe("months of supply over the trailing year", () => {
+  const quarters = ["2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"];
+
+  it("four quarters of 150,000 SF against 1.2M SF UC is 24 months", () => {
+    const m = submarketMetrics(quarters.map((d) => period({ period: d })), []);
+    expect(m.supply.status).toBe("ok");
+    if (m.supply.status !== "ok") throw new Error("unreachable");
+    expect(m.supply.months).toBeCloseTo(24, 9);
+  });
+
+  it("one quarter loaded is not computable — never 96 months", () => {
+    const m = submarketMetrics([period({ period: "2025-12-31" })], []);
+    expect(m.supply.status).toBe("not_computable");
+    if (m.supply.status !== "not_computable") throw new Error("unreachable");
+    expect(m.supply.reason).toContain("One period loaded");
+  });
+
+  it("four annual rows of 600,000 SF against 1.2M SF UC is 24 months — never 6", () => {
+    const m = submarketMetrics(
+      ["2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"].map((d) =>
+        period({ period: d, netAbsorptionSf: 600_000 }),
+      ),
+      [],
+    );
+    expect(m.supply.status).toBe("ok");
+    if (m.supply.status !== "ok") throw new Error("unreachable");
+    expect(m.supply.months).toBeCloseTo(24, 9);
+  });
+
+  it("a missing quarter leaves it not computable, and the warning stays quiet", () => {
+    const m = submarketMetrics(
+      quarters.filter((d) => d !== "2025-06-30").map((d) => period({ period: d, underConstructionSf: 9_000_000 })),
+      [],
+    );
+    expect(m.supply.status).toBe("not_computable");
+    expect(
+      assumptionWarnings(INPUTS, m, SUBMARKET).some((w) => w.code === "supply_vs_exit_cap"),
+    ).toBe(false);
+  });
+
+  it("with no absorption at all, says the data has none rather than not computable", () => {
+    const m = submarketMetrics(quarters.map((d) => period({ period: d, netAbsorptionSf: null })), []);
+    expect(m.supply.status).toBe("unknown");
+  });
+});
+
+describe("unverified periods are marked on every figure they go into", () => {
+  it("counts them per figure", () => {
+    const m = submarketMetrics(
+      [
+        period({ period: "2023-12-31", askingRent: 7.0, unverified: true, source: "web search", vacancyPct: 0.03 }),
+        period({ period: "2024-12-31", askingRent: 9.0 }),
+        period({ period: "2025-12-31", askingRent: 9.5, unverified: true, source: "web search" }),
+      ],
+      [],
+    );
+    // The CAGR is struck on its two end points, and both are web-sourced.
+    expect(m.unverified.cagr).toBe(2);
+    expect(m.unverified.trough).toBe(1);
+    expect(m.unverified.ucShare).toBe(1);
+    expect(m.unverified.absorption).toBe(1);
+    expect(m.unverified.supply).toBe(1);
+    expect(unverifiedMark(2)).toBe("includes 2 unverified periods");
+    expect(unverifiedMark(0)).toBe("");
+  });
+
+  it("puts the mark on the warnings' basis lines", () => {
+    const m = submarketMetrics(
+      [
+        period({ period: "2023-12-31", askingRent: 7.0, unverified: true, source: "web search", vacancyPct: 0.03 }),
+        period({ period: "2024-12-31", askingRent: 9.0 }),
+        period({ period: "2025-12-31", askingRent: 9.5 }),
+      ],
+      [],
+    );
+    const w = assumptionWarnings({ ...INPUTS, rentGrowthPct: 0.2, vacancyPct: 0.01 } as UnderwriteInputs, m, SUBMARKET);
+    expect(w.find((x) => x.code === "rent_growth_above_trend")!.basis).toContain("includes 1 unverified period");
+    expect(w.find((x) => x.code === "vacancy_below_trough")!.basis).toContain("includes 1 unverified period");
+  });
+
+  it("leaves an imported series unmarked", () => {
+    const m = submarketMetrics(PERIODS, []);
+    expect(Object.values(m.unverified).every((n) => n === 0)).toBe(true);
   });
 });
 
@@ -382,12 +554,52 @@ describe("assumptionWarnings", () => {
       PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
       [],
     );
-    const w = assumptionWarnings(INPUTS, heavy, SUBMARKET).find(
+    const w = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "stabilized", { pct: 6, source: "stated" }).find(
       (x) => x.code === "supply_vs_exit_cap",
     )!;
     expect(w).toBeDefined();
     expect(w.message).toContain("months of supply");
-    expect(w.message).toContain("5.50% exit cap");
+    expect(w.message).toContain("Your 5.50% exit cap is 50 bps under the 6.00% going-in cap");
+    expect(w.message).toContain("assumes the market tightens");
+    expect(w.basis).toContain("going-in cap 6.00%, as stated");
+  });
+
+  it("reads a 5.25% exit on a deal bought at 4.75% as widening, never as the market tightening", () => {
+    const heavy = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
+      [],
+    );
+    const inputs = { ...INPUTS, exitCapPct: 0.0525 } as UnderwriteInputs;
+    const w = assumptionWarnings(inputs, heavy, SUBMARKET, [], "stabilized", { pct: 4.75, source: "implied" }).find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(w.message).toContain("Your 5.25% exit cap sits 50 bps over the 4.75% going-in cap.");
+    expect(w.message).not.toMatch(/tighten|compression/);
+    expect(w.basis).toContain("implied by the stated NOI over the price");
+  });
+
+  it("says nothing about compression where the deal has no going-in cap", () => {
+    const heavy = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
+      [],
+    );
+    // A plan deal or a note has none (`dealGoingInCap`), and an exit cap
+    // under 6% is not "the market tightening" without one to tighten from.
+    const w = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "development", null).find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(w.message).toContain("months of supply under construction");
+    expect(w.message).not.toMatch(/tighten|compression|going-in|exit cap/);
+    const shrinking = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, netAbsorptionSf: -50_000 })),
+      [],
+    );
+    const s = assumptionWarnings(INPUTS, shrinking, SUBMARKET).find((x) => x.code === "supply_vs_exit_cap")!;
+    expect(s.message).not.toMatch(/going-in|exit cap/);
+    const held = assumptionWarnings(INPUTS, shrinking, SUBMARKET, [], "stabilized", { pct: 5.75, source: "stated" }).find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(held.message).toContain("Your 5.50% exit cap, at or under the 5.75% going-in cap, is hard to defend here.");
   });
 
   it("on a plan deal, says the deal itself delivers into the pipeline it is warned about", () => {
@@ -445,13 +657,74 @@ describe("assumptionWarnings", () => {
         reason: "Signed LOI at $11.00 with the anchor; trend lags the last two deals.",
         by: "analyst@example.com",
         at: "2026-01-15T00:00:00Z",
+        // recorded before the figure was kept: it stands as it did
+        figure: null,
       },
     ]);
     const w = dismissed.find((x) => x.code === "rent_growth_above_trend")!;
     expect(w.dismissed).not.toBeNull();
+    expect(w.staleOverride).toBeNull();
     const memo = memoLinesFor(dismissed);
     expect(memo).toHaveLength(1);
     expect(memo[0]).toContain("overridden: Signed LOI");
+  });
+
+  it("keys an override to the gap it was written against, not the check alone", () => {
+    const live = assumptionWarnings(INPUTS, metrics, SUBMARKET).find((x) => x.code === "rent_growth_above_trend")!;
+    expect(live.figure).toMatch(/^4\.00% vs \d+\.\d\d% CAGR, 2025-03-31 to 2025-12-31$/);
+    const override = {
+      code: "rent_growth_above_trend",
+      reason: "Signed LOI at $11.00 with the anchor.",
+      by: "analyst@example.com",
+      at: "2026-01-15T00:00:00Z",
+      figure: live.figure,
+    };
+    // The same gap: the override stands, and goes in the memo.
+    const same = assumptionWarnings(INPUTS, metrics, SUBMARKET, [override]);
+    expect(same.find((x) => x.code === "rent_growth_above_trend")!.dismissed?.reason).toBe(override.reason);
+    expect(memoLinesFor(same)).toHaveLength(1);
+    // The gap moved — 6% growth now, not 4% — so a reason given for the old
+    // one no longer stands: the warning is live again, the old override is
+    // shown as written against another figure, and the memo carries none.
+    const moved = assumptionWarnings({ ...INPUTS, rentGrowthPct: 0.06 } as UnderwriteInputs, metrics, SUBMARKET, [override]);
+    const w = moved.find((x) => x.code === "rent_growth_above_trend")!;
+    expect(w.dismissed).toBeNull();
+    expect(w.staleOverride?.figure).toBe(live.figure);
+    expect(w.figure).not.toBe(live.figure);
+    expect(memoLinesFor(moved)).toEqual([]);
+  });
+
+  it("reads the figure an override was stored with, and none from an older row", () => {
+    expect(parseDismissals([{ code: "c", reason: "r", by: "b", at: "a", figure: "4.00% vs 2.94% CAGR" }])[0].figure).toBe(
+      "4.00% vs 2.94% CAGR",
+    );
+    expect(parseDismissals([{ code: "c", reason: "r", by: "b", at: "a" }])[0].figure).toBeNull();
+  });
+
+  it("puts the article a figure takes before it: an 8.00% trough, an 8-month threshold", () => {
+    const eighty = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, vacancyPct: 0.08, underConstructionSf: 4_000_000 })),
+      [],
+    );
+    const w = assumptionWarnings({ ...INPUTS, vacancyPct: 0.05 } as UnderwriteInputs, eighty, {
+      ...SUBMARKET,
+      supplyWarningMonths: 8,
+    });
+    expect(w.find((x) => x.code === "vacancy_below_trough")!.figure).toContain("vs an 8.00% trough");
+    expect(w.find((x) => x.code === "supply_vs_exit_cap")!.figure).toContain("vs an 8-month threshold");
+  });
+
+  it("writes every figure in plain words a printed memo can set — no arrows", () => {
+    const heavy = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
+      applyExclusionRules(PIPELINE, EMPTY_RULES, AS_OF).properties,
+    );
+    const all = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "stabilized", { pct: 6, source: "stated" });
+    expect(all.length).toBeGreaterThan(1);
+    for (const w of all) {
+      expect(w.figure.length, w.code).toBeGreaterThan(0);
+      expect(w.figure, w.code).not.toMatch(/[→←÷−]/);
+    }
   });
 });
 
@@ -525,5 +798,91 @@ TOTAL,,"1,852,400",,,
     expect(rows[2].staleFlag).toBe(true);
     expect(rows[2].staleReason).toContain("round-number placeholder");
     expect(parseStatus("Under Construction")).toBe("under_construction");
+  });
+});
+
+describe("a pipeline re-import replaces, never doubles", () => {
+  const stored = [
+    { id: "1", name: "Building A", address: "100 Commerce Way", source: "pipeline-export.csv" },
+    { id: "2", name: "Cascade Data Center Campus", address: "", source: "pipeline-export.csv" },
+    { id: "3", name: "Harbor Point", address: "9 Wharf St", source: "county-b.csv" },
+  ];
+
+  it("replaces the same buildings from a renamed copy of the same export", () => {
+    const incoming = [
+      { name: "BUILDING A", address: "100 Commerce Way." },
+      { name: "Cascade Data-Center Campus", address: "" },
+    ];
+    // Keyed on the filename alone, the renamed copy kept both and doubled.
+    expect(pipelineRowsToReplace(stored, incoming, "pipeline-export (1).csv").sort()).toEqual(["1", "2"]);
+  });
+
+  it("drops a building the same file no longer lists, and keeps another file's buildings", () => {
+    const incoming = [{ name: "Building A", address: "100 Commerce Way" }];
+    expect(pipelineRowsToReplace(stored, incoming, "pipeline-export.csv").sort()).toEqual(["1", "2"]);
+    expect(pipelineRowsToReplace(stored, [{ name: "New Site", address: "" }], "new.csv")).toEqual([]);
+  });
+
+  it("never matches two rows that have neither a name nor an address", () => {
+    expect(pipelineIdentity({ name: "", address: "  " })).toBeNull();
+    expect(
+      pipelineRowsToReplace([{ id: "9", name: "", address: "", source: "a.csv" }], [{ name: "", address: "" }], "b.csv"),
+    ).toEqual([]);
+  });
+});
+
+describe("the import says what it read", () => {
+  const CSV = `Period,Inventory SF,Under Construction SF,Net Absorption SF,Direct Vacancy Rate,Total Vacancy Rate,Market Asking Rent/SF
+2025 Q4,20000000,1200000,150000,5.1%,6.0%,9.50
+2026 YTD,20000000,1200000,150000,5.1%,6.0%,9.50`;
+
+  it("names the header each field was read from, and the fields none matched", () => {
+    const grid = parseCsv(CSV);
+    const mapping = suggestMarketMapping(grid, PERIOD_FIELDS);
+    const { rows, skipped, headers } = toPeriods(grid, mapping, "x.csv");
+    expect(rows).toHaveLength(1);
+    expect(skipped).toBe(1);
+    const { read, missing } = mappingSummary(mapping, headers, PERIOD_FIELDS);
+    const back = unpackMapping(packMapping(read), PERIOD_FIELDS);
+    expect(back).toEqual(read);
+    const line = mappingSentence(back, missing);
+    // Two vacancy columns: the reader sees which one was taken.
+    expect(line).toContain("Vacancy from “Direct Vacancy Rate”");
+    expect(line).toContain("No column matched Rent basis.");
+  });
+
+  it("keeps one row a date: a year's line beside its Q4 is dropped for the quarter, and said", () => {
+    const grid = parseCsv(`Period,Inventory SF,Net Absorption SF,Vacancy
+2025,20000000,600000,6.0%
+2025 Q3,20000000,140000,6.1%
+2025 Q4,20000000,150000,6.0%
+2025 Q4,20000000,999999,9.9%`);
+    const { rows, doubled } = toPeriods(grid, suggestMarketMapping(grid, PERIOD_FIELDS), "x.csv");
+    expect(rows.map((r) => [r.period, r.netAbsorptionSf])).toEqual([
+      ["2025-12-31", 150_000],
+      ["2025-09-30", 140_000],
+    ]);
+    expect(doubled).toBe(2);
+    expect(importSentence({ kind: "periods", imported: 2, replaced: 0, skipped: 0, doubled: 2, file: "x.csv" })).toBe(
+      "Imported 2 periods from x.csv; 2 rows dropped for a date another row already gave (a year's line ends on its fourth quarter's date, and the quarter is kept).",
+    );
+  });
+
+  it("says how many rows it wrote, replaced and skipped", () => {
+    expect(importSentence({ kind: "periods", imported: 8, replaced: 3, skipped: 1, file: "grid.csv" })).toBe(
+      "Imported 8 periods from grid.csv — 3 replaced the periods already loaded for those dates; 1 row skipped with no readable period.",
+    );
+    expect(importSentence({ kind: "pipeline", imported: 1, replaced: 0, skipped: 0, file: null })).toBe(
+      "Imported 1 building.",
+    );
+    expect(importSentence({ kind: "periods", imported: 2, replaced: null, skipped: 0, file: null })).toBe(
+      "Imported 2 periods.",
+    );
+  });
+
+  it("drops a packed entry that names no field", () => {
+    expect(unpackMapping("vacancyPct:Vac|bogus:X|nocolon", PERIOD_FIELDS)).toEqual([
+      { key: "vacancyPct", label: "Vacancy", header: "Vac" },
+    ]);
   });
 });

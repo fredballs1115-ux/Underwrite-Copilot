@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_LEASE_UP_MONTHS,
   analyzeRentRoll,
   blendedRolloverCostPsf,
   computeWalt,
   concentrationFlags,
+  defaultAbsorptionSfPerMonth,
   leaseUpCurve,
   markToMarket,
   rolloverCostForecast,
@@ -11,8 +13,8 @@ import {
   yearsTo,
 } from "./analytics";
 import { parseCsv, suggestMapping, toLeases } from "./parse";
-import { PROFILE_DEFAULTS, normalizeProfile } from "./profiles";
-import { CLEAN_CSV, MISSING_EXPIRIES_CSV, fortyTenantCsv } from "./__fixtures__";
+import { PROFILE_DEFAULTS, leasesShort, normalizeProfile } from "./profiles";
+import { CLEAN_CSV, MISSING_EXPIRIES_CSV, apartmentCsv, fortyTenantCsv } from "./__fixtures__";
 import type { Lease } from "./schema";
 
 const leasesFrom = (csv: string): Lease[] => {
@@ -70,6 +72,17 @@ describe("computeWalt", () => {
 
   it("treats an already-expired lease as holdover, not negative term", () => {
     expect(yearsTo("2020-01-01", AS_OF)).toBe(0);
+  });
+
+  it("treats a stored expiry that names no real day as undated, never NaN", () => {
+    // An import saved before the parser checked its dates could carry this.
+    const stored: Lease[] = [{ ...CLEAN[0] }, { ...CLEAN[1], leaseExpiry: "2028-31-12" }];
+    const walt = computeWalt(stored, AS_OF);
+    expect(Number.isFinite(walt.bySf!)).toBe(true);
+    expect(walt.excludedSf).toBe(25_000);
+    const s = rolloverSchedule(stored);
+    expect(s.undatedSf).toBe(25_000);
+    expect(s.years.map((y) => y.year)).toEqual([2027]);
   });
 
   it("returns null rather than 0 when nothing is datable", () => {
@@ -258,6 +271,49 @@ describe("concentrationFlags", () => {
     expect(flags.find((f) => f.code === "walt_under_hold")).toBeDefined();
   });
 
+  it("weighs the WALT flag by rent where the roll states its rents, and by area — said so — where it does not", () => {
+    const walt = computeWalt(CLEAN, AS_OF);
+    const byRent = concentrationFlags(CLEAN, rolloverSchedule(CLEAN), walt, { nra: 100_000, holdYears: 5 }).find(
+      (f) => f.code === "walt_under_hold",
+    )!;
+    expect(byRent.value).toBeCloseTo(walt.byRent!, 12);
+    expect(byRent.message).toMatch(/^WALT by rent is \d+\.\d years/);
+
+    const noRents = CLEAN.map((l) => ({ ...l, baseRentAnnual: null }));
+    const areaWalt = computeWalt(noRents, AS_OF);
+    expect(areaWalt.coveredSfWithRent).toBe(0);
+    const byArea = concentrationFlags(noRents, rolloverSchedule(noRents), areaWalt, { nra: 100_000, holdYears: 5 }).find(
+      (f) => f.code === "walt_under_hold",
+    )!;
+    expect(byArea.value).toBeCloseTo(areaWalt.bySf!, 12);
+    expect(byArea.message).toContain("WALT by area");
+    expect(byArea.message).not.toMatch(/tenants that pay/);
+  });
+
+  it("raises no rollover-year or WALT flag on leases that run a year, and says so", () => {
+    const leases = leasesFrom(apartmentCsv());
+    const commercial = analyzeRentRoll(leases, { asOf: "2026-10-01" });
+    // Read as an office roll, every apartment roll looked like a cliff.
+    expect(commercial.flags.map((f) => f.code)).toEqual(
+      expect.arrayContaining(["rollover_year", "walt_under_hold"]),
+    );
+    const apartments = analyzeRentRoll(leases, { asOf: "2026-10-01", leasesShort: true });
+    expect(apartments.leasesShort).toBe(true);
+    expect(apartments.flags.some((f) => f.code === "rollover_year" || f.code === "walt_under_hold")).toBe(false);
+    // The WALT is still measured; it is just not a flag.
+    expect(apartments.walt.bySf).toBeCloseTo(commercial.walt.bySf!, 12);
+    expect(leasesShort("multifamily")).toBe(true);
+    expect(leasesShort("self_storage")).toBe(true);
+    expect(leasesShort("office")).toBe(false);
+    expect(leasesShort("")).toBe(false);
+  });
+
+  it("still raises a tenant concentration flag on a short-lease roll", () => {
+    const walt = computeWalt(CLEAN, AS_OF);
+    const flags = concentrationFlags(CLEAN, rolloverSchedule(CLEAN), walt, { nra: 100_000, leasesShort: true });
+    expect(flags.map((f) => f.code).sort()).toEqual(["tenant_income", "tenant_nra"]);
+  });
+
   it("reports one worst tenant rather than a wall on a 40-tenant roll", () => {
     const leases = leasesFrom(fortyTenantCsv());
     const schedule = rolloverSchedule(leases);
@@ -267,6 +323,21 @@ describe("concentrationFlags", () => {
 });
 
 describe("analyzeRentRoll", () => {
+  it("says which area its occupancy is over, and starts the lease-up at a pace named as a placeholder", () => {
+    const own = analyzeRentRoll(CLEAN, { asOf: AS_OF });
+    expect(own.nra).toBe(100_000);
+    expect(own.nraStated).toBe(false);
+    const stated = analyzeRentRoll(CLEAN, { asOf: AS_OF, nra: 130_000 });
+    expect(stated.nra).toBe(130_000);
+    expect(stated.nraStated).toBe(true);
+    expect(stated.occupancyPct).toBeCloseTo(85_000 / 130_000, 12);
+    // A stated NRA of nothing is no NRA: the roll's own area stands in.
+    expect(analyzeRentRoll(CLEAN, { asOf: AS_OF, nra: 0 }).nraStated).toBe(false);
+    expect(DEFAULT_LEASE_UP_MONTHS).toBe(36);
+    expect(defaultAbsorptionSfPerMonth(15_000)).toBe(Math.round(15_000 / 36));
+    expect(defaultAbsorptionSfPerMonth(0)).toBe(0);
+  });
+
   it("rolls the whole roll up in one pass", () => {
     const a = analyzeRentRoll(CLEAN, { asOf: AS_OF, nra: 100_000 });
     expect(a.leaseCount).toBe(4);

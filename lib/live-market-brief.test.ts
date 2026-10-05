@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
-import { BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
+import { CONSTRUCTION_COST_IDS, BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
+import { briefDelta } from "./brief-delta";
+import { trackerSectorFor } from "./tracker-read";
 
 const NOW = new Date("2026-09-23T12:00:00Z");
 
@@ -57,7 +59,9 @@ const REALTOR: RealtorRead = {
 
 describe("liveMarketBrief — the metro's published figures, dated and sourced, for the market check", () => {
   const rates = readMetroRates("dc", DC_ROWS, NOW);
-  const brief = liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, rates, zori: ZORI, realtor: REALTOR, now: NOW })!;
+  // An apartment deal: the housing figures speak to rental housing alone.
+  const apartments = "multifamily";
+  const brief = liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, assetClass: apartments, rates, zori: ZORI, realtor: REALTOR, now: NOW })!;
 
   it("names the metro, the day it was read, and that the figures are the metro's", () => {
     expect(brief.metro).toBe("Washington, DC");
@@ -77,7 +81,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
 
   it("a year of permits is summed against the year before it — a month alone is the season — with the multi-unit part said as the total less the single-family series", () => {
     expect(brief.lines).toContain(
-      "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before), of which 7,200 in buildings of two or more units (-29.4%) — the total less the single-family series, the only split published for a metro or a state; FRED",
+      "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before), of which 7,200 in buildings of two or more units (-29.4%) — the total less the single-family series, since FRED carries no multi-unit series for a metro or a state; FRED",
     );
     // The single-family series is never a line of its own.
     expect(brief.lines.filter((l) => l.startsWith("Housing units permitted"))).toHaveLength(1);
@@ -105,6 +109,35 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     expect(brief.lines).toContain(
       "For-sale market: median list price $599,000 (-1.2% from a year ago), 12,400 active listings (+14.3%), median 41 days on market (+12.5%), loosening on both flow figures, hotness rank 40 of 300 metros (12 places cooler than a year ago) (Aug 2026; Realtor.com — list prices are asks, not sales)",
     );
+  });
+
+  it("says Zillow's and Realtor.com's figures only while current on the brief's day — the limits the feeds card judges the pulls by", () => {
+    const rates = readMetroRates("dc", DC_ROWS, NOW);
+    const on = (day: string) =>
+      liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, assetClass: apartments, rates, zori: ZORI, realtor: REALTOR, now: new Date(`${day}T12:00:00Z`) })!;
+    const has = (b: { lines: string[] }, start: string) => b.lines.some((l) => l.startsWith(start));
+    // Zillow's August (Aug 31) is current through Oct 25; Realtor.com's (Aug 1) through Oct 13.
+    expect(has(on("2026-10-13"), "Asking rent")).toBe(true);
+    expect(has(on("2026-10-13"), "For-sale market")).toBe(true);
+    expect(has(on("2026-10-14"), "For-sale market")).toBe(false);
+    expect(has(on("2026-10-25"), "Asking rent")).toBe(true);
+    expect(has(on("2026-10-26"), "Asking rent")).toBe(false);
+    expect(on("2026-10-26").figures.some((f) => f.key.startsWith("zori") || f.key.startsWith("rdc"))).toBe(false);
+  });
+
+  it("says the hotness rank under its own month where its file is a month behind the inventory's, and not past its cadence", () => {
+    const july = { ...REALTOR, hotness: { ...REALTOR.hotness!, asOf: "2026-07-01" } };
+    const input = { metro: { id: "dc", name: "Washington, DC" }, assetClass: apartments, rates: [], zori: null, realtor: july };
+    const early = liveMarketBrief({ ...input, now: new Date("2026-09-10T12:00:00Z") })!;
+    expect(early.lines).toEqual([
+      "For-sale market: median list price $599,000 (-1.2% from a year ago), 12,400 active listings (+14.3%), median 41 days on market (+12.5%), loosening on both flow figures, hotness rank 40 of 300 metros for Jul 2026 (12 places cooler than a year ago) (Aug 2026; Realtor.com — list prices are asks, not sales)",
+    ]);
+    expect(early.figures.find((f) => f.key === "rdc_hotness_rank")?.asOf).toBe("2026-07-01");
+    // July's rank was due to be replaced on Sep 8: on Sep 23 the inventory is said and the rank is not.
+    const late = liveMarketBrief({ ...input, now: NOW })!;
+    expect(late.lines[0]).toContain("median list price $599,000");
+    expect(late.lines[0]).not.toContain("hotness");
+    expect(late.figures.some((f) => f.key === "rdc_hotness_rank")).toBe(false);
   });
 
   it("the same figures are kept as values, keyed and dated, for a later screen to compare against", () => {
@@ -139,6 +172,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     const later = new Date("2027-06-01T00:00:00Z");
     const stale = liveMarketBrief({
       metro: { id: "dc", name: "Washington, DC" },
+      assetClass: apartments,
       rates: readMetroRates("dc", DC_ROWS, later),
       zori: null,
       realtor: null,
@@ -150,6 +184,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
   it("a figure the pull did not have has no line, never a zero", () => {
     const few = liveMarketBrief({
       metro: { id: "dc", name: "Washington, DC" },
+      assetClass: apartments,
       rates: readMetroRates("dc", DC_ROWS.filter((r) => r.series_id === "WASH911URN"), NOW),
       zori: { ...ZORI, mfrRent: null, mfrYoyPct: null, homeValue: null, homeValueYoyPct: null, priceToRentYears: null },
       realtor: null,
@@ -167,6 +202,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
   it("a suburb's lines wear the MSA's name, as its tiles do", () => {
     const pg = liveMarketBrief({
       metro: { id: "pg_county", name: "Prince George's County, MD" },
+      assetClass: apartments,
       rates: readMetroRates("pg_county", DC_ROWS, NOW),
       zori: null,
       realtor: null,
@@ -174,6 +210,97 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     })!;
     expect(pg.text).toContain("Prince George's County, MD market");
     expect(pg.lines.some((l) => l.includes("Rental vacancy, metro area, Washington MSA"))).toBe(true);
+  });
+});
+
+// Research pass 18: an office deal's market check was handed the apartment
+// survey's vacancy, the CPI rent, Zillow's asking rents, house prices and the
+// for-sale market, and told to check its vacancy against them. The housing
+// figures speak to rental housing alone, as the model's read and the demand
+// card already hold them.
+describe("the housing figures go to rental housing alone", () => {
+  const rates = readMetroRates("dc", DC_ROWS, NOW);
+  const of = (assetClass: string | null) =>
+    liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, assetClass, rates, zori: ZORI, realtor: REALTOR, now: NOW });
+  const HOUSING = [/^Rental vacancy/, /^Housing units permitted/, /^House prices/, /^Rent paid by sitting tenants/, /^Asking rent/, /^For-sale market/];
+  const HOUSING_KEYS = ["rental_vacancy_msa", "rental_vacancy", "permits_ttm", "permits_multi_ttm", "zori_rent", "zori_mfr_rent", "zhvi", "rdc_median_list_price", "rdc_active_listings", "rdc_days_on_market", "rdc_hotness_rank"];
+
+  it("an office in a covered metro is handed no housing line and no housing figure — the metro's jobs still", () => {
+    const office = of("office")!;
+    for (const re of HOUSING) expect(office.lines.some((l) => re.test(l)), String(re)).toBe(false);
+    for (const key of HOUSING_KEYS) expect(office.figures.some((f) => f.key === key), key).toBe(false);
+    expect(office.lines).toEqual([
+      "Unemployment 3.4% (Jul 2026, Washington MSA; FRED), +0.2 pt on the month before",
+      "Nonfarm payrolls +0.8% from a year ago (Jul 2026, Washington MSA; FRED)",
+    ]);
+    // Its header names only the publisher its lines come from.
+    expect(office.text).toContain("read on 2026-09-23 from FRED. Each is dated");
+    expect(office.text).not.toMatch(/Zillow|Realtor\.com|Census/);
+  });
+
+  it("an apartment building still gets every one of them, and so does each class that is rental housing", () => {
+    const apartments = of("multifamily")!;
+    // Every housing line the fixture has a row for (it carries no house
+    // prices and no CPI rent).
+    for (const re of [/^Rental vacancy, metro area/, /^Rental vacancy, South Census region/, /^Housing units permitted/, /^Asking rent/, /^For-sale market/]) {
+      expect(apartments.lines.some((l) => re.test(l)), String(re)).toBe(true);
+    }
+    expect(apartments.text).toContain("from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com");
+    for (const cls of ["mixed_use", "sfr_btr", "student_housing", "manufactured_housing"]) {
+      expect(of(cls)!.lines.some((l) => l.startsWith("Rental vacancy, metro area")), cls).toBe(true);
+    }
+  });
+
+  it("no other class reads them — a hotel, licensed care, storage, a net lease — and nor does a class nothing has resolved", () => {
+    for (const cls of ["retail", "industrial", "hospitality_str", "senior_housing", "self_storage", "net_lease", "medical_office", null]) {
+      const b = of(cls);
+      for (const re of HOUSING) expect(b?.lines.some((l) => re.test(l)) ?? false, `${cls} ${re}`).toBe(false);
+    }
+  });
+
+  it("house prices and the rent sitting tenants pay are housing figures too", () => {
+    // Philadelphia's own series as the table files them: the division's
+    // house price index (FRED's change from a year ago) and the CPI rent
+    // level, whose change from a year ago is worked out on read.
+    const rows: RateRow[] = [
+      { series_id: "PHIL942URN", obs_date: "2026-08-01", value: 4.2 },
+      { series_id: "ATNHPIUS37964Q_YOY", obs_date: "2026-04-01", value: 3.1 },
+      ...Array.from({ length: 13 }, (_, i) => {
+        const d = new Date(Date.UTC(2026, 7 - i, 1));
+        return { series_id: "CUURA102SEHA", obs_date: d.toISOString().slice(0, 10), value: i === 0 ? 412 : 400 };
+      }),
+    ];
+    const philly = (assetClass: string) =>
+      liveMarketBrief({ metro: { id: "philadelphia", name: "Philadelphia" }, assetClass, rates: readMetroRates("philadelphia", rows, NOW), zori: null, realtor: null, now: NOW })!;
+    const apartments = philly("multifamily").lines;
+    expect(apartments.some((l) => l.startsWith("House prices (FHFA index) +3.1%"))).toBe(true);
+    expect(apartments.some((l) => l.startsWith("Rent paid by sitting tenants (CPI rent of primary residence) +3.0%"))).toBe(true);
+    const office = philly("office").lines;
+    expect(office.some((l) => l.startsWith("House prices"))).toBe(false);
+    expect(office.some((l) => l.startsWith("Rent paid by sitting tenants"))).toBe(false);
+    expect(office.some((l) => l.startsWith("Unemployment 4.2%"))).toBe(true);
+  });
+
+  it("a state's annual rental vacancy is a housing figure too", () => {
+    const stateRows: RateRow[] = [
+      { series_id: "PAUR", obs_date: "2026-08-01", value: 4.1 },
+      { series_id: "PARVAC", obs_date: "2025-01-01", value: 6.1 },
+    ];
+    const pa = (assetClass: string) =>
+      liveMarketBrief({ metro: { id: "state:PA", name: "Pennsylvania" }, assetClass, rates: readMetroRates("state:PA", stateRows, NOW), zori: null, realtor: null, now: NOW })!;
+    expect(pa("multifamily").lines.some((l) => l.startsWith("Rental vacancy, Pennsylvania, the state's annual figure"))).toBe(true);
+    expect(pa("office").lines.some((l) => l.startsWith("Rental vacancy"))).toBe(false);
+    expect(pa("office").text).toContain("read on 2026-09-23 from FRED. Each is dated");
+  });
+
+  it("since this screen leaves out a housing figure an office's check stored before, rather than read it as a move to nothing", () => {
+    // A check stored before the change carried the housing figures; today's
+    // read for the same office carries none, and the comparison keeps only
+    // the figures read both times (lib/brief-delta).
+    const stored = of("multifamily")!.figures;
+    const today = of("office")!.figures;
+    const delta = briefDelta("2026-09-01", stored, today)!;
+    expect(delta.moves.map((m) => m.key).sort()).toEqual(["jobs_yoy", "unemployment"]);
   });
 });
 
@@ -190,21 +317,29 @@ describe("the debt market — national, for every deal, after the metro's lines"
       "Debt market — banks tightening standards for multifamily loans: a net -5.7% of banks (Q3 2026; Fed SLOOS via FRED; negative is a net share easing)",
       "Debt market — CRE loan delinquency at commercial banks 1.53% (Q2 2026; FRED)",
       "Debt market — bank CRE lending +3.6% from a year ago (Sep 9, 2026; FRED, from the Fed's H.8)",
-      "Capital markets — commercial real estate prices, national: +8.8% from a year ago (Q2 2026; the Fed's Financial Accounts via FRED) — the nation's, a trailing year, not this market's and not a cap rate",
     ]);
     expect(b.figures.map((f) => [f.key, f.value, f.unit])).toEqual([
       ["dgs10", 4.94, "pct"],
       ["sloos_multifamily", -5.7, "pts"],
       ["cre_delinquency", 1.53, "pct"],
       ["cre_loans_yoy", 3.56389, "pts"],
-      ["cre_prices_yoy", 8.8068348464, "pts"],
     ]);
   });
 
-  it("the commercial property price index is said for every building that trades on its income, never for land, and nothing without the series", () => {
+  it("the commercial property price index is said for every building that trades on its income, never for land or rental housing, and nothing without the series", () => {
     const priceLine = (b: { lines: string[] } | null) => b?.lines.find((l) => l.startsWith("Capital markets")) ?? null;
     for (const cls of ["office", "industrial", "retail", "hospitality_str", "self_storage", "net_lease"]) {
       expect(priceLine(liveMarketBrief({ ...base, assetClass: cls })), cls).toContain("+8.8% from a year ago (Q2 2026");
+    }
+    // The index is built on CoStar's composite EXCLUDING multifamily (the
+    // Fed's series analyzer, zori probe run 36814538224; the change matched
+    // figure for figure in rates run 36814949981), so it says so, and it
+    // says nothing about what apartments sell for.
+    expect(priceLine(liveMarketBrief({ ...base, assetClass: "office" }))).toBe(
+      "Capital markets — commercial real estate prices excluding apartments, national: +8.8% from a year ago (Q2 2026; the Fed's Financial Accounts, built on CoStar's composite index excluding multifamily, via FRED) — the nation's, a trailing year, not this market's and not a cap rate",
+    );
+    for (const cls of ["multifamily", "sfr_btr", "student_housing", "manufactured_housing", "mixed_use"]) {
+      expect(priceLine(liveMarketBrief({ ...base, assetClass: cls })), cls).toBeNull();
     }
     expect(priceLine(liveMarketBrief({ ...base, assetClass: "land_infill" }))).toBeNull();
     const without = national.filter((r) => r.meta.id !== CRE_PRICE_ID);
@@ -369,6 +504,30 @@ describe("the rents each kind of commercial lessor charges — national, said so
     expect(rentIndexFor("Class A office tower")?.id).toBe("PCU5311205311202_YOY");
   });
 
+  // Research pass 23: a lab filed as an office was handed the office
+  // landlords' rents — the neighbour's figure the tracker refuses it.
+  it("a lab, an outdoor-storage yard or a cold-storage warehouse reads no neighbour's index, by the tracker's own test", () => {
+    for (const cls of ["Laboratory", "Life Sciences Campus", "Cold Storage Warehouse", "Refrigerated distribution", "Industrial Outdoor Storage (IOS)"]) {
+      expect(rentIndexFor(cls), cls).toBeNull();
+    }
+    // The analyst's plain class, with the deck's own words naming the building.
+    expect(rentIndexFor("office", "Life Science / Lab")).toBeNull();
+    expect(rentIndexFor("industrial", "Cold Storage Warehouse")).toBeNull();
+    expect(rentIndexFor("industrial", "IOS yard")).toBeNull();
+    // The two read one test, so they cannot disagree.
+    for (const [cls, words] of [["office", "Life Science / Lab"], ["industrial", "Cold Storage Warehouse"], ["industrial", "Bulk distribution warehouse"], ["office", "Class A office tower"]] as const) {
+      expect(rentIndexFor(cls, words) === null, `${cls} / ${words}`).toBe(trackerSectorFor(cls, words) === null);
+    }
+    // A plain warehouse or office filed the same way still reads its own.
+    expect(rentIndexFor("industrial", "Bulk distribution warehouse")?.id).toBe("PCU5311205311203_YOY");
+    // The brief carries no rents line for the lab, and the office line for an office.
+    const lab = liveMarketBrief({ ...base, assetClass: "office", deckWords: "Life Science / Lab" })!;
+    expect(lab.lines.some((l) => l.startsWith("Rents charged by"))).toBe(false);
+    expect(lab.figures.some((f) => f.key === "rent_index_yoy")).toBe(false);
+    const office = liveMarketBrief({ ...base, assetClass: "office", deckWords: "Class A office tower" })!;
+    expect(office.lines[0]).toContain("Rents charged by lessors of professional and office buildings");
+  });
+
   it("an office deal's brief opens its national lines with the office rent index, dated and named as the nation's", () => {
     const office = liveMarketBrief({ ...base, assetClass: "office" })!;
     expect(office.lines[0]).toBe(
@@ -414,6 +573,53 @@ describe("the rents each kind of commercial lessor charges — national, said so
     // Without the series on hand, nothing claims a figure.
     const without = liveMarketBrief({ ...base, assetClass: "office", national: national.filter((r) => r.meta.id !== "PCU9241269241265_YOY") })!;
     expect(without.lines.some((l) => l.startsWith("Commercial property insurance premiums"))).toBe(false);
+  });
+});
+
+describe("what building costs — national, for a deal that builds something, and for no other", () => {
+  // The runner's own table: the construction series the dry run of
+  // 2026-09-23 printed for August, beside the rest of the national list.
+  const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+  const base = { metro: { id: "dc", name: "Washington DC" }, rates: [], zori: null, realtor: null, now: FIXTURE_NOW, national };
+  const costLines = (b: { lines: string[] } | null) => b?.lines.filter((l) => l.startsWith("Construction costs")) ?? [];
+
+  it("a development of apartments reads the goods that go into residential construction and construction wages, each the nation's", () => {
+    const dev = liveMarketBrief({ ...base, assetClass: "multifamily", plan: true, builds: true })!;
+    expect(costLines(dev)).toEqual([
+      "Construction costs — the goods that go into residential construction, national (BLS producer price index): +7.8% from a year ago (Aug 2026; BLS via FRED) — the nation's, not this project's bids",
+      "Construction costs — average hourly earnings in construction, national: +4.2% from a year ago (Aug 2026; BLS via FRED) — the nation's, not this project's labor",
+    ]);
+    expect(dev.figures.filter((f) => f.key.startsWith("construction_"))).toEqual([
+      { key: "construction_inputs_yoy", label: "Goods into residential construction, national", value: 7.78375, unit: "pts", asOf: "2026-08-01" },
+      { key: "construction_wages_yoy", label: "Construction wages, national", value: 4.2021, unit: "pts", asOf: "2026-08-01" },
+    ]);
+    // They are national lines, counted with the rest, ahead of the debt market.
+    expect(dev.national).toBe(dev.lines.length);
+    expect(dev.lines.findIndex((l) => l.startsWith("Construction costs"))).toBeLessThan(dev.lines.findIndex((l) => l.startsWith("Debt market")));
+  });
+
+  it("an office or a warehouse being built reads the nonresidential goods", () => {
+    for (const cls of ["office", "industrial", "hospitality_str"]) {
+      expect(costLines(liveMarketBrief({ ...base, assetClass: cls, plan: true, builds: true }))[0], cls).toContain(
+        "the goods that go into nonresidential construction, national (BLS producer price index): +8.8% from a year ago",
+      );
+    }
+  });
+
+  it("a building already built reads neither, and a stale or missing series has no line", () => {
+    for (const cls of ["multifamily", "office"]) expect(costLines(liveMarketBrief({ ...base, assetClass: cls })), cls).toEqual([]);
+    // A lease-up is a plan deal whose building is finished: the construction
+    // lenders' standards, never what building costs (the audit of 2026-09-30).
+    const leaseUp = liveMarketBrief({ ...base, assetClass: "multifamily", plan: true, builds: false })!;
+    expect(costLines(leaseUp)).toEqual([]);
+    expect(leaseUp.lines.some((l) => l.includes("construction and land development loans"))).toBe(true);
+    const noWages = national.filter((r) => r.meta.id !== CONSTRUCTION_COST_IDS.wages);
+    expect(costLines(liveMarketBrief({ ...base, national: noWages, assetClass: "multifamily", plan: true, builds: true }))).toHaveLength(1);
+    const later = new Date("2027-06-01T00:00:00Z");
+    const stale = readRates(REAL_ROWS, later).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+    expect(costLines(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "multifamily", plan: true, builds: true }))).toEqual([]);
+    // One list, so the pipeline's read and the page's cannot differ.
+    for (const id of Object.values(CONSTRUCTION_COST_IDS)) expect(BRIEF_NATIONAL_IDS).toContain(id);
   });
 });
 

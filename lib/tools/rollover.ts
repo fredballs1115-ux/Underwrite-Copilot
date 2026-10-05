@@ -43,10 +43,12 @@
 // Pure, no I/O.
 
 import { readFigure } from "@/lib/money";
+import { MAX_LEASE_YEARS, MAX_ROLLOVER_YEARS, heldTo } from "@/lib/tools/limits";
 import { cellsOf } from "@/lib/tools/unit-mix";
 
-/** A rollover schedule past fifteen years is not a screening question. */
-export const MAX_YEARS = 15;
+/** A rollover schedule past fifteen years is not a screening question — the
+ *  bound lives in lib/tools/limits, where the card reads it to say so. */
+export const MAX_YEARS = MAX_ROLLOVER_YEARS;
 const DEFAULT_HOLD = 5;
 
 const real = (n: number | null | undefined): n is number =>
@@ -132,7 +134,13 @@ export function readRoll(text: string, asOfYear: number): RollRead {
     const hasRent = nums.length >= 3;
     const rentRaw = hasRent ? nums[1] : null;
     const expiryRaw = hasRent ? nums[2] : nums[1];
-    const breakRaw = nums.length >= 4 ? nums[3] : null;
+    // In a calendar-year roll a 0 in the break column is no year: it is how
+    // a sheet says the lease has no break (a blank is dropped with the
+    // cell). Read as the year 0 it was a break two thousand years past, open,
+    // and it rolled the lease in year one. In a years-remaining roll a 0 is a
+    // break open today, and stays one.
+    const breakCell = nums.length >= 4 ? nums[3] : null;
+    const breakRaw = expiryWasCalendar && breakCell === 0 ? null : breakCell;
     const toYears = (v: number | null): number | null =>
       v === null ? null : expiryWasCalendar ? v - asOfYear : v;
 
@@ -292,26 +300,45 @@ export interface RollInput {
 }
 
 /**
+ * Rule 2: the term anyone underwrites, in years — to the expiry or the
+ * break, whichever comes first, and none for a lease already past either.
+ * A break already open (at or before today) is the term's end today: the
+ * tenant can leave now, as a tenant in holdover can (the audit of
+ * 2026-10-04: an open break was dropped here and counted at the expiry,
+ * while the tenant roster's list put it in year 1).
+ */
+export function termOf(r: Pick<LeaseRow, "expiryYears" | "breakYears">): number {
+  return Math.max(0, real(r.breakYears) ? Math.min(r.expiryYears, r.breakYears) : r.expiryYears);
+}
+
+/**
+ * The schedule's year a lease rolls in: a lease expiring at 3.5 years rolls
+ * in YEAR 4 — the year during which the expiry falls — and a lease already
+ * expired, or whose break is open, rolls in year 1. The one rule the
+ * schedule's shares and every list of who rolls when read.
+ */
+export function rollYearOf(r: Pick<LeaseRow, "expiryYears" | "breakYears">): number {
+  return Math.max(1, Math.ceil(termOf(r) || 1));
+}
+
+/**
  * Reads the roll into the schedule.
  *
  * A lease expiring at 3.5 years rolls in YEAR 4 — the year during which the
  * expiry falls — and a lease already expired rolls in year 1, because a
- * tenant in holdover is a tenant who can leave. Anything past the schedule's
- * last year is counted in the totals and not in the table.
+ * tenant in holdover is a tenant who can leave (`rollYearOf`). Anything
+ * past the schedule's last year is counted in the totals and not in the
+ * table.
  */
 export function readRollover(t: RollInput): RollResult {
   const rows = t.rows.filter((r) => positive(r.sf));
   if (rows.length === 0) return EMPTY;
 
-  const hold = positive(t.holdYears) ? Math.min(Math.round(t.holdYears), MAX_YEARS) : DEFAULT_HOLD;
+  const hold = positive(t.holdYears) ? heldTo(Math.round(t.holdYears), MAX_YEARS) : DEFAULT_HOLD;
   const leasedSf = rows.reduce((a, r) => a + r.sf, 0);
   const rentOf = (r: LeaseRow) => (positive(r.rentPerSf) ? r.sf * r.rentPerSf : 0);
   const withRent = rows.filter((r) => positive(r.rentPerSf));
   const totalRent = round(withRent.reduce((a, r) => a + rentOf(r), 0));
-
-  // Rule 2: the term anyone underwrites runs to whichever comes first.
-  const termOf = (r: LeaseRow) =>
-    Math.max(0, positive(r.breakYears) ? Math.min(r.expiryYears, r.breakYears) : r.expiryYears);
 
   // Rule 1: the same average, weighted two ways. Area covers every lease;
   // rent covers only the leases that state one, which the note says.
@@ -341,7 +368,7 @@ export function readRollover(t: RollInput): RollResult {
   const buckets = new Map<number, { sf: number; rent: number }>();
   let beyondRent = 0;
   for (const r of rows) {
-    const bucket = Math.max(1, Math.ceil(termOf(r) || 1));
+    const bucket = rollYearOf(r);
     if (bucket > hold) {
       beyondRent += rentOf(r);
       continue;
@@ -383,9 +410,13 @@ export function readRollover(t: RollInput): RollResult {
     totalRent > 0 ? round1(((totalRent - beyondRent) / totalRent) * 100) : null;
 
   // Rule 3's scale: what one year would carry if the same roll were even
-  // over the term it actually spans.
+  // over the term it actually spans — the longest lease's, held only to the
+  // longest lease the cards read, so a mistyped expiry cannot make every
+  // year a cliff. Never the schedule's fifteen years: a roll spanning twenty
+  // is 5% a year, and holding it to fifteen raised the mark to 6.7% and hid
+  // a cliff between the two.
   const span = Math.max(1, Math.ceil(Math.max(...rows.map(termOf), 1)));
-  const evenYearSharePct = round1(100 / Math.min(span, MAX_YEARS));
+  const evenYearSharePct = round1(100 / Math.min(span, MAX_LEASE_YEARS));
 
   const biggest = withRent.length
     ? withRent.reduce((best, r) => (rentOf(r) > rentOf(best) ? r : best))

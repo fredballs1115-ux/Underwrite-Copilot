@@ -4,6 +4,8 @@ import {
   treasuryForTerm,
   type LiveRate,
 } from "@/lib/live-rates";
+import { withArticle } from "@/lib/article";
+import { sourceParts } from "@/lib/source-parts";
 
 /**
  * The index a loan is quoted over, read off today's rates table — the half
@@ -89,9 +91,20 @@ export interface DebtSeeds {
 
 export const NO_DEBT_SEEDS: DebtSeeds = { permanent: null, floating: null, tenYear: null, survey30: null };
 
-/** The construction lender's spread over its floating index — a screening
- *  default (bank construction debt has priced at SOFR + 300 to 400 through
- *  the cycle), marked as an assumption wherever it is used. */
+/** The spread the site's model adds to the permanent loan's index for a
+ *  deal's class (lib/underwrite/inputs `permanentLoanSpread`): the class's
+ *  screening default in basis points and the words the model's note uses
+ *  ("multifamily spread"); `bps` null where the class carries no permanent
+ *  loan (land). An assumption, said as one wherever it is written. */
+export interface PermanentSpread {
+  bps: number | null;
+  label: string;
+}
+
+/** The construction lender's spread over its floating index: the site's
+ *  screening default, not a figure read from any source, so every note
+ *  that uses it calls it a screening default — an assumption a lender's
+ *  quote replaces, never a quote. */
 export const CONSTRUCTION_SPREAD_BPS = 350;
 
 export function debtSeeds(rates: readonly LiveRate[], holdMonths: number): DebtSeeds {
@@ -127,15 +140,35 @@ export interface Benchmark30 {
   /** ISO date of the figure — the survey week, or the snapshot's own as-of */
   asOf: string;
   /** "FRED · MORTGAGE30US" for the live survey (", stale" appended where
-   *  the table has not been written for the survey's cadence), "FRED PMMS,
-   *  the checked-in snapshot" for the research layer's row */
+   *  the table has not been written for the survey's cadence); for the
+   *  research layer's row, its publisher as the row's own source names it
+   *  ("Freddie Mac PMMS, the checked-in snapshot"), or "publisher not
+   *  recorded, the checked-in snapshot" where the source names none */
   source: string;
   live: boolean;
 }
 
+/**
+ * The publisher a snapshot's source names, as the research file writes it:
+ * the words beside its link (lib/source-parts), less the kind of document
+ * they were read from — "Freddie Mac PMMS weekly release" is Freddie Mac's
+ * PMMS. Research pass 26, C16: the label had said "FRED PMMS" over a file
+ * that cites Freddie Mac's release and a newswire's copy of it, and FRED
+ * nowhere. Null where the source names none: a bare link is no publisher,
+ * and none is supplied from memory.
+ */
+function snapshotPublisher(source: string | null | undefined): string | null {
+  const words = sourceParts(source).words;
+  if (!words) return null;
+  const name = words
+    .replace(/\s+(?:(?:daily|weekly|monthly|quarterly|annual)\s+)?(?:(?:press|news)\s+)?releases?$/i, "")
+    .trim();
+  return name || null;
+}
+
 export function benchmark30(
   survey: SurveyRate | null | undefined,
-  snapshot: { low: number | null; as_of: string } | null | undefined,
+  snapshot: { low: number | null; as_of: string; source?: string | null } | null | undefined,
 ): Benchmark30 | null {
   if (survey) {
     return {
@@ -149,7 +182,7 @@ export function benchmark30(
     return {
       value: snapshot.low,
       asOf: snapshot.as_of,
-      source: "FRED PMMS, the checked-in snapshot",
+      source: `${snapshotPublisher(snapshot.source) ?? "publisher not recorded"}, the checked-in snapshot`,
       live: false,
     };
   }
@@ -163,6 +196,67 @@ function floatingIndex(rates: readonly LiveRate[]): DebtIndex | null {
     if (pct !== null && r) return { id, short: r.meta.short, pct, asOf: r.obsDate, kind: "sofr" };
   }
   return null;
+}
+
+/**
+ * The series the debt seeds read: every Treasury tenor, and SOFR with its
+ * 30-day average — what a caller with no cached table (the screen, in the
+ * worker) fetches bare before `debtSeeds`.
+ */
+export function isDebtSeedSeries(s: { id: string; tenorMonths: number | null }): boolean {
+  return s.tenorMonths !== null || s.id === "SOFR" || s.id === "SOFR30DAYAVG";
+}
+
+/**
+ * The latest published debt indices as one line a Claude step reads (the
+ * audit of 2026-09-30): the challenger was told to judge the OM's financing
+ * "at current rates" and the first-draft model to pick a "market-reasonable"
+ * loan rate, and neither was handed a rate, so each stated one from what
+ * it remembered as current. Now each is handed the same figures the site's
+ * own model is seeded from — the Treasury tenor nearest the hold (a
+ * fixed-rate permanent loan's index), the 10-year, and 30-day average SOFR
+ * (a floating, bridge or construction loan's index) — each with its date.
+ * The header says what they are: the latest figures FRED has published,
+ * each dated the day it is for, which is a business day or more behind the
+ * day the step runs — not "today's", and not "read today" as if the market
+ * were. Only a fresh contract rate is read (`debtSeeds`' own rule), and null
+ * where the table seeds none: then the step reasons as before, with
+ * nothing claimed.
+ *
+ * With the deal's `spread` (research pass 18) the line also names the spread
+ * the site's own model adds to the index for the deal's class — its
+ * screening default, said as an assumption a lender's quote replaces — and
+ * the construction panel's, so a step never invents a spread of its own; and
+ * on land, which carries no permanent loan in the model, it says so rather
+ * than claim the model prices one off the tenor.
+ */
+export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number, spread?: PermanentSpread | null): string | null {
+  const said = (i: DebtIndex) => `${i.pct.toFixed(2)}% (${datedLong(i.asOf)})`;
+  const parts: string[] = [];
+  if (seeds.permanent) {
+    const years = Math.round(holdMonths / 12);
+    parts.push(
+      spread && spread.bps == null
+        ? `the ${indexName(seeds.permanent)} ${said(seeds.permanent)}, the tenor nearest a hold of ${years} years — the site's model carries no permanent loan on land, so it prices none off it`
+        : `the ${indexName(seeds.permanent)} ${said(seeds.permanent)}, which the site's model prices a fixed-rate permanent loan off for its hold of ${years} years${
+            spread?.bps != null
+              ? `, adding ${withArticle(`${spread.bps} bps`)} ${spread.label} — the site's screening default, an assumption a lender's quote replaces, never a quote`
+              : ""
+          }`,
+    );
+  }
+  if (seeds.tenYear && seeds.tenYear.id !== seeds.permanent?.id) {
+    parts.push(`the ${indexName(seeds.tenYear)} ${said(seeds.tenYear)}, the benchmark a cap rate's spread is quoted over`);
+  }
+  if (seeds.floating) {
+    parts.push(
+      `${indexName(seeds.floating)} ${said(seeds.floating)}, a floating, bridge or construction loan's index${
+        spread ? `, which the site's construction panel starts from plus ${CONSTRUCTION_SPREAD_BPS} bps — a screening default too, never a quote` : ""
+      }`,
+    );
+  }
+  if (parts.length === 0) return null;
+  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
 }
 
 /** Index plus spread, as a percent to two places — the figure a term sheet prints. */

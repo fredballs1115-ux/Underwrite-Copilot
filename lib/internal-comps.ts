@@ -5,11 +5,13 @@ import {
   findMetric,
   parsePct,
   parsePrice,
+  screenYearOf,
 } from "@/lib/criteria";
 import {
   buildingPriceOf,
   findPriceMetric,
   inferStrategy,
+  isOutdoorStorageYard,
   planSummary,
   statedBasisIsBuildings,
   type StrategyKind,
@@ -17,7 +19,7 @@ import {
 } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { assetWords, perSuffix } from "@/lib/asset-words";
+import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -64,15 +66,6 @@ interface SiblingDealRow {
   extraction: unknown;
 }
 
-function effectiveClass(
-  assetClass: string | null | undefined,
-  extraction: { assetClass?: string } | null,
-): string {
-  const own = (assetClass ?? "").toLowerCase();
-  if (own && own !== "auto") return own;
-  return (extraction?.assetClass ?? "").toLowerCase();
-}
-
 const fmtCompact = (dollars: number) =>
   dollars >= 1e6
     ? `$${(dollars / 1e6).toFixed(1)}M`
@@ -92,6 +85,9 @@ function deriveBasis(
   /** the OM's own per-unit line may be read — false where the price is not
    *  for the building bought outright (#415) */
   statedLine = true,
+  /** the price over the building's feet is a basis — false for an
+   *  outdoor-storage yard, which trades by the usable acre */
+  perSfBasis = true,
 ): string | null {
   const suffix = allIn ? " all-in" : "";
 
@@ -116,7 +112,7 @@ function deriveBasis(
     if (n != null && n > 0) return `${fmtCompact(price / n)}${perSuffix(words)}${suffix}`;
     return null;
   }
-  if (price == null) return null;
+  if (price == null || !perSfBasis) return null;
   // Priced per SF: dollars per square foot, over the building's size — the
   // shared reader, never the land's or a unit's.
   const n = buildingSfFromMetrics(metrics);
@@ -139,7 +135,10 @@ export function deriveInternalComps(
   siblings: SiblingDealRow[],
   limit = 8,
 ): InternalComp[] {
-  const wanted = effectiveClass(currentAssetClass, currentExtraction);
+  // The deal's one class, filed by its words (lib/asset-words
+  // `dealClassKey`): a sibling whose deck says "Garden-style multifamily" is
+  // a multifamily comp, where the raw words had matched nothing.
+  const wanted = dealClassKey(currentAssetClass, currentExtraction);
   if (!wanted) return [];
 
   const comps: InternalComp[] = [];
@@ -152,7 +151,7 @@ export function deriveInternalComps(
     } | null;
     const metrics = extraction?.metrics;
     if (!Array.isArray(metrics) || metrics.length === 0) continue;
-    if (effectiveClass(row.asset_class, extraction) !== wanted) continue;
+    if (dealClassKey(row.asset_class, extraction) !== wanted) continue;
 
     // The sibling's kind first. A plan deal (value-add, lease-up, conversion,
     // development) has no going-in cap — its stabilized cap or yield on cost
@@ -162,7 +161,7 @@ export function deriveInternalComps(
     const ext = { ...extraction, metrics } as ExtractionResult;
     const strategy = inferStrategy(ext);
     const plan = planSummary(ext, strategy);
-    const price = findPriceMetric(metrics, strategy.kind);
+    const price = findPriceMetric(metrics, strategy.kind, screenYearOf(ext));
     // A note's stated cap is the collateral's and a leased fee's a ground
     // rent's (#415): neither sits in a column of buildings' caps.
     const interestKind = interestOf(ext).kind;
@@ -174,6 +173,9 @@ export function deriveInternalComps(
     const priceNum = price ? parsePrice(price.value) : null;
     const capNum = cap ? parsePct(cap.value) : null;
     if (priceNum == null && capNum == null && yoc == null) continue;
+    // An outdoor-storage yard trades by the acre: no per-SF column for its
+    // shop building.
+    const perSfBasis = !isOutdoorStorageYard(extraction?.assetClass) && !isOutdoorStorageYard(row.asset_class);
 
     comps.push({
       dealId: row.id,
@@ -188,9 +190,9 @@ export function deriveInternalComps(
       capLabel: capNum != null ? cap!.value : null,
       basisLabel: plan
         ? plan.totalCost != null
-          ? deriveBasis(metrics, wanted, plan.totalCost, true)
+          ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis)
           : null
-        : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext)),
+        : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis),
       kind: strategy.kind,
       kindLabel: plan ? strategy.label : null,
       yieldOnCostLabel: yoc != null ? `${(yoc * 100).toFixed(1)}%` : null,

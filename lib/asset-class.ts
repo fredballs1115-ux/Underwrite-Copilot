@@ -47,3 +47,29 @@ export function assetClassLabel(key: string | null | undefined): string {
   const words = k.replace(/_+/g, " ").replace(/\s+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+/**
+ * The asset class a pipeline row shows. A deal created with "Auto-detect"
+ * keeps "auto" in its column, and what the deck turned out to be lives in
+ * the extraction — so the row shows that read, and shows nothing (no rail,
+ * no dot, a dash) while nothing has read the deck yet. "Auto" was never an
+ * asset class, and a row that said so read as one.
+ *
+ * A known class comes back as its key, whatever its case, so the filter
+ * and the colour rail match it; a class the model phrased itself keeps
+ * its case — "NNN retail" is not "Nnn retail" — and `assetClassLabel`
+ * only raises its first letter. (Imported from lib/pipeline-slots by every
+ * surface; it lives here so lib/asset-words can file a deal by it.)
+ */
+export function shownAssetClass(
+  stored: string | null | undefined,
+  extraction: { assetClass?: string | null } | null | undefined,
+): string {
+  const norm = (v: string | null | undefined): string => {
+    const t = (v ?? "").trim();
+    const lower = t.toLowerCase();
+    if (!t || lower === "auto") return "";
+    return ASSET_CLASS_LABEL[lower] ? lower : t;
+  };
+  return norm(stored) || norm(extraction?.assetClass);
+}

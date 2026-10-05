@@ -1,27 +1,13 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
-import { interestTag } from "@/lib/interest";
-import { assumableTag } from "@/lib/assumable-debt";
-import { affordableTag } from "@/lib/affordable";
-import { singleTenantTag } from "@/lib/single-tenant";
-import { hotelTag } from "@/lib/hotel-deal";
-import { saleTag } from "@/lib/sale-terms";
-import { rosterTag } from "@/lib/tenant-roster";
-import { valueAddTag } from "@/lib/value-add";
-import { taxAbatementTag } from "@/lib/tax-abatement";
-import { sellerFinancingTag } from "@/lib/seller-financing";
-import { siteReportsTag } from "@/lib/site-reports";
-import { studentHousingTag } from "@/lib/student-housing";
-import { manufacturedHousingTag } from "@/lib/manufactured-housing";
+import type { JobLike } from "@/lib/screen-run";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
   buildPipelineWorkbook,
   type PipelineExportRow,
 } from "@/lib/pipeline-workbook";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import { pipelineExportRow } from "@/lib/pipeline-export-row";
 
 // exceljs needs the Node runtime.
 export const runtime = "nodejs";
@@ -48,8 +34,10 @@ export async function GET(req: Request) {
   const [{ data, error }, team] = await Promise.all([
     supabase
       .from("deals")
+      // The first signal and the address too: the row reads the deal's kind
+      // and its buy-box fit on the pipeline page's own inputs.
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage, is_sample",
+        "id, name, asset_class, created_at, verdict, extraction, first_signal, address, user_id, team_id, stage, is_sample",
       )
       .order("created_at", { ascending: false }),
     getTeam(supabase, user.id).catch(() => null),
@@ -63,6 +51,8 @@ export async function GET(req: Request) {
     created_at: string;
     verdict: unknown;
     extraction: unknown;
+    first_signal: unknown;
+    address: unknown;
     user_id: string;
     team_id: string | null;
     stage: string | null;
@@ -77,7 +67,7 @@ export async function GET(req: Request) {
       rows.filter((d) => d.team_id && d.user_id !== user.id).map((d) => d.user_id),
     ),
   );
-  const [{ data: dueRows }, { data: mates }, personalBox, teamBox] =
+  const [{ data: dueRows }, { data: mates }, personalBox, teamBox, { data: jobRows }] =
     await Promise.all([
       rows.length
         ? supabase
@@ -95,7 +85,26 @@ export async function GET(req: Request) {
           }),
       getBuyBoxForDeal(user.id, null).catch(() => null),
       team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
+      // Each deal's latest job, as the pipeline page reads it: a re-screen
+      // running, or one that failed before its verdict, leaves the call on
+      // file the previous screen's beside this run's terms (lib/screen-run).
+      rows.length
+        ? supabase
+            .from("analysis_jobs")
+            .select("deal_id, status, step, created_at")
+            .in(
+              "deal_id",
+              rows.map((d) => d.id),
+            )
+            .order("created_at", { ascending: false })
+            .limit(Math.max(100, rows.length * 3))
+        : Promise.resolve({ data: [] as ({ deal_id: string } & JobLike)[] }),
     ]);
+  // The newest job per deal (rows arrive newest first).
+  const jobByDeal = new Map<string, JobLike>();
+  for (const j of (jobRows ?? []) as ({ deal_id: string } & JobLike)[]) {
+    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
+  }
   // Offers-due dates are best-effort (column arrived in migration 0013).
   const dueById = new Map<string, string>();
   for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
@@ -110,64 +119,19 @@ export async function GET(req: Request) {
     nameById.set(m.id, m.full_name || m.email || "Teammate");
   }
 
-  const exportRows: PipelineExportRow[] = rows.map((d) => {
-    const extraction = d.extraction as ExtractionResult | null;
-    const metrics = extraction?.metrics ?? [];
-    // The deal's kind first. A plan deal (value-add, lease-up, conversion,
-    // development) has no going-in cap — its stabilized figure is the
-    // finished project's, judged on yield on total cost — and a development's
-    // price is its land cost when the OM states no asking price.
-    const strategy = inferStrategy(extraction ? { ...extraction, metrics } : null);
-    const plan = planSummary(extraction ? { ...extraction, metrics } : null, strategy);
-    const box = d.team_id ? teamBox : personalBox;
-    let fit: PipelineExportRow["fit"] = null;
-    if (box && extraction) {
-      // The inferred kind rides along, as on the pipeline page, so the fit
-      // column judges the land cost this row prints as a development's price.
-      const source = buyBoxCheckSource(extraction, null, null, strategy.kind);
-      const checks = source ? evaluateBuyBox(d.asset_class, source, box) : [];
-      fit = checks.some((c) => c.status === "miss")
-        ? "outside"
-        : checks.some((c) => c.status === "near")
-          ? "near"
-          : checks.some((c) => c.status === "pass")
-            ? "fits"
-            : null;
-    }
-    return {
-      name: d.name,
-      stage: d.stage ?? "screening",
-      assetClass: d.asset_class,
-      market: extraction?.market ?? "",
-      dealType: strategy.kind === "unknown" ? null : strategy.label,
-      planDeal: plan != null,
-      price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
-      interest: interestTag(extraction),
-      debt: assumableTag(extraction),
-      affordable: affordableTag(extraction),
-      tenancy: singleTenantTag(extraction),
-      hotel: hotelTag(extraction),
-      sale: saleTag(extraction),
-      roster: rosterTag(extraction),
-      valueAdd: valueAddTag(extraction),
-      abatement: taxAbatementTag(extraction),
-      sellerNote: sellerFinancingTag(extraction),
-      reports: siteReportsTag(extraction),
-      student: studentHousingTag(extraction),
-      mh: manufacturedHousingTag(extraction),
-      cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
-      yieldOnCost:
-        plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
-      fit,
-      verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
+  // Each row read through the readers every other surface uses
+  // (lib/pipeline-export-row, pure and tested).
+  const exportRows: PipelineExportRow[] = rows.map((d) =>
+    pipelineExportRow(d, {
+      box: d.team_id ? teamBox : personalBox,
+      job: jobByDeal.get(d.id),
       offersDue: dueById.get(d.id) ?? null,
-      createdAt: d.created_at,
       addedBy:
         d.team_id && d.user_id !== user.id
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
-    };
-  });
+    }),
+  );
 
   // Firm branding (Feature 6) — the caller's own identity (this is an
   // account-level export, not a deal-level one). Best-effort.

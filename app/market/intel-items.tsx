@@ -1,0 +1,83 @@
+import { dayOf } from "@/lib/utc-day";
+
+// The UTC day said as one ("Oct 1, 2026 UTC") — lib/utc-day, the one helper
+// every feed's date prints through; re-exported for the readers here.
+export { dayOf };
+
+/** One news item the weekday intel job kept, as the page reads it. */
+export interface IntelItem {
+  url: string;
+  title: string;
+  source: string | null;
+  relevance: number | null;
+  action: string | null;
+  /** when the publisher dated the item, where the feed said */
+  published_at?: string | null;
+  /** when the job first saw it */
+  created_at?: string | null;
+}
+
+/**
+ * The weekday intel's latest digest, as the /market card's corner says it:
+ * "latest digest Oct 1, 2026 UTC · 6 notable". The job dates a digest by the
+ * UTC day it ran (scripts/daily-intel.mjs), so the day is said as UTC's; a
+ * date that is not an ISO day is printed as stored.
+ */
+export function digestLine(digest: { digest_date: string; item_count: number }): string {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(digest.digest_date) ? dayOf(digest.digest_date) : null;
+  return `latest digest ${day ?? digest.digest_date} · ${digest.item_count} notable`;
+}
+
+/**
+ * The weekday intel job's notable items (scripts/daily-intel.mjs), each
+ * dated, and each score and next step labelled for what it is.
+ *
+ * The research pass of 2026-10-01 found the items undated and their "7/10"
+ * and "→ action" shown with no word that they are Claude's scoring of each
+ * headline against one investor's criteria — the job's prompt scores
+ * "decision-usefulness" to a small buyer of 2–4 unit buildings on the East
+ * Coast. A reader with other criteria would read them as the site's advice.
+ * The section stays (whether it is public is the owner's question); it now
+ * says whose read it is, and that it is not advice. Pure.
+ */
+export function IntelItems({ items }: { items: readonly IntelItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="intel-label">
+        The score and the next step on each item are an AI&apos;s read (Claude&apos;s) of the headline against one
+        investor&apos;s criteria — a small buyer of 2–4 unit buildings on the East Coast — not advice, and not a
+        read of your deals.
+      </p>
+      <ul className="mt-3 space-y-2.5">
+        {items.map((it) => {
+          const published = dayOf(it.published_at);
+          const seen = dayOf(it.created_at);
+          const when = published ? published : seen ? `seen ${seen}` : "undated";
+          return (
+            <li key={it.url} className="text-sm leading-snug" data-intel-item>
+              {it.relevance !== null && (
+                <span
+                  className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted"
+                  title="An AI's 0-10 score of how useful the headline is to one investor's criteria — not advice"
+                >
+                  {`AI score ${it.relevance}/10`}
+                </span>
+              )}
+              <a
+                href={it.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-brand"
+              >
+                {it.title}
+              </a>
+              <span className="ml-1 text-xs text-muted">{`(${[it.source, when].filter(Boolean).join(", ")})`}</span>
+              {it.action && <p className="mt-0.5 text-xs text-muted">{`AI's suggested next step for that investor: ${it.action}`}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}

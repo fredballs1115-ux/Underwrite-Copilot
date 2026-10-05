@@ -29,7 +29,7 @@
 // market check's header name the same places.
 
 import type { ExtractionResult, PortfolioProperty } from "@/lib/anthropic/types";
-import { parseCount, parsePct, parsePrice, parseSf } from "@/lib/criteria";
+import { parseCount, parsePct, parsePrice, parseSf, screenYearOf } from "@/lib/criteria";
 import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
 import { placeOf } from "@/lib/address";
 import { withArticle } from "@/lib/article";
@@ -189,7 +189,7 @@ export function readPortfolio(ex: ExtractionResult | null | undefined): Portfoli
     ? assets.reduce((s, a) => s + (a.allocated as number), 0)
     : null;
   const metrics = ex?.metrics ?? [];
-  const priceRow = findPricedMetric(metrics, inferStrategy(ex ?? null).kind);
+  const priceRow = findPricedMetric(metrics, inferStrategy(ex ?? null).kind, screenYearOf(ex));
   // A range's top (#466), as every reader of the ask takes it.
   const statedAsk = priceRow ? parsePrice(priceRow.value) : null;
   const askingPrice = statedAsk != null && statedAsk >= 10_000 ? statedAsk : null;
@@ -240,6 +240,17 @@ type Noun = { one: string; many: string };
  *  shares. */
 export function shareBasisWord(p: PortfolioRead, noun: Noun): string | null {
   return p.shareBasis === "area" ? "SF" : p.shareBasis === "count" ? noun.many : null;
+}
+
+/**
+ * How much of its track a share's bar fills, 0 to 1: the share of the
+ * whole, so a 53% share fills 53% of the track — the deal page's card and
+ * the report's portfolio page draw through this one rule. The bars had been
+ * scaled to the largest share in either set, so a 53% share drew at 97%
+ * beside its own "53%".
+ */
+export function shareOfTrack(sharePct: number): number {
+  return Number.isFinite(sharePct) ? Math.max(0, Math.min(1, sharePct / 100)) : 0;
 }
 
 /**

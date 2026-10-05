@@ -74,6 +74,29 @@ describe("readAssumption — rule 1, the two halves pull opposite ways", () => {
     expect(r.note).toContain("debt service is");
     expect(r.note).toContain("the cheque is");
   });
+
+  it("says the debt service is higher where it is higher", () => {
+    // At today's rate on a ten-year amortisation the assumed loan costs
+    // $397,895 MORE a year than the new one. The note called that "a year
+    // lower".
+    const r = readAssumption({ ...SEED, assumedRatePct: 6.5, assumedAmortYears: 10 });
+    expect(r.annualDebtServiceSaved).toBe(-397_895);
+    expect(r.irrGapPts!).toBeLessThan(0);
+    expect(r.note).toContain("debt service is $397,895 a year HIGHER");
+    expect(r.note).not.toContain("a year lower");
+    expect(r.note).toContain("both work against it");
+  });
+
+  it("never says 'even though' of a smaller cheque", () => {
+    // A $13M assumed balance is a LARGER loan than the new one's $12M, so
+    // the cheque is $990,000 smaller — a second reason for the premium,
+    // which the note had introduced with "even though".
+    const r = readAssumption({ ...SEED, assumedBalance: 13_000_000 });
+    expect(r.extraEquity).toBe(-990_000);
+    expect(r.note).toContain("and assuming it takes $990,000 less equity than a new one as well");
+    expect(r.note).not.toContain("even though");
+    expect(readAssumption(SEED).note).toContain("even though assuming it takes $2.38M MORE equity");
+  });
 });
 
 describe("readAssumption — the premium, solved", () => {

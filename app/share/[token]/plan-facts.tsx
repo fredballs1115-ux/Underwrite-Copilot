@@ -48,6 +48,7 @@ export function SharePlan({
         {withArticle(kind, true)}{" "}deal has no going-in cap: the stabilized NOI is the finished project&apos;s
         figure, judged on yield on total cost — never a cap rate on the{" "}
         {plan.priceLabel === "Land cost" ? "land" : "acquisition"} price.
+        {plan.costWithheld ? ` ${plan.costWithheld}` : ""}
       </p>
     </section>
   );

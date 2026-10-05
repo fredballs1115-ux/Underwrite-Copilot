@@ -1,15 +1,18 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { ProcessorList } from "@/app/processor-list";
+import { publicMetadata } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata = publicMetadata({
   title: "Privacy policy",
   description:
     "What Underwrite Copilot collects, how deal documents are handled, and what we never do with your data.",
-  alternates: { canonical: "/privacy" },
-};
+  canonical: "/privacy",
+});
 
-const SECTIONS: { h: string; body: string[] }[] = [
+// The outside services are lib/data-processors, the security page's list
+// too, held to the hosts the code sends a user's data to.
+const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "What we collect",
     body: [
@@ -32,13 +35,14 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Retention and deletion",
     body: [
-      "Deleting a deal deletes its documents and analyses. You can delete your whole account and everything in it instantly, yourself, from the Account page — it cancels any live subscription and removes your files. Prefer email? Write to underwritecopilot.support@gmail.com from your account address and we'll remove it within 30 days. Either way, deletion is complete except where the law requires retention (for example, billing records).",
+      "Deleting a deal deletes its documents and analyses. You can delete your whole account and everything in it instantly, yourself, from the Account page — it cancels any live subscription and removes your files. A team's owner cannot, since the team would go with them: write to us instead. Prefer email? Write to underwritecopilot.support@gmail.com from your account address and we'll remove it within 30 days. Either way, everything is deleted except two things: the deals you added to a team's pipeline, which stay with the team, handed to its owner along with your work on the team's deals; and what the law requires us to keep (for example, billing records).",
     ],
   },
   {
-    h: "Cookies",
+    h: "Cookies and browser storage",
     body: [
-      "We use session cookies to keep you signed in. There are no advertising or cross-site tracking cookies.",
+      "Signing in sets the session cookies that keep you signed in; they last up to 400 days unless you sign out. Three cookies of our own last a year: the view of your pipeline you left on (cards or list), the regulatory alerts you dismissed, kept under your account's name, and your browser's time zone, so a due date counts from your own calendar day.",
+      "Your browser also keeps a few things on this device only: a deal you started adding but did not submit (its name and address), that you closed the getting-started list, and, for the visit, your pipeline's filters and the map's looked-up places. There are no advertising or cross-site tracking cookies.",
     ],
   },
   {
@@ -50,8 +54,9 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Third parties we rely on",
     body: [
-      "Supabase (database, authentication, and document storage), Anthropic (AI analysis via the Claude API), Stripe (payments), Render (hosting), and Photon by OpenStreetMap (address autocomplete — it receives only the address text you type into an address field, never your documents). Each receives only what it needs to do its job.",
+      "Each receives only what it needs to do its job. Your documents themselves are stored with Supabase and read by Anthropic; every other service receives only what is named beside it.",
     ],
+    processors: true,
   },
   {
     h: "Changes",
@@ -91,7 +96,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Privacy policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: July 7, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: October 4, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Deal documents are sensitive — most OMs travel under confidentiality
           terms. This page says exactly what we collect, where it goes, and
@@ -110,6 +115,7 @@ export default function PrivacyPage() {
                   {p}
                 </p>
               ))}
+              {s.processors && <ProcessorList />}
             </section>
           ))}
         </div>

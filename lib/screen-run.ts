@@ -4,10 +4,13 @@
  * The pipeline writes each result to the deal as its step finishes, so a run
  * that fails midway leaves a MIXED generation: the steps before the failure
  * hold this run's results, the steps from it onward still hold the previous
- * screen's. Nothing in the deal row records that — the job row does: its
- * status is "error" and its step names where the run stopped. Pure, and
- * shared by the deal page, the pipeline list, the memo and report routes
- * and the shared screen, so every surface reads a failed run the same way.
+ * screen's. So does a run still GOING — a re-screen rewrites the terms
+ * first and the verdict last, and for the minutes between, the deal holds
+ * this run's terms beside the last run's call. Nothing in the deal row
+ * records either — the job row does: its status and the step it has
+ * reached. Pure, and shared by the deal page, the pipeline list, the memo
+ * and report routes and the shared screen, so every surface reads a failed
+ * or a running screen the same way (`previousScreenResults`).
  */
 
 /** The automatic pass, in order. Each step rewrites the result named beside it. */
@@ -55,11 +58,78 @@ export const STALE_MS = 10 * 60 * 1000;
  * verdict, so a reconcile that fails there marks the verdict alone.
  */
 export function staleAfterFailure(job: JobLike | null | undefined): Set<ResultKey> {
+  if (!job || job.status !== "error") return new Set();
+  return fromStep(job.step);
+}
+
+/** Whether the job is a run still in flight — queued, or running (a stalled
+ *  one included: its results are as mixed as a live one's until it is
+ *  reclaimed or fails). */
+export function isLiveJob(job: JobLike | null | undefined): boolean {
+  return job?.status === "queued" || job?.status === "running";
+}
+
+/**
+ * The results a screen still RUNNING has not rewritten yet, so they still
+ * belong to the previous screen: the same line a failure draws — every
+ * result from the step in progress onward (a step is written as its step
+ * finishes, and the job names the step it is in). A queued run has
+ * rewritten nothing. On a first screen those results are simply absent,
+ * so marking them marks nothing. Found by the research pass of 2026-09-30:
+ * during a re-screen the memo, the report and the shared screen printed
+ * the run's new terms under the previous run's verdict, as one screen.
+ */
+export function staleWhileRunning(job: JobLike | null | undefined): Set<ResultKey> {
+  if (!job || !isLiveJob(job)) return new Set();
+  return fromStep(job.step);
+}
+
+/**
+ * Every stored result that belongs to a previous screen: the steps a failed
+ * run never reached, and the steps a live run has not reached yet. The one
+ * rule each surface asks — the deal page marks them and leaves them out of
+ * its count of finished steps, and the memo, the report and the shared
+ * screen never pair a result of this run with a verdict of the last.
+ */
+export function previousScreenResults(job: JobLike | null | undefined): Set<ResultKey> {
+  return new Set([...staleAfterFailure(job), ...staleWhileRunning(job)]);
+}
+
+/**
+ * Why the stored verdict is the previous screen's, if it is: the latest
+ * screen failed before it reached the verdict, or a screen still running
+ * has not reached it yet. The memo and the report refuse to print it
+ * beside terms the run has already rewritten, the shared screen marks it,
+ * and the pipeline shows the run instead of the call it will replace.
+ */
+export function verdictBehind(job: JobLike | null | undefined): "failed" | "running" | null {
+  if (staleAfterFailure(job).has("verdict")) return "failed";
+  if (staleWhileRunning(job).has("verdict")) return "running";
+  return null;
+}
+
+/** The day a verdict was written ("Sep 12, 2026"), read in UTC so the
+ *  server's render and the browser's agree; null for a verdict saved before
+ *  the pipeline stamped one, or a stamp that does not parse. */
+export function screenedOn(generatedAt: string | null | undefined): string | null {
+  if (!generatedAt) return null;
+  const t = Date.parse(generatedAt);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** The results from a step onward — no step at all means the run died, or
+ *  has not started, before its first write; a step that is not a screen's
+ *  (a comp search, a model build, the reconciler's own) rewrote none of
+ *  the five and marks nothing. */
+function fromStep(step: string | null | undefined): Set<ResultKey> {
   const out = new Set<ResultKey>();
-  if (!job || job.status !== "error") return out;
-  // No step at all means the run died before its first write.
-  const step = job.step ?? "signal";
-  const idx = (SCREEN_STEPS as readonly string[]).indexOf(step);
+  const idx = (SCREEN_STEPS as readonly string[]).indexOf(step ?? "signal");
   if (idx < 0) return out;
   for (const s of SCREEN_STEPS.slice(idx)) {
     const key = WRITES[s];
@@ -71,10 +141,14 @@ export function staleAfterFailure(job: JobLike | null | undefined): Set<ResultKe
 export type ListJobStatus = "running" | "stalled" | "failed" | null;
 
 /**
- * The pipeline list's status for a deal's latest job: a live run, a run that
- * stopped writing progress (its process died — a deploy, most often), or a
- * failure that left the verdict behind. A failure that never touched the
- * verdict (a comp search, say) leaves the verdict pill alone.
+ * The pipeline list's status for a deal's latest job: a live screen, a run
+ * that stopped writing progress (its process died — a deploy, most often),
+ * or a failure that left the verdict behind. A job that rewrites none of the
+ * five results — a comp search, a model build, the reconciler before its
+ * verdict step — is no screen: live, it leaves the call alone, since the
+ * card shows a running screen in the verdict's place (a re-screen's terms
+ * are rewriting under the old call); failed, it touches the pill only on a
+ * deal with no verdict.
  */
 export function listJobStatus(
   job: JobLike | null | undefined,
@@ -83,6 +157,7 @@ export function listJobStatus(
 ): ListJobStatus {
   if (!job) return null;
   if (job.status === "queued" || job.status === "running") {
+    if (staleWhileRunning(job).size === 0) return null;
     const t = job.updated_at ? Date.parse(job.updated_at) : NaN;
     return Number.isFinite(t) && now - t > STALE_MS ? "stalled" : "running";
   }

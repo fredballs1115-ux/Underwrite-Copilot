@@ -46,6 +46,20 @@ function parseJson(text) {
   }
 }
 
+/** Every string value under a JSON document that contains `needle`
+ *  (lower case), with its path, at any depth. */
+function jsonValuesContaining(value, needle, path = "$", out = []) {
+  if (out.length >= 50) return out;
+  if (typeof value === "string") {
+    if (value.toLowerCase().includes(needle)) out.push({ path, value });
+  } else if (Array.isArray(value)) {
+    value.forEach((v, i) => jsonValuesContaining(v, needle, `${path}[${i}]`, out));
+  } else if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) jsonValuesContaining(v, needle, `${path}.${k}`, out);
+  }
+  return out;
+}
+
 /** Every path of a JSON document to `JSON_DEPTH`: an object's keys, an
  *  array's length and its first element's shape, a scalar's value. */
 function describeJson(value, path = "$", depth = 0, out = []) {
@@ -152,6 +166,30 @@ for (const url of urls) {
     const unique = Array.from(new Set(links));
     console.log(`  an HTML page; ${unique.length} link(s) to a data file${unique.length ? ":" : ""}`);
     for (const l of unique.slice(0, 25)) console.log(`    ${clip(l, 200)}`);
+    // And the page's own words, for what a list of links cannot say — what
+    // the publisher says a series IS (its source, what it covers): the text
+    // with the markup taken out, each match word's lines printed as they
+    // stand, matched without regard to case.
+    if (match.length > 0) {
+      const pageLines = text
+        .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+        .replace(/<br\s*\/?>|<\/(?:p|div|li|tr|td|th|h[1-6]|span)>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;|&apos;/g, "'")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
+        .split("\n")
+        .map((l) => l.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+      for (const m of match) {
+        const hits = pageLines.filter((l) => l.toLowerCase().includes(m.toLowerCase()));
+        console.log(`  page lines containing "${m}": ${hits.length}`);
+        for (const h of hits.slice(0, 6)) console.log(`    ${clip(h)}`);
+      }
+    }
     continue;
   }
   // A JSON response is one long line, and its first 2,000 characters say
@@ -163,6 +201,14 @@ for (const url of urls) {
     const paths = describeJson(json);
     console.log(`  JSON · ${paths.length} path(s)${paths.length >= JSON_PATHS ? ` (the first ${JSON_PATHS})` : ""}:`);
     for (const p of paths) console.log(`    ${p}`);
+    // With match words, every string value that contains one, whole up to
+    // the row clip and at any depth — a credit buried in an API's metadata
+    // (Commons' Artist field carries its own links) is what is being asked.
+    for (const m of match) {
+      const hits = jsonValuesContaining(json, m.toLowerCase());
+      console.log(`  values containing "${m}": ${hits.length}`);
+      for (const h of hits.slice(0, 6)) console.log(`    ${h.path}: ${clip(h.value)}`);
+    }
     continue;
   }
   console.log(`  header: ${clip(lines[0], HEADER_CLIP)}`);

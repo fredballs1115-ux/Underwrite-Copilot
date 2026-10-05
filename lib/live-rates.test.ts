@@ -19,7 +19,9 @@ import {
   readSeriesTable,
   seedRate,
   seriesMeta,
-  shortDate,
+  periodLabel,
+  periodOf,
+  publisherTag,
   treasuryForTerm,
   yieldCurve,
   type RateRow,
@@ -28,6 +30,7 @@ import { FIXTURE_NOW as NOW, REAL_ROWS as REAL } from "./live-rates.fixture";
 import table from "@/data/fred-series.json";
 import metrosSeed from "@/data/research/metros.json";
 import { DATA_METROS } from "@/lib/market-match";
+import { marketOwnArea, namesItsArea } from "@/lib/metro-own-area";
 import {
   HVS_RATES_URL,
   METRO_SERIES,
@@ -108,8 +111,13 @@ describe("the series table", () => {
     // year and published the March after the year ends, so it is fourteen
     // months old on arrival and twenty-six when the next one lands.
     const floor = { daily: 4, weekly: 8, monthly: 90, quarterly: 250, annual: 700 } as const;
+    // The Housing Vacancy Survey releases a quarter late in the month after
+    // it ends (.github/workflows/hvs.yml), a month sooner than the quarterly
+    // series the floor is set for, so its newest figure is at most about 220
+    // days old: the survey's one freshness, 240 days, clears it.
+    const survey = /^RRVR(?:US|NE|MW|SO|WE)Q156N$/;
     for (const s of SERIES) {
-      expect(s.freshDays, s.id).toBeGreaterThanOrEqual(floor[s.cadence]);
+      expect(s.freshDays, s.id).toBeGreaterThanOrEqual(survey.test(s.id) ? 240 : floor[s.cadence]);
     }
   });
 
@@ -120,7 +128,7 @@ describe("the series table", () => {
     for (const id of ["DGS2", "DGS10", "SOFR", "SOFR30DAYAVG", "DPRIME"]) {
       expect(seriesMeta(id)!.contractRate, id).toBe(true);
     }
-    for (const id of ["MORTGAGE30US", "DRCRELEXFACBS", "DFF", "CPIAUCSL_YOY", "HOUST5F", "BAMLC0A0CM"]) {
+    for (const id of ["MORTGAGE30US", "DRCRELEXFACBS", "DFF", "CPIAUCSL_YOY", "HOUST5F", "HQMCB10YR"]) {
       expect(seriesMeta(id)!.contractRate, id).toBe(false);
     }
   });
@@ -164,7 +172,8 @@ describe("reading the table", () => {
     expect(of("DGS10").value).toBe(4.94);
     expect(of("DGS10").obsDate).toBe("2026-09-17");
     expect(of("SOFR").value).toBe(3.85);
-    expect(of("BAMLH0A0HYM2").value).toBe(2.68);
+    expect(of("HQMCB10YR").value).toBe(5.58);
+    expect(of("HQMCB10YR").obsDate).toBe("2026-08-01");
     expect(of("WPUSI012011_YOY").value).toBeCloseTo(10.089, 3);
     expect(of("HOUST5F").value).toBe(344);
   });
@@ -354,8 +363,11 @@ describe("how a figure is said", () => {
   });
 
   it("says a spread in basis points, because nobody says 0.77% over", () => {
-    expect(formatValue(of("BAMLC0A0CM"))).toBe("77 bps");
-    expect(formatValue(of("BAMLH0A0HYM2"))).toBe("268 bps");
+    // No series on the strip is a spread today (ICE's were taken off it,
+    // 2026-09-30); the unit stays, so one added later reads right.
+    const spread = { ...of("DGS10"), meta: { ...of("DGS10").meta, unit: "spread" as const } };
+    expect(formatValue({ ...spread, value: 0.77 })).toBe("77 bps");
+    expect(formatValue({ ...spread, value: 2.68 })).toBe("268 bps");
   });
 
   it("says a share or a change to one place, signed", () => {
@@ -366,9 +378,18 @@ describe("how a figure is said", () => {
     expect(formatValue(of("TLNRESCONS_YOY"))).toBe("−1.3%");
   });
 
-  it("says a count with its thousands", () => {
-    expect(formatValue(of("HOUST5F"))).toBe("344k");
-    expect(formatValue(of("HOUST"))).toBe("1,275k");
+  it("says a count with its thousands and its annual rate, on the figure", () => {
+    // "344k" bare read as a count of something; the annual rate was in a
+    // hover title alone (the research pass of 2026-10-01).
+    expect(formatValue(of("HOUST5F"))).toBe("344k/yr");
+    expect(formatValue(of("HOUST"))).toBe("1,275k/yr");
+  });
+
+  it("names the publisher a tile credits beside its link", () => {
+    expect(publisherTag(of("MORTGAGE30US").meta)).toBe("Freddie Mac");
+    expect(publisherTag(of("DGS10").meta)).toBeNull();
+    expect(publisherTag({ source: "bls", label: "Rent of primary residence" })).toBe("BLS");
+    expect(publisherTag({ source: "census", label: "Rental vacancy" })).toBe("Census");
   });
 
   it("says a move with its unit, as a magnitude the arrow signs", () => {
@@ -378,19 +399,29 @@ describe("how a figure is said", () => {
     expect(formatMove({ move: null, moveUnit: "bps" })).toBeNull();
   });
 
-  it("writes a short date with no year", () => {
-    expect(shortDate("2026-09-17")).toBe("Sep 17");
-    expect(shortDate("2026-04-01")).toBe("Apr 1");
+  it("dates a figure by its cadence, the year always in it", () => {
+    // A day with no year read a quarter's figure as an April morning ("CRE
+    // delinquency as of Apr 1" for Q2) and a series that stopped in 2024 as
+    // this year's (the research pass of 2026-10-01).
+    expect(periodLabel("2026-09-17", "daily")).toBe("Sep 17, 2026");
+    expect(periodLabel("2026-09-17", "weekly")).toBe("Sep 17, 2026");
+    expect(periodLabel("2026-08-01", "monthly")).toBe("Aug 2026");
+    expect(periodLabel("2026-04-01", "quarterly")).toBe("Q2 2026");
+    expect(periodLabel("2024-10-01", "quarterly")).toBe("Q4 2024");
+    expect(periodLabel("2025-01-01", "annual")).toBe("2025");
+    // Each series by its own cadence: a quarter's figure is its quarter.
+    expect(periodOf({ obsDate: "2026-04-01", meta: { cadence: "quarterly" } })).toBe("Q2 2026");
   });
 
   it("reads the date in UTC, so it never slips a day", () => {
     // Formatting in the server's local zone would render "Dec 31" for a
     // Jan 1 observation anywhere west of Greenwich.
-    expect(shortDate("2026-01-01")).toBe("Jan 1");
+    expect(periodLabel("2026-01-01", "daily")).toBe("Jan 1, 2026");
+    expect(periodLabel("2026-01-01", "monthly")).toBe("Jan 2026");
   });
 
   it("hands back an unparseable date rather than inventing one", () => {
-    expect(shortDate("whenever")).toBe("whenever");
+    expect(periodLabel("whenever", "daily")).toBe("whenever");
   });
 
   it("links each series to its own FRED page — the level's page for a transform", () => {
@@ -522,7 +553,7 @@ describe("what may become a number in a box", () => {
     expect(seedRate(read, "DRCRELEXFACBS")).toBeNull();
     expect(seedRate(read, "CPIAUCSL_YOY")).toBeNull();
     expect(seedRate(read, "HOUST5F")).toBeNull();
-    expect(seedRate(read, "BAMLH0A0HYM2")).toBeNull();
+    expect(seedRate(read, "HQMCB10YR")).toBeNull();
   });
 
   it("stops seeding a contract rate that went stale", () => {
@@ -626,6 +657,46 @@ describe("a covered metro's own series", () => {
       expect(m.contractRate).toBe(false);
       expect(m.area.length, m.id).toBeGreaterThan(3);
       expect([...COVERED, ...READ_ONLY], m.id).toContain(m.metro);
+    }
+  });
+
+  it("holds the Housing Vacancy Survey's quarterly figures to one freshness, the nation's, the regions' and the metros' alike (the audit of 2026-10-04)", () => {
+    // The nation's and the regions' went stale at 300 days and the metros'
+    // at 240, so tiles from one survey went stale at different ages.
+    const survey = [...SERIES, ...REGION_SERIES, ...METRO_SERIES].filter(
+      (s) => /^RRVR(?:US|NE|MW|SO|WE)Q156N$/.test(s.id) || /^HVS_RVR_\d+$/.test(s.id),
+    );
+    expect(survey.length).toBeGreaterThanOrEqual(5 + 40);
+    for (const s of survey) {
+      expect(s.cadence, s.id).toBe("quarterly");
+      expect(s.freshDays, s.id).toBe(240);
+    }
+  });
+
+  it("names each metro area one way across every series filed under it (the audit of 2026-10-04)", () => {
+    // The survey's Dallas series said "Dallas MSA" and Norfolk's "Virginia
+    // Beach MSA" beside nine "Dallas–Fort Worth MSA" and "Virginia
+    // Beach–Norfolk MSA" tiles: the page took the survey tile for another
+    // area's and told the reader it was a county's or a division's. A
+    // division or a county is a different area and keeps its own name; the
+    // metro area is one name.
+    const msaNames = new Map<string, Set<string>>();
+    for (const m of METRO_SERIES) {
+      if (!/\bMSA$/.test(m.area)) continue;
+      msaNames.set(m.metro, (msaNames.get(m.metro) ?? new Set()).add(m.area));
+    }
+    expect(msaNames.size).toBeGreaterThan(30);
+    for (const [metro, names] of msaNames) expect([...names], metro).toHaveLength(1);
+    // The page then calls the survey tile the market's own.
+    for (const [id, name] of [
+      ["dallas", "Dallas-Fort Worth"],
+      ["norfolk_hampton_roads", "Norfolk / Hampton Roads VA"],
+    ] as const) {
+      const metas = metroSeriesFor(id).series;
+      const own = marketOwnArea(metas, id, name);
+      const survey = metas.find((s) => s.metro === id && s.metric === "rental_vacancy_msa")!;
+      expect(own, id).not.toBeNull();
+      expect(namesItsArea(survey, id, own), id).toBe(false);
     }
   });
 
@@ -1279,5 +1350,24 @@ describe("the states' series — the fallback grain for a deal outside the cover
     const later = readMarketRates("state:PA", rows, new Date("2027-06-01T00:00:00Z"));
     expect(later.find((x) => x.meta.id === "PARVAC")!.fresh).toBe(false);
     expect(later.find((x) => x.meta.id === "PARVAC")!.meta.cadence).toBe("annual");
+  });
+});
+
+describe("the table carries nothing its publisher licenses to FRED alone", () => {
+  it("no ICE BofA, Moody's, S&P / Case-Shiller or Dow Jones series, national or local", () => {
+    // The rates workflow's probe prints each candidate's notes and a terms
+    // line (run 36785223477, 2026-09-30): Moody's forbids copying or
+    // redistributing its yields outright, and ICE's indices are ICE's
+    // property, used by FRED under licence. A public page republishing
+    // either is not ours to do, so the Treasury's own high-quality
+    // corporate curve stands in for them.
+    const licensedWords = /\b(ICE|BofA|Moody's|S&P|Case-Shiller|Dow Jones)\b/i;
+    const licensedIds = /^(BAML|DBAA|DAAA|AAA10Y|BAA10Y|SPCS|CSUSHPI)/;
+    const all = [...table.series, ...table.metroSeries, ...table.regionSeries, ...table.stateSeries] as { id: string; label?: string }[];
+    expect(all.length).toBeGreaterThan(50);
+    for (const s of all) {
+      expect(s.id, s.id).not.toMatch(licensedIds);
+      if (s.label) expect(s.label, s.id).not.toMatch(licensedWords);
+    }
   });
 });

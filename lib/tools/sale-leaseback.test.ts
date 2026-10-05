@@ -76,14 +76,62 @@ describe("rule 2 — an above-market lease reverts to market", () => {
   });
 
   it("prices what capitalising the contract rent overpays", () => {
-    // $3,973,557 — 14.7% of the price, and the figure a buyer running the
-    // contract NOI over a cap rate has not priced at all.
+    // $3,973,557 — 14.7% of the price, paid over the term and the
+    // reversion together.
     const r = run();
     expect(r.overpayment).toBe(3_973_557);
     expect(r.overpaymentPct).toBe(14.7);
+  });
+
+  it("lays only the premium's part of it on the reversion", () => {
+    // The $270,000 premium capitalised forever at the 6% credit cap is
+    // $4,500,000; over its twenty years, escalating 2% and discounted at 8%,
+    // it is worth $3,065,367 — so $1,434,633 is the premium reverting. The
+    // other $2,538,924 is what the same lease written at market rent is paid
+    // over ITS two pieces: the 6% cap against the 8% discount rate. The note
+    // had laid the whole $3,973,557 on the reversion.
+    const r = run();
+    let premiumOverTerm = 0;
+    for (let y = 1; y <= 20; y += 1) premiumOverTerm += (270_000 * Math.pow(1.02, y - 1)) / Math.pow(1.08, y);
+    expect(r.overpaymentFromPremium).toBe(1_434_633);
+    expect(r.overpaymentFromPremium).toBe(Math.round(4_500_000 - premiumOverTerm));
+    expect(r.overpaymentAtMarketRent).toBe(2_538_924);
+    expect(r.overpaymentAtMarketRent).toBe(run({ contractRentPerSf: 7.5 }).overpayment);
+    expect(r.overpaymentFromPremium! + r.overpaymentAtMarketRent!).toBe(r.overpayment);
     expect(r.note).toBe(
-      "The rent reverts at year 20, and the building does not — which is $3,973,557 of the price, 14.7% of it.",
+      "The rent reverts at year 20, and the building does not — which is $1,434,633 of the price, 5.3% of it. The other $2,538,924 would be paid at market rent too: the price is struck at the 6% credit cap and the term discounted at 8%, two inputs that disagree about the yield rather than a finding about the lease.",
     );
+  });
+
+  it("gates each part's sentence on its own", () => {
+    // Discounted at the credit cap with no escalation and the building
+    // trading at the same cap, a market-rent lease is paid exactly what its
+    // two pieces are worth — so the reversion is the whole of it, and the
+    // yield sentence has nothing to say.
+    const r = run({ discountRatePct: 6, escalationPct: 0, marketCapPct: 6 });
+    expect(r.overpaymentAtMarketRent).toBe(0);
+    expect(r.overpaymentFromPremium).toBe(r.overpayment);
+    expect(r.note).toContain("The rent reverts at year 20");
+    expect(r.note).not.toContain("market rent too");
+  });
+
+  it("says where the two rates pay the reversion back, rather than leave it as an overpayment", () => {
+    // Discounted at 6%, the credit cap, on a rent escalating 2%: the premium
+    // reverting is still $877,446 of the price, but the same lease at market
+    // rent would be priced $2,347,749 UNDER its two pieces, so the price sits
+    // $1,470,303 under them in all. The reversion sentence alone read as the
+    // buyer overpaying.
+    const r = run({ discountRatePct: 6 });
+    expect(r.overpaymentFromPremium).toBe(877_446);
+    expect(r.overpaymentAtMarketRent).toBe(-2_347_749);
+    expect(r.overpayment).toBe(-1_470_303);
+    expect(r.note).toContain("which is $877,446 of the price");
+    expect(r.note).toContain("would be priced $2,347,749 under its two pieces");
+    expect(r.note).toContain("so in all the price is $1,470,303 under them.");
+    // A big enough premium outweighs it, and the sentence says so.
+    const big = run({ discountRatePct: 6, contractRentPerSf: 15 });
+    expect(big.overpayment!).toBeGreaterThan(0);
+    expect(big.note).toContain(`so in all the price is $${big.overpayment!.toLocaleString("en-US")} over them.`);
   });
 
   it("costs MORE on a short lease, because the reversion arrives sooner", () => {
@@ -117,6 +165,9 @@ describe("rule 2 — an above-market lease reverts to market", () => {
     const r = run({ contractRentPerSf: 7.5, creditCapPct: 6.25 });
     expect(r.overpayment!).toBeGreaterThan(0);
     expect(r.note).not.toContain("reverts at year");
+    // …and it says what it is instead.
+    expect(r.overpaymentFromPremium).toBe(0);
+    expect(r.note).toContain("two inputs that disagree about the yield");
   });
 });
 

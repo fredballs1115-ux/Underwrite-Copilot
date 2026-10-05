@@ -1,3 +1,4 @@
+import { PRICES_AS_OF } from "@/lib/anthropic/models";
 import { costByStep, medianUsd, type UsageSummary } from "@/lib/anthropic/usage";
 
 /**
@@ -26,6 +27,16 @@ export const stepWord = (what: string) => {
 
 const fmtTokens = (n: number) => n.toLocaleString("en-US");
 const usd = (n: number | null | undefined) => (n != null ? `$${n.toFixed(2)}` : null);
+
+/** An ISO month as the card says it ("2026-09" → "Sep 2026"), read in UTC. */
+const monthWords = (isoMonth: string) =>
+  new Date(`${isoMonth}-01T00:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+
+/** The prices every dollar figure here is struck at, with the month the
+ *  table was read (lib/anthropic/models `PRICES_AS_OF`): list prices move,
+ *  and a figure that does not say when its prices were read cannot be
+ *  checked against today's. */
+const LIST_PRICES_WORDS = `list prices as of ${monthWords(PRICES_AS_OF)}`;
 
 export function CostCard({
   screens,
@@ -65,10 +76,10 @@ export function CostCard({
             </span>
             <span className="text-xs text-muted">
               {priced.length === rows.length
-                ? `median of the last ${rows.length} screen${rows.length === 1 ? "" : "s"}, at list price`
+                ? `median of the last ${rows.length} screen${rows.length === 1 ? "" : "s"}, at ${LIST_PRICES_WORDS}`
                 : priced.length === 0
                   ? `none of the last ${rows.length} screen${rows.length === 1 ? "" : "s"} priced — an unpriced model`
-                  : `median of the ${priced.length} screen${priced.length === 1 ? "" : "s"} that priced, of the last ${rows.length}, at list price`}
+                  : `median of the ${priced.length} screen${priced.length === 1 ? "" : "s"} that priced, of the last ${rows.length}, at ${LIST_PRICES_WORDS}`}
             </span>
           </p>
           {latest && split.length > 0 && (

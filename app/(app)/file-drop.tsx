@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { tooLargeMessage, wrongTypeMessage } from "@/lib/upload-limit";
 
 /** Does this file satisfy the accept string (".pdf,.csv" / "application/pdf")? */
 function matchesAccept(file: File, accept?: string): boolean {
@@ -25,12 +26,16 @@ export function FileDrop({
   accept,
   hint,
   maxBytes,
+  onFile,
 }: {
   name: string;
   accept?: string;
   hint?: string;
   /** reject oversized files before wasting an upload */
   maxBytes?: number;
+  /** told the file now chosen, or null once none is — so the form around
+   *  it can read the file's name (the new-deal form names the deal by it) */
+  onFile?: (file: File | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   // dragenter/dragleave fire for every child the cursor crosses — count the
@@ -44,26 +49,24 @@ export function FileDrop({
     if (!inputRef.current || !files || !files.length) return;
     const file = files[0];
     if (!matchesAccept(file, accept)) {
-      setTypeError(
-        `"${file.name}" isn't a supported file type${hint ? ` — ${hint.toLowerCase()}` : "."}`,
-      );
+      setTypeError(wrongTypeMessage(file.name, hint));
       return;
     }
     if (maxBytes && file.size > maxBytes) {
-      setTypeError(
-        `"${file.name}" is ${(file.size / 1048576).toFixed(0)} MB — the limit is ${Math.round(maxBytes / 1048576)} MB. Try compressing the PDF or splitting it.`,
-      );
+      setTypeError(tooLargeMessage(file.name, file.size, maxBytes));
       return;
     }
     setTypeError(null);
     inputRef.current.files = files;
     setFileName(file.name);
+    onFile?.(file);
   }
 
   function clear() {
     if (inputRef.current) inputRef.current.value = "";
     setFileName(null);
     setTypeError(null);
+    onFile?.(null);
   }
 
   return (
@@ -106,24 +109,27 @@ export function FileDrop({
             : "border-line hover:border-brand/50 hover:bg-faint"
         }`}
       >
+        {/* Hidden and driven by the drop zone, but named all the same, as
+            the batch upload's picker is. */}
         <input
           ref={inputRef}
           type="file"
           name={name}
           accept={accept}
+          aria-label={`Choose the file${hint ? ` (${hint})` : ""}`}
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
             if (f && maxBytes && f.size > maxBytes) {
-              setTypeError(
-                `"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is ${Math.round(maxBytes / 1048576)} MB. Try compressing the PDF or splitting it.`,
-              );
+              setTypeError(tooLargeMessage(f.name, f.size, maxBytes));
               e.target.value = "";
               setFileName(null);
+              onFile?.(null);
               return;
             }
             setTypeError(null);
             setFileName(f?.name ?? null);
+            onFile?.(f);
           }}
         />
         <svg

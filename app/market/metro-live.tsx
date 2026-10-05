@@ -4,15 +4,17 @@ import {
   formatMove,
   formatValue,
   isSectorJobsMetric,
+  periodOf,
   permitsTrailingYear,
   seriesUrl,
-  shortDate,
   type LiveRate,
   type MetroSeriesMeta,
   type SectorJobsMetric,
 } from "@/lib/live-rates";
 import { monthOf } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
+import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
+import { marketOwnArea, namesItsArea } from "@/lib/metro-own-area";
 
 /**
  * A covered metro's own figures, live from FRED — the four things a metro
@@ -38,10 +40,11 @@ import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
  *   ago, quarterly.
  * - **Rent CPI, y/y** — the CPI's rent of primary residence for the area
  *   against a year ago: what SITTING tenants pay, across every lease the
- *   survey reaches, where the asking rent drawn above it is this month's
- *   new leases. The two are different numbers about different tenants, and
- *   an underwrite needs both — the in-place rent is what a rent roll grows
- *   at, the asking rent is what a vacant unit re-lets at. Eight metros'
+ *   survey reaches, where the asking rent drawn above it is Zillow's
+ *   smoothed index of what landlords ask. The two are different numbers
+ *   about different tenants, and an underwrite needs both — the in-place
+ *   rent is what a rent roll grows at, the asking rent what a vacant unit is
+ *   offered at. Eight metros'
  *   come from FRED; Washington's, Baltimore's, Los Angeles's and San
  *   Francisco's come from the BLS's own API, because FRED does not carry
  *   the CPI areas the BLS redrew in 2018 — and the tile says so.
@@ -104,6 +107,12 @@ export function MetroLive({
   // The areas FRED names, for the heading — the metro's own, then the MSA
   // whose figures fill in.
   const areas = Array.from(new Set(metas.map((m) => m.area)));
+  // The area the market's own figures are for, where that area IS the
+  // market; null where it is not (Northern Virginia's one series of its own
+  // is Fairfax County's unemployment), so every tile names its area.
+  const ownArea = marketOwnArea(metas, metroId, metroName);
+  // Tiles filed under the market whose area is not the market's own.
+  const narrower = metas.filter((m) => m.metro === metroId && namesItsArea(m, metroId, ownArea));
   const fromBls = metas.some((m) => m.source === "bls");
   const fromCensus = metas.some((m) => m.source === "census");
   const hasRentIndex = metas.some((m) => m.metric === "rent_cpi_yoy");
@@ -129,8 +138,11 @@ export function MetroLive({
       <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
         {tiles.map((r) => {
           const meta = r.meta as MetroSeriesMeta;
-          // A borrowed figure wears the MSA's name on its own tile.
-          const owner = meta.metro === metroId ? "" : ` · ${meta.area}`;
+          // A figure that is not the market's own wears its area's name on
+          // its tile: a borrowed one (the MSA's, the region's), and one
+          // filed under the market whose area is narrower or other than the
+          // market's (lib/metro-own-area).
+          const owner = namesItsArea(meta, metroId, ownArea) ? ` · ${meta.area}` : "";
           if (meta.metric === "permits") {
             const year = permitsTrailingYear(r);
             if (!year) {
@@ -138,7 +150,7 @@ export function MetroLive({
                 <RateTile
                   key={r.meta.id}
                   r={r}
-                  value={`${formatValue(r)} in ${shortDate(r.obsDate)}`}
+                  value={`${formatValue(r)} in ${periodOf(r)}`}
                   short={`Permits, one month${owner}`}
                 />
               );
@@ -184,17 +196,21 @@ export function MetroLive({
       {sectors.length > 0 && <SectorJobsPicture sectors={sectors} allJobs={allJobs} metroId={metroId} />}
       {supply && <SupplyPicture supply={supply} metroId={metroId} />}
       <p className="mt-2 text-[11px] text-muted">
-        Pulled every weekday; each figure links to its series.
+        {hasMsaVacancy
+          ? "Pulled every weekday, the survey's metro vacancy each quarter; each figure links to its series."
+          : "Pulled every weekday; each figure links to its series."}
         {sectors.length > 0 &&
           " Jobs by sector are the BLS's payroll counts for the metro area by supersector, each against a year ago beside all payrolls: the sector that fills a building's kind is the demand an underwrite of it is assuming, and a screen of a deal here is handed that sector's line."}
         {supply &&
-          " Housing supply is the Census Bureau's building permits for the metro area, twelve months against the twelve before, because a month of permits is the season: the units in buildings of two or more are the total less the single-family series, the only split FRED publishes for a metro or a state, and they are the pipeline an apartment underwrite competes with."}
+          ` Housing supply is the Census Bureau's building permits for the metro area, twelve months against the twelve before, because a month of permits is the season: the units in buildings of two or more are the total less the single-family series, since ${NO_MULTI_UNIT_SERIES}, and they are the pipeline an apartment underwrite competes with.`}
         {hasRentIndex &&
-          " The rent index is what sitting tenants pay across the area's leases; the asking rent above is this month's new ones."}
+          " The rent index is what sitting tenants pay across the area's leases; the asking rent above is Zillow's smoothed index of what landlords ask."}
         {fromBls &&
           " Where FRED does not carry the area, the rent index comes from the BLS directly."}
         {borrowed.length > 0 &&
           ` Where FRED publishes nothing for ${metroName} itself, the figure is the metro area's, named on the tile.`}
+        {narrower.length > 0 &&
+          ` A figure for an area other than ${metroName} as a whole — a county, or one division of the metro area — names its area on the tile too.`}
         {hasMsaVacancy &&
           " The metro area's rental vacancy is the Housing Vacancy Survey's own figure for it, with the survey's margin of error beside it: the survey is a sample, so a quarter's move inside the margin is noise, and the region's figure is the steadier one."}
         {hasRegionVacancy &&
@@ -235,8 +251,11 @@ function SectorJobsPicture({
     })),
   ];
   const widest = Math.max(0.1, ...rows.map((x) => Math.abs(x.r.value)));
-  const newest = sectors.map((r) => r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
-  const stale = sectors.filter((r) => !r.fresh);
+  // All payrolls is checked like the sectors (the research pass of
+  // 2026-10-01): a stopped total had drawn under the newest sector's month
+  // with no word that it had stopped.
+  const newest = rows.map((x) => x.r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
+  const stale = rows.filter((x) => !x.r.fresh);
   return (
     <div className="mt-4">
       <h4 className="text-[11px] uppercase tracking-wide text-muted">{`Jobs by sector, on a year ago${owner}`}</h4>
@@ -268,7 +287,7 @@ function SectorJobsPicture({
       </div>
       <p className="mt-1 text-[11px] text-muted">
         {`${monthOf(newest)} · BLS payrolls via FRED · each figure links to its series`}
-        {stale.length > 0 && ` · ${stale.length === 1 ? "one sector's figure is stale" : `${stale.length} sectors' figures are stale`}: ${stale.map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${shortDate(r.obsDate)}`).join(", ")}`}
+        {stale.length > 0 && ` · ${stale.length === 1 ? "one figure is stale" : `${stale.length} figures are stale`}: ${stale.map((x) => `${x.label} as of ${periodOf(x.r)}`).join(", ")}`}
       </p>
     </div>
   );
@@ -281,8 +300,9 @@ function SectorJobsPicture({
  * more in the brand tone, since those are the pipeline a rental underwrite
  * competes with — with the figures beside them and both counts linked to
  * their series. The multi-unit figure is the total less the single-family
- * series, and the caption says so: FRED publishes no other split for a
- * metro. A metro with one year and no year before draws one bar.
+ * series, and the caption says why: FRED carries no multi-unit series for
+ * a metro (lib/permit-split). A metro with one year and no year before
+ * draws one bar.
  */
 function SupplyPicture({ supply, metroId }: { supply: MetroSupply; metroId: string }) {
   // A borrowed count wears the MSA's name on the heading, as a tile does.
@@ -332,7 +352,7 @@ function SupplyPicture({ supply, metroId }: { supply: MetroSupply; metroId: stri
         <a href={supply.hrefSingle} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
           single-family
         </a>
-        {", the only split published for a metro or a state"}
+        {` — ${NO_MULTI_UNIT_SERIES}`}
       </p>
     </div>
   );

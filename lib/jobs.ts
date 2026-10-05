@@ -57,6 +57,26 @@ export interface WorkerPayload {
   kind: "screen" | "reconcile";
   /** reconcile only — the model file parked in Storage for the worker */
   model?: { name: string; path: string };
+  /** screen only — the user who asked for this run (any member can screen a
+   *  team deal): the screen's emails go to them (lib/email). A claim on a
+   *  row any member can write, read through `requesterOf` and checked
+   *  against the deal's visibility before anything is sent. */
+  requestedBy?: string;
+}
+
+const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The user a run was asked for by, as its payload or its caller recorded
+ * it: a user id, lower-cased, or null where none is recorded (a run queued
+ * before the requester was carried) or what is recorded is not a user id.
+ * No migration: the id rides in the worker payload's JSON, or in the
+ * in-process run's own arguments.
+ */
+export function requesterOf(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const id = raw.trim();
+  return USER_ID.test(id) ? id.toLowerCase() : null;
 }
 
 /** Build an analysis_jobs insert row. ONE place composes the worker payload
@@ -197,6 +217,11 @@ export async function claimJob(
   // The WHERE clause re-checks the observed state inside the UPDATE itself,
   // so the decision and the write are one statement — a racing claimant's
   // update changes the row and this one matches zero rows.
+  // A claimed row is a new run on the deal's one job row, so its created_at
+  // is restamped: it says when THIS run was asked for (the deal page's clock
+  // counts from it; the worker's queue takes the oldest first). Left alone,
+  // a re-screen's row carried the first screen's date.
+  const now = new Date().toISOString();
   let query = supabase
     .from("analysis_jobs")
     .update({
@@ -204,7 +229,12 @@ export async function claimJob(
       step,
       progress: 0,
       error: null,
-      updated_at: new Date().toISOString(),
+      // The run's ledger is this run's: a claim clears the last one's, so a
+      // run that ends before any model call (no OM, a deck past the page
+      // limit) never wears the previous run's cost or time (migration 0035).
+      usage: null,
+      created_at: now,
+      updated_at: now,
       ...(workerPayload !== undefined
         ? {
             payload: workerPayload

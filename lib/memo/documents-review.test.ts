@@ -21,7 +21,7 @@ import { planFacts } from "@/lib/plan-facts";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { verdictInstruction } from "@/lib/anthropic/prompts";
 import type { DealRow } from "@/lib/deals";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 const render = async (element: React.ReactElement): Promise<string> =>
   pdfTextOf(await renderToBuffer(element as unknown as Parameters<typeof renderToBuffer>[0]));
@@ -114,7 +114,8 @@ describe("the eighth review's document cases", () => {
     expect(data.keyTerms).toHaveLength(4);
     expect(data.keyTerms.slice(0, 3).map((t) => t.label)).toEqual(["Asking price", "Going-in cap", "Units"]);
     const text = await render(React.createElement(MemoDocument, { data }));
-    expect(text).toMatch(/KEY TERMS\nASKING PRICE\n\$68,000,000\nGOING-IN CAP\n5\.45%\nUNITS\n248\n/);
+    // The price tile carries its basis under it, as the pipeline card does.
+    expect(text).toMatch(/KEY TERMS\nASKING PRICE\n\$68,000,000\n\$274k\/unit\nGOING-IN CAP\n5\.45%\nUNITS\n248\n/);
   }, 30000);
 
   it("2. the report omits the IRR sensitivity page on a plan deal and says so on the plan page; a stabilized asset keeps it", async () => {
@@ -227,12 +228,109 @@ describe("the eighth review's document cases", () => {
 
   it("12. the shared screen orders its key terms as the memo does and badges each figure's basis", () => {
     const src = readFileSync("app/share/[token]/share-view.tsx", "utf8");
-    // …and, on a note, leads with the loan's own terms as the memo does (#416).
-    expect(src).toMatch(/keyTermRows\(safeExtraction\?\.metrics \?\? \[\], strategy\.kind, 8, interestOf\(safeExtraction\)\.kind\)/);
+    // …and, on a note, leads with the loan's own terms as the memo does (#416),
+    // its price row read against the year the screen read the memorandum.
+    expect(src).toMatch(
+      /keyTermRows\(safeExtraction\?\.metrics \?\? \[\], strategy\.kind, screenYearOf\(safeExtraction\), 8, interestOf\(safeExtraction\)\.kind\)/,
+    );
     expect(src).toMatch(/m\.basis === "pro_forma"/);
     expect(src).toMatch(/m\.basis === "in_place"/);
     // …and keeps each range's confidence and basis line.
     expect(src).toMatch(/RANGE_CONF\[r\.confidence\]/);
     expect(src).toMatch(/r\.basis && /);
+  });
+});
+
+// The audit of 2026-09-30: the deal page, the pipeline card and the email
+// infer a deal's kind from the extraction AND the first signal; the memo and
+// the report read it from the extraction alone, so a deal the page calls a
+// conversion printed as a stabilized asset.
+describe("the documents read the deal's kind as its page does — the extraction and the first signal", () => {
+  // Nothing in the extraction names a plan (an in-place income, a
+  // "Construction budget" row and a stabilized figure), so on its own it
+  // reads stabilized; the first signal names the conversion. (The budget is
+  // a whole one: a "Hard costs" line alone is no stated total.)
+  const signalConversion: ExtractionResult = {
+    dealName: "The Wexley",
+    assetClass: "multifamily",
+    market: "Washington, DC",
+    address: "",
+    totalPages: 30,
+    metrics: [
+      { label: "Asking price", value: "$20,000,000", flagged: false, page: "" },
+      { label: "In-place NOI", value: "$900,000", flagged: false, page: "" },
+      { label: "Construction budget", value: "$18,000,000", flagged: false, page: "" },
+      { label: "Stabilized NOI", value: "$2,660,000", flagged: false, page: "" },
+      { label: "Units", value: "180", flagged: false, page: "" },
+    ],
+  };
+  const SIGNAL: FirstSignal = {
+    dealName: "The Wexley",
+    assetClass: "multifamily",
+    market: "Washington, DC",
+    askPrice: "$20,000,000",
+    size: "180 units",
+    goingInCap: "",
+    perUnit: "",
+    take: "An office-to-residential conversion of a 1962 tower, sold vacant — check the hard costs against the unit count.",
+  };
+  const row = (first_signal: FirstSignal | null) =>
+    ({ ...(planDealRow(signalConversion) as unknown as Record<string, unknown>), first_signal }) as unknown as DealRow;
+
+  it("the extraction alone reads stabilized; with the first signal, a conversion (the page's read)", () => {
+    expect(inferStrategy(signalConversion).kind).toBe("stabilized");
+    expect(inferStrategy(signalConversion, SIGNAL).kind).toBe("conversion");
+  });
+
+  it("the memo's subtitle and key terms follow the page's kind", () => {
+    const withSignal = buildMemoData(row(SIGNAL), "September 30, 2026");
+    expect(withSignal.strategyLine).toMatch(/^Conversion · stabilized NOI \$2\.7M on \$38\.0M total cost \(7\.00% yield on cost/);
+    // A plan deal's key terms lead with the price, then the stabilized NOI
+    // and the budget it is judged on.
+    expect(withSignal.keyTerms.slice(0, 3).map((t) => t.label)).toEqual(["Asking price", "Stabilized NOI", "Construction budget"]);
+    // A row screened before the first signal existed reads as before.
+    const without = buildMemoData(row(null), "September 30, 2026");
+    expect(without.strategyLine).toBe("");
+    expect(without.keyTerms[1].label).not.toBe("Stabilized NOI");
+  });
+
+  it("the memo's subtitle says whose strategy the deal type is on a note or a leased fee, as the deal header does", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const sold = (kind: "note" | "leased_fee") =>
+      ({
+        ...(planDealRow({ ...signalConversion, interest: { ...blank, kind } }) as unknown as Record<string, unknown>),
+        first_signal: SIGNAL,
+      }) as unknown as DealRow;
+    expect(buildMemoData(sold("note"), "September 30, 2026").strategyLine).toMatch(/^Conversion \(the collateral\)( · |$)/);
+    expect(buildMemoData(sold("leased_fee"), "September 30, 2026").strategyLine).toMatch(/^Conversion \(the leaseholder's building\)( · |$)/);
+    // A price that buys the building keeps the label as it stands.
+    expect(buildMemoData(row(SIGNAL), "September 30, 2026").strategyLine).toMatch(/^Conversion · /);
+  });
+
+  it("the report omits the IRR page and builds the plan page for the kind the page reads", () => {
+    const derived = deriveUnderwriteInputs(signalConversion, "The Wexley");
+    const refCap = { pct: derived.inputs.exitCapPct, provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const) };
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    expect(buildReportData(row(SIGNAL), "September 30, 2026", [], sensitivity).sensitivity).toBeNull();
+    expect(buildReportData(row(null), "September 30, 2026", [], sensitivity).sensitivity).not.toBeNull();
+    const plan = buildPlanReport(signalConversion, refCap, SIGNAL);
+    expect(plan?.kind).toBe("conversion");
+    expect(plan?.plan.yieldOnCost).toBeCloseTo(2_660_000 / 38_000_000, 10);
+    expect(buildPlanReport(signalConversion, refCap)).toBeNull();
+  });
+
+  it("the report route hands the first signal to the plan page", () => {
+    const src = readFileSync("app/api/deals/[id]/report/route.ts", "utf8");
+    expect(src).toMatch(/buildPlanReport\(\s*extraction,[\s\S]*?\(deal\.first_signal as FirstSignal \| null\) \?\? null,\s*\)/);
+  });
+
+  it("the report's and the workbook's market read take the first signal too, as the deal page's does", () => {
+    // modelVsMarketFor reads no going-in cap on a plan deal; without the
+    // signal a plan the signal names read the cap in the documents alone.
+    for (const route of ["app/api/deals/[id]/report/route.ts", "app/api/deals/[id]/underwrite.xlsx/route.ts"]) {
+      const src = readFileSync(route, "utf8");
+      expect(src, route).toMatch(/modelVsMarketFor\(\{[^}]*firstSignal: \(deal\.first_signal as FirstSignal \| null\) \?\? null,/);
+    }
+    expect(readFileSync("app/(app)/deals/[id]/page.tsx", "utf8")).toMatch(/modelVsMarketFor\(\{[^}]*\bfirstSignal,/);
   });
 });

@@ -1,7 +1,9 @@
-// The sensitivity grids, defined ONCE and consumed by both the in-app Model
-// tab and the Excel builder — the app promises "same math as the Excel table",
-// and sharing the definition makes that true by construction. No `server-only`
-// import: the Model tab renders this client-side.
+// The sensitivity grids of the first-draft model, defined ONCE for the
+// in-app Model tab. The first-draft workbook that shared them was retired
+// (2d036c4); the one Excel download is the OM underwrite
+// (lib/underwrite/workbook.ts), a separate model with its own grids
+// (lib/underwrite/sensitivity), so nothing here is "the Excel's math". No
+// `server-only` import: the Model tab renders this client-side.
 
 import { computeModel, type ModelInputs } from "./compute";
 

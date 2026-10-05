@@ -1,0 +1,229 @@
+// A price label dated the year the memorandum was screened in — "Asking
+// price (2026)", "Pricing guidance (Q4 2026)", "Revised asking price (March
+// 2026)" — is the ask, and it stays the ask once the calendar turns. The
+// price reader once judged a label's year against the clock when its module
+// loaded, so after the first restart of 2027 every stored deal with such a
+// label lost its price on the pipeline, the model, the buy box and the memo.
+// The year is the extraction's own now (lib/criteria `screenYearOf`, from
+// the `screenedOn` stamp the screen writes), and an extraction stored before
+// the stamp reads as a 2026 screen.
+//
+// The clock is faked to January 2, 2027 BEFORE the modules load (they are
+// re-imported after `vi.resetModules()`), so a reader that consults the
+// clock — at load or at call — fails here.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExtractedMetric, ExtractionResult } from "./anthropic/types";
+
+const m = (label: string, value: string, basis: ExtractedMetric["basis"] = "na"): ExtractedMetric => ({
+  label,
+  value,
+  flagged: false,
+  page: "",
+  basis,
+});
+
+/** A stabilized 240-unit building priced under `label`, screened on `screenedOn`. */
+const deal = (label: string, screenedOn?: string): ExtractionResult => ({
+  dealName: "Test Deal",
+  assetClass: "multifamily",
+  market: "Washington, DC",
+  address: "1 Test St, Washington, DC",
+  ...(screenedOn ? { screenedOn } : {}),
+  metrics: [m(label, "$42,000,000"), m("Going-in cap rate", "6.00%", "in_place"), m("NOI (in-place)", "$2,520,000", "in_place"), m("Units", "240")],
+});
+
+const THIS_YEARS_LABELS = ["Asking price (2026)", "Pricing guidance (Q4 2026)", "Revised asking price (March 2026)"];
+
+async function surfaces() {
+  const criteria = await import("./criteria");
+  const strategy = await import("./deal-strategy");
+  const { keyTermRows } = await import("./key-terms");
+  const { scoreMandateFit } = await import("./mandate");
+  const { pickSlots } = await import("./pipeline-slots");
+  const { deriveUnderwriteInputs } = await import("./underwrite/inputs");
+  const { computeScreenDiff } = await import("./screen-diff");
+  /** The price each surface reads off one extraction. */
+  const read = (ex: ExtractionResult) => {
+    const kind = strategy.inferStrategy(ex).kind;
+    const source = criteria.buyBoxCheckSource(ex, null, null, kind);
+    const band = criteria.evaluateBuyBox("multifamily", source, { priceMaxM: 50 }).find((c) => c.label === "Price");
+    const mandate = scoreMandateFit("multifamily", source, { dealbreakers: { maxPriceM: 50 } });
+    return {
+      year: criteria.screenYearOf(ex),
+      /** the plausibility check's, the interest panel's and the model's price */
+      asking: strategy.askingPriceOf(ex),
+      /** the pipeline row's price slot */
+      pipeline: pickSlots(ex, null).price,
+      /** the buy box's price band */
+      band: band?.status,
+      /** the mandate's hard ceiling: evaluated, or still waiting on a price */
+      ceilingUnresolved: mandate.unresolvedDealbreakers,
+      /** the memo's and the shared screen's key terms, first row */
+      keyTerm: keyTermRows(ex.metrics, kind, criteria.screenYearOf(ex), 8)[0]?.label,
+      /** the workbook's purchase price, and where it came from */
+      model: deriveUnderwriteInputs(ex, "Test Deal").sources.purchasePrice?.provenance,
+    };
+  };
+  return { criteria, strategy, computeScreenDiff, read };
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ now: new Date(Date.UTC(2027, 0, 2, 15)), toFake: ["Date"] });
+  vi.resetModules();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("a price label dated the screen's year stays the ask after January 1", () => {
+  it("is the ask on a 2026 screen read on January 2, 2027 — on every surface", async () => {
+    const { read } = await surfaces();
+    expect(new Date().getUTCFullYear()).toBe(2027);
+    for (const label of THIS_YEARS_LABELS) {
+      expect(read(deal(label, "2026-12-15")), label).toEqual({
+        year: 2026,
+        asking: 42_000_000,
+        pipeline: "$42,000,000",
+        band: "pass",
+        ceilingUnresolved: 0,
+        keyTerm: label,
+        model: "extracted",
+      });
+    }
+  });
+
+  it("an extraction stored before the stamp reads as a 2026 screen, not as the clock's year", async () => {
+    const { read } = await surfaces();
+    for (const label of THIS_YEARS_LABELS) {
+      const r = read(deal(label));
+      expect(r.year, label).toBe(2026);
+      expect(r.asking, label).toBe(42_000_000);
+      expect(r.pipeline, label).toBe("$42,000,000");
+      expect(r.band, label).toBe("pass");
+      expect(r.keyTerm, label).toBe(label);
+    }
+  });
+
+  it("'Purchase price (2025)' is what the building last traded for, not the ask — stamped or not", async () => {
+    const { read } = await surfaces();
+    for (const ex of [deal("Purchase price (2025)", "2026-12-15"), deal("Purchase price (2025)")]) {
+      const r = read(ex);
+      expect(r.asking).toBeNull();
+      expect(r.pipeline).toBeNull();
+      expect(r.band).toBe("unknown");
+      expect(r.ceilingUnresolved).toBe(1);
+      expect(r.keyTerm).not.toBe("Purchase price (2025)");
+      expect(r.model).not.toBe("extracted");
+    }
+  });
+
+  it("a screen of 2027 reads 2026's label as a prior trade and its own year's as the ask", async () => {
+    const { read } = await surfaces();
+    expect(read(deal("Purchase price (2026)", "2027-01-02")).asking).toBeNull();
+    expect(read(deal("Asking price (2027)", "2027-01-02")).asking).toBe(42_000_000);
+  });
+
+  it("the retrade diff reads each screen's rows against that screen's own year", async () => {
+    const { computeScreenDiff } = await surfaces();
+    const before = { metrics: [m("Asking price (2026)", "$42,000,000")], screenedOn: "2026-12-15" };
+    const after = { metrics: [m("Asking price (2027)", "$40,000,000")], screenedOn: "2027-01-20" };
+    const diff = computeScreenDiff({ at: "2026-12-15T12:00:00Z", extraction: before, verdict: null }, after, null);
+    expect(diff?.rows.find((r) => r.label === "Asking price")).toMatchObject({
+      before: "$42,000,000",
+      after: "$40,000,000",
+      direction: "better",
+    });
+  });
+});
+
+// The stamp was the UTC day, so a screen run on New Year's Eve after 7 pm
+// Eastern (4 pm Pacific) was stamped with the next year — "Asking price
+// (2026)" on a deck its reader screened on December 31, 2026 read as a
+// prior trade. The stamp is the day in Honolulu now — no state's day begins
+// later — so its year never runs ahead of a US reader's.
+describe("the stamp's year never runs ahead of a US reader's own calendar", () => {
+  it("stamps 11:30 pm on Dec 31 in Los Angeles as Dec 31, and 3 am on Jan 1 in New York as Dec 31 too", async () => {
+    const { screenStamp, screenYearOf } = await import("./criteria");
+    const { dayIn } = await import("./reader-day");
+    // 11:30 pm Pacific on New Year's Eve: UTC is already in the new year.
+    const losAngeles = new Date("2027-01-01T07:30:00Z");
+    expect(dayIn("America/Los_Angeles", losAngeles)).toBe("2026-12-31");
+    expect(losAngeles.toISOString().slice(0, 10)).toBe("2027-01-01");
+    expect(screenStamp(losAngeles)).toBe("2026-12-31");
+    // 3 am Eastern on New Year's Day: the stamp is still Dec 31 — behind the
+    // reader's calendar, never ahead of it, which is the side a price label's
+    // year can bear (a label of the reader's new year is a later year, the ask).
+    const newYork = new Date("2027-01-01T08:00:00Z");
+    expect(dayIn("America/New_York", newYork)).toBe("2027-01-01");
+    expect(screenStamp(newYork)).toBe("2026-12-31");
+    const ex = { ...deal("Asking price (2026)"), screenedOn: screenStamp(losAngeles) };
+    expect(screenYearOf(ex)).toBe(2026);
+    // Midnight in Honolulu turns the stamp's year.
+    expect(screenStamp(new Date("2027-01-01T09:59:00Z"))).toBe("2026-12-31");
+    expect(screenStamp(new Date("2027-01-01T10:00:00Z"))).toBe("2027-01-01");
+  });
+
+  it("a deck screened on New Year's Eve keeps its price as the ask on every surface", async () => {
+    const { criteria, read } = await surfaces();
+    const ex = { ...deal("Asking price (2026)"), screenedOn: criteria.screenStamp(new Date("2027-01-01T07:30:00Z")) };
+    expect(read(ex)).toMatchObject({ year: 2026, asking: 42_000_000, pipeline: "$42,000,000", band: "pass", model: "extracted" });
+  });
+});
+
+describe("a re-screen of the same memorandum keeps the day it was first read", () => {
+  it("keeps the stamp for the same bytes, and stamps a reissued deck or an unfingerprinted one anew", async () => {
+    const { screenStampFor } = await import("./criteria");
+    // Noon on January 2 in Honolulu, the stamp's zone: "today" is Jan 2.
+    const now = new Date(Date.UTC(2027, 0, 2, 22));
+    const prior = { screenedOn: "2026-11-20", omFingerprint: "abc123def4567890" };
+    // The same deck screened again in 2027: still a 2026 reading.
+    expect(screenStampFor(prior, "abc123def4567890", now)).toBe("2026-11-20");
+    // A reissued deck is a new reading.
+    expect(screenStampFor(prior, "0000000000000000", now)).toBe("2027-01-02");
+    // Nothing on file says it was this deck: an extraction with no
+    // fingerprint, no extraction at all, or a deal with no memorandum.
+    expect(screenStampFor({ screenedOn: "2026-11-20" }, "abc123def4567890", now)).toBe("2027-01-02");
+    expect(screenStampFor(null, "abc123def4567890", now)).toBe("2027-01-02");
+    expect(screenStampFor(prior, undefined, now)).toBe("2027-01-02");
+    // A malformed stamp on file is no stamp: the extraction of these bytes
+    // read as UNSTAMPED_SCREEN_YEAR, and the re-screen keeps that reading
+    // rather than moving it forward.
+    expect(screenStampFor({ screenedOn: "soon", omFingerprint: "abc123def4567890" }, "abc123def4567890", now)).toBeUndefined();
+  });
+});
+
+describe("an extraction stored before the stamp keeps its reading when the same deck is screened again", () => {
+  // Every extraction on file when the stamp shipped carries neither a stamp
+  // nor a fingerprint, and reads as UNSTAMPED_SCREEN_YEAR. Screening the same
+  // deck again on or after January 1, 2027 stamped 2027, so "Asking price
+  // (2026)" turned into a prior trade and the deal lost its price.
+  it("keeps no stamp (its 2026 reading) where the deal says the extraction on file was read from this deck", async () => {
+    const { screenStampFor, screenYearOf, UNSTAMPED_SCREEN_YEAR } = await import("./criteria");
+    // Noon on January 2 in Honolulu, the stamp's zone: "today" is Jan 2.
+    const now = new Date(Date.UTC(2027, 0, 2, 22));
+    const legacy = {};
+    const kept = screenStampFor(legacy, "abc123def4567890", now, { priorReadFromThisDeck: true });
+    expect(kept).toBeUndefined();
+    expect(screenYearOf({ screenedOn: kept })).toBe(UNSTAMPED_SCREEN_YEAR);
+    // A stamp written before the fingerprint, on the deck the deal says it
+    // was, is kept too.
+    expect(screenStampFor({ screenedOn: "2026-10-04" }, "abc123def4567890", now, { priorReadFromThisDeck: true })).toBe(
+      "2026-10-04",
+    );
+    // The deal says otherwise (the memorandum was replaced since, or the
+    // facts were typed by hand): a new reading.
+    expect(screenStampFor(legacy, "abc123def4567890", now, { priorReadFromThisDeck: false })).toBe("2027-01-02");
+    // An extraction of these bytes stored with no stamp keeps none.
+    expect(screenStampFor({ omFingerprint: "abc123def4567890" }, "abc123def4567890", now)).toBeUndefined();
+    // A fingerprint on file is the answer, whatever the deal row says.
+    expect(
+      screenStampFor({ screenedOn: "2026-11-20", omFingerprint: "0000000000000000" }, "abc123def4567890", now, {
+        priorReadFromThisDeck: true,
+      }),
+    ).toBe("2027-01-02");
+    // A first screen, and a run with no memorandum, read anew.
+    expect(screenStampFor(null, "abc123def4567890", now, { priorReadFromThisDeck: true })).toBe("2027-01-02");
+    expect(screenStampFor(legacy, undefined, now, { priorReadFromThisDeck: true })).toBe("2027-01-02");
+  });
+});

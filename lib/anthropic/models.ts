@@ -28,7 +28,7 @@
  *     `MODEL_EXTRACTION` and `MODEL_REASONING` to the same id. The one step
  *     that can differ for free is the verdict (`MODEL_VERDICT`), which
  *     reads the gathered results, never the deck.
- *  3. The mid tier at its current list price ($2 in / $10 out per million
+ *  3. The mid tier at its list price in the table below ($2 in / $10 out per million
  *     against the flagship's $5 / $25) puts the same screen near $1.25 —
  *     near-flagship quality on this kind of read, but it changes the
  *     product; judge a few screens against their saved verdicts first.
@@ -48,8 +48,17 @@
 const FLAGSHIP = "claude-opus-4-8";
 
 /**
+ * The month the price table below was read from the published list prices,
+ * as an ISO month. List prices move and the table does not move with them,
+ * so a dollar figure it turns the ledger into says when its prices were read
+ * (the operator's cost card: "list prices as of Sep 2026"). Change it with
+ * the table.
+ */
+export const PRICES_AS_OF = "2026-09";
+
+/**
  * List prices per million tokens, by model-id prefix, as published when
- * this table was written (2026-09). The ledger's token meters are the
+ * this table was written (`PRICES_AS_OF`). The ledger's token meters are the
  * measurement; these turn them into an estimate. A model not listed here
  * is still metered — its dollars show blank until it is added.
  */
@@ -85,7 +94,11 @@ export const MODELS = {
 
 /** Output-token caps. Our outputs are compact JSON, so these stay small. */
 export const MAX_TOKENS = {
-  extraction: 8000,
+  // A portfolio lists every property (up to 150, lib/anthropic/prompts). At
+  // an estimated ~65 tokens a property, a tape of 75-odd homes would run
+  // past 8,000, and a cut-off fails the whole screen. The cap bounds the
+  // answer; only the tokens written are billed.
+  extraction: 16000,
   analysis: 8000,
   verdict: 4000,
   // The model reconciliation emits a large audit (every metric + sources +

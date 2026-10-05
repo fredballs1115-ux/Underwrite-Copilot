@@ -19,14 +19,14 @@ export function RealtorLine({ r }: { r: RealtorRead | null }) {
   // One string, so React puts no separators inside a sentence live-verify greps.
   const call =
     r.direction === "loosening"
-      ? "More homes for sale and longer to sell them than a year ago: the for-sale market is loosening, and a loosening market is one a renter can buy into."
+      ? "More homes for sale and longer to sell them than a year ago: the for-sale market is loosening — the usual reasoning is that a looser market is easier for a renter to buy into."
       : r.direction === "tightening"
-        ? "Fewer homes for sale and faster to sell them than a year ago: the for-sale market is tightening, which keeps a renter renting."
+        ? "Fewer homes for sale and faster to sell them than a year ago: the for-sale market is tightening — the usual reasoning is that a tighter market keeps more renters renting."
         : r.direction === "mixed"
           ? "Listings and time to sell moved opposite ways from a year ago, so the for-sale market is not clearly loosening or tightening."
           : "";
   const sentence =
-    "The list price is what sellers are asking, not what buyers paid; the listings and the days on market are the flow behind it, and the flow is what says whether a renter can buy into this market." +
+    "The list price is what sellers are asking, not what buyers paid; the listings and the days on market are the flow behind it, and the flow is the usual read of whether a renter could buy into this market." +
     (call ? ` ${call}` : "") +
     (r.shared ? " The figures are the metro area's, shared across the MSA." : "");
   return (
@@ -75,7 +75,7 @@ export function RealtorLine({ r }: { r: RealtorRead | null }) {
 /** What the rank is, said once, in one string, so live-verify can grep it. */
 const HOTNESS_SENTENCE =
   `Hotness ranks the ${HOTNESS_METROS} largest metros by how many buyers look at each listing and how fast homes sell, each against the country; ` +
-  "a hot for-sale market is one where buyers compete for homes, and the ones who lose out keep renting.";
+  "a hot for-sale market is one where buyers compete for homes, and the usual reasoning is that the ones who lose out keep renting.";
 
 /**
  * The rank, its move on the year and its two parts, each phrase one JS

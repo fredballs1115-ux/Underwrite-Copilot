@@ -13,6 +13,7 @@ import {
 } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, reconcilerInstruction } from "./prompts";
+import { todayLine } from "./today";
 import type { ReconciliationResult } from "./types";
 import type { ParsedModel } from "@/lib/model-parse";
 
@@ -69,6 +70,8 @@ export async function reconcileModel(
   }
 
   content.push({ type: "text", text: reconcilerInstruction(context) });
+  // Today's date, last, after both documents (lib/anthropic/today).
+  content.push({ type: "text", text: todayLine() });
 
   const messages: Anthropic.MessageParam[] = [{ role: "user", content }];
 

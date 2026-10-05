@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import metrosSeed from "@/data/research/metros.json";
 import { DATA_METROS } from "@/lib/market-match";
+import { MARKET_COUNT, MARKETS_READ } from "@/lib/market-count";
 import { SECTORS } from "@/lib/research-sectors";
-import { marketMeta, marketPageFor, marketPages, marketPath, sectorPageFor, sectorPages } from "./public-pages";
+import { figuresDrawn, marketMeta, marketPageFor, marketPages, marketPath, sectorPageFor, sectorPages } from "./public-pages";
 
 describe("public pages — every market and sector page, named for itself (#430)", () => {
   it("lists every briefed market and every metro area read without a brief, each once", () => {
@@ -28,6 +29,32 @@ describe("public pages — every market and sector page, named for itself (#430)
     expect(marketMeta(marketPageFor("dc"), sectorPageFor("office")).canonical).toBe("/market?metro=dc");
   });
 
+  it("claims only the figures a metro's page draws, and the dating only of the published figures (2026-10-01)", () => {
+    // Cleveland's permit series stopped at the 2023 redraw and is not read:
+    // its page draws no permits, and its description promised them.
+    const cle = marketMeta(marketPageFor("cleveland"), null);
+    expect(cle.description).not.toContain("building permits");
+    expect(cle.description).toContain("asking rents, rental vacancy, jobs by sector and the for-sale market");
+    expect(figuresDrawn("pittsburgh")).toEqual(["asking rents", "rental vacancy", "jobs by sector", "building permits", "the for-sale market"]);
+    // A suburb draws the metro area's series it borrows, permits included.
+    expect(figuresDrawn("montgomery_county")).toContain("building permits");
+    // Every metro page names only what its series table holds.
+    for (const p of marketPages()) {
+      const d = marketMeta(p, null).description;
+      expect(d.includes("building permits"), p.id).toBe(figuresDrawn(p.id).includes("building permits"));
+    }
+    // The research brief's figures are not all dated or sourced (the page
+    // says "undated" and "publisher not recorded" where they are not), so
+    // the dating is claimed of the published figures alone.
+    const dc = marketMeta(marketPageFor("dc"), null);
+    expect(dc.description).toContain("each published figure dated and linked to its source.");
+    expect(marketMeta(null, sectorPageFor("office")).description).toContain("each with its period and source where the research recorded them");
+    expect(marketMeta(null, sectorPageFor("office")).description).not.toContain("dated and sourced");
+    // The base page names the latest curve, not "today's".
+    expect(marketMeta(null, null).description).toContain("the latest Treasury curve");
+    expect(marketMeta(null, null).description).not.toContain("today's");
+  });
+
   it("names a sector page and the base page, and refuses an id it does not know", () => {
     const office = marketMeta(null, sectorPageFor("office"));
     expect(office.canonical).toBe("/market?sector=office");
@@ -36,7 +63,11 @@ describe("public pages — every market and sector page, named for itself (#430)
     expect(sectorPageFor("moon_base")).toBeNull();
     const base = marketMeta(null, null);
     expect(base.canonical).toBe("/market");
-    expect(base.description).toContain(`${marketPages().length} US metro areas`);
+    // Counted as the homepage counts — the Washington area's four briefs are
+    // one market — never the 44 pages the catalogue holds.
+    expect(base.description).toContain(`${MARKETS_READ} US markets`);
+    expect(MARKETS_READ).toBe(MARKET_COUNT + DATA_METROS.length);
+    expect(MARKETS_READ).toBeLessThan(marketPages().length);
     expect(marketPath("a b")).toBe("/market?metro=a%20b");
   });
 

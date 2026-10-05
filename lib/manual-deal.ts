@@ -13,7 +13,7 @@
  * pipeline's manual branch, and tests.
  */
 
-import { parseMoney, parsePct } from "@/lib/criteria";
+import { parseMoney, parsePct, screenStamp } from "@/lib/criteria";
 import { assetWords } from "@/lib/asset-words";
 import type {
   ExtractionResult,
@@ -122,9 +122,11 @@ const pct = (n: number, d = 2) => `${n.toFixed(d).replace(/\.?0+$/, "") || "0"}%
  * NOI ÷ cap, cap from NOI ÷ price, per-unit / per-SF bases) are filled in —
  * they're exact arithmetic on the buyer's own numbers, so downstream surfaces
  * see a complete fact set. Nothing is flagged (flagged = "verify against the
- * OM"; here the buyer IS the source) and no metric ever carries a page.
+ * OM"; here the buyer IS the source) and no metric ever carries a page. It
+ * is stamped with the day it is built (`now`), as the pipeline stamps an
+ * OM's extraction: the screen that reads these facts is the one about to run.
  */
-export function buildManualExtraction(facts: ManualDealFacts): ExtractionResult {
+export function buildManualExtraction(facts: ManualDealFacts, now: Date = new Date()): ExtractionResult {
   // Fill the price/cap/NOI triangle from whichever two sides were given.
   let price = facts.price;
   let capPct = facts.capPct;
@@ -172,8 +174,28 @@ export function buildManualExtraction(facts: ManualDealFacts): ExtractionResult 
     // KPI card renders badly, and keeping prose out of the metrics array
     // keeps the label matchers' surface purely figures.
     ...(facts.notes ? { buyerNotes: facts.notes } : {}),
+    // The day the facts were read, which a price label's year is judged
+    // against (lib/criteria `screenYearOf`) — the pipeline stamps an OM's.
+    screenedOn: screenStamp(now),
     metrics,
   };
+}
+
+/**
+ * Whether an extraction is a deal's typed facts rather than a memorandum's
+ * read: what buildManualExtraction writes and has written since manual entry
+ * shipped — a page count of 0 and no figure citing a page. A memorandum's
+ * read carries its deck's page count (the text layer's, the model's or the
+ * byte counter's) or, stored before page counts were kept, none at all; and
+ * since they were recorded, how it was read (`omRead`) and its bytes'
+ * fingerprint. The screen reads it when a deal entered by hand gets its first
+ * memorandum: the facts on file were no deck, so the deck is a new reading
+ * (lib/criteria `screenStampFor`).
+ */
+export function typedByHand(ex: ExtractionResult | null | undefined): boolean {
+  if (!ex || !Array.isArray(ex.metrics)) return false;
+  if (ex.omRead || ex.omFingerprint) return false;
+  return ex.totalPages === 0 && ex.metrics.every((m) => !m?.page);
 }
 
 /** Parse a manual extraction back into form-editable facts — the edit panel

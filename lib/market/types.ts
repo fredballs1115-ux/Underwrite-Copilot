@@ -192,6 +192,10 @@ export interface Dismissal {
   reason: string;
   by: string;
   at: string;
+  /** the gap the warning stated when it was dismissed (lib/market/checks'
+   *  `figure`) — the override stands only while the gap reads the same.
+   *  Null on an override recorded before the figure was kept. */
+  figure: string | null;
 }
 
 export function parseDismissals(raw: unknown): Dismissal[] {
@@ -202,6 +206,6 @@ export function parseDismissals(raw: unknown): Dismissal[] {
     const code = str(o.code);
     const reason = str(o.reason);
     if (!code || !reason) return [];
-    return [{ code, reason, by: str(o.by), at: str(o.at) }];
+    return [{ code, reason, by: str(o.by), at: str(o.at), figure: str(o.figure) || null }];
   });
 }

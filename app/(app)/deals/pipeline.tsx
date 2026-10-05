@@ -13,11 +13,12 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createDeal, createSampleDeal } from "./actions";
+import { createDealFromBatch, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
-import type { BannerSource } from "@/lib/deal-banner";
+import { GalleryCreditText } from "@/app/photo-credit";
+import { shownMarketIds, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
@@ -28,9 +29,19 @@ import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
 import type { StructuredAddress } from "@/lib/address";
 import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
+import { rowMarketLabel } from "@/lib/placed-by";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
-import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
+import { parseMoney, priceRange, priceRangeShort } from "@/lib/criteria";
+import { compareSortValues, pipelineSortValue, type PipelineSortKey, type SortDir } from "@/lib/pipeline-sort";
+import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
+import { SHARING_OPTIONS, matchesSharing } from "@/lib/personal-deal";
+// Why a fit wears "First read": it is judged on the first signal, before the
+// extraction lands — the deal page's buy-box panel says the same, and the
+// CSV and the meeting workbook mark the figure with the same words.
+import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
+import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
   STAGES,
   STAGE_LABEL,
@@ -49,11 +60,18 @@ export type DealCard = {
   stage: string;
   /** teammate who added this team deal (null when it's yours) */
   addedBy: string | null;
+  /** the deal is in the reader's own pipeline while the reader is on a team
+   *  — no team holds it, so the teammates do not see it (lib/personal-deal);
+   *  absent off a team */
+  personal?: boolean;
   /** deterministic buy-box result against the user's mandate */
   fit: "fits" | "near" | "outside" | null;
   /** 0–100 mandate-fit score + its PURSUE/WATCH/PASS call (null pre-screen) */
   score: number | null;
   mandateVerdict: "PURSUE" | "WATCH" | "PASS" | null;
+  /** the fit is judged on the first signal alone — the extraction has not
+   *  landed — and is marked "first read", as the deal page marks it */
+  fitFirstRead?: boolean;
   market: string;
   /** covered-market name when the address maps into the 15-market scope
    *  (computed server-side, lib/market-county's placeDeal) — null outside it */
@@ -69,10 +87,18 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; basis?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; capWithheld?: "note" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
+  /** a live screen has not read the memorandum's terms yet (lib/pipeline-
+   *  slots `readingTerms`): an empty slot is "not read yet" and shimmers,
+   *  where a finished read's empty slot keeps the dash that says "not
+   *  stated" */
+  reading?: boolean;
+  /** a buy box stands against the deal, so a fit is scored once the terms
+   *  are read — without one, the fit's dash is final */
+  hasBox?: boolean;
   /** the deal has an address, so an aerial thumbnail can be attempted */
   hasAddress: boolean;
   /** FEMA's flood zone at the building (lib/site-flags, #426): `tag` only in
@@ -105,6 +131,11 @@ export type DealCard = {
 // and an export of this "use client" module is only a client reference there.
 export type { PipelineView } from "@/lib/pipeline-view";
 
+/** Why a note's cap slot holds its yield, or "n/a" (lib/compare-interest
+ *  `noteCapSlot`): the collateral's cap is not the buyer's figure. */
+const NOTE_CAP_TITLE =
+  "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. The note's yield to maturity at its price stands in its place, where the note pays or may.";
+
 /** A card as the map reads it. */
 function mapDealOf(d: DealCard): MapDeal {
   return {
@@ -112,7 +143,13 @@ function mapDealOf(d: DealCard): MapDeal {
     name: d.name,
     verdict: d.verdict,
     price: d.slots.price ? compactPrice(d.slots.price) : null,
-    figure: d.slots.cap ? `${d.slots.cap} cap` : d.slots.yoc ? `${d.slots.yoc} yield on cost` : null,
+    figure: d.slots.cap
+      ? `${d.slots.cap} cap`
+      : d.slots.yoc
+        ? `${d.slots.yoc} yield on cost`
+        : d.slots.noteYield
+          ? `${d.slots.noteYield} to maturity`
+          : null,
     place: d.place ?? null,
     placeMiss: d.placeMiss,
     hasAddress: d.hasAddress,
@@ -120,8 +157,10 @@ function mapDealOf(d: DealCard): MapDeal {
 }
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
- *  Every column is sortable from its header. */
-type SortKey = "name" | "asset" | "price" | "cap" | "fit" | "status" | "added";
+ *  Every column is sortable from its header, and so is the call-for-offers
+ *  date the deal's own cell carries. What each deal sorts on under a
+ *  column is lib/pipeline-sort's `pipelineSortValue`. */
+type SortKey = PipelineSortKey;
 
 /** The price as a table wants it — "$68.0M", "$950k" — with the OM's own
  *  figure kept for the tooltip and the CSV. A column eighty pixels wide
@@ -137,10 +176,10 @@ function compactPrice(raw: string): string {
   return n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
 }
 
-const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string; rank: number }> = {
-  outside: { label: "Outside", cls: "text-kill", rank: 0 },
-  near: { label: "Near", cls: "text-caution", rank: 1 },
-  fits: { label: "Fits", cls: "text-pass", rank: 2 },
+const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string }> = {
+  outside: { label: "Outside", cls: "text-kill" },
+  near: { label: "Near", cls: "text-caution" },
+  fits: { label: "Fits", cls: "text-pass" },
 };
 
 const MANDATE_META: Record<
@@ -152,38 +191,10 @@ const MANDATE_META: Record<
   PURSUE: { label: "Pursue", cls: "text-pass" },
 };
 
-function statusRank(d: DealCard): number {
-  if (d.verdict) return (VERDICT_META[d.verdict]?.rank ?? 0) + 2;
-  if (d.jobStatus === "running") return 1;
-  if (d.jobStatus === "stalled") return 0.75;
-  if (d.jobStatus === "failed") return 0.5;
-  return 0;
-}
-
-function sortValue(d: DealCard, key: SortKey): string | number {
-  switch (key) {
-    case "name":
-      return d.name.toLowerCase();
-    case "asset":
-      return d.assetClass;
-    case "price":
-      return d.slots.price ? (parsePrice(d.slots.price) ?? -1) : -1;
-    case "cap":
-      return d.slots.cap ? (parsePct(d.slots.cap) ?? -1) : -1;
-    case "fit":
-      // Sort by the numeric mandate score when present (the column shows it),
-      // falling back to the coarse fold rank for pre-score deals.
-      return d.score ?? (d.fit ? FIT_META[d.fit].rank : -1);
-    case "status":
-      return statusRank(d);
-    case "added":
-      return d.createdAt;
-  }
-}
-
 /** First click on a header sorts the way people expect that column to lead:
- *  text A→Z, figures biggest-first, dates newest-first, best fits first. */
-const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
+ *  text A→Z, figures biggest-first, dates newest-first, best fits first, and
+ *  the offers due soonest first. */
+const DEFAULT_DIR: Record<SortKey, SortDir> = {
   name: "asc",
   asset: "asc",
   price: "desc",
@@ -191,15 +202,13 @@ const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
   fit: "desc",
   status: "desc",
   added: "desc",
+  due: "asc",
 };
 
-const VERDICT_META: Record<
-  string,
-  { label: string; cls: string; rank: number }
-> = {
-  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill", rank: 0 },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution", rank: 1 },
-  pass: { label: "Go", cls: "bg-pass/15 text-pass", rank: 2 },
+const VERDICT_META: Record<string, { label: string; cls: string }> = {
+  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
+  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
 };
 
 /** Each asset class reads as its own kind of thing at a glance: a colour dot
@@ -253,14 +262,17 @@ const PERSIST_KEY = "uc-pipeline-view";
 type BillingInfo = {
   isPro: boolean;
   canCreateDeal: boolean;
-  dealCount: number;
-  dealLimit: number;
+  /** the free deals left and where the next one lands, by the create
+   *  action's own rule (lib/deal-allowance, read by the page) */
+  allowance: DealAllowance;
 };
 
 export type OnboardingState = {
   hasBuyBox: boolean;
   sampleId: string | null;
-  hasRealDeal: boolean;
+  /** a memorandum a screen has finished (lib/onboarding `screenedAnOm`) —
+   *  not a deal typed in by hand, nor a screen still running */
+  hasScreenedOm: boolean;
 };
 
 export function Pipeline({
@@ -272,6 +284,9 @@ export function Pipeline({
   onboarding,
   billing,
   initialView = "cards",
+  viewerId = null,
+  onTeam = false,
+  todayIso,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -287,6 +302,16 @@ export function Pipeline({
   billing: BillingInfo | null;
   /** the view the reader last chose, read from its cookie by the page */
   initialView?: PipelineView;
+  /** the signed-in reader's id, whose own the new-deal form's draft is */
+  viewerId?: string | null;
+  /** the reader is on a team: the pipeline holds the team's deals beside
+   *  the reader's own, and a filter tells the two apart */
+  onTeam?: boolean;
+  /** the page's day (the reader's own, yyyy-mm-dd — lib/reader-day), read
+   *  once per request by the server: every offers-due countdown on the list
+   *  counts from it, so the server's markup and the browser's are the same
+   *  day */
+  todayIso: string;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -306,8 +331,11 @@ export function Pipeline({
   const [market, setMarket] = useState("all");
   // Mandate-fit filter (Feature 4): all / PURSUE / WATCH / PASS.
   const [mfit, setMfit] = useState("all");
+  // On a team: the shared pipeline's deals, or the reader's own the team
+  // does not see (lib/personal-deal).
+  const [sharing, setSharing] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("added");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Dead deals stay out of the pipeline until asked for (or filtered to).
   const [showDead, setShowDead] = useState(false);
   // Which stage sections the user has explicitly collapsed/expanded — until
@@ -332,6 +360,7 @@ export function Pipeline({
             asset: string;
             market: string;
             mfit: string;
+            sharing: string;
             showDead: boolean;
             collapsed: Partial<Record<Stage, boolean>>;
           }>;
@@ -340,6 +369,7 @@ export function Pipeline({
           if (typeof v.asset === "string") setAsset(v.asset);
           if (typeof v.market === "string") setMarket(v.market);
           if (typeof v.mfit === "string") setMfit(v.mfit);
+          if (typeof v.sharing === "string") setSharing(v.sharing);
           if (typeof v.showDead === "boolean") setShowDead(v.showDead);
           if (v.collapsed && typeof v.collapsed === "object")
             setCollapsed(v.collapsed);
@@ -356,12 +386,12 @@ export function Pipeline({
     try {
       sessionStorage.setItem(
         PERSIST_KEY,
-        JSON.stringify({ verdict, stage, asset, market, mfit, showDead, collapsed }),
+        JSON.stringify({ verdict, stage, asset, market, mfit, sharing, showDead, collapsed }),
       );
     } catch {
       // storage unavailable — view state is per-visit only
     }
-  }, [verdict, stage, asset, market, mfit, showDead, collapsed]);
+  }, [verdict, stage, asset, market, mfit, sharing, showDead, collapsed]);
 
   // The ⌘K "New deal…" action lands here as ?new=1 — honor it even when the
   // pipeline is already mounted (client-side navigation keeps state). The
@@ -374,10 +404,10 @@ export function Pipeline({
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // While any deal is mid-screen, refresh the list every few seconds so the
-  // verdict lands without a manual reload.
+  // While any deal is mid-screen — a first screen or a re-screen — refresh
+  // the list every few seconds so the verdict lands without a manual reload.
   const router = useRouter();
-  const anyRunning = deals.some((d) => !d.verdict && d.jobStatus === "running");
+  const anyRunning = deals.some((d) => d.jobStatus === "running");
   useEffect(() => {
     if (!anyRunning) return;
     const t = setInterval(() => router.refresh(), 7000);
@@ -433,7 +463,10 @@ export function Pipeline({
 
   // Free users who've hit the cap can't open the create form — they upgrade.
   const atLimit = !!billing && !billing.canCreateDeal;
-  const showUsage = !!billing && !billing.isPro;
+  // The meter shows wherever a cap applies to the next deal: the reader's
+  // own free deals, and a team trial's before them.
+  const allowance = billing?.allowance ?? null;
+  const showUsage = allowance?.left != null;
 
   const assets = useMemo(
     () => Array.from(new Set(deals.map((d) => d.assetClass).filter(Boolean))).sort(),
@@ -472,20 +505,18 @@ export function Pipeline({
       if (asset !== "all" && d.assetClass !== asset) return false;
       if (market !== "all" && d.market !== market) return false;
       if (mfit !== "all" && d.mandateVerdict !== mfit) return false;
+      // Only where the filter is drawn: a choice saved on a team never
+      // hides deals once the reader is off it.
+      if (onTeam && !matchesSharing(sharing, !!d.personal)) return false;
       return true;
     });
     return list.sort((a, b) => {
-      const va = sortValue(a, sortKey);
-      const vb = sortValue(b, sortKey);
-      const cmp =
-        typeof va === "string" && typeof vb === "string"
-          ? va.localeCompare(vb)
-          : (va as number) - (vb as number);
+      const cmp = compareSortValues(pipelineSortValue(a, sortKey), pipelineSortValue(b, sortKey), sortDir);
       // Ties fall back to newest-first so the order stays stable and sane.
       const tie = sortKey === "added" ? 0 : b.createdAt.localeCompare(a.createdAt);
-      return (sortDir === "asc" ? cmp : -cmp) || tie;
+      return cmp || tie;
     });
-  }, [deals, deferredQuery, verdict, stage, asset, market, mfit, sortKey, sortDir, showDead]);
+  }, [deals, deferredQuery, verdict, stage, asset, market, mfit, onTeam, sharing, sortKey, sortDir, showDead]);
 
   // The pipeline reads as one ladder: deals grouped by stage, in stage order,
   // each group internally sorted by the active column sort.
@@ -500,6 +531,22 @@ export function Pipeline({
     [deals],
   );
 
+  // Which market photograph each card settled on (DealBanner's report), for
+  // the one credit line under the cards: a card has no room for the links a
+  // Creative Commons credit carries, and a link inside the card's own link
+  // is not one. Only the photographs on screen are credited — never one a
+  // card fell past, one a memorandum photograph loaded over, or one in a
+  // folded stage.
+  const [marketShown, setMarketShown] = useState<ReadonlyMap<string, string | null>>(new Map());
+  const reportMarket = useCallback((id: string, marketId: string | null) => {
+    setMarketShown((prev) => {
+      if (prev.has(id) && prev.get(id) === marketId) return prev;
+      const next = new Map(prev);
+      next.set(id, marketId);
+      return next;
+    });
+  }, []);
+
   /** A section is open unless the user collapsed it; an EMPTY section starts
    *  collapsed until the user opens it. */
   function isOpen(s: Stage): boolean {
@@ -507,6 +554,15 @@ export function Pipeline({
     if (explicit !== undefined) return !explicit;
     return (groups.get(s)?.length ?? 0) > 0;
   }
+  /** A stage drawn at all: dead lives behind its toggle, and an empty rung
+   *  is the funnel's to show. */
+  function sectionDrawn(s: Stage): boolean {
+    if (s === "dead" && !showDead && stage !== "dead") return false;
+    return (groups.get(s)?.length ?? 0) > 0;
+  }
+  const cardsOnScreen =
+    view === "cards" ? STAGES.flatMap((s) => (sectionDrawn(s) && isOpen(s) ? (groups.get(s) ?? []) : [])) : [];
+  const marketPhotoIds = shownMarketIds(cardsOnScreen, marketShown);
   function toggleSection(s: Stage) {
     setCollapsed((c) => ({ ...c, [s]: isOpen(s) }));
   }
@@ -543,6 +599,7 @@ export function Pipeline({
     setAsset("all");
     setMarket("all");
     setMfit("all");
+    setSharing("all");
   }
   const filtersActive =
     query.trim() !== "" ||
@@ -550,7 +607,8 @@ export function Pipeline({
     stage !== "all" ||
     asset !== "all" ||
     market !== "all" ||
-    mfit !== "all";
+    mfit !== "all" ||
+    (onTeam && sharing !== "all");
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
     // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
@@ -561,13 +619,16 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Market read", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Self-storage", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
         assetClassLabel(d.assetClass),
         d.market,
-        d.coveredMarket ?? "",
+        // What the row itself names (lib/placed-by): the briefed market, or
+        // the metro area read for it and how — never blank where the row
+        // says "Pittsburgh PA · read" or "Dallas–Fort Worth · Collin County".
+        rowMarketLabel(d) ?? "",
         d.slots.price ?? "",
         // The price by the unit, the key or the foot (#469); blank where
         // the count or the area is not stated, and on a plan deal.
@@ -599,21 +660,29 @@ export function Pipeline({
         d.slots.student ?? "",
         // Blank on anything but a manufactured-housing park (#470).
         d.slots.mh ?? "",
+        // Blank on anything but self-storage (#471).
+        d.slots.storage ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
-        d.slots.cap ?? "",
+        // A note's cap is withheld, said so rather than left blank (#423).
+        d.slots.cap ?? (d.slots.capWithheld === "note" ? "n/a — note" : ""),
         d.slots.yoc ?? "",
-        d.fit ? FIT_META[d.fit].label : "",
-        d.score != null ? String(d.score) : "",
-        d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "",
+        // A fit judged on the first signal, before the extraction lands, is
+        // marked on each of its figures as the card marks it — "Near (first
+        // read)" — since a CSV is read away from the page (lib/first-read).
+        markFirstRead(d.fit ? FIT_META[d.fit].label : "", d.fitFirstRead),
+        markFirstRead(d.score != null ? String(d.score) : "", d.fitFirstRead),
+        markFirstRead(d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "", d.fitFirstRead),
         d.jobStatus === "failed"
           ? "Failed"
           : d.jobStatus === "stalled"
             ? "Stalled"
-            : d.verdict
-              ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
-              : d.jobStatus === "running"
-                ? "Screening"
+            : d.jobStatus === "running"
+              ? d.verdict
+                ? "Re-screening"
+                : "Screening"
+              : d.verdict
+                ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
                 : "Not screened",
         STAGE_LABEL[normalizeStage(d.stage)],
         d.offersDue ?? "",
@@ -652,28 +721,24 @@ export function Pipeline({
                   {deals.length} {deals.length === 1 ? "deal" : "deals"}
                 </span>
               )}
-              {showUsage && (
-                // The free allowance as a meter with the number, not a sentence.
+              {showUsage && allowance && allowance.left != null && (
+                // The free allowance as a meter with the number, not a
+                // sentence: a track a pool, the team's trial first — the
+                // create action takes the next deal from it — then the
+                // reader's own (lib/deal-allowance).
                 <Link
                   href="/billing"
-                  title={`${billing!.dealCount} of ${billing!.dealLimit} free deals used`}
+                  title={allowance.line ?? undefined}
                   className={`inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline ${
                     atLimit ? "text-caution" : ""
                   }`}
                 >
-                  <span
-                    aria-hidden
-                    className="h-1.5 w-12 overflow-hidden rounded-full bg-faint ring-1 ring-inset ring-line"
-                  >
-                    <span
-                      className={`block h-full rounded-full ${atLimit ? "bg-caution" : "bg-brand/70"}`}
-                      style={{
-                        width: `${Math.min(100, Math.round((billing!.dealCount / Math.max(1, billing!.dealLimit)) * 100))}%`,
-                      }}
-                    />
+                  <span aria-hidden className="flex w-12 items-center gap-0.5">
+                    {allowance.teamTrial ? <MeterPool pool={allowance.teamTrial} atLimit={atLimit} which="team" /> : null}
+                    {allowance.personal ? <MeterPool pool={allowance.personal} atLimit={atLimit} which="personal" /> : null}
                   </span>
-                  {Math.max(0, billing!.dealLimit - billing!.dealCount)} free{" "}
-                  {billing!.dealLimit - billing!.dealCount === 1 ? "deal" : "deals"} left
+                  {allowance.left} free {allowance.left === 1 ? "deal" : "deals"} left
+                  {allowance.teamTrial ? <span className="sr-only">. {allowance.line}</span> : null}
                 </Link>
               )}
             </p>
@@ -767,7 +832,7 @@ export function Pipeline({
       )}
 
       {showForm && !atLimit && (
-        <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} />
+        <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} viewerId={viewerId} />
       )}
       {atLimit && errorMessage && (
         <section className="rounded-xl border border-caution/30 bg-caution/5 p-5">
@@ -860,6 +925,16 @@ export function Pipeline({
               ]}
             />
           )}
+          {/* On a team the list holds the shared pipeline's deals beside the
+              reader's own, which the team does not see (lib/personal-deal). */}
+          {onTeam && (
+            <FilterSelect
+              label="Filter by sharing"
+              value={sharing}
+              onChange={setSharing}
+              options={SHARING_OPTIONS}
+            />
+          )}
           {deadCount > 0 && (
             <button
               type="button"
@@ -880,7 +955,7 @@ export function Pipeline({
             label="Sort deals"
             value={`${sortKey}:${sortDir}`}
             onChange={(v) => {
-              const [k, dir] = v.split(":") as [SortKey, "asc" | "desc"];
+              const [k, dir] = v.split(":") as [SortKey, SortDir];
               setSortKey(k);
               setSortDir(dir);
             }}
@@ -888,6 +963,7 @@ export function Pipeline({
             options={[
               ["added:desc", "Newest"],
               ["added:asc", "Oldest"],
+              ["due:asc", "Offers due, earliest"],
               ["price:desc", "Price: high to low"],
               ["cap:desc", "Cap: high to low"],
               ["fit:desc", "Mandate fit: high to low"],
@@ -912,7 +988,10 @@ export function Pipeline({
               className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
             >
               <DownloadIcon />
-              CSV
+              {/* On a phone the two exports are their icons (their names
+                  stay for a screen reader and in the title): with the view
+                  toggle beside them the row ran past a 390px screen. */}
+              <span className="max-sm:sr-only">CSV</span>
             </button>
             <a
               href="/api/pipeline/export"
@@ -920,7 +999,7 @@ export function Pipeline({
               className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
             >
               <SheetIcon />
-              Excel
+              <span className="max-sm:sr-only">Excel</span>
             </a>
           </div>
         </div>
@@ -962,8 +1041,11 @@ export function Pipeline({
             </form>
           </div>
           <p className="mt-3 text-xs">
+            {/* To the metro explorer itself: /market opens a signed-in
+                reader on their own market data, which an empty pipeline has
+                none of ("No market data yet", and a link back here). */}
             <Link
-              href="/market"
+              href="/market#explorer"
               className="font-medium text-brand hover:text-brand-strong"
             >
               Browse the covered markets →
@@ -1025,14 +1107,17 @@ export function Pipeline({
             {view === "list" && (
             <div className="hidden items-center gap-3 px-5 pb-1.5 md:flex">
               {compareMode && <span className="w-5 shrink-0" />}
-              <div className="min-w-0 flex-1">
+              {/* The call for offers is drawn in the deal's own cell, under
+                  its name, so its sort sits beside the name's. */}
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 <SortHead label="Deal" k="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHead label="Offers due" k="due" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               </div>
               <SortHead label="Asset" k="asset" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 lg:flex" />
               <SortHead label="Price" k="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-20" right />
               <SortHead label="Cap" k="cap" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-12" right />
               <SortHead label="Fit" k="fit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-16 lg:flex" right />
-              <SortHead label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-22" right />
+              <SortHead label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-24" right />
               <SortHead label="Added" k="added" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 xl:flex" right />
               {!compareMode && (
                 <span className="hidden w-36 shrink-0 text-right text-[10px] font-medium uppercase tracking-wide text-muted lg:block">
@@ -1048,9 +1133,8 @@ export function Pipeline({
                 const sectionDeals = groups.get(s) ?? [];
                 // Dead lives behind its toggle; an empty rung is the funnel's
                 // to show — no header with a zero in it here.
-                if (s === "dead" && !showDead && stage !== "dead") return null;
-                if (sectionDeals.length === 0) return null;
-                const open = isOpen(s) && sectionDeals.length > 0;
+                if (!sectionDrawn(s)) return null;
+                const open = isOpen(s);
                 return (
                   <section key={s}>
                     <button
@@ -1097,6 +1181,8 @@ export function Pipeline({
                             compareMode={compareMode}
                             checked={selected.has(d.id)}
                             onToggle={toggleSelected}
+                            onMarket={reportMarket}
+                            todayIso={todayIso}
                           />
                         ))}
                       </ul>
@@ -1111,6 +1197,7 @@ export function Pipeline({
                             compareMode={compareMode}
                             checked={selected.has(d.id)}
                             onToggle={toggleSelected}
+                            todayIso={todayIso}
                           />
                         ))}
                       </ul>
@@ -1119,6 +1206,11 @@ export function Pipeline({
                 );
               })}
             </div>
+            {view === "cards" && marketPhotoIds.length > 0 ? (
+              <p className="mt-6 text-[11px] leading-relaxed text-muted" data-qa="market-photo-credit">
+                <GalleryCreditText ids={marketPhotoIds} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />
+              </p>
+            ) : null}
           </div>
           )}
         </>
@@ -1129,7 +1221,8 @@ export function Pipeline({
 
 /** The ladder as one picture: a rung per live stage with its count, each a
  *  one-tap stage filter. An empty rung is hollow — it used to be a collapsed
- *  section header with a zero in it. Dead deals sit behind their own toggle. */
+ *  section header with a zero in it — and still wears its stage's name, for
+ *  sight and for a screen reader. Dead deals sit behind their own toggle. */
 function StageFunnel({
   counts,
   active,
@@ -1150,12 +1243,13 @@ function StageFunnel({
         const on = active === s;
         const lit = n > 0 || on;
         return (
-          // On a phone the populated rungs take twice the width of the hollow
-          // ones and the hollow ones drop their label, so six rungs fit.
-          <li
-            key={s}
-            className={`relative min-w-0 ${lit ? "flex-[2] sm:flex-1" : "flex-1"}`}
-          >
+          // Six rungs share the width equally while there is room, and none
+          // is ever narrower than its own name: on a phone, or beside the
+          // calls' split at `lg`, "Screening" takes the width it needs and the
+          // shorter names give it up. The hollow rungs used to drop their
+          // name below `sm` to make room, which left a row of blank circles
+          // a screen reader announced as "0 deals".
+          <li key={s} className="relative min-w-max flex-1">
             {/* the rail, drawn as each rung's two halves so it meets the
                 neighbours' centres whatever the rungs' widths; the rung's
                 own background covers the joint */}
@@ -1188,11 +1282,12 @@ function StageFunnel({
                   {n > 0 ? n : ""}
                 </span>
               </span>
-              {/* Six rungs share a phone's width: the label shrinks there
-                  rather than truncating; the full name is the tooltip. */}
+              {/* Six names share a phone's width: the label is a size smaller
+                  there (and smaller again under 340px, where the six only
+                  just fit), never cut; the full name is the tooltip. */}
               <span
-                className={`w-full truncate text-[9px] font-medium uppercase sm:text-[10px] sm:tracking-wide ${
-                  lit ? "text-ink" : "hidden text-muted sm:block"
+                className={`w-full truncate text-[8px] font-medium uppercase min-[340px]:text-[9px] sm:text-[10px] sm:tracking-wide ${
+                  lit ? "text-ink" : "text-muted"
                 }`}
               >
                 {SHORT_STAGE[s]}
@@ -1269,6 +1364,24 @@ function VerdictSplit({
         })}
       </div>
     </div>
+  );
+}
+
+/** One pool of free deals drawn as a track, as wide as its share of the
+ *  allowance and filled as far as it is used: the team's trial, or the
+ *  reader's own. */
+function MeterPool({ pool, atLimit, which }: { pool: AllowancePool; atLimit: boolean; which: "team" | "personal" }) {
+  return (
+    <span
+      data-meter={which}
+      className="h-1.5 overflow-hidden rounded-full bg-faint ring-1 ring-inset ring-line"
+      style={{ flexGrow: pool.of, flexBasis: 0 }}
+    >
+      <span
+        className={`block h-full rounded-full ${atLimit ? "bg-caution" : "bg-brand/70"}`}
+        style={{ width: `${Math.min(100, Math.round((pool.used / Math.max(1, pool.of)) * 100))}%` }}
+      />
+    </span>
   );
 }
 
@@ -1414,6 +1527,82 @@ function MetaLine({
   );
 }
 
+/** A tag's tone in its words, and in the outline its chip wears on a line
+ *  of its own (on the picture, a chip is white). */
+const TAG_TEXT: Record<TagTone, string> = { brand: "text-brand", caution: "text-caution", kill: "text-kill", muted: "text-muted" };
+const TAG_BORDER: Record<TagTone, string> = { brand: "border-brand/30", caution: "border-caution/35", kill: "border-kill/35", muted: "border-line" };
+
+/** A deal's tags (lib/pipeline-tags) on a line of their own under its
+ *  figures, wrapping: a chip each, never cut — a tag longer than the line
+ *  wraps inside its chip rather than losing its end, and a figure never
+ *  shares a line with them, so no tag can push a figure off one. The
+ *  caller names the line's display (`flex`, or a card's width tiers'), and
+ *  a card's own tiers for each chip. */
+function TagLine({
+  tags,
+  className = "flex",
+  chipClass,
+}: {
+  tags: readonly DealTag[];
+  className?: string;
+  chipClass?: (t: DealTag) => string;
+}) {
+  if (tags.length === 0) return null;
+  return (
+    <p className={`flex-wrap gap-1 ${className}`} data-tags="line">
+      {tags.map((t, idx) => (
+        <Fragment key={t.key}>
+          {idx > 0 && " "}
+          <span
+            title={t.title}
+            className={`max-w-full rounded-full border bg-surface px-2 py-0.5 text-[11px] font-semibold leading-tight ${TAG_BORDER[t.tone]} ${TAG_TEXT[t.tone]} ${chipClass?.(t) ?? ""}`}
+          >
+            {t.text}
+          </span>
+        </Fragment>
+      ))}
+    </p>
+  );
+}
+
+/** Drawn at the picture widths a mask names — one digit a tier of
+ *  lib/pipeline-tags `PICTURE_TIERS`: under 278px, 278 to 347, 348 up — as
+ *  the card's picture and tag row ask of themselves (`@container/card`).
+ *  A chip shows as a block (a flex item either way); the line as a flex
+ *  row. Every class is written out whole, for Tailwind's scanner. */
+const AT_TIERS: Record<string, { block: string; flex: string }> = {
+  "111": { block: "", flex: "flex" },
+  "100": { block: "@min-[278px]/card:hidden", flex: "flex @min-[278px]/card:hidden" },
+  "010": { block: "hidden @min-[278px]/card:block @min-[348px]/card:hidden", flex: "hidden @min-[278px]/card:flex @min-[348px]/card:hidden" },
+  "001": { block: "hidden @min-[348px]/card:block", flex: "hidden @min-[348px]/card:flex" },
+  "110": { block: "@min-[348px]/card:hidden", flex: "flex @min-[348px]/card:hidden" },
+  "011": { block: "hidden @min-[278px]/card:block", flex: "hidden @min-[278px]/card:flex" },
+  "101": { block: "@min-[278px]/card:hidden @min-[348px]/card:block", flex: "flex @min-[278px]/card:hidden @min-[348px]/card:flex" },
+  "000": { block: "hidden", flex: "hidden" },
+};
+const atTiers = (shown: readonly boolean[]) => AT_TIERS[shown.map((on) => (on ? "1" : "0")).join("")] ?? AT_TIERS["111"];
+
+/** A slot the live screen has not read yet: a quiet shimmer where the figure
+ *  will land (`.skeleton` moves only where motion is welcome), named for a
+ *  screen reader — never the dash that says the memorandum states none. */
+function Reading({ width }: { width: string }) {
+  return (
+    <span
+      role="img"
+      aria-label="Reading the memorandum"
+      title="Reading the memorandum"
+      data-reading
+      className={`skeleton inline-block h-3.5 rounded align-middle ${width}`}
+    />
+  );
+}
+
+/** A figure's empty slot: the shimmer while the terms are being read, the
+ *  dash once a read has found none. */
+function Unstated({ reading, width, className = "text-line" }: { reading: boolean; width: string; className?: string }) {
+  return reading ? <Reading width={width} /> : <span className={className}>—</span>;
+}
+
 /** The mandate score drawn: a 0–100 bar in the current text colour (the
  *  call's), so a row reads its fit before the number does. */
 function FitBar({ score }: { score: number }) {
@@ -1435,12 +1624,15 @@ const DealRow = memo(function DealRow({
   compareMode,
   checked,
   onToggle,
+  todayIso,
 }: {
   d: DealCard;
   i: number;
   compareMode: boolean;
   checked: boolean;
   onToggle: (id: string) => void;
+  /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
+  todayIso: string;
 }) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
   const isDead = normalizeStage(d.stage) === "dead";
@@ -1474,7 +1666,7 @@ const DealRow = memo(function DealRow({
       }
     >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full border border-muted" />
-      {d.readCounty ? `${d.readMarket} · ${d.readCounty.split(",")[0]}` : `${d.readMarket} · read`}
+      {rowMarketLabel(d)}
     </span>
   ) : null;
   const asset = assetMeta(d.assetClass ?? "");
@@ -1489,147 +1681,13 @@ const DealRow = memo(function DealRow({
       {compactPrice(d.slots.price)}
     </span>
   ) : null;
-  // What the price buys where it is not the building (#415): a share's
-  // price, a note's, the land's under a ground lease — said beside the
-  // figure so a $20M share never reads as a $20M building.
-  const interestBit = d.slots.interest ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.interest}: the price does not buy the building outright — the deal page says what it buys`}
-    >
-      {d.slots.interest}
-    </span>
-  ) : null;
-  // The seller's loan, where it is offered for assumption (#419) — the deal
-  // page prices it against today's rate.
-  const debtBit = d.slots.debt ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate`}
-    >
-      {d.slots.debt}
-    </span>
-  ) : null;
-  // A covenant or a contract that sets the rents (#453): a restricted
-  // building's rents move with the limits, not the market — said beside the
-  // price, where the pipeline is scanned.
-  const affordableBit = d.slots.affordable ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.affordable}: a covenant or a contract sets these rents — the deal page says until when`}
-    >
-      {d.slots.affordable}
-    </span>
-  ) : null;
-  // One tenant leases the whole property (#454): the lease is the income,
-  // and how long it has left is what the price is paid for.
-  const tenancyBit = d.slots.tenancy ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.tenancy}: one lease is the whole income — the deal page reads its guarantor, its term and its increases`}
-    >
-      {d.slots.tenancy}
-    </span>
-  ) : null;
-  // What a hotel is sold with (#455): the encumbrance and the PIP change
-  // what the price buys.
-  const hotelBit = d.slots.hotel ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.hotel}: what the hotel is sold with — the deal page reads the flag, the manager and the PIP`}
-    >
-      {d.slots.hotel}
-    </span>
-  ) : null;
-  // The listed tenants (#457): an anchor not in the sale, and the share of
-  // the rent expiring before the model's sale.
-  const rosterBit = d.slots.roster ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.roster}: the listed tenants against the model's sale — the deal page reads the roll, the anchors and their rights`}
-    >
-      {d.slots.roster}
-    </span>
-  ) : null;
-  // A renovation program (#460): the premium it is priced on, and its
-  // return on the cost of a door.
-  const valueAddBit = d.slots.valueAdd ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.valueAdd}: the renovation program as stated — the deal page reads its proof, its pace and what the model does not carry`}
-    >
-      {d.slots.valueAdd}
-    </span>
-  ) : null;
-  // A note the seller will carry (#462): its rate, beside the price.
-  const sellerNoteBit = d.slots.sellerNote ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.sellerNote}: the seller offers to carry financing — the deal page prices the note against today's rate`}
-    >
-      {d.slots.sellerNote}
-    </span>
-  ) : null;
-  // A student building's pre-leasing against last year's (#468): behind
-  // the pace, or a drive to campus, in the warning tone.
-  const studentBit = d.slots.student ? (
-    <span
-      className={`whitespace-nowrap font-medium ${/−|Drive-to/.test(d.slots.student) ? "text-caution" : "text-brand"}`}
-      title={`${d.slots.student}: a student building's leasing for the coming year — the deal page reads the pace, the beds and the walk to campus`}
-    >
-      {d.slots.student}
-    </span>
-  ) : null;
-  // A manufactured-housing park's lot rent against the market's (#470): a
-  // private water or sewer system in the warning tone.
-  const mhBit = d.slots.mh ? (
-    <span
-      className={`whitespace-nowrap font-medium ${/Private/.test(d.slots.mh) ? "text-caution" : "text-brand"}`}
-      title={`${d.slots.mh}: a manufactured-housing park — the deal page reads the lot rent against the market's, the park-owned homes and the water and sewer`}
-    >
-      {d.slots.mh}
-    </span>
-  ) : null;
-  // What the third-party reports found (#465): the most serious finding.
-  const reportsBit = d.slots.reports ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.reports}: from the third-party reports the memorandum cites — the deal page reads them`}
-    >
-      {d.slots.reports}
-    </span>
-  ) : null;
-  // A tax abatement (#461): the NOI is on an abated bill, how long it has
-  // and what the owner pays more once it ends.
-  const abatementBit = d.slots.abatement ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.abatement}: the NOI is on an abated tax bill — the deal page reads when it ends and what it is worth`}
-    >
-      {d.slots.abatement}
-    </span>
-  ) : null;
-  // How it is sold (#456): an auction's figure is where the bidding opens,
-  // and a court's or a lender's sale is as-is.
-  const saleBit = d.slots.sale ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.sale}: the figure is where the bidding opens or the seller is not an owner — the deal page reads the sale`}
-    >
-      {d.slots.sale}
-    </span>
-  ) : null;
-  // A Special Flood Hazard Area (#426): a federally backed loan requires
-  // flood insurance there, which is a cost and a lender's condition — said
-  // beside the price, where a list of deals is read.
-  const floodBit = d.flood?.tag ? (
-    <span
-      className="whitespace-nowrap font-medium text-kill"
-      title={`${d.flood.tag}: FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance; the deal page draws the map`}
-    >
-      {d.flood.tag}
-    </span>
-  ) : null;
+  // What the price buys where it is not the building, the seller's loan, a
+  // covenant on the rents, a flood zone… (lib/pipeline-tags): said on a
+  // line of their own under the figures at every width, so a tag never
+  // pushes the price, the cap or the fit off a one-line truncation — the
+  // phone's line had read "$41.3M · 49% share · 5…" — and is never cut
+  // itself. A deal the reader's team does not see says so last.
+  const tags = d.personal ? [...dealTags(d.slots, d.flood), PERSONAL_TAG] : dealTags(d.slots, d.flood);
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -1644,6 +1702,12 @@ const DealRow = memo(function DealRow({
       <span className="font-mono tabular-nums">{d.slots.yoc}</span>{" "}
       <span className="text-[9px] font-medium uppercase">yoc</span>
     </span>
+  ) : d.slots.noteYield ? (
+    // A note has no going-in cap: its yield to maturity takes the slot.
+    <span title={NOTE_CAP_TITLE}>
+      <span className="font-mono tabular-nums">{d.slots.noteYield}</span>{" "}
+      <span className="text-[9px] font-medium uppercase">ytm</span>
+    </span>
   ) : null;
   // The mandate score, when there is one: a call's colour, the words a
   // screen reader gets, and the tooltip — shared by the `lg` column and the
@@ -1651,22 +1715,34 @@ const DealRow = memo(function DealRow({
   // page and the deal header's chip — the row doesn't repeat them.
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
   const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
+  // A fit judged on the first signal alone says so wherever it is drawn —
+  // the deal page's "First read" — until the extraction lands.
+  const firstRead = !!d.fitFirstRead && (!!scored || !!d.fit);
   const fitWords = scored
-    ? d.fit === "outside"
-      ? `Fit ${scored.score} · Outside box`
-      : `Fit ${scored.score} · ${MANDATE_META[scored.verdict].label}`
+    ? `${
+        d.fit === "outside"
+          ? `Fit ${scored.score} · Outside box`
+          : `Fit ${scored.score} · ${MANDATE_META[scored.verdict].label}`
+      }${firstRead ? ", first read" : ""}`
     : null;
   const fitTitle = scored
-    ? d.fit === "outside"
-      ? `${scored.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
-      : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
+    ? `${
+        d.fit === "outside"
+          ? `${scored.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
+          : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
+      }${firstRead ? `. ${FIRST_READ_TITLE}` : ""}`
     : null;
+  const firstReadMark = firstRead ? (
+    <span className="text-[9px] font-medium uppercase text-brand" title={FIRST_READ_TITLE}>
+      first read
+    </span>
+  ) : null;
   // Without a score there is no bar to draw, so the fit stays a word in the
   // meta line; with one, the bar below carries it and the word goes.
   const fitBit =
     !scored && d.fit ? (
-      <span className={`font-medium ${FIT_META[d.fit].cls}`}>
-        {FIT_META[d.fit].label} box
+      <span className={`font-medium ${FIT_META[d.fit].cls}`} title={firstRead ? FIRST_READ_TITLE : undefined}>
+        {FIT_META[d.fit].label} box{firstRead ? ", first read" : ""}
       </span>
     ) : null;
   // Below `lg` the score column is hidden, and as a word at the end of the
@@ -1682,13 +1758,14 @@ const DealRow = memo(function DealRow({
         fit
       </span>
       <FitBar score={scored.score} />
+      {firstRead ? <span aria-hidden>{firstReadMark}</span> : null}
       <span className="sr-only">{fitWords}</span>
     </span>
   ) : null;
   const dateBit = (
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
-  const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} /> : null;
+  const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} today={todayIso} /> : null;
   // A teammate's deal wears their initials; the name is the tooltip and
   // what a screen reader says.
   const addedByBit = d.addedBy ? (
@@ -1707,9 +1784,9 @@ const DealRow = memo(function DealRow({
   // the price line instead (#420), because the column's 88px beside a name
   // that also has the building's picture beside it left the name
   // "The Maddox at…".
-  // A failed or stalled run outranks the stored verdict: that verdict was
-  // written about the terms as they were before the run the analyst just
-  // asked for, and the deal page says so.
+  // A failed, stalled or running screen outranks the stored verdict: that
+  // verdict was written about the terms as they were before the run the
+  // analyst just asked for, and the deal page says so (lib/screen-run).
   const status =
     d.jobStatus === "failed" ? (
       <span
@@ -1729,13 +1806,16 @@ const DealRow = memo(function DealRow({
       >
         Stalled
       </span>
+    ) : d.jobStatus === "running" ? (
+      <span
+        className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-muted"
+        title={v ? `Re-screening — the previous call was ${v.label}` : undefined}
+      >
+        <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+        {v ? "Re-screening…" : "Screening…"}
+      </span>
     ) : v ? (
       <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}>{v.label}</span>
-    ) : d.jobStatus === "running" ? (
-      <span className="flex items-center gap-1.5 text-[11px] text-muted">
-        <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        Screening…
-      </span>
     ) : (
       // Nothing has run yet: an empty ring where the verdict pill will sit.
       <span className="inline-flex h-6 items-center" title="Not screened yet — open the deal to run the screen">
@@ -1745,119 +1825,137 @@ const DealRow = memo(function DealRow({
     );
 
   const inner = (
-    <>
-      {compareMode && (
-        <span
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
-            checked
-              ? "border-brand bg-brand text-white"
-              : "border-line bg-surface"
-          }`}
-          aria-hidden
-        >
-          {checked && (
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={3}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-3 w-3"
-            >
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
+    // Two rows: the picture beside the deal's line and its columns, then
+    // the deal's tags under them (lib/pipeline-tags) — once, at every
+    // width, starting under the name and running the row's whole width
+    // (under the columns from `md`), so a tag wraps only where the row
+    // runs out and never shares a line with a figure it could push off.
+    <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3">
+      <div className="flex items-center gap-3">
+        {compareMode && (
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+              checked
+                ? "border-brand bg-brand text-white"
+                : "border-line bg-surface"
+            }`}
+            aria-hidden
+          >
+            {checked && (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3 w-3"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            )}
+          </span>
+        )}
+        <DealThumb sources={d.thumbs ?? []} cover={d.cover ?? null} label={d.name} />
+      </div>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {/* The name is the row: two lines before an ellipsis at every
+              width, so "The Maddox at Brewerytown" is never "The Maddox at
+              Bre…" beside a half-empty column. */}
+          <p className="line-clamp-2 font-medium" title={d.name}>
+            {d.name}
+          </p>
+          {/* A phone gets two lines — where the deal is (the row's coloured
+              edge already says what it is), then what it costs and how it
+              fits — so the price, the cap and the fit are never the part a
+              one-line truncation cuts off. */}
+          <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
+          {/* On a phone the price line leads with the call; from `sm` to `md`
+              the call has its own column and the line is the figures alone. */}
+          <div className="mt-1 flex items-center gap-2 md:hidden">
+            <span className="flex shrink-0 sm:hidden">{status}</span>
+            <MetaLine flush className="min-w-0" bits={[priceBit, capBit, fitBit]} />
+          </div>
+          <MetaLine className="hidden md:block lg:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, fitBit, dateBit, addedByBit]} />
+          <MetaLine className="hidden lg:block xl:hidden" bits={[dueBit, marketBit, coveredBit, dateBit, addedByBit]} />
+          <MetaLine className="hidden xl:block" bits={[dueBit, marketBit, coveredBit, addedByBit]} />
+          {fitBar}
+        </div>
+        {/* Column cells — widths, order, and gaps mirror the header row. */}
+        <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm text-muted lg:flex">
+          {d.assetClass ? (
+            <>
+              <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${asset.dot}`} />
+              <span className="truncate" title={assetClassLabel(d.assetClass)}>
+                {assetClassLabel(d.assetClass)}
+              </span>
+            </>
+          ) : (
+            // An "Auto-detect" deal's class is the deck's, read with the terms.
+            <Unstated reading={!!d.reading} width="w-16" />
           )}
         </span>
-      )}
-      <DealThumb sources={d.thumbs ?? []} cover={d.cover ?? null} label={d.name} />
-      <div className="min-w-0 flex-1">
-        {/* The name is the row: two lines before an ellipsis at every
-            width, so "The Maddox at Brewerytown" is never "The Maddox at
-            Bre…" beside a half-empty column. */}
-        <p className="line-clamp-2 font-medium" title={d.name}>
-          {d.name}
-        </p>
-        {/* A phone gets two lines — where the deal is (the row's coloured
-            edge already says what it is), then what it costs and how it
-            fits — so the price, the cap and the fit are never the part a
-            one-line truncation cuts off. */}
-        <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
-        {/* On a phone the price line leads with the call; from `sm` to `md`
-            the call has its own column and the line is the figures alone. */}
-        <div className="mt-1 flex items-center gap-2 md:hidden">
-          <span className="flex shrink-0 sm:hidden">{status}</span>
-          <MetaLine flush className="min-w-0" bits={[priceBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, floodBit, capBit, fitBit]} />
-        </div>
-        <MetaLine
-          className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, floodBit, fitBit, dateBit, addedByBit]}
-        />
-        <MetaLine
-          className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, dateBit, addedByBit]}
-        />
-        <MetaLine
-          className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, addedByBit]}
-        />
-        {fitBar}
-      </div>
-      {/* Column cells — widths, order, and gaps mirror the header row. */}
-      <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm text-muted lg:flex">
-        {d.assetClass ? (
-          <>
-            <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${asset.dot}`} />
-            <span className="truncate" title={assetClassLabel(d.assetClass)}>
-              {assetClassLabel(d.assetClass)}
+        <span
+          className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block"
+          title={
+            d.slots.price
+              ? [d.slots.price, d.slots.basis, d.slots.interest?.toLowerCase()].filter(Boolean).join(" — ")
+              : undefined
+          }
+        >
+          {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
+        </span>
+        <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
+          {d.slots.cap ??
+            (d.slots.yoc ? (
+              <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
+                {d.slots.yoc}
+                <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
+              </span>
+            ) : d.slots.noteYield ? (
+              // A note has no going-in cap: its yield to maturity, labelled.
+              <span title={NOTE_CAP_TITLE} className="text-brand">
+                {d.slots.noteYield}{" "}
+                <span className="text-[9px] font-sans font-medium uppercase">ytm</span>
+              </span>
+            ) : d.slots.capWithheld === "note" ? (
+              <span title={NOTE_CAP_TITLE} className="font-sans text-xs text-muted">
+                n/a
+              </span>
+            ) : (
+              <Unstated reading={!!d.reading} width="w-10" />
+            ))}
+        </span>
+        <span className="hidden w-16 shrink-0 flex-col items-end text-right text-xs font-semibold lg:flex">
+          {scored ? (
+            // The score, and the score drawn: a 0–100 bar in the call's colour.
+            <span
+              className={`flex flex-col items-end gap-1 tabular-nums ${fitCls}`}
+              title={fitTitle ?? undefined}
+            >
+              {scored.score}
+              <FitBar score={scored.score} />
+              {firstReadMark}
             </span>
-          </>
-        ) : (
-          <span className="text-line">—</span>
-        )}
-      </span>
-      <span
-        className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block"
-        title={
-          d.slots.price
-            ? [d.slots.price, d.slots.basis, d.slots.interest?.toLowerCase()].filter(Boolean).join(" — ")
-            : undefined
-        }
-      >
-        {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
-      </span>
-      <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
-        {d.slots.cap ??
-          (d.slots.yoc ? (
-            <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
-              {d.slots.yoc}
-              <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
-            </span>
+          ) : d.fit ? (
+            <>
+              <span className={FIT_META[d.fit].cls} title={firstRead ? FIRST_READ_TITLE : undefined}>
+                {FIT_META[d.fit].label}
+              </span>
+              {firstReadMark}
+            </>
           ) : (
-            <span className="text-line">—</span>
-          ))}
-      </span>
-      <span className="hidden w-16 shrink-0 flex-col items-end text-right text-xs font-semibold lg:flex">
-        {scored ? (
-          // The score, and the score drawn: a 0–100 bar in the call's colour.
-          <span
-            className={`flex flex-col items-end gap-1 tabular-nums ${fitCls}`}
-            title={fitTitle ?? undefined}
-          >
-            {scored.score}
-            <FitBar score={scored.score} />
-          </span>
-        ) : d.fit ? (
-          <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
-        ) : (
-          <span className="font-normal text-line">—</span>
-        )}
-      </span>
-      <span className="hidden w-22 shrink-0 justify-end sm:flex">{status}</span>
-      <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
-        {fmtDate(d.createdAt)}
-      </span>
-    </>
+            <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
+          )}
+        </span>
+        <span className="hidden w-24 shrink-0 justify-end sm:flex">{status}</span>
+        <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
+          {fmtDate(d.createdAt)}
+        </span>
+      </div>
+      <TagLine tags={tags} className="col-start-2 mt-1.5 flex" />
+    </div>
   );
 
   return (
@@ -1985,15 +2083,17 @@ function TileCall({ d }: { d: DealCard }) {
       </span>
     );
   }
-  if (v && d.verdict) return <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`}>{v.label}</span>;
+  // A screen in flight outranks the call it will replace: a re-screen's
+  // terms are already rewriting under the old verdict.
   if (d.jobStatus === "running") {
     return (
-      <span className={`${pill} bg-white/95 text-ink`}>
+      <span className={`${pill} bg-white/95 text-ink`} title={v ? `Re-screening — the previous call was ${v.label}` : undefined}>
         <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        Screening…
+        {v ? "Re-screening…" : "Screening…"}
       </span>
     );
   }
+  if (v && d.verdict) return <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`}>{v.label}</span>;
   return (
     <span className={`${pill} bg-white/90 py-1.5 text-muted`} title="Not screened yet — open the deal to run the screen">
       <span aria-hidden className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70" />
@@ -2028,13 +2128,21 @@ const DealTile = memo(function DealTile({
   compareMode,
   checked,
   onToggle,
+  onMarket,
+  todayIso,
 }: {
   d: DealCard;
   i: number;
   compareMode: boolean;
   checked: boolean;
   onToggle: (id: string) => void;
+  /** told which market photograph the card shows, for the page's credit */
+  onMarket?: (dealId: string, marketId: string | null) => void;
+  /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
+  todayIso: string;
 }) {
+  const dealId = d.id;
+  const reportMarket = useCallback((marketId: string | null) => onMarket?.(dealId, marketId), [dealId, onMarket]);
   // The deal's photographs, flipped through on the card (#450): which one is
   // on screen, and whether the deal's own photograph is the picture at all
   // (a card whose photograph failed shows its market's or its cover, and
@@ -2064,31 +2172,27 @@ const DealTile = memo(function DealTile({
   const place = d.coveredMarket ?? d.readMarket ?? d.market;
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
   const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
-  // What the picture must not hide: a Special Flood Hazard Area, what the
-  // price buys where it is not the building, the seller's loan, a covenant
-  // on the rents, the one lease a single-tenant building is.
-  const tags = [
-    d.flood?.tag ? { text: d.flood.tag, cls: "text-kill", title: `${d.flood.tag}: FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance` } : null,
-    d.slots.interest ? { text: d.slots.interest, cls: "text-brand", title: `${d.slots.interest}: the price does not buy the building outright` } : null,
-    d.slots.debt ? { text: d.slots.debt, cls: "text-brand", title: `${d.slots.debt}: the seller's loan is offered for assumption` } : null,
-    d.slots.affordable ? { text: d.slots.affordable, cls: "text-brand", title: `${d.slots.affordable}: a covenant or a contract sets these rents` } : null,
-    d.slots.tenancy ? { text: d.slots.tenancy, cls: "text-brand", title: `${d.slots.tenancy}: one lease is the whole income` } : null,
-    d.slots.roster ? { text: d.slots.roster, cls: "text-caution", title: `${d.slots.roster}: the listed tenants against the model's sale` } : null,
-    d.slots.valueAdd ? { text: d.slots.valueAdd, cls: "text-brand", title: `${d.slots.valueAdd}: the renovation program as stated` } : null,
-    d.slots.abatement ? { text: d.slots.abatement, cls: "text-caution", title: `${d.slots.abatement}: the NOI is on an abated tax bill` } : null,
-    d.slots.sellerNote ? { text: d.slots.sellerNote, cls: "text-brand", title: `${d.slots.sellerNote}: the seller offers to carry financing` } : null,
-    d.slots.hotel ? { text: d.slots.hotel, cls: "text-brand", title: `${d.slots.hotel}: what the hotel is sold with` } : null,
-    d.slots.sale ? { text: d.slots.sale, cls: "text-caution", title: `${d.slots.sale}: the figure is where the bidding opens or the seller is not an owner` } : null,
-    d.slots.reports ? { text: d.slots.reports, cls: "text-caution", title: `${d.slots.reports}: from the third-party reports the memorandum cites` } : null,
-    d.slots.student
-      ? { text: d.slots.student, cls: /−|Drive-to/.test(d.slots.student) ? "text-caution" : "text-brand", title: `${d.slots.student}: a student building's leasing for the coming year` }
-      : null,
-    d.slots.mh ? { text: d.slots.mh, cls: /Private/.test(d.slots.mh) ? "text-caution" : "text-brand", title: `${d.slots.mh}: a manufactured-housing park's lot rent and utilities` } : null,
-  ].filter((t): t is { text: string; cls: string; title: string } => t !== null);
+  // What the picture must not hide — a Special Flood Hazard Area, how it is
+  // sold, what the price buys where it is not the building, the seller's
+  // loan… (lib/pipeline-tags). A chip rides on the picture only where it
+  // fits whole on a picture as wide as this card's (each of the tiers'
+  // widths, asked by container query), two at most; the rest wait on the
+  // card's line under the figures. A chip is never cut: the picture's had
+  // truncated "Shadow-anchored, 56% rolls in 5 …" at 390px.
+  const placed = placeTagsByTier(dealTags(d.slots, d.flood));
+  const pictureTags = placed.filter((p) => p.onPicture.some(Boolean));
+  const lineTags = placed.filter((p) => p.onPicture.some((on) => !on));
+  const lineAt = new Map(lineTags.map((p) => [p.tag.key, p.onPicture.map((on) => !on)]));
+  // A deal the reader's team does not see says so on the line at every
+  // width, after the tags; never on the picture, which carries what the
+  // building's figures must not hide.
+  const lineShown = PICTURE_TIERS.map((_, k) => !!d.personal || lineTags.some((p) => !p.onPicture[k]));
 
   const inner = (
     <>
-      <div className="relative">
+      {/* A container (`@container/card`), so the chips on it ask the
+          picture's own width. */}
+      <div className="@container/card relative">
         <DealBanner
           sources={d.pictures ?? []}
           cover={d.cover ?? null}
@@ -2102,6 +2206,7 @@ const DealTile = memo(function DealTile({
           slide={canFlip ? slide : 0}
           onPhoto={setPhotoOn}
           onSlideGone={dropSlide}
+          onMarket={reportMarket}
           sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
         />
         {/* The call, and in compare mode the pick beside it: the foot of the
@@ -2123,21 +2228,31 @@ const DealTile = memo(function DealTile({
             </span>
           )}
         </span>
-        {tags.length > 0 && (
-          <span className="absolute right-3 top-3 flex max-w-[60%] flex-col items-end gap-1">
-            {tags.map((t) => (
-              <span
-                key={t.text}
-                title={t.title}
-                className={`truncate rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${t.cls}`}
-              >
-                {t.text}
-              </span>
+        {pictureTags.length > 0 && (
+          // Inside the column's 58%, never past it: a flex item sized to its
+          // content ran leftward over the call. Every chip here fits that
+          // column whole on the narrowest card (lib/pipeline-tags), so none
+          // is truncated.
+          <span className="absolute right-3 top-3 flex max-w-[58%] flex-col items-end gap-1" data-tags="picture">
+            {pictureTags.map(({ tag: t, onPicture }, idx) => (
+              <Fragment key={t.key}>
+                {idx > 0 && " "}
+                <span
+                  title={t.title}
+                  className={`max-w-full rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${TAG_TEXT[t.tone]} ${atTiers(onPicture).block}`}
+                >
+                  {t.text}
+                </span>
+              </Fragment>
             ))}
           </span>
         )}
       </div>
-      <div className="flex flex-1 flex-col px-4 pb-3.5 pt-3">
+      {/* The card's rows — the picture, the name and place, the figures,
+          the tags under them — are the grid row's own (`grid-rows-subgrid`
+          on the card), so a row of cards lines up its figures whatever the
+          names' lengths, and whichever cards carry tags under them. */}
+      <div className="px-4 pb-3 pt-3">
         <p className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight" title={d.name}>
           {d.name}
         </p>
@@ -2155,34 +2270,67 @@ const DealTile = memo(function DealTile({
             </span>
           ) : null}
         </p>
-        {/* Pushes the figures to the card's foot, so a row of cards lines
-            its figures up whatever the names' lengths. */}
-        <span aria-hidden className="min-h-3 flex-1" />
-        <dl className="grid grid-cols-3 gap-3 border-t border-line pt-3">
-          <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
-            {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
-          </TileStat>
-          {/* A plan deal has no going-in cap; its yield on total cost takes
-              the slot, labelled. */}
-          <TileStat label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : "Cap"}>
-            {d.slots.cap ?? d.slots.yoc ?? <span className="text-line">—</span>}
-          </TileStat>
-          <div className="min-w-0">
-            <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
-            <dd className="mt-0.5 text-sm font-semibold">
-              {scored ? (
-                <span className={`flex items-center gap-1.5 tabular-nums ${fitCls}`} title={`${scored.score} / 100 mandate fit`}>
-                  {scored.score}
-                  <FitBar score={scored.score} />
-                </span>
-              ) : d.fit ? (
-                <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
-              ) : (
-                <span className="font-normal text-line">—</span>
-              )}
+      </div>
+      {/* The price is the longest figure ("$9–9.5M", "$124.5M"), so its
+          column is the widest. */}
+      <dl className="grid grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)] gap-3 border-t border-line mx-4 pt-3">
+        {/* While a first screen has not read the terms, an empty slot
+            shimmers ("not read yet"); once a read finds none, the dash
+            ("not stated"). */}
+        <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
+          {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
+        </TileStat>
+        {/* A plan deal has no going-in cap; its yield on total cost takes
+            the slot, labelled. Nor has a note: its yield to maturity
+            takes it where the note pays or may, else it says n/a. */}
+        <TileStat
+          label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? "Note yield" : "Cap"}
+          title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld === "note" ? NOTE_CAP_TITLE : undefined}
+          sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? "to maturity" : undefined}
+        >
+          {d.slots.cap ??
+            d.slots.yoc ??
+            d.slots.noteYield ??
+            (d.slots.capWithheld === "note" ? "n/a" : <Unstated reading={!!d.reading} width="w-10" />)}
+        </TileStat>
+        <div className="min-w-0">
+          <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
+          <dd className="mt-0.5 text-sm font-semibold">
+            {scored ? (
+              <span
+                className={`flex items-center gap-1.5 tabular-nums ${fitCls}`}
+                title={d.fitFirstRead ? `${scored.score} / 100 mandate fit. ${FIRST_READ_TITLE}` : `${scored.score} / 100 mandate fit`}
+              >
+                {scored.score}
+                <FitBar score={scored.score} />
+              </span>
+            ) : d.fit ? (
+              <span className={FIT_META[d.fit].cls} title={d.fitFirstRead ? FIRST_READ_TITLE : undefined}>
+                {FIT_META[d.fit].label}
+              </span>
+            ) : (
+              <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
+            )}
+          </dd>
+          {/* Judged on the first signal while the extraction is on its
+              way: said under the fit, as the deal page says it. */}
+          {d.fitFirstRead && (scored || d.fit) ? (
+            <dd className="truncate text-[10px] font-medium uppercase tracking-wide text-brand" title={FIRST_READ_TITLE} data-qa="fit-first-read">
+              First read
             </dd>
-          </div>
-        </dl>
+          ) : null}
+        </div>
+      </dl>
+      {/* The tags the picture could not carry whole, on a line of their own
+          under the figures, at the widths where it could not; a card with
+          none keeps only the padding. A container, as the picture is, so
+          the two ask the same width. */}
+      <div className="@container/card pb-3.5">
+        <TagLine
+          tags={d.personal ? [...lineTags.map((p) => p.tag), PERSONAL_TAG] : lineTags.map((p) => p.tag)}
+          className={`px-4 pt-2.5 ${atTiers(lineShown).flex}`}
+          chipClass={(t) => atTiers(lineAt.get(t.key) ?? []).block}
+        />
       </div>
     </>
   );
@@ -2215,17 +2363,20 @@ const DealTile = memo(function DealTile({
             }
           : undefined
       }
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+      // Five rows of the grid's own (the picture, the name and place, the
+      // figures, the tags under them, the footer), so every card in a row
+      // of the grid shares their heights.
+      className={`group relative row-span-5 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
         checked ? "border-brand ring-2 ring-brand/40" : "border-line"
       } ${isDead ? "opacity-60" : ""}`}
     >
       {compareMode ? (
-        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="flex flex-1 flex-col text-left">
+        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="row-span-4 grid grid-rows-subgrid text-left">
           {inner}
         </button>
       ) : (
         <>
-          <Link href={`/deals/${d.id}`} className="flex flex-1 flex-col">
+          <Link href={`/deals/${d.id}`} className="row-span-4 grid grid-rows-subgrid">
             {inner}
           </Link>
           {/* The deal's other photographs (#450), flipped through where a
@@ -2266,7 +2417,7 @@ const DealTile = memo(function DealTile({
               stage is changed here without leaving the pipeline. */}
           <div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">
             {d.offersDue ? (
-              <OffersDueBit iso={d.offersDue} />
+              <OffersDueBit iso={d.offersDue} today={todayIso} />
             ) : (
               <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
             )}
@@ -2354,7 +2505,7 @@ function GettingStarted({
     {
       key: "screen",
       label: "Screen your first OM",
-      done: state.hasRealDeal,
+      done: state.hasScreenedOm,
       action: atLimit ? (
         <Link
           href="/billing"
@@ -2504,13 +2655,25 @@ interface DealDraft {
   address: StructuredAddress | null;
   /** set when a submit starts; a return WITHOUT an error means it succeeded */
   submittedAt: number | null;
+  /** the name is the one the last chosen PDF gave it, so a newer file may
+   *  replace it after a reload or an upload error, as it could before; a
+   *  name the reader typed is never marked */
+  nameFromFile?: boolean;
 }
 
+// The unsent draft is kept under the reader's own account: kept under one
+// key for the browser, the next person to sign in on it was offered the last
+// one's deal name and address (pass 14, 2026-10-01). The old shared key is
+// cleared on sight, never read.
 const DRAFT_KEY = "uc:new-deal-draft";
+const draftKeyFor = (viewerId: string | null | undefined) =>
+  viewerId ? `${DRAFT_KEY}:${viewerId.toLowerCase().replace(/[^0-9a-f-]/g, "")}` : null;
 
-function readDraft(): DealDraft | null {
+function readDraft(key: string | null): DealDraft | null {
   try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
+    window.localStorage.removeItem(DRAFT_KEY);
+    if (!key) return null;
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const d = JSON.parse(raw) as DealDraft;
     return d && typeof d === "object" ? d : null;
@@ -2519,12 +2682,13 @@ function readDraft(): DealDraft | null {
   }
 }
 
-function writeDraft(d: DealDraft | null) {
+function writeDraft(key: string | null, d: DealDraft | null) {
+  if (!key) return;
   try {
     if (!d || (!d.name.trim() && !d.address)) {
-      window.localStorage.removeItem(DRAFT_KEY);
+      window.localStorage.removeItem(key);
     } else {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+      window.localStorage.setItem(key, JSON.stringify(d));
     }
   } catch {
     // Private mode / quota — drafts are a convenience, never a blocker.
@@ -2534,16 +2698,29 @@ function writeDraft(d: DealDraft | null) {
 function NewDealForm({
   errorMessage,
   prefill,
+  viewerId,
 }: {
   errorMessage: string | null;
   prefill?: StructuredAddress | null;
+  /** the signed-in reader, whose own the unsent draft is */
+  viewerId?: string | null;
 }) {
+  const draftKey = draftKeyFor(viewerId);
+  const router = useRouter();
+  // No answer came back for the upload — the connection dropped, or the
+  // server failed before it answered: the deal may or may not exist, so the
+  // form says to look before uploading again (a repeat is merged into the
+  // first only inside 15 seconds; app/(app)/deals/actions.ts).
+  const [dropped, setDropped] = useState(false);
   // Two ways in: upload the OM, or type the facts (no document needed —
   // small-multifamily listings rarely come with one). An upload error code
   // in the URL means the last submit was an upload — open on that mode.
   // A Pull Comps hand-off arrives with the address picked: open on manual.
   const [mode, setMode] = useState<"upload" | "manual">(prefill ? "manual" : "upload");
   const [name, setName] = useState("");
+  // The name the last chosen PDF put in the field: a newer file replaces it,
+  // as the batch upload names each deal by its file; a name typed stays.
+  const filledName = useRef<string | null>(null);
   const [assetClass, setAssetClass] = useState("auto");
   // The address field manages its own text; we mirror its latest value here
   // and remount it (key) when a draft restores.
@@ -2556,15 +2733,20 @@ function NewDealForm({
   // rAF defers the setState burst out of the effect body per hooks rules).
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
-      const d = readDraft();
+      const d = readDraft(draftKey);
       if (!d) return;
       if (d.submittedAt && !errorMessage) {
         // Last submit came back without an error — the deal was created and
         // this draft is spent.
-        writeDraft(null);
+        writeDraft(draftKey, null);
         return;
       }
-      if (d.name) setName(d.name);
+      if (d.name) {
+        setName(d.name);
+        // A name a PDF gave stays the file's to replace; the file itself
+        // cannot be restored, so the next one chosen names the deal.
+        filledName.current = restoredFileName(d);
+      }
       if (d.assetClass) setAssetClass(d.assetClass);
       if (d.address) {
         addressRef.current = d.address;
@@ -2572,7 +2754,7 @@ function NewDealForm({
         setAddrKey((k) => k + 1);
       }
       if (d.name || d.address) setRestored(true);
-      if (d.submittedAt) writeDraft({ ...d, submittedAt: null });
+      if (d.submittedAt) writeDraft(draftKey, { ...d, submittedAt: null });
     });
     return () => cancelAnimationFrame(raf);
     // errorMessage is fixed for the lifetime of this render of the page.
@@ -2580,17 +2762,20 @@ function NewDealForm({
   }, []);
 
   function persist(next: Partial<DealDraft>) {
-    writeDraft({
+    const draftName = next.name ?? name;
+    writeDraft(draftKey, {
       name,
       assetClass,
       address: addressRef.current,
       submittedAt: null,
       ...next,
+      nameFromFile: nameIsFromFile(draftName, filledName.current),
     });
   }
 
   function clearDraft() {
-    writeDraft(null);
+    writeDraft(draftKey, null);
+    filledName.current = null;
     setName("");
     setAssetClass("auto");
     addressRef.current = null;
@@ -2667,14 +2852,56 @@ function NewDealForm({
           </button>
         </p>
       )}
+      {dropped && (
+        <p className="mt-3 rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution" role="alert">
+          No answer came back for the upload, so the deal may or may not have
+          been created. Check your pipeline for it before uploading again;
+          everything you typed is still here.
+        </p>
+      )}
       <form
-        action={createDeal}
+        // The create's own outcome, read here rather than through a redirect:
+        // a dropped connection mid-upload had reached the app's error page
+        // ("a rendering hiccup"), wiped the draft as a success, and left a
+        // second upload free to make a twin deal (pass 14, 2026-10-01). The
+        // batch panel reads the same action the same way.
+        action={async (fd: FormData) => {
+          setDropped(false);
+          const keep = () =>
+            writeDraft(draftKey, {
+              name,
+              assetClass,
+              address: addressRef.current,
+              submittedAt: null,
+              nameFromFile: nameIsFromFile(name, filledName.current),
+            });
+          let res: Awaited<ReturnType<typeof createDealFromBatch>>;
+          try {
+            res = await createDealFromBatch(fd);
+          } catch {
+            keep();
+            setDropped(true);
+            router.refresh();
+            return;
+          }
+          if (res.ok) {
+            writeDraft(draftKey, null);
+            router.push(`/deals/${res.dealId}`);
+            return;
+          }
+          keep();
+          // Signed out mid-upload: round-trip through sign-in back to the
+          // error, as the server action's own redirect did.
+          if (res.error === "auth") router.push(`/login?next=${encodeURIComponent("/deals?error=auth")}`);
+          else router.push(`/deals?error=${res.error}`);
+        }}
         onSubmit={() =>
-          writeDraft({
+          writeDraft(draftKey, {
             name,
             assetClass,
             address: addressRef.current,
             submittedAt: Date.now(),
+            nameFromFile: nameIsFromFile(name, filledName.current),
           })
         }
         className="mt-4 space-y-3"
@@ -2741,6 +2968,14 @@ function NewDealForm({
           accept="application/pdf"
           hint="PDF offering memorandum, up to 32 MB"
           maxBytes={32 * 1024 * 1024}
+          onFile={(file) => {
+            if (!file) return;
+            const next = prefillName(name, filledName.current, file.name);
+            if (next == null) return;
+            filledName.current = next;
+            setName(next);
+            persist({ name: next });
+          }}
         />
         <PendingButton
           pendingLabel="Uploading your OM — hang tight…"

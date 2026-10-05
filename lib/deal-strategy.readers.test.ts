@@ -19,6 +19,9 @@ import {
 } from "./deal-strategy";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
+/** The year these rows were screened in. No price label below carries a
+ *  year of its own, so any screen year reads them alike. */
+const SCREEN_YEAR = 2026;
 
 describe("parseCount — a count is a whole number, alone or with what it counts", () => {
   it("reads the plain forms", () => {
@@ -69,31 +72,31 @@ describe("unitCountFromMetrics — the row that counts units, not the rows about
 
 describe("findPriceMetric — every name an OM gives the number being asked", () => {
   it("reads a sale, list, contract or whisper price as the price", () => {
-    expect(findPriceMetric([m("Sale price", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
-    expect(findPriceMetric([m("List price", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
-    expect(findPriceMetric([m("Whisper price", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
-    expect(findPriceMetric([m("Whisper", "$42M")], "stabilized")?.value).toBe("$42M");
-    expect(findPriceMetric([m("Contract price", "$42,000,000")], "value_add")?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Sale price", "$42,000,000")], "stabilized", SCREEN_YEAR)?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("List price", "$42,000,000")], "stabilized", SCREEN_YEAR)?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Whisper price", "$42,000,000")], "stabilized", SCREEN_YEAR)?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Whisper", "$42M")], "stabilized", SCREEN_YEAR)?.value).toBe("$42M");
+    expect(findPriceMetric([m("Contract price", "$42,000,000")], "value_add", SCREEN_YEAR)?.value).toBe("$42,000,000");
   });
 
   it("reads an offer price, a 'Pricing' header, 'Price / Terms'; never a reserve, bid or target figure, never a price reduction", () => {
-    expect(findPriceMetric([m("Offer price", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
-    expect(findPriceMetric([m("Pricing", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
-    expect(findPriceMetric([m("Asking", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
-    expect(findPriceMetric([m("Price / Terms", "$42,000,000 all cash")], "stabilized")?.value).toBe(
+    expect(findPriceMetric([m("Offer price", "$42,000,000")], "stabilized", SCREEN_YEAR)?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Pricing", "$42,000,000")], "stabilized", SCREEN_YEAR)?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Asking", "$42,000,000")], "stabilized", SCREEN_YEAR)?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Price / Terms", "$42,000,000 all cash")], "stabilized", SCREEN_YEAR)?.value).toBe(
       "$42,000,000 all cash",
     );
     for (const label of ["Reserve price", "Bid price", "Target price", "Underwritten price", "Price range"]) {
-      expect(findPriceMetric([m(label, "$42,000,000")], "stabilized"), label).toBeNull();
+      expect(findPriceMetric([m(label, "$42,000,000")], "stabilized", SCREEN_YEAR), label).toBeNull();
     }
     // The land is what is being bought on a development, when no ask exists
     // at all; on an operating asset a land line is an allocation.
-    expect(findPriceMetric([m("Land price", "$4,000,000")], "development")?.value).toBe("$4,000,000");
-    expect(findPriceMetric([m("Land price", "$4,000,000")], "stabilized")).toBeNull();
+    expect(findPriceMetric([m("Land price", "$4,000,000")], "development", SCREEN_YEAR)?.value).toBe("$4,000,000");
+    expect(findPriceMetric([m("Land price", "$4,000,000")], "stabilized", SCREEN_YEAR)).toBeNull();
     expect(
-      findPriceMetric([m("Land cost", "$4,000,000"), m("Asking price", "$40,000,000")], "stabilized")?.value,
+      findPriceMetric([m("Land cost", "$4,000,000"), m("Asking price", "$40,000,000")], "stabilized", SCREEN_YEAR)?.value,
     ).toBe("$40,000,000");
-    expect(findPriceMetric([m("Land value", "$4,000,000")], "development")).toBeNull();
+    expect(findPriceMetric([m("Land value", "$4,000,000")], "development", SCREEN_YEAR)).toBeNull();
   });
 
   it("a bare land OM — a land price and no income figure — is read as a development, so its land price is its price", () => {
@@ -106,29 +109,31 @@ describe("findPriceMetric — every name an OM gives the number being asked", ()
     } as ExtractionResult;
     const kind = inferStrategy(land).kind;
     expect(kind).toBe("development");
-    expect(findPriceMetric(land.metrics, kind)?.value).toBe("$4,000,000");
+    expect(findPriceMetric(land.metrics, kind, SCREEN_YEAR)?.value).toBe("$4,000,000");
     // With income in the deck the land line is an allocation: still an
     // operating asset, and never the price.
     const operating = { ...land, metrics: [m("Land cost", "$4,000,000"), m("NOI (in-place)", "$1,200,000")] };
     expect(inferStrategy(operating).kind).toBe("stabilized");
-    expect(findPriceMetric(operating.metrics, "stabilized")).toBeNull();
+    expect(findPriceMetric(operating.metrics, "stabilized", SCREEN_YEAR)).toBeNull();
     expect(
       findPriceMetric(
         [m("Price reduction", "$2,000,000"), m("Asking price", "$40,000,000")],
         "stabilized",
+        SCREEN_YEAR,
       )?.value,
     ).toBe("$40,000,000");
   });
 
   it("never reads what the building last traded for, or a per-unit price", () => {
-    expect(findPriceMetric([m("Last sale price", "$30,000,000")], "stabilized")).toBeNull();
-    expect(findPriceMetric([m("Prior sale price (2019)", "$30,000,000")], "stabilized")).toBeNull();
-    expect(findPriceMetric([m("Sale price per unit", "$169,000")], "stabilized")).toBeNull();
-    expect(findPriceMetric([m("Sale price / SF", "$420")], "stabilized")).toBeNull();
+    expect(findPriceMetric([m("Last sale price", "$30,000,000")], "stabilized", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([m("Prior sale price (2019)", "$30,000,000")], "stabilized", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([m("Sale price per unit", "$169,000")], "stabilized", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([m("Sale price / SF", "$420")], "stabilized", SCREEN_YEAR)).toBeNull();
     expect(
       findPriceMetric(
         [m("Last sale price", "$30,000,000"), m("Asking price", "$42,000,000")],
         "stabilized",
+        SCREEN_YEAR,
       )?.value,
     ).toBe("$42,000,000");
   });
@@ -389,18 +394,18 @@ describe("the fourth review's cases", () => {
 
   it("the LOI prefill takes the first price row whose value is a figure, else the shared reader's row", () => {
     expect(
-      findPricedMetric([m("Asking price", "Call for pricing"), m("Purchase price", "$42,000,000")], "stabilized")
+      findPricedMetric([m("Asking price", "Call for pricing"), m("Purchase price", "$42,000,000")], "stabilized", SCREEN_YEAR)
         ?.value,
     ).toBe("$42,000,000");
-    expect(findPricedMetric([m("Asking price", "Unpriced")], "stabilized")?.value).toBe("Unpriced");
-    expect(findPricedMetric([m("Asking rent", "$2,150"), m("Land cost", "$4,500,000")], "development")?.value).toBe(
+    expect(findPricedMetric([m("Asking price", "Unpriced")], "stabilized", SCREEN_YEAR)?.value).toBe("Unpriced");
+    expect(findPricedMetric([m("Asking rent", "$2,150"), m("Land cost", "$4,500,000")], "development", SCREEN_YEAR)?.value).toBe(
       "$4,500,000",
     );
-    expect(findPricedMetric([m("Price / unit", "$135,000"), m("Asking price", "$42,000,000")], "stabilized")?.value).toBe(
+    expect(findPricedMetric([m("Price / unit", "$135,000"), m("Asking price", "$42,000,000")], "stabilized", SCREEN_YEAR)?.value).toBe(
       "$42,000,000",
     );
-    expect(findPricedMetric([m("Asking price", "$42.5M")], "stabilized")?.value).toBe("$42.5M");
-    expect(findPricedMetric([m("NOI", "$3,000,000")], "stabilized")).toBeNull();
+    expect(findPricedMetric([m("Asking price", "$42.5M")], "stabilized", SCREEN_YEAR)?.value).toBe("$42.5M");
+    expect(findPricedMetric([m("NOI", "$3,000,000")], "stabilized", SCREEN_YEAR)).toBeNull();
   });
 
   it("a deck that names its plan's rows but no strategy and no income in place is a development", () => {
@@ -415,7 +420,7 @@ describe("the fourth review's cases", () => {
       m("Construction period", "24 months"),
     ]);
     expect(inferStrategy(dev).kind).toBe("development");
-    expect(findPriceMetric(dev.metrics, inferStrategy(dev).kind)?.value).toBe("$8,000,000");
+    expect(findPriceMetric(dev.metrics, inferStrategy(dev).kind, SCREEN_YEAR)?.value).toBe("$8,000,000");
     expect(planSummary(dev, inferStrategy(dev))?.price).toBe(8_000_000);
     const noLand = ex([m("Total project cost", "$70,000,000"), m("Stabilized NOI", "$5,600,000"), m("Units (proposed)", "240")]);
     expect(inferStrategy(noLand).kind).toBe("development");

@@ -1,17 +1,20 @@
 import {
   isSectorJobsMetric,
+  periodLabel,
   permitsTrailingYear,
   type LiveRate,
   type MetroMetric,
   type SectorJobsMetric,
   type SeriesSource,
 } from "@/lib/live-rates";
-import { monthOf, type ZoriRead } from "@/lib/zori";
+import { monthOf, zillowFresh, type ZoriRead } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
-import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
+import { HOTNESS_METROS, realtorFresh, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { isDataMetro, isStateMarket } from "@/lib/market-match";
+import { ownMarketBuilding } from "@/lib/tracker-read";
 import { placedByClause, type CountyPlacedBy } from "@/lib/placed-by";
+import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
 
 export type { CountyPlacedBy } from "@/lib/placed-by";
 
@@ -54,9 +57,17 @@ export interface LiveMarketInput {
   /** the deal's asset class, which picks the lending-standards series a
    *  bank reports for its kind of loan */
   assetClass?: string | null;
+  /** the deck's own class words (the extraction's phrase), read beside the
+   *  class so a lab or a cold-storage warehouse the analyst filed as plain
+   *  office or industrial reads no neighbour's rent index (`rentIndexFor`) */
+  deckWords?: string | null;
   /** a plan deal (development, conversion) also reads the construction
    *  lenders' standards */
   plan?: boolean;
+  /** the deal builds something (lib/deal-strategy `buildsSomething`: a
+   *  development, a conversion, or a value-add with a stated budget), so it
+   *  also reads what building costs; a lease-up's building is built */
+  builds?: boolean;
   /** a portfolio OM spanning more than one market (lib/portfolio): how
    *  many properties, how many of them sit in THIS market, and the markets
    *  phrase — so the header says whose figures these are. `role` is
@@ -89,13 +100,25 @@ export interface LiveMarketInput {
  * Financial Accounts price index for commercial real estate, against a
  * year ago (Z.1's Financial Soundness Indicators, quarterly, published
  * about ten weeks after the quarter). The one free, current figure for
- * the value side: the BIS's national series on FRED stopped at 2025 Q2,
- * and the private indexes (Green Street, RCA, CoStar's own) are licensed.
+ * the value side: FRED's "Commercial Real Estate Prices for United States"
+ * (COMREPUSQ159N) runs to 2026 Q1, but its notes carry the International
+ * Monetary Fund's copyright, "Reprinted with permission" (rates run
+ * 37243027958), so it is not republished here; and the private indexes
+ * (Green Street, RCA, CoStar's own) are licensed.
  * Printed by the runner with its notes (rates run 35945851126: no
  * copyright or permission named, where the same flag caught
  * Case-Shiller's) before it was trusted. A trailing year of prices, said
  * as the nation's — never this market's, never a forecast, and never a
  * cap rate.
+ *
+ * It EXCLUDES apartments. The Fed's series analyzer says the Financial
+ * Accounts index is built, since 1996, from "the Costar U.S. Composite Index
+ * Excluding Multifamily: Value Weighted" (zori probe run 36814538224), and
+ * this series is that index's own change from a year ago, figure for figure
+ * (rates run 36814949981: 8.80683, 7.54922, 1.59015 against 8.8068348464,
+ * 7.5492240848, 1.5901502087). So it is said as excluding apartments, with
+ * the index it is built on, and a rental-housing deal is not handed it: it
+ * says nothing about what apartments sell for.
  */
 export const CRE_PRICE_ID = "BOGZ1FL010000386Q";
 
@@ -130,6 +153,13 @@ export function lendingStandardsFor(assetClass: string | null | undefined, plan:
  * has no rent. Every id was printed by the runner (rates run 35917247236)
  * before it was trusted, and the figure is said as the nation's, never the
  * metro's — the one national figure on the income side of the brief.
+ *
+ * A lab, an outdoor-storage yard or a cold-storage warehouse — named so in
+ * the class or in the deck's own class words — reads none: it is filed
+ * under office or industrial, but its rents are a market of its own, and
+ * the research tracker already refuses it the neighbour's figure. Both ask
+ * the tracker's one test (lib/tracker-read `ownMarketBuilding`), so they
+ * cannot disagree (research pass 23).
  */
 export const RENT_INDEX_IDS = [
   "PCU531120531120_YOY",
@@ -152,10 +182,33 @@ export const RENT_INDEX_IDS = [
  */
 export const INSURANCE_INDEX_ID = "PCU9241269241265_YOY";
 
+/**
+ * What building costs, nationally, for a deal that builds something — a
+ * development or a conversion, whose budget is the deal, or a value-add that
+ * states its budget. The BLS producer price index
+ * for the goods that go into construction, residential or nonresidential
+ * by what is being built, and construction's average hourly earnings, each
+ * against a year ago. Both already ride the rates strip (every id was
+ * printed by the runner before it went into data/fred-series.json); here
+ * they are the figures a budget's escalation and contingency are checked
+ * against. The nation's, a trailing year — never this project's bids.
+ */
+export const CONSTRUCTION_COST_IDS = {
+  residentialInputs: "WPUIP2311001_YOY",
+  nonresidentialInputs: "WPUIP2312001_YOY",
+  wages: "CES2000000003_YOY",
+} as const;
+
 /** The national series the brief reads for a deal: the debt market's, the
- *  rent index for the deal's kind of lessor, and the insurance premium
- *  index. One list, so the pipeline's read and the page's cannot differ. */
-export const BRIEF_NATIONAL_IDS: readonly string[] = [...DEBT_MARKET_IDS, ...RENT_INDEX_IDS, INSURANCE_INDEX_ID];
+ *  rent index for the deal's kind of lessor, the insurance premium index
+ *  and, for a plan deal, what building costs. One list, so the pipeline's
+ *  read and the page's cannot differ. */
+export const BRIEF_NATIONAL_IDS: readonly string[] = [
+  ...DEBT_MARKET_IDS,
+  ...RENT_INDEX_IDS,
+  INSURANCE_INDEX_ID,
+  ...Object.values(CONSTRUCTION_COST_IDS),
+];
 
 export interface RentIndex {
   id: (typeof RENT_INDEX_IDS)[number];
@@ -163,9 +216,10 @@ export interface RentIndex {
   lessor: string;
 }
 
-export function rentIndexFor(assetClass: string | null | undefined): RentIndex | null {
+export function rentIndexFor(assetClass: string | null | undefined, deckWords?: string | null): RentIndex | null {
   const key = assetClassKey(assetClass);
   if (!key) return null;
+  if (ownMarketBuilding(assetClass, deckWords)) return null;
   const words = assetWords(key);
   if (words.residential || !words.operating) return null;
   switch (key) {
@@ -301,16 +355,10 @@ function publisher(source: SeriesSource | undefined): string {
   }
 }
 
-/** "Jul 2026" for a monthly figure, "Q2 2026" for a quarterly one, the day for anything faster. */
-export function periodLabel(obsDate: string, cadence: LiveRate["meta"]["cadence"]): string {
-  const at = Date.parse(`${obsDate}T00:00:00Z`);
-  if (!Number.isFinite(at)) return obsDate;
-  const d = new Date(at);
-  if (cadence === "quarterly") return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
-  if (cadence === "annual") return String(d.getUTCFullYear());
-  if (cadence === "monthly") return monthOf(obsDate);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
+/** "Jul 2026" for a monthly figure, "Q2 2026" for a quarterly one, the day
+ *  with its year for anything faster — lib/live-rates' one formatter, which
+ *  every live figure on the site is dated through. */
+export { periodLabel } from "@/lib/live-rates";
 
 interface Said {
   line: string;
@@ -361,7 +409,7 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
         supply && supply.fresh && supply.to === year.to
           ? `, of which ${whole(supply.multi)} in buildings of two or more units${
               supply.multiChangePct !== null ? ` (${signed(supply.multiChangePct)}%)` : ""
-            } — the total less the single-family series, the only split published for a metro or a state`
+            } — the total less the single-family series, since ${NO_MULTI_UNIT_SERIES}`
           : "";
       return {
         line: `Housing units permitted, twelve months to ${monthOf(year.to)}${where}: ${whole(year.units)}${
@@ -410,8 +458,12 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
   }
 }
 
-function zoriLine(z: ZoriRead | null): Said | null {
-  if (!z) return null;
+/** Zillow's figures, one line under the month they are all of (lib/zori
+ *  reads each only where its own row is of the rent's month) — and only
+ *  while that month is current on the brief's day, the same limit the read
+ *  and the feeds card use, so a read made on another day cannot say one. */
+function zoriLine(z: ZoriRead | null, now: Date): Said | null {
+  if (!z || !zillowFresh(z.asOf, now)) return null;
   const parts = [
     `Asking rent, all home types: $${whole(z.rent)}/mo${z.yoyPct !== null ? `, ${signed(z.yoyPct)}% from a year ago` : ""}`,
   ];
@@ -431,8 +483,12 @@ function zoriLine(z: ZoriRead | null): Said | null {
   return { line: `${parts.join("; ")} (${monthOf(z.asOf)}; Zillow Research — listings, before concessions)`, figures };
 }
 
-function realtorLine(m: RealtorRead | null): Said | null {
-  if (!m) return null;
+/** Realtor.com's figures, one line under the inventory's month — the
+ *  hotness rank, from a file of its own that can be a month behind, under
+ *  its own month where that differs — each only while current on the
+ *  brief's day. */
+function realtorLine(m: RealtorRead | null, now: Date): Said | null {
+  if (!m || !realtorFresh(m.asOf, now)) return null;
   const parts = [
     `median list price $${whole(m.medianListPrice)}${m.medianListPriceYoyPct !== null ? ` (${signed(m.medianListPriceYoyPct)}% from a year ago)` : ""}`,
   ];
@@ -448,22 +504,29 @@ function realtorLine(m: RealtorRead | null): Said | null {
     figures.push({ key: "rdc_days_on_market", label: "Median days on market", value: m.daysOnMarket, unit: "days", asOf: m.asOf });
   }
   if (m.direction) parts.push(`${m.direction} on both flow figures`);
-  if (m.hotness) {
+  const h = m.hotness && realtorFresh(m.hotness.asOf, now) ? m.hotness : null;
+  if (h) {
+    // The line's month is the inventory's; a rank of another month says its own.
+    const ownMonth = h.asOf !== m.asOf ? ` for ${monthOf(h.asOf)}` : "";
     parts.push(
-      `hotness rank ${m.hotness.rank} of ${HOTNESS_METROS} metros${
-        m.hotness.move && m.hotness.move.direction !== "unchanged"
-          ? ` (${m.hotness.move.places > 0 ? m.hotness.move.places : -m.hotness.move.places} places ${m.hotness.move.direction} than a year ago)`
+      `hotness rank ${h.rank} of ${HOTNESS_METROS} metros${ownMonth}${
+        h.move && h.move.direction !== "unchanged"
+          ? ` (${h.move.places > 0 ? h.move.places : -h.move.places} places ${h.move.direction} than a year ago)`
           : ""
       }`,
     );
-    figures.push({ key: "rdc_hotness_rank", label: "Hotness rank", value: m.hotness.rank, unit: "rank", asOf: m.hotness.asOf });
+    figures.push({ key: "rdc_hotness_rank", label: "Hotness rank", value: h.rank, unit: "rank", asOf: h.asOf });
   }
   return { line: `For-sale market: ${parts.join(", ")} (${monthOf(m.asOf)}; Realtor.com — list prices are asks, not sales)`, figures };
 }
 
 /** The rents the deal's kind of lessor charges, nationally — one line, said as the nation's. */
-function rentIndexLine(national: readonly LiveRate[] | undefined, assetClass: string | null | undefined): Said | null {
-  const idx = rentIndexFor(assetClass);
+function rentIndexLine(
+  national: readonly LiveRate[] | undefined,
+  assetClass: string | null | undefined,
+  deckWords: string | null | undefined,
+): Said | null {
+  const idx = rentIndexFor(assetClass, deckWords);
   if (!idx || !national) return null;
   const r = national.find((x) => x.meta.id === idx.id && x.fresh && Number.isFinite(x.value));
   if (!r) return null;
@@ -488,6 +551,39 @@ function insuranceLine(national: readonly LiveRate[] | undefined, assetClass: st
       { key: "insurance_index_yoy", label: "Commercial property insurance premiums, national", value: r.value, unit: "pts", asOf: r.obsDate },
     ],
   };
+}
+
+/** What building costs, for a deal that builds something: the goods that go
+ *  into what is being built, and the wages of the people building it, each
+ *  the nation's against a year ago. A deal that builds nothing — a stabilized
+ *  building, a lease-up, a value-add that states no budget — reads neither. */
+function constructionCostLines(
+  national: readonly LiveRate[] | undefined,
+  assetClass: string | null | undefined,
+  builds: boolean,
+): Said[] {
+  if (!builds || !national) return [];
+  const fresh = (id: string) => national.find((x) => x.meta.id === id && x.fresh && Number.isFinite(x.value)) ?? null;
+  const residential = assetWords(assetClass ?? undefined).residential;
+  const inputs = fresh(residential ? CONSTRUCTION_COST_IDS.residentialInputs : CONSTRUCTION_COST_IDS.nonresidentialInputs);
+  const wages = fresh(CONSTRUCTION_COST_IDS.wages);
+  const out: Said[] = [];
+  if (inputs) {
+    const kind = residential ? "residential" : "nonresidential";
+    out.push({
+      line: `Construction costs — the goods that go into ${kind} construction, national (BLS producer price index): ${signed(inputs.value)}% from a year ago (${periodLabel(inputs.obsDate, inputs.meta.cadence)}; BLS via FRED) — the nation's, not this project's bids`,
+      figures: [
+        { key: "construction_inputs_yoy", label: `Goods into ${kind} construction, national`, value: inputs.value, unit: "pts", asOf: inputs.obsDate },
+      ],
+    });
+  }
+  if (wages) {
+    out.push({
+      line: `Construction costs — average hourly earnings in construction, national: ${signed(wages.value)}% from a year ago (${periodLabel(wages.obsDate, wages.meta.cadence)}; BLS via FRED) — the nation's, not this project's labor`,
+      figures: [{ key: "construction_wages_yoy", label: "Construction wages, national", value: wages.value, unit: "pts", asOf: wages.obsDate }],
+    });
+  }
+  return out;
 }
 
 const SLOOS_LABEL: Record<string, { key: string; loan: string }> = {
@@ -537,12 +633,14 @@ function debtMarketLines(
     });
   }
   // What the capital buys: commercial property prices, for a building that
-  // trades on its income. Land's value is its entitlement, not this index.
+  // trades on its income. Land's value is its entitlement, not this index,
+  // and rental housing is outside it: the index excludes apartments.
   const prices = by.get(CRE_PRICE_ID);
-  if (prices && assetWords(assetClass ?? undefined).operating) {
+  const words = assetWords(assetClass ?? undefined);
+  if (prices && words.operating && !words.residential) {
     out.push({
-      line: `Capital markets — commercial real estate prices, national: ${signed(prices.value)}% from a year ago (${periodLabel(prices.obsDate, prices.meta.cadence)}; the Fed's Financial Accounts via FRED) — the nation's, a trailing year, not this market's and not a cap rate`,
-      figures: [{ key: "cre_prices_yoy", label: "Commercial real estate prices, national", value: prices.value, unit: "pts", asOf: prices.obsDate }],
+      line: `Capital markets — commercial real estate prices excluding apartments, national: ${signed(prices.value)}% from a year ago (${periodLabel(prices.obsDate, prices.meta.cadence)}; the Fed's Financial Accounts, built on CoStar's composite index excluding multifamily, via FRED) — the nation's, a trailing year, not this market's and not a cap rate`,
+      figures: [{ key: "cre_prices_yoy", label: "Commercial real estate prices excluding apartments, national", value: prices.value, unit: "pts", asOf: prices.obsDate }],
     });
   }
   return out;
@@ -551,17 +649,45 @@ function debtMarketLines(
 /** Whose figures a market id's are: a state's (`state:PA`) or a metro's. */
 const grainOf = (id: string): LiveMarketBrief["grain"] => (isStateMarket(id) ? "state" : "metro");
 
+/**
+ * The metro's figures about housing: the survey's rental vacancy (the metro
+ * area's, the region's, the state's), the rent sitting tenants pay (CPI
+ * rent), house prices and the housing units permitted. With Zillow's asking
+ * rents and Realtor.com's for-sale market, they speak to rental housing and
+ * to nothing else (research pass 18): an office's vacancy is not the
+ * apartment survey's, its rent is not a renter's, and its supply is not the
+ * housing pipeline — the model's read (lib/model-vs-market), the demand
+ * card's supply line (lib/metro-demand) and now the market check all hold
+ * them to a `residential` class. Unemployment and all payrolls speak to
+ * every deal; a commercial deal reads its own sector's payrolls and its kind
+ * of lessor's national rents instead.
+ */
+const HOUSING_METRICS: ReadonlySet<string> = new Set([
+  "rental_vacancy_msa",
+  "rental_vacancy",
+  "rental_vacancy_state",
+  "rent_cpi_yoy",
+  "hpi_yoy",
+  "permits",
+  "permits_1unit",
+]);
+
 export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null {
   const said: Said[] = [];
   const sector = sectorJobsFor(input.assetClass);
   const supply = metroSupply(input.rates);
+  // Rental housing reads the housing figures; every other class — and a
+  // class nothing has resolved — reads none of them (`assetWords`).
+  const housing = assetWords(input.assetClass ?? undefined).residential;
   for (const r of input.rates) {
+    const metric = (r.meta as { metric?: string }).metric;
+    if (!housing && metric && HOUSING_METRICS.has(metric)) continue;
     const s = rateLine(r, sector, supply);
     if (s) said.push(s);
   }
-  const z = zoriLine(input.zori);
+  const z = housing ? zoriLine(input.zori, input.now) : null;
   if (z) said.push(z);
-  const m = realtorLine(input.realtor);
+  const m = housing ? realtorLine(input.realtor, input.now) : null;
   if (m) said.push(m);
   // Everything after this point is national, and every surface says how
   // many: "each the metro's" over a block that ends with the 10-year was
@@ -569,12 +695,15 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   const local = said.length;
   // A commercial deal's rents are national: the income side's one national
   // figure, ahead of the debt market's.
-  const ri = rentIndexLine(input.national, input.assetClass);
+  const ri = rentIndexLine(input.national, input.assetClass, input.deckWords);
   if (ri) said.push(ri);
   // And the one national figure on the expense side: what the policy a
   // building carries costs this year against last.
   const ins = insuranceLine(input.national, input.assetClass);
   if (ins) said.push(ins);
+  // A plan deal's budget is the deal: what building costs this year against
+  // last, the goods and the labor.
+  said.push(...constructionCostLines(input.national, input.assetClass, input.builds ?? false));
   said.push(...debtMarketLines(input.national, input.assetClass, input.plan ?? false));
   if (said.length === 0) return null;
   const national = said.length - local;
@@ -590,7 +719,15 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   // flatters or damns a market the deal is not in.
   const grain: LiveMarketBrief["grain"] = grainOf(input.metro.id);
   const pf = input.portfolio && input.portfolio.properties >= 2 ? input.portfolio : null;
-  const sources = grain === "state" ? "FRED and the Census Bureau" : "FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com";
+  // The publishers the block can carry: the Census Bureau's survey, Zillow,
+  // Realtor.com and the BLS's own CPI rent series speak to rental housing
+  // alone, so a commercial deal's block — its every line read through FRED
+  // — never names them.
+  const sources = !housing
+    ? "FRED"
+    : grain === "state"
+      ? "FRED and the Census Bureau"
+      : "FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com";
   const whose = grain === "state" ? "the state's" : "the metro area's";
   // One of a portfolio's OTHER markets (#413): its own block, saying which
   // of the portfolio's properties it speaks for — never the portfolio's,

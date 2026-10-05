@@ -2,10 +2,12 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { structured } from "./failure";
-import { omDocument, omRequestOptions, omSourceFor, releaseOmSource } from "./om-source";
+import { omDocument, omRequestOptions, omSourceWithPages, releaseOmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
+import { todayLine } from "./today";
 import { newLedger, summarizeUsage, usageLogLine, withUsageLedger } from "./usage";
 // What the screen established about the deal — shared with the broker-comp
 // scrutiny, the market check and the reconciler; re-exported here so the
@@ -29,7 +31,14 @@ const AskSchema = z.object({
 
 export interface AskResult {
   answer: string;
+  /** the pages as the model cited them — held to the memorandum's length
+   *  by the caller (lib/facts `locatedPage`) before any is kept */
   cites: { page: string; note: string }[];
+  /** the memorandum's length in pages as this read established it (the
+   *  text layer's count, else the screen's stored count held to the byte
+   *  counter — lib/pdf `citablePageCount`); null where none could, and then
+   *  no cited page can be validated */
+  pages: number | null;
 }
 
 /**
@@ -60,6 +69,34 @@ ${question}
 }
 
 /**
+ * Whether Ask may read the memorandum's text layer: not where the screen
+ * read the PDF itself (`ExtractionResult.omRead`, research pass 18) — the
+ * screen found the layer wanting (no figures, or no NOI: the tables were
+ * pictures) or never dense enough, and an answer read from the layer would
+ * say "the OM doesn't state" a figure the screen found on a page. A deal
+ * screened before the read was recorded decides as before: the layer when
+ * it is dense.
+ */
+export function askTextFirst(omRead: "pdf" | "text" | null | undefined): boolean {
+  return omRead !== "pdf";
+}
+
+/** The screen's read of the deal's memorandum, as stored on its extraction
+ *  — null where none is recorded, there is no deal to read, or the read
+ *  fails (the question then decides as before). The deal's id is the one
+ *  the asking action has already read under the reader's own session. */
+async function storedOmRead(dealId: string | undefined): Promise<"pdf" | "text" | null> {
+  if (!dealId) return null;
+  try {
+    const { data } = await createSupabaseAdminClient().from("deals").select("extraction").eq("id", dealId).maybeSingle();
+    const read = (data as { extraction?: { omRead?: unknown } | null } | null)?.extraction?.omRead;
+    return read === "pdf" || read === "text" ? read : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Ask-the-deal: answer one question FROM THE OM ONLY, with page citations.
  * Sends the same cached document prefix as the pipeline steps, so a question
  * asked near a screen reads the OM from cache instead of re-paying for it.
@@ -68,19 +105,35 @@ export async function askDealQuestion(
   pdf: Buffer,
   question: string,
   context?: string | null,
-  opts?: { dealId?: string },
+  opts?: {
+    dealId?: string;
+    /** how the screen read the memorandum, where the caller holds it;
+     *  otherwise it is read off the deal's stored extraction */
+    omRead?: "pdf" | "text" | null;
+    /** the memorandum's length as the screen's extraction stored it
+     *  (`totalPages`): what a cited page is held to where the text layer
+     *  is not read, beside the byte counter */
+    totalPages?: number | null;
+  },
 ): Promise<AskResult> {
   const client = getAnthropic();
-  // The same source the pipeline reads — the deck's text layer when dense,
-  // the PDF otherwise (oversized ones as a Files-API reference) — so a
-  // question asked near a screen shares its cached prefix.
-  const om = await omSourceFor(pdf, "om.pdf", { textFirst: true });
+  // The same source the screen read — the deck's text layer when dense, the
+  // PDF where the layer was not or the screen found it wanting (oversized
+  // ones as a Files-API reference) — so a question reads the figures the
+  // screen read, and one asked near a screen shares its cached prefix. The
+  // read also says how many pages the deck has, which every cited page is
+  // held to.
+  const omRead = opts?.omRead !== undefined ? opts.omRead : await storedOmRead(opts?.dealId);
+  const { om, pages } = await omSourceWithPages(pdf, "om.pdf", {
+    textFirst: askTextFirst(omRead),
+    statedPages: opts?.totalPages ?? null,
+  });
   // A question is one read of the whole deck. Its spend is said in the log
   // the way a screen's is, so the operator's picture of what a deal costs
   // includes the questions asked of it.
   const ledger = newLedger();
   try {
-    return await withUsageLedger(ledger, () =>
+    const out = await withUsageLedger(ledger, () =>
       structured("The answer", () =>
         client.messages.parse({
           model: MODELS.reasoning,
@@ -92,6 +145,9 @@ export async function askDealQuestion(
               content: [
                 omDocument(om),
                 { type: "text", text: askInstruction(question, context) },
+                // Today's date, after the cached document
+                // (lib/anthropic/today).
+                { type: "text", text: todayLine() },
               ],
             },
           ],
@@ -99,6 +155,7 @@ export async function askDealQuestion(
         }, omRequestOptions(om)),
       ),
     );
+    return { ...out, pages };
   } finally {
     // The Files-API copy of a large OM lives only for this one question.
     await releaseOmSource(om);

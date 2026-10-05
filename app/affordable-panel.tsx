@@ -1,5 +1,5 @@
 import { endLabel, type AffordableRead, type AffordableTier, type DatedEnd } from "@/lib/affordable";
-import { yearsText } from "@/lib/ground-lease-term";
+import { endHasPassed, leftText } from "@/lib/ground-lease-term";
 import { withArticle } from "@/lib/article";
 
 /**
@@ -121,7 +121,19 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
         <span className="text-sm font-semibold">{r.label}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{r.headline}</p>
+      {/* What is restricted or under contract, and until when, leads; the
+          limits, the contract's terms and the clocks are one click away and
+          whole in the HTML, since the pictures below draw them. */}
+      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
+      {r.sentences.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
+        </details>
+      )}
 
       {units && (
         <div className="mt-2.5" data-qa="affordable-units">
@@ -153,34 +165,48 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
       )}
 
       {clocks.length > 0 && (
-        <dl className="mt-3 space-y-1.5" data-qa="affordable-clocks">
-          {clocks.map((c) => {
-            const left = c.end.yearsLeft;
-            return (
-              <div key={c.key} className="grid grid-cols-[minmax(7rem,11rem)_1fr] items-center gap-x-3 gap-y-0.5 text-[11px]">
-                <dt className="font-medium text-ink">{c.label}</dt>
-                <dd className="min-w-0">
-                  {left > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-faint" aria-hidden>
-                        <div
-                          className={`h-full rounded-full ${c.key === "hap" ? "bg-caution/70" : c.key === "compliance" ? "bg-brand/40" : "bg-brand/70"}`}
-                          data-bar="affordable-clock"
-                          style={{ width: pctOf(left, longest) }}
-                        />
+        // A clock is its label, its bar and its date. Side by side only where
+        // the panel itself is 28rem wide: on a phone the label's column and
+        // the date left the bar no width at all, and the dates ran past the
+        // panel's edge. Side by side, the date's column is one width, so
+        // every bar is drawn on one track.
+        <div className="@container/clocks mt-3">
+          <dl className="space-y-1.5" data-qa="affordable-clocks">
+            {clocks.map((c) => {
+              const left = c.end.yearsLeft;
+              // Passed by the DAY: inside its last month the whole months
+              // count none, and the clock had read "— passed" four weeks
+              // early (lib/ground-lease-term `DatedSpan`).
+              const passed = endHasPassed(c.end);
+              return (
+                <div
+                  key={c.key}
+                  className="grid grid-cols-1 gap-y-0.5 text-[11px] @md/clocks:grid-cols-[minmax(7rem,11rem)_1fr] @md/clocks:items-center @md/clocks:gap-x-3"
+                >
+                  <dt className="font-medium text-ink">{c.label}</dt>
+                  <dd className="min-w-0">
+                    {!passed ? (
+                      <div className="flex flex-col gap-0.5 @md/clocks:flex-row @md/clocks:items-center @md/clocks:gap-2">
+                        <div className="h-2 min-w-0 overflow-hidden rounded-full bg-faint @md/clocks:flex-1" aria-hidden>
+                          <div
+                            className={`h-full rounded-full ${c.key === "hap" ? "bg-caution/70" : c.key === "compliance" ? "bg-brand/40" : "bg-brand/70"}`}
+                            data-bar="affordable-clock"
+                            style={{ width: pctOf(Math.max(0, left), longest) }}
+                          />
+                        </div>
+                        <span className="font-mono tabular-nums text-muted @md/clocks:w-36 @md/clocks:shrink-0">
+                          {`${c.end.from === "year" ? "" : "to "}${endLabel(c.end)} · ${leftText(c.end)}`}
+                        </span>
                       </div>
-                      <span className="shrink-0 font-mono tabular-nums text-muted">
-                        {`${c.end.from === "year" ? "" : "to "}${endLabel(c.end)} · ${yearsText(left)}`}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-muted">{`Stated end ${endLabel(c.end)} — passed`}</span>
-                  )}
-                </dd>
-              </div>
-            );
-          })}
-        </dl>
+                    ) : (
+                      <span className="text-muted">{`Stated end ${endLabel(c.end)} — passed`}</span>
+                    )}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </div>
       )}
 
       {rents.length > 0 && (

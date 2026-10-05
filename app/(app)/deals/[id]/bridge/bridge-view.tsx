@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 import type { Bridge, BridgeStep } from "@/lib/bridge/attribution";
-import { fieldFormat, formatFieldValue } from "@/lib/bridge/fields";
+import { fieldFormat, formatFieldPair, formatFieldValue } from "@/lib/bridge/fields";
 
-/** A step's before / after value in the field's own units — "$13.7M",
- *  "8.00%", "60 mo" — never the raw number the model was run on. */
-const stepValue = (step: BridgeStep, which: "fromValue" | "toValue"): string =>
-  formatFieldValue(step[which], fieldFormat(step.field));
+/** A step's before / after values in the field's own units — "$13.7M",
+ *  "8.00%", "60 mo" — never the raw number the model was run on, and at
+ *  more places where the usual ones would print the two the same. */
+const stepValues = (step: BridgeStep): [string, string] => {
+  const fmt = fieldFormat(step.field);
+  return (
+    formatFieldPair(step.fromValue, step.toValue, fmt) ?? [
+      formatFieldValue(step.fromValue, fmt),
+      formatFieldValue(step.toValue, fmt),
+    ]
+  );
+};
 
 export interface VersionOption {
   id: string;
@@ -58,6 +66,7 @@ function columns(bridge: Bridge): Column[] {
   let running = start;
   for (const step of bridge.steps) {
     const next = running + step.leveredIrrBps;
+    const [before, after] = stepValues(step);
     cols.push({
       key: step.field,
       label: step.label,
@@ -65,7 +74,7 @@ function columns(bridge: Bridge): Column[] {
       hi: Math.max(running, next),
       fill: barFill(step.leveredIrrBps),
       caption: bps(step.leveredIrrBps),
-      title: `${step.label}: ${stepValue(step, "fromValue")} → ${stepValue(step, "toValue")} (${bps(step.leveredIrrBps)})`,
+      title: `${step.label}: ${before} → ${after} (${bps(step.leveredIrrBps)})`,
       level: next,
     });
     running = next;
@@ -211,11 +220,12 @@ function StepRow({
   bridge: Bridge;
 }) {
   const se = bridge.standardErrorBps?.[step.field];
+  const [before, after] = stepValues(step);
   return (
     <tr className="border-t border-line">
       <td className="py-2 pr-3 text-ink">{step.label}</td>
-      <td className="py-2 pr-3 text-right font-mono text-muted">{stepValue(step, "fromValue")}</td>
-      <td className="py-2 pr-3 text-right font-mono text-muted">{stepValue(step, "toValue")}</td>
+      <td className="py-2 pr-3 text-right font-mono text-muted">{before}</td>
+      <td className="py-2 pr-3 text-right font-mono text-muted">{after}</td>
       <td
         className="py-2 pr-3 text-right font-mono font-medium"
         style={{ color: barFill(step.leveredIrrBps) }}

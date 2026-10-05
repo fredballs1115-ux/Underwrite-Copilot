@@ -45,10 +45,23 @@
 // read by its own rows (lib/ground-lease-term), never twice.
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { inferStrategy, notYetDelivered } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
-import { readLeaseTerm, termEndLabel, yearsText, type LeaseTerm, type MetricRow } from "@/lib/ground-lease-term";
+import {
+  endHasPassed,
+  endIsAhead,
+  endsByYear,
+  fromToday,
+  leftText as spanLeftText,
+  readLeaseTerm,
+  termEndLabel,
+  yearsText,
+  type DatedSpan,
+  type LeaseTerm,
+  type MetricRow,
+} from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, parseStatedDate } from "@/lib/note-yield";
+import { monthsBetween, readStatedDate, sameMonth, sameYear, yearsBetween } from "@/lib/note-yield";
 
 // ── The rows ────────────────────────────────────────────────────────────
 
@@ -224,9 +237,19 @@ const GRADE_WORDS: Record<NonNullable<RatingRead["grade"]>, string> = {
 /** A date the tenant may leave early, as stated. */
 export interface EarlyEnd {
   ends: string;
-  from: "date" | "year";
+  from: "date" | "month" | "year";
   stated: string;
+  /** whole months ÷ 12, the figure said */
   yearsLeft: number;
+  /** to the day (lib/ground-lease-term `DatedSpan`): what opened, ahead and
+   *  before the sale are decided by */
+  yearsToTheDay: number;
+  /** stated as a month alone, and the reading's date falls in that month:
+   *  the right opens "this month" (`DatedSpan`) */
+  thisMonth: boolean;
+  /** stated as a year alone, and the reading's date falls in that year:
+   *  the right opens "this year" (`DatedSpan`) */
+  thisYear: boolean;
 }
 
 export interface SingleTenantRead {
@@ -239,32 +262,88 @@ export interface SingleTenantRead {
   page: string;
   /** the primary term, as its rows state it */
   term: LeaseTerm | null;
+  /** the deal's kind says the building is not yet delivered (lib/deal-
+   *  strategy `notYetDelivered`: a development — a build-to-suit or a
+   *  forward purchase — or a conversion), so the lease begins at delivery:
+   *  a term stated as a count runs from the lease's start, never from today */
+  startsAtDelivery: boolean;
   /** an early termination the tenant holds, dated before the term's end */
   early: EarlyEnd | null;
   /** when the lease can end: the early termination where it comes first,
    *  else the term — the date every "years left" is counted to */
-  effective: { ends: string; from: "date" | "year" | "remaining"; yearsLeft: number; early: boolean } | null;
+  effective: { ends: string; from: "date" | "month" | "year" | "remaining"; yearsLeft: number; early: boolean } | null;
   /** the rent's increases as read, and the row's own words */
   increases: Increases | null;
   increasesStated: string;
   /** the annual base rent, where stated */
   rent: number | null;
   rating: RatingRead | null;
-  /** who, until when, and how the rent grows, in the reader's sentences */
+  /** who, until when, and how the rent grows, in the reader's sentences,
+   *  one a line — the panel leads with the first and folds the rest */
+  sentences: string[];
+  /** those sentences as one paragraph */
   headline: string;
 }
+
+/** The read's figures, before its sentences are written from them. */
+type LeaseFacts = Omit<SingleTenantRead, "headline" | "sentences">;
 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
 const clean = (s: string | null | undefined) => (s ?? "").trim();
 
-/** A date the text states; a year alone as its first day — the earliest the
- *  tenant could leave in it. */
+/** A date the text states; a month or a year alone as its first day — the
+ *  earliest the tenant could leave in it. */
 function earlyOf(value: string, asOf: Date): EarlyEnd | null {
-  const d = parseStatedDate(value, 1990, 2199);
+  const d = readStatedDate(value, 1990, 2199, "first");
   const y = d ? null : value.match(/\b(19[89]\d|20\d{2}|21\d{2})\b/);
-  const ends = d ?? (y ? `${y[1]}-01-01` : null);
+  const ends = d?.iso ?? (y ? `${y[1]}-01-01` : null);
   if (!ends) return null;
-  return { ends, from: d ? "date" : "year", stated: value.trim(), yearsLeft: monthsBetween(isoOf(asOf), ends) / 12 };
+  const today = isoOf(asOf);
+  return {
+    ends,
+    from: d ? (d.month ? "month" : "date") : "year",
+    stated: value.trim(),
+    yearsLeft: monthsBetween(today, ends) / 12,
+    yearsToTheDay: yearsBetween(today, ends),
+    thisMonth: !!d?.month && sameMonth(today, ends),
+    thisYear: !d && sameYear(today, ends),
+  };
+}
+
+/** The end every "years left" is counted to — the early termination where
+ *  it comes first, else the term — with its years to the day, which
+ *  `effective` (whose shape the pages read) does not carry. */
+export function effectiveSpan(r: Pick<SingleTenantRead, "effective" | "early" | "term">): DatedSpan | null {
+  if (!r.effective) return null;
+  return r.effective.early ? r.early : r.term;
+}
+
+/**
+ * The term of a lease that has not begun: on a building not yet delivered
+ * (`startsAtDelivery`), a term stated as a count of years runs from the
+ * lease's start at delivery — a date the count does not give — so its
+ * length is all there is to say, and nothing is counted from today. Null on
+ * every other lease, on a stated date (a date is a date, delivered or not)
+ * and where the tenant may leave early on a stated date, which is then the
+ * lease's end.
+ */
+export function termFromDelivery(r: Pick<SingleTenantRead, "startsAtDelivery" | "term" | "effective">): number | null {
+  const t = r.term;
+  return r.startsAtDelivery && t?.from === "remaining" && !r.effective?.early ? t.yearsLeft : null;
+}
+
+/**
+ * Whether the lease runs past the model's sale `holdYears` on — to the day
+ * (`endsByYear`). A lease that begins at delivery runs past it whenever the
+ * building is delivered once its term is as long as the hold, since it
+ * begins after today; a shorter one may end inside the hold, which is not
+ * past. The panel's picture and the model's read ask this one question.
+ */
+export function runsPastSale(r: Pick<SingleTenantRead, "startsAtDelivery" | "term" | "effective" | "early">, holdYears: number): boolean {
+  const fromDelivery = termFromDelivery(r);
+  if (fromDelivery != null) return Math.round(fromDelivery * 12) >= Math.round(holdYears * 12);
+  const span = effectiveSpan(r);
+  return !!span && !endsByYear(span, holdYears);
 }
 
 /**
@@ -288,9 +367,15 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
   );
   const earlyRow = find(rows, EARLY_ROW);
   const earlyRead = earlyRow ? earlyOf(earlyRow.value, asOf) : null;
+  const startsAtDelivery = notYetDelivered(inferStrategy(ex).kind);
   // Early only where it comes before the term's end; a date at or after it
-  // is no earlier than the lease itself.
-  const early = earlyRead && (!term || earlyRead.ends < term.ends) ? earlyRead : null;
+  // is no earlier than the lease itself. A term counted from a delivery not
+  // yet dated has no end to set a stated date against — its end as read is
+  // today plus the count, earlier than the lease's — so the stated date
+  // stands (the second pre-merge audit: a 2042 right on a 15-year lease from
+  // delivery was dropped against "about Oct 2041", and said nowhere).
+  const fromDelivery = startsAtDelivery && term?.from === "remaining";
+  const early = earlyRead && (!term || fromDelivery || earlyRead.ends < term.ends) ? earlyRead : null;
   const effective = early
     ? { ends: early.ends, from: early.from, yearsLeft: early.yearsLeft, early: true }
     : term
@@ -307,7 +392,7 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
   const n = parsePageNumber(st.page);
   const page = n != null && pageCount != null && n <= pageCount ? clean(st.page) : "";
 
-  const read: Omit<SingleTenantRead, "headline"> = {
+  const read: LeaseFacts = {
     tenant,
     guarantor: clean(st.guarantor),
     leaseType: clean(st.leaseType),
@@ -315,6 +400,7 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
     tenantRights: clean(st.tenantRights),
     page,
     term,
+    startsAtDelivery,
     early,
     effective,
     increases: readIncreases(increasesStated),
@@ -322,15 +408,16 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
     rent,
     rating: readRating(ratingRow?.value),
   };
-  return { ...read, headline: headlineOf(read) };
+  const sentences = sentencesOf(read);
+  return { ...read, sentences, headline: sentences.join(" ") };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────
 
 /** "Mar 2036"; a year alone as the year. */
-export const leaseEndLabel = (e: { ends: string; from: "date" | "year" | "remaining" }) => termEndLabel(e);
+export const leaseEndLabel = (e: { ends: string; from: "date" | "month" | "year" | "remaining" }) => termEndLabel(e);
 /** The end after a verb: "ends Mar 2036", "ends in 2036" for a year alone. */
-const endsWhen = (e: { ends: string; from: "date" | "year" | "remaining" }) => (e.from === "year" ? `in ${termEndLabel(e)}` : termEndLabel(e));
+const endsWhen = (e: { ends: string; from: "date" | "month" | "year" | "remaining" }) => (e.from === "year" ? `in ${termEndLabel(e)}` : termEndLabel(e));
 
 // A clause's words without their closing punctuation; a name keeps its
 // own abbreviation's period ("Walgreens Co.").
@@ -342,7 +429,7 @@ function ratingClause(r: RatingRead): string {
   return r.grade ? ` — rated ${noPeriod(r.stated)}, ${GRADE_WORDS[r.grade]}` : ` — its credit as stated: ${noPeriod(r.stated)}`;
 }
 
-function whoSentence(r: Omit<SingleTenantRead, "headline">): string {
+function whoSentence(r: LeaseFacts): string {
   const guarantee = r.guarantor ? `, the rent guaranteed by ${nameOf(r.guarantor)} as stated` : ", and the memorandum names no guarantor";
   const end = r.rating ? ratingClause(r.rating) : "";
   const sentence = `${nameOf(r.tenant)} leases the whole property${guarantee}${end}`;
@@ -360,37 +447,48 @@ function optionsClause(t: LeaseTerm): string {
   return t.optionsStated ? `, with renewal options as stated: ${noPeriod(t.optionsStated)}${theirs}` : "";
 }
 
-function termSentence(t: LeaseTerm | null): string {
+/** A term stated as a count, without its "remaining": "15 years". */
+const statedCount = (t: LeaseTerm) => noPeriod(t.stated).replace(/\s+(?:remaining|left)$/i, "");
+
+function termSentence(t: LeaseTerm | null, startsAtDelivery: boolean): string {
   if (!t) return "The memorandum states no date the lease ends — the one figure a single tenant's income runs on.";
   const end = termEndLabel(t);
-  if (t.yearsLeft <= 0) {
+  if (endHasPassed(t)) {
     return `The lease's stated end, ${end}, has passed — the tenant is holding over or has renewed, or the term as read is wrong: check the lease and any renewal already exercised.`;
   }
   const opts = optionsClause(t);
   switch (t.from) {
     case "date":
-      return `The lease ends ${end}, ${yearsText(t.yearsLeft)} from today${opts}.`;
+    case "month":
+      return `The lease ends ${end}, ${fromToday(t)}${opts}.`;
     case "year":
-      return `The lease ends in ${end}, ${yearsText(t.yearsLeft)} from today — the memorandum states the year alone, read as its first day${opts}.`;
+      return `The lease ends in ${end}, ${fromToday(t)} — the memorandum states the year alone, read as its first day${opts}.`;
     case "remaining":
-      return `The memorandum states ${noPeriod(t.stated).replace(/\s+(?:remaining|left)$/i, "")} left on the lease; counted from today they run to about ${end}, and its own date is earlier, so the term may be shorter${opts}.`;
+      // A lease on a building not yet delivered begins at delivery: its
+      // stated term runs from the lease's start, later than today, so
+      // "counted from today … may be shorter" said it backwards (research
+      // pass 23).
+      return startsAtDelivery
+        ? `The memorandum states ${statedCount(t)} on the lease; the building is not yet delivered, so the term is counted from the lease's start, not from today${opts}.`
+        : `The memorandum states ${statedCount(t)} left on the lease; counted from today they run to about ${end}, and its own date is earlier, so the term may be shorter${opts}.`;
   }
 }
 
 function earlySentence(e: EarlyEnd | null): string {
   if (!e) return "";
   const end = termEndLabel(e);
-  return e.yearsLeft > 0
-    ? `The tenant may end the lease early from ${end}, ${yearsText(e.yearsLeft)} from today, as stated — read that as the lease's end: the tenant decides, and a lender will not count past it.`
+  // A right opens ON its day: from then on the lease is the tenant's choice.
+  return endIsAhead(e)
+    ? `The tenant may end the lease early from ${end}, ${fromToday(e)}, as stated — read that as the lease's end: the tenant decides, and a lender will not count past it.`
     : `The tenant's right to end the lease early opened ${end}, as stated — the lease runs only as long as the tenant chooses.`;
 }
 
-function increasesSentence(r: Omit<SingleTenantRead, "headline">): string {
+function increasesSentence(r: LeaseFacts): string {
   const inc = r.increases;
   if (!inc) return r.increasesStated ? `The rent's increases as stated: ${noPeriod(r.increasesStated)}.` : "";
   switch (inc.kind) {
     case "flat": {
-      const until = r.term && r.term.yearsLeft > 0 ? ` until ${termEndLabel(r.term)}` : "";
+      const until = r.term && !endHasPassed(r.term) ? ` until ${termEndLabel(r.term)}` : "";
       return `The rent is flat${until}, as stated — a fixed income that inflation erodes every year the lease runs.`;
     }
     case "cpi":
@@ -402,8 +500,8 @@ function increasesSentence(r: Omit<SingleTenantRead, "headline">): string {
   }
 }
 
-function headlineOf(r: Omit<SingleTenantRead, "headline">): string {
-  return [whoSentence(r), termSentence(r.term), earlySentence(r.early), increasesSentence(r)].filter(Boolean).join(" ");
+function sentencesOf(r: LeaseFacts): string[] {
+  return [whoSentence(r), termSentence(r.term, r.startsAtDelivery), earlySentence(r.early), increasesSentence(r)].filter(Boolean);
 }
 
 /** The model a single tenant's lease is set against: the engine's own
@@ -440,7 +538,10 @@ function growthSentence(r: SingleTenantRead, m: LeaseModel): string {
 /**
  * What the lease means for the screening model: the years left at its sale,
  * or the lease ending inside its hold, then the rent's increases against
- * its growth. "" where no end is stated or the stated one has passed.
+ * its growth — and on a lease that begins at delivery (`termFromDelivery`),
+ * its term from then and what the delivery date decides, never years
+ * counted from today. "" where no end is stated or the stated one has
+ * passed.
  */
 export function singleTenantModelLine(r: SingleTenantRead, m: LeaseModel): string {
   const eff = r.effective;
@@ -451,7 +552,30 @@ export function singleTenantModelLine(r: SingleTenantRead, m: LeaseModel): strin
     m.vacancyPct > 0
       ? `its ${pct1(m.vacancyPct)} vacancy is a market's allowance, not a single tenant's all-or-nothing`
       : "it allows no vacancy for the tenant leaving";
-  if (!(eff.yearsLeft > 0)) {
+  const beforeOptions = !eff.early && r.term?.options ? ", before the tenant's renewal options" : "";
+  // A term stated with its renewal options counted in is a ceiling, not the
+  // lease: each renewal is the tenant's to take, so every figure off it is
+  // "up to" (the second pre-merge audit).
+  const ceiling = !eff.early && !!r.term?.includesOptions;
+  const optionsIn = ceiling ? ", its renewal options counted in" : "";
+  // A lease that has not begun runs from delivery (research pass 23): what
+  // it has left at the sale turns on a date its stated count does not give,
+  // so it is said so — never counted from today.
+  const fromDelivery = termFromDelivery(r);
+  if (fromDelivery != null) {
+    const runs = `The lease runs ${ceiling ? "up to " : ""}${yearsText(fromDelivery)} from delivery${optionsIn}, not from today`;
+    if (!runsPastSale(r, hold)) {
+      return `${runs}, so it ends inside the model's ${holdWord} hold if the building is delivered within ${yearsText(hold - fromDelivery)}: the model's rent after that is this tenant staying — the tenant's choice, not the buyer's — and ${vacancy}.`;
+    }
+    const whenever = ceiling
+      ? `${runs}: a ceiling, since each renewal is the tenant's to take, so whether it outlasts the model's ${holdWord} hold turns on those renewals and the delivery date, and the model's ${capText(m.exitCapPct)} exit cap is one figure whatever the term left.`
+      : `${runs}, so it outlasts the model's ${holdWord} hold whenever the building is delivered, and how much of it is left at the sale${beforeOptions ? `${beforeOptions},` : ""} turns on that date: the next buyer prices those years of this tenant's rent and a renewal the tenant decides, and the model's ${capText(m.exitCapPct)} exit cap is one figure whatever the term left.`;
+    return [whenever, growthSentence(r, m)].filter(Boolean).join(" ");
+  }
+  // Ahead, passed and before the sale by the DAY, never whole months
+  // (lib/ground-lease-term `DatedSpan`).
+  const span = effectiveSpan(r);
+  if (!span || (eff.early ? !endIsAhead(span) : endHasPassed(span))) {
     // A termination right already open: every year of the hold is the
     // tenant's choice. A stated end that has passed is a misread the
     // headline already says, not a model line.
@@ -460,12 +584,13 @@ export function singleTenantModelLine(r: SingleTenantRead, m: LeaseModel): strin
       : "";
   }
   const end = endsWhen(eff);
-  if (eff.yearsLeft <= hold) {
+  if (endsByYear(span, hold)) {
     return `The lease ${eff.early ? "may end" : "ends"} ${end}, inside the model's ${holdWord} hold: the model's rent after that is this tenant staying — the tenant's choice, not the buyer's — and ${vacancy}.`;
   }
   const left = eff.yearsLeft - hold;
-  const beforeOptions = !eff.early && r.term?.options ? ", before the tenant's renewal options" : "";
-  const sale = `At the model's sale in ${yearsText(hold)} the lease has ${yearsText(left)} left${beforeOptions}: the next buyer prices those years of this tenant's rent and a renewal the tenant decides, and the model's ${capText(m.exitCapPct)} exit cap is one figure whatever the term left.`;
+  // Past the sale by under a whole month: the tenths would say "0 years".
+  const leftText = Math.round(left * 12) < 1 ? "under a month" : yearsText(left);
+  const sale = `At the model's sale in ${yearsText(hold)} the lease has ${ceiling && Math.round(left * 12) >= 1 ? "up to " : ""}${leftText} left${beforeOptions}${optionsIn}: the next buyer prices those years of this tenant's rent and a renewal the tenant decides, and the model's ${capText(m.exitCapPct)} exit cap is one figure whatever the term left.`;
   return [sale, growthSentence(r, m)].filter(Boolean).join(" ");
 }
 
@@ -479,12 +604,17 @@ export function singleTenantShortLine(r: SingleTenantRead): string {
   if (r.leaseType) who += `, ${noPeriod(r.leaseType)}`;
   const parts = [who];
   const t = r.term;
-  if (t && t.yearsLeft > 0) {
-    parts.push(`the lease ends ${endsWhen(t)}, ${yearsText(t.yearsLeft)} from today${t.options && !t.includesOptions ? `, then renewal options (${t.options.how})` : ""}`);
+  const options = t?.options && !t.includesOptions ? `, then renewal options (${t.options.how})` : "";
+  if (t && t.from === "remaining" && r.startsAtDelivery) {
+    // A building not yet delivered: the stated count runs from the lease's
+    // start, never from today.
+    parts.push(`${statedCount(t)} on the lease, counted from its start — the building is not yet delivered${options}`);
+  } else if (t && !endHasPassed(t)) {
+    parts.push(`the lease ends ${endsWhen(t)}, ${fromToday(t)}${options}`);
   } else if (t) {
     parts.push(`the lease's stated end, ${termEndLabel(t)}, has passed`);
   }
-  if (r.early && r.early.yearsLeft > 0) parts.push(`the tenant may end it early from ${termEndLabel(r.early)}`);
+  if (r.early && endIsAhead(r.early)) parts.push(`the tenant may end it early from ${termEndLabel(r.early)}`);
   const inc = r.increases;
   if (inc) parts.push(inc.kind === "flat" ? "the rent is flat" : inc.kind === "cpi" ? "the rent rises with CPI" : `the rent rises ${inc.how}`);
   return parts.join("; ");
@@ -493,16 +623,28 @@ export function singleTenantShortLine(r: SingleTenantRead): string {
 /**
  * The pipeline row's tag: "Single tenant, 9 yrs left" (whole years down),
  * "Single tenant, may leave in 4 yrs" where an early termination comes
- * first, "Single tenant" where no end can be read. Null on anything else.
+ * first, "Single tenant, 15 yrs from delivery" on a lease that begins at
+ * delivery, "Single tenant" where no end can be read. Null on anything
+ * else.
  */
 export function singleTenantTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const r = readSingleTenant(ex, asOf);
   if (!r) return null;
+  // A count with the renewal options in it is the lease's ceiling: "up to".
+  const upTo = (years: number) => (r.term?.includesOptions && years >= 1 ? "up to " : "");
+  // A lease that has not begun: its term from delivery, never years left
+  // today (research pass 23).
+  const fromDelivery = termFromDelivery(r);
+  if (fromDelivery != null) {
+    const whole = Math.floor(fromDelivery);
+    return `Single tenant, ${upTo(fromDelivery)}${fromDelivery < 1 ? "under 1 yr" : `${whole} ${whole === 1 ? "yr" : "yrs"}`} from delivery`;
+  }
   const eff = r.effective;
-  if (!eff || !(eff.yearsLeft > 0)) return "Single tenant";
+  const span = effectiveSpan(r);
+  if (!eff || !span || !endIsAhead(span)) return "Single tenant";
   const whole = Math.floor(eff.yearsLeft);
   const yrs = eff.yearsLeft < 1 ? "under 1 yr" : `${whole} ${whole === 1 ? "yr" : "yrs"}`;
-  return eff.early ? `Single tenant, may leave in ${yrs}` : `Single tenant, ${yrs} left`;
+  return eff.early ? `Single tenant, may leave in ${yrs}` : `Single tenant, ${upTo(eff.yearsLeft)}${yrs} left`;
 }
 
 /** The lease as the steps that read the memorandum after the extraction
@@ -537,6 +679,19 @@ const RIGHTS: Array<{ re: RegExp; trap: string }> = [
  *  trap keyed to them by name. */
 export function singleTenantNote(r: SingleTenantRead): string {
   const eff = r.effective;
+  const span = effectiveSpan(r);
+  // An end stated as a month or a year alone, read inside it, comes "this
+  // month" or "this year" — never "under a month left today", which a day
+  // nobody stated had said all through it.
+  const within = span && (span.thisMonth || span.thisYear) ? spanLeftText(span) : null;
+  const leftNow =
+    eff && span
+      ? within
+        ? eff.early
+          ? `the tenant may end the lease ${within}, as stated`
+          : `the lease ends ${within}, as stated`
+        : `${Math.round(span.yearsLeft * 12) < 1 ? "under a month" : yearsText(eff.yearsLeft)} left today${eff.early ? " to the tenant's early termination" : ""}`
+      : "";
   const traps: string[] = [];
   traps.push(
     r.guarantor
@@ -544,9 +699,11 @@ export function singleTenantNote(r: SingleTenantRead): string {
       : "(a) THE GUARANTOR IS THE CREDIT — the memorandum names no guarantor: the tenant entity alone stands behind the rent, so say which entity that is and what it owns",
   );
   traps.push(
-    eff && eff.yearsLeft > 0
-      ? `(b) THE TERM AT THE EXIT — ${yearsText(eff.yearsLeft)} left today${eff.early ? " to the tenant's early termination" : ""}: price the exit on the term a buyer will then be buying, and treat the renewal options as the tenant's, exercised only if the rent then suits it`
-      : "(b) THE TERM AT THE EXIT — the memorandum states no end the lease can be read to: ask for the lease's expiration, the options and any termination right before believing any exit",
+    eff && !eff.early && r.startsAtDelivery && r.term?.from === "remaining"
+      ? `(b) THE TERM AT THE EXIT — ${statedCount(r.term)} as stated, counted from the lease's start, not today, since the building is not yet delivered: price the exit on the term a buyer will then be buying, and treat the renewal options as the tenant's, exercised only if the rent then suits it`
+      : eff && span && endIsAhead(span)
+        ? `(b) THE TERM AT THE EXIT — ${leftNow}: price the exit on the term a buyer will then be buying, and treat the renewal options as the tenant's, exercised only if the rent then suits it`
+        : "(b) THE TERM AT THE EXIT — the memorandum states no end the lease can be read to: ask for the lease's expiration, the options and any termination right before believing any exit",
   );
   traps.push("(c) DARK VALUE — what the building is worth empty, re-let at market rent after downtime, allowances and commissions: the downside a single tenant leaves, and rarely in the memorandum");
   traps.push("(d) THE RENT AGAINST MARKET — a rent above what the space would re-let for (a sale-leaseback's rent is set by the seller) resets at the lease's end, and a cap on it prices the premium as if it were permanent");

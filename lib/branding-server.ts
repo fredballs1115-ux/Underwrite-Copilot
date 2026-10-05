@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadDealFile } from "@/lib/storage";
 import { sanitizeBranding, type Branding } from "@/lib/branding";
+import { intactImage } from "@/lib/memo/cover-aerial";
 
 export interface ActiveBranding {
   branding: Branding | null;
@@ -104,9 +105,10 @@ export async function saveBrandingValue(
 
 /** The logo as a data URI for the PDF renderer — react-pdf takes it directly.
  *  Best-effort: any failure (missing file, pre-0021 schema, a path outside
- *  the account's or team's folder) returns null and the export renders
- *  text-only branding. `owner` is whose branding this is — the deal's
- *  creator and team for an export, the signed-in user for the settings page. */
+ *  the account's or team's folder, bytes that are not an intact picture)
+ *  returns null and the export renders text-only branding. `owner` is whose
+ *  branding this is — the deal's creator and team for an export, the
+ *  signed-in user for the settings page. */
 export async function brandingLogoDataUri(
   branding: Branding | null,
   owner: { userId: string | null; teamId: string | null },
@@ -117,6 +119,12 @@ export async function brandingLogoDataUri(
     const mime = branding.logoPath.toLowerCase().endsWith(".png")
       ? "image/png"
       : "image/jpeg";
+    // The memo cover's rule (lib/memo/cover-aerial): react-pdf decodes the
+    // picture during the render, and a PNG whose zlib stream fails its check
+    // hangs the render — and the download with it — rather than throwing.
+    // The upload checks only the file's signature, so the bytes are held to
+    // an intact picture of the type the name claims before they reach a PDF.
+    if (!intactImage(buf, mime)) return null;
     return `data:${mime};base64,${buf.toString("base64")}`;
   } catch {
     return null;

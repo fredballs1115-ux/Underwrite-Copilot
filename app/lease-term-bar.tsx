@@ -11,6 +11,15 @@
  * lease ends inside the hold, the hold's years past the lease's end in the
  * warning tone, since those are years the model counts and the buyer does
  * not have. A legend says each part in words, so nothing rides on colour.
+ *
+ * A lease that has not begun — on a building not yet delivered, its term
+ * stated as a count (lib/single-tenant `termFromDelivery`) — is drawn from
+ * delivery instead: the term from then, the options after it, and no hold,
+ * since the model's hold begins today and the two share no start. Nothing
+ * on it is counted from today.
+ *
+ * A term stated with its options counted in (`ceiling`) is the lease's
+ * ceiling, not the lease: the legend says "up to", with the options.
  */
 // On the tenths, and a whole number without its ".0": "40 years", "40.3 years".
 const years = (n: number) => {
@@ -25,35 +34,49 @@ export function LeaseTermBar({
   optionYears = null,
   holdYears = null,
   optionsWord = "Extension options",
+  fromDelivery = false,
+  ceiling = false,
 }: {
-  /** years left on the lease today */
+  /** years left on the lease today — or, on a lease that begins at
+   *  delivery (`fromDelivery`), the term's length from then */
   yearsLeft: number;
-  /** when the current term ends, as the page says it ("Dec 2071") */
-  endLabel: string;
+  /** when the current term ends, as the page says it ("Dec 2071"); none on
+   *  a lease from delivery, whose stated count dates no end */
+  endLabel?: string;
   /** the extension options' years in all, where they parse */
   optionYears?: number | null;
-  /** the model's hold, where the picture is the model's */
+  /** the model's hold, where the picture is the model's — never drawn over
+   *  a lease from delivery */
   holdYears?: number | null;
   /** what the options are called: a ground lease's extension options, a
    *  tenant's renewal options (#454) */
   optionsWord?: string;
+  /** the lease begins at delivery, later than today: the track is its term
+   *  from then, said so */
+  fromDelivery?: boolean;
+  /** the stated term already counts its options: a ceiling, said "up to" */
+  ceiling?: boolean;
 }) {
   if (!(yearsLeft > 0)) return null;
   const opts = optionYears != null && optionYears > 0 ? optionYears : 0;
-  const hold = holdYears != null && holdYears > 0 ? holdYears : null;
+  const hold = !fromDelivery && holdYears != null && holdYears > 0 ? holdYears : null;
   const whole = Math.max(yearsLeft + opts, hold ?? 0);
   const heldOnLease = hold != null ? Math.min(hold, yearsLeft) : 0;
   const pastEnd = hold != null && hold > yearsLeft ? hold - yearsLeft : 0;
   const afterSale = hold != null ? Math.max(0, yearsLeft - hold) : 0;
+  const toEnd = endLabel ? ` (to ${endLabel})` : "";
+  const upTo = ceiling ? " with the options, up to" : ",";
   const legend = [
     hold != null
       ? { tone: "bg-brand", text: `The model's hold, ${hold} ${hold === 1 ? "year" : "years"}${pastEnd > 0 ? `, ${years(pastEnd)} of it after the lease ends` : ""}` }
       : null,
     hold != null
       ? afterSale > 0
-        ? { tone: "bg-brand/35", text: `Left at the sale, ${years(afterSale)} (to ${endLabel})` }
+        ? { tone: "bg-brand/35", text: `Left at the sale${upTo} ${years(afterSale)}${toEnd}` }
         : null
-      : { tone: "bg-brand/60", text: `Left today, ${years(yearsLeft)} (to ${endLabel})` },
+      : fromDelivery
+        ? { tone: "bg-brand/60", text: `The term${ceiling ? " with its options, up to" : ","} ${years(yearsLeft)} from delivery` }
+        : { tone: "bg-brand/60", text: `Left today${upTo} ${years(yearsLeft)}${toEnd}` },
     pastEnd > 0 ? { tone: "bg-kill/60", text: "Past the lease's end" } : null,
     opts > 0 ? { tone: "border border-dashed border-brand/60 bg-brand/5", text: `${optionsWord}, ${years(opts)} if exercised` } : null,
   ].filter((l): l is { tone: string; text: string } => l != null);

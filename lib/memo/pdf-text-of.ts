@@ -189,6 +189,46 @@ export function pdfTextOf(pdf: Buffer): string {
     .join("\n");
 }
 
+/** One object's stream, inflated: the bytes between `N 0 obj … stream` and
+ *  its `endstream`. */
+function objectStream(pdf: Buffer, id: string): string {
+  const head = new RegExp(String.raw`(?:^|[^\d])${id} 0 obj\b`);
+  const latin = pdf.toString("latin1");
+  const at = latin.search(head);
+  if (at === -1) return "";
+  const start = latin.indexOf("stream", at);
+  const objEnd = latin.indexOf("endobj", at);
+  if (start === -1 || (objEnd !== -1 && objEnd < start)) return "";
+  let dataStart = start + 6;
+  if (pdf[dataStart] === 0x0d) dataStart++;
+  if (pdf[dataStart] === 0x0a) dataStart++;
+  const end = latin.indexOf("endstream", dataStart);
+  const dict = latin.slice(at, start);
+  const raw = pdf.subarray(dataStart, end);
+  try {
+    return (/\/FlateDecode/.test(dict) ? inflateSync(raw) : raw).toString("latin1");
+  } catch {
+    return raw.toString("latin1");
+  }
+}
+
+/**
+ * The text of each page, in page order — the page tree's `/Kids`, each
+ * page's `/Contents` read the way `pdfTextOf` reads the whole document — so
+ * a test can say which page a line lands on: that a card's words are whole
+ * on one page, or that a continuation page carries its heading.
+ */
+export function pdfPageTextsOf(pdf: Buffer): string[] {
+  const latin = pdf.toString("latin1");
+  const kids = latin.match(/\/Type\s*\/Pages\b[\s\S]*?\/Kids\s*\[([^\]]*)\]/)?.[1] ?? "";
+  const pageIds = [...kids.matchAll(/(\d+)\s+0\s+R/g)].map((m) => m[1]);
+  return pageIds.map((id) => {
+    const obj = latin.match(new RegExp(String.raw`(?:^|[^\d])${id} 0 obj\b([\s\S]*?)endobj`))?.[1] ?? "";
+    const contents = obj.match(/\/Contents\s+(\d+)\s+0\s+R/)?.[1];
+    return contents ? runsOf(objectStream(pdf, contents)).join("\n") : "";
+  });
+}
+
 /**
  * How many filled shapes the document draws — every `f` / `f*` operator
  * outside a text string. A View with a background is one fill, so the
@@ -203,4 +243,23 @@ export function pdfFillCountOf(pdf: Buffer): number {
     count += (ops.match(/(?:^|\s)f\*?(?=\s|$)/g) ?? []).length;
   }
   return count;
+}
+
+/**
+ * Every rectangle the document fills, in drawing order, in the units of the
+ * transform it is drawn under: react-pdf paints a View's background as
+ * `x y w h re f` inside the View's own clip, so a bar's length is its `w`.
+ * Lets a test say a bar is drawn at the length its figure says, not merely
+ * that it is drawn.
+ */
+export function pdfFillRectsOf(pdf: Buffer): Array<{ x: number; y: number; w: number; h: number }> {
+  const strings = new RegExp(STRING, "g");
+  const rect = new RegExp(String.raw`(?:^|\s)(${NUM})\s+(${NUM})\s+(${NUM})\s+(${NUM})\s+re\s+f\*?(?=\s|$)`, "g");
+  const out: Array<{ x: number; y: number; w: number; h: number }> = [];
+  for (const content of streamsOf(pdf)) {
+    for (const m of content.replace(strings, "()").matchAll(rect)) {
+      out.push({ x: Number(m[1]), y: Number(m[2]), w: Number(m[3]), h: Number(m[4]) });
+    }
+  }
+  return out;
 }

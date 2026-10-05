@@ -17,8 +17,9 @@
 // from the reader's own pipeline, the deal page's sticky bar and the
 // pipeline map's hover card: the overheads are never tried, and where no
 // photograph of the building answers, the deal's cover is drawn instead
-// (lib/deal-cover-art `coverSvg`: its gradient and its kind of building,
-// the one the pipeline's card wears). A cover, plainly not a photograph.
+// (lib/deal-cover-art `coverSvg`: its kind of building under its own sky,
+// the one the pipeline's card wears, laid out for the frame asked for). An
+// illustration, plainly not a photograph.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -27,16 +28,10 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
 import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
 import { coverFor } from "@/lib/deal-cover";
-import { coverSvg } from "@/lib/deal-cover-art";
+import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { shownAssetClass } from "@/lib/pipeline-slots";
-
-const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
-
-function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(hi, Math.max(lo, Math.round(n)));
-}
+import { dealPhotoPathOf } from "@/lib/storage-paths";
+import { DEAL_IMAGE_FRAMES, nearestFrame } from "@/lib/image-frames";
 
 export async function GET(
   req: Request,
@@ -56,21 +51,34 @@ export async function GET(
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const q = new URL(req.url).searchParams;
-  const width = clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW);
-  const height = clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH);
+  // The size is one its own callers ask for (`DEAL_IMAGE_FRAMES`,
+  // lib/image-frames; research pass 22): any other is the listed frame
+  // nearest it, where the route had drawn any size from 48 to 1280.
+  const { w: width, h: height } = nearestFrame(DEAL_IMAGE_FRAMES, q.get("w"), q.get("h"));
   const coverFallback = q.get("fallback") === "cover";
 
   // The deal's own photograph first — found in its memorandum on the first
   // ask and stored, so the plan below can serve it.
   const cache = (deal.photo as DealVisualCache | null) ?? null;
-  const picture = await ensureDealPicture(supabase, id, {
+  const found = await ensureDealPicture(supabase, id, {
     omPath: (deal.om_storage_path as string | null) ?? null,
     isSample: !!(deal as { is_sample?: boolean }).is_sample,
     cache,
     // A thumbnail's slot holds its plate meanwhile; this may wait its turn.
     waitMs: SEARCH_WAIT_MS,
   });
-  const withPicture: DealVisualCache | null = picture ? { ...(cache ?? {}), picture } : cache;
+  // deals.photo is the deal owner's to write, and the validator below puts
+  // its stored path and its geocode stamp in a header, where a line break
+  // had made the route answer 500 (research pass 22). A picture whose path
+  // is not this deal's photograph is none of its own (lib/storage would
+  // refuse to read it), and a stamp that is not a timestamp is no stamp.
+  const picture = found && dealPhotoPathOf(id, found[pictureSizeFor({ width, height })]) ? found : null;
+  const withPicture: DealVisualCache | null = picture
+    ? { ...(cache ?? {}), picture }
+    : cache
+      ? { ...cache, picture: undefined }
+      : null;
+  const geoAt = typeof cache?.geoAt === "string" && /^[0-9A-Za-z:.+-]{1,40}$/.test(cache.geoAt) ? cache.geoAt : "";
 
   // What the browser revalidates against, under a URL that never changes. A
   // stored photograph's identity is its path (the stamp of the upload that
@@ -81,7 +89,7 @@ export async function GET(
   // deals' pictures the next day rather than after a week of aerials.
   const etag = picture
     ? `W/"${picture[pictureSizeFor({ width, height })]}"`
-    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? ":cover" : ""}"`;
+    : `W/"map:${geoAt}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}"`;
   const revalidate = { etag, "cache-control": "private, no-cache" };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: revalidate });
@@ -101,7 +109,7 @@ export async function GET(
       seed: id,
       assetClass: shownAssetClass(row.asset_class ?? null, { assetClass: row.extracted_class ?? null }),
     });
-    return new NextResponse(coverSvg(cover.kind, cover.tone, width, height), {
+    return new NextResponse(coverSvg(cover, width, height), {
       headers: {
         "content-type": "image/svg+xml; charset=utf-8",
         // An SVG opened on its own is a document: this one carries no script

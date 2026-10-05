@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { AssumptionWarning } from "@/lib/market/checks";
 import type { SubmarketView } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
+import { unverifiedMark } from "@/lib/market/metrics";
 import { dismissSubmarketWarning, linkSubmarket, restoreSubmarketWarning } from "./submarket-actions";
 
 /**
@@ -73,7 +74,9 @@ export function SubmarketCard({
       ? `${metrics.supply.months.toFixed(0)} months`
       : metrics.supply.status === "supply_exceeds_demand"
         ? "supply > demand"
-        : "—";
+        : metrics.supply.status === "not_computable"
+          ? "not computable"
+          : "—";
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface px-5 py-4">
@@ -96,24 +99,31 @@ export function SubmarketCard({
       <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
         {(
           [
-            ["Months of supply", supply],
+            ["Months of supply", supply, metrics.unverified.supply],
             [
               "UC % of inventory",
               metrics.ucShare == null ? "—" : `${(metrics.ucShare * 100).toFixed(1)}%`,
+              metrics.unverified.ucShare,
             ],
             [
               "T12 absorption",
               metrics.absorption.sf == null ? "—" : sfFmt(metrics.absorption.sf),
+              metrics.unverified.absorption,
             ],
             [
               "Rent CAGR",
               metrics.rent.cagr == null ? "—" : `${(metrics.rent.cagr * 100).toFixed(2)}%`,
+              metrics.unverified.cagr,
             ],
           ] as const
-        ).map(([label, value]) => (
+        ).map(([label, value, unverified]) => (
           <div key={label}>
             <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
             <dd className="font-mono text-sm text-ink">{value}</dd>
+            {/* A web-sourced period in the figure is marked, never blended in. */}
+            {unverified > 0 ? (
+              <dd className="text-[10px] font-medium text-caution">{unverifiedMark(unverified)}</dd>
+            ) : null}
           </div>
         ))}
       </dl>
@@ -148,11 +158,19 @@ export function SubmarketCard({
               </p>
               <p className="mt-1 text-[11px] text-muted">Basis: {w.basis}</p>
 
+              {w.staleOverride ? (
+                <p className="mt-1 text-xs text-muted">
+                  {`Overridden earlier by ${w.staleOverride.by || "the analyst"}, when it read “${
+                    w.staleOverride.figure
+                  }”: “${w.staleOverride.reason}”. It reads “${w.figure}” now, so that override no longer stands.`}
+                </p>
+              ) : null}
               {w.dismissed ? (
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <p className="text-xs text-muted">
-                    Overridden by {w.dismissed.by || "the analyst"}: &ldquo;{w.dismissed.reason}
-                    &rdquo; — this line goes into the deal memo.
+                    {`Overridden by ${w.dismissed.by || "the analyst"}${
+                      w.dismissed.figure ? ` at “${w.dismissed.figure}”` : ""
+                    }: “${w.dismissed.reason}” — this line goes into the deal memo.`}
                   </p>
                   <form action={restoreSubmarketWarning}>
                     <input type="hidden" name="dealId" value={dealId} />

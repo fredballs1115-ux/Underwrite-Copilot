@@ -117,8 +117,27 @@ describe("how far past ordinary that is", () => {
     // The words are about the gap from the caller's own benchmark. Move
     // the benchmark and the same deal changes description, which is the
     // point: this module does not have an opinion about growth.
-    expect(readBelief({ ...SEED, marketGrowthPct: 12 }).reach).toBe("at market");
+    // 7.16% required against a 12% benchmark is 4.84 points UNDER it — growth
+    // to spare. This line pinned "at market", the only word the first
+    // version had for anything that was not above.
+    expect(readBelief({ ...SEED, marketGrowthPct: 12 }).reach).toBe("below market");
     expect(readBelief({ ...SEED, marketGrowthPct: 0.5 }).reach).toBe("heroic");
+  });
+
+  it("says a requirement under the benchmark is under it, whatever the sign", () => {
+    // A deal that clears 8% while NOI shrinks 0.63% a year, against 3%
+    // called ordinary: 3.63 points below it. The note had said "within a
+    // point of the 3%".
+    const r = readBelief({ ...SEED, noi: 1_750_000, targetIrrPct: 8 });
+    expect(r.requiredGrowthPct).toBe(-0.63);
+    expect(r.aboveMarketBy).toBe(-3.63);
+    expect(r.reach).toBe("below market");
+    expect(r.note).toContain("That is 3.63 points below the 3% you called ordinary");
+    expect(r.note).not.toContain("within a point");
+    // Within a point either side is at market.
+    const g = readBelief(SEED).requiredGrowthPct!;
+    expect(readBelief({ ...SEED, marketGrowthPct: g + 0.5 }).reach).toBe("at market");
+    expect(readBelief({ ...SEED, marketGrowthPct: g + STRETCH_POINTS }).reach).toBe("below market");
   });
 
   it("sits on the stated boundaries rather than drifting", () => {

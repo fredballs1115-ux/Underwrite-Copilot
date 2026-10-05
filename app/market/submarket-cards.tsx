@@ -3,6 +3,7 @@ import type { Submarket } from "@/lib/market/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { metroForName } from "@/lib/market-match";
 import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
+import { GalleryCreditText } from "@/app/photo-credit";
 import { CityPhoto } from "@/app/city-photo";
 
 /** One line naming what a submarket's persistent exclusion rules drop. */
@@ -78,7 +79,11 @@ export function SubmarketCards({ submarkets }: { submarkets: readonly Submarket[
       </ul>
       {credit || anyOverhead ? (
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
-          {credit ? <>{credit} </> : null}
+          {credit ? (
+            <>
+              <GalleryCreditText ids={pictured} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />{" "}
+            </>
+          ) : null}
           {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
         </p>
       ) : null}

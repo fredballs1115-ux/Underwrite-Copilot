@@ -46,8 +46,8 @@ export function sortDealTasks<T extends DealTask>(tasks: T[]): T[] {
 }
 
 /** Past-due and still open. Dates are compared as ISO strings — no timezone
- *  math; the caller supplies "today" (yyyy-mm-dd, UTC) once. Due today is
- *  NOT overdue. */
+ *  math; the caller supplies "today" (yyyy-mm-dd, the reader's own day —
+ *  lib/reader-day) once. Due today is NOT overdue. */
 export function isTaskOverdue(
   task: Pick<DealTask, "dueDate" | "done">,
   todayIso: string,

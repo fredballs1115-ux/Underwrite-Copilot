@@ -3,6 +3,23 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { aOrAn, withArticle } from "@/lib/article";
 import { readFigure } from "@/lib/money";
+import { usd, usdCents, usdExact } from "@/lib/tools/format";
+import { blanks, fillIn } from "@/lib/tools/blanks";
+import {
+  MAX_BUILD_MONTHS,
+  MAX_DOWNTIME_MONTHS,
+  MAX_GROUND_LEASE_YEARS,
+  MAX_HOLD_YEARS,
+  MAX_LEASEBACK_YEARS,
+  MAX_LEASE_UP_MONTHS,
+  MAX_LEASE_YEARS,
+  MAX_LOAN_MONTHS,
+  MAX_LOAN_TERM_YEARS,
+  MAX_ROLLOVER_YEARS,
+  heldNote,
+  heldTo,
+  pastEndNote,
+} from "@/lib/tools/limits";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
@@ -16,7 +33,7 @@ import { readBelief } from "@/lib/tools/what-you-believe";
 import { readReassessment } from "@/lib/tools/tax-reassessment";
 import {
   NO_SEEDS,
-  shortDate,
+  periodLabel,
   treasuryForTerm,
   type CurveSeed,
   type RateSeeds,
@@ -26,10 +43,10 @@ import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readTrailing } from "@/lib/tools/trailing-window";
-import { readEgi } from "@/lib/tools/economic-occupancy";
-import { readHold } from "@/lib/tools/hold-or-sell";
-import { readBelow } from "@/lib/tools/below-the-line";
-import { readBid } from "@/lib/tools/max-bid";
+import { EMPTY as NO_EGI, readEgi } from "@/lib/tools/economic-occupancy";
+import { EMPTY as NO_HOLD, readHold } from "@/lib/tools/hold-or-sell";
+import { EMPTY as NO_BELOW, readBelow } from "@/lib/tools/below-the-line";
+import { EMPTY as NO_BID, readBid } from "@/lib/tools/max-bid";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
@@ -37,9 +54,9 @@ import { SEED_MONTHS_REMAINING, readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { readRoll, readRollover } from "@/lib/tools/rollover";
-import { readLeaseUp } from "@/lib/tools/lease-up";
-import { readLeaseback } from "@/lib/tools/sale-leaseback";
-import { readInsurance } from "@/lib/tools/insurance";
+import { EMPTY as NO_LEASE_UP, readLeaseUp } from "@/lib/tools/lease-up";
+import { EMPTY as NO_LEASEBACK, readLeaseback } from "@/lib/tools/sale-leaseback";
+import { EMPTY as NO_INSURANCE, readInsurance } from "@/lib/tools/insurance";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import { DOWNSIDE_EXIT_HAIRCUT, readFeeDrag } from "@/lib/tools/fee-drag";
 import { readEnvelope } from "@/lib/tools/zoning-envelope";
@@ -113,7 +130,9 @@ function Field({
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full rounded-lg border border-line bg-white px-3 py-2 text-sm tabular-nums outline-none transition-colors focus:border-brand ${
+          // 16px below `sm`: iPhone Safari zooms the page into any field
+          // set smaller than that the moment it takes the focus.
+          className={`w-full rounded-lg border border-line bg-white px-3 py-2 text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm ${
             suffix ? "pr-9" : ""
           }`}
         />
@@ -148,6 +167,14 @@ function Field({
  * browser's first paint disagree, which React calls a hydration error and a
  * reader sees as a flash of the wrong numbers. So a shared link paints the
  * seeded figures for one frame and then its own.
+ *
+ * A key belongs to the PAGE, not to its card: every card writes into one
+ * query string, and the first card to read a key claims it, so two cards
+ * reaching for the same short key share one figure — the later card shows
+ * the earlier one's seed on every visit, and typing in either moves both.
+ * Seven keys did exactly that (the research pass of 2026-10-01), unseen by
+ * the render tests because the server never reads a URL. The catalog test
+ * holds every key to one field of one card.
  */
 /** The page's live field values, and the subscribers to tell when one moves. */
 const live = new Map<string, string>();
@@ -210,6 +237,29 @@ function useShared(key: string, initial: string): [string, (v: string) => void] 
   return [value, set];
 }
 
+/**
+ * A choice in the link: one of the card's own options, else its seed.
+ *
+ * The link is text anyone can edit, and a value no option matches is a trap
+ * with two sides: a `<select>` shows its FIRST option while the card's sum
+ * reads the raw string, so the capital stack drew "Accrues" and computed
+ * "Pays current", and the tax card "Reassessed to price" over a bill that
+ * carried the assessment over (the research pass of 2026-10-01). Read
+ * through here, the control and the sum see the same value, and the options
+ * handed back are the ones the control draws. The page's other dropdowns
+ * read a value no option names as their seed, which is each one's first
+ * option, so their control and sum agree already; a new one belongs here.
+ */
+function useChoice<T extends string>(
+  key: string,
+  initial: NoInfer<T>,
+  options: readonly { value: T; label: string }[],
+): [T, (v: string) => void, readonly { value: T; label: string }[]] {
+  const [raw, set] = useShared(key, initial);
+  const value = options.find((o) => o.value === raw)?.value ?? initial;
+  return [value, set, options];
+}
+
 /** A button that puts something on the clipboard and says it did. */
 function CopyButton({
   label,
@@ -249,26 +299,10 @@ function CopyButton({
 
 // ── the output layer ───────────────────────────────────────────────────────
 
-// The sign goes OUTSIDE the dollar. Interpolating a negative straight in
-// gives "$-385,213", which is not how money is written anywhere, and it
-// shows up wherever a figure can legitimately go below zero — a stack
-// oversized against its basis, a residual that does not work at any
-// price, a defeasance that pays you. Ninety-odd call sites share these
-// two helpers, so it is fixed once here.
-const money = (n: number, body: (abs: number) => string) =>
-  `${n < 0 ? "-" : ""}$${body(Math.abs(n))}`;
-
-const usd = (n: number | null) =>
-  n === null
-    ? "—"
-    : money(n, (a) =>
-        a >= 1_000_000
-          ? `${(a / 1_000_000).toFixed(2)}M`
-          : Math.round(a).toLocaleString("en-US"),
-      );
-
-const usdExact = (n: number | null) =>
-  n === null ? "—" : money(n, (a) => Math.round(a).toLocaleString("en-US"));
+// The dollar writers — `usd`, `usdExact`, `usdCents`, the sign outside the
+// dollar — live in lib/tools/format, because the modules' own sentences
+// print their figures through them too: one figure, said one way, whether
+// it sits in a tile or in a note under it.
 
 const pct = (n: number | null, places = 2) =>
   n === null ? "—" : `${n.toFixed(places)}%`;
@@ -278,6 +312,33 @@ const mult = (n: number | null) => (n === null ? "—" : `${n.toFixed(2)}x`);
 /** An area, in the unit a zoning code and a rent roll both use. */
 const sf = (n: number | null) =>
   n === null ? "—" : `${Math.round(n).toLocaleString("en-US")} SF`;
+
+/**
+ * Under a card's fields: each figure the card read at the longest it runs
+ * (lib/tools/limits). A million-year hold answers at once as thirty years,
+ * and the card says it did rather than holding the figure quietly.
+ */
+function HeldNotes({
+  notes,
+  className = "",
+}: {
+  notes: (string | null)[];
+  className?: string;
+}) {
+  const shown = notes.filter((n): n is string => n !== null);
+  if (shown.length === 0) return null;
+  return <p className={`text-xs text-caution ${className}`}>{shown.join(" ")}</p>;
+}
+
+/**
+ * A field's figure in whole units, as a module that rounds before it holds
+ * reads it — so "40.3" years is the 40 typed, and only "40.6", which the
+ * module rounds to 41 and then holds, is said to be held.
+ */
+const wholeYears = (raw: string): number | null => {
+  const n = num(raw);
+  return n === null ? null : Math.round(n);
+};
 
 /** A figure with its name under it — the shape every result here takes. */
 function Stat({
@@ -316,7 +377,7 @@ function Choice<T extends string>({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: { value: T; label: string }[];
+  options: readonly { value: T; label: string }[];
 }) {
   return (
     <label className="block w-full">
@@ -326,7 +387,7 @@ function Choice<T extends string>({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
+        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-base outline-none transition-colors focus:border-brand sm:text-sm"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -398,7 +459,11 @@ function DebtSizer() {
   const [noi, setNoi] = useShared("noi", "1,200,000");
   const [rate, setRate] = useShared("r", "6.5");
   const [amort, setAmort] = useShared("am", "30");
-  const [io, setIo] = useState(false);
+  // The interest-only box travels in the link too (the audit of 2026-09-30:
+  // a sizing sent as a URL dropped it): "1" while ticked, the seed otherwise.
+  const [ioFlag, setIoFlag] = useShared("io", "0");
+  const io = ioFlag === "1";
+  const setIo = (on: boolean) => setIoFlag(on ? "1" : "0");
   const [ltv, setLtv] = useShared("ltv", "65");
   const [dscr, setDscr] = useShared("dscr", "1.25");
   const [dy, setDy] = useShared("dy", "9");
@@ -491,7 +556,14 @@ function DebtSizer() {
             ))}
           </div>
 
-          {binding ? (
+          {binding && s.loan === 0 && binding.key !== "ltv" ? (
+            // No income to cover debt service: a coverage test lends nothing,
+            // and that is not a term to negotiate.
+            <p className="mt-4 text-sm text-ink">
+              With no NOI to cover it, the coverage tests allow no debt at all — the
+              building has to earn before it can borrow.
+            </p>
+          ) : binding ? (
             <p className="mt-4 text-sm text-ink">
               <span className="font-semibold">{binding.label}</span> governs at{" "}
               {binding.setAt}. That is the constraint to negotiate.
@@ -611,7 +683,7 @@ function CapTriangle() {
           <Stat label="Per unit" value={usdExact(perUnit)} />
         </div>
         <div className="flex items-end pb-1">
-          <Stat label="Per SF" value={perSf === null ? "—" : `$${perSf.toFixed(0)}`} />
+          <Stat label="Per SF" value={usdExact(perSf)} />
         </div>
       </div>
     </Card>
@@ -647,6 +719,13 @@ function BuildOrBuy() {
   // the trade, to the left there is no reason to take the risk. 300 bps of
   // travel each way covers the range anyone actually argues about.
   const SPAN = 300;
+  // What developers commonly ask of the spread before they build — a rule
+  // of thumb, said as one, never a verdict on the project: it moves with
+  // the market and the risk, and it is read on an all-in cost, construction
+  // interest included, which the cost above does not carry unless the soft
+  // cost does. The line once said the seed, sitting exactly on it, was "a
+  // spread worth building into".
+  const RULE_OF_THUMB_BPS = 150;
   const bps = y.spreadBps ?? 0;
   const reach = Math.min(50, (Math.abs(bps) / SPAN) * 50);
   const healthy = bps >= 0;
@@ -710,10 +789,10 @@ function BuildOrBuy() {
             <span className="text-muted">
               {" "}
               over the exit cap.{" "}
-              {bps >= 150
-                ? "That is a spread worth building into."
+              {bps >= RULE_OF_THUMB_BPS
+                ? `That meets the ${RULE_OF_THUMB_BPS} bps developers commonly look for — a rule of thumb, and only once the cost carries the construction loan's interest.`
                 : bps >= 0
-                  ? "Thin — the risk is not obviously paid for."
+                  ? `Under the ${RULE_OF_THUMB_BPS} bps developers commonly look for — a rule of thumb — so the risk is not obviously paid for.`
                   : "Below the cap it would sell at. There is no trade here."}
             </span>
           </p>
@@ -726,9 +805,14 @@ function BuildOrBuy() {
 // ── 4. one rent, four ways ─────────────────────────────────────────────────
 
 function RentConverter() {
-  const [basis, setBasis] = useState<"perSfYear" | "perSfMonth" | "perUnitMonth">(
-    "perSfYear",
-  );
+  // The basis travels in the link beside the amount it is the unit of: kept
+  // in the page alone, a "$2,500 a unit a month" sent as a URL opened as
+  // $2,500 a foot a year.
+  const [basis, setBasis, bases] = useChoice("amtb", "perSfYear", [
+    { value: "perSfYear", label: "$ / SF / yr" },
+    { value: "perSfMonth", label: "$ / SF / mo" },
+    { value: "perUnitMonth", label: "$ / unit / mo" },
+  ]);
   const [amount, setAmount] = useShared("amt", "36");
   const [sf, setSf] = useShared("rsf", "100,000");
   const [units, setUnits] = useShared("ru", "120");
@@ -747,22 +831,17 @@ function RentConverter() {
   const exp = num(expenses);
   const gross = q.perSfYear !== null && exp !== null ? q.perSfYear + exp : null;
 
-  const BASES: Array<{ key: typeof basis; label: string }> = [
-    { key: "perSfYear", label: "$ / SF / yr" },
-    { key: "perSfMonth", label: "$ / SF / mo" },
-    { key: "perUnitMonth", label: "$ / unit / mo" },
-  ];
-
   return (
     <Card id="rent-converter" eyebrow="Rent" title="One rent, four ways">
       <div className="flex flex-wrap gap-2">
-        {BASES.map((b) => (
+        {bases.map((b) => (
           <button
-            key={b.key}
+            key={b.value}
             type="button"
-            onClick={() => setBasis(b.key)}
+            onClick={() => setBasis(b.value)}
+            aria-pressed={basis === b.value}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              basis === b.key
+              basis === b.value
                 ? "bg-brand text-white"
                 : "bg-faint text-muted hover:text-ink"
             }`}
@@ -788,11 +867,11 @@ function RentConverter() {
       <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
         <Stat
           label="$ / SF / yr"
-          value={q.perSfYear === null ? "—" : `$${q.perSfYear.toFixed(2)}`}
+          value={usdCents(q.perSfYear)}
         />
         <Stat
           label="$ / SF / mo"
-          value={q.perSfMonth === null ? "—" : `$${q.perSfMonth.toFixed(2)}`}
+          value={usdCents(q.perSfMonth)}
         />
         <Stat
           label="$ / unit / mo"
@@ -804,7 +883,7 @@ function RentConverter() {
       <p className="mt-4 text-sm text-muted">
         Gross equivalent of that net rent:{" "}
         <span className="font-semibold tabular-nums text-ink">
-          {gross === null ? "—" : `$${gross.toFixed(2)}`}
+          {usdCents(gross)}
         </span>{" "}
         per SF per year.
       </p>
@@ -851,7 +930,7 @@ function CashFlowStrip() {
 
   return (
     <Card id="cash-flow-strip" eyebrow="Returns" title="Paste a cash flow">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -862,7 +941,7 @@ function CashFlowStrip() {
               onChange={(e) => setRaw(e.target.value)}
               rows={8}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -971,8 +1050,11 @@ function CashFlowStrip() {
                 ))}
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                {/* The running total is drawn from sm up, so the caption
+                    names it only there. */}
                 <p className="text-[11px] text-muted">
-                  Each year against the largest flow; the right column is the running total.
+                  Each year against the largest flow
+                  <span className="hidden sm:inline">; the right column is the running total</span>.
                 </p>
                 {/* Tab-delimited with headers, and the numbers RAW — no
                     dollar signs, no commas, no compacting to "$8.10M" — so
@@ -1080,26 +1162,19 @@ function NetEffectiveRent() {
           <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-3 lg:grid-cols-5">
             <Stat
               label="Net effective"
-              value={r.nerPsfYr === null ? "—" : `$${r.nerPsfYr.toFixed(2)}`}
+              value={usdCents(r.nerPsfYr)}
               tone="brand"
             />
-            <Stat
-              label="…discounted"
-              value={
-                r.discountedNerPsfYr === null ? "—" : `$${r.discountedNerPsfYr.toFixed(2)}`
-              }
-            />
+            <Stat label="…discounted" value={usdCents(r.discountedNerPsfYr)} />
             <Stat label="Below face" value={pct(r.discountToFacePct, 1)} />
             <Stat
               label="Collected / SF"
-              value={r.collectedPsf === null ? "—" : `$${r.collectedPsf.toFixed(0)}`}
+              value={usdExact(r.collectedPsf)}
               tone="muted"
             />
             <Stat
               label="Cost to sign / SF"
-              value={
-                cost === null ? "—" : `$${(cost.free + cost.ti + cost.lc).toFixed(0)}`
-              }
+              value={cost === null ? "—" : usdExact(cost.free + cost.ti + cost.lc)}
               tone="muted"
             />
           </div>
@@ -1107,7 +1182,7 @@ function NetEffectiveRent() {
           <p className="mt-4 text-sm text-muted">
             The face rent is{" "}
             <span className="font-semibold tabular-nums text-ink">
-              ${num(rent)?.toFixed(2) ?? "—"}
+              {usdCents(num(rent))}
             </span>
             . Straight-line net effective is the simple one most memoranda quote;
             the discounted figure charges the landlord for waiting, so it is
@@ -1351,7 +1426,7 @@ function ResidualLand() {
           <Stat label="Land, residual" value={usd(r.land)} tone={negative ? "muted" : "brand"} />
           <Stat
             label="Per buildable SF"
-            value={r.landPerBuildableSf === null ? "—" : `$${r.landPerBuildableSf.toFixed(2)}`}
+            value={usdCents(r.landPerBuildableSf)}
           />
           <Stat label="Per unit" value={usdExact(r.landPerUnit)} />
           <Stat
@@ -1411,9 +1486,9 @@ function Proration() {
   const [taxAmount, setTaxAmount] = useShared("ptx", "240,000");
   const [timing, setTiming] = useShared("ptm", "arrears");
   const [dayTo, setDayTo] = useShared("pdy", "seller");
-  const [rent, setRent] = useShared("prc", "150,000");
+  const [rent, setRent] = useShared("pcr", "150,000");
   const [deposits, setDeposits] = useShared("psd", "92,000");
-  const [price, setPrice] = useShared("ppr", "$20M");
+  const [price, setPrice] = useShared("pcp", "$20M");
   const [escrow, setEscrow] = useShared("pem", "500,000");
 
   const r = useMemo(
@@ -1615,6 +1690,12 @@ function AfterTax() {
     [terms],
   );
   const segOn = (num(segPct) ?? 0) > 0;
+  // The building's depreciation comes back at the ordinary rate, capped at
+  // 25% — the module's figure, so the bar, the legend and the sentences say
+  // the rate the bill was struck at.
+  const ordinaryRate = num(ordinary);
+  const rate1250 = r.recaptureRatePct ?? 25;
+  const ratePct = (n: number) => `${Math.round(n * 100) / 100}%`;
 
   const slice: { label: string; amount: number; rate: string; tone: string }[] = r.sale
     ? [
@@ -1627,13 +1708,14 @@ function AfterTax() {
         {
           label: "Unrecaptured 1250",
           amount: r.sale.unrecaptured1250,
-          rate: "25%",
+          rate: ratePct(rate1250),
           tone: "bg-caution",
         },
         {
+          // The rate the module taxed it at, a blank field's 20% included.
           label: "Capital gain",
           amount: r.sale.capitalGain,
-          rate: `${(num(capGains) ?? 0).toFixed(0)}%`,
+          rate: `${(r.capGainsRatePct ?? 0).toFixed(0)}%`,
           tone: "bg-brand",
         },
       ].filter((x) => x.amount > 0)
@@ -1710,15 +1792,33 @@ function AfterTax() {
               </span>
             ))}
           </div>
+          {/* "Higher" only where it is (lib/tools/after-tax
+              `recaptureVsGains`): the building's depreciation comes back
+              at the ordinary rate, capped at 25%, so an owner taxed under
+              the capital gains rate pays less on it, not more. The figure
+              beside it is at the rate the module taxed the gain at. */}
           <p className="mt-3 text-sm text-muted">
             Running the whole gain at the capital gains rate would say{" "}
             <span className="font-semibold tabular-nums text-ink">
-              {usd(gain * ((num(capGains) ?? 0) / 100))}
+              {usd(gain * ((r.capGainsRatePct ?? 0) / 100))}
             </span>
             . The bill is{" "}
-            <span className="font-semibold tabular-nums text-kill">{usd(r.sale!.tax)}</span>,
-            because what you depreciated comes back at a higher rate than what
-            you made.
+            <span
+              className={`font-semibold tabular-nums ${
+                r.recaptureVsGains === "higher" ? "text-kill" : r.recaptureVsGains === "lower" ? "text-brand" : "text-ink"
+              }`}
+            >
+              {usd(r.sale!.tax)}
+            </span>
+            {r.recaptureVsGains === "higher"
+              ? ", because what you depreciated comes back at a higher rate than what you made."
+              : r.recaptureVsGains === "lower"
+                ? ", because what you depreciated comes back at a lower rate than what you made."
+                : r.recaptureVsGains === "same"
+                  ? ", because what you depreciated comes back at the same rate as what you made."
+                  : r.recaptureVsGains === "mixed"
+                    ? ": part of what you depreciated comes back at a higher rate than what you made, and part at a lower one."
+                    : "."}
           </p>
         </div>
       )}
@@ -1736,10 +1836,25 @@ function AfterTax() {
         <p className="mt-4 text-sm text-muted">
           Depreciation is a <span className="font-semibold text-ink">timing</span> benefit,
           not a permanent one: shelter and recapture at the same rate and it nets
-          to nothing. What survives here is the gap between the{" "}
-          {(num(ordinary) ?? 0).toFixed(0)}% that sheltered it and the 25% that
-          recaptures it — plus the time value of having had the money in
-          between, which this does not count.
+          to nothing.
+          {ordinaryRate !== null && ordinaryRate > rate1250 && (
+            <>
+              {" "}
+              What survives here is the gap between the {ratePct(ordinaryRate)} that
+              sheltered it and the {ratePct(rate1250)} that recaptures it — plus the time
+              value of having had the money in between, which this does not count.
+            </>
+          )}
+          {ordinaryRate !== null && ordinaryRate <= rate1250 && (
+            <>
+              {" "}
+              Here the two are one rate: the building&rsquo;s depreciation comes back at
+              the ordinary rate up to a 25% ceiling, and {ratePct(ordinaryRate)} is under
+              it, so every dollar the sale takes back is worth what it saved — the
+              benefit is the time value of having had the money in between, which this
+              does not count.
+            </>
+          )}
         </p>
       )}
 
@@ -1748,8 +1863,13 @@ function AfterTax() {
           <span className="font-semibold text-ink">Cost segregation is not a free lunch.</span>{" "}
           It moves {usdExact(plain.yearOneDepreciation)} of year-one write-off up to{" "}
           {usdExact(r.yearOneDepreciation)} — but the carved-out part comes back
-          under section 1245 at {(num(ordinary) ?? 0).toFixed(0)}%, not at 25%. In
-          raw dollars this deal keeps{" "}
+          under section 1245 at{" "}
+          {ordinaryRate === null
+            ? "the ordinary rate."
+            : ordinaryRate > rate1250
+              ? `${ratePct(ordinaryRate)}, not at the ${ratePct(rate1250)} the building’s depreciation comes back at.`
+              : `${ratePct(ordinaryRate)}, the rate the building’s depreciation comes back at too.`}{" "}
+          In raw dollars this deal keeps{" "}
           <span className="font-semibold tabular-nums text-ink">{usd(r.netOfRecapture)}</span>{" "}
           with the study against{" "}
           <span className="font-semibold tabular-nums text-ink">{usd(plain.netOfRecapture)}</span>{" "}
@@ -1961,11 +2081,19 @@ function Exchange1031() {
               <span className="font-semibold tabular-nums">
                 {EXCHANGE_DAYS - r.clock.closeDays} days
               </span>{" "}
-              off the back of the window: the replacement has to be acquired before
-              the return for {closing.slice(0, 4)} is filed, due{" "}
-              <span className="font-mono tabular-nums">{r.clock.returnDueBy}</span>. An
-              extension restores the full {EXCHANGE_DAYS} days, which is why a
-              fourth-quarter exchange files one first.
+              off the back of the window: the replacement has to be acquired by
+              the due date of the return for {closing.slice(0, 4)},{" "}
+              <span className="font-mono tabular-nums">{r.clock.returnDueBy}</span>,
+              extensions included. An extension restores the full {EXCHANGE_DAYS} days,
+              which is why a fourth-quarter exchange files one first.
+            </p>
+          )}
+          {r.clock.entityCutShort && (
+            <p className="mt-2 text-sm text-caution" data-qa="entity-due">
+              Sold by a partnership or an S corporation, the window ends sooner:
+              its calendar-year return for {closing.slice(0, 4)} is due{" "}
+              <span className="font-mono tabular-nums">{r.clock.entityReturnDueBy}</span>,
+              so the replacement has to close by then unless that return is extended.
             </p>
           )}
         </div>
@@ -2038,13 +2166,17 @@ function Recovery() {
   const [curVar, setCurVar] = useShared("rcv", "1,180,000");
   const [curOcc, setCurOcc] = useShared("rco", "94");
   const [grossTo, setGrossTo] = useShared("rgu", "95");
-  const [capPct, setCapPct] = useShared("rcap", "5");
+  const [capPct, setCapPct] = useShared("rcpct", "5");
   const [capType, setCapType] = useShared("rct", "cumulative");
   const [controllable, setControllable] = useShared("rctrl", "60");
   const [years, setYears] = useShared("ryr", "3");
+  // Last year's controllable expenses as charged — what a non-cumulative cap
+  // is measured against. Blank unless typed: the card does not invent it.
+  const [priorCtrl, setPriorCtrl] = useShared("rprior", "");
   const [paid, setPaid] = useShared("rpaid", "30,000");
 
   const stopBasis = basis === "expense stop";
+  const nonCumulative = capType === "non-cumulative";
 
   const r = useMemo(
     () =>
@@ -2061,11 +2193,12 @@ function Recovery() {
           capType === "none" ? "none" : capType === "non-cumulative" ? "non-cumulative" : "cumulative",
         controllablePct: num(controllable),
         yearsSinceBase: num(years),
+        priorControllable: num(priorCtrl),
         estimatedPaid: num(paid),
       }),
     [
       tenantSf, buildingSf, stopBasis, baseFixed, baseVar, baseOcc,
-      curFixed, curVar, curOcc, grossTo, capPct, capType, controllable, years, paid, stop,
+      curFixed, curVar, curOcc, grossTo, capPct, capType, controllable, years, priorCtrl, paid, stop,
     ],
   );
 
@@ -2153,9 +2286,19 @@ function Recovery() {
             />
             <Field label="Controllable" suffix="%" value={controllable} onChange={setControllable} placeholder="60" />
           </div>
-          {!stopBasis && (
+          {(!stopBasis || nonCumulative) && (
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Field label="Years since base" value={years} onChange={setYears} placeholder="3" />
+              {!stopBasis && (
+                <Field label="Years since base" value={years} onChange={setYears} placeholder="3" />
+              )}
+              {nonCumulative && (
+                <Field
+                  label="Last year's controllable"
+                  value={priorCtrl}
+                  onChange={setPriorCtrl}
+                  placeholder="1,140,000"
+                />
+              )}
             </div>
           )}
         </div>
@@ -2277,13 +2420,14 @@ function Recovery() {
                 back.
               </>
             )}
-            {(r.carvedOut ?? 0) > 0 && (
+            {(r.carvedOut ?? 0) > 0 && r.capSaved !== null && (
               <>
                 {" "}
                 {/* Lead with what the cap actually DID. Saying "$34,021 is
                     outside the cap" beside a stat reading "held back $0"
                     implies the cap bit and the carve-out blunted it, when
-                    in fact the cap never came near binding. */}
+                    in fact the cap never came near binding. A cap that
+                    could not be measured says so below instead. */}
                 <span className="font-normal text-muted">
                   {(r.capSaved ?? 0) > 0 ? (
                     <>
@@ -2303,6 +2447,7 @@ function Recovery() {
               </>
             )}
           </p>
+          {r.capNote && <p className="mt-2 text-sm text-caution">{r.capNote}</p>}
         </>
       )}
 
@@ -2374,7 +2519,7 @@ function PercentageRent() {
         <Field label="Cost ceiling" suffix="%" value={ceiling} onChange={setCeiling} placeholder="10" />
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
         <label className="block">
           <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
             Sales, month by month
@@ -2384,7 +2529,7 @@ function PercentageRent() {
             onChange={(e) => setRaw(e.target.value)}
             rows={8}
             spellCheck={false}
-            className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
           />
           <span className="mt-1.5 block text-[11px] leading-relaxed text-muted">
             Twelve figures in the lease year&apos;s order. The monthly shape is
@@ -2523,7 +2668,7 @@ function PercentageRent() {
           {/* Cents, not whole dollars: usdExact would round $59.33 to $59,
               and a rent per foot is quoted to the cent everywhere it is
               quoted at all. */}
-          ${r.baseRentPsf.toFixed(2)} a foot base, ${r.allInPsf.toFixed(2)} all in.
+          {usdCents(r.baseRentPsf)} a foot base, {usdCents(r.allInPsf)} all in.
           {r.salesToClearCeiling === null ? (
             <>
               {" "}
@@ -2608,6 +2753,7 @@ function WhatYouBelieve() {
         <Field label="Cost of sale" suffix="%" value={saleCost} onChange={setSaleCost} placeholder="2" />
         <Field label="Ordinary growth" suffix="%" value={market} onChange={setMarket} placeholder="3" />
       </div>
+      <HeldNotes className="mt-2" notes={[heldNote(num(hold), MAX_HOLD_YEARS, "Hold", "years")]} />
 
       {r.requiredGrowthPct !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -2621,7 +2767,7 @@ function WhatYouBelieve() {
               {
                 label: "What the return requires",
                 amount: r.requiredGrowthPct,
-                tone: r.reach === "at market" ? "bg-brand" : "bg-kill",
+                tone: r.reach === "at market" || r.reach === "below market" ? "bg-brand" : "bg-kill",
               },
               {
                 label: "What you called ordinary",
@@ -2726,35 +2872,67 @@ function Leaseback() {
   const [sf, setSf] = useShared("lbsf", "180,000");
   const [mkt, setMkt] = useShared("lbmr", "7.50");
   const [con, setCon] = useShared("lbcr", "9.00");
-  const [term, setTerm] = useShared("lbt", "20");
-  const [esc, setEsc] = useShared("lbe", "2");
+  const [term, setTerm] = useShared("slbt", "20");
+  const [esc, setEsc] = useShared("slbe", "2");
   const [credit, setCredit] = useShared("lbcc", "6.00");
   const [market, setMarket] = useShared("lbmc", "6.25");
-  const [disc, setDisc] = useShared("lbd", "8");
+  const [disc, setDisc] = useShared("slbd", "8");
   const [cost, setCost] = useShared("lbsc", "1.5");
   const [rate, setRate] = useShared("lbr", "6.5");
   const [amort, setAmort] = useShared("lba", "25");
+  // The loan the same building would carry is sized by three lender tests,
+  // which were a 60% / 1.30× / 9% the card applied with no field (the
+  // research pass of 2026-10-01). A blank one is not applied, as on the
+  // debt sizer.
+  const [ltv, setLtv] = useShared("slbl", "60");
+  const [dscr, setDscr] = useShared("slbc", "1.30");
+  const [dy, setDy] = useShared("slby", "9");
 
-  const r = useMemo(
-    () =>
-      readLeaseback({
-        buildingSf: num(sf) ?? 0,
-        marketRentPerSf: num(mkt) ?? 0,
-        contractRentPerSf: num(con) ?? 0,
-        termYears: num(term) ?? 0,
-        escalationPct: num(esc),
-        creditCapPct: num(credit) ?? 0,
-        marketCapPct: num(market) ?? 0,
-        discountRatePct: num(disc),
-        sellingCostPct: num(cost),
-        mortgageRatePct: num(rate),
-        mortgageAmortYears: num(amort),
-        maxLtvPct: 60,
-        minDscr: 1.3,
-        minDebtYieldPct: 9,
-      }),
-    [sf, mkt, con, term, esc, credit, market, disc, cost, rate, amort],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["the building's size", sf],
+      ["the market rent", mkt],
+      ["the contract rent", con],
+      ["the term", term],
+      // The rent's path is rule 4's whole comparison: a blank is not a flat
+      // lease. A flat one is typed as 0.
+      ["the escalation", esc],
+      ["the credit cap", credit],
+      ["the market cap", market],
+    ];
+    // A lender test left blank is not applied (`sizeLoan`'s rule), and with
+    // none set there is no loan to size; any test set sizes one, which needs
+    // its rate and its amortisation — Max bid's rule.
+    const lending = [ltv, dscr, dy].some((v) => (num(v) ?? 0) > 0);
+    if (lending) needs.push(["the mortgage rate", rate], ["the amortisation", amort]);
+    const missing = blanks(needs);
+    // One return rather than an early one: with an early return the React
+    // Compiler's lint could not preserve this memo (on these five cards).
+    return missing.length > 0
+      ? { ...NO_LEASEBACK, note: fillIn(missing) }
+      : readLeaseback({
+          buildingSf: num(sf)!,
+          marketRentPerSf: num(mkt)!,
+          contractRentPerSf: num(con)!,
+          termYears: num(term)!,
+          escalationPct: num(esc)!,
+          creditCapPct: num(credit)!,
+          marketCapPct: num(market)!,
+          // A blank discount rate is the market cap, the module's stated
+          // default; a blank cost of sale is none, a cost not stated (Max
+          // bid's closing costs); a blank mortgage rate with no lender test
+          // set draws no coupon.
+          discountRatePct: num(disc),
+          sellingCostPct: num(cost),
+          mortgageRatePct: num(rate),
+          mortgageAmortYears: num(amort),
+          maxLtvPct: num(ltv),
+          minDscr: num(dscr),
+          minDebtYieldPct: num(dy),
+        });
+  }, [sf, mkt, con, term, esc, credit, market, disc, cost, rate, amort, ltv, dscr, dy]);
+  // Years the rent costs less than the coupon: every year before it passes.
+  const underCoupon = r.yearRentPassesCoupon === null ? null : r.yearRentPassesCoupon - 1;
 
   // Rules 1 and 2 as one picture: what the buyer pays, what an ordinary
   // owner would pay, and what the two pieces are actually worth. The gaps
@@ -2776,7 +2954,7 @@ function Leaseback() {
 
   return (
     <Card id="sale-leaseback" eyebrow="The structure" title="The sale-leaseback">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="180,000" />
@@ -2790,7 +2968,14 @@ function Leaseback() {
             <Field label="Cost of sale" suffix="%" value={cost} onChange={setCost} placeholder="1.5" />
             <Field label="Mortgage rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
             <Field label="…amortised over" suffix="yrs" value={amort} onChange={setAmort} placeholder="25" />
+            <Field label="Max LTV" suffix="%" value={ltv} onChange={setLtv} placeholder="60" />
+            <Field label="Min DSCR" suffix="x" value={dscr} onChange={setDscr} placeholder="1.30" />
+            <Field label="Min debt yield" suffix="%" value={dy} onChange={setDy} placeholder="9" />
           </div>
+          <HeldNotes
+            className="mt-2"
+            notes={[heldNote(wholeYears(term), MAX_LEASEBACK_YEARS, "Term", "years")]}
+          />
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
             Two cap rates, deliberately. One prices the tenant&rsquo;s covenant
             and the other prices the building, and a sale-leaseback is the one
@@ -2873,13 +3058,20 @@ function Leaseback() {
             </div>
           )}
 
-          {r.yearRentPassesCoupon !== null && r.mortgageProceeds !== null && (
+          {underCoupon !== null && r.mortgageProceeds !== null && r.extraRaised !== null && (
             <p className="mt-3 text-sm text-muted">
-              It raises {usdExact(r.extraRaised)} more than the loan the
-              building carries ({usdExact(r.mortgageProceeds)}, on{" "}
-              {r.mortgageBindingTest?.toLowerCase()}) and costs less than the
-              coupon — for four years. The rent passes it in year{" "}
-              {r.yearRentPassesCoupon} and never comes back under.
+              {/* Each part read off the figures: the years under the coupon
+                  were a typed "four", true of the worked example alone. */}
+              {`It raises ${usdExact(Math.abs(r.extraRaised))} ${
+                r.extraRaised < 0 ? "less" : "more"
+              } than the loan the building carries (${usdExact(r.mortgageProceeds)}${
+                r.mortgageBindingTest ? `, on ${r.mortgageBindingTest.toLowerCase()}` : ""
+              }) `}
+              {underCoupon === 0
+                ? "and its first year's rent is already over the coupon."
+                : `and costs less than the coupon for its first ${
+                    underCoupon === 1 ? "year" : `${underCoupon} years`
+                  }. The rent passes it in year ${r.yearRentPassesCoupon} and never comes back under.`}
             </p>
           )}
 
@@ -2933,6 +3125,8 @@ function GroundLease() {
 
   const widestValue = Math.max(1, r.asIfPerpetual ?? 0, r.leaseholdValue ?? 0);
   const widestCover = Math.max(0.01, r.coverage ?? 0, r.resetCoverage ?? 0);
+  // The years the module ran, held as it holds them.
+  const heldYears = Math.max(1, Math.round(heldTo(num(years) ?? 0, MAX_GROUND_LEASE_YEARS)));
 
   return (
     <Card
@@ -2962,6 +3156,10 @@ function GroundLease() {
           ]}
         />
       </div>
+      <HeldNotes
+        className="mt-2"
+        notes={[heldNote(num(years), MAX_GROUND_LEASE_YEARS, "Years left", "years")]}
+      />
 
       {r.leaseholdValue !== null && r.asIfPerpetual !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -2977,7 +3175,12 @@ function GroundLease() {
                 tone: "bg-kill",
               },
               {
-                label: `Worth over the ${years} years that are left`,
+                // The years the module ran, held as it holds them — and the
+                // reset in the value where the lease gives its year.
+                label:
+                  r.resetYear === null
+                    ? `Worth over the ${heldYears} years that are left`
+                    : `Worth over the ${heldYears} years left, the year-${r.resetYear} reset in`,
                 amount: r.leaseholdValue,
                 tone: "bg-brand",
               },
@@ -3013,7 +3216,12 @@ function GroundLease() {
               ...(r.resetCoverage !== null
                 ? [
                     {
-                      label: `After the reset to ${reset}% of land value`,
+                      // On the NOI of the year the reset lands — the
+                      // building's income has grown by then too.
+                      label:
+                        r.resetYear === null
+                          ? `If it reset today, to ${reset}% of land value`
+                          : `After the reset in year ${r.resetYear}, on that year's NOI`,
                       amount: r.resetCoverage,
                       tone: r.resetCoverage < 2 ? "bg-kill" : "bg-brand",
                     },
@@ -3149,6 +3357,10 @@ function ConstructionDraw() {
           ]}
         />
       </div>
+      <HeldNotes
+        className="mt-2"
+        notes={[heldNote(num(months), MAX_BUILD_MONTHS, "Works", "months")]}
+      />
 
       {r.interestReserve !== null && (
         <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
@@ -3344,11 +3556,10 @@ function FloatingRate({
 
       {r.breachIndexPct !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
-          <p className="text-sm font-semibold">
-            {r.capProtects === false
-              ? "The cap is on the wrong side of the covenant."
-              : "The cap engages before the covenant does."}
-          </p>
+          {/* The module's own line, so it says what the note and the
+              worst-case tile say: a floor over the breach point is on the
+              wrong side of the covenant whatever the strike. */}
+          <p className="text-sm font-semibold">{r.headline}</p>
           <div className="relative mt-4 h-2 w-full rounded-full bg-white">
             <div
               data-bar="float"
@@ -3400,7 +3611,7 @@ function FloatingRate({
             tone={r.breachHeadroomBps !== null && r.breachHeadroomBps < 0 ? "brand" : "muted"}
           />
           <Stat
-            label="DSCR at the strike"
+            label={r.worstCaseAt === "floor" ? "DSCR at the floor" : "DSCR at the strike"}
             value={r.worstCaseDscr !== null ? `${r.worstCaseDscr.toFixed(2)}x` : "—"}
             tone="muted"
           />
@@ -3416,7 +3627,7 @@ function FloatingRate({
         The premium is what a broker quoted you, never a number this works out:
         pricing a cap needs a volatility surface, which is not screening
         arithmetic. It is a use funded at closing, not a haircut on the loan.
-        {sofrAsOf ? ` SOFR is today's, as of ${sofrAsOf}.` : ""}
+        {sofrAsOf ? ` The index starts at SOFR as of ${periodLabel(sofrAsOf, "daily")}.` : ""}
       </p>
     </Card>
   );
@@ -3485,6 +3696,7 @@ function Prepayment({ curve = [] }: { curve?: readonly CurveSeed[] }) {
         <Field label="Open in" suffix="mo" value={open} onChange={setOpen} placeholder="24" />
         <Field label="Market loan rate" suffix="%" value={mkt} onChange={setMkt} placeholder="6.5" />
       </div>
+      <HeldNotes className="mt-2" notes={[heldNote(num(months), MAX_LOAN_MONTHS, "Months left")]} />
 
       {r.yieldMaintenance !== null && r.defeasance !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -3542,7 +3754,13 @@ function Prepayment({ curve = [] }: { curve?: readonly CurveSeed[] }) {
         <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
           <Stat label="Cheaper route" value={r.cheaper ?? "—"} />
           <Stat label="What it costs" value={usd(r.cost)} />
-          <Stat label="Below market by" value={usd(r.debtMarkToMarket)} tone="muted" />
+          {/* Signed: a coupon over today's lending rate is a loan ABOVE
+              market, said as one, never "below market by -$412,000". */}
+          <Stat
+            label={(r.debtMarkToMarket ?? 0) < 0 ? "Above market by" : "Below market by"}
+            value={usd(r.debtMarkToMarket === null ? null : Math.abs(r.debtMarkToMarket))}
+            tone="muted"
+          />
           <Stat label="Balloon at maturity" value={usd(r.balloon)} tone="muted" />
         </div>
       )}
@@ -3560,7 +3778,7 @@ function Prepayment({ curve = [] }: { curve?: readonly CurveSeed[] }) {
         lower, and a lower rate makes the penalty bigger, so reaching for
         the 10-year understates what getting out costs.
         {seed
-          ? ` The field starts at the ${seed.short} as of ${shortDate(seed.asOf)}: the Treasury tenor nearest the remaining term is what the clause names, so change the months and check the tenor still matches.`
+          ? ` The field starts at the ${seed.short} as of ${periodLabel(seed.asOf, "daily")}: the Treasury tenor nearest the remaining term is what the clause names, so change the months and check the tenor still matches.`
           : ""}
       </p>
     </Card>
@@ -3653,6 +3871,14 @@ function LeaseBuyout() {
         <Field label="Vacant possession worth" value={outside} onChange={setOutside} placeholder="0" />
         <Field label="Tenant moving cost" value={moving} onChange={setMoving} placeholder="750,000" />
       </div>
+      <HeldNotes
+        className="mt-2"
+        notes={[
+          heldNote(num(years), MAX_LEASE_YEARS, "Years left", "years"),
+          heldNote(num(down), MAX_DOWNTIME_MONTHS, "Downtime", "months"),
+          heldNote(num(newTerm), MAX_LEASE_YEARS, "New term", "years"),
+        ]}
+      />
 
       {r.buyoutValue !== null && r.naiveSpreadPv !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -3751,10 +3977,16 @@ function LeaseBuyout() {
               to the cent. A "$14 / SF" spread beside a "$41.50" market
               rent reads as a different kind of number. */}
           <Stat
-            label="Under market by"
-            value={r.spreadPsf === null ? "—" : `$${r.spreadPsf.toFixed(2)} / SF`}
+            label={(r.spreadPsf ?? 0) < 0 ? "Over market by" : "Under market by"}
+            value={
+              r.spreadPsf === null ? "—" : `${usdCents(Math.abs(r.spreadPsf))} / SF`
+            }
           />
-          <Stat label="A year, across the space" value={usd(r.spreadAnnual)} tone="muted" />
+          <Stat
+            label="A year, across the space"
+            value={usd(r.spreadAnnual === null ? null : Math.abs(r.spreadAnnual))}
+            tone="muted"
+          />
           <Stat label="Turnover bill" value={usd(r.reTenantingCost)} tone="muted" />
           <Stat label="Rent lost to downtime" value={usd(r.downtimeCost)} tone="muted" />
         </div>
@@ -3799,7 +4031,10 @@ function CapitalStack() {
   const [mezzRate, setMezzRate] = useShared("csmr", "9");
   const [pref, setPref] = useShared("csp", "8,000,000");
   const [prefRate, setPrefRate] = useShared("cspr", "11");
-  const [accrues, setAccrues] = useShared("csac", "yes");
+  const [accrues, setAccrues, accrual] = useChoice("csac", "yes", [
+    { value: "yes", label: "Accrues" },
+    { value: "no", label: "Pays current" },
+  ]);
   const [hold, setHold] = useShared("csh", "5");
   const [target, setTarget] = useShared("cst", "15");
 
@@ -3866,15 +4101,7 @@ function CapitalStack() {
         <Field label="Pref rate" suffix="%" value={prefRate} onChange={setPrefRate} placeholder="11" />
         <Field label="Hold" suffix="yr" value={hold} onChange={setHold} placeholder="5" />
         <Field label="Equity target" suffix="%" value={target} onChange={setTarget} placeholder="15" />
-        <Choice
-          label="Preferred"
-          value={accrues}
-          onChange={setAccrues}
-          options={[
-            { value: "yes", label: "Accrues" },
-            { value: "no", label: "Pays current" },
-          ]}
-        />
+        <Choice label="Preferred" value={accrues} onChange={setAccrues} options={accrual} />
       </div>
 
       {r.layers.length > 0 && (
@@ -4043,7 +4270,10 @@ function TaxReassessment() {
   const [rate, setRate] = useShared("txt", "1.5");
   const [phase, setPhase] = useShared("txph", "3");
   const [noi, setNoi] = useShared("txn", "1,500,000");
-  const [rule, setRule] = useShared("txrule", "yes");
+  const [rule, setRule, rules] = useChoice("txrule", "yes", [
+    { value: "yes", label: "Reassessed to price" },
+    { value: "no", label: "Assessment carries over" },
+  ]);
 
   const r = useMemo(
     () =>
@@ -4087,15 +4317,7 @@ function TaxReassessment() {
         <Field label="Assessment ratio" suffix="%" value={ratio} onChange={setRatio} placeholder="100" />
         <Field label="Tax rate" suffix="%" value={rate} onChange={setRate} placeholder="1.5" />
         <Field label="Phase-in" suffix="yr" value={phase} onChange={setPhase} placeholder="1" />
-        <Choice
-          label="On transfer"
-          value={rule}
-          onChange={setRule}
-          options={[
-            { value: "yes", label: "Reassessed to price" },
-            { value: "no", label: "Assessment carries over" },
-          ]}
-        />
+        <Choice label="On transfer" value={rule} onChange={setRule} options={rules} />
       </div>
 
       {r.newTax !== null && (
@@ -4288,11 +4510,11 @@ function RentableUsable() {
       {r.rentPerUsf !== null && (
         <p className="mt-4 text-sm text-muted">
           <span className="font-semibold tabular-nums text-ink">
-            ${(num(rentPerRsf) ?? 0).toFixed(2)} per rentable foot
+            {usdCents(num(rentPerRsf) ?? 0)} per rentable foot
           </span>{" "}
           is{" "}
           <span className="font-semibold tabular-nums text-brand">
-            ${r.rentPerUsf.toFixed(2)} per foot you can furnish
+            {usdCents(r.rentPerUsf)} per foot you can furnish
           </span>
           . That is the figure that compares two buildings, because a lower
           quote at a heavier load can be the more expensive space.
@@ -4351,10 +4573,7 @@ function OpexTranslator() {
 
       <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
         <Stat label="Per unit" value={usdExact(r.perUnit)} tone="brand" />
-        <Stat
-          label="Per SF"
-          value={r.perSf === null ? "—" : `$${r.perSf.toFixed(2)}`}
-        />
+        <Stat label="Per SF" value={usdCents(r.perSf)} />
         <Stat label="Expense ratio" value={pct(ratio, 1)} />
         <Stat label="NOI" value={usd(r.noi)} />
       </div>
@@ -4533,23 +4752,36 @@ function HoldOrSell() {
   const [amort, setAmort] = useShared("hsA", "30");
   const [tax, setTax] = useShared("hsT", "");
 
-  const r = useMemo(
-    () =>
-      readHold({
-        currentValue: num(value) ?? 0,
-        nextYearNoi: num(noi) ?? 0,
-        noiGrowthPct: num(growth) ?? 0,
-        exitCapPct: num(cap) ?? 0,
-        sellingCostPct: num(cost) ?? 0,
-        reinvestmentRatePct: num(hurdle) ?? 0,
-        loanBalance: num(loan) ?? 0,
-        ratePct: num(rate) ?? 0,
-        amortYears: num(amort) ?? 0,
-        taxOnSaleNow: num(tax),
-        horizonYears: 10,
-      }),
-    [value, noi, growth, cap, cost, hurdle, loan, rate, amort, tax],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["what it is worth today", value],
+      ["next year's NOI", noi],
+      ["the NOI growth", growth],
+      ["the exit cap", cap],
+      ["the cost to sell", cost],
+      ["what the next deal earns", hurdle],
+    ];
+    // A cleared balance is no loan — the module's own "or clear the
+    // balance" — so the rate and the amortisation are needed beside one.
+    const levered = (num(loan) ?? 0) > 0;
+    if (levered) needs.push(["the loan rate", rate], ["the amortisation", amort]);
+    const missing = blanks(needs);
+    if (missing.length > 0) return { ...NO_HOLD, note: fillIn(missing) };
+    return readHold({
+      currentValue: num(value)!,
+      nextYearNoi: num(noi)!,
+      noiGrowthPct: num(growth)!,
+      exitCapPct: num(cap)!,
+      sellingCostPct: num(cost)!,
+      reinvestmentRatePct: num(hurdle)!,
+      loanBalance: levered ? num(loan)! : 0,
+      // Unread without a loan; never a stand-in zero beside one.
+      ratePct: levered ? num(rate)! : Number.NaN,
+      amortYears: levered ? num(amort)! : Number.NaN,
+      taxOnSaleNow: num(tax),
+      horizonYears: 10,
+    });
+  }, [value, noi, growth, cap, cost, hurdle, loan, rate, amort, tax]);
 
   // Every year drawn against the first year's return, so the DECAY is the
   // shape of the picture — the thing a lifetime IRR can never show. The
@@ -4560,7 +4792,7 @@ function HoldOrSell() {
 
   return (
     <Card id="hold-or-sell" eyebrow="Returns" title="Hold it or sell it">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Worth today" value={value} onChange={setValue} placeholder="34M" />
           <Field label="Next year's NOI" value={noi} onChange={setNoi} placeholder="1,870,000" />
@@ -4586,7 +4818,10 @@ function HoldOrSell() {
             <Stat label="Holding one more year" value={pct(r.nextYearReturnPct, 1)} tone="brand" />
             <Stat
               label="The year to sell"
-              value={r.sellYear === null ? "not yet" : `Year ${r.sellYear}`}
+              // "not yet" is an answer: it needs a schedule that ran.
+              value={
+                r.years.length === 0 ? "—" : r.sellYear === null ? "not yet" : `Year ${r.sellYear}`
+              }
               tone={r.sellYear === null ? "muted" : undefined}
             />
             <Stat
@@ -4688,28 +4923,46 @@ function MaxBid() {
   const [dy, setDy] = useShared("mbY", "9");
   const [rate, setRate] = useShared("mbR", "6.5");
   const [amort, setAmort] = useShared("mbA", "30");
+  // The loan fee was a 1% the card charged with no field (the research pass
+  // of 2026-10-01): a cost it counts belongs in front of the reader.
+  const [fee, setFee] = useShared("mbF", "1");
   const [close, setClose] = useShared("mbC", "1.5");
 
-  const r = useMemo(
-    () =>
-      readBid({
-        year1Noi: num(noi) ?? 0,
-        noiGrowthPct: num(growth) ?? 0,
-        holdYears: num(hold) ?? 0,
-        exitCapPct: num(exitCap) ?? 0,
-        sellingCostPct: num(sellCost) ?? 0,
-        targetLeveredIrrPct: num(target) ?? Number.NaN,
-        maxLtvPct: num(ltv),
-        minDscr: num(dscr),
-        minDebtYieldPct: num(dy),
-        ratePct: num(rate) ?? 0,
-        amortYears: num(amort) ?? 0,
-        ioYears: 0,
-        loanFeePct: 1,
-        closingCostPct: num(close),
-      }),
-    [noi, growth, hold, exitCap, sellCost, target, ltv, dscr, dy, rate, amort, close],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["the year 1 NOI", noi],
+      ["the NOI growth", growth],
+      ["the hold", hold],
+      ["the exit cap", exitCap],
+      ["the cost to sell", sellCost],
+      ["what the equity needs", target],
+    ];
+    // A lender test left blank is not applied (`sizeLoan`'s rule), and with
+    // none set the bid is all cash; any test set sizes a loan, which needs
+    // its rate and its amortisation.
+    const lending = [ltv, dscr, dy].some((v) => (num(v) ?? 0) > 0);
+    if (lending) needs.push(["the loan rate", rate], ["the amortisation", amort]);
+    const missing = blanks(needs);
+    if (missing.length > 0) return { ...NO_BID, note: fillIn(missing) };
+    return readBid({
+      year1Noi: num(noi)!,
+      noiGrowthPct: num(growth)!,
+      holdYears: num(hold)!,
+      exitCapPct: num(exitCap)!,
+      sellingCostPct: num(sellCost)!,
+      targetLeveredIrrPct: num(target)!,
+      maxLtvPct: num(ltv),
+      minDscr: num(dscr),
+      minDebtYieldPct: num(dy),
+      // Unread with no lender test set; never a stand-in zero beside one.
+      ratePct: lending ? num(rate)! : Number.NaN,
+      amortYears: lending ? num(amort)! : Number.NaN,
+      ioYears: 0,
+      // A blank fee is none, as a blank closing cost is: a cost not stated.
+      loanFeePct: num(fee),
+      closingCostPct: num(close),
+    });
+  }, [noi, growth, hold, exitCap, sellCost, target, ltv, dscr, dy, rate, amort, fee, close]);
 
   // The three lender tests on one track, scaled to the largest, so the
   // binding one is the SHORTEST bar — which is the whole reading.
@@ -4721,7 +4974,7 @@ function MaxBid() {
 
   return (
     <Card id="max-bid" eyebrow="Returns" title="What you can pay">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Year 1 NOI" value={noi} onChange={setNoi} placeholder="1,650,000" />
           <Field label="NOI growth" suffix="%" value={growth} onChange={setGrowth} placeholder="3" />
@@ -4734,6 +4987,7 @@ function MaxBid() {
           <Field label="Min debt yield" suffix="%" value={dy} onChange={setDy} placeholder="9" />
           <Field label="Loan rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
           <Field label="Amortisation" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
+          <Field label="Loan fee" suffix="%" value={fee} onChange={setFee} placeholder="1" />
           <Field label="Closing costs" suffix="%" value={close} onChange={setClose} placeholder="1.5" />
         </div>
 
@@ -4871,22 +5125,29 @@ function Insurance() {
   const [altPct, setAltPct] = useShared("insad", "10");
   const [altPrem, setAltPrem] = useShared("insap", "620,000");
 
-  const r = useMemo(
-    () =>
-      readInsurance({
-        sellerPremium: num(seller) ?? 0,
-        quotedPremium: num(quoted) ?? 0,
-        statedNoi: num(noi),
-        advertisedCapPct: num(cap),
-        buildingSf: num(sf),
-        units: num(units),
-        insuredValue: num(insured),
-        namedStormDeductiblePct: num(storm),
-        alternativeDeductiblePct: num(altPct),
-        alternativePremium: num(altPrem),
-      }),
-    [seller, quoted, noi, cap, units, sf, insured, storm, altPct, altPrem],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["the memorandum's premium", seller],
+      ["your quote", quoted],
+    ];
+    const missing = blanks(needs);
+    return missing.length > 0
+      ? { ...NO_INSURANCE, note: fillIn(missing) }
+      : readInsurance({
+          sellerPremium: num(seller)!,
+          quotedPremium: num(quoted)!,
+          // Each of these answers one part of the card, and a blank leaves
+          // that part out — the module reads it as no figure, never as zero.
+          statedNoi: num(noi),
+          advertisedCapPct: num(cap),
+          buildingSf: num(sf),
+          units: num(units),
+          insuredValue: num(insured),
+          namedStormDeductiblePct: num(storm),
+          alternativeDeductiblePct: num(altPct),
+          alternativePremium: num(altPrem),
+        });
+  }, [seller, quoted, noi, cap, units, sf, insured, storm, altPct, altPrem]);
 
   // Rule 1 as a picture: the memorandum's premium against the real one.
   const prem = [
@@ -4905,7 +5166,7 @@ function Insurance() {
 
   return (
     <Card id="insurance" eyebrow="The expense line" title="What insurance really costs">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Memorandum's premium" value={seller} onChange={setSeller} placeholder="420,000" />
@@ -5030,30 +5291,52 @@ function BelowTheLine() {
   const [price, setPrice] = useShared("blP", "48M");
   const [reserve, setReserve] = useShared("blR", "0.25");
   const [roll, setRoll] = useShared("blO", "20");
-  const [term, setTerm] = useShared("blT", "5");
   const [newTi, setNewTi] = useShared("blA", "45");
   const [renTi, setRenTi] = useShared("blB", "12");
   const [newLc, setNewLc] = useShared("blC", "14");
   const [renLc, setRenLc] = useShared("blD", "6");
   const [renew, setRenew] = useShared("blE", "65");
 
-  const r = useMemo(
-    () =>
-      readBelow({
-        brokerNoi: num(noi) ?? 0,
-        buildingSf: num(sf) ?? 0,
-        priceUsd: num(price),
-        reservePerSf: num(reserve),
-        annualRolloverPct: num(roll),
-        leaseTermYears: num(term),
-        newTiPerSf: num(newTi),
-        renewalTiPerSf: num(renTi),
-        newLcPerSf: num(newLc),
-        renewalLcPerSf: num(renLc),
-        renewalProbabilityPct: num(renew),
-      }),
-    [noi, sf, price, reserve, roll, term, newTi, renTi, newLc, renLc, renew],
-  );
+  const r = useMemo(() => {
+    // The lines this card exists to count are the module's three rules: the
+    // reserve (capital that recurs is an expense) and the leasing capital
+    // (not optional, and a year's roll is never nothing). A blank one read
+    // as zero is the line left out, which is the error the card names — so
+    // each is asked for, and a building with none of one types 0.
+    const needs: Array<readonly [string, string]> = [
+      ["the NOI as stated", noi],
+      ["the building's size", sf],
+      ["the reserve", reserve],
+      ["the share that rolls a year", roll],
+    ];
+    // What re-leasing a foot costs is needed only where some of it rolls.
+    if ((num(roll) ?? 0) > 0) {
+      needs.push(
+        ["the new TI", newTi],
+        ["the renewal TI", renTi],
+        ["the new commission", newLc],
+        ["the renewal commission", renLc],
+      );
+    }
+    const missing = blanks(needs);
+    return missing.length > 0
+      ? { ...NO_BELOW, note: fillIn(missing) }
+      : readBelow({
+          brokerNoi: num(noi)!,
+          buildingSf: num(sf)!,
+          // A blank price leaves the caps out, and the note asks for it; a
+          // blank renewal rate blends at the module's 50/50, both ends drawn
+          // beside it.
+          priceUsd: num(price),
+          reservePerSf: num(reserve)!,
+          annualRolloverPct: num(roll)!,
+          newTiPerSf: num(newTi),
+          renewalTiPerSf: num(renTi),
+          newLcPerSf: num(newLc),
+          renewalLcPerSf: num(renLc),
+          renewalProbabilityPct: num(renew),
+        });
+  }, [noi, sf, price, reserve, roll, newTi, renTi, newLc, renLc, renew]);
 
   // The two NOIs on one track, the stated one full width and the owner's
   // as the share of it that survives — so the gap IS the overhang, in the
@@ -5070,14 +5353,13 @@ function BelowTheLine() {
 
   return (
     <Card id="below-the-line" eyebrow="The statement" title="What sits below the NOI line">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="NOI as stated" value={noi} onChange={setNoi} placeholder="2,640,000" />
           <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="200,000" />
           <Field label="Asking price" value={price} onChange={setPrice} placeholder="48M" />
           <Field label="Reserve" suffix="/SF" value={reserve} onChange={setReserve} placeholder="0.25" />
           <Field label="Rolls a year" suffix="%" value={roll} onChange={setRoll} placeholder="20" />
-          <Field label="Lease term" suffix="yr" value={term} onChange={setTerm} placeholder="5" />
           <Field label="New TI" suffix="/SF" value={newTi} onChange={setNewTi} placeholder="45" />
           <Field label="Renewal TI" suffix="/SF" value={renTi} onChange={setRenTi} placeholder="12" />
           <Field label="New commission" suffix="/SF" value={newLc} onChange={setNewLc} placeholder="14" />
@@ -5123,9 +5405,15 @@ function BelowTheLine() {
               </p>
               <div className="mt-2 space-y-1.5">
                 {r.lines.map((l) => (
-                  <div key={l.label} className="flex items-center gap-3 text-xs">
-                    <span className="w-44 shrink-0 text-muted">{l.label}</span>
-                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                  // On a phone the label takes a line of its own above the
+                  // bar: beside it, its 11rem pushed the row 27px past the
+                  // card at 390px.
+                  <div
+                    key={l.label}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:flex-nowrap"
+                  >
+                    <span className="w-full text-muted sm:w-44 sm:shrink-0">{l.label}</span>
+                    <span className="relative h-2.5 min-w-0 flex-1 rounded-full bg-faint">
                       <span
                         data-bar="line"
                         className="absolute inset-y-0 left-0 rounded-full bg-caution"
@@ -5135,8 +5423,8 @@ function BelowTheLine() {
                     <span className="w-20 shrink-0 text-right tabular-nums">
                       {usdExact(l.amount)}
                     </span>
-                    <span className="w-14 shrink-0 text-right tabular-nums text-muted">
-                      ${l.perSf}/SF
+                    <span className="w-16 shrink-0 text-right tabular-nums text-muted">
+                      {`${usdCents(l.perSf)}/SF`}
                     </span>
                   </div>
                 ))}
@@ -5162,17 +5450,17 @@ function BelowTheLine() {
                 And the largest line is a guess
               </p>
               <div className="mt-2 flex items-center gap-3 text-xs">
-                <span className="w-28 shrink-0 text-right tabular-nums text-muted">
+                <span className="w-20 shrink-0 text-right tabular-nums text-muted sm:w-28">
                   {usdExact(r.leasingIfAllRenew)}
                 </span>
-                <span className="relative h-2.5 flex-1 rounded-full bg-brand/25">
+                <span className="relative h-2.5 min-w-0 flex-1 rounded-full bg-brand/25">
                   <span
                     data-bar="renew"
                     className="absolute inset-y-0 w-1 -translate-x-1/2 rounded-full bg-ink"
                     style={{ left: `${Math.max(0, Math.min(100, atBlend))}%` }}
                   />
                 </span>
-                <span className="w-28 shrink-0 tabular-nums text-muted">
+                <span className="w-20 shrink-0 tabular-nums text-muted sm:w-28">
                   {usdExact(r.leasingIfNoneRenew)}
                 </span>
               </div>
@@ -5188,9 +5476,10 @@ function BelowTheLine() {
             Capital that recurs is an expense: replacing a twenty-fifth of a
             roof every year forever is a cost of doing business, whatever an
             accountant calls it. Leasing capital is not optional either, and
-            its annual cost is not its invoice — a building on five-year
-            leases re-tenants a fifth of itself a year, so spending nothing
-            this year means the cost is late rather than absent.
+            its annual cost is an average year&rsquo;s invoice, not this
+            year&rsquo;s — a building on five-year leases re-tenants a fifth
+            of itself a year, so spending nothing this year means the cost is
+            late rather than absent.
           </p>
         </div>
       </div>
@@ -5210,22 +5499,30 @@ function EconomicOccupancy() {
   const [opex, setOpex] = useShared("eoX", "1,950,000");
   const [price, setPrice] = useShared("eoP", "52M");
 
-  const r = useMemo(
-    () =>
-      readEgi({
-        units: num(units) ?? 0,
-        marketRentPerUnit: num(market) ?? 0,
-        physicalOccupancyPct: num(occ) ?? -1,
-        lossToLeasePct: num(ltl),
-        concessionsPct: num(conc),
-        nonRevenueUnits: num(nonRev),
-        badDebtPct: num(bad),
-        otherIncomeAnnual: num(other),
-        opexAnnual: num(opex),
-        priceUsd: num(price),
-      }),
-    [units, market, occ, ltl, conc, nonRev, bad, other, opex, price],
-  );
+  const r = useMemo(() => {
+    const missing = blanks([
+      ["the units", units],
+      ["the market rent", market],
+      ["the occupancy", occ],
+    ]);
+    return missing.length > 0
+      ? { ...NO_EGI, note: fillIn(missing) }
+      : readEgi({
+          units: num(units)!,
+          marketRentPerUnit: num(market)!,
+          physicalOccupancyPct: num(occ)!,
+          // An unstated deduction is absent, not nil — the module's own rule
+          // — so a blank one is a line the bridge does not draw; a blank
+          // expense line or price leaves the NOI and the cap out.
+          lossToLeasePct: num(ltl),
+          concessionsPct: num(conc),
+          nonRevenueUnits: num(nonRev),
+          badDebtPct: num(bad),
+          otherIncomeAnnual: num(other),
+          opexAnnual: num(opex),
+          priceUsd: num(price),
+        });
+  }, [units, market, occ, ltl, conc, nonRev, bad, other, opex, price]);
 
   // The two occupancies on ONE track, because the whole point is that they
   // are answers to the same question and they disagree. The economic bar
@@ -5247,7 +5544,7 @@ function EconomicOccupancy() {
 
   return (
     <Card id="economic-occupancy" eyebrow="The statement" title="The doors against the dollars">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Units" value={units} onChange={setUnits} placeholder="200" />
           <Field label="Market rent" suffix="/mo" value={market} onChange={setMarket} placeholder="1,850" />
@@ -5309,9 +5606,14 @@ function EconomicOccupancy() {
               </p>
               <div className="mt-2 space-y-1.5">
                 {r.lines.map((l) => (
-                  <div key={l.label} className="flex items-center gap-3 text-xs">
-                    <span className="w-32 shrink-0 text-muted">{l.label}</span>
-                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                  // The label over its bar on a phone, beside it from sm:
+                  // inline at 360px the row ran past the card.
+                  <div
+                    key={l.label}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:flex-nowrap"
+                  >
+                    <span className="w-full text-muted sm:w-32 sm:shrink-0">{l.label}</span>
+                    <span className="relative h-2.5 min-w-0 flex-1 rounded-full bg-faint">
                       <span
                         data-bar="egi"
                         className={`absolute inset-y-0 left-0 rounded-full ${tone(l.kind)}`}
@@ -5404,7 +5706,7 @@ function TrailingWindow() {
 
   return (
     <Card id="trailing-window" eyebrow="The statement" title="Which trailing window">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -5415,7 +5717,7 @@ function TrailingWindow() {
               onChange={(e) => setRaw(e.target.value)}
               rows={9}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -5449,9 +5751,13 @@ function TrailingWindow() {
               {r.windows.map((w) => {
                 const lead = r.flattering?.months === w.months && r.windows.length > 1;
                 return (
-                  <div key={w.months} className="flex items-center gap-3 text-xs">
-                    <span className="w-24 shrink-0 text-muted">{w.label}</span>
-                    <span className="relative h-3 flex-1 rounded-full bg-faint">
+                  // The label over its bar on a phone, beside it from sm.
+                  <div
+                    key={w.months}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:flex-nowrap"
+                  >
+                    <span className="w-full text-muted sm:w-24 sm:shrink-0">{w.label}</span>
+                    <span className="relative h-3 min-w-0 flex-1 rounded-full bg-faint">
                       <span
                         data-bar="window"
                         className={`absolute inset-y-0 left-0 rounded-full ${
@@ -5540,23 +5846,65 @@ function LeaseUp() {
   const [fixed, setFixed] = useShared("lufx", "65");
   const [debt, setDebt] = useShared("luds", "");
 
-  const r = useMemo(
-    () =>
-      readLeaseUp({
-        buildingSf: num(sf) ?? 0,
-        preLeasedSf: num(pre),
-        stabilizedOccupancyPct: num(stab),
-        absorptionSfPerMonth: num(pace) ?? 0,
-        rentPerSf: num(rent) ?? 0,
-        freeRentMonths: num(free),
-        tiPerSf: num(ti),
-        lcPerSf: num(lc),
-        opexPerSf: num(opex),
-        fixedOpexSharePct: num(fixed),
-        monthlyDebtService: num(debt),
-        maxMonths: 60,
-      }),
-    [sf, pre, stab, pace, rent, free, ti, lc, opex, fixed, debt],
+  const r = useMemo(() => {
+    const missing = blanks([
+      ["the building's size", sf],
+      ["the absorption", pace],
+      ["the rent", rent],
+      // The money the module's rules are about: the free rent that makes
+      // leased not paying (rule 3), the allowance and commission due at
+      // signing that put the trough late (rule 4), and the operating cost
+      // an empty building still carries (rule 2). Read as zero, each is the
+      // error its rule names; a lease with none of one is typed as 0.
+      ["the free rent", free],
+      ["the allowance", ti],
+      ["the commission", lc],
+      ["the operating cost", opex],
+    ]);
+    return missing.length > 0
+      ? { ...NO_LEASE_UP, note: fillIn(missing) }
+      : readLeaseUp({
+          buildingSf: num(sf)!,
+          // A blank is the empty building the card is named for; the
+          // stabilized occupancy and the fixed share take the module's own
+          // defaults (95%, 65%); a blank debt service is the unlevered case.
+          preLeasedSf: num(pre),
+          stabilizedOccupancyPct: num(stab),
+          absorptionSfPerMonth: num(pace)!,
+          rentPerSf: num(rent)!,
+          freeRentMonths: num(free)!,
+          tiPerSf: num(ti)!,
+          lcPerSf: num(lc)!,
+          opexPerSf: num(opex)!,
+          fixedOpexSharePct: num(fixed),
+          monthlyDebtService: num(debt),
+          maxMonths: MAX_LEASE_UP_MONTHS,
+        });
+  }, [sf, pre, stab, pace, rent, free, ti, lc, opex, fixed, debt]);
+
+  // The schedule ends at the longest the card runs, and a tile whose answer
+  // falls past it reads "—": said, so the dash is where the schedule stopped
+  // rather than an answer. Not filling at all is the module's own note.
+  const notPaid = r.monthsToStabilize !== null && r.monthsToFullPay === null;
+  const notBack = r.peakFunding !== null && r.peakFunding > 0 && r.paybackMonth === null;
+  // The deepest month is the last one: still going out, so not back either.
+  const stillOut = r.peakFundingMonth !== null && r.peakFundingMonth === r.months.length;
+  const pastEnd = pastEndNote(
+    MAX_LEASE_UP_MONTHS,
+    "months",
+    stillOut
+      ? [
+          notPaid
+            ? "by then it is not paid in full and the cash is still going out, so the worst month may come later"
+            : "the cash is still going out at the end, so the worst month may come later",
+        ]
+      : notPaid && notBack
+        ? ["by then it is not paid in full, nor is the cash back"]
+        : notPaid
+          ? ["it is not paid in full by then"]
+          : notBack
+            ? ["the cash is not back by then"]
+            : [],
   );
 
   // The J-curve, drawn from a centre line: the hole the building digs and
@@ -5576,7 +5924,7 @@ function LeaseUp() {
 
   return (
     <Card id="lease-up" eyebrow="The plan" title="Filling an empty building">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
         <div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="120,000" />
@@ -5646,6 +5994,7 @@ function LeaseUp() {
               tone={r.paybackMonth === null ? "muted" : undefined}
             />
           </div>
+          <HeldNotes className="mt-2" notes={[pastEnd]} />
 
           {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
 
@@ -5712,7 +6061,7 @@ const ROLLOVER_SEED = [
 ].join("\n");
 
 function Rollover() {
-  const [raw, setRaw] = useShared("rr", ROLLOVER_SEED);
+  const [raw, setRaw] = useShared("rrt", ROLLOVER_SEED);
   const [sf, setSf] = useShared("rrsf", "200,000");
   const [hold, setHold] = useShared("rrh", "5");
   const [capSf, setCapSf] = useShared("rrc", "45");
@@ -5750,7 +6099,7 @@ function Rollover() {
 
   return (
     <Card id="rollover" eyebrow="The rent roll" title="When the income rolls">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -5761,7 +6110,7 @@ function Rollover() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -5776,6 +6125,10 @@ function Rollover() {
             <Field label="Downtime" suffix="mo" value={down} onChange={setDown} placeholder="6" />
             <Field label="Renewal rate" suffix="%" value={renew} onChange={setRenew} placeholder="65" />
           </div>
+          <HeldNotes
+            className="mt-2"
+            notes={[heldNote(wholeYears(hold), MAX_ROLLOVER_YEARS, "Hold", "years")]}
+          />
           {read.skipped.length > 0 && (
             <p className="mt-2 text-xs text-caution">
               Ignored: {read.skipped.slice(0, 3).join(", ")}
@@ -5814,21 +6167,26 @@ function Rollover() {
 
           {r.years.length > 0 && (
             <div className="mt-5 border-t border-line pt-4">
+              {/* Narrower columns on a phone, where the wide ones pushed the
+                  table 18px past the card at 390px and 48px at 360px. */}
               <div className="mb-2 flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted">
-                <span className="w-20 shrink-0">Year</span>
-                <span className="flex-1">Share of income rolling</span>
-                <span className="w-20 shrink-0 text-right">SF</span>
-                <span className="w-24 shrink-0 text-right">TI + LC</span>
+                <span className="w-12 shrink-0 sm:w-20">Year</span>
+                <span className="min-w-0 flex-1">
+                  <span className="sm:hidden">Share rolling</span>
+                  <span className="hidden sm:inline">Share of income rolling</span>
+                </span>
+                <span className="w-14 shrink-0 text-right sm:w-20">SF</span>
+                <span className="w-20 shrink-0 text-right sm:w-24">TI + LC</span>
               </div>
               <div className="space-y-1.5">
                 {r.years.map((y) => {
                   const cliff = r.worstYear?.year === y.year && r.years.length > 1;
                   return (
                     <div key={y.year} className="flex items-center gap-3 text-xs">
-                      <span className="w-20 shrink-0 tabular-nums text-muted">
+                      <span className="w-12 shrink-0 tabular-nums text-muted sm:w-20">
                         Year {y.year}
                       </span>
-                      <span className="relative h-3 flex-1 rounded-full bg-faint">
+                      <span className="relative h-3 min-w-0 flex-1 rounded-full bg-faint">
                         <span
                           data-bar="roll"
                           className={`absolute inset-y-0 left-0 rounded-full ${
@@ -5845,11 +6203,11 @@ function Rollover() {
                           />
                         )}
                       </span>
-                      <span className="w-20 shrink-0 text-right tabular-nums">
+                      <span className="w-14 shrink-0 text-right tabular-nums sm:w-20">
                         {y.sfExpiring === 0 ? "—" : y.sfExpiring.toLocaleString("en-US")}
                       </span>
                       <span
-                        className={`w-24 shrink-0 text-right tabular-nums ${
+                        className={`w-20 shrink-0 text-right tabular-nums sm:w-24 ${
                           cliff ? "font-semibold text-caution" : "text-muted"
                         }`}
                       >
@@ -5941,7 +6299,7 @@ function UnitMix() {
 
   return (
     <Card id="unit-mix" eyebrow="Multifamily" title="Read the unit mix">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -5952,7 +6310,7 @@ function UnitMix() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -5989,7 +6347,9 @@ function UnitMix() {
                   {read.rows.map((r) => (
                     <div key={`${r.label}|${r.units}`}>
                       <div className="flex items-baseline justify-between gap-3 text-sm">
-                        <span className="truncate">
+                        {/* Wraps on a phone, where a truncated line cut the
+                            count and the size off every row at 360px. */}
+                        <span className="min-w-0 sm:truncate">
                           <span className="font-medium">{r.label}</span>{" "}
                           <span className="text-muted">
                             · {r.units} {r.units === 1 ? "unit" : "units"}
@@ -6028,11 +6388,15 @@ function UnitMix() {
                 <Stat label="Avg SF" value={t.avgSf === null ? "—" : t.avgSf.toLocaleString("en-US")} tone="muted" />
                 <Stat
                   label="Rent / SF, in place"
-                  value={t.inPlacePerSf === null ? "—" : `$${t.inPlacePerSf.toFixed(2)}`}
+                  value={usdCents(t.inPlacePerSf)}
                   tone="muted"
                 />
                 <Stat label="GPR at market" value={usd(t.gprMarket)} tone="muted" />
-                <Stat label="Under market by" value={pct(t.lossToLeasePct, 1)} tone="muted" />
+                <Stat
+                  label={(t.lossToLeasePct ?? 0) < 0 ? "Over market by" : "Under market by"}
+                  value={pct(t.lossToLeasePct === null ? null : Math.abs(t.lossToLeasePct), 1)}
+                  tone="muted"
+                />
               </div>
             </>
           )}
@@ -6090,7 +6454,7 @@ function Waterfall() {
 
   return (
     <Card id="the-waterfall" eyebrow="Structure" title="Who actually gets the return">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -6101,16 +6465,19 @@ function Waterfall() {
               onChange={(e) => setRaw(e.target.value)}
               rows={6}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
             />
           </label>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <Field label="LP equity" suffix="%" value={lpPct} onChange={setLpPct} placeholder="90" />
             <Field label="Pref" suffix="%" value={pref} onChange={setPref} placeholder="8" />
+            {/* A tier's split runs UP TO its hurdle — 80/20 until the LP
+                reaches 12% — which is how `runWaterfall` reads it and how
+                the result rows below name it ("To 12% — 80/20"). */}
             <Field label="Hurdle 1" suffix="%" value={h1} onChange={setH1} placeholder="12" />
-            <Field label="LP above it" suffix="%" value={s1} onChange={setS1} placeholder="80" />
+            <Field label="LP to hurdle 1" suffix="%" value={s1} onChange={setS1} placeholder="80" />
             <Field label="Hurdle 2" suffix="%" value={h2} onChange={setH2} placeholder="18" />
-            <Field label="LP above it" suffix="%" value={s2} onChange={setS2} placeholder="70" />
+            <Field label="LP to hurdle 2" suffix="%" value={s2} onChange={setS2} placeholder="70" />
           </div>
         </div>
 
@@ -6251,7 +6618,7 @@ function FeasibilityRent() {
       eyebrow="New supply"
       title="The rent a new building needs"
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Rentable area" suffix="SF" value={sf} onChange={setSf} placeholder="120,000" />
           <Field label="Land, all in" value={land} onChange={setLand} placeholder="9,000,000" />
@@ -6280,7 +6647,7 @@ function FeasibilityRent() {
                       <span
                         className={`font-mono tabular-nums ${row.brand ? "font-semibold text-brand" : "text-ink"}`}
                       >
-                        {row.value === null ? "—" : `$${row.value.toFixed(2)}`}
+                        {usdCents(row.value)}
                       </span>
                     </div>
                     <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
@@ -6295,7 +6662,7 @@ function FeasibilityRent() {
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <Stat label="Replacement cost" value={`$${(f.costPerSf ?? 0).toFixed(2)}`} tone="muted" />
+                <Stat label="Replacement cost" value={usdCents(f.costPerSf ?? 0)} tone="muted" />
                 <Stat
                   label="…of which land"
                   value={pct(f.landShareOfCostPct, 1)}
@@ -6315,15 +6682,27 @@ function FeasibilityRent() {
                 />
               </div>
 
-              {f.breakEvenHardCostPerSf !== null && (
+              {f.breakEvenHardCostPerSf !== null && f.breakEvenHardCostPerSf >= 0 && (
                 <p className="mt-4 text-sm text-muted">
                   The gap closes from either side. Today&apos;s rent already pencils at a hard cost
                   of{" "}
                   <span className="font-semibold text-ink">
-                    ${f.breakEvenHardCostPerSf.toFixed(2)}
+                    {usdCents(f.breakEvenHardCostPerSf)}
                   </span>{" "}
-                  a foot against the {`$${(num(hard) ?? 0).toFixed(2)}`} assumed — the cost side is
+                  a foot against the {usdCents(num(hard) ?? 0)} assumed — the cost side is
                   the one nobody models.
+                </p>
+              )}
+              {/* A negative break-even is the module's own finding, said as
+                  one: no hard cost pencils, not a cost below zero that does. */}
+              {f.breakEvenHardCostPerSf !== null && f.breakEvenHardCostPerSf < 0 && (
+                <p className="mt-4 text-sm text-muted">
+                  The gap does not close from the cost side: the break-even hard cost is{" "}
+                  <span className="font-semibold text-ink">
+                    {usdCents(f.breakEvenHardCostPerSf)}
+                  </span>{" "}
+                  a foot, so the land alone is dear enough that free construction would not make
+                  the site work at today&apos;s rent.
                 </p>
               )}
             </>
@@ -6399,7 +6778,7 @@ function StorageEcri() {
 
   return (
     <Card id="storage-ecri" eyebrow="Self-storage" title="The rate increase, and the runway it spends">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Units let" value={units} onChange={setUnits} placeholder="585" />
           <Field label="In-place rent" suffix="/mo" value={inPlace} onChange={setInPlace} placeholder="135" />
@@ -6499,9 +6878,14 @@ function StorageEcri() {
           <p className="mt-3 text-xs text-muted">
             A free month costs one month out of the whole tenancy, so the same offer is{" "}
             {pct(st.concessionCostPct, 1)} here and {pct(st.concessionCostIfShortStayPct, 1)} in a
-            market where tenants leave a quarter sooner. Unit occupancy runs{" "}
-            {st.occupancyGapPts === null ? "\u2014" : `${st.occupancyGapPts} points`} above square-foot
-            occupancy because small units fill first, and an OM quotes whichever is higher.
+            market where tenants leave a quarter sooner.{" "}
+            {/* The gap's words follow its sign: "runs -4 points above" was
+                what a facility whose large units were the fuller ones read. */}
+            {st.occupancyGapPts !== null && st.occupancyGapPts < 0
+              ? `Unit occupancy runs ${Math.abs(st.occupancyGapPts)} points below square-foot occupancy here \u2014 the large units are the fuller ones \u2014 and an OM quotes whichever is higher.`
+              : st.occupancyGapPts === 0
+                ? "Unit and square-foot occupancy agree here; where they differ, an OM quotes whichever is higher."
+                : `Unit occupancy runs ${st.occupancyGapPts === null ? "\u2014" : `${st.occupancyGapPts} points`} above square-foot occupancy because small units fill first, and an OM quotes whichever is higher.`}
           </p>
         </div>
       </div>
@@ -6561,7 +6945,7 @@ function LoanAssumption() {
 
   return (
     <Card id="loan-assumption" eyebrow="Assumable debt" title="Taking over the seller's loan">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Asking price" value={price} onChange={setPrice} placeholder="20,000,000" />
           <Field label="Year-one NOI" value={noi} onChange={setNoi} placeholder="1,100,000" />
@@ -6578,6 +6962,10 @@ function LoanAssumption() {
           <Field label="New loan LTV" suffix="%" value={ltv} onChange={setLtv} placeholder="60" />
           <Field label="New amort" suffix="yrs" value={newAmort} onChange={setNewAmort} placeholder="30" />
           <Field label="New loan fee" suffix="% loan" value={newFee} onChange={setNewFee} placeholder="1" />
+          <HeldNotes
+            className="col-span-full"
+            notes={[heldNote(num(hold), MAX_HOLD_YEARS, "Hold", "years")]}
+          />
         </div>
 
         <div>
@@ -6739,7 +7127,7 @@ function Hotel() {
 
   return (
     <Card id="hotel-revpar" eyebrow="Hotels" title="What a hotel actually earns">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Keys" value={keys} onChange={setKeys} placeholder="150" />
           <Field label="ADR" value={adr} onChange={setAdr} placeholder="185" />
@@ -6790,7 +7178,7 @@ function Hotel() {
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat
               label="RevPAR"
-              value={h.revpar === null ? "\u2014" : `$${h.revpar.toFixed(2)}`}
+              value={usdCents(h.revpar)}
               tone="brand"
             />
             <Stat label="GOP margin" value={pct(h.gopMarginPct, 1)} />
@@ -6802,7 +7190,7 @@ function Hotel() {
             <div className="mt-5">
               <p className="text-xs uppercase tracking-wide text-muted">
                 The same RevPAR of{" "}
-                {h.revparAfterLift === null ? "\u2014" : `$${h.revparAfterLift.toFixed(2)}`}, reached
+                {usdCents(h.revparAfterLift)}, reached
                 two ways
               </p>
               <div className="mt-2 space-y-2">
@@ -6830,9 +7218,12 @@ function Hotel() {
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted">
-                {usd(h.leverGap)} a year apart, {usd(h.leverGapValue)} of value at the stated cap.
+                {/* "Apart" is a size: the gap is signed rate less occupancy, and
+                    the bars above already say which way it runs. */}
+                {usd(h.leverGap === null ? null : Math.abs(h.leverGap))} a year apart,{" "}
+                {usd(h.leverGapValue)} of value at the stated cap.
                 Occupancy overtakes rate once ancillary spend passes{" "}
-                {h.leverCrossingPerRoom === null ? "\u2014" : `$${h.leverCrossingPerRoom.toFixed(2)}`} an
+                {usdCents(h.leverCrossingPerRoom)} an
                 occupied room — the variable cost plus what
                 the management fee and the reserve take out of it.
               </p>
@@ -6929,7 +7320,7 @@ function Renovation() {
 
   return (
     <Card id="renovation-program" eyebrow="Value-add" title="The renovation program">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Doors to renovate" value={units} onChange={setUnits} placeholder="200" />
           <Field label="In-place rent" suffix="/mo" value={inPlace} onChange={setInPlace} placeholder="1,400" />
@@ -6968,6 +7359,10 @@ function Renovation() {
           <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="5.00" />
           <Field label="Hold" suffix="yrs" value={hold} onChange={setHold} placeholder="5" />
           <Field label="Claimed program" suffix="mo" value={claimed} onChange={setClaimed} placeholder="24" />
+          <HeldNotes
+            className="col-span-full"
+            notes={[heldNote(num(hold), MAX_HOLD_YEARS, "Hold", "years")]}
+          />
         </div>
 
         <div>
@@ -7121,7 +7516,7 @@ function Entitlement() {
 
   return (
     <Card id="entitlement" eyebrow="Before the shovel" title="The entitlement clock">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Land price" value={land} onChange={setLand} placeholder="6,000,000" />
           <Field label="Worth as it is" value={asIs} onChange={setAsIs} placeholder="4,200,000" />
@@ -7319,7 +7714,7 @@ function Swap() {
 
   return (
     <Card id="swap" eyebrow="Hedging" title="The swap, and getting out of one">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Loan" value={loan} onChange={setLoan} placeholder="20,000,000" />
           <Field label="Credit spread" suffix="%" value={spread} onChange={setSpread} placeholder="2.50" />
@@ -7511,7 +7906,7 @@ function CompGrid() {
 
   return (
     <Card id="comp-grid" eyebrow="Comparables" title="The comp adjustment grid">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -7522,7 +7917,7 @@ function CompGrid() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -7563,11 +7958,17 @@ function CompGrid() {
           {drawn.length > 0 && (
             <div className="mt-5 space-y-1.5">
               {drawn.map((c) => (
-                <div key={c.name} className="flex items-center gap-3 text-xs">
+                // The gross adjustment and the weight are the comparability
+                // test, so a phone keeps them: under the bar there, beside it
+                // from sm.
+                <div
+                  key={c.name}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs sm:flex-nowrap"
+                >
                   <span className="w-28 shrink-0 truncate text-muted" title={c.name}>
                     {c.name}
                   </span>
-                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                  <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-faint">
                     <div
                       data-bar="grid"
                       className={`h-full ${c.flagged ? "bg-caution/60" : "bg-brand"}`}
@@ -7577,7 +7978,7 @@ function CompGrid() {
                   <span className="w-20 shrink-0 text-right font-mono tabular-nums text-ink">
                     {usd(c.basisAdjusted)}
                   </span>
-                  <span className="hidden w-28 shrink-0 text-right font-mono tabular-nums text-muted sm:inline">
+                  <span className="w-full pl-[7.75rem] font-mono tabular-nums text-muted sm:w-40 sm:shrink-0 sm:pl-0 sm:text-right">
                     {c.grossAdjustmentPct}% gross, {c.weightPct}% wt
                   </span>
                 </div>
@@ -7669,7 +8070,7 @@ function StraightLineRent() {
 
   return (
     <Card id="straight-line-rent" eyebrow="The statement" title="What the statement reports, and what the building collects">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Term" suffix="yrs" value={term} onChange={setTerm} placeholder="10" />
           <Field label="Area" suffix="SF" value={area} onChange={setArea} placeholder="20,000" />
@@ -7812,7 +8213,7 @@ function ZoningEnvelope() {
 
   return (
     <Card id="zoning-envelope" eyebrow="The envelope" title="What the site actually holds">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Site" suffix="SF" value={site} onChange={setSite} placeholder="87,120" />
           <Field label="Density" suffix="/ac" value={upa} onChange={setUpa} placeholder="80" />
@@ -7929,6 +8330,10 @@ function ZoningEnvelope() {
                   </div>
                 </div>
               )}
+              {/* A bonus lifts the density limit, not the site: where another
+                  cap holds the site, this says which, and what would let the
+                  lifted limit fit. */}
+              {z.bonusNote && <p className="mt-3 text-sm text-muted">{z.bonusNote}</p>}
             </>
           )}
 
@@ -8005,7 +8410,7 @@ function FeeDrag() {
 
   return (
     <Card id="fee-drag" eyebrow="Structure" title="What the LP actually nets">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -8016,7 +8421,7 @@ function FeeDrag() {
               onChange={(e) => setRaw(e.target.value)}
               rows={6}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
             />
           </label>
           <div className="mt-3 grid grid-cols-2 gap-3">
@@ -8038,9 +8443,9 @@ function FeeDrag() {
             <Field label="LP equity" suffix="%" value={lpPct} onChange={setLpPct} placeholder="90" />
             <Field label="Pref" suffix="%" value={pref} onChange={setPref} placeholder="8" />
             <Field label="Hurdle 1" suffix="%" value={h1} onChange={setH1} placeholder="15" />
-            <Field label="LP above it" suffix="%" value={s1} onChange={setS1} placeholder="70" />
+            <Field label="LP to hurdle 1" suffix="%" value={s1} onChange={setS1} placeholder="70" />
             <Field label="Hurdle 2" suffix="%" value={h2} onChange={setH2} placeholder="20" />
-            <Field label="LP above it" suffix="%" value={s2} onChange={setS2} placeholder="50" />
+            <Field label="LP to hurdle 2" suffix="%" value={s2} onChange={setS2} placeholder="50" />
           </div>
         </div>
 
@@ -8275,6 +8680,11 @@ function LoanOverTime() {
         />
         <Field label="Term" suffix="yr" value={term} onChange={setTerm} placeholder="10" />
       </div>
+      <HeldNotes
+        className="mt-2"
+        // Whole years, as the schedule reads the term, then held.
+        notes={[heldNote(wholeYears(term), MAX_LOAN_TERM_YEARS, "Term", "years")]}
+      />
 
       {d.years.length > 0 && (
         <>

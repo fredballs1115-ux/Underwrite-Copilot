@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM, firstSignalInstruction } from "./prompts";
+import { todayLine } from "./today";
 import type { AssetClass, FirstSignal } from "./types";
 
 const FirstSignalSchema = z.object({
@@ -42,6 +43,8 @@ export async function readFirstSignal(
         content: [
           omDocument(om),
           { type: "text", text: firstSignalInstruction(assetClass) },
+          // Today's date, after the cached document (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

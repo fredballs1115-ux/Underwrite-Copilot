@@ -42,6 +42,8 @@
  * the hard costs. Land draws in full at closing, because it does.
  */
 
+import { MAX_BUILD_MONTHS, heldTo } from "./limits";
+
 const real = (n: number | null): n is number => n !== null && Number.isFinite(n);
 const positive = (n: number | null): n is number => real(n) && n > 0;
 const round = (n: number) => Math.round(n);
@@ -155,7 +157,9 @@ export function readDraw(t: DrawTerms): DrawRead {
   const hardCostsTotal = land + hard + soft;
   if (hardCostsTotal <= 0) return empty;
 
-  const n = Math.round(t.months);
+  // A month at a time, iterated to a fixed point, so held to the longest the
+  // card runs (lib/tools/limits).
+  const n = Math.round(heldTo(t.months, MAX_BUILD_MONTHS));
   const r = t.ratePct / 100 / 12;
   const ltc = t.ltcPct / 100;
   const softAtClose = real(t.softAtCloseP)

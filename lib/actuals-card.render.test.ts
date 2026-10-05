@@ -6,7 +6,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { compareNoi } from "@/lib/actuals/analyze";
 import type { T12Summary } from "@/lib/actuals/types";
-import { PropertyActuals } from "@/app/(app)/deals/[id]/property-actuals";
+import { PropertyActuals, statedDay } from "@/app/(app)/deals/[id]/property-actuals";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const T12: T12Summary = {
   collectedRent: 2_400_000,
@@ -62,6 +64,85 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
     expect(html).not.toContain("OM in-place NOI");
     expect(html).not.toContain("OM pro forma NOI");
     expect(html).toContain("nothing to hold the T-12 against");
+  });
+
+  it("reads an apartment roll per unit a month, as the memorandum does, and writes its dates as the page does (2026-09-30)", () => {
+    // The research pass: the apartment sample's card said "Avg rent
+    // $32.40/SF" and "Lease expiry (% of occupied SF)" where the memorandum
+    // and the reconciler speak of "$2,400/mo", and printed "as of 2026-05-31".
+    const apartments = {
+      rentRoll: { asOf: SAMPLE_DEAL.rentRoll.as_of_date, summary: SAMPLE_DEAL.rentRoll.summary },
+      t12: { periodEnd: SAMPLE_DEAL.t12.period_end_date, summary: SAMPLE_DEAL.t12.summary },
+      noiComparison: null,
+      assetClass: "multifamily",
+    };
+    const html = render(apartments);
+    const text = visibleText(html);
+    // $32.40/SF a year over 200,635 occupied SF ÷ 12 ÷ 225 units.
+    expect(text).toMatch(/Avg rent\s*\$2,408\/unit\/mo/);
+    expect(text).not.toContain("$32.40/SF");
+    expect(text).not.toContain("Lease expiry");
+    expect(text).toMatch(/as of May 31, 2026/);
+    expect(text).toMatch(/TTM to May 31, 2026/);
+    expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+
+    // A summary stored before the monthly figure was read keeps the rent per
+    // foot, with its period said.
+    const { avgRentMonthly: _, ...older } = SAMPLE_DEAL.rentRoll.summary;
+    void _;
+    expect(visibleText(render({ ...apartments, rentRoll: { ...apartments.rentRoll, summary: older } }))).toMatch(
+      /Avg rent\s*\$32\.40\/SF\/yr/,
+    );
+    // An average over fewer units than are occupied says so.
+    const partial = { ...SAMPLE_DEAL.rentRoll.summary, rentUnits: 200 };
+    expect(visibleText(render({ ...apartments, rentRoll: { ...apartments.rentRoll, summary: partial } }))).toMatch(
+      /over 200 of 225 occupied units/,
+    );
+    // A roll with no stated as-of date says the screen date it was measured from, as a date.
+    const undated = { ...SAMPLE_DEAL.rentRoll.summary, asOfUsed: "2026-09-08" };
+    expect(visibleText(render({ ...apartments, rentRoll: { asOf: null, summary: undated } }))).toMatch(
+      /measured at screen date Sep 8, 2026/,
+    );
+  });
+
+  it("dates only what the document stated, and names a park's pads and a dorm's beds (the audit, 2026-10-01)", () => {
+    expect(statedDay("2026-05-31")).toBe("May 31, 2026");
+    expect(statedDay("2026-05-31T00:00:00Z")).toBe("May 31, 2026");
+    expect(statedDay("2026-05")).toBe("May 2026");
+    expect(statedDay("2026")).toBe("2026");
+    expect(statedDay("2026-02-30")).toBe("2026-02-30");
+    expect(statedDay("2026-13")).toBe("2026-13");
+    expect(statedDay("Q2 2026")).toBe("Q2 2026");
+    for (const [cls, one, many] of [
+      ["manufactured_housing", "pad", "pads"],
+      ["student_housing", "bed", "beds"],
+    ] as const) {
+      const partial = { ...SAMPLE_DEAL.rentRoll.summary, rentUnits: 200 };
+      const text = visibleText(
+        render({ rentRoll: { asOf: "2026-05", summary: partial }, t12: null, noiComparison: null, assetClass: cls }),
+      );
+      expect(text, cls).toMatch(new RegExp(`Avg rent\\s*\\$2,408/${one}/mo`));
+      expect(text, cls).toContain(`over 200 of 225 occupied ${many}`);
+      expect(text, cls).toContain("as of May 2026");
+      expect(text, cls).not.toContain("/unit/mo");
+    }
+  });
+
+  it("reads an office roll by the foot, with its expiry ladder", () => {
+    const text = visibleText(
+      render({
+        rentRoll: { asOf: "2026-06-30", summary: SAMPLE_DEAL.rentRoll.summary },
+        t12: null,
+        noiComparison: null,
+        assetClass: "office",
+      }),
+    );
+    expect(text).toMatch(/Avg rent\s*\$32\.40\/SF/);
+    expect(text).not.toContain("/unit/mo");
+    expect(text).toContain("Lease expiry (% of occupied SF)");
+    expect(text).toMatch(/as of Jun 30, 2026/);
   });
 
   it("an older comparison without a basis still reads 'OM assumed NOI'", () => {

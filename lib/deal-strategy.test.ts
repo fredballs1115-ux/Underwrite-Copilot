@@ -8,7 +8,9 @@ import {
   classifyNoi,
   findPriceMetric,
   inferStrategy,
+  isOutdoorStorageYard,
   isPlanDeal,
+  buildsSomething,
   noiFigures,
   planSummary,
   plausibilityNote,
@@ -17,7 +19,10 @@ import {
   renovationProgramBudget,
   timelineFromMetrics,
 } from "./deal-strategy";
-import { parseMoney } from "./criteria";
+import { parseMoney, screenYearOf } from "./criteria";
+
+/** The year the bare rows below were screened in; none carries a year. */
+const SCREEN_YEAR = 2026;
 
 const metric = (
   label: string,
@@ -211,6 +216,20 @@ describe("planSummary / capitalBudgetFromMetrics", () => {
     expect(isPlanDeal("conversion")).toBe(true);
   });
 
+  it("builds something only on a development, a conversion, or a value-add that states its budget", () => {
+    expect(buildsSomething(null, "development")).toBe(true);
+    expect(buildsSomething(CONVERSION, "conversion")).toBe(true);
+    // A lease-up's building is already built.
+    expect(buildsSomething(ex([]), "lease_up")).toBe(false);
+    expect(buildsSomething(STABILIZED, "stabilized")).toBe(false);
+    // A value-add builds only where it states what it will spend.
+    expect(buildsSomething(ex([metric("Asking price", "$30,000,000")]), "value_add")).toBe(false);
+    expect(buildsSomething(ex([metric("Renovation budget", "$4,500,000")]), "value_add")).toBe(true);
+    expect(
+      buildsSomething(ex([metric("Units to renovate", "192"), metric("Renovation cost per unit", "$15,000")]), "value_add"),
+    ).toBe(true);
+  });
+
   it("carries the OM's own words for the budget and the timeline when the extraction states them", () => {
     const p = planSummary(
       ex(CONVERSION.metrics, {
@@ -252,6 +271,97 @@ describe("planSummary / capitalBudgetFromMetrics", () => {
     expect(capitalBudgetFromMetrics([metric("Total project cost", "$15M")], 20_000_000)).toBeNull(); // below the price
     expect(capitalBudgetFromMetrics([metric("Construction budget", "—")], 20_000_000)).toBeNull();
   });
+
+  it("takes the total wherever it sits, and never a line of the budget for it", () => {
+    // Hard costs listed ahead of the total: the first matching row had won,
+    // so the soft costs and the land dropped out of the plan's cost.
+    const lines = [
+      metric("Hard costs", "$18,000,000"),
+      metric("Soft costs", "$4,000,000"),
+      metric("Total project cost", "$40,000,000", { page: "p. 14" }),
+    ];
+    expect(capitalBudgetFromMetrics(lines, 10_000_000)).toMatchObject({
+      budget: 30_000_000,
+      allIn: true,
+      label: "Total project cost",
+      page: "p. 14",
+    });
+    // A works budget as a whole wins over a line listed ahead of it too.
+    expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000"), metric("Construction budget", "$22,000,000")], 10_000_000)).toMatchObject({
+      budget: 22_000_000,
+      label: "Construction budget",
+    });
+    // A total wins over a works budget, wherever the two sit.
+    expect(capitalBudgetFromMetrics([metric("Construction budget", "$22,000,000"), metric("Total development cost", "$34,000,000")], 10_000_000)).toMatchObject({
+      budget: 24_000_000,
+      label: "Total development cost",
+    });
+    expect(capitalBudgetFromMetrics([metric("Total capitalization", "$40,000,000")], 10_000_000)).toMatchObject({ budget: 30_000_000, allIn: true });
+  });
+
+  it("says where the budget's own words include its interest reserve, and reads such a total at all", () => {
+    // "reserve" in the label had thrown the total out entirely.
+    expect(capitalBudgetFromMetrics([metric("Total project cost (incl. interest reserve)", "$180,000,000")], 20_000_000)).toMatchObject({
+      budget: 160_000_000,
+      allIn: true,
+      includesReserve: true,
+    });
+    expect(capitalBudgetFromMetrics([metric("Total project cost", "$180,000,000 including capitalized interest")], 20_000_000)?.includesReserve).toBe(true);
+    expect(budgetFromText("$180 million total project cost, including the interest reserve", 20_000_000)?.includesReserve).toBe(true);
+    // Left out, or not said: no flag, and a reserve row is still no budget.
+    expect(capitalBudgetFromMetrics([metric("Total project cost", "$180,000,000")], 20_000_000)?.includesReserve).toBeUndefined();
+    expect(capitalBudgetFromMetrics([metric("Construction budget", "$160,000,000 excl. financing costs")], 20_000_000)?.includesReserve).toBeUndefined();
+    expect(capitalBudgetFromMetrics([metric("Replacement reserve", "$74,400")], 20_000_000)).toBeNull();
+    expect(capitalBudgetFromMetrics([metric("Interest reserve", "$6,000,000")], 20_000_000)).toBeNull();
+  });
+
+  it("with only lines of the budget stated there is no stated total: null, never a sum", () => {
+    expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000")], 10_000_000)).toBeNull();
+    expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000"), metric("Soft costs", "$4,000,000"), metric("Land cost", "$10,000,000")], 10_000_000)).toBeNull();
+    for (const label of [
+      "Construction hard costs",
+      "Construction budget (hard costs)",
+      "Renovation budget – soft costs",
+      "Construction cost – contingency",
+      "Construction budget: developer fee",
+      "Renovation budget (FF&E)",
+      "Construction budget – interest reserve",
+      "Construction cost (land)",
+    ]) {
+      expect(capitalBudgetFromMetrics([metric(label, "$4,000,000")], 10_000_000), label).toBeNull();
+    }
+    // Hard and soft together are the works' whole; a line named only to say
+    // what the figure includes or leaves out is a note, not the row.
+    for (const label of ["Hard and soft costs", "Construction budget (hard & soft)", "Renovation budget (incl. contingency)", "Construction budget, excl. land", "Construction cost (land excluded)"]) {
+      expect(capitalBudgetFromMetrics([metric(label, "$4,000,000")], 10_000_000)?.budget, label).toBe(4_000_000);
+    }
+  });
+
+  it("the plan and the model's capital line read the one reader: hard costs ahead of the total never flatter the yield", async () => {
+    const e = ex(
+      [
+        metric("Purchase price", "$20,000,000"),
+        metric("Hard costs", "$120,000,000"),
+        metric("NOI (stabilized, pro forma)", "$21,000,000"),
+        metric("Total project cost", "$180,000,000"),
+      ],
+      { strategy: { kind: "conversion", summary: "", capitalBudget: "", timeline: "" } },
+    );
+    const p = planSummary(e)!;
+    expect(p.budget?.label).toBe("Total project cost");
+    expect(p.totalCost).toBe(180_000_000);
+    // $21M over the hard costs and the price alone would have read 15.0%.
+    expect(p.yieldOnCost).toBeCloseTo(21 / 180, 9);
+    const { deriveUnderwriteInputs } = await import("./underwrite/inputs");
+    expect(deriveUnderwriteInputs(e, "x").inputs.capitalImprovementsYr1).toBe(160_000_000);
+    // Hard costs alone: no budget, no total cost, no yield on cost — and
+    // the model carries no capital it was never told.
+    const bare = ex([metric("Purchase price", "$20,000,000"), metric("Hard costs", "$120,000,000"), metric("NOI (stabilized, pro forma)", "$21,000,000")], {
+      strategy: { kind: "conversion", summary: "", capitalBudget: "", timeline: "" },
+    });
+    expect(planSummary(bare)).toMatchObject({ budget: null, totalCost: null, yieldOnCost: null });
+    expect(deriveUnderwriteInputs(bare, "x").inputs.capitalImprovementsYr1).toBe(0);
+  });
 });
 
 describe("renovationProgramBudget — a value-add program stated a door at a time (#460)", () => {
@@ -284,6 +394,12 @@ describe("renovationProgramBudget — a value-add program stated a door at a tim
     expect(plausibilityNote([], inferStrategy(VALUE_ADD()), p)).toContain(
       "$2.9M (192 doors × $15,000 a door, the renovation program as stated)",
     );
+    // A stabilized NOI never sits above a price: it sits above today's
+    // income, and over the price alone reads as a cap not earned today
+    // (research pass 18 — the note had told the challenger the first).
+    const note = plausibilityNote([], inferStrategy(VALUE_ADD()), p);
+    expect(note).not.toContain("far above the acquisition price");
+    expect(note).toContain("it is expected to sit above today's income");
   });
 
   it("a total the memorandum states wins, and is never added to the program", () => {
@@ -427,6 +543,33 @@ describe("assessPlausibility", () => {
     expect(f[0].title).toContain("per SF");
   });
 
+  it("never calls a fitted data center or an outdoor-storage yard a misread for its price per foot", () => {
+    const codes = (assetClass: string, price: string, sf: string) =>
+      assessPlausibility(
+        ex([metric("Asking price", price), metric("Rentable square feet", sf)], { assetClass }),
+      ).map((f) => f.code);
+    // $600M over 150,000 SF is $4,000/SF: a data center's price is its power.
+    expect(codes("Data center", "$600,000,000", "150,000")).not.toContain("basis_out_of_band");
+    // The same figures on an office are no market's.
+    expect(codes("Office", "$600,000,000", "150,000")).toContain("basis_out_of_band");
+    // A yard trades by the acre: $18M over a 5,000 SF shop is no misread.
+    expect(codes("Industrial Outdoor Storage", "$18,000,000", "5,000")).not.toContain("basis_out_of_band");
+    // A data center under the band's floor is still one.
+    expect(codes("Data center", "$400,000", "150,000")).toContain("basis_out_of_band");
+    // A self-storage facility that also lets outdoor storage is priced by
+    // its buildings' feet: held to the band like any storage facility.
+    expect(codes("Self storage with outdoor storage", "$18,000,000", "5,000")).toContain("basis_out_of_band");
+  });
+
+  it("isOutdoorStorageYard reads a yard off the deck's own words, the one test every basis reader shares", () => {
+    for (const cls of ["Industrial Outdoor Storage (IOS)", "IOS", "Outdoor storage yard", "Truck terminal", "Truck yard", "Storage yard"]) {
+      expect(isOutdoorStorageYard(cls), cls).toBe(true);
+    }
+    for (const cls of ["Industrial", "industrial", "Warehouse / distribution", "Self storage with outdoor storage", "Self-Storage", "Portfolios", "Studios", "", null, undefined]) {
+      expect(isOutdoorStorageYard(cls), String(cls)).toBe(false);
+    }
+  });
+
   it("reads a zero in-place NOI on a supposedly stabilized deal as a strategy question", () => {
     const f = assessPlausibility(
       ex([metric("Asking price", "$12,000,000"), metric("NOI (in-place)", "$0", { basis: "in_place" })]),
@@ -486,10 +629,26 @@ describe("plausibilityNote", () => {
     expect(note).toMatch(/THE PLAN AS THE OM STATES IT/);
     expect(note).toMatch(/stabilized NOI \$21\.0M/);
     expect(note).toMatch(/total cost \$180\.0M/);
-    expect(note).toMatch(/yield on total cost 11\.7%/);
+    expect(note).toMatch(/yield on total cost 11\.67%/);
     expect(note).toMatch(/not a misread/);
     expect(note).toMatch(/as conservative as the deck presents it/);
     expect(note).not.toMatch(/FIGURES THAT DO NOT TIE/);
+  });
+
+  it("says whose strategy the deal type is on a note or a leased fee, as the deal header does", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const sold = (kind: "note" | "leased_fee" | "fee_simple") =>
+      ex([metric("Asking price", "$9M"), metric("Renovation budget", "$1M")], { interest: { ...blank, kind } });
+    const noteFor = (kind: "note" | "leased_fee" | "fee_simple") => {
+      const e = sold(kind);
+      const s = inferStrategy(e);
+      return plausibilityNote([], s, planSummary(e, s), e);
+    };
+    expect(noteFor("note")).toMatch(/^DEAL STRATEGY: Value-add \(the collateral\) /);
+    expect(noteFor("leased_fee")).toMatch(/^DEAL STRATEGY: Value-add \(the leaseholder's building\) /);
+    // A price that buys the building keeps the label as it stands.
+    expect(noteFor("fee_simple")).toMatch(/^DEAL STRATEGY: Value-add /);
+    expect(noteFor("fee_simple")).not.toMatch(/\(the /);
   });
 
   it("says plainly what the plan does not state", () => {
@@ -614,7 +773,7 @@ describe("findPriceMetric — a development buys land", () => {
 
   it("reads the land cost as the price on a development, never the appraised land value", () => {
     expect(inferStrategy(DEVELOPMENT).kind).toBe("development");
-    expect(findPriceMetric(DEVELOPMENT.metrics, "development")?.value).toBe("$8,000,000");
+    expect(findPriceMetric(DEVELOPMENT.metrics, "development", screenYearOf(DEVELOPMENT))?.value).toBe("$8,000,000");
     const p = planSummary(DEVELOPMENT)!;
     expect(p.price).toBe(8_000_000);
     expect(p.budget).toMatchObject({ budget: 52_000_000, allIn: true });
@@ -624,11 +783,11 @@ describe("findPriceMetric — a development buys land", () => {
 
   it("the asking price still wins when both are stated, and other deals never read a land line as the price", () => {
     const both = [metric("Land cost", "$8,000,000"), metric("Asking price", "$50,000,000")];
-    expect(findPriceMetric(both, "development")?.value).toBe("$50,000,000");
-    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "stabilized")).toBeNull();
-    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "conversion")).toBeNull();
-    expect(findPriceMetric([metric("Land cost per acre", "$400,000")], "development")).toBeNull();
-    expect(findPriceMetric([metric("Land value", "$9,500,000")], "development")).toBeNull();
+    expect(findPriceMetric(both, "development", SCREEN_YEAR)?.value).toBe("$50,000,000");
+    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "stabilized", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "conversion", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([metric("Land cost per acre", "$400,000")], "development", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([metric("Land value", "$9,500,000")], "development", SCREEN_YEAR)).toBeNull();
   });
 });
 

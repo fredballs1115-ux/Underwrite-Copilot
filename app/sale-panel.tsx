@@ -25,6 +25,7 @@ const METHOD_CHIP: Record<SaleRead["method"], string> = {
   receivership: "Receiver's sale",
   bankruptcy: "Bankruptcy sale",
   reo: "Lender-owned (REO)",
+  short_sale: "Short sale",
   negotiated: "",
   unknown: "Sale terms",
 };
@@ -54,7 +55,19 @@ export function SalePanel({ sale, ceiling = null }: { sale: SaleRead | null; cei
         )}
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{r.headline}</p>
+      {/* How it is sold leads; the premium, the reserve and the deadline
+          are one click away and whole in the HTML — the bid's picture below
+          draws the premium, and the chip above counts down to the deadline. */}
+      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
+      {r.sentences.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
+        </details>
+      )}
 
       {bid != null && allIn != null && (
         <div className="mt-2.5" data-qa="sale-bid">

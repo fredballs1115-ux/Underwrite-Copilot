@@ -14,6 +14,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { normalizeBostonLU, absenteeFlag, numOrNull } from "../../lib/ingest/normalize";
 import { ckanPages, ckanSearch } from "../../lib/ingest/ckan";
+import { pickAssessmentRoll, type CkanResource } from "../../lib/ingest/boston-roll";
 import { resolveFields } from "../../lib/ingest/socrata";
 
 const MARKET = "boston";
@@ -45,17 +46,17 @@ async function resolveResource(): Promise<{ id: string; name: string }> {
   }
   const body = (await res.json()) as {
     success?: boolean;
-    result?: { resources?: { id: string; name?: string; datastore_active?: boolean }[] };
+    result?: { resources?: CkanResource[] };
   };
-  const resources = (body.result?.resources ?? []).filter((r) => r.datastore_active);
-  if (!resources.length) {
+  // Per-year resources are named "Property Assessment FY" and the year (in
+  // `name_translated.en`; `name` is null) — the highest fiscal year the
+  // portal can serve rows from is the current roll (lib/ingest/boston-roll).
+  const roll = pickAssessmentRoll(body.result?.resources ?? []);
+  if (!roll) {
     throw new Error(`package ${SLUG} has no datastore-enabled resources — inspect it on ${PORTAL}.`);
   }
-  // Per-year resources are named like "Property Assessment FY2026" — the
-  // highest FY (falling back to list order) is the current roll.
-  const fy = (n?: string) => Number((n ?? "").match(/(?:FY|20)(\d{2})/i)?.[1] ?? 0);
-  resources.sort((a, b) => fy(b.name) - fy(a.name));
-  return { id: resources[0].id, name: resources[0].name ?? resources[0].id };
+  if (roll.year == null) console.warn(`no resource name states a fiscal year — taking the portal's first: ${roll.name}`);
+  return { id: roll.id, name: roll.name };
 }
 
 const resource = await resolveResource();

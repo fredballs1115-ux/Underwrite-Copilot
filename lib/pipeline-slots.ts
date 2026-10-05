@@ -5,10 +5,11 @@
 // carries, and what the price buys where it is not the building (#415).
 // Pure: no I/O, no LLM.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
-import { findGoingInCap, unitCountRow } from "@/lib/criteria";
+import { shownAssetClass } from "@/lib/asset-class";
+import { findGoingInCap, screenYearOf, unitCountRow } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
+import { noteCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
 import { assumableTag } from "@/lib/assumable-debt";
@@ -24,11 +25,20 @@ import { siteReportsTag } from "@/lib/site-reports";
 import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
+import { selfStorageTag } from "@/lib/self-storage";
+import type { ListJobStatus } from "@/lib/screen-run";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
-   *  none (its stabilized cap or yield on cost is the finished project's) */
+   *  none (its stabilized cap or yield on cost is the finished project's),
+   *  and on a note, whose collateral's cap is not the buyer's (`capWithheld`) */
   cap: string | null;
+  /** "note" where the going-in cap is withheld because the price is a
+   *  loan's (lib/compare-interest `noteCapSlot`); absent or null otherwise */
+  capWithheld?: "note" | null;
+  /** a note's yield to maturity at its price — "13.8%" — where the note pays
+   *  or may: its answer in the cap slot; absent or null otherwise */
+  noteYield?: string | null;
   price: string | null;
   /** a plan deal's yield on total cost — its answer where a stabilized
    *  asset shows a cap — null for a stabilized asset or an unstated plan */
@@ -91,10 +101,16 @@ export interface PipelineSlots {
    *  (lib/manufactured-housing `manufacturedHousingTag`, #470); absent or
    *  null on anything else */
   mh?: string | null;
+  /** a self-storage facility's lease-up, the premium sitting tenants pay
+   *  over street and its economic occupancy — "In-place 21.1% over street,
+   *  Economic 84%", "Lease-up, 72% occupied" (lib/self-storage
+   *  `selfStorageTag`, #471); absent or null on anything else */
+  storage?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
-   *  percentage, or where the count or the area is not stated */
+   *  percentage or beside the loan its entity carries (its grossed-up price
+   *  is the equity's whole), or where the count or the area is not stated */
   basis?: string | null;
 }
 
@@ -105,15 +121,20 @@ const compactUsd = (n: number) =>
  * The price by the class's own basis — "$274k/unit", "$200k/key", "$212/SF"
  * — read through the comps page's subject reader (lib/comp-detail
  * `subjectBasis`), so the card and the comps' tick agree on the figure: the
- * building's price (a share's grossed up, none for a note or the land)
- * over the count in the memorandum's own noun, or over the building's
- * area where the class is priced by the foot. None on a conversion or a
- * development, whose basis is the all-in cost, not the shell's price.
+ * building's price (a share's grossed up, none for a note, the land or a
+ * share beside the loan its entity carries, whose grossed-up price is the
+ * equity's whole) over the count in the memorandum's own noun, or over the
+ * building's area where the class is priced by the foot. None on a conversion or a
+ * development, whose basis is the all-in cost, not the shell's price, and
+ * none by the foot on an outdoor-storage yard, which trades by the acre
+ * (the deck's own words, lib/deal-strategy `isOutdoorStorageYard`). The
+ * class is the deal's one class (`shownAssetClass`): the analyst's where
+ * they filed one, the deck's where they left "Auto".
  */
-export function basisTag(extraction: ExtractionResult, kind: StrategyKind): string | null {
+export function basisTag(extraction: ExtractionResult, kind: StrategyKind, storedClass?: string | null): string | null {
   const metrics = extraction.metrics ?? [];
-  const words = assetWords(extraction.assetClass);
-  const b = subjectBasis(metrics, kind, interestOf(extraction));
+  const words = assetWords(shownAssetClass(storedClass, extraction));
+  const b = subjectBasis(metrics, kind, screenYearOf(extraction), interestOf(extraction), extraction.assetClass);
   if (words.basis === "sf") return b.perSf != null ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
   if (words.basis === "unit" && b.perUnit != null) {
     const noun = countNoun(unitCountRow(metrics)?.label, words.key).replace(/s$/, "");
@@ -123,47 +144,68 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind): stri
 }
 
 /**
- * The asset class a pipeline row shows. A deal created with "Auto-detect"
- * keeps "auto" in its column, and what the deck turned out to be lives in
- * the extraction — so the row shows that read, and shows nothing (no rail,
- * no dot, a dash) while nothing has read the deck yet. "Auto" was never an
- * asset class, and a row that said so read as one.
- *
- * A known class comes back as its key, whatever its case, so the filter
- * and the colour rail match it; a class the model phrased itself keeps
- * its case — "NNN retail" is not "Nnn retail" — and `assetClassLabel`
- * only raises its first letter.
+ * The going-in cap the memorandum states, as a pipeline row's Cap slot
+ * shows it: none on a plan deal, whose stabilized cap or yield on cost is the
+ * finished project's (its slot carries the yield on total cost), and none on
+ * a note, whose collateral's cap is not the buyer's figure (lib/compare-
+ * interest `noteCapSlot`: its slot carries the note's yield). The compare
+ * table reads it where a deal's model has no cap (lib/compare-figures), and
+ * the meeting workbook's row reads it too, so the three show one figure.
  */
-export function shownAssetClass(
-  stored: string | null | undefined,
-  extraction: { assetClass?: string | null } | null | undefined,
-): string {
-  const norm = (v: string | null | undefined): string => {
-    const t = (v ?? "").trim();
-    const lower = t.toLowerCase();
-    if (!t || lower === "auto") return "";
-    return ASSET_CLASS_LABEL[lower] ? lower : t;
-  };
-  return norm(stored) || norm(extraction?.assetClass);
+export function statedCapSlot(extraction: ExtractionResult, planDeal: boolean): string | null {
+  if (planDeal || interestOf(extraction).kind === "note") return null;
+  return findGoingInCap(extraction.metrics ?? [])?.value ?? null;
 }
 
-export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): PipelineSlots {
+// The asset class a pipeline row shows — the deal's one class — is
+// `shownAssetClass` in lib/asset-class, beside the labels it reads, so the
+// modules the browser loads (lib/market-memory, through the deal page's
+// strip) can file a deal by it without loading every slot reader here.
+// Every surface still imports it from here.
+export { shownAssetClass };
+
+/**
+ * Whether a card's empty slots are still being read rather than not stated:
+ * a screen is live (`listJobStatus`'s "running") on a memorandum whose terms
+ * nothing has read yet — a first screen before its extraction lands. A
+ * figure a finished read did not find keeps its dash, a re-screen's
+ * included (its slots are the last finished read's until the new terms
+ * land); a deal typed in by hand has no memorandum to read; a stalled run
+ * is reading nothing.
+ */
+export function readingTerms(status: ListJobStatus | undefined, hasExtraction: boolean, hasOm: boolean): boolean {
+  return status === "running" && !hasExtraction && hasOm;
+}
+
+/** The row's slots. `storedClass` is the class the deal was filed under
+ *  ("auto" where the analyst left it to the deck), read with the
+ *  extraction's through `shownAssetClass` wherever a slot speaks in the
+ *  class's terms. Before the extraction lands — a first screen's first
+ *  minute — the first signal is all there is: its ask fills the price, as
+ *  on the deal page, and every other slot waits for the terms. */
+export function pickSlots(extraction: ExtractionResult | null, signal: FirstSignal | null, storedClass?: string | null): PipelineSlots {
+  if (!extraction) return { cap: null, price: signalAskPrice(signal), yoc: null };
   const metrics = extraction.metrics ?? [];
   // The same read the deal page makes — extraction plus the first signal —
   // so a deal never shows a price on one surface and none on the other.
   const strategy = inferStrategy(extraction, signal);
   const plan = planSummary(extraction, strategy);
+  // A note's cap slot (#423's rule): the collateral's cap withheld, the
+  // note's yield to maturity in its place where the note pays or may.
+  const note = plan ? null : noteCapSlot(extraction);
   return {
     // The going-in cap only, and only on an operating asset: the same rule
     // the meeting .xlsx, the analytics and the comp memory apply, so a
     // value-add's row shows its yield on cost where the export shows "n/a
     // — plan", never a cap on one and a yield on the other.
-    cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
+    cap: statedCapSlot(extraction, plan != null),
+    capWithheld: note ? "note" : null,
+    noteYield: note?.ytmPct != null ? `${note.ytmPct.toFixed(1)}%` : null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask
     // fills the slot before the extraction lands, as on the deal page —
     // only when it is a figure, never an "unpriced" or "call for offers".
-    price: findPriceMetric(metrics, strategy.kind)?.value ?? signalAskPrice(signal),
+    price: findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(signal),
     yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
     // A share's price, a note's or the land's under a ground lease is not
     // the building's, and the row says so beside the figure.
@@ -200,7 +242,10 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // A park's lot rent against the market's, and its private utilities
     // (#470).
     mh: manufacturedHousingTag(extraction),
-    // The price by the unit or the foot, as a listing card shows it (#469).
-    basis: basisTag(extraction, strategy.kind),
+    // A storage facility's lease-up and the premium over street (#471).
+    storage: selfStorageTag(extraction),
+    // The price by the unit or the foot, as a listing card shows it (#469),
+    // in the deal's one class.
+    basis: basisTag(extraction, strategy.kind, storedClass),
   };
 }

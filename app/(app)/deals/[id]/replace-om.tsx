@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { replaceOm } from "../actions";
+import { tooLargeMessage } from "@/lib/upload-limit";
 
 function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }) {
   const { pending } = useFormStatus();
@@ -28,7 +29,7 @@ function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }
           if (f.size > 32 * 1024 * 1024) {
             // Past 32 MB the request would blow the server-action body cap
             // and die as a raw 500 — reject before the confirm dialog.
-            alert(`"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is 32 MB. Try compressing or splitting it.`);
+            alert(tooLargeMessage(f.name, f.size, 32 * 1024 * 1024));
             e.currentTarget.value = "";
             return;
           }

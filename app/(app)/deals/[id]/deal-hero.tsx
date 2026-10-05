@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { priceRange, priceRangeShort } from "@/lib/criteria";
 
 /**
  * The deal's header, laid out the way a listing opens (#433): the
@@ -24,8 +25,25 @@ export interface HeroFigure {
   value: string | null;
   /** a figure, set in the mono face; a word like the deal type is not */
   figure?: boolean;
-  /** hover text — the deal type's one-line summary */
+  /** hover text — the deal type's one-line summary, or a price range as
+   *  the memorandum states it */
   title?: string;
+}
+
+/**
+ * The price slot's figure. A price the memorandum states as a range (#466)
+ * is drawn the way the pipeline draws it — "$9–9.5M", `priceRangeShort` —
+ * with the range as stated in its title: a tile holds one figure on one
+ * line, and "$9,000,000 – $9,500,000" ran 192px in a phone's 121px tile,
+ * cut to "$9,000,000 – $9". A single figure, or words, stay as stated. The
+ * header and the bar that keeps the deal in view both draw this one figure,
+ * so the two say the price word for word.
+ */
+export function priceFigureOf(label: string, stated: string | null): HeroFigure {
+  const range = stated ? priceRange(stated) : null;
+  return range && stated
+    ? { label, value: priceRangeShort(range), title: `As stated: ${stated.trim()}`, figure: true }
+    : { label, value: stated, figure: true };
 }
 
 // One column by default: the picture, the facts, the tools, the panels.
@@ -45,6 +63,7 @@ export function DealHero({
   actions,
   controls,
   children,
+  reading = false,
 }: {
   title: string;
   /** the call and the buy-box fit, beside the name */
@@ -61,6 +80,10 @@ export function DealHero({
   controls?: ReactNode;
   /** the panels under the toolbar: each is a boxed card of its own */
   children?: ReactNode;
+  /** the deal's screen is still reading the memorandum (lib/screen-reading):
+   *  a figure not read yet shimmers in place of the dash a finished screen
+   *  gives a figure its memorandum does not state */
+  reading?: boolean;
 }) {
   return (
     // No overflow-hidden on the card: the share panel and the deal's menu open
@@ -78,18 +101,37 @@ export function DealHero({
             <p className="mt-1 line-clamp-2 text-sm text-muted">{subtitle}</p>
           </div>
           {/* Four across only where a tile holds a nine-figure price on one
-              line; a figure never breaks inside itself. */}
+              line; a figure never breaks inside itself. A label may take two
+              lines — "Price · Leasehold, 45 yrs left" is the fact the price
+              turns on, and one truncated line cut it off at every width —
+              and a row's figures stay on one line with each other, each at
+              the foot of its tile. */}
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line @2xl/facts:grid-cols-4">
             {figures.map((f) => (
-              <div key={f.label} className="min-w-0 bg-surface px-3.5 py-2.5">
-                <dt className="truncate text-[11px] uppercase tracking-wide text-muted">{f.label}</dt>
+              <div key={f.label} className="flex min-w-0 flex-col justify-between bg-surface px-3.5 py-2.5">
+                <dt className="line-clamp-2 text-[11px] uppercase tracking-wide text-muted">{f.label}</dt>
                 <dd
                   className={`mt-0.5 text-base font-semibold @xs/facts:text-lg ${
                     f.figure ? "whitespace-nowrap font-mono tabular-nums" : "break-words"
                   }`}
                   title={f.title}
                 >
-                  {f.value ?? "—"}
+                  {f.value ??
+                    (reading ? (
+                      // Not read yet, rather than not stated: a quiet
+                      // shimmer (still under prefers-reduced-motion — the
+                      // .skeleton sweep only runs where motion is welcome).
+                      // A picture with a name, not a live region: four
+                      // figures announcing themselves at once is noise.
+                      <span
+                        role="img"
+                        aria-label="Reading the memorandum"
+                        data-qa="figure-reading"
+                        className="skeleton inline-block h-[1.1em] w-20 max-w-full rounded align-middle"
+                      />
+                    ) : (
+                      "—"
+                    ))}
                 </dd>
               </div>
             ))}

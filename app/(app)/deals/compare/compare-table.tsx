@@ -3,6 +3,7 @@ import { assetClassLabel } from "@/lib/asset-class";
 import type { BannerSource } from "@/lib/deal-banner";
 import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
+import type { FigureSource } from "@/lib/compare-figures";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -16,6 +17,29 @@ export const pct = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(1) + "%";
 export const mult = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(2) + "x";
+
+/** What the return rows are, said once over the table (the audit of
+ *  2026-09-30): the first-draft model's figures (lib/model, which carries
+ *  no date), not the memorandum's that each deal's header prints. */
+export const MODEL_ROWS_NOTE =
+  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced), not the memorandum’s figures on its header; a figure marked (OM) comes from the memorandum’s figures, stated or worked from them (a yield on cost, a note’s yield, a spread), where the model has none.";
+
+/** A row a model figure fills says so beside its name. */
+const MODEL_ROW = " · model";
+
+/** A figure the memorandum states, in a row the model fills elsewhere. */
+const OM_MARK = (
+  <>
+    {" "}
+    <span className="font-sans text-[10px] text-muted" title="From the memorandum’s figures — this deal’s first-draft model has none">
+      (OM)
+    </span>
+  </>
+);
+
+/** A cell that says nothing: no figure, or the dash that stands for none.
+ *  A reason ("n/a — plan", "judged on yield on cost") is not blank. */
+const blankCell = (v: string | null | undefined) => v == null || v.trim() === "" || v.trim() === "—";
 
 export type Col = {
   id: string;
@@ -31,6 +55,11 @@ export type Col = {
   readCounty?: string | null;
   verdict: string | null;
   reason: string | null;
+  /** why the call on file is the previous screen's, if it is: a re-screen
+   *  still running toward its verdict, or one that failed before reaching
+   *  it (lib/screen-run `verdictBehind`). Such a call is shown as the run,
+   *  the way the pipeline card shows it, and never crowned "best". */
+  behind?: "running" | "failed" | null;
   hasModel: boolean;
   /** deterministic mandate fit + a one-line why (misses / near-misses) */
   fit: "fits" | "near" | "outside" | null;
@@ -45,9 +74,14 @@ export type Col = {
   em: number | null;
   coc: number | null;
   cap: number | null;
-  /** stabilized NOI ÷ total cost, % — the yardstick for a deal with a plan;
-   *  null for a stabilized asset or a model built before the plan existed */
+  /** where the cap came from: the first-draft model, or the memorandum's
+   *  own going-in cap where the model has none (lib/compare-figures) */
+  capFrom?: FigureSource | null;
+  /** stabilized NOI ÷ total cost, % — the yardstick for a deal with a plan:
+   *  the model's, else the one the deal's header prints; null for a
+   *  stabilized asset */
   yoc: number | null;
+  yocFrom?: FigureSource | null;
   /** cap vs the freshest 30-yr fixed — same arithmetic as the deal page */
   leverage: LeverageRead | null;
   /** cap over today's 10-year Treasury (lib/leverage `capSpreadRead`) —
@@ -55,7 +89,9 @@ export type Col = {
    *  when the table holds no fresh 10-year */
   capOverTenYear?: CapSpreadRead | null;
   price: string | null;
+  priceFrom?: FigureSource | null;
   noi: string | null;
+  noiFrom?: FigureSource | null;
   /** what the price buys where it is not the building outright ("Note",
    *  "49% share", "Leasehold, 45 yrs left" — lib/interest `interestTag`),
    *  said beside the price (#423) */
@@ -109,6 +145,11 @@ export type Col = {
    *  — lib/manufactured-housing `manufacturedHousingTag`, #470); absent
    *  otherwise */
   mh?: string | null;
+  /** a self-storage facility's lease-up, premium over street, economic
+   *  occupancy and management ("In-place 21.1% over street, Economic 84%,
+   *  3rd-party managed" — lib/self-storage `selfStorageTag`, #471); absent
+   *  otherwise */
+  storage?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -174,6 +215,57 @@ function SignedBar({
   );
 }
 
+/** A deal whose figures may be crowned "best": not one the screen rejected,
+ *  and not one whose call a re-screen is replacing — that call was written
+ *  about the terms before the run the analyst asked for. */
+const crownable = (c: Col) => c.verdict !== "pass_on" && !c.behind;
+
+/** The deal's call, the way the pipeline card draws it (lib/screen-run): a
+ *  running or failed re-screen outranks the call on file, which is the
+ *  previous screen's; else the call; else nothing has run. */
+function CallPill({ c, className = "" }: { c: Col; className?: string }) {
+  const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+  if (c.behind === "running") {
+    return (
+      <span
+        data-qa="call-behind"
+        className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] text-muted ${className}`}
+        title={p ? `Re-screening — the previous call was ${p.label}` : undefined}
+      >
+        <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+        {p ? "Re-screening…" : "Screening…"}
+      </span>
+    );
+  }
+  if (c.behind === "failed") {
+    return (
+      <span
+        data-qa="call-behind"
+        className={`rounded-full bg-kill/10 px-2.5 py-1 text-[11px] font-medium text-kill ${className}`}
+        title={
+          p
+            ? `The latest screen failed before it reached the verdict — the previous call was ${p.label}`
+            : "The screen failed — open the deal to see why and try again"
+        }
+      >
+        Failed
+      </span>
+    );
+  }
+  if (p) {
+    return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${p.cls} ${className}`}>{p.label}</span>;
+  }
+  return <span className={`text-[11px] text-muted ${className}`}>Not screened</span>;
+}
+
+/** The verdict's reason under the call — said as the previous screen's
+ *  where a re-screen is replacing it, so it never reads as this run's. */
+function reasonLine(c: Col): string | null {
+  const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+  if (!c.behind || !p) return c.reason;
+  return c.reason ? `Previous screen's call: ${p.label} — ${c.reason}` : `Previous screen's call: ${p.label}`;
+}
+
 const BEST_PILL = (
   <>
     {/* The space keeps "2.10x best" two words when the table is read aloud
@@ -187,8 +279,9 @@ const BEST_PILL = (
 
 export function CompareTable({ cols }: { cols: Col[] }) {
   // Never crown a hero number on a deal the screen rejected — that's the
-  // exact pro-forma trap the product exists to counter.
-  const eligible = cols.filter((c) => c.verdict !== "pass_on");
+  // exact pro-forma trap the product exists to counter — nor on one whose
+  // call a running or failed re-screen is replacing.
+  const eligible = cols.filter(crownable);
   const bestIrr = Math.max(...eligible.map((c) => c.irr ?? -Infinity));
   const bestEm = Math.max(...eligible.map((c) => c.em ?? -Infinity));
 
@@ -206,10 +299,14 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     /** the figure is signed (a spread over a benchmark): its bar runs from a
      *  centre line, scaled to the row's widest spread either way */
     signed?: boolean;
+    /** where a return row's figure came from — the deal's first-draft model
+     *  or the memorandum — so a row the model fills says so beside its name
+     *  and a memorandum's figure in it is marked (the audit of 2026-09-30) */
+    src?: (c: Col) => FigureSource | null | undefined;
   }[] = [
     { label: "Market", get: (c) => c.market },
     {
-      label: "Covered market",
+      label: "Market read",
       get: (c) =>
         c.coveredMarket ??
         (c.readMarket ? (c.readCounty ? `${c.readMarket} (by its county, ${c.readCounty})` : `${c.readMarket} (read, not briefed)`) : "—"),
@@ -254,26 +351,37 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A manufactured-housing park's lot rent and utilities (#470): every
     // part of the read, since the table has the width a card does not.
     { label: "Manufactured housing", get: (c) => c.mh || "—" },
+    // A self-storage facility's occupancy and rates (#471).
+    { label: "Self-storage", get: (c) => c.storage || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },
     // A note's or a share's model returns are not the deal's (#423): said
     // as withheld, with the reason, rather than left a bare dash.
+    // The returns are the first-draft model's alone.
     {
       label: "Levered IRR",
       get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.irr)),
-      best: (c) => c.verdict !== "pass_on" && c.irr != null && c.irr === bestIrr,
+      best: (c) => crownable(c) && c.irr != null && c.irr === bestIrr,
       mono: true,
       num: (c) => c.irr,
+      src: (c) => (c.withheld || c.irr == null ? null : "model"),
     },
     {
       label: "Equity multiple",
       get: (c) => (c.withheld ? `n/a — ${c.withheld}` : mult(c.em)),
-      best: (c) => c.verdict !== "pass_on" && c.em != null && c.em === bestEm,
+      best: (c) => crownable(c) && c.em != null && c.em === bestEm,
       mono: true,
       num: (c) => c.em,
+      src: (c) => (c.withheld || c.em == null ? null : "model"),
     },
-    { label: "Cash-on-cash (Yr 1)", get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.coc)), mono: true, num: (c) => c.coc },
+    {
+      label: "Cash-on-cash (Yr 1)",
+      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.coc)),
+      mono: true,
+      num: (c) => c.coc,
+      src: (c) => (c.withheld || c.coc == null ? null : "model"),
+    },
     // A plan deal's year-1 cap is a dark building's (negative, or a default)
     // — not a figure to compare on. Say so; the yield on cost row below is
     // its answer. Its cell draws no bar either. A note has no cap at all:
@@ -290,10 +398,24 @@ export function CompareTable({ cols }: { cols: Col[] }) {
             : pct(c.cap),
       mono: true,
       num: (c) => (c.planDeal ? null : c.cap),
+      // The model's cap, else the memorandum's (lib/compare-figures); a
+      // note's yield is read off the memorandum's own terms.
+      src: (c) =>
+        c.planDeal ? null : c.withheld === "note" ? (c.noteYtm != null ? "om" : null) : c.cap != null ? c.capFrom : null,
     },
     // The plan's yardstick: stabilized NOI over everything it cost to get
     // there. Blank for a stabilized asset — its going-in cap is the answer.
-    { label: "Yield on cost (stabilized)", get: (c) => pct(c.yoc), mono: true, num: (c) => c.yoc },
+    {
+      label: "Yield on cost (stabilized)",
+      // A plan deal's other cells send the reader here ("judged on yield on
+      // cost"), so the row stays while one is compared: the model's figure,
+      // else the one the deal's header prints; "not stated" where neither
+      // has one, rather than a dash.
+      get: (c) => pct(c.yoc) ?? (c.planDeal ? "not stated" : null),
+      mono: true,
+      num: (c) => c.yoc,
+      src: (c) => (c.yoc != null ? c.yocFrom : null),
+    },
     {
       label: "Leverage vs 30-yr",
       // Signed spread only — the full sentence lives on each deal's page.
@@ -318,6 +440,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       // the read's colour; a plan deal has no cap to spread, so no bar.
       num: (c) => (c.planDeal || !c.leverage ? null : c.leverage.spreadBps),
       signed: true,
+      // Struck on the cap one row up, so from where that cap came.
+      src: (c) => (c.planDeal || c.withheld === "note" || !c.leverage ? null : c.capFrom),
     },
     // The cap over today's 10-year — the spread a cap is quoted against, a
     // fact with no verdict, so the cell carries no tone; signed, like the
@@ -335,18 +459,39 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       mono: true,
       num: (c) => (c.planDeal || !c.capOverTenYear ? null : c.capOverTenYear.spreadBps),
       signed: true,
+      src: (c) => (c.planDeal || c.withheld === "note" || !c.capOverTenYear ? null : c.capFrom),
     },
     // What the price buys, beside it, where it is not the building
     // outright (#423) — the pipeline row's own tag.
-    { label: "Purchase price", get: (c) => (c.price && c.interest ? `${c.price} · ${c.interest}` : c.price), mono: true },
-    { label: "Year-1 NOI", get: (c) => c.noi, mono: true },
+    {
+      label: "Purchase price",
+      get: (c) => (c.price && c.interest ? `${c.price} · ${c.interest}` : c.price),
+      mono: true,
+      src: (c) => (c.price ? c.priceFrom : null),
+    },
+    { label: "Year-1 NOI", get: (c) => c.noi, mono: true, src: (c) => (c.noi ? c.noiFrom : null) },
   ];
+
+  // A row blank for every deal compared says nothing a meeting can read:
+  // most deal-type rows (a hotel's, a park's, an auction's) hold a figure
+  // for one kind of deal and a dash for every other, so a side-by-side of
+  // apartments ran a column of dashes a dozen rows long. Such a row is left
+  // out, in the table and the phone cards alike; a row with a figure for
+  // any one deal stays, its dashes with it.
+  const rows = metricRows.filter((mr) => cols.some((c) => !blankCell(mr.get(c))));
+
+  // A row the first-draft model fills for any deal says so beside its name,
+  // so its figures never read as the header's; a figure the memorandum
+  // states instead, where the model has none, is marked (OM).
+  const labelOf = rows.map((mr) => (cols.some((c) => mr.src?.(c) === "model") ? `${mr.label}${MODEL_ROW}` : mr.label));
+  const omMark = (mr: (typeof rows)[number], c: Col, val: string | null) =>
+    val != null && mr.src?.(c) === "om" ? OM_MARK : null;
 
   // Each row's spread, once, for both layouts: every figure against the
   // row's largest (the widest either way on a signed row), rejected deals
   // included (the proportions must be honest) but drawn muted — the "best"
   // pill still never lands on one. One column is no spread, so no bars.
-  const rowStats = metricRows.map((mr) => {
+  const rowStats = rows.map((mr) => {
     const nums = cols.map((c) => mr.num?.(c) ?? null);
     const rowMax = Math.max(0, ...nums.map((n) => (n == null ? 0 : mr.signed ? Math.abs(n) : n)));
     const drawBars = cols.length > 1 && rowMax > 0;
@@ -357,9 +502,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     const n = nums[col];
     if (!drawBars || n == null) return null;
     const share = n / rowMax;
-    return metricRows[row].signed ? Math.max(-1, Math.min(1, share)) : Math.min(1, Math.max(0, share));
+    return rows[row].signed ? Math.max(-1, Math.min(1, share)) : Math.min(1, Math.max(0, share));
   };
-  const barFor = (mr: (typeof metricRows)[number], c: Col, ri: number, ci: number, isBest: boolean) => {
+  const barFor = (mr: (typeof rows)[number], c: Col, ri: number, ci: number, isBest: boolean) => {
     const share = shareOf(ri, ci);
     if (share == null) return null;
     const rejected = c.verdict === "pass_on";
@@ -377,7 +522,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           From `sm` up the table takes over. */}
       <ul className="grid gap-3 sm:hidden" aria-label="Deals compared">
         {cols.map((c, ci) => {
-          const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+          const reason = reasonLine(c);
           return (
             <li key={c.id} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
               {c.pictures && <DealBanner sources={c.pictures} label={c.name} className="mb-3" />}
@@ -385,15 +530,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 <Link href={`/deals/${c.id}`} className="font-medium text-ink hover:text-brand">
                   {c.name}
                 </Link>
-                {p ? (
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${p.cls}`}>
-                    {p.label}
-                  </span>
-                ) : (
-                  <span className="shrink-0 text-[11px] text-muted">Screening</span>
-                )}
+                <CallPill c={c} className="shrink-0" />
               </div>
-              {c.reason && <p className="mt-1 text-xs leading-relaxed text-muted">{c.reason}</p>}
+              {reason && <p className="mt-1 text-xs leading-relaxed text-muted">{reason}</p>}
               {c.fit && (
                 <p className="mt-2 text-xs">
                   <span className={`font-semibold ${FIT_LABEL[c.fit].cls}`}>{FIT_LABEL[c.fit].text}</span>
@@ -401,18 +540,19 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 </p>
               )}
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
-                {metricRows.map((mr, ri) => {
+                {rows.map((mr, ri) => {
                   const val = mr.get(c);
                   const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
                   return (
                     <div key={mr.label} className="min-w-0">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted">{mr.label}</dt>
+                      <dt className="text-[10px] uppercase tracking-wide text-muted">{labelOf[ri]}</dt>
                       <dd
                         className={`text-sm ${mr.mono ? "font-mono tabular-nums" : ""} ${
                           isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"
                         }`}
                       >
                         {val ?? <span className="text-muted">—</span>}
+                        {omMark(mr, c, val)}
                         {isBest && BEST_PILL}
                         {barFor(mr, c, ri, ci, isBest)}
                       </dd>
@@ -439,7 +579,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
             <tr>
               <th className="sticky left-0 z-10 bg-surface" />
               {cols.map((c) => {
-                const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+                const reason = reasonLine(c);
                 return (
                   <th
                     key={c.id}
@@ -455,19 +595,11 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                       {c.name}
                     </Link>
                     <div className="mt-2">
-                      {p ? (
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${p.cls}`}
-                        >
-                          {p.label}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-muted">Screening</span>
-                      )}
+                      <CallPill c={c} />
                     </div>
-                    {c.reason && (
+                    {reason && (
                       <p className="mt-2 max-w-[16rem] text-xs font-normal leading-relaxed text-muted">
-                        {c.reason}
+                        {reason}
                       </p>
                     )}
                     {!c.hasModel && (
@@ -511,10 +643,10 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 ))}
               </tr>
             )}
-            {metricRows.map((mr, ri) => (
+            {rows.map((mr, ri) => (
               <tr key={mr.label} className="border-b border-line last:border-0">
                 <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  {mr.label}
+                  {labelOf[ri]}
                 </td>
                 {cols.map((c, ci) => {
                   const val = mr.get(c);
@@ -527,6 +659,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                       } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
                     >
                       {val ?? <span className="text-muted">—</span>}
+                      {omMark(mr, c, val)}
                       {isBest && BEST_PILL}
                       {barFor(mr, c, ri, ci, isBest)}
                     </td>

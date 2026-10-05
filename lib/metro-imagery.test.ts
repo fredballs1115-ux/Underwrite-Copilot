@@ -2,9 +2,12 @@ import { describe, it, expect } from "vitest";
 import metrosSeed from "@/data/research/metros.json";
 import { DATA_METROS } from "@/lib/market-match";
 import {
+  METRO_FRAMES,
+  METRO_FRAME_DEFAULT,
   METRO_FRAME_METRES,
   METRO_VIEWS,
   US_BOUNDS,
+  metroFrame,
   metroView,
 } from "./metro-imagery";
 
@@ -85,5 +88,46 @@ describe("metroView", () => {
   it("returns null for an unknown id rather than guessing a location", () => {
     expect(metroView("atlantis")).toBeNull();
     expect(metroView("")).toBeNull();
+  });
+  it("reads an id off a URL that names what every object inherits as unknown", () => {
+    for (const id of ["constructor", "__proto__", "toString", "hasOwnProperty", "valueOf"]) {
+      expect(metroView(id), id).toBeNull();
+    }
+  });
+});
+
+describe("metroFrame — the frames the overhead route draws (the security review, 2026-09-30)", () => {
+  it("draws a listed frame as asked, none past 1600px a side, the default among them", () => {
+    for (const [w, h] of METRO_FRAMES) {
+      expect(metroFrame(w, h)).toEqual([w, h]);
+      expect(metroFrame(String(w), String(h))).toEqual([w, h]);
+      expect(Math.max(w, h)).toBeLessThanOrEqual(1600);
+    }
+    expect(METRO_FRAMES).toContainEqual(METRO_FRAME_DEFAULT);
+    expect(new Set(METRO_FRAMES.map((f) => f.join("x"))).size).toBe(METRO_FRAMES.length);
+  });
+
+  it("snaps any other size to the frame nearest in proportion and size", () => {
+    expect(metroFrame(481, 359)).toEqual([480, 360]);
+    expect(metroFrame(1400, 500)).toEqual([1400, 480]);
+    expect(metroFrame(1300, 880)).toEqual([1400, 900]);
+    expect(metroFrame(9_999, 9_999)).toEqual([1600, 900]);
+    expect(metroFrame(0, -3)).toEqual([480, 192]);
+  });
+
+  it("draws a missing or unreadable side at the default frame's", () => {
+    expect(metroFrame(null, null)).toEqual(METRO_FRAME_DEFAULT);
+    expect(metroFrame(undefined, "")).toEqual(METRO_FRAME_DEFAULT);
+    expect(metroFrame("abc", "  ")).toEqual(METRO_FRAME_DEFAULT);
+    expect(metroFrame(Number.NaN, 360)).toEqual(METRO_FRAME_DEFAULT);
+  });
+
+  it("keeps however many sizes a caller types to the listed frames", () => {
+    const drawn = new Set<string>();
+    for (let w = 1; w <= 3_000; w += 37) {
+      for (let h = 1; h <= 3_000; h += 41) drawn.add(metroFrame(w, h).join("x"));
+    }
+    const listed = new Set(METRO_FRAMES.map((f) => f.join("x")));
+    for (const f of drawn) expect(listed.has(f), f).toBe(true);
   });
 });

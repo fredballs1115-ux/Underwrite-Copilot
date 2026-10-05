@@ -3,6 +3,359 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
+
+**Do these (each is yours alone):**
+1. **Run migration 0036** (`supabase/migrations/0036_security_hardening.sql`)
+   in the Supabase SQL editor, then `supabase/CHECK_MIGRATIONS.sql`. Until
+   it runs:
+   - the public anon key can call the two public-record functions, which
+     read owner names and mailing addresses;
+   - a share link minted outside the app keeps whatever expiry and token its
+     minter chose;
+   - an update can dodge the free-deal cap;
+   - an account can put its own screen back at the head of the worker's
+     queue, over and over, ahead of every other customer's;
+   - any signed-in account can write the alert banner's shared dismissal
+     columns, which nothing on the site uses any more.
+
+   The last two were added on October 4. If you ran the file before then,
+   run the whole file again: it is idempotent. The file's header says what
+   each part closes and why the app's own writes pass unchanged. In the same editor, delete the rows the rates
+   pull wrote for the four licensed series before it stopped asking for
+   them. No page shows them, but migration 0023's read policy lets any
+   signed-in account select them through the API:
+   `delete from public.rates where series_id in ('BAMLC0A0CM','BAMLC0A4CBBB','BAMLH0A0HYM2','DBAA');`
+2. **Rotate the six credentials** that appeared in screenshots (the list
+   under 2026-09-16 below). Rotation is the only way to be sure.
+3. **Keys that switch things on**, each optional and free or already
+   budgeted:
+   - `CENSUS_API_KEY`: a deal's own census tract figures;
+   - `GOOGLE_MAPS_API_KEY`: Street View photographs of a building with no
+     memorandum photo;
+   - `HUD_API_TOKEN` (free, huduser.gov): the yearly fair market rent pull
+     (`fmr.yml`) reads it; until it is set, the rents are the ones seeded from
+     HUD's own FY2027 file.
+4. **Your own domain**: steps under 2026-09-25 below. It is a purchase, so
+   it is your move.
+
+**Before a public launch** (research pass 14 walked a stranger's path from
+the homepage to a first screen; the code's half of each is done or under
+way in this batch):
+5. **Prove a stranger can sign up and reset a password.** Without custom
+   SMTP, Supabase's built-in mailer refuses any address outside your
+   organization and sends two emails an hour. Do A1 below, raise Auth's
+   email rate limit above the 30-an-hour custom-SMTP default, replace the
+   default confirm and reset templates and sender name, then sign up and
+   reset a password from an address outside the organization.
+6. **Stop deploys from killing screens.** A screen runs inside the web
+   process until `ANALYSIS_WORKER=1` is set on the web service with the
+   worker service live (E below); main took 27 deploys on Sept 30, and a
+   screen that overlaps one stalls and must be run again from the start.
+7. **The Upgrade button**: finish Stripe (B1 below: live prices, the
+   webhook, a customer portal set to cancel at the end of the period to
+   match the Terms, and a run of `scripts/stripe-test-flow.mjs`), or ask
+   me to replace Upgrade with "Contact us" until you do. A setup problem
+   now reads to a customer as "checkout isn't available right now"; which
+   knob is wrong is in the server log as `[billing] Stripe setup problem`.
+8. **Email's sender**: verify a domain in Resend and set `RESEND_FROM` on
+   BOTH the web service and the worker; Resend's default sender delivers
+   only to the Resend account's owner.
+9. **Before charging anyone**: the legal entity, governing law and venue on
+   the Terms and Privacy pages, and a support address that is not Gmail —
+   with counsel.
+10. **`OPERATOR_EMAILS` on the Render web service** (your address, comma-
+    separated for several): /data-health's working view — what a screen
+    costs, the feeds, the probes, the steward — now shows only to the
+    addresses it names; until it is set, everyone (you included) sees the
+    corrections ledger alone. It also names who is emailed when screens
+    stop for a reason only you can fix (at most one alert an hour for each
+    kind); set it on the worker too once screens run there. Optional
+    beside it: `RESEND_REPLY_TO`, an address replies to the emails go to
+    (sent only where it names one).
+11. **The free tier's rule** (a decision): today it is "3 deals at a time"
+    (deleting one frees a slot), re-screens are unlimited and sign-up has no
+    CAPTCHA, at about $3 a screen. The pages now say what is enforced; tell
+    me the rule you want and I will make the code and the copy match it.
+    The security review of October 1 adds one fact to weigh: nothing caps
+    what one account spends. Once 0036 runs, a re-queued screen waits its
+    turn, but an account can still ask for screen after screen; a daily cap
+    per account is the guard, and its number is yours.
+
+**What changed without asking you, and why:**
+- The rates strip's **three ICE BofA credit spreads and Moody's Baa yield
+  are gone.** The runner printed their terms (run 36785223477):
+  - Moody's forbids any copying or redistribution without its written
+    consent;
+  - ICE's indices are ICE's property, used by FRED under licence.
+
+  The "Corporate credit" fold now reads the Treasury's own high-quality
+  corporate bond curve (`HQMCB10YR`, monthly, public). If you ever license
+  ICE or Moody's data, the four series can come back.
+- **Five kinds of deck are filed under their right class** (research pass
+  23): apartments over shops as mixed-use (they had read as retail, so the
+  rules panel treated the building as commercial), an RV resort as a park
+  (it had read as a hotel), a lab or life-science building as an office
+  (it had read as no class), "Apartments" alone as multifamily, and
+  resort-style apartments as multifamily (the bare word "resort" had read
+  them as a hotel). Each class's defaults are unchanged, but a re-filed
+  deal now runs on its own class's: retail to mixed-use moves the expense
+  ratio from 32% to 40% and the reserve from $0.15 to $0.20 a foot; a hotel
+  to a park, 65% to 35% expenses, 32% to 6% vacancy and a 325 to a 200 bps
+  spread; a lab, 40% to 45% expenses, 7% to 10% vacancy and a 250 to a
+  300 bps spread; "Apartments" alone, 40% to 42% expenses, 7% to 5%
+  vacancy, the reserve from $0.20 to $0.25 a foot, 850 SF a unit where no
+  area is stated, and a 250 to a 200 bps spread; a hotel to an apartment
+  building, 65% to 42% expenses, 32% to 5% vacancy, the reserve from
+  $0.50 to $0.25 a foot, 550 to 850 SF a unit and a 325 to a 200 bps
+  spread. A phrase that names a resort and units and nothing else
+  ("Resort with 200 units") is now filed as no class, on the generic
+  defaults, since it may be either. Then the second pre-merge audit and
+  research pass 28 re-filed more:
+  - a resort named by a senior community's words ("Resort-style assisted
+    living", "… CCRC") moves from a hotel to senior housing: 65% to 68%
+    expenses, 32% to 12% vacancy, the reserve from $0.50 to $0.30 a foot,
+    550 to 600 SF a unit and a 325 to a 275 bps spread; a resort-style
+    park ("Resort-style MHC") from a hotel to a park, as the RV resort
+    above; "Resort-style rental homes" from a hotel to single-family
+    rentals, 65% to 38% expenses, 32% to 6% vacancy, $0.50 to $0.30, 550
+    to 1,600 SF a unit and 325 to 225 bps;
+  - an active-adult or 55+ community, which sells no care, files as
+    apartments (it had read as no class), with "Apartments" alone's deltas
+    above — and its rent rules now reach it;
+  - a land-lease community (residents own the homes, rent the land) moves
+    from land, which the model runs as non-operating, to a park: it now has
+    an NOI, a cap and a loan;
+  - a truck terminal or truck yard moves from no class to industrial, 40%
+    to 28% expenses, 7% to 5% vacancy, $0.20 to $0.15 and 250 to 225 bps;
+    a "Storage yard" from self-storage to industrial, 35% to 28%, 12% to
+    5% and 250 to 225 bps, with no unit size.
+
+  Say if you would rather a re-filing waited for you.
+
+**Your call — larger changes held for your permission:**
+- **Model math:**
+  - the exit cap's default: it is the going-in cap where the memorandum
+    states one, and a flat 6% where it states none; the 6% could come from
+    the cap the memorandum's NOI implies on its price, or the sector band;
+  - transfer and recording taxes could go into the model's closing costs,
+    and the seller's share into its cost of sale. They are zero today and
+    the largest input with a free source behind it (state and city
+    statutes): research pass 27 found rates from 0% (Texas) to about 4.6%
+    in Philadelphia and 5.5–6% on large sales in Los Angeles and San
+    Francisco. On the sample, a 4.578% Philadelphia rate split between
+    the purchase and the sale takes the levered return from 9.28% to
+    7.11%. Those rates are from search results until the runner prints
+    each statute, which is the first step either way;
+  - the model's loan has no coverage test: its 60% loan at 6.00% covers
+    its year-one debt service only 1.03 times on a deal bought at a 4.5%
+    cap, and 1.15 at 5.0%, below the 1.25 the page's own debt sizer
+    starts from, so a deal bought under about a 5.45% cap is given a
+    levered return on a loan a lender would size smaller (research pass
+    27, measured on the engine). The line moves with the rate: a live
+    deal's loan is seeded at the index plus its class's spread, and at
+    6.50% the 1.25 line is a 5.75% cap, at 6.78% (4.78% plus 200 bps) a
+    5.91% cap (the second pre-merge audit, on the engine). Sizing the loan
+    by coverage would change those returns;
+  - expense growth could come from the 5-year breakeven inflation rate;
+  - plan deals could price on SOFR plus a construction spread;
+  - a hotel's reserve could be 4% of revenue;
+  - lease-by-lease cash flow;
+  - a buyer's own NOI could feed the model.
+- **Which model the compare table reads:** the compare table reads the
+  first-draft model while every other surface reads the engine. On the
+  sample the compare table's first-draft model gives 8.72% and the engine
+  9.28%. The labels now say which is which;
+  pick one.
+- **The sample deal's one set of numbers:** the public pages quote 8.7% and
+  9.3% from those same two models.
+- **The workbook's yield on cost** divides by uses plus the capital plan;
+  every other surface divides by price plus budget. It is labelled; the
+  formula is your call.
+- **Deal types that need a new model shape:**
+  - a share of a levered entity (today its price grosses up to the
+    equity, not the building);
+  - development budgets split into hard, soft and contingency, and whether
+    a GMP contract is signed;
+  - preferred equity, mezzanine and JV recapitalizations as positions;
+  - senior housing by operating structure (a lease, a management contract,
+    or owner-operated);
+  - an apartment building still leasing up (a vacancy path, not one flat
+    rate);
+  - life science as its own class;
+  - HUD's mortgage insurance premium in the assumable-loan card's rate;
+  - data centers priced per megawatt;
+  - a bulk condo sell-out;
+  - a Delaware Statutory Trust's master lease (research pass 23): the
+    investors' income is the master lease's rent, not the building's NOI;
+  - rent regulation in the model: a regulated building's rent growth is
+    capped by its board or statute, and the model grows every rent at one
+    market rate;
+  - reserves on a placeholder area: where the memorandum states no area,
+    the model's per-foot reserves are struck on the class's typical size
+    or the flat 100,000 SF, a figure the deal never stated.
+- **Wider coverage:**
+  - rent rules for the 26 metro areas read without a brief, and for Oregon;
+  - photographs for rural deals;
+  - Opportunity Zone 2.0 once the new list is published;
+  - Baton Rouge's photograph, whose only good frames are PNGs, which means
+    re-encoding a PNG, a change to the "PNG never served" rule.
+- **Photo credits:** two name a different author from the one in the
+  filename, as Commons states them (Milwaukee, Greenville).
+- **The deal page on a phone** (research pass 13, 2026-09-30): every
+  deal-type panel sits in the header, above the tabs, so at 390px a deal's
+  header runs 1,340–2,280px, and a deal with several panels 3,290px (about
+  four screens) before the verdict. The fix agents fold each panel's read
+  after its first sentence within today's design; folding each panel to a
+  headline, or moving the panels into Overview, is a layout change and
+  yours.
+- **The rent roll workbook's math** (research pass 15): it applies the
+  model's whole-building vacancy (one minus today's occupancy) every year
+  ON TOP of the lease-up it models lease by lease, and sets expense
+  recoveries to zero — on the module's own design case (130,493 SF, 48%
+  leased) that is no levered IRR at all against 14.75% with a 5% general
+  vacancy. ARGUS reduces general vacancy by absorption and turnover by
+  default. Also yours: downtime and free rent sit below NOI (ARGUS puts them
+  in revenue), every lease grows at the market escalation rather than its
+  own stated bump, and closing costs are the 1% hold alone. The workbook
+  now says what it assumes; the fix changes the exported IRR, so it waits
+  for you.
+- **The BOV reconciler's cap basis:** a broker who quotes the cap on its own
+  headline and also states a deduction has that deduction counted twice,
+  and the bridge shows the difference as "Unexplained". Fixing it means
+  recording which value each opinion's cap is struck on.
+- **The rent roll and the model read one file twice:** the rent roll upload
+  is also re-read by Claude into the deal's model, so the confirmed mapping
+  never reaches the model. Feeding the confirmed import into the model, and
+  a residential rent roll mode (loss to lease and unit mix, not WALT), are
+  larger changes.
+- **Which regulatory alerts an account sees** (research pass 14): every
+  signed-in account sees every alert detected in the last 30 days, up to
+  three red banners, whatever its markets, so a brand-new account meets
+  banners about places it has no deal in. Showing an account only the
+  alerts for its own deals' jurisdictions is a product choice.
+- **Four ideas from the outside view** (research pass 24, 2026-10-04: what
+  Dealpath, ARGUS, Crexi and others do that the site does not). The pass's
+  no-permission ideas go into the next batch; these four need you:
+  - **Critical dates for a deal under LOI or contract** (when the deposit
+    goes hard, diligence ends, closing): Dealpath tracks them with
+    reminders. The deal holds one date today, offers due. Storing the rest
+    is a migration you run, and a date read off our LOI would be marked as
+    ours until you confirm it against the signed PSA.
+  - **Ask over every document**, not only the memorandum: the rent roll,
+    the T-12, your own model and the supplements. Each question would cost
+    more, which ties to the Ask quota you have not set.
+  - **Memoranda over 32 MB**, which the upload refuses today although a
+    text-layer read has no such limit. Supabase's free plan caps a file at
+    50 MB; above that is a paid plan. A first step that needs nothing from
+    you: log the refusals, to see how often it happens.
+  - **Forward an OM to a deal inbox** (Dealpath's email intake): Resend,
+    already the sender, can receive mail by webhook, but it needs your
+    domain's DNS, and the sender must be a verified account address.
+- **Header slots on two deal types:** a value-add whose memorandum states
+  no stabilized NOI shows "Yield on cost —" (a plan deal shows yield on
+  cost, never a cap), and an auction shows "Price —" beside a stated
+  starting bid. Showing the going-in cap, or the starting bid labelled as
+  one, changes the slot rule.
+- **Seven methods on /tools** (research pass 16, 2026-10-01). The pass's
+  errors are being fixed. These seven are choices of method, and each is
+  yours to keep or change:
+  - the waterfall has no "thereafter" split: above the last hurdle, the
+    last tier's split repeats;
+  - lease buyout: in the end-it-now case, the replacement tenant keeps
+    paying past its term with no second turnover, which flatters the
+    buyout;
+  - leased fee: only the land reverts, although the card's own rule says
+    the building reverts too;
+  - hold or sell: the tax and the prepayment penalty are held flat every
+    year;
+  - prepayment: discounts to maturity rather than to the open date, on a
+    monthly-compounded Treasury;
+  - ground lease: the 10-year term margin is said as "the margin lenders
+    look for";
+  - after tax and 1031: recapture is filled first.
+- **The Pro and team features** (research pass 17, 2026-10-01). The pass's
+  errors are being fixed; these are yours:
+  - **Equity multiple:** the engine nets the year-1 capital call into the
+    multiple's numerator. Standard practice is distributions over
+    contributions. This is model math.
+  - **Construction debt:** a plan deal's loan is sized on the acquisition
+    cost alone, with no construction debt behind the budget. This is model
+    math.
+  - **Departing members:** a member who leaves or is removed can still
+    open, share by link and delete the deals they added (editing is
+    refused), and deleting one takes the teammates' versions, valuations,
+    tasks and documents on it with it (pass 8's item, still open). The team
+    page's Remove and Leave confirmations now say so; whether removing or
+    leaving should hand the deals to the team's owner is your call. An
+    account deleted after leaving now hands its team deals to the owner, as
+    the privacy page promised.
+  - **Invites by address:** invites bound to an email address need SMTP and
+    a migration.
+  - **Roles:** read-only or custom roles, as Dealpath and Northspyre offer
+    them. This is a billing question.
+  - **Ask quotas:** per-user limits on Ask (pass 8's run quotas).
+- **The screen's Claude steps** (research pass 18, 2026-10-01). Its errors
+  are fixed in this batch; these are yours:
+  - **The prompt cache and structured outputs.** Anthropic's
+    structured-outputs page says a change of output format invalidates the
+    prompt cache, and each step that reads the memorandum sends its own
+    format, so the deck may be written to the cache several times and read
+    back never. The cost card on /data-health shows a screen's cache reads;
+    restructuring the calls is a cost decision.
+  - **The first-draft model's prompt:** telling it what is being sold and
+    the site's spread, and labelling its 2% / 1% / $250–300-a-unit
+    defaults, changes the model's inputs.
+  - **A value-add's basis** on the pipeline card and the comps tick: the
+    price, or the all-in cost (the comps step is told all-in).
+  - **Summing a T-12 and dividing a rent roll's annual rent in code**
+    rather than by the model.
+  - **The research tracker's cited vacancy band** handed to the market
+    check for a commercial deal.
+- **The public market pages** (research pass 19, 2026-10-01). Its dating,
+  ranking and wording errors are being fixed; these are yours:
+  - **Licensed or scraped material on public pages:** tracker figures
+    credited to CoStar (Dallas retail, Los Angeles's multifamily cap,
+    Baltimore office's low end), a Homes.com listing count in
+    Philadelphia's note (Homes.com is CoStar's), Moody's via JPMorgan for
+    San Francisco's multifamily vacancy, and Bright MLS listings in the
+    example-properties block (now dated and sourced, not removed). Keep,
+    credit, or remove each.
+  - **The strip's commercial property price figure** is the Fed's index
+    built on CoStar's composite excluding multifamily (the runner printed
+    the Fed's own description, zori run 36814538224, and the change matched
+    figure for figure, rates run 36814949981). It now says it excludes
+    apartments and names the index; whether a CoStar-built index stays on a
+    public page is yours.
+  - **Freddie Mac's mortgage survey:** FRED's notes say "Copyright, 2016,
+    Freddie Mac. Reprinted with permission." Whether the 30- and 15-year
+    tiles may be republished is a terms question.
+  - **Redfin's attribution rule** for the multifamily summary's source.
+  - **"Weekday intel"** on /market is scored against your own buy box and
+    shown to strangers; it is now dated and labelled. Keep it public or
+    move it behind sign-in.
+- **The emails** (research pass 21, 2026-10-01). Its code items are being
+  fixed; these are yours:
+  - **Sign-up and password-reset email** (item 5 above): Supabase Auth's
+    SMTP through Resend on a verified domain, the templates and sender
+    name, the rate limit, and the Site URL and Redirect URLs
+    (`/login?confirmed=1&next=…` and `/account?reset=1`). Until then a
+    stranger cannot confirm an account or reset a password.
+  - **The sending domain:** verify `RESEND_FROM`'s domain in Resend (SPF,
+    DKIM, DMARC); the code refuses only resend.dev, and an unverified
+    sender fails quietly, one log line an email.
+  - **The worker's settings:** the Monday digest always sends from the
+    worker, and so do screen emails in worker mode, so `RESEND_API_KEY`,
+    `RESEND_FROM`, `NEXT_PUBLIC_APP_URL` and the same
+    `SUPABASE_SERVICE_ROLE_KEY` belong on the worker as well as the web
+    service. The pictures in emails already sent are signed with a key
+    derived from the service-role key, so rotating it (item 2) breaks
+    them; nothing else breaks.
+  - **A reply address** that is not Gmail, and bounce and complaint
+    suppression in Resend.
+  - **Team deal emails:** whether a creator who has left the team should
+    still get its screen emails (the departing-members question above).
+
 ## 🟢 2026-09-25 — being found, and the site's own address (#430)
 
 The site is already public: anyone can open
@@ -526,7 +879,7 @@ memorandum and sending a letter:
 | **Lease-up** (#345) | What the months between delivery and stabilization actually cost — the part of a plan deal every pro forma covers in a footnote. Three things nobody models: an empty building still pays its taxes, so the fixed share of the operating expense runs from the certificate of occupancy; a signed lease is not a paying lease, so the seeded 120,000-foot building is full at month 22 and **paid in full at month 28**; and the allowance and the commission fall due at SIGNING, ahead of the rent they buy. Which means **the worst month is month 22 — the month it fills** — not month one: **$6,200,437** of cash out, deep into a lease-up that is going *well*. Then the finding this card exists for. **Stress the absorption and the reserve looks BETTER**: six months slower takes the worst month *down* to **$5,674,789**, because a slower pace spends the leasing capital slower. A sponsor who stress-tests slippage against the lease-up reserve concludes it is survivable and has measured the wrong thing. The cost is time, and it shows only at a common date — at month 36 the plan is $3,465,450 out and the slipped case **$4,158,892**, which is **$693,442** worse and **1.9x** what a 5% rent miss costs on the same building |
 | **Trailing window** (#337) | The trap on the cover page that is not an error but a *selection*. "T-3 annualized" and "T-12" are both true statements about the same building, and the seller quotes whichever is larger — nothing says a choice was made. Paste the monthly column: the seeded building's T-3 annualizes to **$1,720,000** against a T-12 of **$1,582,000**, and at the stated 5.5% cap that $138,000 is **$2,509,091 of value** riding on which window the cover quoted. Then the check a memorandum quoting T-3 almost never includes — the same three months a year earlier, where the season sits on both sides and cancels. The building is really up **3.6%**; the other five points were the summer. On an **expense** column it all runs backwards, because there the seller wants the *smallest* figure and gets it by picking a quarter that missed the tax bill: the seeded expenses read **$508,000** against a real **$803,000**, and the card names the month the lump is in and the windows that step over it |
 | **Doors vs dollars** (#338) | "95% occupied" is a count of doors, and it is the higher of the two numbers that could be on the cover. The seeded 200-unit building at $1,850 is 95% leased and banks **87.3%** of market rent — three model units that are physically full and pay nothing, sitting tenants under market, concessions, bad debt. Underwrite the cover page and the going-in cap reads **4.96%** against an honest **4.30%**: 66bp, or **$7,950,698** of price at the cap this NOI really supports. The denominator is market rent and never the in-place rent roll — divide by the rents currently charged and loss to lease vanishes into the denominator, and the same building reads 90.5%. Loss to lease closes as leases roll; a concession reverses when the market does; bad debt does neither, so the card names which bucket the largest part of the gap is in. And other income stays out of the ratio, or a full building prints above 100% |
-| **Below the line** (#341) | A broker's NOI and an owner's NOI are different numbers for the same building, and the difference is not about operations — it is about what counts as an operating expense. The reserve, the tenant allowance and the commission are all real, recurring, unavoidable cash, and all three sit below the line on a marketing package. On the seeded 200,000-foot building at $48M they are **$308,800 a year**, and the advertised **5.50%** cap is **4.86%** to the buyer: **64bp**, or **$5,614,545** of price — which is also exactly the $48M ask less the **$42.39M** at which the real NOI earns the advertised cap. Capital that recurs is an expense, whatever an accountant calls it; and leasing capital's annual cost is not its invoice, because a building on five-year leases re-tenants a fifth of itself a year. The largest line is also the least certain — **$144,000** if every rolling tenant renews against **$472,000** if none does — so it is drawn as a range with the assumption marked on it |
+| **Below the line** (#341) | A broker's NOI and an owner's NOI are different numbers for the same building, and the difference is not about operations — it is about what counts as an operating expense. The reserve, the tenant allowance and the commission are all real, recurring, unavoidable cash, and all three sit below the line on a marketing package. On the seeded 200,000-foot building at $48M they are **$1,344,000 a year**, and the advertised **5.50%** cap is **2.70%** to the buyer: **280bp**, or **$24,436,364** of price — which is also exactly the $48M ask less the **$23.56M** at which the real NOI earns the advertised cap (the leasing line had divided by the term twice and read $308,800 and 64bp, fixed 2026-10-01). Capital that recurs is an expense, whatever an accountant calls it; and leasing capital's annual cost is not its invoice, because a building on five-year leases re-tenants a fifth of itself a year. The largest line is also the least certain — **$720,000** if every rolling tenant renews against **$2,360,000** if none does — so it is drawn as a range with the assumption marked on it |
 | **Insurance** (#347) | The expense line that reprices hardest and gets read least, and the same shape as the tax line: **the premium in a memorandum is the SELLER's expiring policy**, bound on limits the seller chose in a market that may no longer exist. Nothing in it is false — it describes someone else's placement. On the seeded 240-unit Florida apartment the memorandum carries **$420,000** ($1,750 a unit) and the quote comes back **$780,000** ($3,250), and insurance is a FIXED expense, so the whole **$360,000** comes out of NOI. Capitalised at the advertised **5.25%** cap that is **$6,857,143**, and the cap a buyer actually earns is **4.60%** — **65 basis points**. Then the figure nobody writes down. **A named-storm deductible is a percentage of the INSURED VALUE, not a dollar amount**: 5% of a $52M replacement cost is **$2,600,000 retained per event**, which is **0.9 years of NOI** before the policy pays anything, and no replacement reserve covers it. The premium is the number people argue about; this is the number that takes the building. And raising the deductible is a priceable trade rather than a judgement call — going to 10% saves $160,000 a year and retains $2.6M more per event, so it pays only if a named-storm loss arrives **less often than once every 16.3 years** |
 | **Unit mix** (#309) | Paste the OM's table. Weighted average rent, GPR both ways, loss to lease — **weighted by unit count**, which is $1,858 where averaging the rows gives $1,961 |
 | **The site** (#312) | Acres into square feet (43,560, which nobody remembers), FAR drawn *inside* the zoning limit so the unbuilt part of a site is a visible gap, units per acre, land per unit, and parking said both ways — the same car park is **1.50 spaces per unit and 1.64 per 1,000 feet** |
@@ -538,8 +891,8 @@ memorandum and sending a letter:
 | **Percentage rent** (#322) | The retail lease's own arithmetic. The natural breakpoint is base rent over the rate — **$2.00M** on the seeded lease — and anything else the lease states is artificial, named and sided. The seeded tenant's year lands at $1.92M, *under* the breakpoint, so nothing is owed. Billed monthly against a twelfth of it with no year-end true-up, the same lease collects **$22,300**, because two months of Christmas clear the line and the ten below it give nothing back. Plus the occupancy cost ratio, solved for the sales that reach your ceiling — and honest that a 5% ceiling on a 6% lease is unreachable |
 | **1031 exchange** (#319) | What rolling it forward actually defers. The seeded trade sells at $26M, buys at $30M with *more* debt — passes the price test, and still owes **$305,000**, because $1.22M of proceeds stayed in the seller's pocket and borrowing more never cures that. Debt relief is boot even with every dollar of cash reinvested; cash added to the replacement offsets it. Deferred is not forgiven: $30M of property, a **$20.5M basis**. And the clock's 45 and 180 days run from the *same* day — a November closing loses **29 of them** to the return's due date |
 | **Tax reassessment** (#324) | The error that hides in plain sight: the memorandum's tax line is the *seller's* bill, struck on the seller's assessed value. Where the jurisdiction reassesses on transfer, your purchase resets it to the price — so every figure downstream was computed on a bill that stops existing at closing. The seeded $25M building's bill goes $210,000 → **$375,000** and the **6.00% cap on the cover is 5.34%** to the buyer. Said as a price too, because that is what you negotiate with: **$22.8M**, solved rather than scaled, since paying less lowers the assessment that lowers the tax that raises the NOI. A phase-in is a deferral, not a discount |
-| **Ground lease** (#325) | The one structure where the standard arithmetic is wrong by a *multiple*. A leasehold is a wasting asset — at expiry the building reverts — so capitalising its NOI values a perpetuity that expires: **$120M** the lazy way against **$97.5M** over the forty years the lease has, and **62.8% imaginary** with ten years left. Coverage, not DSCR, is the lender's test, because an unsubordinated ground rent outranks the mortgage. A reset to a share of land value is uncapped: **4× coverage becomes 2.22×**, and 1.11× if land doubles. The leased fee moves the *opposite* way as the clock runs |
-| **Sale-leaseback** (#346) | The one structure where both sides price it wrong in the same direction. **The seller writes its own lease, so the rent is the price lever**: on a 180,000-foot building letting at $7.50, a $9 contract rent at a 6.00% credit cap is a **$27,000,000** price against a **$21,600,000** building — **$5,400,000** of it the lease rather than the real estate, which is cash borrowed and not value created. **And an above-market lease reverts.** The buyer is really buying the term's rent plus a market-rent building afterwards, which come to **$23,026,443** — so capitalising the contract NOI overpays by **$3,973,557**, 14.7% of the price, and it is WORSE on a short lease because the reversion arrives sooner. The credit prices one cap and the real estate prices the other, 250bp apart on the covenant alone. And for the seller it is borrowing: it raises **$26,595,000** where the building carries a **$12,816,579** loan, at **6.09 cents** a dollar against a **6.50%** coupon — cheaper, for four years. The rent escalates past the coupon in **year 5** and reaches 8.87 cents by the end, and then the building is gone. Compared to the coupon and never to the loan constant, because amortisation is a transfer and not a cost |
+| **Ground lease** (#325) | The one structure where the standard arithmetic is wrong by a *multiple*. A leasehold is a wasting asset — at expiry the building reverts — so capitalising its NOI values a perpetuity that expires: **$120M** the lazy way against **$93.9M** over the forty years the lease has, its year-16 reset included, and **62.8% imaginary** with ten years left. Coverage, not DSCR, is the lender's test, because an unsubordinated ground rent outranks the mortgage. A reset to a share of land value is uncapped: **4× coverage becomes 3.22×** on the year-16 income, and 1.61× if land doubles. The leased fee moves the *opposite* way as the clock runs |
+| **Sale-leaseback** (#346) | The one structure where both sides price it wrong in the same direction. **The seller writes its own lease, so the rent is the price lever**: on a 180,000-foot building letting at $7.50, a $9 contract rent at a 6.00% credit cap is a **$27,000,000** price against a **$21,600,000** building — **$5,400,000** of it the lease rather than the real estate, which is cash borrowed and not value created. **And an above-market lease reverts.** The buyer is really buying the term's rent plus a market-rent building afterwards, which come to **$23,026,443** — so capitalising the contract NOI overpays by **$3,973,557**, 14.7% of the price: **$1,434,633** of it the premium reverting, which is WORSE on a short lease because the reversion arrives sooner, and **$2,538,924** a 6% credit cap set against an 8% discount rate, which would be paid at market rent too. The credit prices one cap and the real estate prices the other, 250bp apart on the covenant alone. And for the seller it is borrowing: it raises **$26,595,000** where the building carries a **$12,816,579** loan, at **6.09 cents** a dollar against a **6.50%** coupon — cheaper, for four years. The rent escalates past the coupon in **year 5** and reaches 8.87 cents by the end, and then the building is gone. Compared to the coupon and never to the loan constant, because amortisation is a transfer and not a cost |
 | **Closing statement** (#317) | The one that comes after yes, and the one people get *backwards*: taxes in arrears mean the seller credits the buyer, in advance the reverse, so the wrong reading misses by the **sum** of the two figures. Deposits are the tenants' money and go over whole. The closing day itself is worth **$657.53** on a $240,000 bill, so the contract decides it, not a default |
 | **Opex translator** | One expense per unit, per foot, as a share of income |
 | **Cap triangle · Rent converter · Build or buy** | The quick ones |
@@ -555,8 +908,8 @@ and never was.
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **1,113 tests** on
-the forty-two modules, plus **118** that render the page itself and check the
+math is a pure tested module before it reaches a page — **1,202 tests** on
+the forty-five modules, plus **119** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.
@@ -1866,9 +2219,12 @@ never a placeholder.
 ### E. Standing decisions, no deadline
 
 - **`ANALYSIS_WORKER=1`** on Render moves screens to the worker process.
-  Migration 0016 now exists, so this is available. Worth doing once you have
-  real concurrent users: a deploy mid-screen currently restarts the web
-  process (checkpoints resume it, but the worker is cleaner).
+  Migration 0016 now exists, so this is available. Worth doing before real
+  users arrive: without it a screen runs inside the web process, and a
+  deploy mid-screen ends it — nothing resumes it (checkpoints are read only
+  in the worker), so the deal reads "Stalled" until the analyst runs it
+  again. With the worker, a deploy pauses the screen and the next attempt
+  resumes from its last finished step.
 - **`MODEL_VERDICT`** picks the verdict model; `/data-health` shows what each
   choice costs per screen.
 - **`OM_READ=pdf`** forces the page read if a deck ever reads wrong from its

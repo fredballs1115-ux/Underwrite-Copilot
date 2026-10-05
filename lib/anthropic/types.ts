@@ -128,9 +128,35 @@ export interface ExtractionResult {
   /** Full street address ("" if the OM never states it). Optional for
    *  backward-compatibility. The screen anchors on the address. */
   address?: string;
-  /** The OM's total page count as the model read it, used to validate cited
-   *  pages. 0 / absent when unknown or for pre-citation extractions. */
+  /** The OM's total page count, used to validate cited pages: the text
+   *  layer's exact count where the screen read the layer, else the model's
+   *  own count of the PDF. 0 / absent when unknown or for pre-citation
+   *  extractions. */
   totalPages?: number;
+  /** How the screen read the memorandum: "text" — its own text layer,
+   *  page-tagged — or "pdf" — the PDF itself, where the layer was not dense
+   *  enough to stand in for the pages, or was found wanting (no figures, or
+   *  no NOI: the tables were pictures) and the pages were read instead.
+   *  Recorded with the extraction so Ask reads the memorandum the way the
+   *  screen did (lib/anthropic/ask). Absent on an extraction saved before
+   *  it was recorded, and on a deal entered by hand. */
+  omRead?: "pdf" | "text";
+  /** The day the screen read the memorandum (or the typed facts), an ISO
+   *  date stamped when the extraction is stored (lib/criteria
+   *  `screenStamp`) — never a field the model writes. A price label's year
+   *  is judged against its year: "Asking price (2026)" is the ask on a 2026
+   *  screen and stays the ask in 2027 (`screenYearOf`). Absent on an
+   *  extraction stored before the stamp, which reads as a 2026 screen. A
+   *  re-screen of the same memorandum (the same `omFingerprint`, or, for an
+   *  extraction stored before the fingerprint, nothing on the deal saying the
+   *  deck changed since) keeps its first stamp — or its lack of one, and
+   *  with it the 2026 reading (lib/criteria `screenStampFor`). */
+  screenedOn?: string;
+  /** Which memorandum this extraction was read from: the fingerprint of its
+   *  bytes (lib/om-fingerprint), stamped with `screenedOn`, so a re-screen
+   *  can tell the same deck from a reissued one. Absent on a deal entered by
+   *  hand and on an extraction stored before it was recorded. */
+  omFingerprint?: string;
   /** Free-text context typed by the buyer on MANUAL (no-OM) deals — condition,
    *  tenancy, the story. Never set by the OM extraction; rendered as prose,
    *  not a metric, and fed verbatim to the analysis fact sheet. */
@@ -233,8 +259,9 @@ export interface ExtractedTenant {
   page: string;
 }
 
-/** How a property is sold (#456). */
-export type SaleMethod = "negotiated" | "auction" | "receivership" | "bankruptcy" | "reo" | "unknown";
+/** How a property is sold (#456) — a short sale is the owner's, for less
+ *  than its loan's balance, with its lender's consent. */
+export type SaleMethod = "negotiated" | "auction" | "receivership" | "bankruptcy" | "reo" | "short_sale" | "unknown";
 
 /** The sale as the OM states it — every field a string, "" where it
  *  states none. The auction's figures (the starting bid, the reserve, the

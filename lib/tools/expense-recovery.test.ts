@@ -150,18 +150,74 @@ describe("the cap", () => {
   });
 
   it("gives a cumulative cap more room than a non-cumulative one", () => {
-    // Same 5%, same three years, same words in a term sheet. Cumulative
-    // compounds off the base year and banks the unused room; the other
-    // allows one year's worth.
+    // Same 5%, same three years, same words in a term sheet. Controllable
+    // expenses sat flat at the base year's $1,096,500 for two years, then
+    // jumped. Cumulative compounds off the base year and banks the two
+    // quiet years' room; the other allows one year's worth on last year.
     const cum = readRecovery({ ...SEED, current: { fixed: 1_600_000, variable: 1_500_000, occupancyPct: 94 } });
     const non = readRecovery({
       ...SEED,
       capType: "non-cumulative",
+      priorControllable: 1_827_500 * 0.6,
       current: { fixed: 1_600_000, variable: 1_500_000, occupancyPct: 94 },
     });
     expect(cum.capCeiling!).toBeGreaterThan(non.capCeiling!);
     expect(non.capSaved!).toBeGreaterThan(cum.capSaved!);
     expect(non.tenantShare!).toBeLessThan(cum.tenantShare!);
+  });
+
+  describe("a non-cumulative cap is measured against last year, not the base year", () => {
+    // $1M of controllable expenses, nothing to gross up, all of it under the
+    // cap, so the figures are the cap's alone.
+    const FLAT: RecoveryTerms = {
+      ...SEED,
+      base: { fixed: 1_000_000, variable: 0, occupancyPct: 95 },
+      current: { fixed: 1_124_864, variable: 0, occupancyPct: 95 },
+      capPct: 5,
+      capType: "non-cumulative",
+      controllablePct: 100,
+      yearsSinceBase: 3,
+    };
+
+    it("holds nothing back where no year rose more than the cap on the year before", () => {
+      // Up 4% a year for three years: $1,124,864 against last year's
+      // $1,081,600 is 4%, under 5%. The first version measured it against
+      // the BASE year plus one year's 5% and held back $74,864 of the
+      // $124,864 increase.
+      const r = readRecovery({ ...FLAT, priorControllable: 1_081_600 });
+      expect(r.increase).toBe(124_864);
+      expect(r.capCeiling).toBe(Math.round(1_081_600 * 1.05 - 1_000_000));
+      expect(r.capSaved).toBe(0);
+      expect(r.capSaved).not.toBe(74_864);
+      expect(r.billable).toBe(124_864);
+    });
+
+    it("holds back what this year rose past the cap on last year", () => {
+      // Flat for two years, then 10%: a 5% cap allows $1,050,000.
+      const r = readRecovery({
+        ...FLAT,
+        current: { fixed: 1_100_000, variable: 0, occupancyPct: 95 },
+        priorControllable: 1_000_000,
+      });
+      expect(r.capSaved).toBe(50_000);
+      expect(r.billable).toBe(50_000);
+    });
+
+    it("says it cannot be measured, rather than measuring it on the base year", () => {
+      const r = readRecovery(FLAT);
+      expect(r.capSaved).toBeNull();
+      expect(r.capCeiling).toBeNull();
+      expect(r.capNote).toContain("last year's controllable expenses");
+      // Nothing is held back that the lease's cap has not been shown to hold.
+      expect(r.billable).toBe(r.increase);
+    });
+
+    it("takes the base year as last year where it was", () => {
+      const r = readRecovery({ ...FLAT, yearsSinceBase: 1, current: { fixed: 1_080_000, variable: 0, occupancyPct: 95 } });
+      expect(r.capNote).toBeNull();
+      expect(r.capCeiling).toBe(50_000);
+      expect(r.capSaved).toBe(30_000);
+    });
   });
 
   it("compounds the cumulative ceiling off the base year", () => {

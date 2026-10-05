@@ -18,11 +18,13 @@ import { assumableView, readAssumable, type AssumableView } from "@/lib/assumabl
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
-import { staleAfterFailure } from "@/lib/screen-run";
+import { verdictBehind } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { modelMarketFor } from "@/lib/model-market";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { bidFloors, type BidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { coverPictureFor, galleryPhotosFor } from "@/lib/memo/cover-aerial";
@@ -91,8 +93,9 @@ export async function GET(
       302,
     );
   }
-  // Same gate as the memo: a screen that failed before the verdict left
-  // today's terms beside the previous screen's call — not one report.
+  // Same gate as the memo: a screen that failed before the verdict, or one
+  // still running toward it, leaves this run's terms beside the previous
+  // screen's call — not one report.
   const { data: latestJob } = await supabase
     .from("analysis_jobs")
     .select("status, step")
@@ -100,9 +103,10 @@ export async function GET(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (staleAfterFailure(latestJob).has("verdict")) {
+  const behind = verdictBehind(latestJob);
+  if (behind) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=reportstale`, req.url),
+      new URL(`/deals/${id}?error=${behind === "running" ? "reportrunning" : "reportstale"}`, req.url),
       302,
     );
   }
@@ -117,6 +121,9 @@ export async function GET(
   // The buy-box target IRR anchors the sensitivity page's color scale, so
   // the grids grade against THIS buyer's hurdle, not a generic threshold.
   let hurdlePct: number | null = null;
+  // The box's return floors — IRR, cash-on-cash, going-in cap — which the
+  // deal page solves its max bid on; the report makes the same call.
+  let floors: BidFloors | null = null;
   try {
     const ownership = deal as unknown as {
       user_id: string;
@@ -139,6 +146,7 @@ export async function GET(
         box,
       );
       hurdlePct = box.minIrrPct ?? null;
+      floors = bidFloors(box);
     }
   } catch {
     buyBoxChecks = [];
@@ -169,6 +177,7 @@ export async function GET(
   let siteReports: { line: string; read: string } | null = null;
   let student: { line: string; read: string } | null = null;
   let mh: { line: string; read: string } | null = null;
+  let storage: { line: string; read: string } | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -188,7 +197,8 @@ export async function GET(
           .limit(1)
           .maybeSingle(),
       ]);
-      // The same rate read as the deal page and the workbook route.
+      // The same rate read as the deal page and the workbook route — and,
+      // as there, none for the sample (lib/model-market).
       const debt = await liveDebtSeeds(HOLD_MONTHS);
       const derived = deriveUnderwriteInputs(
         extraction,
@@ -207,13 +217,23 @@ export async function GET(
               }
             : null,
         },
-        { debtIndex: debt.permanent },
+        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
       );
-      sensitivity = buildSensitivityData(derived.inputs, hurdlePct);
-      plan = buildPlanReport(extraction, {
-        pct: derived.inputs.exitCapPct,
-        provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
-      });
+      // The sources say whether the price and the year-1 NOI are the
+      // documents' or placeholders; on a placeholder's model the report
+      // leaves the grids and the max bid out and says why. The max bid is
+      // solved on the box's floors, as the deal page solves it.
+      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, { sources: derived.sources, floors });
+      // The plan page for the kind the deal page reads — the extraction and
+      // the first signal — the same read buildReportData gates the IRR page on.
+      plan = buildPlanReport(
+        extraction,
+        {
+          pct: derived.inputs.exitCapPct,
+          provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
+        },
+        (deal.first_signal as FirstSignal | null) ?? null,
+      );
       const assumableRead = readAssumable(extraction, derived.inputs);
       // A note the seller offers to carry (#462), priced against this
       // model's own new loan the way the deal page prices it.
@@ -240,6 +260,7 @@ export async function GET(
       siteReports = derived.meta.siteReports ?? null;
       student = derived.meta.student ?? null;
       mh = derived.meta.mh ?? null;
+      storage = derived.meta.storage ?? null;
       // How it is sold (#456): the ceiling bid at this report's own hurdle,
       // the buy box's where set — the same one its grids are coloured by.
       sale = derived.meta.sale
@@ -262,6 +283,9 @@ export async function GET(
         assumptions = modelVsMarketFor({
           derived,
           extraction,
+          // The kind the page reads — the extraction and the first signal —
+          // so a plan the signal names reads no going-in cap here either.
+          firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
           storedAssetClass: deal.asset_class as string | null,
           metro,
           reads: await todayReads(metro),
@@ -326,7 +350,7 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

@@ -6,7 +6,8 @@
 //      research layer, HEAD/GET-checked; dead → data_issues, revived →
 //      resolved. (The weekly link-audit workflow covers the JSON layer.)
 //   2. FRESHNESS — every feed has a cadence: rates (weekdays), intel digest +
-//      news stories (weekdays), benchmarks (180-day research rule), each
+//      news stories (weekdays), benchmarks (the 180-day research rule,
+//      lib/research-age's RESEARCH_STALE_DAYS), each
 //      wired ingest market (monthly re-runs). Overdue → data_issues; back on
 //      schedule → resolved. A cron that silently stopped becomes a visible
 //      issue the next night.
@@ -18,7 +19,12 @@
 //      today. A changed benchmark number is corrected IN THE OPEN: the row
 //      updates AND data_changelog records old → new + evidence URL. Legal
 //      rule text is NEVER auto-edited — a change flags a 'disputed' issue for
-//      human review instead.
+//      human review instead. A row a FEED PULL wrote (Zillow's, Realtor.com's,
+//      HUD's fair market rents — lib/feed-rows) is never re-checked, re-dated
+//      or corrected: its publisher dates it and the next run replaces it.
+//      Nor is a row whose as_of is the PERIOD its figure is for (the 2–4 unit
+//      month's figures, the mortgage survey's week — lib/period-rows): its
+//      date is the figure's, and today is not that period.
 //   5. HEARTBEAT — a steward_runs row wraps the whole run; the site footer
 //      renders its finished_at as "data last verified", and warns when the
 //      newest run is older than 48h. Silence is impossible by construction.
@@ -32,6 +38,21 @@ import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
+// What the feed pulls write, and the filters that leave those rows alone —
+// the one list the pulls and the reads use too (plain Node strips its types).
+import { FMR_METRICS_LIKE, isFeedMetric, withoutFeedRows, withoutYearAgoRows } from "../lib/feed-rows.ts";
+// The research rows dated by the period their figure is for, which no
+// re-verification may re-date (lib/period-rows).
+import { isPeriodMetric, withoutPeriodRows } from "../lib/period-rows.ts";
+// Today's date, as every Claude step is told it (lib/anthropic/today): a
+// "confirmed" means true today, never true of a period that has ended.
+import { todayLine } from "../lib/anthropic/today.ts";
+// The research rule's one limit, the pages' own (lib/research-age): a row
+// past it is what every surface marks stale, so it is what this counts.
+import { RESEARCH_STALE_DAYS } from "../lib/research-age.ts";
+// A fair market rent holds for its fiscal year (lib/fmr): it is stale once
+// that year has ended, never 180 days after it was read.
+import { fmrLabel, fyEnd, readFmrMetric } from "../lib/fmr.ts";
 
 const LINKS_PER_NIGHT = 25;
 const RECHECK_CLAIMS = 5;
@@ -192,20 +213,61 @@ await freshness("rates", "obs_date", 5, "rates", "is the weekday FRED cron runni
 await freshness("market_intel_digests", "digest_date", 4, "market_intel_digests", "is the weekday intel cron running?");
 await freshness("market_intel_items", "created_at", 4, "news_stories", "is the weekday intel cron running?");
 
-// Benchmarks: the 180-day research rule — count, don't just check the newest.
+// Benchmarks: the research rule (RESEARCH_STALE_DAYS) — count, don't just
+// check the newest. The year-ago rows a pull dates a year back on purpose
+// (Realtor.com's prior hotness rank) are always past it, and would keep
+// this tripped every night; the feeds' own rows keep their own cadence —
+// Zillow's and Realtor.com's are replaced each month, and a fair market
+// rent holds for its fiscal year (checked below) — so the count is of the
+// research rows alone.
 try {
   checksRun += 1;
-  const { count } = await supabase
-    .from("benchmarks")
-    .select("id", { count: "exact", head: true })
-    .lt("as_of", daysAgo(180).toISOString().slice(0, 10));
+  const { count, error } = await withoutFeedRows(
+    withoutYearAgoRows(
+      supabase
+        .from("benchmarks")
+        .select("id", { count: "exact", head: true })
+        .lt("as_of", daysAgo(RESEARCH_STALE_DAYS).toISOString().slice(0, 10))
+    )
+  );
+  // A query that failed is not a count of zero: it resolves nothing.
+  if (error) throw new Error(error.message);
   if ((count ?? 0) > 0) {
-    await openIssue("stale", "benchmarks", `${count} rows older than 180 days — refresh pass due`);
+    await openIssue("stale", "benchmarks", `${count} rows older than ${RESEARCH_STALE_DAYS} days — refresh pass due`);
   } else {
     await resolveIssue("stale", "benchmarks");
   }
-} catch {
-  notes.push("benchmarks freshness: table unreadable — skipped");
+} catch (err) {
+  notes.push(`benchmarks freshness: table unreadable (${String(err).slice(0, 80)}) — skipped`);
+}
+
+// HUD's fair market rents: the newest fiscal year on file is current until
+// that year ends (lib/fmr's fyEnd), whenever it was read. The yearly pull
+// (fmr.yml) runs on the day a new year takes effect; past the end with no
+// newer year on file, it did not run or did not write.
+try {
+  checksRun += 1;
+  const { data, error } = await supabase
+    .from("benchmarks")
+    .select("metric")
+    .like("metric", FMR_METRICS_LIKE)
+    .order("metric", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  const newest = data?.[0] ? readFmrMetric(data[0].metric) : null;
+  if (!newest) {
+    await openIssue("stale", "fair market rents", "no fair market rent rows — run the fmr workflow or the research seed");
+  } else if (iso.slice(0, 10) > fyEnd(newest.fy)) {
+    await openIssue(
+      "stale",
+      "fair market rents",
+      `the newest on file are ${fmrLabel(newest.fy)}'s, a year that ended ${fyEnd(newest.fy)} — run the fmr workflow`
+    );
+  } else {
+    await resolveIssue("stale", "fair market rents");
+  }
+} catch (err) {
+  notes.push(`fair market rents: table unreadable (${String(err).slice(0, 80)}) — skipped`);
 }
 
 // Each WIRED ingest market (a pipeline file in scripts/ingest/) must have
@@ -308,11 +370,29 @@ if (!anthropicKey) {
     // every Jan 1, and statutes amend), and a sourced-only filter would
     // leave them rotting forever. Sourced rows still surface first simply
     // by being older on average.
-    const [{ data: bm }, { data: rr }] = await Promise.all([
-      supabase
-        .from("benchmarks")
-        .select("id, sector, metro, metric, low, high, unit, source, as_of, note")
-        .in("status", ["sourced", "verified"])
+    //
+    // A FEED ROW IS NEVER A CLAIM TO RE-VERIFY (lib/feed-rows). The oldest
+    // rows in the table were always Realtor.com's year-ago hotness ranks,
+    // dated a year back by design, so every night a "confirmed" moved a
+    // publisher's observation to today and a "corrected" wrote a search
+    // result over Zillow's, Realtor.com's or HUD's own figure. The pull is
+    // the source; its next run replaces the row. So feed rows are left out
+    // in the query — the three oldest are three research rows — in every
+    // write, and once more in hand below.
+    //
+    // NOR IS A PERIOD ROW (lib/period-rows): once the feed rows were out,
+    // the three oldest were the 2–4 unit medians, dated the last day of the
+    // month they are for, and a "confirmed" would have made May's median
+    // October's. Left out the same three ways.
+    const [{ data: bmRows, error: bmError }, { data: rr }] = await Promise.all([
+      withoutPeriodRows(
+        withoutFeedRows(
+          supabase
+            .from("benchmarks")
+            .select("id, sector, metro, metric, low, high, unit, source, as_of, note")
+            .in("status", ["sourced", "verified"])
+        )
+      )
         .order("as_of", { ascending: true })
         .limit(3),
       supabase
@@ -322,8 +402,17 @@ if (!anthropicKey) {
         .order("as_of", { ascending: true })
         .limit(RECHECK_CLAIMS - 3),
     ]);
+    if (bmError) notes.push(`re-verification: benchmarks unreadable (${String(bmError.message).slice(0, 80)}) — none re-checked`);
+    const notFeed = (bmRows ?? []).filter((b) => !isFeedMetric(b.metric));
+    if (notFeed.length < (bmRows?.length ?? 0)) {
+      notes.push(`re-verification: ${(bmRows?.length ?? 0) - notFeed.length} feed rows came back past the filter and were left alone`);
+    }
+    const bm = notFeed.filter((b) => !isPeriodMetric(b.metric));
+    if (bm.length < notFeed.length) {
+      notes.push(`re-verification: ${notFeed.length - bm.length} period rows came back past the filter and were left alone`);
+    }
 
-    for (const b of bm ?? []) {
+    for (const b of bm) {
       checksRun += 1;
       const claim = `${b.sector}${b.metro ? ` / ${b.metro}` : ""} — ${b.metric}: ${b.low ?? "?"}–${b.high ?? "?"} ${b.unit} (source: ${b.source}; as of ${b.as_of}${b.note ? `; note: ${b.note}` : ""})`;
       try {
@@ -334,18 +423,28 @@ Claim: ${claim}
 
 Reply with ONLY a JSON object:
 {"verdict":"confirmed"|"corrected"|"disputed"|"not_found","new_low":number|null,"new_high":number|null,"evidence_url":"https://..."|null,"note":"one sentence"}
-- confirmed: a primary source still supports these numbers (evidence_url required)
+- confirmed: a primary source still supports these numbers TODAY (evidence_url required) — a source for a period that has ended confirms that period's figure, not today's
 - corrected: a primary source now states materially different numbers — give them in the SAME unit (${b.unit})
 - disputed: primary sources conflict with each other
-- not_found: you could not find a primary source either way`
+- not_found: you could not find a primary source either way
+
+${todayLine(today)}`
         );
         const subj = `benchmark ${b.sector}/${b.metro || "national"}/${b.metric}`;
         const okUrl = typeof v.evidence_url === "string" && v.evidence_url.startsWith("http");
         if (v.verdict === "confirmed" && okUrl) {
-          await supabase
-            .from("benchmarks")
-            .update({ as_of: iso.slice(0, 10) })
-            .eq("id", b.id);
+          // The write carries the feed and period filters too: it cannot
+          // touch either kind of row whatever id it is handed. A write that
+          // failed logs nothing.
+          const { error: upError } = await withoutPeriodRows(
+            withoutFeedRows(
+              supabase
+                .from("benchmarks")
+                .update({ as_of: iso.slice(0, 10) })
+                .eq("id", b.id)
+            )
+          );
+          if (upError) throw new Error(`benchmarks update: ${upError.message}`);
           await logChange(subj, `as_of ${b.as_of}`, `as_of ${iso.slice(0, 10)}`, `steward re-verified against live source: ${v.note ?? ""}`.trim(), v.evidence_url);
           await resolveIssue("disputed", subj);
         } else if (
@@ -355,10 +454,15 @@ Reply with ONLY a JSON object:
         ) {
           const nl = Number.isFinite(v.new_low) ? v.new_low : b.low;
           const nh = Number.isFinite(v.new_high) ? v.new_high : b.high;
-          await supabase
-            .from("benchmarks")
-            .update({ low: nl, high: nh, as_of: iso.slice(0, 10) })
-            .eq("id", b.id);
+          const { error: upError } = await withoutPeriodRows(
+            withoutFeedRows(
+              supabase
+                .from("benchmarks")
+                .update({ low: nl, high: nh, as_of: iso.slice(0, 10) })
+                .eq("id", b.id)
+            )
+          );
+          if (upError) throw new Error(`benchmarks update: ${upError.message}`);
           await logChange(subj, `${b.low ?? "?"}–${b.high ?? "?"} ${b.unit}`, `${nl ?? "?"}–${nh ?? "?"} ${b.unit}`, `steward correction from live source: ${v.note ?? ""}`.trim(), v.evidence_url);
         } else {
           await openIssue("disputed", subj, `${v.verdict ?? "unparseable"}: ${v.note ?? "no note"}${okUrl ? ` (${v.evidence_url})` : ""}`);
@@ -379,7 +483,10 @@ Rule [${r.id}] (${r.jurisdiction_state}${r.jurisdiction_local ? "/" + r.jurisdic
 Source on file: ${r.source} (as of ${r.as_of})
 
 Reply with ONLY a JSON object:
-{"verdict":"confirmed"|"changed"|"disputed"|"not_found","evidence_url":"https://..."|null,"note":"one sentence"}`
+{"verdict":"confirmed"|"changed"|"disputed"|"not_found","evidence_url":"https://..."|null,"note":"one sentence"}
+- confirmed only where the rule as stated is still true TODAY: a cap, an allowance or a term stated for a period that has ended is "changed", even where a source confirms it for that period
+
+${todayLine(today)}`
         );
         const subj = `rule ${r.id}`;
         const okUrl = typeof v.evidence_url === "string" && v.evidence_url.startsWith("http");

@@ -10,28 +10,33 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  asOfLabel,
   evaluateRules,
-  isStale,
-  vsRange,
   type Benchmark,
   type RegulatoryRule,
   type RuleEvaluation,
 } from "@/lib/research";
+import { researchAge, staleMark } from "@/lib/research-age";
+import { DatedNotes } from "@/app/dated-notes";
 import {
   benchmarksForDeal,
   buildSubject,
   fmtBenchValue,
   mergeBenchmarks,
+  mergeRules,
   pricePerUnit,
   seedBenchmarks,
   seedRules,
 } from "@/lib/research-data";
 import { withArticle } from "@/lib/article";
-import { sectorLeaderboard } from "@/lib/sector-leaderboard";
+import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
+import { monthOf } from "@/lib/zori";
+import { sectorStandings } from "@/lib/sector-leaderboard";
+import { rankLabel } from "@/lib/rank";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
-import { capSpreadRead, leverageRead } from "@/lib/leverage";
+import { capSpreadRead, leverageRead, SEEDED_RATE_BENCHMARK } from "@/lib/leverage";
 import {
   benchmark30,
   datedLong,
@@ -60,16 +65,60 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   unverified_not_found: { label: "unverified", cls: "bg-amber-500/10 text-amber-600" },
 };
 
-/** Friendly names for benchmark metrics — raw keys like "hud_fmr_fy2026_0br"
- *  read like plumbing. Unknown metrics fall back to de-underscored text. */
-function metricLabel(metric: string): string {
-  // Any fiscal year — the FMR cron (scripts/fetch-fmr.mjs) writes fy2027+
-  // rows when HUD rolls forward; those must not fall to the raw-key fallback.
-  const fmr = metric.match(/^hud_fmr_fy(\d{4})_(\w+)$/);
-  if (fmr) {
-    const br = fmr[2] === "0br" ? "studio" : fmr[2].toUpperCase();
-    return `FY${fmr[1]} fair market rent · ${br}`;
+/** A bedroom count as the panel says it. */
+function bedLabel(bed: FmrBed): string {
+  return bed === "0br" ? "studio" : bed.toUpperCase();
+}
+
+/** A metro's fair market rents for one fiscal year, read as ONE line — the
+ *  bedroom row with one provenance link — rather than five rows naming the
+ *  same source five times. The year is the rows' own (lib/fmr reads it out
+ *  of the metric), so a row HUD's next year replaces is never relabelled. */
+export type BenchItem =
+  | { kind: "row"; b: Benchmark }
+  | { kind: "fmr"; metro: string; fy: number; rows: { bed: FmrBed; b: Benchmark }[] };
+
+export function benchItems(rows: readonly Benchmark[]): BenchItem[] {
+  const items: BenchItem[] = [];
+  for (const b of rows) {
+    const f = readFmrMetric(b.metric);
+    if (!f) {
+      items.push({ kind: "row", b });
+      continue;
+    }
+    const group = items.find(
+      (i): i is Extract<BenchItem, { kind: "fmr" }> => i.kind === "fmr" && i.metro === b.metro && i.fy === f.fy,
+    );
+    if (group) group.rows.push({ bed: f.bed, b });
+    else items.push({ kind: "fmr", metro: b.metro, fy: f.fy, rows: [{ bed: f.bed, b }] });
   }
+  for (const i of items) if (i.kind === "fmr") i.rows.sort((x, y) => FMR_BEDS.indexOf(x.bed) - FMR_BEDS.indexOf(y.bed));
+  return items;
+}
+
+/** One metro's fair market rent line: the year and the day it takes effect
+ *  (read back out of the headline row's note) — or the day it ended, once
+ *  it has (lib/fmr `fmrWhen`) — the bedroom row, and the headline
+ *  two-bedroom row whose provenance the line shows — the rows of one year
+ *  and one metro come from one source. */
+export function fmrLine(
+  item: Extract<BenchItem, { kind: "fmr" }>,
+  today: string,
+): { heading: string; figures: string; head: Benchmark; ended: boolean } {
+  const head = (item.rows.find((r) => r.bed === "2br") ?? item.rows[0]).b;
+  const when = fmrWhen({ fy: item.fy, effective: fmrEffectiveOf(head.note) }, today);
+  return {
+    heading: `${fmrLabel(item.fy)} fair market rent${when.text ? `, ${when.text}` : ""}`,
+    figures: item.rows.map((r) => `${bedLabel(r.bed)} ${fmtBenchValue(r.b.metric, r.b.low, r.b.high)}`).join(" · "),
+    head,
+    ended: when.ended,
+  };
+}
+
+/** Friendly names for benchmark metrics — raw keys read like plumbing.
+ *  Unknown metrics fall back to de-underscored text. (A fair market rent is
+ *  never one row here: `benchItems` reads a metro's as one line.) */
+function metricLabel(metric: string): string {
   const snap = metric.match(/^(\w+?)_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/);
   if (snap) {
     const sector = snap[1].replace(/_/g, " ");
@@ -81,31 +130,36 @@ function metricLabel(metric: string): string {
           : "cap rate";
     return `${sector} ${what}`;
   }
-  if (metric === "median_sale_price_2_4_unit") return "2–4 unit median sale";
   if (metric === "monthly_sales_2_4_unit") return "2–4 unit sales / month";
   if (metric === "active_listings_2_4_unit") return "2–4 unit active listings";
   if (metric === "pmms_30y_fixed") return "30-yr fixed (PMMS)";
   return metric.replace(/__/g, ": ").replace(/_/g, " ");
 }
 
-// Where each covered metro sits per sector across the covered markets
-// (tightest vacancy first) — the same shared builder behind the market
-// page's rankings, the briefs' chips, and the sample screen, so a deal's
-// vs-market row can never disagree with them.
-const SECTOR_RANKS: Record<
-  string,
-  Record<string, { rank: number; total: number }>
-> = Object.fromEntries(
-  ["office", "industrial", "multifamily", "retail"].map((sec) => {
-    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
-    return [
-      sec,
-      Object.fromEntries(
-        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
-      ),
-    ];
-  }),
-);
+/**
+ * A benchmark row's name as the panel prints it. The 2–4 unit median is the
+ * sale price of a whole property — a duplex, a triplex or a fourplex, never
+ * one unit — for one month (the row's `as_of` is that month's last day, the
+ * period the tracker states), so it is named as a property's and dated, and
+ * set against nothing: the panel once called a deal "below market" by its
+ * price per unit against it, which every Philadelphia deal priced under the
+ * median a unit read (the research pass of 2026-09-30).
+ */
+export function benchRowLabel(b: Pick<Benchmark, "metric" | "as_of">): string {
+  if (b.metric === "median_sale_price_2_4_unit") {
+    const month = b.as_of ? monthOf(b.as_of) : "";
+    return `Median sale price of a 2–4 unit property${month ? `, ${month}` : ""}`;
+  }
+  return metricLabel(b.metric);
+}
+
+// Where each covered metro's figure stands per sector across the covered
+// markets (tightest vacancy first) — the same shared builder behind the
+// market page's rankings, the briefs' chips, and the sample screen
+// (lib/sector-leaderboard `sectorStandings`), so a deal's vs-market row can
+// never disagree with them. Read for the day the panel renders: a figure
+// over a year old is not ranked.
+const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 
 /** Plain-English labels for condition keys surfaced as open questions. */
 const UNKNOWN_LABELS: Record<string, string> = {
@@ -138,17 +192,37 @@ const ANSWERABLE_IN_DEAL_FACTS = new Set([
   "owner_total_rental_units_in_state_lte",
 ]);
 
-function SourceLink({
+export function SourceLink({
   source,
   asOf,
   status,
+  today,
+  yearEnded,
+  readOn,
 }: {
   source: string | null;
   asOf: string;
   status: string;
+  /** the day the panel is read (an ISO day), for the research rule's age */
+  today: string;
+  /** a figure that holds for a fiscal year (a fair market rent): its
+   *  freshness is the year's — true once the year has ended — never the
+   *  research rule's days since it was read, which would call a year in
+   *  force stale */
+  yearEnded?: boolean;
+  /** `asOf` is the day the research was read, not the figure's date (a
+   *  research-tracker row, whose own period rides in its citation) */
+  readOn?: boolean;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.sourced;
-  const stale = isStale(asOf);
+  // The research rule (lib/research-age): past its limit the date is shown
+  // with its age and marked stale, never hidden. A figure whose file states
+  // no date is undated — flagged in the stale tone, but never given a date
+  // it does not have.
+  const age = researchAge(asOf, today);
+  const undated = age.asOf === null;
+  const stale = yearEnded === undefined ? undated || age.stale : yearEnded;
+  const dated = readOn ? `read ${asOf}` : asOfLabel(asOf);
   // Audit gate: a link the audit script has verified DEAD renders as plain
   // text — the user never gets handed a clickable 404. Unaudited links render
   // normally (never audited ≠ dead).
@@ -157,11 +231,11 @@ function SourceLink({
     <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
       <span className={`rounded px-1.5 py-px font-medium ${meta.cls}`}>{meta.label}</span>
       {stale && (
-        <span className="rounded bg-amber-500/10 px-1.5 py-px font-medium text-amber-600">
-          stale · {asOf}
+        <span className="rounded bg-amber-500/10 px-1.5 py-px font-medium text-amber-600" data-qa="research-stale">
+          {yearEnded ? "year ended" : undated ? "undated" : `${dated} · ${staleMark(age)}`}
         </span>
       )}
-      {!stale && <span>as of {asOf}</span>}
+      {!stale && <span>{dated}</span>}
       {source &&
         (audited === false ? (
           <span title={source}>source on file — link unavailable</span>
@@ -184,6 +258,7 @@ export async function ResearchPanel({
   sizeText,
   priceText,
   capText,
+  capWithheld = null,
   yearBuilt,
   sectorFields,
   assetClass,
@@ -207,6 +282,10 @@ export async function ResearchPanel({
   priceText?: string | null;
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
   capText?: string | null;
+  /** "note" where the deal's price is a loan's: the collateral's income
+   *  over it is a cap nobody earns (lib/compare-interest `noteCapSlot`), so
+   *  the leverage check does not run and says why */
+  capWithheld?: "note" | null;
   /** the screening rate the model was seeded with off today's curve
    *  (lib/debt-index): the index a fact, the class spread an assumption,
    *  the note naming both — the leverage check reads the cap against it */
@@ -226,8 +305,14 @@ export async function ResearchPanel({
   /** the deal's asset class — same-sector benchmark rows sort first */
   assetClass?: string | null;
 }) {
-  // DB first, seeds as fallback — a missing table (migration not yet run)
-  // must degrade silently to the checked-in research layer.
+  // Today, for a fair market rent's year (ended or not) and every research
+  // date's age (lib/research-age) — read once here.
+  const today = fmrToday();
+  const standings = sectorStandings(TRACKED_SECTORS, today);
+  // The checked-in research layer, with the database's rows merged in — a
+  // missing table (migration not yet run) degrades silently to the files.
+  // A rule's words are always the file's (mergeRules: nothing else writes
+  // them); a benchmark's figures may be the steward's correction.
   let rules: RegulatoryRule[] = seedRules();
   let benchmarks: Benchmark[] = seedBenchmarks();
   try {
@@ -236,11 +321,7 @@ export async function ResearchPanel({
       supabase.from("regulatory_rules").select("*"),
       supabase.from("benchmarks").select("*"),
     ]);
-    if (dbRules?.length) {
-      const byId = new Map(rules.map((r) => [r.id, r]));
-      for (const r of dbRules as unknown as RegulatoryRule[]) byId.set(r.id, r);
-      rules = [...byId.values()];
-    }
+    if (dbRules?.length) rules = mergeRules(dbRules as unknown as RegulatoryRule[]);
     if (dbBench?.length) {
       benchmarks = mergeBenchmarks(dbBench as unknown as Benchmark[]);
     }
@@ -259,6 +340,9 @@ export async function ResearchPanel({
     yearBuilt,
     sectorFields,
     residential: assetClassKey(assetClass) ? words.residential : undefined,
+    // A rule's own stated window or effective date is read on this day
+    // (lib/dated-window): each evaluation says what has ended.
+    today,
   });
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
@@ -310,7 +394,7 @@ export async function ResearchPanel({
   // assumption, both named in the seed's own note.
   const capSpread = capPct != null && tenYear ? capSpreadRead(capPct, tenYear.pct) : null;
   const seededLeverage =
-    capPct != null && rateSeed ? leverageRead(capPct, rateSeed.pct, "today's index plus the class spread") : null;
+    capPct != null && rateSeed ? leverageRead(capPct, rateSeed.pct, SEEDED_RATE_BENCHMARK) : null;
 
   const hasRegulation = shown.length > 0;
   const hasBenchmarks = metroBench.length > 0;
@@ -413,7 +497,7 @@ export async function ResearchPanel({
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             {leverage.label} — going-in cap {capPct}% vs {bench30.value}% (
-            {bench30.source}, as of {bench30.asOf}). The benchmark is an
+            {bench30.source}, {asOfLabel(bench30.asOf, bench30.live ? undefined : today)}). The benchmark is an
             owner-occupier rate; investor debt usually prices above it, so a
             thin spread here is thinner in practice.
           </p>
@@ -421,7 +505,7 @@ export async function ResearchPanel({
             <div className="mt-2 border-t border-line/60 pt-2" data-qa="leverage-today">
               {capSpread && tenYear && (
                 <p className="text-xs leading-relaxed text-muted">
-                  {`Against today's curve: the cap is ${capSpread.label} (${tenYear.pct.toFixed(2)}% on ${datedLong(tenYear.asOf)}, FRED).`}
+                  {`Against the latest curve: the cap is ${capSpread.label} (${tenYear.pct.toFixed(2)}% on ${datedLong(tenYear.asOf)}, FRED).`}
                 </p>
               )}
               {seededLeverage && rateSeed && (
@@ -441,9 +525,27 @@ export async function ResearchPanel({
           )}
         </div>
       )}
+      {/* A note: its price is a loan's, and the collateral's income over it
+          is a cap nobody earns — there is no buyer's cap to spread against
+          debt. Say so rather than leaving a gap. */}
+      {capPct == null && capWithheld === "note" && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3" data-qa="leverage-note">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
+              n/a on a note
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            The price is a loan&apos;s, not the building&apos;s: the collateral&apos;s income over it
+            is a cap nobody earns, so there is no cap of the buyer&apos;s to spread against debt. The
+            note is read by its yield to maturity at its price, not by a cap rate.
+          </p>
+        </div>
+      )}
       {/* A plan deal with no going-in cap: a dark building has nothing to
           spread against debt yet. Say so rather than leaving a gap. */}
-      {capPct == null && planLabel && (
+      {capPct == null && capWithheld !== "note" && planLabel && (
         <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold">Leverage check</p>
@@ -499,6 +601,10 @@ export async function ResearchPanel({
                   </span>
                 </div>
                 <p className="mt-1.5 text-sm leading-relaxed">{e.rule.effect}</p>
+                {/* The rule's text as written, and — once a window it states
+                    its figure for has ended, or a date it gives has come —
+                    that sentence beneath it (lib/dated-window). */}
+                <DatedNotes notes={e.dated} className="mt-1" />
                 {open.length > 0 && (
                   <p className="mt-1 text-[12px] text-amber-600">
                     To settle this: provide {open.join(", ")}.{" "}
@@ -513,7 +619,7 @@ export async function ResearchPanel({
                   </p>
                 )}
                 <div className="mt-1.5">
-                  <SourceLink source={e.rule.source} asOf={e.rule.as_of} status={e.rule.status} />
+                  <SourceLink source={e.rule.source} asOf={e.rule.as_of} status={e.rule.status} today={today} />
                 </div>
               </li>
             );
@@ -527,23 +633,38 @@ export async function ResearchPanel({
             vs. market{ppu ? ` — this deal ≈ $${ppu.toLocaleString()}/unit` : ""}
           </h3>
           <ul className="mt-2 space-y-2">
-            {metroBench.map((b) => {
-              const cmp =
-                ppu && b.metric === "median_sale_price_2_4_unit"
-                  ? vsRange(ppu, b.low, b.high)
-                  : null;
+            {benchItems(metroBench).map((item) => {
+              if (item.kind === "fmr") {
+                const line = fmrLine(item, today);
+                return (
+                  <li
+                    key={`${item.metro}|fmr`}
+                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                  >
+                    <span>
+                      {`${line.heading}: `}
+                      <span className="font-mono tabular-nums">{line.figures}</span>
+                    </span>
+                    <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} today={today} yearEnded={line.ended} />
+                  </li>
+                );
+              }
+              const b = item.b;
               // Vacancy rows also say where this metro sits in its sector's
               // cross-metro ranking — same builder as the market page.
               const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
+              const standing = vac && metro ? standings[vac[1]]?.[metro.id] : undefined;
               const rank =
-                vac && metro ? SECTOR_RANKS[vac[1]]?.[metro.id] : undefined;
+                standing && standing.rank !== null
+                  ? { label: rankLabel({ rank: standing.rank, tied: standing.tied }), total: standing.total }
+                  : undefined;
               return (
                 <li
                   key={`${b.metro}|${b.metric}`}
                   className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
                 >
                   <span>
-                    {metricLabel(b.metric)}
+                    {benchRowLabel(b)}
                     {": "}
                     <span className="font-mono tabular-nums">
                       {fmtBenchValue(b.metric, b.low, b.high)}
@@ -551,27 +672,22 @@ export async function ResearchPanel({
                     {rank && vac && (
                       <Link
                         href={`/market?sector=${vac[1]}`}
-                        title="rank across covered markets, tightest first"
+                        title={`rank across covered markets, tightest first${standing && standing.row.markets.length > 1 ? ` — one figure${standing.row.sharedArea ? ` for ${standing.row.sharedArea}` : ""}, read by ${standing.row.markets.map((m) => m.name).join(", ")}` : ""}`}
                         className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
                       >
-                        #{rank.rank} of {rank.total}
+                        {`${rank.label} of ${rank.total}`}
                       </Link>
                     )}
-                    {cmp && cmp !== "no_range" && (
-                      <span
-                        className={`ml-2 rounded px-1.5 py-px text-[11px] font-medium ${
-                          cmp === "above"
-                            ? "bg-red-500/10 text-red-600"
-                            : cmp === "below"
-                              ? "bg-emerald-500/10 text-emerald-600"
-                              : "bg-line/60 text-muted"
-                        }`}
-                      >
-                        deal {cmp} market
+                    {/* A research-tracker figure's own house, area and
+                        period (lib/tracker-read) — the row's date is the
+                        day the research was read, not the figure's. */}
+                    {b.cite && (
+                      <span className="block text-[11px] text-muted" data-qa="bench-cite">
+                        {b.cite}
                       </span>
                     )}
                   </span>
-                  <SourceLink source={b.source} asOf={b.as_of} status={b.status} />
+                  <SourceLink source={b.source} asOf={b.as_of} status={b.status} today={today} readOn={!!b.cite} />
                 </li>
               );
             })}

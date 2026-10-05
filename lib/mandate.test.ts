@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { scoreMandateFit, WEIGHTS } from "./mandate";
-import { evaluateBuyBox, foldBuyBoxChecks, type BuyBox } from "./criteria";
+import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, type BuyBox } from "./criteria";
 
 /** Build a minimal extraction-like object for the score to read. */
 function ex(
@@ -131,6 +131,26 @@ describe("scoreMandateFit — proportional partial credit", () => {
     // 10 * (1 - 0.05/0.10) = 5
     expect(size.earned).toBeCloseTo(5, 5);
     expect(r.score).toBe(50);
+  });
+
+  it("a note's cap stays the collateral's through buyBoxCheckSource, as every page scores it (the audit of 2026-10-01)", () => {
+    const note = { ...ex([["Going-in cap rate", "4.50%"]]), interest: { kind: "note" } };
+    const r = scoreMandateFit("auto", buyBoxCheckSource(note, null, null), { minCapPct: 6.0, dealbreakers: { minCapPct: 5.0 } });
+    expect(dim(r, "cap")?.detail).toContain("this is a note");
+    expect(r.dealbreakerTripped).toBe(false);
+    expect(r.verdict).not.toBe("pass");
+  });
+
+  it("a note's stated cap is the collateral's: never scored against the floor, never a tripped dealbreaker (the audit of 2026-09-30)", () => {
+    const note = { ...ex([["Going-in cap rate", "4.00%"]]), interest: { kind: "note" } };
+    const r = scoreMandateFit("auto", note, { minCapPct: 5.0, dealbreakers: { minCapPct: 6.0 } });
+    expect(dim(r, "cap")?.status).toBe("unknown");
+    expect(dim(r, "cap")?.detail).toContain("this is a note: its price is a loan's");
+    expect(r.dealbreakerTripped).toBe(false);
+    // The same 4.00% on a building misses the floor and trips the dealbreaker.
+    const building = scoreMandateFit("auto", ex([["Going-in cap rate", "4.00%"]]), { minCapPct: 5.0, dealbreakers: { minCapPct: 6.0 } });
+    expect(dim(building, "cap")?.status).toBe("miss");
+    expect(building.dealbreakerTripped).toBe(true);
   });
 
   it("beyond the tolerance band it is a clean miss (zero)", () => {

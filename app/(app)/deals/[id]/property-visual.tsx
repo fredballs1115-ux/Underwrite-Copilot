@@ -1,13 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { FLOOD_ZOOM } from "@/lib/basemaps";
+import { useEffect, useRef, useState } from "react";
 import type { MarketPicture } from "@/lib/market-picture";
+import {
+  FLOOD_CLASS_LABEL,
+  floodStyleOf,
+  floodSwatchBackground,
+  floodSwatchBorder,
+  type FloodClassKey,
+} from "@/lib/flood-style";
+import { photographerParts } from "@/lib/credit-parts";
+import { CreditPartsText } from "@/app/credit-parts";
 import { MarketCaption } from "../market-caption";
 import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 import { previewStyle } from "@/lib/photo-preview";
+import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER } from "@/lib/image-frames";
+import {
+  headerPhotoSizes,
+  mosaicTileSizes,
+  photoAspect,
+  photoSrcSet,
+  viewerSizes,
+  type StoredPhotoSizes,
+} from "@/lib/photo-srcset";
 
 /**
  * The real property, at the top of its deal page: the building's OWN
@@ -48,18 +65,24 @@ import { previewStyle } from "@/lib/photo-preview";
  * beside the name and the figures where the header is wide and above them
  * where it is not, with the reader's Replace photo on the picture itself.
  *
- * The Flood tab (#425) is the USGS aerial at a wider frame with FEMA's flood
- * zones drawn over it in FEMA's own colours — the two images asked for the
- * same location, zoom and size, so they share one Web-Mercator frame — with
- * a ring at the frame's centre, which is the building, FEMA's key under it
- * and one sentence on the zone at the building. Only for a street address:
- * a neighbourhood placement's centre is not the building.
+ * The Flood tab (#425) is the deal's flood frame (#472, lib/flood-map): the
+ * USGS aerial at a wider frame, calmed, with FEMA's flood zones drawn over it
+ * in the site's palette, drawn once a deal on the server and kept — one
+ * picture, cut to the view's shape — with a ring at the frame's centre,
+ * which is the building, a key of the zones the frame actually shows under
+ * it and one sentence on the zone at the building. A frame not drawn yet
+ * shows that it is being drawn, and one that does not come says so beside
+ * the key and the sentence rather than taking them away. Only for a street
+ * address: a neighbourhood placement's centre is not the building.
  *
  * Where the deal has no photograph of the building's own and no Street View,
  * the picture leads with the photograph its market is known by (#439), the
  * one its pipeline card shows (#438): named on its face as the market's,
  * never passed for the building, with the aerial, the flood map and the map
- * one step along the filmstrip. The reader's "Add photo" sits on it.
+ * one step along the filmstrip. The reader's "Add photo" sits on it. Its
+ * credit carries what the licence asks — the photographer linked to the
+ * file's page on Commons, the licence to its text, and "cropped to fit" in
+ * the frame that crops it, never in the viewer, which shows it whole.
  *
  * Every picture opens full screen (#445, `PhotoViewer`): a click on it, or
  * the expand control at its top left, shows the views one at a time at the
@@ -79,15 +102,27 @@ import { previewStyle } from "@/lib/photo-preview";
  * each asked for at the cover's size (lazily, since a phone keeps the one
  * picture), each credited, each opening the viewer at itself, the last saying
  * how many more there are.
+ *
+ * A stored photograph whose source was larger than its hero has a full-size
+ * copy too (lib/deal-picture), and every picture of it here — the cover, a
+ * mosaic tile, a gallery view, the viewer — names both in a srcset with the
+ * width it is drawn at (lib/photo-srcset), so a dense screen, a panorama
+ * covering the frame by its height and the viewer take the full copy where
+ * the hero would be stretched, and every other screen the hero it had.
  */
 
 /** A view's id: the fixed views, and the memorandum's other photographs
  *  as `g1`, `g2`… (#448). */
 type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "map" | `g${number}`;
 
-const AERIAL = { w: 1280, h: 576 }; // the route's max width
-/** The overheads' frame in the full-screen viewer: the route's width, 4:3. */
-const VIEWER = { w: 1280, h: 960 };
+/** The overhead views' frame, and the overheads' in the full-screen viewer:
+ *  lib/image-frames' own, the frames the aerial route draws (research pass
+ *  22), so this page and its route cannot drift apart. */
+const AERIAL = DEAL_AERIAL_VIEW;
+const VIEWER = DEAL_AERIAL_VIEWER;
+/** The Flood view's crop of the deal's flood frame (#472): the view's own
+ *  16:9, so nothing the key describes is cut away by the box. */
+const FLOOD_VIEW = { w: 1280, h: 720 };
 
 /** Every view's frame, read against the deal header it sits in (#433): 16:9
  *  on a phone, a wider band where the header stacks at a tablet's width (so
@@ -126,15 +161,23 @@ export function PropertyVisual({
   googleEnabled: boolean;
   /** the deal has an address at all — without one there is no overhead and no map */
   hasAddress?: boolean;
-  /** the deal's own photograph, with what it is credited as and its
-   *  blur-up preview (#463); null for none */
-  picture?: { credit: string; source: "om" | "upload"; preview?: string | null } | null;
+  /** the deal's own photograph, with what it is credited as, its blur-up
+   *  preview (#463) and its stored sizes (the hero's, and the full-size
+   *  copy's width where one is stored); null for none */
+  picture?: ({ credit: string; source: "om" | "upload"; preview?: string | null } & StoredPhotoSizes) | null;
   /** the reader may put their own picture on the deal (never on the sample) */
   canReplace?: boolean;
-  /** the Flood tab's key and sentence (lib/site-flags `floodKey`,
+  /** the Flood tab (#472): the frame's URL stem (the route, with the point
+   *  it is drawn around, so a moved deal asks for a new picture), the
+   *  classes the page's and the viewer's crops show where the frame is
+   *  drawn already, the class the building's own zone is drawn in, the zone
+   *  in a word for the picture, and the sentence (lib/site-flags
    *  `floodZoneLine`); null for no Flood tab */
   flood?: {
-    key: { label: string; image: string | null; here: boolean }[];
+    src: string;
+    classes: { page: FloodClassKey[]; full: FloodClassKey[] } | null;
+    here: FloodClassKey | null;
+    zone: string | null;
     line: string | null;
   } | null;
   /** the photograph the deal's market is known by (lib/market-picture),
@@ -142,8 +185,8 @@ export function PropertyVisual({
    *  Street View (#439); null for none */
   market?: MarketPicture | null;
   /** the memorandum's other photographs, in page order, each with its
-   *  credit (#448); served as `?g=1`, `?g=2`… */
-  gallery?: { page: number | null; credit: string; preview?: string | null }[];
+   *  credit (#448) and its stored sizes; served as `?g=1`, `?g=2`… */
+  gallery?: ({ page: number | null; credit: string; preview?: string | null } & StoredPhotoSizes)[];
 }) {
   // Lead with the building's own photograph wherever one exists; the
   // aerial leads only when it is the best picture available.
@@ -154,6 +197,76 @@ export function PropertyVisual({
   const [streetGone, setStreetGone] = useState(false);
   const [satelliteGone, setSatelliteGone] = useState(false);
   const [floodGone, setFloodGone] = useState(false);
+  // The flood frame (#472) is drawn on the server behind the page's first
+  // render, so the first ask may find it still being drawn. A picture that
+  // does not come is asked about — `?meta=1` answers by its status: 404,
+  // nothing to draw (the view goes); 503, not drawn yet — and asked for
+  // again, a little later each time, three times before the view says it
+  // did not come. The key and the sentence stay either way.
+  const [floodTry, setFloodTry] = useState(0);
+  const [floodState, setFloodState] = useState<"loading" | "ready" | "failed">("loading");
+  const [floodClasses, setFloodClasses] = useState(flood?.classes ?? null);
+  // The try that failed, once: the view and its thumbnail failing together
+  // ask about it one time.
+  const [floodFailed, setFloodFailed] = useState<number | null>(null);
+  const floodImg = useRef<HTMLImageElement>(null);
+  const floodStem = flood?.src ?? null;
+  const onFloodError = () => setFloodFailed(floodTry);
+  const onFloodLoad = () => setFloodState("ready");
+  useEffect(() => {
+    if (floodFailed === null || !floodStem) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void (async () => {
+      let status = 0;
+      try {
+        const res = await fetch(`${floodStem}&meta=1`);
+        status = res.status;
+        if (res.ok) {
+          const meta = (await res.json()) as { classes?: { page: FloodClassKey[]; full: FloodClassKey[] } };
+          if (!cancelled && meta.classes) setFloodClasses(meta.classes);
+        }
+      } catch {
+        status = 0;
+      }
+      if (cancelled) return;
+      if (status === 404) return setFloodGone(true);
+      if (floodFailed >= 3) return setFloodState("failed");
+      timer = setTimeout(
+        () => {
+          setFloodFailed(null);
+          setFloodTry(floodFailed + 1);
+        },
+        status === 200 ? 300 : 4000 * (floodFailed + 1),
+      );
+    })();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [floodFailed, floodStem]);
+  useEffect(() => {
+    // A page rendered before the frame existed learns its key once the
+    // picture has come.
+    if (floodState !== "ready" || floodClasses || !floodStem) return;
+    let cancelled = false;
+    fetch(`${floodStem}&meta=1`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ classes?: { page: FloodClassKey[]; full: FloodClassKey[] } }>) : null))
+      .then((meta) => {
+        if (!cancelled && meta?.classes) setFloodClasses(meta.classes);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [floodState, floodClasses, floodStem]);
+  useEffect(() => {
+    // A picture that settled before hydration fired its event unheard.
+    const img = floodImg.current;
+    if (!img?.complete) return;
+    if (img.naturalWidth > 0) setFloodState("ready");
+    else setFloodFailed(0);
+  }, []);
   const [marketGone, setMarketGone] = useState(false);
   const [viewing, setViewing] = useState<View | null>(null);
   // The gallery photographs that failed to load, by their 1-based index, and
@@ -182,7 +295,7 @@ export function PropertyVisual({
   // a deal with a photograph or a street view never shows a skyline.
   const marketPossible = !!market && !marketGone && !photoPossible && !streetPossible;
   // Nothing photographic resolved — collapse entirely.
-  if (aerialGone && !photoPossible && !streetPossible && !satellitePossible && !marketPossible && galleryLive.length === 0) {
+  if (aerialGone && !photoPossible && !streetPossible && !satellitePossible && !marketPossible && !floodPossible && galleryLive.length === 0) {
     return null;
   }
 
@@ -204,15 +317,18 @@ export function PropertyVisual({
   // already make, and a thumbnail that fails takes its view away just as
   // the view failing would.
   const aerialSrc = `/api/deals/${dealId}/aerial?src=usgs&w=${AERIAL.w}&h=${AERIAL.h}`;
-  const floodAerialSrc = `${aerialSrc}&z=${FLOOD_ZOOM}`;
-  const floodSrc = `/api/deals/${dealId}/flood?w=${AERIAL.w}&h=${AERIAL.h}&z=${FLOOD_ZOOM}`;
-  const thumbs: Record<string, { src: string | null; over?: string; fail: () => void }> = {
+  // The flood frame's crops (#472): the view's 16:9 at 1x and 2x, the
+  // filmstrip's, and the viewer's whole frame — each retry a new URL.
+  const floodR = floodTry ? `&r=${floodTry}` : "";
+  const floodView = flood ? `${flood.src}&w=${FLOOD_VIEW.w}&h=${FLOOD_VIEW.h}${floodR}` : "";
+  const floodView2x = flood ? `${flood.src}&w=${FLOOD_VIEW.w * 2}&h=${FLOOD_VIEW.h * 2}${floodR}` : "";
+  const thumbs: Record<string, { src: string | null; fail: () => void }> = {
     photo: { src: `/api/deals/${dealId}/picture?size=hero`, fail: () => setPhotoGone(true) },
     street: { src: `/api/deals/${dealId}/photo`, fail: () => setStreetGone(true) },
     market: { src: market?.src ?? null, fail: () => setMarketGone(true) },
     satellite: { src: `/api/deals/${dealId}/aerial?src=satellite&w=${AERIAL.w}&h=${AERIAL.h}`, fail: () => setSatelliteGone(true) },
     aerial: { src: aerialSrc, fail: () => setAerialGone(true) },
-    flood: { src: floodAerialSrc, over: floodSrc, fail: () => setFloodGone(true) },
+    flood: { src: flood && floodState !== "failed" ? `${flood.src}&w=192&h=108${floodR}` : null, fail: onFloodError },
     map: { src: null, fail: () => {} },
     // A gallery photograph's place in the filmstrip is its stored 240px
     // crop: its full-size picture waits for its view to be opened.
@@ -223,6 +339,12 @@ export function PropertyVisual({
   const galleryHero = (i: number) => `/api/deals/${dealId}/picture?size=hero&g=${i}`;
   const galleryAlt = (g: { page: number | null }) =>
     g.page ? `Photograph from page ${g.page} of the memorandum for ${label}` : `Photograph from the memorandum for ${label}`;
+  // Each stored photograph at its hero's width and, where one is stored, its
+  // full-size copy's (lib/photo-srcset): the browser takes whichever the
+  // width it is drawn at on this screen needs.
+  const coverSrcSet = photoSrcSet((size) => `/api/deals/${dealId}/picture?size=${size}`, picture);
+  const gallerySrcSet = (g: StoredPhotoSizes & { i: number }) =>
+    photoSrcSet((size) => `/api/deals/${dealId}/picture?size=${size}&g=${g.i}`, g);
 
   // The full-screen viewer's pictures (#445): the views the page has, the
   // map apart, each credited exactly as its own view is.
@@ -231,11 +353,32 @@ export function PropertyVisual({
     const thumb = thumbs[v.id].src ?? "";
     const photo = galleryLive.find((g) => g.id === v.id);
     if (photo) {
-      return [{ id: v.id, label: v.label, src: galleryHero(photo.i), alt: galleryAlt(photo), credit: photo.credit, thumb }];
+      const srcSet = gallerySrcSet(photo);
+      return [
+        {
+          id: v.id,
+          label: v.label,
+          src: galleryHero(photo.i),
+          ...(srcSet ? { srcSet, sizes: viewerSizes(photo) } : {}),
+          alt: galleryAlt(photo),
+          credit: photo.credit,
+          thumb,
+        },
+      ];
     }
     switch (v.id) {
       case "photo":
-        return [{ id: v.id, label: v.label, src: `/api/deals/${dealId}/picture?size=hero`, alt: `Photograph of ${label}`, credit: picture?.credit ?? "", thumb }];
+        return [
+          {
+            id: v.id,
+            label: v.label,
+            src: `/api/deals/${dealId}/picture?size=hero`,
+            ...(coverSrcSet ? { srcSet: coverSrcSet, sizes: viewerSizes(picture) } : {}),
+            alt: `Photograph of ${label}`,
+            credit: picture?.credit ?? "",
+            thumb,
+          },
+        ];
       case "street":
         return [{ id: v.id, label: v.label, src: `/api/deals/${dealId}/photo`, alt: `Street view of ${label}`, credit: "Street View imagery © Google", thumb }];
       case "market":
@@ -246,7 +389,9 @@ export function PropertyVisual({
                 label: v.label,
                 src: market.src,
                 alt: `${market.place}: the market this deal is in, ${market.name}. No photograph of the building yet.`,
-                credit: `Market photo: ${market.name} · ${market.credit}`,
+                // Linked, and never "cropped to fit": the viewer shows the
+                // photograph whole.
+                credit: [`Market photo: ${market.name} · `, ...photographerParts(market.author, market.license, false)],
                 thumb,
               },
             ]
@@ -277,19 +422,20 @@ export function PropertyVisual({
           },
         ];
       case "flood":
-        return [
-          {
-            id: v.id,
-            label: v.label,
-            src: `${viewerAerial}&z=${FLOOD_ZOOM}`,
-            over: `/api/deals/${dealId}/flood?w=${VIEWER.w}&h=${VIEWER.h}&z=${FLOOD_ZOOM}`,
-            alt: `Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones`,
-            credit: "FEMA flood zones · USGS imagery",
-            thumb,
-            thumbOver: thumbs.flood.over,
-            ring: true,
-          },
-        ];
+        return flood
+          ? [
+              {
+                id: v.id,
+                label: v.label,
+                // The whole frame, at the pixels it is drawn at.
+                src: `${flood.src}&w=${VIEWER.w * 2}&h=${VIEWER.h * 2}${floodR}`,
+                alt: `Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones drawn over it`,
+                credit: "FEMA flood zones · USGS imagery",
+                thumb,
+                ring: true,
+              },
+            ]
+          : [];
       default:
         return [];
     }
@@ -302,6 +448,15 @@ export function PropertyVisual({
   const tiles = photoPossible ? galleryLive.slice(0, 2) : [];
   const mosaic = tiles.length === 2;
   const moreCount = photoIds.length - 3;
+  // The Flood view's key (#472): the zones the view's crop actually shows,
+  // read off the frame when it was drawn, the building's own first.
+  const floodKeyList: { key: FloodClassKey; here: boolean }[] | null = floodClasses
+    ? (() => {
+        const shown = floodClasses.page;
+        const own = flood?.here && shown.includes(flood.here) ? flood.here : null;
+        return (own ? [own, ...shown.filter((c) => c !== own)] : shown).map((key) => ({ key, here: key === own }));
+      })()
+    : null;
 
   return (
     // The deal header's own picture (#433): no card of its own — the header
@@ -322,6 +477,8 @@ export function PropertyVisual({
                     adds nothing over a route with its own cache headers */}
                 <img
                   src={`/api/deals/${dealId}/picture?size=hero`}
+                  srcSet={coverSrcSet}
+                  sizes={coverSrcSet ? headerPhotoSizes(photoAspect(picture)) : undefined}
                   alt={`Photograph of ${label}`}
                   width={AERIAL.w}
                   height={AERIAL.h}
@@ -354,6 +511,7 @@ export function PropertyVisual({
                   {tiles.map((g, k) => {
                     const at = photoIds.indexOf(g.id) + 1;
                     const more = k === tiles.length - 1 && moreCount > 0;
+                    const srcSet = gallerySrcSet(g);
                     return (
                       <button
                         key={g.id}
@@ -371,6 +529,8 @@ export function PropertyVisual({
                         {/* eslint-disable-next-line @next/next/no-img-element -- proxied, auth-scoped route serving the stored derivative */}
                         <img
                           src={galleryHero(g.i)}
+                          srcSet={srcSet}
+                          sizes={srcSet ? mosaicTileSizes(photoAspect(g)) : undefined}
                           alt=""
                           width={AERIAL.w}
                           height={AERIAL.h}
@@ -405,6 +565,8 @@ export function PropertyVisual({
                   auth-scoped route serving the stored derivative */}
               <img
                 src={galleryHero(g.i)}
+                srcSet={gallerySrcSet(g)}
+                sizes={gallerySrcSet(g) ? headerPhotoSizes(photoAspect(g)) : undefined}
                 alt={galleryAlt(g)}
                 width={AERIAL.w}
                 height={AERIAL.h}
@@ -433,7 +595,20 @@ export function PropertyVisual({
               className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
               onError={() => setMarketGone(true)}
             />
-            <MarketCaption market={market.name} credit={market.credit} size="hero" />
+            {/* The photographer linked to the file's page and the licence to
+                its text, and "cropped to fit": the frame crops it. The
+                picture under the caption is no link, so the links stand on
+                their own, each taking its click back from the caption. */}
+            <MarketCaption
+              market={market.name}
+              credit={
+                <CreditPartsText
+                  parts={photographerParts(market.author, market.license, true)}
+                  linkClassName="pointer-events-auto underline decoration-dotted underline-offset-2 hover:text-white"
+                />
+              }
+              size="hero"
+            />
           </div>
         )}
 
@@ -501,61 +676,100 @@ export function PropertyVisual({
           </div>
         )}
 
-        {/* FEMA's zones over the aerial, both asked for one frame. The
-            filmstrip's Flood thumbnail asks for the same two URLs, so they
-            load with the page's other pictures and this view is drawn from
-            the browser's cache when opened; either failing takes the view
-            away rather than leaving a plain aerial under the word "Flood". */}
-        {floodPossible && (
+        {/* The deal's flood frame (#472): one picture, drawn on the server —
+            the aerial calmed, FEMA's zones in the site's palette over it —
+            shown only once whole, over a plate that says it is being drawn.
+            One that does not come says so here, and the key and the
+            sentence stay. */}
+        {floodPossible && flood && (
           <div className={active === "flood" ? "" : "hidden"}>
             <div className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
-                  auth-scoped route with its own cache headers */}
-              <img
-                src={`/api/deals/${dealId}/aerial?src=usgs&w=${AERIAL.w}&h=${AERIAL.h}&z=${FLOOD_ZOOM}`}
-                alt={`Aerial photograph of the blocks around ${label}`}
-                width={AERIAL.w}
-                height={AERIAL.h}
-                loading="lazy"
-                className={`${FRAME} w-full bg-faint object-cover`}
-                onError={() => setFloodGone(true)}
-              />
-              {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
-              <img
-                src={`/api/deals/${dealId}/flood?w=${AERIAL.w}&h=${AERIAL.h}&z=${FLOOD_ZOOM}`}
-                alt={`FEMA flood hazard zones around ${label}`}
-                width={AERIAL.w}
-                height={AERIAL.h}
-                loading="lazy"
-                onClick={open}
-                className="absolute inset-0 h-full w-full cursor-zoom-in object-cover"
-                onError={() => setFloodGone(true)}
-              />
-              {/* Both frames are centred on the building's location. */}
-              <span
-                aria-hidden
-                data-picture="flood-pin"
-                className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_2px_rgba(0,0,0,0.65)]"
-              />
+              {floodState === "failed" ? (
+                <div
+                  data-picture="flood-failed"
+                  className={`${FRAME} flex w-full items-center justify-center bg-faint px-6 text-center text-sm text-muted`}
+                >
+                  FEMA&rsquo;s flood map did not come through just now. It is asked for again on your next visit.
+                </div>
+              ) : (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
+                      auth-scoped route cutting a stored frame, with its own cache headers */}
+                  <img
+                    key={floodTry}
+                    ref={floodImg}
+                    src={floodView}
+                    srcSet={`${floodView} ${FLOOD_VIEW.w}w, ${floodView2x} ${FLOOD_VIEW.w * 2}w`}
+                    sizes="(min-width: 64rem) 50vw, 100vw"
+                    alt={`Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones drawn over it`}
+                    width={FLOOD_VIEW.w}
+                    height={FLOOD_VIEW.h}
+                    onClick={open}
+                    onLoad={onFloodLoad}
+                    onError={onFloodError}
+                    data-picture="flood"
+                    className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover transition-opacity duration-500 ${
+                      floodState === "ready" ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  {floodState === "loading" && (
+                    <div aria-hidden data-picture="flood-drawing" className="absolute inset-0 flex items-end overflow-hidden bg-faint">
+                      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-faint via-surface to-faint motion-reduce:animate-none" />
+                      <span className="relative m-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white">
+                        Drawing FEMA&rsquo;s flood map&hellip;
+                      </span>
+                    </div>
+                  )}
+                  {floodState === "ready" && (
+                    <>
+                      {/* The frame is drawn around the building's location. */}
+                      <span
+                        aria-hidden
+                        data-picture="flood-pin"
+                        className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.45),0_1px_6px_rgba(0,0,0,0.5)]"
+                      >
+                        <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+                      </span>
+                      {flood.zone ? (
+                        <span
+                          data-picture="flood-zone"
+                          className="absolute bottom-0 left-0 rounded-tr bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white"
+                        >
+                          {`${flood.zone} at the building`}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </>
+              )}
               <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
                 FEMA flood zones · USGS imagery
               </span>
             </div>
             <div className="border-t border-line px-4 py-3">
-              {flood && flood.key.length > 0 ? (
-                <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-muted" aria-label="FEMA's key">
-                  {flood.key.map((k) => (
-                    <li key={k.label} className={`flex items-center gap-1.5 ${k.here ? "font-semibold text-ink" : ""}`}>
-                      {k.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- FEMA's own 20px swatch, a data URI
-                        <img src={k.image} alt="" width={14} height={14} className="h-3.5 w-3.5 rounded-sm border border-line" />
-                      ) : null}
-                      <span>{k.here ? `${k.label} — at the building` : k.label}</span>
-                    </li>
-                  ))}
-                </ul>
+              {floodKeyList ? (
+                floodKeyList.length > 0 ? (
+                  <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-muted" aria-label="Flood zones in this picture">
+                    {floodKeyList.map((k) => {
+                      const style = floodStyleOf(k.key);
+                      return (
+                        <li key={k.key} className={`flex items-center gap-1.5 ${k.here ? "font-semibold text-ink" : ""}`}>
+                          <span
+                            aria-hidden
+                            data-flood-swatch={k.key}
+                            className="h-3.5 w-3.5 shrink-0 rounded-sm border-[1.5px]"
+                            style={{ background: floodSwatchBackground(style), borderColor: floodSwatchBorder(style) }}
+                          />
+                          <span>{k.here ? `${FLOOD_CLASS_LABEL[k.key]} — at the building` : FLOOD_CLASS_LABEL[k.key]}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-[11px] text-muted">FEMA draws no flood hazard zone inside this frame.</p>
+                )
               ) : null}
-              {flood?.line ? <p className="mt-1.5 text-xs leading-relaxed text-ink">{flood.line}</p> : null}
+              {flood.line ? <p className="mt-1.5 text-xs leading-relaxed text-ink">{flood.line}</p> : null}
             </div>
           </div>
         )}
@@ -653,14 +867,14 @@ export function PropertyVisual({
                 }`}
               >
                 {t.src ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- the view's own URL, cached by the browser once for both */}
-                    <img src={t.src} alt="" aria-hidden width={96} height={56} className="absolute inset-0 h-full w-full object-cover" onError={t.fail} />
-                    {t.over ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- FEMA's zones over the same frame, as the view draws them
-                      <img src={t.over} alt="" aria-hidden width={96} height={56} className="absolute inset-0 h-full w-full object-cover" onError={t.fail} />
-                    ) : null}
-                  </>
+                  // eslint-disable-next-line @next/next/no-img-element -- the view's own URL, cached by the browser once for both
+                  <img key={t.src} src={t.src} alt="" aria-hidden width={96} height={56} className="absolute inset-0 h-full w-full object-cover" onError={t.fail} />
+                ) : v.id === "flood" ? (
+                  <span aria-hidden className="absolute inset-0 flex items-center justify-center bg-brand/5 text-brand">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                      <path d="M3 9c2 0 2-1.5 4.5-1.5S9.5 9 12 9s2.5-1.5 4.5-1.5S19 9 21 9M3 14c2 0 2-1.5 4.5-1.5S9.5 14 12 14s2.5-1.5 4.5-1.5S19 14 21 14M3 19c2 0 2-1.5 4.5-1.5S9.5 19 12 19s2.5-1.5 4.5-1.5S19 19 21 19" />
+                    </svg>
+                  </span>
                 ) : (
                   <span aria-hidden className="absolute inset-0 flex items-center justify-center bg-brand/5 text-brand">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">

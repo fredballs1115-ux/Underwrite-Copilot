@@ -6,23 +6,20 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadSupplement, signatureMismatch, downloadDealFile, documentPath } from "@/lib/storage";
 import { omSourceFor, omFromBuffer } from "@/lib/anthropic/om-source";
 import { extractBov } from "@/lib/anthropic/bov-extract";
-import { VALUATION_FIELDS, type ValuationField } from "@/lib/valuation/types";
+import {
+  VALUATION_FIELDS,
+  citationsAfterEdit,
+  parseValuationRow,
+  type ValuationField,
+} from "@/lib/valuation/types";
+import {
+  diffValuationForm,
+  extractedFields,
+  readValuationForm,
+  type FieldRefusal,
+} from "@/lib/valuation/form";
 
 const MAX_FILE = 32 * 1024 * 1024;
-
-/** How each field is typed on the manual form. Percent fields are entered as
- *  whole numbers and stored as decimals, matching the engine everywhere else. */
-const FIELD_KIND: Record<ValuationField, "usd" | "pct" | "years"> = {
-  headlineValue: "usd",
-  year1Noi: "usd",
-  goingInCap: "pct",
-  exitCap: "pct",
-  holdYears: "years",
-  rentGrowth: "pct",
-  vacancyAssumption: "pct",
-  capexDeduction: "usd",
-  discountRate: "pct",
-};
 
 const COLUMN: Record<ValuationField, string> = {
   headlineValue: "headline_value",
@@ -36,19 +33,16 @@ const COLUMN: Record<ValuationField, string> = {
   discountRate: "discount_rate",
 };
 
-/**
- * Parse one typed field. A BLANK INPUT IS NULL, not zero — that is the whole
- * discipline of this feature. Anything unparseable is also null rather than a
- * silent zero that would move the bridge.
- */
-function parseField(raw: FormDataEntryValue | null, kind: "usd" | "pct" | "years"): number | null {
-  if (raw == null) return null;
-  const cleaned = String(raw).replace(/[$,\s%]/g, "");
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  if (!Number.isFinite(n)) return null;
-  return kind === "pct" ? n / 100 : n;
-}
+/** A posted field as text, or null where the form did not post it. A BLANK
+ *  INPUT IS NULL, not zero, and a figure the form cannot read is refused
+ *  with a sentence (lib/valuation/form) — never a silent null. */
+const postedField = (formData: FormData) => (field: ValuationField): string | null =>
+  formData.has(field) ? String(formData.get(field) ?? "") : null;
+
+/** Back to the page with a refused field's code; the page builds the
+ *  sentence from the field's own label. */
+const refusedUrl = (dealId: string, field: ValuationField, refusal: FieldRefusal) =>
+  `/deals/${dealId}/valuations?error=field&field=${field}&why=${refusal}`;
 
 async function requireDeal(dealId: string) {
   const supabase = await createSupabaseServerClient();
@@ -78,6 +72,9 @@ export async function addManualValuation(formData: FormData) {
     : "broker";
   if (!sourceLabel) redirect(`/deals/${dealId}/valuations?error=label`);
 
+  const form = readValuationForm(postedField(formData));
+  if (form.refused) redirect(refusedUrl(dealId, form.refused.field, form.refused.refusal));
+
   const row: Record<string, unknown> = {
     deal_id: dealId,
     user_id: ctx.user.id,
@@ -87,11 +84,14 @@ export async function addManualValuation(formData: FormData) {
     note: String(formData.get("note") ?? "").trim() || null,
   };
   for (const f of VALUATION_FIELDS) {
-    row[COLUMN[f]] = parseField(formData.get(f), FIELD_KIND[f]);
+    row[COLUMN[f]] = form.values[f];
   }
 
   const { error } = await ctx.supabase.from("valuations").insert(row);
-  if (error) redirect(`/deals/${dealId}/valuations?error=save`);
+  if (error) {
+    console.error("[bov] manual valuation insert failed", error.message);
+    redirect(`/deals/${dealId}/valuations?error=save`);
+  }
   revalidatePath(`/deals/${dealId}/valuations`);
   redirect(`/deals/${dealId}/valuations`);
 }
@@ -149,22 +149,14 @@ export async function addValuationFromPdf(formData: FormData) {
   try {
     const source = await omSourceFor(buffer, file.name);
     const bov = await extractBov(source);
-    const citations: Record<string, { page: string; snippet: string }> = {};
-    const derived: string[] = [];
-    for (const f of VALUATION_FIELDS) {
-      const field = bov.fields[f];
-      row[COLUMN[f]] = field.value;
-      if (field.value != null && field.page) {
-        citations[f] = { page: field.page, snippet: field.snippet };
-      }
-      if (field.value != null && field.derived) derived.push(f);
-    }
+    const read = extractedFields(bov.fields);
+    for (const f of VALUATION_FIELDS) row[COLUMN[f]] = read.values[f];
     row.source_label = fallbackLabel || bov.sourceLabel;
     row.source_type = bov.sourceType;
     row.extracted = true;
-    row.citations = citations;
-    row.derived_fields = derived;
-    row.note = bov.take || null;
+    row.citations = read.citations;
+    row.derived_fields = read.derived;
+    row.note = [bov.take, read.note].filter(Boolean).join(" ") || null;
   } catch (err) {
     // The document is already attached; the user fills the fields in by hand.
     console.error("[bov] extraction failed", err);
@@ -177,7 +169,14 @@ export async function addValuationFromPdf(formData: FormData) {
   redirect(`/deals/${dealId}/valuations`);
 }
 
-/** Fill in or correct one valuation's fields. Blank still means null. */
+/**
+ * Fill in or correct one valuation's fields. Blank still means null.
+ *
+ * Only the fields the user changed are written, and each one becomes the
+ * user's: its page citation and its "derived" mark go — they described the
+ * document's figure, not this one — and an edited mark takes their place.
+ * The write's error is read and said; nothing is reported saved that wasn't.
+ */
 export async function updateValuation(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const valuationId = String(formData.get("valuationId") ?? "");
@@ -185,18 +184,40 @@ export async function updateValuation(formData: FormData) {
   const ctx = await requireDeal(dealId);
   if (!ctx) return;
 
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const { data: stored, error: readError } = await ctx.supabase
+    .from("valuations")
+    .select("*")
+    .eq("id", valuationId)
+    .eq("deal_id", dealId)
+    .maybeSingle();
+  if (readError || !stored) {
+    if (readError) console.error("[bov] valuation read failed", readError.message);
+    redirect(`/deals/${dealId}/valuations?error=update`);
+  }
+  const current = parseValuationRow(stored as Record<string, unknown>);
+
+  const edit = diffValuationForm(current, postedField(formData));
+  if (edit.refused) redirect(refusedUrl(dealId, edit.refused.field, edit.refused.refusal));
+
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { updated_at: now };
   const label = String(formData.get("sourceLabel") ?? "").trim();
   if (label) patch.source_label = label;
-  for (const f of VALUATION_FIELDS) {
-    if (formData.has(f)) patch[COLUMN[f]] = parseField(formData.get(f), FIELD_KIND[f]);
+  for (const f of edit.edited) patch[COLUMN[f]] = edit.changes[f] ?? null;
+  if (edit.edited.length) {
+    patch.citations = citationsAfterEdit((stored as Record<string, unknown>).citations, edit.edited, now);
+    patch.derived_fields = current.derivedFields.filter((f) => !edit.edited.includes(f));
   }
 
-  await ctx.supabase
+  const { error } = await ctx.supabase
     .from("valuations")
     .update(patch)
     .eq("id", valuationId)
     .eq("deal_id", dealId);
+  if (error) {
+    console.error("[bov] valuation update failed", error.message);
+    redirect(`/deals/${dealId}/valuations?error=update`);
+  }
   revalidatePath(`/deals/${dealId}/valuations`);
   redirect(`/deals/${dealId}/valuations`);
 }
@@ -208,7 +229,11 @@ export async function deleteValuation(formData: FormData) {
   const ctx = await requireDeal(dealId);
   if (!ctx) return;
 
-  await ctx.supabase.from("valuations").delete().eq("id", valuationId).eq("deal_id", dealId);
+  const { error } = await ctx.supabase.from("valuations").delete().eq("id", valuationId).eq("deal_id", dealId);
+  if (error) {
+    console.error("[bov] valuation delete failed", error.message);
+    redirect(`/deals/${dealId}/valuations?error=delete`);
+  }
   revalidatePath(`/deals/${dealId}/valuations`);
   redirect(`/deals/${dealId}/valuations`);
 }
@@ -238,32 +263,34 @@ export async function reextractValuation(formData: FormData) {
     .maybeSingle();
   if (!doc) redirect(`/deals/${dealId}/valuations?error=nodoc`);
 
+  // A refused write is said after the try: a redirect thrown inside it would
+  // be caught as an extraction failure.
+  let writeFailed = false;
   try {
     const buffer = await downloadDealFile(doc.storage_path as string, { kind: "deal", dealId });
     const bov = await extractBov(
       buffer.length > 0 ? await omSourceFor(buffer, String(doc.filename)) : omFromBuffer(buffer),
     );
+    const read = extractedFields(bov.fields);
     const patch: Record<string, unknown> = {
       extracted: true,
       source_type: bov.sourceType,
-      note: bov.take || null,
+      note: [bov.take, read.note].filter(Boolean).join(" ") || null,
       updated_at: new Date().toISOString(),
     };
-    const citations: Record<string, { page: string; snippet: string }> = {};
-    const derived: string[] = [];
-    for (const f of VALUATION_FIELDS) {
-      const field = bov.fields[f];
-      patch[COLUMN[f]] = field.value;
-      if (field.value != null && field.page) citations[f] = { page: field.page, snippet: field.snippet };
-      if (field.value != null && field.derived) derived.push(f);
+    for (const f of VALUATION_FIELDS) patch[COLUMN[f]] = read.values[f];
+    patch.citations = read.citations;
+    patch.derived_fields = read.derived;
+    const { error } = await ctx.supabase.from("valuations").update(patch).eq("id", valuationId).eq("deal_id", dealId);
+    if (error) {
+      console.error("[bov] re-extraction write failed", error.message);
+      writeFailed = true;
     }
-    patch.citations = citations;
-    patch.derived_fields = derived;
-    await ctx.supabase.from("valuations").update(patch).eq("id", valuationId);
   } catch (err) {
     console.error("[bov] re-extraction failed", err);
     redirect(`/deals/${dealId}/valuations?error=extract`);
   }
+  if (writeFailed) redirect(`/deals/${dealId}/valuations?error=extractsave`);
 
   revalidatePath(`/deals/${dealId}/valuations`);
   redirect(`/deals/${dealId}/valuations`);

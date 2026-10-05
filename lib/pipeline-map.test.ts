@@ -5,7 +5,9 @@ import {
   partitionForMap,
   pinColor,
   pinHtml,
+  pinTapAction,
   placementLine,
+  previewHtml,
   tooltipHtml,
   type MapDeal,
 } from "./pipeline-map";
@@ -55,6 +57,37 @@ describe("the pipeline map's rules (#431)", () => {
     expect(html).toContain("Caution");
     expect(html).toContain("$68.0M · 5.6% cap");
     expect(tooltipHtml(deal({ id: "y" }))).toContain("Not screened");
+  });
+
+  it("on a touch screen, the same card is a link into the deal — escaped the same way, the id encoded", () => {
+    const d = deal({ id: "x/1", name: `<img src=x onerror="alert(1)"> & Co's`, verdict: "pass", price: "$68.0M", figure: "5.6% cap" });
+    const html = previewHtml(d);
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; Co&#39;s");
+    expect(html).toMatch(/^<a class="uc-maptip" href="\/deals\/x%2F1" data-maptip-link>/);
+    expect(html).toContain("/api/deals/x%2F1/image?w=96&amp;h=96&amp;fallback=cover");
+    expect(html).toContain("$68.0M · 5.6% cap");
+    // The chevron says the card opens something; the hover card has none
+    // and is no link, since a mouse never reaches it before it closes.
+    expect(html).toContain('class="uc-maptip-go"');
+    expect(tooltipHtml(d)).not.toContain("<a ");
+    expect(tooltipHtml(d)).not.toContain("uc-maptip-go");
+  });
+
+  it("a finger's first tap on a pin shows its card; a second tap on it opens the deal; a mouse and compare mode act at once", () => {
+    const touch = { coarse: true, compare: false, pointer: "touch" };
+    expect(pinTapAction({ ...touch, previewOpen: false })).toBe("preview");
+    expect(pinTapAction({ ...touch, previewOpen: true })).toBe("open");
+    // A mouse keeps its one click, on a desktop and on a tablet alike.
+    expect(pinTapAction({ coarse: false, compare: false, pointer: "mouse", previewOpen: false })).toBe("open");
+    expect(pinTapAction({ coarse: true, compare: false, pointer: "mouse", previewOpen: false })).toBe("open");
+    // A touchscreen laptop's main pointer is fine: its hover card and its
+    // click stay as they were.
+    expect(pinTapAction({ coarse: false, compare: false, pointer: "touch", previewOpen: false })).toBe("open");
+    // A click with no pointer behind it — a keyboard, a screen reader —
+    // opens at once, and compare mode picks at once.
+    expect(pinTapAction({ coarse: true, compare: false, pointer: null, previewOpen: false })).toBe("open");
+    expect(pinTapAction({ ...touch, compare: true, previewOpen: false })).toBe("open");
   });
 
   it("says where every deal is, each in exactly one count", () => {

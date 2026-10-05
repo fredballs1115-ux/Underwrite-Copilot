@@ -600,7 +600,9 @@ async function saveThumb(file, metroId, name, entry) {
     }
     const bytes = Buffer.from(await res.arrayBuffer());
     const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg";
-    const dir = join(thumbsDir, metroId);
+    // A metro area keyed by its Census code ("cbsa:41940", #472) gets a
+    // folder name every filesystem takes.
+    const dir = join(thumbsDir, metroId.replace(/[^A-Za-z0-9_-]/g, "-"));
     mkdirSync(dir, { recursive: true });
     const path = join(dir, `${name}.${ext}`);
     writeFileSync(path, bytes);

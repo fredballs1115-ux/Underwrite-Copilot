@@ -5,9 +5,14 @@
 // the on-screen sliders can never disagree.
 
 import { withArticle } from "@/lib/article";
-import type { UnderwriteInputs } from "./engine";
-import { leverValues, runScenario } from "./playground";
-import { solveMaxBid } from "./solver";
+import { computeUnderwrite, type UnderwriteInputs } from "./engine";
+import { costAssumptionsLine } from "./cost-note";
+import type { DerivedModel, InputSource } from "./inputs";
+import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
+import { floorWords, floorsWords, fmtBid, solveMaxBid, type BidFloors, type BidMetrics } from "./solver";
+
+/** Where each of the model's inputs came from (lib/underwrite/inputs). */
+export type ModelSources = DerivedModel["sources"];
 
 export interface HeatCell {
   irrPct: number | null; // decimal
@@ -199,7 +204,12 @@ const clears = (cell: HeatCell, hurdlePct: number): boolean =>
  * how little growth still clears the hurdle; along the BASE growth column,
  * how much exit-cap expansion the deal survives.
  */
-export function gridTakeaway(grid: CapGrowthGrid, hurdlePct: number): string {
+export function gridTakeaway(
+  grid: CapGrowthGrid,
+  hurdlePct: number,
+  /** what the growth axis grows: a hotel's is its RevPAR, not a rent */
+  growth = "rent growth",
+): string {
   const p = (n: number) => `${Number(n.toFixed(1))}%`;
   const baseRow = grid.cells[grid.baseRow];
   const growthsClearing = grid.growthCols.filter((_, c) =>
@@ -219,10 +229,10 @@ export function gridTakeaway(grid: CapGrowthGrid, hurdlePct: number): string {
 
   const growthPart =
     growthsClearing.length === 0
-      ? `no tested rent growth clears it at the base exit cap`
+      ? `no tested ${growth} clears it at the base exit cap`
       : growthsClearing.length === grid.growthCols.length
         ? `every tested growth rate clears it at the base exit cap`
-        : `needs at least ${fmtPctPt(Math.min(...growthsClearing))} rent growth at the base exit cap`;
+        : `needs at least ${fmtPctPt(Math.min(...growthsClearing))} ${growth} at the base exit cap`;
 
   return `The deal ${capPart}, and ${growthPart}.`;
 }
@@ -233,6 +243,33 @@ export interface MaxBidLine {
   price: number;
   deltaPct: number;
   unbounded: boolean;
+  /** the floor that gives first at the solved price (the deal page's
+   *  "your 5% cash-on-cash floor binds"); null where it is unbounded */
+  binding?: keyof BidFloors | null;
+  /** the model's IRR, year-1 cash-on-cash and going-in cap at that price */
+  at?: BidMetrics | null;
+}
+
+/** The floors a max bid was solved on, and whose they are: the buy box's
+ *  (every floor it sets, as the deal page solves) or the screening
+ *  hurdle's IRR alone, where the box sets none. */
+export interface MaxBidFloors {
+  floors: BidFloors;
+  from: "buybox" | "screening";
+}
+
+/**
+ * The levers the deal page's max bid is solved under at rest: each
+ * slider's base stop — the base clamped into the lever's range, which for
+ * a route-derived model is the base itself — so the report's bid is the
+ * page's own call on the same inputs.
+ */
+export function pageBaseLevers(inputs: UnderwriteInputs): Partial<PlaygroundLevers> {
+  const base = (lever: "exitCapPct" | "rentGrowthPct" | "vacancyPct") => {
+    const s = sliderValues(lever, inputs[lever]);
+    return s.values[s.baseIdx];
+  };
+  return { exitCapPct: base("exitCapPct"), rentGrowthPct: base("rentGrowthPct"), vacancyPct: base("vacancyPct") };
 }
 
 export interface SensitivityData {
@@ -242,14 +279,143 @@ export interface SensitivityData {
   hurdlePct: number;
   hurdleSource: "buybox" | "default";
   takeaway: string;
-  /** max price holding ≥ hurdle IRR (solver), null when unattainable */
+  /** the highest price that clears the floors (solver), null when none in
+   *  the searched range does */
   maxBid: MaxBidLine | null;
+  /** what the max bid was solved on; absent on a bundle built before it
+   *  was recorded, which solved the hurdle's IRR alone */
+  maxBidFloors?: MaxBidFloors;
+  /** why the report leaves the model's returns out, or null where it may
+   *  print them (`placeholderReturnsLine`); null where no sources were given */
+  withheld?: string | null;
+  /** what the modeled price is — the ask, a share grossed up to the whole,
+   *  an auction's floor, NOI over the going-in cap — as the derived model
+   *  marks it; null where no sources were given */
+  priceSource?: ModelSources["purchasePrice"] | null;
+  /** the model's base case the grids are struck around; null where no
+   *  sources were given, which cannot say what is a default */
+  baseCase?: BaseCase | null;
+}
+
+/**
+ * The base case the grids are struck around, as the workbook's Deal Summary
+ * holds it: the price, the loan, the equity, the hold and year 1's NOI, each
+ * input with where it came from (so a default never reads as the sponsor's
+ * case); the returns the ink-bordered cells show and year 1's coverage; and
+ * the sources and uses. Every figure is the engine's (`computeUnderwrite`),
+ * every source the derived model's own.
+ */
+export interface BaseCase {
+  price: number;
+  priceSource: InputSource | null;
+  loan: number;
+  /** loan to cost, decimal — the engine sizes the loan off the price plus
+   *  closing costs and the acquisition fee */
+  ltc: number;
+  ltcSource: InputSource | null;
+  equity: number;
+  holdYears: number;
+  holdSource: InputSource | null;
+  noiY1: number;
+  noiSource: InputSource | null;
+  /** the all-in rate, decimal, with its source — dated where today's
+   *  curve seeded it */
+  rate: number;
+  rateSource: InputSource | null;
+  amortYears: number;
+  /** months of interest-only; 999 is the whole term */
+  ioMonths: number;
+  leveredIrr: number | null;
+  equityMultiple: number | null;
+  cocY1: number | null;
+  dscrY1: number | null;
+  debtYieldY1: number | null;
+  closingCosts: number;
+  acqFee: number;
+  financingCosts: number;
+  totalUses: number;
+  /** what the returns carry for buying and selling (lib/underwrite/cost-note) */
+  costLine: string;
+}
+
+export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): BaseCase {
+  const uw = computeUnderwrite(inputs);
+  const su = uw.sourcesUses;
+  const y1 = uw.cashFlow[0];
+  return {
+    price: inputs.purchasePrice,
+    priceSource: sources.purchasePrice ?? null,
+    loan: su.loanAmount,
+    ltc: inputs.ltc,
+    ltcSource: sources.ltc ?? null,
+    equity: su.equity,
+    holdYears: uw.holdYears,
+    holdSource: sources.holdMonths ?? null,
+    noiY1: y1?.noi ?? 0,
+    noiSource: sources.inPlaceRentAnnual ?? null,
+    rate: inputs.allInRatePct,
+    rateSource: sources.allInRatePct ?? null,
+    amortYears: inputs.amortMonths / 12,
+    ioMonths: inputs.ioMonths,
+    leveredIrr: uw.returns.leveredIrrPct,
+    equityMultiple: uw.returns.leveredEquityMultiple,
+    cocY1: y1 && su.equity > 0 ? y1.leveredCashFlow / su.equity : null,
+    dscrY1: y1?.dscrNoi ?? null,
+    debtYieldY1: y1?.debtYield ?? null,
+    closingCosts: su.closingCosts,
+    acqFee: su.acqFee,
+    financingCosts: su.financingCosts,
+    totalUses: su.totalUses,
+    costLine: costAssumptionsLine(inputs),
+  };
+}
+
+/** What the caller knows beside the inputs. */
+export interface SensitivityOptions {
+  /** where each input came from — the derived model's own sources, which
+   *  say whether the price and the year-1 NOI are the documents' or
+   *  placeholders */
+  sources?: ModelSources | null;
+  /** the buy box's return floors (lib/underwrite/solver `bidFloors`): the
+   *  max bid is solved on every one set, the deal page's own call; none set
+   *  solves the screening hurdle's IRR alone */
+  floors?: BidFloors | null;
+}
+
+const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * Why the report leaves the model's returns out, or null where it may print
+ * them. A price or a year-1 NOI the model had to assume (lib/underwrite/inputs
+ * marks it "assumption": the $10M placeholder price where none was read, an
+ * assumed 6% going-in NOI where no NOI the price supports was) makes every
+ * IRR and every bid solved on it the placeholder's — printed beside a real
+ * deal's grids, "$10M (ask)" read as the ask. Said from the sources alone:
+ * an assumed price means no price was read from the memorandum, which is all
+ * this line claims.
+ */
+export function placeholderReturnsLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
+  if (!sources) return null;
+  const price = sources.purchasePrice?.provenance === "assumption";
+  const noi = sources.inPlaceRentAnnual?.provenance === "assumption";
+  const out = "The IRR grids and the max bid are left out:";
+  if (price && noi) {
+    return `${out} no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`;
+  }
+  if (price) {
+    return `${out} no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns would be the placeholder's.`;
+  }
+  if (noi) {
+    return `${out} no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.`;
+  }
+  return null;
 }
 
 /** Everything the report's sensitivity page renders, in one pure build. */
 export function buildSensitivityData(
   inputs: UnderwriteInputs,
   hurdlePct?: number | null,
+  opts: SensitivityOptions = {},
 ): SensitivityData {
   const hurdle =
     hurdlePct != null && Number.isFinite(hurdlePct) && hurdlePct > 0
@@ -257,7 +423,14 @@ export function buildSensitivityData(
       : DEFAULT_HURDLE_PCT;
   const grid = buildCapGrowthGrid(inputs);
   const priceGrid = buildPriceCapGrid(inputs);
-  const solved = solveMaxBid(inputs, { minIrr: hurdle / 100 });
+  // The deal page solves its max bid on every floor the buy box sets — an
+  // IRR, a cash-on-cash, a going-in cap — under the sliders' base stops,
+  // and names the one that binds. The report makes the same call, so the
+  // two never print different bids for one deal; only a box with no floor
+  // falls back to the screening hurdle's IRR the grids are graded on.
+  const box = opts.floors && (opts.floors.minIrr != null || opts.floors.minCoc != null || opts.floors.minCap != null) ? opts.floors : null;
+  const maxBidFloors: MaxBidFloors = box ? { floors: box, from: "buybox" } : { floors: { minIrr: hurdle / 100 }, from: "screening" };
+  const solved = solveMaxBid(inputs, maxBidFloors.floors, pageBaseLevers(inputs));
   return {
     grid,
     priceGrid,
@@ -266,7 +439,49 @@ export function buildSensitivityData(
     takeaway: gridTakeaway(grid, hurdle),
     maxBid:
       solved.price != null && solved.deltaPct != null
-        ? { price: solved.price, deltaPct: solved.deltaPct, unbounded: solved.unbounded }
+        ? { price: solved.price, deltaPct: solved.deltaPct, unbounded: solved.unbounded, binding: solved.binding, at: solved.at }
         : null,
+    maxBidFloors,
+    withheld: placeholderReturnsLine(inputs, opts.sources),
+    priceSource: opts.sources?.purchasePrice ?? null,
+    baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
   };
+}
+
+const pct1 = (d: number | null | undefined, dp = 1) => (d == null || !Number.isFinite(d) ? "—" : `${(d * 100).toFixed(dp)}%`);
+
+/**
+ * The max bid in the deal page's words (the playground's max-bid card): the
+ * floors it clears and whose they are, the bid as the page prints it
+ * (rounded down, `fmtBid`), its distance from the modeled price, the floor
+ * that binds, and the model's IRR, year-1 cash-on-cash and going-in cap at
+ * that price. A bundle with no recorded floors reads as the screening
+ * hurdle's IRR, which is what it was solved on.
+ */
+export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource">): string {
+  const f = s.maxBidFloors ?? { floors: { minIrr: s.hurdlePct / 100 }, from: "screening" as const };
+  const box = f.from === "buybox";
+  const hurdle = `${Number(s.hurdlePct.toFixed(1))}%`;
+  const what = box
+    ? `your buy box's floors (${floorsWords(f.floors)})`
+    : s.hurdleSource === "buybox"
+      ? `your ${hurdle} IRR target`
+      : `the ${hurdle} screening hurdle`;
+  const bid = s.maxBid;
+  if (!bid) {
+    return box
+      ? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`
+      : `No price inside the tested range holds ${what} under these assumptions.`;
+  }
+  if (bid.unbounded) {
+    return box
+      ? `Max bid: ${what} hold even at twice the modeled price, so the box is not the constraint on this deal.`
+      : `Max bid holding ${what}: clears at every tested price — the constraint never binds inside the search range.`;
+  }
+  const delta = `${bid.deltaPct > 0 ? "+" : ""}${(bid.deltaPct * 100).toFixed(1)}% vs the modeled price`;
+  const binds = box && bid.binding ? `; your ${floorWords(bid.binding, f.floors)} floor binds` : "";
+  const at = bid.at
+    ? ` At that price: IRR ${pct1(bid.at.irr)}, year-1 cash-on-cash ${pct1(bid.at.coc)}, going-in cap ${pct1(bid.at.cap, 2)}.`
+    : "";
+  return `Max bid ${box ? "clearing" : "holding"} ${what}: ${fmtBid(bid.price)} (${delta})${binds}.${at}`;
 }

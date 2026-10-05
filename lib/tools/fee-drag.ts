@@ -65,6 +65,7 @@
  */
 
 import { irr } from "@/lib/underwrite/engine";
+import { usdExact } from "@/lib/tools/format";
 import { runWaterfall, type Tier } from "@/lib/tools/waterfall-math";
 
 /** how much softer the downside exit is, in % of the sale price — rule 4 */
@@ -420,7 +421,7 @@ function noteFor(x: FeeDragRead, missingRevenue: boolean): string {
     return `The asset management fee turns year ${x.capitalCallYear} negative, so that year is a capital call rather than a distribution.`;
   }
   if (x.downsideFeeSharePct !== null && x.downsideGpTakeTotal !== null && x.downsideFeeSharePct >= 60) {
-    return `On an exit ${DOWNSIDE_EXIT_HAIRCUT}% softer the sponsor still collects ${usd(x.downsideGpTakeTotal)}, and ${x.downsideFeeSharePct}% of it is fees rather than promote.`;
+    return `On an exit ${DOWNSIDE_EXIT_HAIRCUT}% softer the sponsor still collects ${usdExact(x.downsideGpTakeTotal)}, and ${x.downsideFeeSharePct}% of it is fees rather than promote.`;
   }
   if (x.totalDragPts !== null && x.feeDragPts !== null && x.promoteDragPts !== null && x.dealIrrPct !== null) {
     return `The deck's ${x.dealIrrPct}% reaches the LP as ${x.lpIrrPct}% — ${x.feeDragPts} points of fees and ${x.promoteDragPts} points of promote.`;
@@ -429,10 +430,6 @@ function noteFor(x: FeeDragRead, missingRevenue: boolean): string {
     return `The fees come to ${x.totalFeesPctOfEquity}% of the equity, ahead of the preferred return.`;
   }
   return "Set the fees to see what the deck's return becomes by the time it reaches the LP.";
-}
-
-function usd(n: number): string {
-  return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
 function pct(r: number | null): number | null {

@@ -27,8 +27,10 @@ import {
   fieldFormat,
   fieldLabel,
   formatFieldDelta,
+  formatFieldPair,
   formatFieldValue,
   getPath,
+  inSentence,
   setPath,
   type FieldPath,
   type LeafValue,
@@ -285,8 +287,11 @@ function popcount(x: number): number {
   return c;
 }
 
+/** A leaf as the step carries it: a number or a string as it is; a
+ *  re-shaped expense array as its line count ("3 lines"), a flag as yes /
+ *  no — never `String()` of an array, which printed "[object Object]". */
 const displayValue = (v: LeafValue): number | string =>
-  typeof v === "number" || typeof v === "string" ? v : v == null ? "—" : String(v);
+  typeof v === "number" || typeof v === "string" ? v : formatFieldValue(v, "text");
 
 export interface BuildBridgeOptions {
   /** injected for tests; defaults to the underwriting engine */
@@ -353,32 +358,47 @@ export function buildBridge(
 
 const pct1 = (v: number | null): string => (v == null ? "n/a" : `${(v * 100).toFixed(1)}%`);
 
-/** Verb that matches the direction of travel for a given field. */
-function movementPhrase(step: BridgeStep): string {
+/** A cap rate or a spread WIDENS and TIGHTENS; nothing else does — rent
+ *  growth, a rate and leverage rise and fall. The leaf's own name says
+ *  which: `exitCapPct` is a cap rate, `acqFeeCap` (a dollar ceiling) is not. */
+const widensAndTightens = (field: FieldPath): boolean =>
+  /cap(rate)?pct$|spread/i.test(field.split(".").pop() ?? "");
+
+/**
+ * The clause for one driver, with a verb for its own kind of input:
+ * widening / tightening for a cap rate or a spread, raising / cutting for a
+ * dollar figure, lengthening / shortening for a period, raising / lowering
+ * for everything else. Null when the before and after print the same at
+ * every precision carried (`formatFieldPair`) — "from 5.87% to 5.87%" is not
+ * a sentence anyone should paste.
+ */
+function movementPhrase(step: BridgeStep): string | null {
   const fmt = fieldFormat(step.field);
   const from = step.fromValue;
   const to = step.toValue;
+  const label = inSentence(step.label);
   if (typeof from !== "number" || typeof to !== "number") {
-    return `Changing ${step.label.toLowerCase()} from ${from} to ${to}`;
+    return from === to ? null : `Changing ${label} from ${from} to ${to}`;
   }
   const rose = to > from;
-  if (fmt === "pct") {
-    return `${rose ? "Widening" : "Tightening"} ${step.label.toLowerCase()} from ${formatFieldValue(
-      from,
-      fmt,
-    )} to ${formatFieldValue(to, fmt)}`;
-  }
   if (fmt === "usd") {
-    return `${rose ? "Raising" : "Cutting"} ${step.label.toLowerCase()} by ${formatFieldDelta(
-      from,
-      to,
-      fmt,
-    ).replace(/^[+−-]/, "")}`;
+    const by = formatFieldDelta(from, to, fmt).replace(/^[+−-]/, "");
+    return Math.round(Math.abs(to - from)) === 0 ? null : `${rose ? "Raising" : "Cutting"} ${label} by ${by}`;
   }
-  return `Moving ${step.label.toLowerCase()} from ${formatFieldValue(from, fmt)} to ${formatFieldValue(
-    to,
-    fmt,
-  )}`;
+  const pair = formatFieldPair(from, to, fmt);
+  if (!pair) return null;
+  const verb = widensAndTightens(step.field)
+    ? rose
+      ? "Widening"
+      : "Tightening"
+    : fmt === "months"
+      ? rose
+        ? "Lengthening"
+        : "Shortening"
+      : rose
+        ? "Raising"
+        : "Lowering";
+  return `${verb} ${label} from ${pair[0]} to ${pair[1]}`;
 }
 
 /**
@@ -401,12 +421,15 @@ export function bridgeSentence(bridge: Bridge, maxDrivers = 4): string {
   const material = bridge.steps.filter((s) => Math.abs(s.leveredIrrBps) >= 1);
   if (material.length === 0) return `${head} No single assumption moved it materially.`;
 
-  const shown = material.slice(0, maxDrivers);
-  const rest = material.slice(maxDrivers);
+  // A driver whose before and after print the same is never narrated as a
+  // move; it rides in the trailing "other assumptions" clause instead.
+  const phrased = material.map((s) => ({ s, phrase: movementPhrase(s) }));
+  const shown = phrased.filter((p) => p.phrase != null).slice(0, maxDrivers);
+  const rest = phrased.filter((p) => !shown.includes(p)).map((p) => p.s);
 
-  const clauses = shown.map((s) => {
+  const clauses = shown.map(({ s, phrase }) => {
     const bps = Math.round(Math.abs(s.leveredIrrBps));
-    return `${movementPhrase(s)} ${s.leveredIrrBps >= 0 ? "added" : "cost"} ${bps} bps.`;
+    return `${phrase} ${s.leveredIrrBps >= 0 ? "added" : "cost"} ${bps} bps.`;
   });
 
   if (rest.length) {

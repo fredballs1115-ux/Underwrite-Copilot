@@ -1,18 +1,21 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { ProcessorList } from "@/app/processor-list";
+import { publicMetadata } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata = publicMetadata({
   title: "Security",
   description:
     "How Underwrite Copilot protects uploaded offering memoranda: private storage, database-level isolation, server-side keys, and no model training on your documents.",
-  alternates: { canonical: "/security" },
-};
+  canonical: "/security",
+});
 
 // Every claim on this page is verifiable in the codebase or in a vendor's
 // published terms. No aspirational statements, no certifications we don't
-// hold. If a control isn't real yet, it doesn't appear here.
-const SECTIONS: { h: string; body: string[] }[] = [
+// hold. If a control isn't real yet, it doesn't appear here. The list of
+// outside services is lib/data-processors, the privacy policy's list too,
+// held to the hosts the code sends a user's data to.
+const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "The short version",
     body: [
@@ -52,8 +55,9 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Who processes what",
     body: [
-      "Supabase — database, authentication, and document storage. Anthropic — AI analysis of document contents via the Claude API. Stripe — payments and subscription state. Render — application hosting. Photon (OpenStreetMap) — address autocomplete; it receives only the address text you type into an address field, never your documents. Each vendor receives only what its job requires.",
+      "Each outside service receives only what its job requires. The documents themselves are stored with Supabase and read by Anthropic, on an app Render hosts; every other service receives only what is named beside it.",
     ],
+    processors: true,
   },
   {
     h: "What we don't claim",
@@ -85,7 +89,7 @@ export default function SecurityPage() {
 
       <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-tight">Security</h1>
-        <p className="mt-2 text-sm text-muted">Last updated: July 7, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: September 30, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Every upload comes down to one thing: whether it is safe to put a
           confidential OM here. This page is the answer — how documents are
@@ -108,6 +112,7 @@ export default function SecurityPage() {
                   {p}
                 </p>
               ))}
+              {s.processors && <ProcessorList />}
             </section>
           ))}
         </div>

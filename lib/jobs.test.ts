@@ -3,7 +3,7 @@
  * FAILED worker run keeps, and what every other claim resets.
  */
 import { describe, expect, it } from "vitest";
-import { claimJob } from "./jobs";
+import { claimJob, newJobRow, requesterOf } from "./jobs";
 
 type Row = Record<string, unknown>;
 
@@ -114,6 +114,47 @@ describe("claimJob — a retry after a failed worker run keeps the steps that fi
     const update = calls.find((c) => c.update)!.update!;
     expect("payload" in update).toBe(false);
     expect("attempts" in update).toBe(false);
+  });
+
+  it("a claim restamps the row's created_at: the deal's one job row says when THIS run was asked for, never the first screen's day", async () => {
+    const before = Date.now();
+    const { db, calls } = fakeDb({ id: "j1", status: "done", updated_at: HOUR_AGO, created_at: "2026-01-05T09:00:00.000Z" });
+    expect((await claimJob(db, "d1", "signal")).outcome).toBe("claimed");
+    const update = calls.find((c) => c.update)!.update as { created_at: string; updated_at: string };
+    expect(update.created_at).toBe(update.updated_at);
+    expect(Date.parse(update.created_at)).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(update.created_at)).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("a claim clears the last run's ledger, so a run that ends before any model call never wears its cost or time (the audit of 2026-10-01)", async () => {
+    const { db, calls } = fakeDb({ id: "j1", status: "done", updated_at: HOUR_AGO });
+    expect((await claimJob(db, "d1", "signal")).outcome).toBe("claimed");
+    const update = calls.find((c) => c.update)!.update as { usage?: unknown };
+    expect("usage" in update && update.usage === null).toBe(true);
+  });
+
+  it("a worker claim and a worker insert carry who asked for the run, and a retry carries the retrier, not the last asker", async () => {
+    const ASKER = "22222222-2222-4222-8222-222222222222";
+    const RETRIER = "33333333-3333-4333-8333-333333333333";
+    const { db, calls } = fakeDb({ ...failedRun(), payload: { ...(failedRun().payload as Row), requestedBy: ASKER } });
+    await claimJob(db, "d1", "signal", { kind: "screen", requestedBy: RETRIER }, "queued", { keepCheckpoints: true });
+    const update = calls.find((c) => c.update)!.update as { payload: Row };
+    expect(update.payload.requestedBy).toBe(RETRIER);
+    expect(update.payload.completed).toEqual(["signal", "extract", "challenge"]);
+    expect(newJobRow("d1", "signal", { workerPayload: { kind: "screen", requestedBy: ASKER } }).payload).toEqual({
+      kind: "screen",
+      requestedBy: ASKER,
+      snapshotPrior: false,
+      completed: [],
+    });
+  });
+
+  it("reads a recorded requester only where it is a user id", () => {
+    expect(requesterOf("22222222-2222-4222-8222-222222222222")).toBe("22222222-2222-4222-8222-222222222222");
+    expect(requesterOf(" 22222222-2222-4222-8222-22222222222A ")).toBe("22222222-2222-4222-8222-22222222222a");
+    for (const bad of [undefined, null, "", "u1", 42, { id: "x" }, "22222222-2222-4222-8222-2222222222222"]) {
+      expect(requesterOf(bad), String(bad)).toBeNull();
+    }
   });
 
   it("a live, fresh row is busy; a live row past the stale window is reclaimable", async () => {

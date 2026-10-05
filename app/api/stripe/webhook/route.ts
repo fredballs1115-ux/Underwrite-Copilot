@@ -1,23 +1,38 @@
 import type Stripe from "stripe";
+import { after } from "next/server";
 import { getStripe } from "@/lib/stripe/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { syncTeamSeats } from "@/lib/stripe/seats";
 import { assertKnownPrices } from "@/lib/stripe/prices";
+import { occasionKey, sendEmail } from "@/lib/email-send";
+import { escapeHtml } from "@/lib/email-template";
 
 export const runtime = "nodejs";
+
+/** Where the price alert goes: BILLING_ALERT_EMAIL, else the support inbox
+ *  the site publishes. */
+const BILLING_ALERT_DEFAULT = "underwritecopilot.support@gmail.com";
 
 /**
  * Price-ID assertion failed: log loudly and alert (email via Resend when
  * configured), then SKIP processing — never silently sync a subscription
  * carrying prices this app doesn't sell. Read-and-verify only: no Stripe
  * object is ever written here.
+ *
+ * The email goes through the one sender (lib/email `sendEmail`): its
+ * timeout, its key, and its setup check — no key, or a sender on Resend's
+ * shared resend.dev domain (which delivers to the Resend account's own
+ * address and nobody else), sends nothing, and the log line is the alert.
+ * It had posted to Resend by hand from that shared domain, with no timeout,
+ * awaited before Stripe got its response; it is scheduled with `after()`
+ * now, so Stripe's answer never waits on an email.
  */
-async function alertUnknownPrices(
+function alertUnknownPrices(
   event: Stripe.Event,
   sub: Stripe.Subscription,
   unknown: string[],
   seen: string[],
-): Promise<void> {
+): void {
   const line =
     `[stripe] ALERT unknown price id(s) [${unknown.join(", ")}] on subscription ` +
     `${sub.id} (customer ${typeof sub.customer === "string" ? sub.customer : sub.customer.id}, ` +
@@ -25,22 +40,20 @@ async function alertUnknownPrices(
     `expected the ids in STRIPE_PRICE_ID / STRIPE_TEAM_PRICE_ID / STRIPE_TEAM_SEAT_PRICE_ID. ` +
     `Event NOT processed.`;
   console.error(line);
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return;
-  try {
-    await fetch(`${process.env.RESEND_BASE_URL ?? "https://api.resend.com"}/emails`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM ?? "Underwrite Copilot <onboarding@resend.dev>",
-        to: [process.env.BILLING_ALERT_EMAIL ?? "underwritecopilot.support@gmail.com"],
-        subject: `Stripe webhook: unknown price on ${sub.id}`,
-        text: line,
-      }),
-    });
-  } catch {
-    // The console.error above is the fallback alert channel.
-  }
+  after(async () => {
+    try {
+      await sendEmail(
+        process.env.BILLING_ALERT_EMAIL?.trim() || BILLING_ALERT_DEFAULT,
+        `Stripe webhook: unknown price on ${sub.id}`,
+        `<p style="font-family:monospace;font-size:13px;line-height:1.5;">${escapeHtml(line)}</p>`,
+        line,
+        // One alert an event, however often the work is retried.
+        { idempotencyKey: occasionKey("stripe-unknown-price", event.id) },
+      );
+    } catch {
+      // The console.error above is the fallback alert channel.
+    }
+  });
 }
 
 /**
@@ -196,7 +209,7 @@ export async function POST(req: Request) {
           );
           const priceCheck = assertKnownPrices(sub);
           if (!priceCheck.ok) {
-            await alertUnknownPrices(event, sub, priceCheck.unknown, priceCheck.seen);
+            alertUnknownPrices(event, sub, priceCheck.unknown, priceCheck.seen);
             // 200: the event is understood and deliberately not processed —
             // retrying wouldn't change the verdict, the alert is the signal.
             return new Response("skipped: unknown price id", { status: 200 });
@@ -216,7 +229,7 @@ export async function POST(req: Request) {
         const sub = await stripe.subscriptions.retrieve(evSub.id);
         const priceCheck = assertKnownPrices(sub);
         if (!priceCheck.ok) {
-          await alertUnknownPrices(event, sub, priceCheck.unknown, priceCheck.seen);
+          alertUnknownPrices(event, sub, priceCheck.unknown, priceCheck.seen);
           return new Response("skipped: unknown price id", { status: 200 });
         }
         await sync(sub);

@@ -1,20 +1,24 @@
 import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
+import { firstSentence } from "@/lib/first-sentence";
+import { screenedOn } from "@/lib/screen-run";
+import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import type {
   BrokerCompsResult,
   ExtractionResult,
+  FirstSignal,
   MarketResult,
-  ScreenRange,
   VerdictCall,
   VerdictResult,
   VerdictScenario,
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
+import { screenYearOf } from "@/lib/criteria";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
-import { interestOf, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
-import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
+import { sellerFinancingDocLine } from "@/lib/seller-financing";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
@@ -25,6 +29,8 @@ import { StudentHousingPanel } from "@/app/student-housing-panel";
 import { readStudentHousing } from "@/lib/student-housing";
 import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
 import { readManufacturedHousing } from "@/lib/manufactured-housing";
+import { SelfStoragePanel } from "@/app/self-storage-panel";
+import { readSelfStorage } from "@/lib/self-storage";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -58,13 +64,22 @@ export interface ShareViewProps {
   assetClass: string | null;
   /** the link's expiry, ISO */
   expiresAt: string;
-  /** the sender's latest screen failed before it reached the verdict */
+  /** the sender's latest screen has not rewritten the verdict: it failed
+   *  before reaching it, or is still running toward it (lib/screen-run) */
   verdictStale: boolean;
+  /** why, when it is stale: a failed run, or a re-screen in progress */
+  staleWhy?: "failed" | "running";
+  /** the comp and market reads the latest screen has not rewritten either —
+   *  the previous screen's, beside this run's terms */
+  staleReads?: ReadonlyArray<"comps" | "market">;
   /** the building (#434): its own photograph where the deal has one, then
    *  the aerial — each a token-scoped route with its credit — and the
    *  place they picture; null when there is neither */
   picture: { sources: SharePictureSource[]; place: string } | null;
   extraction: ExtractionResult | null;
+  /** the deal's first signal, which the sender's deal page reads beside the
+   *  extraction to infer the deal's kind; absent on a row screened before it */
+  firstSignal?: FirstSignal | null;
   comps: BrokerCompsResult | null;
   market: MarketResult | null;
   verdict: VerdictResult;
@@ -154,33 +169,19 @@ function VerdictIcon({ call, className }: { call: VerdictCall | null; className?
   );
 }
 
-/** Pull the first numeric out of a display string ("$1,495" → 1495). */
-function firstNum(sv: string): number | null {
-  const m = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-  return m ? parseFloat(m[0]) : null;
-}
-
-/** Where the base sits inside low→high — the deal page's positional read. */
-function basePosition(r: ScreenRange): number | null {
-  const lo = firstNum(r.low);
-  const hi = firstNum(r.high);
-  const base = firstNum(r.base);
-  return lo != null && hi != null && base != null && hi > lo
-    ? Math.min(1, Math.max(0, (base - lo) / (hi - lo)))
-    : null;
-}
-
 /** A first sentence in the open, the rest one click away (the Market data
- *  page's fold). The whole text stays in the HTML. */
+ *  page's fold). The whole text stays in the HTML. The first sentence is
+ *  lib/first-sentence's, which never ends at an abbreviation ("D.C.") or
+ *  inside parentheses. */
 function Fold({ text, className = "" }: { text: string; className?: string }) {
-  const m = /^([\s\S]+?[.!?])\s+([\s\S]+)$/.exec(text);
-  if (!m) return <p className={className}>{text}</p>;
+  const { first, rest } = firstSentence(text);
+  if (!rest) return <p className={className}>{text}</p>;
   return (
     <details className={className}>
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        {m[1]} <span className="text-[11px] font-medium text-brand">more</span>
+        {first} <span className="text-[11px] font-medium text-brand">more</span>
       </summary>
-      <p className="mt-1">{m[2]}</p>
+      <p className="mt-1">{rest}</p>
     </details>
   );
 }
@@ -244,13 +245,28 @@ function splitOf(b: { lines: string[]; national?: number }, local: string, each:
   return nat > 0 ? `${b.lines.length - nat} ${local} and ${nat} the nation's, ${none}` : each;
 }
 
+/** A read the sender's latest screen has not rewritten: the previous
+ *  screen's, beside this run's terms, and said so. */
+function PreviousRead({ why }: { why: "failed" | "running" }) {
+  return (
+    <p className="mt-1 text-xs text-caution" data-qa="previous-read">
+      {why === "running"
+        ? "From the previous screen — the sender\u2019s re-screen has not reached it yet."
+        : "From the previous screen — the sender\u2019s latest run did not reach it."}
+    </p>
+  );
+}
+
 export function ShareView({
   dealName,
   assetClass,
   expiresAt,
   verdictStale,
+  staleWhy = "failed",
+  staleReads = [],
   picture,
   extraction,
+  firstSignal = null,
   comps,
   market,
   verdict,
@@ -262,19 +278,26 @@ export function ShareView({
   const screen = verdict.screen;
   // The deal's kind first — a partner reading "$21M stabilized NOI" beside a
   // $20M price needs to know it is a conversion's finished-project figure.
+  // The sender's deal page reads it from the extraction and the first
+  // signal, and so does this screen.
   const safeExtraction = extraction
     ? { ...extraction, metrics: extraction.metrics ?? [] }
     : null;
-  const strategy = inferStrategy(safeExtraction);
+  const strategy = inferStrategy(safeExtraction, firstSignal);
   const plan = planSummary(safeExtraction, strategy);
   // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
-  const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8, interestOf(safeExtraction).kind);
+  // Its price row is read against the year the screen read the memorandum.
+  const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, screenYearOf(safeExtraction), 8, interestOf(safeExtraction).kind);
   // The seller's loan offered for assumption (#419), as the memorandum
   // states it — the pricing against today's rate needs the model, which a
   // shared screen does not carry.
   const assumable = readAssumable(safeExtraction, null);
-  const sellerNote = readSellerFinancing(safeExtraction, null);
-  const ranges = (screen?.ranges ?? []).slice(0, 6);
+  // A note the seller offers to carry, as stated (#462) — on a note, the
+  // financing of its purchase, said as that: the memo's one line.
+  const sellerNoteLine = sellerFinancingDocLine(safeExtraction);
+  // Read in numeric order (lib/verdict-range): a verdict stored when the
+  // conservative end came first can hold its larger figure as "low".
+  const ranges = (screen?.ranges ?? []).slice(0, 6).map(rangeInOrder);
   const killers = (screen?.dealKillers ?? []).slice(0, 3);
   // One OM, several properties (#411): the deal page's own card, read by
   // the same reader, so a partner sees what is being bought property by
@@ -302,7 +325,9 @@ export function ShareView({
         {[
           extraction?.market,
           assetClassLabel(assetClass),
-          strategy.kind !== "unknown" ? strategy.label : null,
+          // Whose strategy it is on a note or a leased fee, as the sender's
+          // page header says it (lib/interest `dealTypeLabel`).
+          strategy.kind !== "unknown" ? dealTypeLabel(strategy.label, safeExtraction) : null,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -348,6 +373,10 @@ export function ShareView({
           the lot rent against the market's and the water and sewer. */}
       <ManufacturedHousingPanel park={readManufacturedHousing(safeExtraction)} />
 
+      {/* A self-storage facility (#471): its occupancies and the in-place
+          rent against the street rate. */}
+      <SelfStoragePanel storage={readSelfStorage(safeExtraction)} />
+
       {/* What the third-party reports found (#465): a tile a report, the
           Phase I's age and the seismic PML against the lenders' lines. */}
       <SiteReportsPanel reports={readSiteReports(safeExtraction)} />
@@ -363,12 +392,12 @@ export function ShareView({
 
       {/* A note the seller offers to carry (#462), as stated — the pricing
           needs the model, which the sender's deal page carries. */}
-      {sellerNote && (
+      {sellerNoteLine && (
         <p
           data-qa="share-seller-note"
           className="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm leading-relaxed shadow-sm"
         >
-          {sellerFinancingLine(sellerNote.terms)}
+          {sellerNoteLine}
         </p>
       )}
 
@@ -388,6 +417,12 @@ export function ShareView({
       >
         <p className="text-xs font-medium uppercase tracking-wider text-muted">
           First-pass verdict
+          {screenedOn(verdict.generatedAt) ? (
+            <span className="normal-case tracking-normal" data-qa="verdict-date">
+              {" · "}
+              {screenedOn(verdict.generatedAt)}
+            </span>
+          ) : null}
         </p>
         <div className="mt-2 flex items-center gap-3">
           <span
@@ -401,8 +436,9 @@ export function ShareView({
         </div>
         {verdictStale && (
           <p className="mt-2 text-xs text-caution">
-            From the previous completed screen — the sender&rsquo;s latest run of this
-            deal did not finish.
+            {staleWhy === "running"
+              ? "From the previous completed screen — the sender is re-screening this deal, and this call is replaced when the run reaches its verdict."
+              : "From the previous completed screen — the sender\u2019s latest run of this deal did not finish."}
           </p>
         )}
         {verdict.reason && (
@@ -436,14 +472,11 @@ export function ShareView({
             {ranges.map((r, i) => {
               // The honesty markers the deal page shows on every range card:
               // the model's confidence, where the base sits inside the range
-              // (hugging the sponsor's end is a tell), and what drives the
-              // spread.
+              // (drawn in one neutral colour — the higher figure is not
+              // always the sponsor's end), and what drives the spread.
               const conf = RANGE_CONF[r.confidence];
               const pos = basePosition(r);
-              const posLabel =
-                pos != null && pos > 0.7
-                  ? "Base sits near the optimistic end of the range"
-                  : "Where the base sits inside the range";
+              const posLabel = "Where the base sits inside the range";
               return (
                 <li key={i} className="rounded-xl border border-line p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -483,9 +516,7 @@ export function ShareView({
                         style={{ width: `${pos * 100}%` }}
                       />
                       <span
-                        className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${
-                          pos > 0.7 ? "bg-caution" : "bg-brand"
-                        }`}
+                        className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-2 ring-surface"
                         style={{ left: `${pos * 100}%` }}
                       />
                     </span>
@@ -569,12 +600,14 @@ export function ShareView({
           {comps?.summary && (
             <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight">Comp read</h2>
+              {staleReads.includes("comps") && <PreviousRead why={staleWhy} />}
               <Fold text={comps.summary} className="mt-2 text-sm leading-relaxed text-muted" />
             </div>
           )}
           {market?.summary && (
             <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight">Market read</h2>
+              {staleReads.includes("market") && <PreviousRead why={staleWhy} />}
               <Fold text={market.summary} className="mt-2 text-sm leading-relaxed text-muted" />
               {market.liveBrief && market.liveBrief.lines.length > 0 && (
                 <p className="mt-2 text-xs text-muted">

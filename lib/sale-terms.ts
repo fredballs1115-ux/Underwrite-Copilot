@@ -29,7 +29,9 @@
 // A RECEIVER, A TRUSTEE OR A LENDER IS NOT AN OWNER. The seller never ran
 // the building: it sells as-is, gives no representations, holds thin
 // records, and a court's approval or an overbid can follow the winning
-// bid.
+// bid. A short sale's seller IS the owner, but sells for less than its
+// loan's balance, so its lender's approval decides the price and whether it
+// closes at all.
 //
 // A BLANK IS NULL. A bid, a premium or a deadline the memorandum does not
 // state is not assumed, and a negotiated sale says nothing here.
@@ -37,7 +39,7 @@
 import type { ExtractionResult, SaleMethod } from "@/lib/anthropic/types";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
-import { parseStatedDate } from "@/lib/note-yield";
+import { readStatedDate } from "@/lib/note-yield";
 import { withArticle } from "@/lib/article";
 
 export type { SaleMethod };
@@ -55,10 +57,15 @@ const RESERVE = /^(?:auction\s+|seller'?s?\s+)?reserve(?:\s+(?:price|bid|amount)
 const PREMIUM = /\bbuyer'?s\s+premium\b|\bbuyer\s+premium\b/i;
 const DEADLINE = /\bbid(?:s|ding)?\s+(?:deadline|due|date|ends?|closes?)\b|\bauction\s+(?:date|ends?|closes?)\b|\bcall\s+for\s+offers\b/i;
 const STALKING = /\bstalking[- ]horse\b/i;
+// A stalking-horse row that says there is none, or says nothing: "None",
+// "No stalking horse", "N/A", "Not applicable", "Not stated", "—". Any other
+// words state one, priced or not ("$12,500,000", "In place — terms in the
+// data room", "Not disclosed"). "TBD" is left out of this list on purpose:
+// a stalking-horse process whose bid is not yet set is still one — higher
+// bids can reopen the sale, so the letter of intent is refused on it.
+const NO_STALKING = /^(?:none|no|nil|n\/?a|not\s+(?:applicable|stated))\b|^[-–—]?\.?$/i;
 const NO_RESERVE = /\bno\s+reserve\b|\babsolute\b|\bwithout\s+reserve\b|\bnone\b/i;
 const UNDISCLOSED = /\bundisclosed\b|\bnot\s+disclosed\b|\bconfidential\b|\bunpublished\b/i;
-
-const METHODS: SaleMethod[] = ["negotiated", "auction", "receivership", "bankruptcy", "reo", "unknown"];
 
 const METHOD_LABEL: Record<SaleMethod, string> = {
   negotiated: "A negotiated sale",
@@ -66,8 +73,16 @@ const METHOD_LABEL: Record<SaleMethod, string> = {
   receivership: "A receiver's sale",
   bankruptcy: "A bankruptcy sale",
   reo: "A lender's sale of a property it took back (REO)",
+  short_sale: "A short sale",
   unknown: "The sale",
 };
+
+/** Every way a property can be said to be sold, in one list: the label
+ *  record above holds every `SaleMethod` (the compiler sees to it), and the
+ *  extraction's enum reads this list (lib/anthropic/extract), so the schema,
+ *  the type and the reader cannot drift apart. */
+export const SALE_METHODS = Object.keys(METHOD_LABEL) as [SaleMethod, ...SaleMethod[]];
+const METHODS: readonly SaleMethod[] = SALE_METHODS;
 
 const clean = (s: string | null | undefined) => (s ?? "").trim();
 const pageIn = (page: string | undefined, pageCount: number | null) => {
@@ -106,6 +121,21 @@ export function hammerFor(allIn: number, premium: { pct: number; min: number | n
   return (byPct * premium.pct) / 100 >= min ? byPct : allIn - min;
 }
 
+/** The memorandum's stalking-horse row where it states one, priced or not;
+ *  null where there is no row, or the row says there is none. */
+function stalkingRowOf(rows: MetricRow[]): MetricRow | null {
+  return rows.find((m) => STALKING.test(m.label) && !NO_STALKING.test(m.value.trim())) ?? null;
+}
+
+/** Whether the memorandum states a stalking-horse bid — priced or not, and
+ *  whatever sale method it names: a sale that higher bids can reopen. The
+ *  letter of intent is refused on it (lib/loi-terms); it had been refused
+ *  only where the bid parsed as dollars. */
+export function statesStalkingHorse(ex: ExtractionResult | null | undefined): boolean {
+  if (!ex) return false;
+  return stalkingRowOf((Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow)) != null;
+}
+
 /** An auction's own rows, for a key-terms block to lead with right after
  *  the price: the starting bid, the buyer's premium, the reserve, the bid
  *  deadline. */
@@ -133,8 +163,19 @@ export interface SaleRead {
   floorAllIn: number | null;
   deadline: { ends: string; stated: string; daysLeft: number } | null;
   stalkingHorse: number | null;
+  /** the stalking-horse row's words as stated, priced or not ("" where the
+   *  memorandum states none) */
+  stalkingHorseStated: string;
+  /** who sells, the bid, the premium, the reserve and the deadline, in the
+   *  reader's sentences, one a line — the panel leads with the first and
+   *  folds the rest */
+  sentences: string[];
+  /** those sentences as one paragraph */
   headline: string;
 }
+
+/** The read's figures, before its sentences are written from them. */
+type SaleFacts = Omit<SaleRead, "headline" | "sentences">;
 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
 const money = (n: number) =>
@@ -157,7 +198,7 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
   const reserveRow = rows.find((m) => RESERVE.test(m.label.trim())) ?? null;
   const premiumRow = rows.find((m) => PREMIUM.test(m.label)) ?? null;
   const deadlineRow = rows.find((m) => DEADLINE.test(m.label)) ?? null;
-  const stalkingRow = rows.find((m) => STALKING.test(m.label)) ?? null;
+  const stalkingRow = stalkingRowOf(rows);
   const stated = METHODS.includes(s?.method as SaleMethod) ? (s!.method as SaleMethod) : "unknown";
   // An auction's figures say it is one, whatever the method field says.
   const method: SaleMethod = stated === "unknown" && (bidRow || premiumRow) ? "auction" : stated;
@@ -179,8 +220,12 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
           ? { kind: "amount", amount, stated: v }
           : { kind: "stated", amount: null, stated: v };
   }
-  const deadlineIso = deadlineRow ? parseStatedDate(deadlineRow.value, 2000, 2199) : null;
-  const read: Omit<SaleRead, "headline"> = {
+  // A deadline is a day (lib/offering's rule): a month alone ("June 2027")
+  // stays in the key terms as stated and is never counted down to a day the
+  // memorandum did not name — it had read "Bids are due Jun 30, 2027".
+  const deadlineRead = deadlineRow ? readStatedDate(deadlineRow.value, 2000, 2199, "first") : null;
+  const deadlineIso = deadlineRead && !deadlineRead.month ? deadlineRead.iso : null;
+  const read: SaleFacts = {
     method,
     label: METHOD_LABEL[method],
     terms: clean(s?.terms),
@@ -200,13 +245,15 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
         }
       : null,
     stalkingHorse: stalkingRow ? parseUsd(stalkingRow.value) : null,
+    stalkingHorseStated: clean(stalkingRow?.value),
   };
-  return { ...read, headline: headlineOf(read) };
+  const sentences = sentencesOf(read);
+  return { ...read, sentences, headline: sentences.join(" ") };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────
 
-function auctionSentences(r: Omit<SaleRead, "headline">): string[] {
+function auctionSentences(r: SaleFacts): string[] {
   const out: string[] = [];
   if (r.startingBid != null) {
     out.push(
@@ -247,14 +294,22 @@ const SELLER_SENTENCE: Partial<Record<SaleMethod, string>> = {
   bankruptcy:
     "It is sold out of a bankruptcy: the court approves the sale, a stalking-horse bid can set the floor, and higher bids can reopen it until the court rules.",
   reo: "The lender that took it back is selling it: it never ran the building either, sells as-is, and discloses only what it knows.",
+  // A short sale (research pass 23): the owner sells, for less than its
+  // loan's balance, so the lender must consent — said as what the sale is,
+  // with what to ask, and never a rule of law.
+  short_sale:
+    "It is a short sale: the owner is selling for less than its loan's balance, so its lender must approve the sale — the price the lender will take, and when it decides, are the lender's, and the seller cannot promise to close.",
 };
 
-function headlineOf(r: Omit<SaleRead, "headline">): string {
+function sentencesOf(r: SaleFacts): string[] {
   const parts: string[] = [];
   if (r.method === "auction") parts.push(...auctionSentences(r));
   else if (SELLER_SENTENCE[r.method]) parts.push(SELLER_SENTENCE[r.method]!);
   if (r.method !== "auction" && (r.startingBid != null || r.premium)) parts.push(...auctionSentences(r).slice(0, 2));
   if (r.stalkingHorse != null) parts.push(`A stalking-horse bid of ${money(r.stalkingHorse)} is stated: that is the floor every other bid starts over.`);
+  else if (r.stalkingHorseStated) {
+    parts.push(`A stalking-horse bid is stated (${r.stalkingHorseStated.replace(/[.;,\s]+$/, "")}): it sets the floor every other bid starts over.`);
+  }
   if (r.deadline) {
     parts.push(
       r.deadline.daysLeft > 0
@@ -265,7 +320,7 @@ function headlineOf(r: Omit<SaleRead, "headline">): string {
     );
   }
   if (r.condition) parts.push(`Sold as stated: ${r.condition.replace(/[.;,\s]+$/, "")}.`);
-  return parts.join(" ");
+  return parts;
 }
 
 /**
@@ -289,7 +344,8 @@ export function ceilingBidLine(r: SaleRead, maxAllIn: number | null, hurdlePct: 
 }
 
 /** The pipeline row's tag: "Auction, 5% premium", "Auction",
- *  "Receivership sale", "Bankruptcy sale", "Bank-owned (REO)". */
+ *  "Receivership sale", "Bankruptcy sale", "Bank-owned (REO)", "Short
+ *  sale". */
 export function saleTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const r = readSale(ex, asOf);
   if (!r) return null;
@@ -302,6 +358,8 @@ export function saleTag(ex: ExtractionResult | null | undefined, asOf: Date = ne
       return "Bankruptcy sale";
     case "reo":
       return "Bank-owned (REO)";
+    case "short_sale":
+      return "Short sale";
     default:
       return null;
   }
@@ -317,6 +375,7 @@ export function saleShortLine(r: SaleRead): string {
     receivership: "Sold by a court-appointed receiver, as-is",
     bankruptcy: "Sold out of a bankruptcy, subject to the court",
     reo: "Sold by the lender that took it back (REO), as-is",
+    short_sale: "A short sale, subject to the lender's approval",
     negotiated: "",
     unknown: "Sold on the terms stated",
   };
@@ -329,6 +388,7 @@ export function saleShortLine(r: SaleRead): string {
   }
   if (r.reserve) parts.push(r.reserve.kind === "none" ? "no reserve" : r.reserve.kind === "undisclosed" ? "reserve undisclosed" : `reserve ${r.reserve.stated}`);
   if (r.stalkingHorse != null) parts.push(`${withArticle(money(r.stalkingHorse))} stalking-horse bid`);
+  else if (r.stalkingHorseStated) parts.push("a stalking-horse bid");
   if (r.deadline && r.deadline.daysLeft >= 0) parts.push(`bids due ${dayLabel(r.deadline.ends)}`);
   return parts.length ? `${head[r.method]}: ${parts.join("; ")}` : head[r.method];
 }
@@ -358,6 +418,18 @@ export function saleNote(r: SaleRead): string {
         ? "(d) THE RESERVE — undisclosed: the seller can refuse any bid under it, so the starting bid is not an offer to sell at that figure"
         : "(d) THE RESERVE — ask whether one exists and whether the seller may bid against the buyers",
     );
+  } else if (r.method === "short_sale") {
+    // The owner sells, but its lender decides (research pass 23): each a
+    // question to put, never a rule of law.
+    traps.push(
+      "(a) THE LENDER'S CONSENT AND ITS TIMING — ask whether the lender has approved this sale in writing, and how long its review takes: a contract signed before it is an offer the seller cannot promise to honour",
+    );
+    traps.push(
+      "(b) THE PRICE THE LENDER APPROVES — the lender, not the seller, decides what it will take: ask what it has approved, and whether a reappraisal or a higher offer can move it after the contract is signed",
+    );
+    traps.push(
+      "(c) THE SELLER CANNOT PROMISE TO CLOSE — every date in the contract waits on the lender: weigh the deposit, the diligence spend and any rate lock against a sale that may not happen",
+    );
   } else {
     traps.push("(a) THE SELLER NEVER RAN IT — the figures are the receiver's, the trustee's or the lender's reconstruction: rebuild the rent roll and the T-12 from source, and price the deferred maintenance an absent owner leaves");
     traps.push("(b) AS-IS — no representations or warranties survive the closing: the diligence is the buyer's alone, before the bid");
@@ -368,6 +440,13 @@ export function saleNote(r: SaleRead): string {
           ? "(c) THE COURT — the receiver's sale can need the court's approval, and a higher offer can reopen it"
           : "(c) THE LENDER'S TERMS — a lender's contract is its own form: read its limits on disclosure, its deposit and its remedies",
     );
+    // How a lender came to own it decides what came with the title — asked,
+    // never assumed (research pass 23).
+    if (r.method === "reo") {
+      traps.push(
+        "(d) HOW THE LENDER TOOK TITLE — ask whether it came by a foreclosure or by a deed in lieu: a deed in lieu typically leaves junior liens in place, so check the title commitment for what survives",
+      );
+    }
   }
   return `${saleContextLine(r)}\n\nSALE TRAPS, checked by name against the facts above: ${traps.join("; ")}.`;
 }

@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
+import { todayLine } from "./today";
 import type { ValuationField } from "@/lib/valuation/types";
 
 /**
@@ -101,7 +102,8 @@ export async function extractBov(source: OmSource): Promise<BovExtraction> {
       messages: [
         {
           role: "user",
-          content: [omDocument(source), { type: "text", text: INSTRUCTION }],
+          // Today's date last, after the document (lib/anthropic/today).
+          content: [omDocument(source), { type: "text", text: INSTRUCTION }, { type: "text", text: todayLine() }],
         },
       ],
       output_config: { format: zodOutputFormat(BovSchema) },

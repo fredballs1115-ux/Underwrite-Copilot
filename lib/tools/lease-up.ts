@@ -45,8 +45,12 @@
 //
 // Pure, no I/O.
 
-/** A lease-up past five years is not a screening question. */
-export const MAX_MONTHS = 60;
+import { usdExact } from "./format";
+import { MAX_LEASE_UP_MONTHS, heldTo } from "./limits";
+
+/** A lease-up past five years is not a screening question — the bound lives
+ *  in lib/tools/limits, where the card reads it to say what falls past it. */
+export const MAX_MONTHS = MAX_LEASE_UP_MONTHS;
 /** The common date the two shocks are read at — rule 1. */
 export const COMPARE_MONTH = 36;
 const DEFAULT_STABILIZED_PCT = 95;
@@ -109,7 +113,8 @@ export interface LeaseUpResult {
   note: string;
 }
 
-const EMPTY: LeaseUpResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: LeaseUpResult = {
   targetSf: null,
   months: [],
   monthsToStabilize: null,
@@ -183,7 +188,7 @@ function settle(t: LeaseUpInput): Settled | null {
     sf,
     targetSf,
     preLeased: Math.min(targetSf, atLeastZero(t.preLeasedSf)),
-    horizon: positive(t.maxMonths) ? Math.min(Math.round(t.maxMonths), MAX_MONTHS) : MAX_MONTHS,
+    horizon: positive(t.maxMonths) ? heldTo(Math.round(t.maxMonths), MAX_MONTHS) : MAX_MONTHS,
     free: Math.max(0, Math.round(atLeastZero(t.freeRentMonths))),
     capPerSf: atLeastZero(t.tiPerSf) + atLeastZero(t.lcPerSf),
     opexPerSf: atLeastZero(t.opexPerSf),
@@ -347,7 +352,7 @@ function noteFor(x: {
   horizon: number;
   free: number;
 }): string {
-  const usd = (n: number) => `$${round(n).toLocaleString("en-US")}`;
+  const usd = usdExact;
   const mo = (n: number) => `${n} month${n === 1 ? "" : "s"}`;
   if (x.monthsToStabilize === null) {
     return `It does not fill within ${mo(x.horizon)} at this pace — check the absorption.`;

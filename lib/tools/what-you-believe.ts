@@ -58,6 +58,7 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { MAX_HOLD_YEARS, heldTo } from "./limits";
 
 // No `irr` import here on purpose: the solve works on the NPV at the
 // target rate, which is cheaper and exact. The agreement WITH the shared
@@ -79,8 +80,14 @@ function round(n: number, places = 0): number {
   return r === 0 ? 0 : r;
 }
 
-/** How far past the benchmark the required growth sits. */
-export type Reach = "at market" | "a stretch" | "heroic";
+/**
+ * How far from the benchmark the required growth sits, either side of it:
+ * within a point is "at market", a point or more under it is "below
+ * market" — growth to spare — and over it "a stretch", then "heroic". The
+ * first version had no word for under, so a required −0.63% against an
+ * ordinary 3% read "within a point of the 3%".
+ */
+export type Reach = "below market" | "at market" | "a stretch" | "heroic";
 
 /** Above the benchmark by this many points and it stops being a forecast. */
 export const STRETCH_POINTS = 1;
@@ -235,7 +242,8 @@ export function readBelief(input: BeliefInputs): BeliefRead {
     };
   }
 
-  const years = Math.max(1, Math.round(holdYears));
+  // Held to the longest the card runs (lib/tools/limits).
+  const years = Math.max(1, Math.round(heldTo(holdYears, MAX_HOLD_YEARS)));
   const sale = real(sellingCostPct) ? sellingCostPct : 0;
 
   // Rule 2: NPV at the target rate is monotone in growth, so its zero is
@@ -282,7 +290,9 @@ export function readBelief(input: BeliefInputs): BeliefRead {
         ? "heroic"
         : aboveMarketBy >= STRETCH_POINTS
           ? "a stretch"
-          : "at market";
+          : aboveMarketBy <= -STRETCH_POINTS
+            ? "below market"
+            : "at market";
   }
 
   const notes: string[] = [];
@@ -300,7 +310,9 @@ export function readBelief(input: BeliefInputs): BeliefRead {
       notes.push(
         reach === "at market"
           ? `That is within a point of the ${marketGrowthPct}% you called ordinary.`
-          : `That is ${aboveMarketBy} points above the ${marketGrowthPct}% you called ordinary — ${reach}.`,
+          : reach === "below market"
+            ? `That is ${Math.abs(aboveMarketBy)} points below the ${marketGrowthPct}% you called ordinary — the target clears with growth to spare.`
+            : `That is ${aboveMarketBy} points above the ${marketGrowthPct}% you called ordinary — ${reach}.`,
       );
     }
   }

@@ -4,7 +4,7 @@
 // "unavailable", never a silent absence. Data: deals.site_flags
 // (lib/site-flags, migration 0030).
 
-import { isMinimalHazard, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { isMinimalHazard, opportunityZoneRead, type SiteFlagsResult } from "@/lib/site-flags/core";
 
 function Chip({ label, cls }: { label: string; cls: string }) {
   return (
@@ -17,11 +17,21 @@ function Chip({ label, cls }: { label: string; cls: string }) {
 export function SiteFlagsCard({
   result,
   hasAddress,
+  today,
 }: {
   result: SiteFlagsResult | null;
   hasAddress: boolean;
+  /** today as an ISO day (the reader's own, lib/reader-day), read by the
+   *  page: what an answer from the 2018 list means turns on where that
+   *  round stands */
+  today: string;
 }) {
   if (!hasAddress) return null;
+  // The Opportunity Zone as the stored lookup can say it on `today`
+  // (lib/site-flags): on the list, off it (by the 2010 tract, or the current
+  // number with its caveat), or not checked and why — and the 2018 round's
+  // line, which changes as the next round takes effect and the 2018 one ends.
+  const oz = result ? opportunityZoneRead(result, today) : null;
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
       <h2 className="text-sm font-semibold">Site flags</h2>
@@ -57,18 +67,30 @@ export function SiteFlagsCard({
                 cls="bg-caution/10 text-caution"
               />
             )}
-            {/* Opportunity Zone */}
-            {result.opportunityZone === "unchecked" ? (
-              <Chip label="Opportunity Zone: not checked (registry unavailable)" cls="bg-faint text-muted" />
-            ) : result.opportunityZone === null ? (
-              <Chip label="Not in an Opportunity Zone" cls="bg-line/60 text-muted" />
-            ) : (
-              <Chip label="Opportunity Zone tract" cls="bg-pass/10 text-pass" />
+            {/* Opportunity Zone — drawn as a zone in force only while the
+                2018 designations are */}
+            {oz && (
+              <Chip
+                label={oz.label}
+                cls={
+                  oz.kind === "listed" && oz.phase !== "ended"
+                    ? "bg-pass/10 text-pass"
+                    : oz.kind === "unchecked"
+                      ? "bg-faint text-muted"
+                      : "bg-line/60 text-muted"
+                }
+              />
             )}
             {result.tractGeoid && (
               <span className="text-xs text-muted">tract {result.tractGeoid}</span>
             )}
+            {/* The number the zone was checked by, where 2010's differs. */}
+            {result.ozTract?.vintage === "2010" && result.ozTract.geoid !== result.tractGeoid && (
+              <span className="text-xs text-muted">2010 tract {result.ozTract.geoid}</span>
+            )}
           </div>
+          {oz?.caveat && <p className="mt-2 text-xs text-muted">{oz.caveat}</p>}
+          {oz?.note && <p className="mt-2 text-xs text-muted">{oz.note}</p>}
           <p className="mt-2 text-xs text-muted">{result.note}</p>
           {result.error && <p className="mt-1 text-xs text-caution">{result.error}</p>}
         </>

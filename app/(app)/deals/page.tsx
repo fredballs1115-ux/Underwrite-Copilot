@@ -1,28 +1,34 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { getBilling } from "@/lib/billing";
+import { FREE_DEAL_LIMIT, getBilling } from "@/lib/billing";
+import { MAX_OM_PAGES } from "@/lib/pdf";
+import { TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { dealAllowance } from "@/lib/deal-allowance";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueUpgrade } from "@/lib/offering";
 import { WhatsNewCard } from "./whats-new";
+import { NewsStrip, type NewsStripItem } from "./news-strip";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
-import { PICTURE_CREDIT, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
+import { PICTURE_CREDIT, galleryPage, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
-import { pickSlots, shownAssetClass } from "@/lib/pipeline-slots";
+import { pickSlots, readingTerms, shownAssetClass } from "@/lib/pipeline-slots";
 import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { scoreMandateFit } from "@/lib/mandate";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
+import { screenedAnOm } from "@/lib/onboarding";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -31,16 +37,18 @@ const ERRORS: Record<string, string> = {
   file: "Please choose a PDF offering memorandum to upload.",
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
   size: "That PDF is larger than 32 MB — please try a smaller file for now.",
+  locked: "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password (or ask the broker for one) and upload that. Nothing was saved.",
+  pages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the financial sections on their own. Nothing was saved.`,
   save: "Couldn’t save the deal. Please try again.",
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
-  limit:
-    "You’ve reached the 3-deal limit on the Free plan. Upgrade to Pro for unlimited deals.",
+  // The limits read from the constants the gates count by (lib/billing,
+  // lib/teams), never typed: a changed allowance changes the sentence.
+  limit: `You’ve reached the ${FREE_DEAL_LIMIT}-deal limit on the Free plan. Upgrade to Pro for unlimited deals.`,
   exportfail:
     "Couldn’t build that export just now — please try again in a moment.",
   auth:
     "You were signed out, so the upload didn’t start. You’re back in now — everything you typed is still filled in below; just re-attach the PDF.",
-  teamlimit:
-    "Your team’s 3 trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.",
+  teamlimit: `Your team’s ${TEAM_TRIAL_DEALS} trial deals and your personal free deals are all in use. Start the Team plan for unlimited shared deals, or upgrade to Pro.`,
 };
 
 // Fixed metric slots for the pipeline table — every row fills the SAME
@@ -71,10 +79,14 @@ export default async function DealsPage({
   // opens the new-deal form on the manual tab with the address pre-picked.
   const prefillAddress = parseStructuredAddress(addr ?? "");
   const errorMessage = errorCode ? (ERRORS[errorCode] ?? null) : null;
+  // Joining moves no deal (join_team_with_token adds the membership alone):
+  // the deals added from now on go into the team's pipeline, while its trial
+  // or plan takes them (the create actions' `teamAllowed`), and the ones
+  // already here stay the reader's own.
   const notice = deleted
     ? "Deal deleted."
     : joined
-      ? "Welcome to the team — this pipeline is now shared with your teammates."
+      ? "Welcome to the team. The deals you add from now on go into its shared pipeline while the team's trial or plan allows; the deals you already had stay personal."
       : null;
 
   const supabase = await createSupabaseServerClient();
@@ -283,6 +295,10 @@ export default async function DealsPage({
     const storedFlags = (d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
     const flags = siteFlagsStale(storedFlags, rowAddress?.label) ? null : storedFlags;
     const placement = placeDeal(rowAddress, countyOf(rowAddress, flags));
+    // Running, stalled (its process died mid-screen — a deploy, most
+    // often) or failed with the verdict left behind; a failure that never
+    // touched the verdict leaves the pill alone (lib/screen-run.ts).
+    const jobStatus = listJobStatus(job, !!verdict?.verdict);
     return {
       id: d.id,
       name: d.name,
@@ -300,10 +316,17 @@ export default async function DealsPage({
           : null,
       score: mandate?.score ?? null,
       mandateVerdict: mandate?.verdict ?? null,
+      // Judged on the first signal alone until the extraction lands — the
+      // deal page's "First read" (its buy-box panel's provisional rule).
+      fitFirstRead: !extraction && !!d.first_signal,
       addedBy:
         d.team_id && d.user_id !== user?.id
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
+      // On a team, a deal no team holds is the reader's own and the team
+      // does not see it — filed there once the team's trial deals are in
+      // use, or added before the reader joined (lib/personal-deal).
+      personal: !!billing?.team && !d.team_id,
       market: extraction?.market ?? "",
       // The same placement the deal page makes — the list and the detail
       // agree on whether an address sits inside the briefed markets.
@@ -314,13 +337,16 @@ export default async function DealsPage({
       readMarket: placement.read?.name ?? null,
       readCounty: placement.placedBy?.county ?? null,
       offersDue: dueById.get(d.id) ?? null,
-      slots: extraction
-        ? pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null)
-        : { cap: null, price: null, yoc: null },
-      // Running, stalled (its process died mid-screen — a deploy, most
-      // often) or failed with the verdict left behind; a failure that never
-      // touched the verdict leaves the pill alone (lib/screen-run.ts).
-      jobStatus: listJobStatus(job, !!verdict?.verdict),
+      // Before the extraction lands the first signal's ask fills the price,
+      // as on the deal page (lib/pipeline-slots).
+      slots: pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class),
+      jobStatus,
+      // A first screen before its terms are read: an empty slot is "not
+      // read yet" and shimmers, never the dash that says "not stated"
+      // (lib/pipeline-slots). The fit waits with them only where a buy box
+      // stands — without one its dash is final.
+      reading: readingTerms(jobStatus, !!extraction, !!d.om_storage_path),
+      hasBox: !!box,
       // Gate the aerial thumbnail here rather than letting every row fire a
       // request that can only 404: no address, no possible photograph.
       hasAddress: !!(d.address as StructuredAddress | null)?.label?.trim(),
@@ -358,7 +384,7 @@ export default async function DealsPage({
         // again like one not yet looked for (#444): over the next picture,
         // taking over only if today's search keeps it.
         const picture = unread ? null : (cache?.picture ?? null);
-        const market = marketPictureFor(address, extraction?.market ?? null, placement.briefed ?? placement.read);
+        const market = marketPictureFor(address, extraction?.market ?? null, placement.briefed ?? placement.read, placement.county);
         const facts = {
           dealId: d.id,
           pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
@@ -390,26 +416,48 @@ export default async function DealsPage({
           // credit, only where the card leads with the deal's own photograph.
           slides:
             picture && !d.is_sample
-              ? (cache?.gallery ?? []).map((g, k) => ({
-                  kind: "photo" as const,
-                  src: `/api/deals/${encodeURIComponent(d.id)}/picture?size=hero&g=${k + 1}`,
-                  credit: memorandumPhotoCredit(g.page),
-                  alt: g.page
-                    ? `Photograph from page ${g.page} of the memorandum for ${d.name}`
-                    : `Photograph from the memorandum for ${d.name}`,
-                }))
+              ? (cache?.gallery ?? []).map((g, k) => {
+                  // A page the deal's owner wrote is printed only as a page number.
+                  const page = galleryPage(g.page);
+                  return {
+                    kind: "photo" as const,
+                    src: `/api/deals/${encodeURIComponent(d.id)}/picture?size=hero&g=${k + 1}`,
+                    credit: memorandumPhotoCredit(page),
+                    alt: page
+                      ? `Photograph from page ${page} of the memorandum for ${d.name}`
+                      : `Photograph from the memorandum for ${d.name}`,
+                  };
+                })
               : [],
         };
       })(),
     };
   });
 
-  // Getting-started state — all real, computed from the account's actual data.
+  // Getting-started state — all real, computed from the reader's own data:
+  // the list carries a team's deals too, and a teammate's screened memorandum
+  // or sample is not this reader's first step taken.
+  const own = rows.filter((d) => d.user_id === user?.id);
   const onboarding = {
     hasBuyBox: !!(personalBox || teamBox),
-    sampleId: rows.find((d) => d.is_sample)?.id ?? null,
-    hasRealDeal: rows.some((d) => !d.is_sample),
+    sampleId: own.find((d) => d.is_sample)?.id ?? null,
+    // "Screen your first OM" ticks for a memorandum a screen has finished —
+    // never a deal typed in by hand, or a screen still running (lib/onboarding).
+    hasScreenedOm: own.some((d) =>
+      screenedAnOm({
+        isSample: !!d.is_sample,
+        omPath: d.om_storage_path ?? null,
+        hasVerdict: !!(d.verdict as { verdict?: string } | null)?.verdict,
+        job: jobByDeal.get(d.id),
+      }),
+    ),
   };
+
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once per request and handed to the list:
+  // every offers-due countdown counts from it, on the server and in the
+  // browser alike (the deal page reads its own the same way).
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   return (
     <>
@@ -425,74 +473,45 @@ export default async function DealsPage({
             ? {
                 isPro: billing.isPro,
                 canCreateDeal: billing.canCreateDeal,
-                dealCount: billing.dealCount,
-                dealLimit: billing.dealLimit,
+                // The meter counts what the create action counts: a team
+                // trial's deals first, then the reader's own (lib/deal-allowance).
+                allowance: dealAllowance(billing),
               }
             : null
         }
         initialView={initialView}
+        viewerId={user?.id ?? null}
+        onTeam={!!billing?.team}
+        todayIso={todayIso}
       />
-      <TodaysNews />
+      {/* The strip's own read streams after the pipeline rather than
+          holding it back; nothing is drawn until it has stories. */}
+      <Suspense fallback={null}>
+        <TodaysNews />
+      </Suspense>
       <WhatsNewCard />
     </>
   );
 }
 
-/** Compact stories strip under the pipeline: the highest-scored recent
- *  headlines from the weekday sweep, each linking to its source. Renders
- *  nothing at all until the intel cron has stories — no filler card. */
+/** Compact stories strip under the pipeline: the newest headlines the
+ *  weekday sweep scored 5 or more, each linking to its source and dated. The
+ *  sweep's table is shared by every account and carries no market, so the
+ *  strip is titled for what it is (`NewsStrip`). Renders nothing at all
+ *  until the intel cron has stories — no filler card. */
 async function TodaysNews() {
-  let items: {
-    url: string;
-    title: string;
-    source: string | null;
-    relevance: number | null;
-  }[] = [];
+  let items: NewsStripItem[] = [];
   try {
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase
       .from("market_intel_items")
-      .select("url, title, source, relevance")
+      .select("url, title, source, relevance, published_at")
       .gte("relevance", 5)
       .order("created_at", { ascending: false })
       .limit(4);
-    items = (data as typeof items | null) ?? [];
+    items = (data as NewsStripItem[] | null) ?? [];
   } catch {
     // table absent — no card
   }
-  if (items.length === 0) return null;
-
-  return (
-    <section className="mt-6 rounded-xl border border-line bg-surface p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">News for your markets</h2>
-        <Link
-          href="/news"
-          className="text-xs font-medium text-brand underline decoration-dotted underline-offset-2"
-        >
-          All stories →
-        </Link>
-      </div>
-      <ul className="mt-2 space-y-1.5">
-        {items.map((it) => (
-          <li key={it.url} className="text-sm leading-snug">
-            {it.relevance !== null && (
-              <span className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted">
-                {it.relevance}/10
-              </span>
-            )}
-            <a
-              href={it.url}
-              target="_blank"
-              rel="noreferrer"
-              className="underline decoration-dotted underline-offset-2 hover:text-brand"
-            >
-              {it.title}
-            </a>
-            {it.source && <span className="ml-1.5 text-[11px] text-muted">{it.source}</span>}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
+  return <NewsStrip items={items} />;
 }

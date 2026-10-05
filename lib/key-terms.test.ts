@@ -7,6 +7,11 @@ import { describe, expect, it } from "vitest";
 import { keyTermRows } from "./key-terms";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { inferStrategy } from "./deal-strategy";
+import { screenYearOf } from "./criteria";
+
+/** The year these rows were screened in, as the memo and the shared screen
+ *  read it; no price label below carries a year of its own. */
+const SCREEN_YEAR = screenYearOf(SAMPLE_DEAL.extraction);
 
 const conversion = [
   { label: "NOI (stabilized, pro forma)", value: "$21,000,000", flagged: true },
@@ -19,17 +24,17 @@ const conversion = [
 
 describe("keyTermRows — the deal-defining rows lead the key terms", () => {
   it("on the sample deal: asking price, going-in cap and units first, then the flagged rows", () => {
-    const rows = keyTermRows(SAMPLE_DEAL.extraction.metrics, inferStrategy(SAMPLE_DEAL.extraction).kind, 8);
+    const rows = keyTermRows(SAMPLE_DEAL.extraction.metrics, inferStrategy(SAMPLE_DEAL.extraction).kind, SCREEN_YEAR, 8);
     expect(rows.slice(0, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap", "Units"]);
     // The flagged pro-forma rows still come before the unflagged rest.
     expect(rows[3].flagged).toBe(true);
     // Cut at four — the memo's width when the screen block is present — the
     // price is still on the page.
-    expect(keyTermRows(SAMPLE_DEAL.extraction.metrics, "stabilized", 4).map((m) => m.value)).toContain("$68,000,000");
+    expect(keyTermRows(SAMPLE_DEAL.extraction.metrics, "stabilized", SCREEN_YEAR, 4).map((m) => m.value)).toContain("$68,000,000");
   });
 
   it("on a plan deal: the price, the stabilized NOI and the total cost the plan is judged on, then the planned units", () => {
-    const rows = keyTermRows(conversion, "conversion", 4);
+    const rows = keyTermRows(conversion, "conversion", SCREEN_YEAR, 4);
     expect(rows.map((m) => m.label)).toEqual([
       "Purchase price",
       "NOI (stabilized, pro forma)",
@@ -44,13 +49,13 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Land cost", value: "$8,000,000", flagged: false },
       { label: "Proposed units", value: "240", flagged: false },
     ];
-    expect(keyTermRows(land, "development", 8)[0].label).toBe("Land cost");
+    expect(keyTermRows(land, "development", SCREEN_YEAR, 8)[0].label).toBe("Land cost");
     const stabilized = [
       { label: "NOI (stabilized, pro forma)", value: "$4,000,000", flagged: true },
       { label: "Going-in cap rate", value: "5.4%", flagged: false },
       { label: "Asking price", value: "$60,000,000", flagged: false },
     ];
-    expect(keyTermRows(stabilized, "stabilized", 8).map((m) => m.label)).toEqual([
+    expect(keyTermRows(stabilized, "stabilized", SCREEN_YEAR, 8).map((m) => m.label)).toEqual([
       "Asking price",
       "Going-in cap rate",
       "NOI (stabilized, pro forma)",
@@ -68,19 +73,41 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Note rate", value: "5.25%", flagged: false },
       { label: "Unpaid principal balance", value: "$24,400,000", flagged: false },
     ];
-    // The collateral's size still says what secures the loan; its cap
-    // comes after, among the flagged rows.
-    expect(keyTermRows(note, "stabilized", 7, "note").map((m) => m.label)).toEqual([
+    // The collateral's size still says what secures the loan; its cap is
+    // not printed at all, flagged or not — among the rows it would read as
+    // a cap on the note's price (the audit of 2026-09-30).
+    expect(keyTermRows(note, "stabilized", SCREEN_YEAR, 7, "note").map((m) => m.label)).toEqual([
       "Asking price",
       "Unpaid principal balance",
       "Note rate",
       "Maturity date",
       "Payment status",
       "Units",
-      "Going-in cap rate",
+      "Yield to maturity (at ask)",
     ]);
+    expect(keyTermRows(note, "stabilized", SCREEN_YEAR, 20, "note").map((m) => m.label)).not.toContain("Going-in cap rate");
+    // Nor any other cap on the collateral's income, flagged or not — only
+    // the one going-in row had been dropped, and a memo printed "Cap rate
+    // (pro forma) 6.1%" under a note (the audit of 2026-10-01). An interest
+    // rate cap is a term of the loan and stays.
+    const caps = [
+      ...note,
+      { label: "Cap rate (pro forma)", value: "6.1%", flagged: true },
+      { label: "Stabilized cap rate", value: "6.5%", flagged: false },
+      { label: "Exit cap", value: "6.0%", flagged: false },
+      { label: "In-place cap", value: "5.2%", flagged: false },
+      { label: "Capitalization rate (T-12)", value: "5.4%", flagged: false },
+      { label: "Interest rate cap", value: "SOFR 4.00% strike, through 2027", flagged: false },
+      { label: "Capital improvements", value: "$1,200,000", flagged: false },
+    ];
+    const shown = keyTermRows(caps, "stabilized", SCREEN_YEAR, 30, "note").map((m) => m.label);
+    expect(shown.filter((l) => /cap\b|capitalization/i.test(l) && !/interest rate cap/i.test(l))).toEqual([]);
+    expect(shown).toContain("Interest rate cap");
+    expect(shown).toContain("Capital improvements");
+    // Read as a building, every one of them prints.
+    expect(keyTermRows(caps, "stabilized", SCREEN_YEAR, 30).map((m) => m.label)).toEqual(expect.arrayContaining(["Cap rate (pro forma)", "Exit cap", "In-place cap"]));
     // The same rows read as a building lead with its cap and count.
-    expect(keyTermRows(note, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
+    expect(keyTermRows(note, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
   });
 
   it("a single tenant's lease leads after the cap (#454): when it ends, how its rent grows, the tenant's options", () => {
@@ -93,7 +120,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Lease expiration", value: "March 31, 2036", flagged: false },
       { label: "Asking price", value: "$6,500,000", flagged: false },
     ];
-    expect(keyTermRows(nnn, "stabilized", 5).map((m) => m.label)).toEqual([
+    expect(keyTermRows(nnn, "stabilized", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
       "Asking price",
       "Going-in cap rate",
       "Lease expiration",
@@ -111,7 +138,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Going-in cap rate", value: "8.00%", flagged: false },
       { label: "Asking price", value: "$26,000,000", flagged: false },
     ];
-    expect(keyTermRows(hotel, "stabilized", 6).map((m) => m.label)).toEqual([
+    expect(keyTermRows(hotel, "stabilized", SCREEN_YEAR, 6).map((m) => m.label)).toEqual([
       "Asking price",
       "Going-in cap rate",
       "Keys",
@@ -130,7 +157,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Buyer's premium", value: "5%", flagged: false },
       { label: "Starting bid", value: "$2,500,000", flagged: false },
     ];
-    expect(keyTermRows(auction, "stabilized", 4).map((m) => m.label)).toEqual(["Starting bid", "Buyer's premium", "Reserve price", "Bid deadline"]);
+    expect(keyTermRows(auction, "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual(["Starting bid", "Buyer's premium", "Reserve price", "Bid deadline"]);
   });
 
   it("a multi-tenant property's quoted WALT leads after the price (#457)", () => {
@@ -140,7 +167,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "WALT", value: "6.8 years", flagged: false },
       { label: "Asking price", value: "$21,500,000", flagged: false },
     ];
-    expect(keyTermRows(center, "stabilized", 2).map((m) => m.label)).toEqual(["Asking price", "WALT"]);
+    expect(keyTermRows(center, "stabilized", SCREEN_YEAR, 2).map((m) => m.label)).toEqual(["Asking price", "WALT"]);
   });
 
   it("a value-add program's doors, cost, premium and achieved premium lead after the price (#460)", () => {
@@ -152,7 +179,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Units to renovate", value: "192", flagged: false },
       { label: "Asking price", value: "$48,000,000", flagged: false },
     ];
-    expect(keyTermRows(program, "stabilized", 5).map((m) => m.label)).toEqual([
+    expect(keyTermRows(program, "stabilized", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
       "Asking price",
       "Units to renovate",
       "Renovation cost per unit",
@@ -170,7 +197,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false },
       { label: "Asking price", value: "$55,000,000", flagged: false },
     ];
-    expect(keyTermRows(abated, "stabilized", 4).map((m) => m.label)).toEqual([
+    expect(keyTermRows(abated, "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual([
       "Asking price",
       "Tax abatement",
       "Tax abatement expiration",
@@ -186,7 +213,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Seller financing amount", value: "$14,000,000", flagged: false },
       { label: "Asking price", value: "$20,000,000", flagged: false },
     ];
-    expect(keyTermRows(note, "stabilized", 4).map((m) => m.label)).toEqual([
+    expect(keyTermRows(note, "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual([
       "Asking price",
       "Seller financing amount",
       "Seller financing rate",
@@ -201,7 +228,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Pre-leased", value: "87% for Fall 2026", flagged: false },
       { label: "Asking price", value: "$61,200,000", flagged: false },
     ];
-    expect(keyTermRows(student, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Pre-leased", "Distance to campus"]);
+    expect(keyTermRows(student, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Pre-leased", "Distance to campus"]);
   });
 
   it("a park's lot rent, the market's and its water and sewer lead after the price (#470)", () => {
@@ -212,7 +239,18 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Lot rent", value: "$430", flagged: false },
       { label: "Asking price", value: "$9,300,000", flagged: false },
     ];
-    expect(keyTermRows(park, "stabilized", 4).map((m) => m.label)).toEqual(["Asking price", "Lot rent", "Market lot rent", "Water and sewer"]);
+    expect(keyTermRows(park, "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual(["Asking price", "Lot rent", "Market lot rent", "Water and sewer"]);
+  });
+
+  it("a storage facility's economic occupancy and rates lead after the price (#471)", () => {
+    const storage = [
+      { label: "Occupancy", value: "91%", flagged: false },
+      { label: "In-place rent", value: "$1.38/SF/month", flagged: false },
+      { label: "Street rate", value: "$1.14/SF/month", flagged: false },
+      { label: "Economic occupancy", value: "84%", flagged: false },
+      { label: "Asking price", value: "$9,800,000", flagged: false },
+    ];
+    expect(keyTermRows(storage, "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual(["Asking price", "Economic occupancy", "Street rate", "In-place rent"]);
   });
 
   it("what the third-party reports found leads after the price (#465)", () => {
@@ -223,7 +261,7 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Phase I ESA findings", value: "One REC", flagged: false },
       { label: "Asking price", value: "$42,000,000", flagged: false },
     ];
-    expect(keyTermRows(reported, "stabilized", 4).map((m) => m.label)).toEqual([
+    expect(keyTermRows(reported, "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual([
       "Asking price",
       "Phase I ESA findings",
       "PCA immediate repairs",
@@ -232,9 +270,9 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
   });
 
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
-    const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
+    const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", SCREEN_YEAR, 3);
     expect(rows).toHaveLength(3);
     expect(new Set(rows.map((m) => m.label)).size).toBe(3);
-    expect(keyTermRows([], "conversion", 4)).toEqual([]);
+    expect(keyTermRows([], "conversion", SCREEN_YEAR, 4)).toEqual([]);
   });
 });

@@ -1,18 +1,23 @@
 import "server-only";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
-import type { BuyBoxCheck } from "@/lib/criteria";
-import type { FloodMapView } from "@/lib/site-flags/core";
+import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
+import { currentBriefLine } from "@/lib/permit-split";
 import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 import type {
   ExtractionResult,
   ChallengerResult,
   BrokerCompsResult,
+  FirstSignal,
   ReconciliationResult,
   MarketResult,
+  VerdictResult,
 } from "@/lib/anthropic/types";
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
+import { rangeInOrder } from "@/lib/verdict-range";
+import { typicalRangeParts } from "@/lib/typical-range";
 
 /** The OM's figure placed on the typical range — "5.25%" on "5.25–5.75%" —
  *  as the memo places a base between its low and high: 0..1, clamped, so a
@@ -20,34 +25,39 @@ import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type Me
  *  null when either side does not parse as one scale. */
 export function rangeRead(omSays: string, typicalRange: string): number | null {
   // "5.25–5.75%", "5.25%–5.75%" (the unit after the low figure too),
-  // "$2,150–$2,450/mo", "2.5 to 3.5%", "5.25%-5.75%" (a hyphen).
-  const m = typicalRange.match(
-    /(\$?-?\d[\d,]*\.?\d*)\s*%?\s*(?:–|—|-|to)\s*(\$?-?\d[\d,]*\.?\d*)/,
-  );
-  if (!m) return null;
-  return basePosition({ low: m[1], base: omSays, high: m[2] });
+  // "$2,150–$2,450/mo", "2.5 to 3.5%", "5.25%-5.75%" (a hyphen): the one
+  // reader the deal page's position bar reads too (lib/typical-range).
+  const parts = typicalRangeParts(typicalRange);
+  if (!parts) return null;
+  return basePosition({ low: parts[0], base: omSays, high: parts[1] });
 }
 import {
+  gridTakeaway,
   heatBucket,
   heatCellIrr,
   heatCellEm,
   heatLegend,
+  maxBidSentence,
   HEAT_BG,
+  type BaseCase,
   type SensitivityData,
   type HeatCell,
 } from "@/lib/underwrite/report-grid";
+import { withArticle } from "@/lib/article";
 import {
   SPREAD_BG,
   SPREAD_LABEL,
+  SPREAD_RULE_OF_THUMB,
   refCapNote,
   spreadBucket,
   type PlanReport,
   type SpreadBucket,
   type YocGrid,
 } from "@/lib/plan-sensitivity";
-import { planFacts } from "@/lib/plan-facts";
+import { planFacts, yieldOnCostText } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
-import { assetWords } from "@/lib/asset-words";
+import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
@@ -60,13 +70,15 @@ import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
 import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
+import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import type { AssumableView } from "@/lib/assumable-debt";
+import type { InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
-import { gapScale } from "@/lib/gap-detail";
+import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
-import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, type PortfolioRead } from "@/lib/portfolio";
+import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
 
 const C = {
   brand: "#114e54",
@@ -82,6 +94,18 @@ const C = {
 const str = (v: unknown): string =>
   pdfSafe(typeof v === "string" ? v : v == null ? "" : String(v));
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+/**
+ * A stored day as a reader writes it — "2026-09-28" or a timestamp reads
+ * "Sep 28, 2026" — the way the memo dates its screen. A value that is not a
+ * date prints as stored rather than as a guess.
+ */
+export function readDay(v: string | null | undefined): string {
+  const s = (v ?? "").trim();
+  const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z` : s);
+  if (!s || !Number.isFinite(t)) return s;
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
 
 const SEV_COLOR: Record<string, string> = {
   high: C.kill,
@@ -274,23 +298,21 @@ const s = StyleSheet.create({
  */
 function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) {
   if (!read || read.checks.length === 0) return null;
-  const titles = read.checks.map((c) => c.title.toLowerCase());
-  const what = titles.length <= 1 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
-  const scope = read.metro
-    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
-    : `The model's ${what}, set against the national series, read on ${read.readOn}.`;
+  // The deal page's card's own words (lib/model-vs-market-scope): the
+  // published figures for the market or the state, and the nation's.
+  const scope = readScope(read, readDay(read.readOn));
   return (
     <View style={{ marginTop: 12 }} wrap={false}>
       <TitleRow title="Assumptions against the published figures" marginTop={0} />
       <Text style={s.sub}>
-        {`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; a metro figure is the metro area's, not the submarket's or the building's.`}
+        {str(`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)}`)}
       </Text>
       {read.checks.map((c) => (
         <View key={c.key} style={{ marginTop: 3 }}>
           <Text style={{ fontSize: 8.5, color: C.ink }}>
-            {`${c.title} ${c.model} (${c.modelSource}) — ${c.toneLabel}`}
+            {str(`${c.title} ${c.model} (${c.modelSource}) — ${c.toneLabel}`)}
           </Text>
-          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{c.read}</Text>
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(c.read)}</Text>
         </View>
       ))}
     </View>
@@ -357,8 +379,9 @@ function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
 
 /**
  * FEMA's flood map at the building (#427): the aerial with FEMA's zones, in
- * FEMA's colours, as one picture the width of the page, with a ring at its
- * centre (the building), FEMA's key under it and the sentence on the zone at
+ * the site's palette (#472, lib/flood-style), as one picture the width of the
+ * page, with a ring at its centre (the building), the key of the zones the
+ * picture shows under it and the sentence on the zone at
  * the building. The same frame and the same words as the deal page's Flood
  * tab, so the report and the page cannot disagree about the map.
  */
@@ -389,7 +412,7 @@ function PhotosBlock({ photos }: { photos: MemoCover[] }) {
   );
 }
 
-function SiteBlock({ view }: { view: FloodMapView }) {
+function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string | null }) {
   return (
     <View wrap={false}>
       {view.image ? (
@@ -397,14 +420,27 @@ function SiteBlock({ view }: { view: FloodMapView }) {
           <View style={{ position: "relative", width: SITE_MAP_W, height: SITE_MAP_H, marginTop: 2 }}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image takes no alt */}
             <Image src={view.image} style={{ width: SITE_MAP_W, height: SITE_MAP_H, borderRadius: 4, objectFit: "cover" }} />
+            {/* The ring over a dark halo, so it reads over the pale tints. */}
             <View
               style={{
                 position: "absolute",
-                left: SITE_MAP_W / 2 - 6,
-                top: SITE_MAP_H / 2 - 6,
-                width: 12,
-                height: 12,
-                borderRadius: 6,
+                left: SITE_MAP_W / 2 - 8,
+                top: SITE_MAP_H / 2 - 8,
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                borderWidth: 1.5,
+                borderColor: "#1f2937",
+              }}
+            />
+            <View
+              style={{
+                position: "absolute",
+                left: SITE_MAP_W / 2 - 6.5,
+                top: SITE_MAP_H / 2 - 6.5,
+                width: 13,
+                height: 13,
+                borderRadius: 6.5,
                 borderWidth: 2,
                 borderColor: "#ffffff",
               }}
@@ -431,6 +467,13 @@ function SiteBlock({ view }: { view: FloodMapView }) {
         </View>
       ) : null}
       {view.line ? <Text style={{ fontSize: 9, color: C.ink, marginTop: 6, lineHeight: 1.35 }}>{str(view.line)}</Text> : null}
+      {/* The day the zone was looked up, where the stored lookup says it:
+          a map is redrawn and a lookup can be months old. */}
+      {view.line && lookedUp ? (
+        <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 3 }}>
+          {str(`The zone as FEMA's National Flood Hazard Layer gave it on ${lookedUp}.`)}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -537,9 +580,10 @@ function LeaseholdBlock({ view }: { view: LeaseholdExitView | null | undefined }
 function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: { one: string; many: string } }) {
   const p = portfolio;
   const basisWord = shareBasisWord(p, noun);
-  const widest = Math.max(1, ...(p.shares ?? []), ...(p.noiShares ?? []));
+  // A share of the whole fills that share of the track, as on the deal
+  // page's card (`shareOfTrack`).
   const track = 84;
-  const bar = (v: number) => Math.max(1.5, (v / widest) * track);
+  const bar = (sharePct: number) => Math.max(1.5, shareOfTrack(sharePct) * track);
   return (
     <View>
       <Text style={s.sub}>
@@ -563,7 +607,10 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
           {str(f)}
         </Text>
       ))}
-      <View style={[s.tableHead, { marginTop: 8 }]}>
+      {/* The table's own View: its header repeats on a page a long list of
+          properties runs onto. */}
+      <View>
+      <View style={[s.tableHead, { marginTop: 8 }]} fixed>
         <Text style={[s.headText, { width: "30%" }]}>Property</Text>
         <Text style={[s.headText, { width: "22%" }]}>{p.shares && basisWord ? "Share" : ""}</Text>
         <Text style={[s.headText, { width: "40%" }]}>What the memorandum states</Text>
@@ -593,6 +640,7 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
           <Text style={{ width: "8%", fontSize: 7.5, color: C.muted }}>{a.page ? str(a.page) : "—"}</Text>
         </View>
       ))}
+      </View>
       <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 8 }}>
         {str(
           "An allocation is the seller's split of the price, set for transfer taxes and financing rather than by value; a cap struck on it is the allocation's cap, not the property's. Each property's market is read from its own address; the market check's published figures are the one market's that the deal's address on file sits in, never the portfolio's.",
@@ -622,9 +670,9 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   const localCount = b.lines.length - nat;
   const first_ = localCount === 1 ? "The first is" : `The first ${localCount} are`;
   if (!first) {
-    return `And ${whose} own, where ${sit}, read on ${b.readOn}. Each is ${state ? "the state's" : "the metro's"} - not those properties' own, and never the portfolio's.${nationSays}`;
+    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} - not those properties' own, and never the portfolio's.${nationSays}`;
   }
-  const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${b.readOn}${
+  const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${readDay(b.readOn)}${
     state ? " - the address lies outside the metros the site tracks" : ""
   }.${state ? "" : placedBySentence(b.placedBy)}`;
   const each =
@@ -725,6 +773,135 @@ function PageChrome({
   );
 }
 
+const CALL_COLOR: Record<string, string> = { Go: C.pass, Caution: C.caution, "No-go": C.kill };
+// A range's confidence, in the memo's and the deal page's colours.
+const CONF_COLOR: Record<string, string> = { high: C.pass, medium: C.caution, low: C.kill };
+const CALL_WORD: Record<string, string> = { pass: "Go", caution: "Caution", pass_on: "No-go" };
+const LEVER_WORD: Record<string, string> = { basis: "Basis", exit: "Exit", debt: "Debt" };
+const SCENARIO_WORD: Record<string, string> = { conservative: "Conservative", base: "Base", sponsor: "Sponsor" };
+
+/**
+ * The call, in full: what the one-page memo clamps to fit its boxes or
+ * drops for room — the whole rationale, every top risk and next step, each
+ * range with its source, its basis and its confidence, and the deal-killers
+ * and the flips in their own words. Only what the verdict stores, through
+ * the WinAnsi filter; nothing is summarised or added.
+ */
+function CallInFullPage({
+  verdict,
+  memo,
+}: {
+  verdict: VerdictResult;
+  memo: MemoData;
+}) {
+  const word = memo.verdictWord ?? "";
+  const color = CALL_COLOR[word] ?? C.brand;
+  const risks = list(verdict.topRisks).map(str).filter(Boolean);
+  const steps = list(verdict.nextSteps).map(str).filter(Boolean);
+  const screen = verdict.screen;
+  // Read in numeric order (lib/verdict-range): a verdict stored when the
+  // conservative end came first can hold its larger figure as "low".
+  const ranges = (list(screen?.ranges) as NonNullable<VerdictResult["screen"]>["ranges"]).map((r) =>
+    r ? rangeInOrder({ ...r, low: str(r.low), high: str(r.high) }) : r,
+  );
+  const killers = list(screen?.dealKillers) as NonNullable<VerdictResult["screen"]>["dealKillers"];
+  const flips = list(screen?.sensitivity) as NonNullable<VerdictResult["screen"]>["sensitivity"];
+  const item = { fontSize: 9, color: C.ink, lineHeight: 1.3 } as const;
+  return (
+    <PageChrome title="The call, in full" count={[word, memo.screened].filter(Boolean).join(" · ")} dealName={memo.name} branding={memo.branding}>
+      <Text style={s.sub}>
+        {"What the one-page memo shortens to fit or leaves out, as the verdict states it: the whole rationale, every risk and next step, and each range with its source, basis and confidence."}
+      </Text>
+      {str(verdict.reason) ? (
+        <View style={[s.summaryBox, { marginTop: 0, borderLeftColor: color }]} wrap={false}>
+          {word ? <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color, marginBottom: 3 }}>{word}</Text> : null}
+          <Text style={[s.summaryText, { lineHeight: 1.35 }]}>{str(verdict.reason)}</Text>
+        </View>
+      ) : null}
+      {risks.length > 0 ? (
+        <View>
+          <TitleRow title="Top risks" count={`${risks.length}`} marginTop={14} />
+          {risks.map((r, i) => (
+            <View key={i} style={{ flexDirection: "row", marginBottom: 4 }} wrap={false}>
+              <Text style={{ width: 12, fontSize: 9, color: C.muted }}>•</Text>
+              <Text style={[item, { flex: 1 }]}>{r}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {steps.length > 0 ? (
+        <View>
+          <TitleRow title="Next steps" count={`${steps.length}`} marginTop={10} />
+          {steps.map((n, i) => (
+            <View key={i} style={{ flexDirection: "row", marginBottom: 4 }} wrap={false}>
+              <Text style={{ width: 14, fontSize: 9, color: C.muted }}>{`${i + 1}.`}</Text>
+              <Text style={[item, { flex: 1 }]}>{n}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {ranges.length > 0 ? (
+        <View>
+          <TitleRow title="The screen's ranges" count={`${ranges.length}`} marginTop={10} />
+          <View style={s.tableHead} fixed>
+            <Text style={[s.headText, { width: "34%" }]}>Assumption</Text>
+            <Text style={[s.headText, { width: "15%", textAlign: "right" }]}>Low</Text>
+            <Text style={[s.headText, { width: "15%", textAlign: "right" }]}>Base</Text>
+            <Text style={[s.headText, { width: "15%", textAlign: "right" }]}>High</Text>
+            <Text style={[s.headText, { width: "21%", textAlign: "right" }]}>Confidence</Text>
+          </View>
+          {ranges.map((r, i) => (
+            <View key={i} style={[s.row, { flexDirection: "column", alignItems: "stretch" }, i % 2 === 1 ? s.rowAlt : {}]} wrap={false}>
+              <View style={{ flexDirection: "row" }}>
+                <Text style={{ width: "34%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}>{str(r?.label)}</Text>
+                <Text style={{ width: "15%", fontSize: 8.5, textAlign: "right" }}>{str(r?.low)}</Text>
+                <Text style={{ width: "15%", fontSize: 8.5, textAlign: "right", fontFamily: "Helvetica-Bold", color: C.brand }}>{str(r?.base)}</Text>
+                <Text style={{ width: "15%", fontSize: 8.5, textAlign: "right" }}>{str(r?.high)}</Text>
+                <Text style={{ width: "21%", fontSize: 8, textAlign: "right", color: CONF_COLOR[str(r?.confidence)] ?? C.muted }}>
+                  {str(r?.confidence)}
+                </Text>
+              </View>
+              {str(r?.source) ? (
+                <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>{str(`Source: ${str(r?.source)}`)}</Text>
+              ) : null}
+              {str(r?.basis) ? (
+                <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(`What drives the spread: ${str(r?.basis)}`)}</Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {killers.length > 0 ? (
+        <View wrap={false}>
+          <TitleRow title="The deal-killers" marginTop={10} />
+          {killers.map((k, i) => (
+            <View key={i} style={{ marginBottom: 5 }} wrap={false}>
+              <Text style={[item, { fontFamily: "Helvetica-Bold", color: C.brand }]}>
+                {str(`${i + 1}. ${LEVER_WORD[str(k?.lever)] ?? str(k?.lever)}`)}
+              </Text>
+              {str(k?.read) ? <Text style={item}>{str(k?.read)}</Text> : null}
+              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`Breaks if (screen's estimate): ${str(k?.risk)}`)}</Text> : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {flips.length > 0 ? (
+        <View wrap={false}>
+          <TitleRow title="Where the call flips" count="the screen's estimate, not the model's" marginTop={10} />
+          {flips.map((f, i) => {
+            const call = CALL_WORD[str(f?.call)] ?? str(f?.call);
+            return (
+              <Text key={i} style={[item, { marginBottom: 3 }]}>
+                {str(`${SCENARIO_WORD[str(f?.scenario)] ?? str(f?.scenario)}: ${call}${str(f?.note) ? ` — ${str(f?.note)}` : ""}`)}
+              </Text>
+            );
+          })}
+        </View>
+      ) : null}
+    </PageChrome>
+  );
+}
+
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
@@ -732,6 +909,12 @@ export interface ReportInput {
    *  color scale, the takeaway, and the max bid; null when the deal has no
    *  extraction to derive a model from */
   sensitivity?: SensitivityData | null;
+  /** why the IRR page and the max bid are left out where the model runs on
+   *  a placeholder price or an assumed year-1 NOI (lib/underwrite/report-grid
+   *  `placeholderReturnsLine`); printed on the page the grids would have
+   *  been on. Null where the grids print, and on a plan deal, whose plan
+   *  page says why its IRR page is left out. */
+  withheld?: string | null;
   /** the plan page for a conversion / development / lease-up / value-add:
    *  the plan as the OM states it and yield on total cost stressed across
    *  NOI shortfall and budget overrun; null for a stabilized asset or when
@@ -805,13 +988,26 @@ export interface ReportInput {
    *  model's `meta.mh`, #470) — printed over the grids; absent where the
    *  caller built no model, and then the line prints alone */
   mh?: { line: string; read: string } | null;
-  /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
-   *  the composite, FEMA's key and the zone sentence; null for no page */
+  /** a self-storage facility's occupancies, rates and platform, and what
+   *  the model does with the premium over street and a lease-up
+   *  (lib/self-storage via the derived model's `meta.storage`, #471) —
+   *  printed over the grids; absent where the caller built no model, and
+   *  then the line prints alone */
+  storage?: { line: string; read: string } | null;
+  /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427,
+   *  #472): the deal's flood frame cut to the band, the key of the zones it
+   *  shows and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
   /** the memorandum's other photographs, cut to the page's frame and
    *  credited (lib/memo/cover-aerial `galleryPhotosFor`, #459); fewer than
    *  two is no page */
   photos?: MemoCover[] | null;
+}
+
+/** The deal's first signal, which the deal page reads beside the
+ *  extraction to infer the deal's kind; null on a row screened before it. */
+function firstSignalOf(deal: DealRow): FirstSignal | null {
+  return (deal.first_signal as FirstSignal | null | undefined) ?? null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -839,36 +1035,49 @@ export function buildReportData(
   siteReports?: { line: string; read: string } | null,
   student?: { line: string; read: string } | null,
   mh?: { line: string; read: string } | null,
+  storage?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
+  // On a plan deal the annual screening model books the budget in year 1
+  // and anchors year 1 on in-place income, so its IRR grid is not the
+  // plan's return — it once printed a -48% IRR and a -17.9x multiple as
+  // the base case. The plan page carries the sensitivity such a deal is
+  // judged on; the IRR page is omitted rather than caveated. The kind is
+  // the deal page's read: the extraction and the first signal.
+  const planDeal = isPlanDeal(inferStrategy(extraction, firstSignalOf(deal)).kind);
+  // A model on a placeholder price or an assumed year-1 NOI (the route's
+  // sources say which) has no returns worth printing: the IRR page and the
+  // max bid are left out the same way, with the line that says why — and
+  // nothing else it computed prints either, so its reads fall back to the
+  // lines the memorandum states, as for a caller that built no model. A
+  // plan deal's page already says why its IRR page is left out.
+  const withheld = planDeal ? null : (sensitivity?.withheld ?? null);
+  const modelRead = <T,>(v: T | null | undefined): T | null => (withheld ? null : (v ?? null));
   return {
     modelVsMarket: modelVsMarket ?? null,
-    assumable: assumable ?? null,
-    leasehold: leasehold ?? null,
+    assumable: modelRead(assumable),
+    leasehold: modelRead(leasehold),
     floodMap: floodMap ?? null,
-    singleTenant: singleTenant ?? null,
-    hotel: hotel ?? null,
-    sale: sale ?? null,
-    roster: roster ?? null,
+    singleTenant: modelRead(singleTenant),
+    hotel: modelRead(hotel),
+    sale: modelRead(sale),
+    roster: modelRead(roster),
     photos: photos ?? null,
-    valueAdd: valueAdd ?? null,
-    taxAbatement: taxAbatement ?? null,
-    sellerNote: sellerNote ?? null,
-    siteReports: siteReports ?? null,
-    student: student ?? null,
-    mh: mh ?? null,
+    valueAdd: modelRead(valueAdd),
+    taxAbatement: modelRead(taxAbatement),
+    sellerNote: modelRead(sellerNote),
+    siteReports: modelRead(siteReports),
+    student: modelRead(student),
+    mh: modelRead(mh),
+    storage: modelRead(storage),
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
     // report as they do with the standalone memo.
     memo: buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover),
-    // On a plan deal the annual screening model books the budget in year 1
-    // and anchors year 1 on in-place income, so its IRR grid is not the
-    // plan's return — it once printed a -48% IRR and a -17.9x multiple as
-    // the base case. The plan page carries the sensitivity such a deal is
-    // judged on; the IRR page is omitted rather than caveated.
-    sensitivity: isPlanDeal(inferStrategy(extraction).kind) ? null : (sensitivity ?? null),
+    sensitivity: planDeal || withheld ? null : (sensitivity ?? null),
+    withheld,
     plan: plan ?? null,
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
   };
@@ -885,6 +1094,153 @@ export function citedPage(page: unknown, totalPages: number | null): string {
 
 const fmtPct = (d: number, dp = 1): string => `${(d * 100).toFixed(dp)}%`;
 const fmtDelta = (d: number): string => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
+const fmtUsd0 = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * Where one of the model's inputs came from, as the workbook's Sources
+ * column marks it (lib/underwrite/workbook): its note — which names the
+ * document for a figure read from one ("OM asking / purchase price", "Rent
+ * roll actual …") — then in brackets its page where it falls inside the
+ * memorandum (lib/facts' rule), "derived" for a figure computed from stated
+ * ones, "assumption" for a default, so a default never reads as the
+ * sponsor's case. "" where the model carries no source for it.
+ */
+export function sourceSays(src: InputSource | null | undefined, totalPages: number | null): string {
+  if (!src) return "";
+  const note = (src.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const page = citedPage(src.page, totalPages);
+  const tag =
+    src.provenance === "extracted" ? (page === "—" ? "" : page) : src.provenance === "derived" ? "derived" : "assumption";
+  return tag ? `${note} (${tag})` : note;
+}
+/** Where one of the model's inputs came from, as a tag: "OM p. 3" (the page
+ *  only where it falls inside the memorandum), "derived", "assumption". */
+function provenanceOf(src: InputSource | null | undefined, totalPages: number | null): string {
+  if (!src) return "";
+  if (src.provenance === "extracted") {
+    const page = citedPage(src.page, totalPages);
+    return page === "—" ? "OM" : `OM ${page}`;
+  }
+  return src.provenance;
+}
+
+const pctOrDash = (d: number | null | undefined, dp = 1) => (d == null || !Number.isFinite(d) ? "—" : `${(d * 100).toFixed(dp)}%`);
+const xOrDash = (d: number | null | undefined, dp = 2) => (d == null || !Number.isFinite(d) || d <= 0 ? "—" : `${d.toFixed(dp)}x`);
+
+/**
+ * The terms the grids run on, said under them: the hold, the loan against
+ * cost and how it amortizes, the rate with its source note — dated where
+ * today's curve seeded it — each with its provenance, then what the returns
+ * carry for buying and selling (the deal page's playground's own line).
+ */
+export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
+  const tag = (src: InputSource | null) => (src ? ` (${provenanceOf(src, totalPages)})` : "");
+  const amort =
+    b.ioMonths >= 999
+      ? "interest-only for the whole hold"
+      : b.ioMonths > 0
+        ? `interest-only for ${b.ioMonths} months, then amortizing over ${Number(b.amortYears.toFixed(1))} years`
+        : `amortizing over ${Number(b.amortYears.toFixed(1))} years`;
+  // The seeded rate's note names the index and its day ("5-yr Treasury
+  // 4.78% (FRED, Sep 17, 2026) + 200 bps …"); a placeholder's is only the
+  // instruction to enter one, which the provenance already says.
+  const rawNote = (b.rateSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const rateNote = /^enter\b/i.test(rawNote) ? "" : rawNote;
+  return [
+    `The grids run on ${withArticle(`${b.holdYears}-year hold`)}${tag(b.holdSource)}`,
+    `a loan of ${(b.ltc * 100).toFixed(0)}% of cost${tag(b.ltcSource)}, ${amort}`,
+    `and ${withArticle(`${(b.rate * 100).toFixed(2)}% all-in rate`)}${rateNote ? `: ${rateNote}` : ""}${tag(b.rateSource)}.`,
+  ].join("; ") + ` ${b.costLine}`;
+}
+
+/**
+ * The base case the grids are struck around (lib/underwrite/report-grid
+ * `buildBaseCase`): the returns the ink-bordered cells show and year 1's
+ * coverage as tiles; then the inputs with where each came from, beside the
+ * sources and uses. The workbook's Deal Summary on one strip of paper.
+ */
+function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | null }) {
+  const tiles: [string, string][] = [
+    ["Levered IRR", pctOrDash(b.leveredIrr)],
+    ["Equity multiple", xOrDash(b.equityMultiple)],
+    ["Year-1 cash-on-cash", pctOrDash(b.cocY1)],
+    ["Year-1 DSCR", xOrDash(b.dscrY1)],
+    ["Year-1 debt yield", pctOrDash(b.debtYieldY1)],
+  ];
+  const line = (label: string, value: string, note?: string, key?: string) => (
+    <View key={key ?? label} style={{ flexDirection: "row", marginBottom: 2 }} wrap={false}>
+      <Text style={{ width: 70, fontSize: 7.5, color: C.muted }}>{str(label)}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 8, color: C.ink, fontFamily: "Helvetica-Bold" }}>{str(value)}</Text>
+        {note ? <Text style={{ fontSize: 7, color: C.muted, marginTop: 0.5 }}>{str(note)}</Text> : null}
+      </View>
+    </View>
+  );
+  const money = (label: string, n: number, bold = false) => (
+    <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 1.5 }}>
+      <Text style={{ fontSize: 7.5, color: bold ? C.ink : C.muted, fontFamily: bold ? "Helvetica-Bold" : "Helvetica" }}>{label}</Text>
+      <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: bold ? "Helvetica-Bold" : "Helvetica" }}>{fmtUsd0(n)}</Text>
+    </View>
+  );
+  const noiNote = (b.noiSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  return (
+    <View style={{ marginBottom: 10 }} wrap={false}>
+      <TitleRow title="The base case" count="the ink-bordered cells" marginTop={0} />
+      <View style={{ flexDirection: "row", borderTopWidth: 0.7, borderBottomWidth: 0.7, borderColor: C.line, paddingVertical: 5, marginBottom: 6 }}>
+        {tiles.map(([label, value]) => (
+          <View key={label} style={{ width: "20%" }}>
+            <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{label.toUpperCase()}</Text>
+            <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>{value}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: "row" }}>
+        <View style={{ width: "58%", paddingRight: 14 }}>
+          {line("Price", `${fmtUsd0(b.price)} · ${provenanceOf(b.priceSource, totalPages)}`)}
+          {line("Loan", `${fmtUsd0(b.loan)} · ${(b.ltc * 100).toFixed(0)}% of cost · ${provenanceOf(b.ltcSource, totalPages)}`)}
+          {line("Equity", `${fmtUsd0(b.equity)} · total uses less the loan`)}
+          {line("Hold", `${b.holdYears} years · ${provenanceOf(b.holdSource, totalPages)}`)}
+          {line("Year-1 NOI", `${fmtUsd0(b.noiY1)} · ${provenanceOf(b.noiSource, totalPages)}`, noiNote)}
+        </View>
+        <View style={{ width: "42%" }}>
+          <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted, marginBottom: 2 }}>USES</Text>
+          {money("Purchase price", b.price)}
+          {money("Closing costs", b.closingCosts)}
+          {b.acqFee > 0 ? money("Acquisition fee", b.acqFee) : null}
+          {money("Financing costs", b.financingCosts)}
+          {money("Total uses", b.totalUses, true)}
+          <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted, marginTop: 4, marginBottom: 2 }}>SOURCES</Text>
+          {money("Loan", b.loan)}
+          {money("Equity", b.equity)}
+          {money("Total sources", b.loan + b.equity, true)}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The max bid, or why there is none, for what the price buys (lib/interest).
+ * A note's model runs the collateral at the loan's price, so a bid solved on
+ * it is a price for the building, never for the note: none prints. A share's
+ * model runs the whole asset its price implies, so its bid is the whole
+ * building's, and says so. A share whose percentage the memorandum does not
+ * state cannot be grossed up to the whole at all, so a bid solved on it is
+ * neither the share's price nor the building's: none prints.
+ */
+function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestOf>): string {
+  if (interest.kind === "note") {
+    return "No max bid: the model's price is the collateral's, run as if the building were bought at the loan's price, so a bid solved on it is not a price for the note.";
+  }
+  if (interest.kind === "partial_interest" && interest.sharePct == null) {
+    return "No max bid: the memorandum states no single percentage for the share, so the model cannot gross its price up to the whole building, and a bid solved on it would be neither the share's price nor the building's.";
+  }
+  const line = maxBidSentence(s);
+  return interest.kind === "partial_interest" && s.maxBid && !s.maxBid.unbounded
+    ? `${line} It is the whole building's price, not the share's.`
+    : line;
+}
+
 /** What the overrun axis and sentence call the figure they stress. When the
  *  OM stated only an all-in total and no price, the "budget" IS that total
  *  with the acquisition inside it — the strip above declines to call it a
@@ -952,7 +1308,7 @@ function YocGridPdf({ grid, axis }: { grid: YocGrid; axis: string }) {
                 }}
               >
                 <Text style={{ fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.ink }}>
-                  {fmtPct(cell.yieldOnCost)}
+                  {yieldOnCostText(cell.yieldOnCost)}
                 </Text>
                 <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 1 }}>
                   {`${cell.spreadBps >= 0 ? "+" : ""}${cell.spreadBps} bps`}
@@ -1120,6 +1476,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // The plan's finished product in the class's own noun (lib/asset-words):
   // a hotel development is costed per key, never per unit.
   const planNoun = assetWords(memo.assetClass).noun ?? { one: "unit", many: "units" };
+  // A hotel's model grows its rooms revenue at the growth lever: the grid's
+  // axis and its takeaway call it RevPAR growth, not rent growth.
+  const hotelGrid = assetClassKey(memo.assetClass) === "hospitality_str";
   const extraction = deal.extraction as ExtractionResult | null;
   // One OM, several properties (#411): the portfolio page, read by the same
   // reader as the deal page's card; null for a single property.
@@ -1163,10 +1522,24 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A manufactured-housing park (#470), the same way.
   const mhRead = readManufacturedHousing(extraction);
   const mh = input.mh ?? (mhRead ? { line: mhShortLine(mhRead), read: "" } : null);
+  // A self-storage facility (#471), the same way.
+  const storageRead = readSelfStorage(extraction);
+  const storage = input.storage ?? (storageRead ? { line: storageShortLine(storageRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
   const reconciliation = deal.reconciliation as ReconciliationResult | null;
+  const verdict = (deal.verdict as VerdictResult | null) ?? null;
+  // The day the flood zone on the site page was looked up: the stored
+  // lookup's own date, only where it answered for the address the map is
+  // drawn at (the route's floodMapFor reads the same row the same way).
+  const siteFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+  const floodLookedUp =
+    siteFlags?.status === "ok" &&
+    !siteFlagsStale(siteFlags, (deal.address as { label?: string } | null)?.label) &&
+    Number.isFinite(Date.parse(siteFlags.retrievedAt ?? ""))
+      ? readDay(siteFlags.retrievedAt)
+      : null;
 
   const metrics = list(extraction?.metrics) as NonNullable<
     ExtractionResult["metrics"]
@@ -1189,8 +1562,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     saleComps,
     subjectBasis(
       metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
-      inferStrategy(extraction).kind,
+      inferStrategy(extraction, firstSignalOf(deal)).kind,
+      screenYearOf(extraction),
       interestOf(extraction),
+      extraction?.assetClass,
     ),
     planNoun.one,
   );
@@ -1205,7 +1580,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     ...(liveBrief ? [{ rec: liveBrief, first: true }] : []),
     ...list(market?.otherBriefs).map((rec) => ({ rec: rec as NonNullable<MarketResult["liveBrief"]>, first: false })),
   ]
-    .map((b) => ({ ...b, lines: list(b.rec?.lines).map(str).filter(Boolean) }))
+    .map((b) => ({ ...b, lines: list(b.rec?.lines).map(str).filter(Boolean).map(currentBriefLine) }))
     .filter((b) => b.lines.length > 0);
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]
@@ -1215,7 +1590,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // the widest dollar gap and a basis-point gap against the widest in basis
   // points, never across; a neutral or figureless row draws none.
   const gapShares = gapScale(
-    rows.map((r) => ({ gap: str(r?.gap), direction: str(r?.direction) })),
+    rows.map((r) => ({ gap: str(r?.gap), omValue: str(r?.omValue), myValue: str(r?.myValue), direction: str(r?.direction) })),
   ).shares;
 
   const BASIS_LABEL: Record<string, string> = {
@@ -1243,6 +1618,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     >
       {/* Page 1: the one-page memo, unchanged — the executive read. */}
       <MemoPage data={memo} />
+
+      {/* What the memo shortens to fit or leaves out, as the verdict
+          states it, before any page the model computed. */}
+      {verdict && <CallInFullPage verdict={verdict} memo={memo} />}
 
       {/* The plan page, before the IRR grids, on a deal that is not a
           stabilized asset: the plan as the OM states it, then yield on total
@@ -1330,7 +1709,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             )}
           </Text>
 
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
+          {/* The bands are a rule of thumb (lib/plan-sensitivity), said
+              beside the swatches as the deal page says it. */}
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 9 }}>{str(SPREAD_RULE_OF_THUMB)}</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
             {SPREAD_ORDER.map((b) => (
               <View key={b} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
                 <View
@@ -1368,6 +1750,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={siteReports} />}
           {!sensitivity && <SingleTenantCaveat lease={student} />}
           {!sensitivity && <SingleTenantCaveat lease={mh} />}
+          {!sensitivity && <SingleTenantCaveat lease={storage} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1412,46 +1795,79 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={siteReports} />
           <SingleTenantCaveat lease={student} />
           <SingleTenantCaveat lease={mh} />
+          <SingleTenantCaveat lease={storage} />
 
-          <HeatGrid
-            axisLabel="EXIT CAP"
-            spanLabel="RENT GROWTH (ANNUAL)"
-            colLabels={sensitivity.grid.growthCols.map((g) => `${(g * 100).toFixed(1)}%`)}
-            rowLabels={sensitivity.grid.capRows.map((cap) => `${(cap * 100).toFixed(2)}%`)}
-            cells={sensitivity.grid.cells}
-            baseRow={sensitivity.grid.baseRow}
-            baseCol={sensitivity.grid.baseCol}
-            hurdlePct={sensitivity.hurdlePct}
-          />
-          <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {sensitivity.takeaway}
-          </Text>
+          {/* The base case the grids are struck around, each input with
+              where it came from — the workbook's Deal Summary. */}
+          {sensitivity.baseCase ? <BaseCaseBlock b={sensitivity.baseCase} totalPages={totalPages} /> : null}
 
-          {/* Legend — shared by both grids. */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
-            {heatLegend(sensitivity.hurdlePct).map((l) => (
-              <View key={l.bucket} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
-                <View
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 2,
-                    backgroundColor: HEAT_BG[l.bucket],
-                    borderWidth: 0.5,
-                    borderColor: C.line,
-                  }}
-                />
-                <Text style={{ fontSize: 7.5, color: C.muted }}>{l.label}</Text>
-              </View>
-            ))}
+          <View wrap={false}>
+            <HeatGrid
+              axisLabel="EXIT CAP"
+              spanLabel={hotelGrid ? "REVPAR GROWTH (ANNUAL)" : "RENT GROWTH (ANNUAL)"}
+              colLabels={sensitivity.grid.growthCols.map((g) => `${(g * 100).toFixed(1)}%`)}
+              rowLabels={sensitivity.grid.capRows.map((cap) => `${(cap * 100).toFixed(2)}%`)}
+              cells={sensitivity.grid.cells}
+              baseRow={sensitivity.grid.baseRow}
+              baseCol={sensitivity.grid.baseCol}
+              hurdlePct={sensitivity.hurdlePct}
+            />
+            <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
+              {str(hotelGrid ? gridTakeaway(sensitivity.grid, sensitivity.hurdlePct, "RevPAR growth") : sensitivity.takeaway)}
+            </Text>
+
+            {/* Legend — shared by both grids. */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
+              {heatLegend(sensitivity.hurdlePct).map((l) => (
+                <View key={l.bucket} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 2,
+                      backgroundColor: HEAT_BG[l.bucket],
+                      borderWidth: 0.5,
+                      borderColor: C.line,
+                    }}
+                  />
+                  <Text style={{ fontSize: 7.5, color: C.muted }}>{str(l.label)}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* The terms every cell runs on: the hold, the loan, the rate
+                with its source, and the costs of buying and selling. */}
+            {sensitivity.baseCase ? (
+              <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 6 }}>
+                {str(gridTermsLine(sensitivity.baseCase, totalPages))}
+              </Text>
+            ) : null}
           </View>
 
+          {/* The retrade grid moves to the next page whole, its title and
+              its max bid with it, rather than leave a heading or half a
+              grid at the foot of this one. */}
+          <View wrap={false}>
           <TitleRow title="The retrade grid" marginTop={16} />
           <Text style={s.sub}>
             The same model repriced: what paying less (or more) does to
             returns at each exit cap. Rows re-size the loan, fees, and equity
             from the new price.
           </Text>
+          {/* The base row is the MODELED price, which is the ask only where
+              the ask is what the model runs at: a share's price grossed up
+              to the whole, an auction's floor and a price backed out of NOI
+              and the cap are not. The source says which. */}
+          {sensitivity.priceSource ? (
+            <Text style={{ fontSize: 7.5, color: C.muted, marginTop: -6, marginBottom: 4 }}>
+              {str(
+                `The modeled price is ${fmtUsd0(sensitivity.priceGrid.priceRows[sensitivity.priceGrid.baseRow]?.price ?? 0)}: ${sourceSays(
+                  sensitivity.priceSource,
+                  totalPages,
+                )}.`,
+              )}
+            </Text>
+          ) : null}
           <HeatGrid
             axisLabel="PRICE"
             spanLabel="EXIT CAP"
@@ -1459,7 +1875,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             rowLabels={sensitivity.priceGrid.priceRows.map(
               (p) =>
                 `${fmtCompactUsd(p.price)}  ${
-                  p.deltaPct === 0 ? "(ask)" : `(${p.deltaPct > 0 ? "+" : ""}${Math.round(p.deltaPct * 100)}%)`
+                  p.deltaPct === 0 ? "(modeled)" : `(${p.deltaPct > 0 ? "+" : ""}${Math.round(p.deltaPct * 100)}%)`
                 }`,
             )}
             cells={sensitivity.priceGrid.cells}
@@ -1468,15 +1884,13 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             hurdlePct={sensitivity.hurdlePct}
             rowLabelWidth="19%"
           />
+          {/* The deal page's max bid, solved on the buy box's own floors
+              and named by the one that binds (lib/underwrite/report-grid) —
+              none on a note, the whole building's on a share. */}
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {sensitivity.maxBid
-              ? sensitivity.maxBid.unbounded
-                ? `Max bid holding ${fmtHurdle(sensitivity.hurdlePct)} IRR: clears at every tested price — the constraint never binds inside the search range.`
-                : `Max bid holding ${fmtHurdle(sensitivity.hurdlePct)} IRR: ${fmtCompactUsd(sensitivity.maxBid.price)} (${
-                    sensitivity.maxBid.deltaPct > 0 ? "+" : ""
-                  }${(sensitivity.maxBid.deltaPct * 100).toFixed(1)}% vs the modeled price).`
-              : `No price inside the tested range holds ${fmtHurdle(sensitivity.hurdlePct)} IRR under these assumptions.`}
+            {str(maxBidLineFor(sensitivity, interestOf(extraction)))}
           </Text>
+          </View>
 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>
             Computed from the deal&apos;s derived screening model — the same
@@ -1488,6 +1902,18 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <AssumableBlock view={input.assumable} />
           <AssumableBlock view={input.sellerNote} />
           <LeaseholdBlock view={input.leasehold} />
+        </PageChrome>
+      )}
+
+      {/* A model on a placeholder price or an assumed year-1 NOI: its grids
+          and its max bid would be the placeholder's, so the page says why
+          they are left out where they would have been — and keeps the
+          model's assumptions against the published figures, which no price
+          enters. */}
+      {!sensitivity && input.withheld && (
+        <PageChrome title="Sensitivity analysis" count="left out" dealName={dealName} branding={memo.branding}>
+          <Text style={{ fontSize: 9, color: C.ink, marginBottom: 6 }}>{str(input.withheld)}</Text>
+          <AssumptionsBlock read={modelVsMarket} />
         </PageChrome>
       )}
 
@@ -1510,8 +1936,8 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           line in the expenses. */}
       {input.floodMap && (
         <PageChrome title="The site" count="FEMA flood map" dealName={dealName} branding={memo.branding}>
-          <Text style={s.sub}>{"What FEMA's flood insurance rate map shows around the building, drawn the way FEMA draws it."}</Text>
-          <SiteBlock view={input.floodMap} />
+          <Text style={s.sub}>{"What FEMA's flood insurance rate map shows around the building: FEMA's own zones, drawn in the colours of the key below."}</Text>
+          <SiteBlock view={input.floodMap} lookedUp={floodLookedUp} />
         </PageChrome>
       )}
 
@@ -1539,7 +1965,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             Every figure the screen pulled from the OM, with its basis and
             source page. Flagged rows deserve independent verification.
           </Text>
-          <View style={s.tableHead}>
+          {/* The table's own View, so its header row — fixed — repeats at
+              the top of every page the rows run onto. */}
+          <View>
+          <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "34%" }]}>Term</Text>
             <Text style={[s.headText, { width: "24%" }]}>Value</Text>
             <Text style={[s.headText, { width: "16%" }]}>Basis</Text>
@@ -1571,6 +2000,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               </View>
             </View>
           ))}
+          </View>
         </PageChrome>
       )}
 
@@ -1581,8 +2011,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           dealName={dealName}
           branding={memo.branding}
         >
+          {/* The challenger is asked for its challenges most severe first
+              (lib/anthropic/prompts), so that is the order the page says. */}
           <Text style={s.sub}>
-            The pro forma grilled in the order deals die — basis, exit, debt —
+            The pro forma&apos;s assumptions, challenged most severe first,
             each with the exact question to put to the broker.
           </Text>
           {chList.map((c, i) => (
@@ -1601,9 +2033,11 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               ) : null}
             </View>
           ))}
+          {/* The challenger estimates what reverting an assumption does to
+              the returns without running the engine; the box says so. */}
           {str(challenges?.stressTest) ? (
             <View style={s.summaryBox} wrap={false}>
-              <Text style={[s.headText, { marginBottom: 3 }]}>Stress test</Text>
+              <Text style={[s.headText, { marginBottom: 3 }]}>Stress test — the screen&apos;s estimate, not the model&apos;s</Text>
               <Text style={s.summaryText}>{str(challenges?.stressTest)}</Text>
             </View>
           ) : null}
@@ -1735,7 +2169,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             The OM&rsquo;s key assumptions against typical ranges for the asset
             class — rules of thumb, not a live comps feed.
           </Text>
-          <View style={s.tableHead}>
+          {/* The table's own View: its header repeats on a page the rows
+              run onto. */}
+          <View>
+          <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "24%" }]}>Assumption</Text>
             <Text style={[s.headText, { width: "14%" }]}>OM says</Text>
             <Text style={[s.headText, { width: "14%" }]}>Typical</Text>
@@ -1811,6 +2248,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               </View>
             );
           })}
+          </View>
           {str(market?.summary) ? (
             <View style={s.summaryBox} wrap={false}>
               <Text style={s.summaryText}>{str(market?.summary)}</Text>
@@ -1840,7 +2278,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             Where the OM and your own underwriting disagree, framed from your
             side of the table.
           </Text>
-          <View style={s.tableHead}>
+          {/* The table's own View: its header repeats on a page the rows
+              run onto. */}
+          <View>
+          <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "26%" }]}>Metric</Text>
             <Text style={[s.headText, { width: "22%" }]}>OM</Text>
             <Text style={[s.headText, { width: "22%" }]}>Your model</Text>
@@ -1871,6 +2312,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   >
                     {str(r?.gap)}
                   </Text>
+                  {(() => {
+                    // Where the line's figure is not the two figures' own
+                    // gap, the page says so, as the deal page does.
+                    const differs = gapDisagreementLine({ gap: str(r?.gap), omValue: str(r?.omValue), myValue: str(r?.myValue) });
+                    return differs ? <Text style={{ fontSize: 7, color: C.muted, marginTop: 1.5 }}>{pdfSafe(differs)}</Text> : null;
+                  })()}
                   {share !== null ? (
                     <View
                       style={{
@@ -1910,6 +2357,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               </View>
             );
           })}
+          </View>
           {gapShares.some((g) => g !== null) ? (
             <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
               Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.

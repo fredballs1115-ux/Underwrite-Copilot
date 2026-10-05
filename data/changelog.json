@@ -2,6 +2,348 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-10-05",
+      "title": "Emails sent once, to the person who asked",
+      "href": "/account",
+      "blurb": "A screen's emails now go to whoever asked for the screen, and only while they can still see the deal, and a send retried after a timeout is never a second email. The Monday digest counts your open deals and the offers due in the week ahead, marks a call whose re-screen is running or did not finish, and carries a one-click unsubscribe."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Every market figure dated with its year",
+      "href": "/market",
+      "blurb": "Each live figure on the market pages is dated by its own cadence, a day, a month or a quarter, with the year always in it, and a count carries its annual rate. A rule is cut at its first whole sentence with its caution kept in view. A research figure is ranked only where it can be, a band is printed as a band, and the survey board drops its rank numbers because its margins overlap. A feed's date says UTC wherever it is printed, each market page claims only the figures it draws, and a photo credit never covers a market's name."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Dates read on the day they are read",
+      "href": "/deals",
+      "blurb": "Every analysis step is told today's date. A price labelled with a year is read against the year the memorandum was screened, so a 2026 asking price stays the ask after New Year, and screening the same deck again keeps the day it was first read. The Opportunity Zone answer says where the 2018 round stands on the day you read it, and maturities, lease ends and abatements are counted to the day."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Research dates that say when they are stale",
+      "href": "/market",
+      "blurb": "Once a research figure is more than 180 days old, every page that shows it says so beside its date, and the model's checks stop holding an assumption to it. A rule that states its figure for a window, such as a rent cap for July 2026 to June 2027, says once that window has ended that its figure needs checking. Each market's note on /market carries the day its research was read. Nothing is hidden; the date and the figure stay."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Links and pictures that show only what they should",
+      "href": "/security",
+      "blurb": "A shared screen's aerial and a deal's pictures are drawn only at the sizes their pages ask for, and an email's photograph is served only to someone who can read the deal. The health checks' costly probes run for the site's operators alone, and a screen run again waits its turn in the queue."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Calculator dollars, written one way",
+      "href": "/tools",
+      "blurb": "Every calculator writes its dollars through one writer, so a negative figure reads with its minus sign outside the dollar. Five more cards name a blank required field instead of reading it as zero, four more say when a figure ran to the longest the card runs, a ground lease worth less than nothing says so, and the 1031 card says when a partnership's or an S corporation's March 15 return date ends the window sooner."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Fifty-six more cities, pictured",
+      "href": "/deals",
+      "blurb": "Deals in fifty-six more metro areas now open on a photograph of their market, from Waterbury, Cape Cod and San Jose to Duluth's lift bridge, Flagstaff's peaks and Coeur d'Alene's lake. Each was chosen by eye through the card's and the deal page's own crops and is credited to its photographer; a city whose photographs held nothing worth showing keeps the deal's drawn cover."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Mixed-use, labs and short sales, read as what they are",
+      "href": "/deals",
+      "blurb": "Apartments over shops now file as mixed-use, an RV resort or a land-lease community as a park, a lab as an office, a truck terminal or storage yard as an industrial yard, an active-adult community as apartments, and a resort-style apartment building, senior community or home as housing, each on its own class's defaults. A share whose entity carries its own loan says its price is the equity's whole and strikes no price a unit or cap on it, seller financing on a note is said to be the note purchase's, a single tenant's lease on a building not yet built counts from delivery, a lease term that counts its options is said as a ceiling, the land under a tower, billboard or solar array is said to come back, and a short sale's letter of intent waits on its lender's approval."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Defaults said as defaults",
+      "href": "/deals",
+      "blurb": "On a day with no fresh rate, the debt sizer starts from the model's own rate, so the page and the workbook quote one rate for one loan. The sizer's lender tests, the construction panel's terms and the workbook's zero rows say they are defaults, a rent roll's figures are credited to the rent roll, the cost line never implies a jurisdiction levies a transfer tax, a rate is said as the latest with its date, and where the model's loan falls under the sizer's coverage test, the year-1 coverage says by how much."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Counts that hold from one day to the next",
+      "href": "/deals",
+      "blurb": "The offers-due countdown, your tasks and the rent roll count from your own calendar day, in your time zone, a closed deal counts as closed rather than live on the analytics page and in the meeting workbook, a deal with no price, cap or fit sorts last whichever way the list runs, the Cap column sorts a plan's yield on cost and a note's yield with the caps, and a shared deal screen previews as a plain card rather than the homepage's advert. A lease or contract that ends in a year stated alone is said to end this year, never today. No page promises how long a screen takes."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Every step of the screen reads the same deal",
+      "href": "/deals",
+      "blurb": "The verdict now reads the account of the deal every other step reads: what is being sold, the building's own price a unit, the buy box's own checks and any red line it trips, and today's rates with the class's screening spread named. The deal's kind is read with the first signal from the first step, and an Auto deal is challenged as what it turned out to be. A price stated as a range is kept whole and read at its top, housing figures go to rental housing alone, and Ask reads the memorandum the way its screen did."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Screening ranges, low to high everywhere",
+      "href": "/deals",
+      "blurb": "The verdict is asked for each range's smaller figure first and told to say which end is the conservative one. A range stored the other way round, as an exit cap's conservative end once was, now prints low to high and draws its track on the deal page, the shared screen, the memo and the report alike."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Commercial property prices, said as excluding apartments",
+      "href": "/tools",
+      "blurb": "The rates strip's commercial property price figure is the change in the Federal Reserve's index, which the Fed builds on CoStar's composite excluding multifamily. The tile now says it excludes apartments and names the index, and an apartment deal's market check is no longer handed it."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Calculator figures, corrected",
+      "href": "/tools",
+      "blurb": "A review of the calculators against textbook arithmetic corrected several of them. Below the line counts leasing capital once: $1,344,000 a year on the example, where $308,800 was shown. The renovation card credits the premium every year to the sale, and the ground lease is valued with the reset its card announces. A non-cumulative expense cap holds each year to the one before, recapture is taxed at the owner's rate up to 25%, and a density bonus lifts the density limit. A cash-flow strip with several rates no longer prints one of them as its IRR."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Calculator links, blank fields and phones",
+      "href": "/tools",
+      "blurb": "Every calculator link key now belongs to one card, so a shared link opens each card on its own figures, and a dropdown reads only its own options. Max bid and Hold or sell name a blank required field instead of reading it as zero. A horizon is held to the longest its card runs, and the card says so. Every card fits a 360px phone, Max bid's loan fee and the sale-leaseback's lender tests are fields, and each sentence writes its dollars the way the cards do."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Nineteen more cities, pictured",
+      "href": "/deals",
+      "blurb": "Deals in nineteen more metro areas now open on a photograph of their market, from Springfield, Trenton, Green Bay and Davenport to Montgomery, Destin, Santa Fe, St. George and Gainesville. Each was chosen by eye through the card's and the deal page's own crops and is credited to its photographer."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The workbook, true to its cells",
+      "href": "/deals",
+      "blurb": "The underwriting workbook's sensitivity grids now centre on the inputs as they stand. A plan deal's headline returns say they are the screening model's, the leasing commission is labelled as it is charged, and every label and colour is true of its cell. The Market Read is dated in the deal page's words with each figure in its unit, and an unbranded workbook numbers its printed pages."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "A team's deals stay with the team",
+      "href": "/team",
+      "blurb": "Deleting an account now hands its team deals to the team's owner first, cancels its plan, and only then deletes it; a deletion that stops says what it had already done. A member's own deals are marked personal on the pipeline, and the invite, leave and join screens say what each one does."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The letter of intent, Ask and the model, held to the deal",
+      "href": "/deals",
+      "blurb": "The letter of intent drafts its clauses from the plan its panel names, and declines a note, a share, a leased fee, an auction or a bankruptcy sale, saying why. Ask holds its cited pages to the memorandum, marks an answer given on a memorandum since replaced, names who asked on a team deal and keeps your question when the cap is reached. The model tab marks its own assumptions, says when it was built and what has changed since, and withholds a note's or a share's returns."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Reconciliation gaps drawn from their own figures",
+      "href": "/deals",
+      "blurb": "A reconciliation row's gap is now worked out from its two figures, and where the reconciler's own line says something else the page says so. The hotel's traps quote the hotel's own facts, the broker email and the comps map cite only pages the memorandum has, and a market check's typical range reads one way on the deal page and the report."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Rent rolls read as the file states them",
+      "href": "/deals",
+      "blurb": "A rent roll's totals line is now found by its shape, and the rows it left out are named. Dates are read as days that exist, day first where the file writes them that way. A deal's roll opens on a leasing profile of its own class; an apartment's in-place rent is read by the month, and a rent per foot no building charges is flagged. The WALT flag weighs the leases by rent, and escalations are read as percents only. The workbook dates its figures, names its placeholders and prices its loan for its own ten-year hold. Deleting an import deletes its file."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The bridge, valuations and submarkets, held to their documents",
+      "href": "/deals",
+      "blurb": "The assumption bridge saves only the levers you moved, reads $12.5M as typed, and keeps one version for each change rather than one for each view. It will not delete the version that is the deal as it stands. The model's own opinion of value is struck on the price plus its capital. On a note or a plan deal, the bridge and the valuations say what their model figures are. A submarket's trailing year is read by date. Its import says which column each figure came from and keeps one row a date, preferring a quarter to a year's line. Its supply warning sets the exit cap against the deal's going-in cap, and a new submarket can be any of the sixteen asset classes."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The seller's pages are evidence, never instructions",
+      "href": "/deals",
+      "blurb": "Every step of the screen is now instructed to treat the memorandum's words, and any text quoted from it, as the seller's claims to weigh, never as instructions to follow, a line addressed to an AI reviewer included. The public-web comp search is told the same of the pages it reads."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Small figures, read on their own terms",
+      "href": "/deals",
+      "blurb": "A reconciliation gap stated by the month or per unit is no longer divided by a yearly or whole-building figure. A cap rate's gap keeps its grade rather than being judged on the income's band. A comp's cap reads correctly past a year, a count or a T-12 before it, and an average rent is never read as a price per unit. The actuals card writes a month as a month and calls a park's pads and a dorm's beds by name. A term of the seller's loan stated on its own is listed as that loan's."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Notices that say what happened",
+      "href": "/account",
+      "blurb": "The email sent when a screen fails before its verdict now also goes when the worker gives up on a screen or hits an unexpected error. None goes where your email setting cannot be read. Data health dates the steward's last run rather than promising a nightly one. A file just over the upload limit is said to be just over it."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The pipeline, whole at every width",
+      "blurb": "On a phone, every rung of the stage funnel now shows its stage's name, an empty one included, where a row of unnamed circles had stood. A deal's tags sit on a line of their own under its figures, so no price, cap rate or tag is cut off; a tag rides on the picture only where it fits whole. Within a row of cards, the figures and footers line up. A buy-box fit judged before the memorandum has been read is marked \"first read\" in the CSV and the meeting workbook, as it is on the card.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Deal page figures that agree with each other",
+      "blurb": "A plan's yield on cost now prints to two decimals wherever it is shown, so a grid's yield less its cap matches the spread beside it. The sensitivity playground's fit chip is drawn as the header's chip, scored on the model's returns, and says so beside the memorandum's score. A reconciliation gap inside the actuals card's 5% in-line band is graded low in the risk digest, no longer high. An apartment rent roll reads as rent per unit a month. The debt sizer lists a loan offered for assumption, or a note the seller offers to carry, under its own heading, and lists nothing as your financing on a note. The exit-cap slider sweeps 2 points each way and never goes under 2.00%.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "One Pro plan, listed as it works",
+      "blurb": "The billing page and the homepage now list the same Pro plan, line by line the features it unlocks, Ask and the first-draft model built from your documents included. Features every plan has are no longer listed as Pro. The free plan is said as its limit counts: up to 3 deals.",
+      "href": "/billing"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Signing up keeps your invite",
+      "blurb": "If you open a team invite and then create an account, the confirmation email now brings you back to the invite, and a plan chosen on the homepage is carried through the same way. Wherever an unconfirmed email stands in the way, the sign-in page offers to send the confirmation link again. When our email is rate-limited, the page says so, rather than asking you to wait before requesting another link. A password change that is refused says why in one sentence.",
+      "href": "/login"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Deleting an account, said as it happens",
+      "blurb": "Deleting your account removes it, your own deals and their files. If you are a member of a team, the deals you added to the team's pipeline stay with the team: they pass to its owner with your saved versions, valuations and rent roll imports on them, and the sign-in page you land on says so. If that handover fails, nothing is deleted.",
+      "href": "/privacy"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Reports that print only what the deal supports",
+      "blurb": "A full report on a memorandum that states no price now leaves out its IRR grids and max bid, and says why. Before, it printed a placeholder price's returns as if they were the deal's. The max bid is solved on every floor your buy box sets, as the deal page solves it, and names the one that binds. A note gets no max bid, and on a share the max bid is said to be the whole building's price. The grids now print the hold, the loan and the dated rate they run on, beside a base case that names each input's source. A new page, \"The call, in full\", prints everything the one-page memo shortens to fit.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "A memorandum the screen cannot read is refused at upload",
+      "blurb": "A PDF that asks for a password to open, or one longer than the analysis reads in one pass, is now refused when you upload it, with the reason. It no longer becomes a deal, takes a free slot and fails a minute later. A broker's secured copy, which opens without asking, still goes ahead. When the analysis service turns a document away, the message points you to Replace OM. It no longer blames a scan, which reads fine.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The deal header, whole on a phone",
+      "blurb": "On a phone, a price stated as a range now reads short in the deal header, for example $9–9.5M, with the full range one tap away. A label for what the price buys, such as \"Leasehold, 45 yrs left\", wraps instead of being cut off. A hotel's and an affordable deal's clocks stack so their bars are drawn. The older deal-type panels lead with one sentence and fold the rest. Each portfolio property's bar is drawn at its share of the whole, so a 53% share no longer fills 97% of its track.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Notes held to their own terms",
+      "blurb": "On a deal that sells a loan, your buy box no longer checks the collateral's cap rate against your cap floor. A note's key terms print no cap on the collateral's income, whether pro forma, stabilized or exit. The collateral's loan-to-value is said only where the memorandum shows this note comes first, and a note's payment status or a line such as \"no mezzanine debt\" no longer reads it as a junior note.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Your first screen, drawn as it reads",
+      "blurb": "While a new deal's first screen is still reading its memorandum, its card, its row and its page show a figure not yet read as being read, never as the dash that means the memorandum does not state it, and the card shows the first read's asking price. The deal page no longer promises how long a screen takes: once you have run three, it says how long yours usually take, start to finish. ⌘K finds any deal you can see by name, not only the fifty changed last, and the free-deal meter counts a team trial's deals the way adding a deal does.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Research figures, credited one by one",
+      "blurb": "On /market and the homepage, each vacancy rate, asking rent and cap rate from the research tracker now names who published it, the area and the period it covers where the research states them, and links to its own source where the research ties one to it. Before, a market's figures had shared one link and one date. A figure whose period the research does not state says it is undated, and a figure for a narrower stock, such as Class A space, says so. Two notes that had lost their dollar signs read $10–15 and $11.04 again.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Corporate credit, from the Treasury",
+      "blurb": "The rates strip on /tools and /market now reads corporate credit from the Treasury's own high-quality corporate bond curve: its 10-year spot rate, published monthly. The three ICE BofA spreads and Moody's Baa yield it had shown are gone. Their publishers license them to FRED, not to sites that republish them, and Moody's forbids redistribution without its written consent.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "An alert you dismiss is dismissed for you",
+      "blurb": "Dismissing a regulatory alert now hides it for you, in the browser you dismissed it in, and for no one else. Before, the dismissal was written to the alert itself, so one reader's click hid it from every account.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The documents say what the deal page says",
+      "blurb": "The memo, the full report, the shared screen, the meeting workbook, the pipeline's CSV and the compare page now read each deal the way its own page does: its kind from the same first signal, its class from the same one choice. A note's collateral is never shown as a cap rate on the note's price. A flood zone is printed only from a lookup made for the deal's current address. The compare page marks a call that a re-screen is replacing rather than ranking it, and says which figures are the first-draft model's. The research panel shows the median sale price of a two-to-four-unit property as that, dated, and no longer sets a deal's price per unit against it.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Fifty-seven more cities, pictured",
+      "blurb": "A deal with no photograph of its own now opens on a photograph of its city in fifty-seven more metro areas, from Akron and Albany to Worcester and York. Where a place is known by something other than its skyline, that is the picture: Savannah's Forsyth Park fountain, Pensacola's beach, Modesto's arch, a Sonoma County vineyard for Santa Rosa. Each was chosen by eye through the pipeline card's and the deal page's own crops, and each credit names its photographer, links to the photograph and to its licence where it has one, and says the picture is cropped to fit.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The public pages, held to their own figures",
+      "blurb": "The sample deal's sentences now quote its own model, so the stress test, the exit risk and the basis read the figures the page shows. Every page counts the markets one way: 15 with a research brief, 41 read with live figures. The homepage headline stays legible over a bright sky on a phone, and its sample card shows the buy-box chip the deal page's header would. Each public page now previews as itself when its link is shared, its opening photograph loads first, its fields no longer make a phone zoom in, and the markets ticker can be paused.",
+      "href": "/"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "What building costs, and what the bond market expects, in the checks",
+      "blurb": "A deal that builds something (a development, a conversion, or a value-add that states its budget) now has its market check read what building costs this year against last: the goods that go into construction, residential or nonresidential by what is being built, and construction wages, each national and dated from the BLS, and never said as the project's own bids. The check measures a budget's escalation and contingency against them. Beside the model's expense growth, the deal page, the report and the workbook now show what the bond market expects inflation to average over the next ten years (the 10-year breakeven), the market's own forecast next to the trailing year's prices.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Cold storage, outdoor storage and affordable housing read as what they are",
+      "blurb": "A deck that called itself a cold-storage warehouse or industrial outdoor storage was filed as self-storage, and an affordable- or workforce-housing deck as no class at all, so the market check read the wrong rent index, payrolls and lending standards. Each is filed as what it is now. Where you choose a deal's class yourself, the market check and every card on the deal page read your choice, as the header always did, and a shared link shows it. A fitted data center or an outdoor-storage yard is no longer called a likely misread for its price per foot. The deal page's returns now say what they carry for closing and sale costs: by default no transfer tax, a 1% closing hold and a 2% cost of sale. And a portfolio of many properties no longer risks cutting the screen off: up to 150 are listed one by one, and a larger tape is read by its totals.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Files that open whenever you click them",
+      "blurb": "A file added with a note and a BOV's page citation now open through a link signed at the moment you click it. Before, those links were signed when the page loaded and expired an hour later, so a page left open showed the storage host's error. The Documents tab now links each source document the same way, where it listed the file's name alone: a PDF opens in the browser, and a spreadsheet such as a rent roll downloads.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The pipeline, a little quicker",
+      "blurb": "The pipeline can sort by when offers are due, earliest first, with deals that have no deadline last. Choosing a PDF for a new deal fills the name from the file, as the batch upload does, and never replaces a name you typed. On a phone, the first tap on a map pin shows the deal's card and a second tap opens it. The compare table leaves out a row that is blank for every deal compared. A screen's clock counts from when the run was asked for, so reloading the page mid-screen picks up its time rather than starting again at 0:00.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "A re-screen never mixes two runs",
+      "blurb": "A screen writes the terms first and the verdict last, so for the minutes a deal was being screened again it held the new run's terms beside the last run's call, and the memo, the full report and a shared link printed the two as one screen. They now wait for the new verdict, the way they already did after a failed run; a shared link says the sender is re-screening and marks the comp and market reads the run has not reached; the deal page marks each result still from the previous screen and draws the call in its header as the previous one; and the pipeline card, row, CSV and meeting workbook say Re-screening, with the list refreshing until the run finishes. A comp search or a model build is not a screen and leaves the call alone. Every verdict now carries the day it was written: the memo and the report's first page print it under the export date, and the deal page and the shared screen date the call.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Corrections: rule sources, sales feeds and fair market rent years",
+      "blurb": "A last read of the batch against its sources. The homepage counted all 29 rules as source-linked, and New Jersey's municipal rent control has no single source, so it says 28 of them are now. The market comparison said a sales feed was documented and not wired for eleven metros whose research names no feed at all; it says none yet. A fiscal year of HUD's fair market rents now says it has ended once it has, on the research panel, the market comparison, the asking-rent line, the demo and the Mid-Atlantic line, where only the market brief knew; the research panel no longer calls a year still in force stale after 180 days; and a newer year for one metro no longer hides another metro's year while that year is in force. A photograph lifted from a memorandum can no longer replace one you added while the screen ran, a gallery read that ran out of time is read again rather than kept as the whole, and a photograph lifted under older rules that could not be judged again is dropped rather than kept for good.",
+      "href": "/"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Current rates, handed to the analysis",
+      "href": "/deals",
+      "blurb": "The screen's challenger asks whether an OM's financing holds at current rates, and the first-draft model picks a loan rate, but neither was ever given a rate, so each worked from memory. Both are now handed the day's Treasury and SOFR rates from the same feed the site's own model runs on, each with its date, and told to build any rate from them. Where the feed has nothing fresh, they are handed nothing and claim nothing as current."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Building photographs, found sooner and drawn sharper",
+      "href": "/deals",
+      "blurb": "A new deal's photograph is now lifted from its offering memorandum while the deal is being screened, so its card can show the building the first time the pipeline opens rather than waiting for someone to open the deal. A memorandum whose pages ran out of reading time is read again later that day instead of being written off for a month, and a cover stored as JPEG 2000, a format some brokers' software exports, is now read. A large photograph keeps a full-size copy beside its standard one, so a dense laptop screen and the full-screen viewer draw it sharp rather than stretched."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The FY2027 fair market rents, the year read from the data",
+      "href": "/market",
+      "blurb": "HUD's new fair market rents take effect October 1, and the market pages, the market comparison, the demo and a deal's research panel now carry them for every covered metro, four bedrooms included. The fiscal year, the day it takes effect and HUD's name for each area are read from the data rather than typed on the page, so when the next year takes effect no page goes on calling last year's rents current, and a year that has ended says so. Three rent caps carry the new year's figures too: Los Angeles's rent-stabilized units at 3% to June 2027, the Los Angeles area's statewide cap at 8.7% to July 2027, and Washington's at 10% for increases in 2027."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Corrections: what the site says about itself",
+      "href": "/",
+      "blurb": "Every claim on the public pages was read against the code, and a few were wrong. The homepage now describes the Excel workbook that ships: live formulas, sources and uses, every assumption with its source, annual and monthly cash flows, the debt schedule and the sensitivity grids. Outside the covered markets the screen still checks statewide rules and reads the metro area's or the state's published figures, and the FAQ says so. The rules are called source-linked, since a few cite a secondary source rather than a statute. Washington DC's recorded-sales feed is labelled documented, not yet wired, where it said live. Two research notes that had lost their dollar signs have them back, and the market tables say the date their figures are as of."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Opportunity Zones, checked in every state",
+      "href": "/deals",
+      "blurb": "The site-check card could say a tract was not in an Opportunity Zone anywhere outside Maryland, because the list it checked held only Maryland's zones. It now checks the Treasury CDFI Fund's list of all 8,764 tracts designated in 2018, in every state and territory, and it checks each deal by the tract number the zones were designated on — the 2010 census tract, which is not always today's, since a tract split or renumbered since could sit in a zone and still miss the list. Where the check cannot run, the card says why."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "A picture for every deal, even before its photograph",
+      "href": "/deals",
+      "blurb": "A deal with no photograph now wears an illustration of its kind of building at dusk rather than an icon on a gradient: an apartment block, a house and a manufactured home, an office tower, a warehouse, a storefront, a hotel, storage doors or a staked parcel, lit from a low sun with a few windows glowing. Each deal keeps its own colours, and two deals of one kind are two different buildings. The same picture shows on its card, its list row, ⌘K, the deal's sticky bar, the map and the emails."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Twenty-one more cities, pictured",
+      "href": "/deals",
+      "blurb": "A deal in a metro area the site reads no market figures for — Albuquerque, Birmingham, Boise, Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville, Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New Orleans, Oklahoma City, Omaha, Providence, Tucson or Tulsa — now shows the photograph its city is known by on its card and its deal page until a photograph of the building itself is found, placed by the deal's county, chosen by eye and credited to its photographer."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Corrections: dates, rules and who sees your data",
+      "href": "/security",
+      "blurb": "Every research figure on the market pages now carries the date it is as of, and a file with no date says undated rather than borrowing one. California's and Washington's exemptions for new buildings are read as the rolling ages their statutes set, 15 and 12 years, so they move each January on their own. The security and privacy pages list every outside service that receives your data and what each receives, from one list checked against the code. And a few sentences are corrected: the gap between Zillow's asking rent and HUD's fair market rent is between two measures, not a premium over what HUD pays; FRED, not every publisher, lacks a multi-unit permit series for a metro; and a typical range in the memo or a risk is labelled a rule of thumb."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The flood map, drawn once and kept",
+      "href": "/deals",
+      "blurb": "The Flood view on a deal page could vanish when FEMA's map service or the USGS aerial answered slowly, which they often do on a first request. Each deal's flood map is now drawn once on the server, as soon as the deal page is first opened, and kept: the aerial, calmed, with FEMA's flood zones drawn over it in clear colours at twice the pixels, so edges stay sharp on a high-resolution screen. The 1% annual chance zone is blue, its floodway a red hatch over the blue, the 0.2% zone amber and levee areas teal. While the map is being drawn the view says so; a slow answer is asked for again; and if it never comes, the key and the sentence stay. The key lists only the zones the picture actually shows. The sentence names the zone at the building correctly for every zone FEMA returns, with FEMA's base flood elevation where it states one. It is now looked up at the same point the map is drawn around. The full report prints the same picture."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Self-storage, read by the unit and the street rate",
+      "href": "/deals",
+      "blurb": "A self-storage deal is now read the way an operator reads one. The deal page draws the share of units let, the share of the area let and the share of the rent collected as three bars against the 85% line a facility is read as stabilized past, so the gap between units let and rent collected is the distance between two bars. It puts what sitting tenants pay on one scale with today's street rate. The premium years of rate increases built is the part past the street tick, and the page says what the rent would be with every tenant at street, the case a new facility down the road makes real. Rates are compared only on one basis: a per-unit figure is never set against a per-foot one, and a yearly figure is converted to a month's. It also reads the climate-controlled share, the tenant insurance program and a third-party manager as stated, and says a buyer on another platform keeps neither the program nor the pricing system. A facility under 85% by units is flagged as a lease-up on the pipeline card. Where the deal has a model, the page says what the premium is worth at its exit cap and that its single vacancy never leases up."
+    },
+    {
       "date": "2026-09-30",
       "title": "Mobile-home parks, read by the lot",
       "href": "/deals",
@@ -472,8 +814,8 @@
     {
       "date": "2026-09-23",
       "title": "Every feed, judged on its own cadence",
-      "href": "/data-health",
-      "blurb": "The data-health page now shows what each feed last wrote — FRED's daily, weekly, monthly and quarterly series apart, the metro series, the BLS rent index, the Census survey, Zillow and Realtor.com — with the newest observation, its age, and whether every series in it is current for its own cadence, the stale ones named. The nightly steward could only ask whether the rates table as a whole had anything newer than five days, which a dead monthly pull passes as long as the Treasury curve keeps arriving; this cannot be fooled that way. A feed with no rows says no rows, never current."
+      "href": "/market",
+      "blurb": "Each feed the market figures come from is now judged on its own cadence — FRED's daily, weekly, monthly and quarterly series apart, the metro series, the BLS rent index, the Census survey, Zillow and Realtor.com — with the newest observation, its age and the stale series named, so a pull that stops writing is caught on its own schedule. The old nightly check only asked whether the rates table as a whole had anything newer than five days, which a dead monthly pull passes as long as the Treasury curve keeps arriving. A feed with no rows reads as no rows, never current."
     },
     {
       "date": "2026-09-23",
@@ -557,7 +899,7 @@
       "date": "2026-09-22",
       "title": "The apartment asking rent, and what a home costs in years of it",
       "href": "/market?metro=dc",
-      "blurb": "Zillow's all-homes asking rent runs over houses, condos and apartments together, so in a market of dear houses it sits well above what an apartment actually lets for. Each market's brief now shows the same index over apartment listings alone — the figure an apartment underwrite should be reading — as a third bar beside the all-homes rent and the fair market rent HUD pays, with the gap said. And beside it the typical home value, said against a year of asking rent as the price-to-rent ratio in years, which is the arithmetic that keeps a renter renting. Both come from two more of Zillow's monthly files, read by the same pull and verified from the runner before they were trusted; a figure the pull does not have is simply absent, never a zero."
+      "blurb": "Zillow's all-homes asking rent runs over houses, condos and apartments together, so in a market of dear houses it sits well above what an apartment actually lets for. Each market's brief now shows the same index over apartment listings alone — the figure an apartment underwrite should be reading — as a third bar beside the all-homes rent and HUD's fair market rent, with the gap said. And beside it the typical home value, said against a year of asking rent as the price-to-rent ratio in years, which is the arithmetic that keeps a renter renting. Both come from two more of Zillow's monthly files, read by the same pull and verified from the runner before they were trusted; a figure the pull does not have is simply absent, never a zero."
     },
     {
       "date": "2026-09-22",
@@ -579,9 +921,9 @@
     },
     {
       "date": "2026-09-21",
-      "title": "What landlords are asking, against what HUD pays",
+      "title": "What landlords are asking, beside HUD's fair market rent",
       "href": "/market",
-      "blurb": "Each covered market's brief now shows this month's asking rent from Zillow's Observed Rent Index — all home types, refreshed monthly, with its change from a year ago and Zillow's credit — drawn on one scale against the two-bedroom fair market rent HUD pays, with the gap said in words. They are different numbers about different things: the fair market rent is set once a year from survey data two years old by the time it applies, the asking rent is this month's listings before concessions, and an underwrite that mistakes either for the other is wrong in a known direction. A suburb that shares its metro area's figure says so. Pulled on the 20th of each month from Zillow Research's public file; the file's shape and every metro's name in it were checked from the runner before a number was trusted."
+      "blurb": "Each covered market's brief now shows this month's asking rent from Zillow's Observed Rent Index — all home types, refreshed monthly, with its change from a year ago and Zillow's credit — drawn on one scale beside HUD's two-bedroom fair market rent, with the gap said in words. They are different numbers about different things: the fair market rent is set once a year from survey data two years old by the time it applies, the asking rent is this month's listings before concessions, and an underwrite that mistakes either for the other is wrong in a known direction. A suburb that shares its metro area's figure says so. Pulled on the 20th of each month from Zillow Research's public file; the file's shape and every metro's name in it were checked from the runner before a number was trusted."
     },
     {
       "date": "2026-09-21",
@@ -591,7 +933,7 @@
     },
     {
       "date": "2026-09-21",
-      "title": "Every market figure on the site is today's",
+      "title": "Every rate on the strip is today's",
       "href": "/tools",
       "blurb": "The rates strip across the top of the calculators, and at the foot of the market page, used to carry four figures. It now carries forty-six, every one pulled from FRED each weekday and dated: the whole Treasury curve from one month to thirty years, drawn as a line — today solid, a week earlier dashed — with the slope named, because the shape of the curve is a fact you read from a picture and cannot read from eleven tiles; SOFR, its 30-day average, fed funds and prime beside it; and, folded into groups whose summary line already carries the headline figures, the credit spreads, the two mortgage surveys, bank CRE lending and the net share of banks tightening on construction, multifamily and nonresidential loans, inflation and the cost of building (the construction-materials index is running 10% above a year ago), jobs and output, and the multifamily supply pipeline — starts, permits and completions in buildings of five units or more. Every figure links to its series and every tile draws its recent path. Two rules did not change. A benchmark is not a quote, so only a rate a loan document names can pre-fill a field — and the prepayment card now starts from the Treasury tenor nearest its remaining term, the 2-year, rather than the 10-year that would flatter the penalty. And stale is judged per series, because a quarterly figure five months old is current and a daily one a week old is broken. One rule is new: every series id was verified from the runner against FRED's own title before it was trusted, which caught the first list naming a credit-card series as a commercial real estate one. Cap rates have no free daily source, so they stay dated research and say so."
     },
@@ -641,7 +983,7 @@
       "date": "2026-09-17",
       "title": "The renovation program, and the part of the premium that is not renovation",
       "href": "/tools#renovation-program",
-      "blurb": "Page 12 of every multifamily memorandum quotes the value-add as one multiplication: $15,000 a door times 200 doors, $250 a month times 200 times twelve, \"a twenty percent return on cost\". Four things are wrong with that and they do not point the same way. The quoted premium is TWO numbers — the renovated comparable's rent less the subject's decomposes exactly into what renovation buys ($150) and the gap to a better building ($100), which granite does not close, so 40% of the value-add is the comparable being a different property. Turnover sets the pace, not ambition: at 35% the program runs 2.9 years against the two claimed, which would need half the book turning every year. The make-ready was owed at the turn whatever happened so it comes OUT of the cost, while the extra weeks the unit sits down are a real loss the invoice never mentioned — two corrections running opposite ways, which is why neither is ever made. Corrected, the 20% on cost is 13.4% and the $9.0M of value created is $4.5M. And the return on cost has no clock in it: the same program earns 63.7% sold the year it finishes and 31.4% held to a five-year exit, because 90% of its value is the resale rather than the rent. A renovation is a transaction, not an income strategy."
+      "blurb": "Page 12 of every multifamily memorandum quotes the value-add as one multiplication: $15,000 a door times 200 doors, $250 a month times 200 times twelve, \"a twenty percent return on cost\". Four things are wrong with that and they do not point the same way. The quoted premium is TWO numbers — the renovated comparable's rent less the subject's decomposes exactly into what renovation buys ($150) and the gap to a better building ($100), which granite does not close, so 40% of the value-add is the comparable being a different property. Turnover sets the pace, not ambition: at 35% the program runs 2.9 years against the two claimed, which would need half the book turning every year. The make-ready was owed at the turn whatever happened so it comes OUT of the cost, while the extra weeks the unit sits down are a real loss the invoice never mentioned — two corrections running opposite ways, which is why neither is ever made. Corrected, the 20% on cost is 13.4% and the $9.0M of value created is $4.5M. And the return on cost has no clock in it: the same program earns 63.7% sold the year it finishes and 34.7% held to a five-year exit, because 82% of its value is the resale rather than the rent. A renovation is a transaction, not an income strategy."
     },
     {
       "date": "2026-09-17",
@@ -676,7 +1018,7 @@
     {
       "date": "2026-09-17",
       "title": "The sale-leaseback",
-      "blurb": "A company sells the building it operates from and signs a lease back the same day. Both sides then price it wrong in the same direction. The seller writes its own lease, so the rent is the price lever — a $9 contract rent on space letting at $7.50 turns a $21.6M building into a $27M price, and $5.4M of that is the lease rather than the real estate. It is cash borrowed, not value created. And an above-market lease reverts: the buyer is really buying the term's rent plus a market-rent building afterwards, which come to $23.0M — so capitalising the contract NOI overpays by $3,973,557, and it is worse on a SHORT lease, because the reversion arrives sooner. For the seller it is borrowing, and it looks cheaper than a mortgage without being cheaper: 6.09 cents a dollar against a 6.50% coupon, true for exactly four years before the escalations pass it.",
+      "blurb": "A company sells the building it operates from and signs a lease back the same day. Both sides then price it wrong in the same direction. The seller writes its own lease, so the rent is the price lever — a $9 contract rent on space letting at $7.50 turns a $21.6M building into a $27M price, and $5.4M of that is the lease rather than the real estate. It is cash borrowed, not value created. And an above-market lease reverts: the buyer is really buying the term's rent plus a market-rent building afterwards, which come to $23.0M — so capitalising the contract NOI overpays by $3,973,557: $1,434,633 of it the premium reverting, which is worse on a SHORT lease because the reversion arrives sooner, and the rest a 6% credit cap set against an 8% discount rate, which would be paid at market rent too. For the seller it is borrowing, and it looks cheaper than a mortgage without being cheaper: 6.09 cents a dollar against a 6.50% coupon, true for exactly four years before the escalations pass it.",
       "href": "/tools#sale-leaseback"
     },
     {
@@ -700,7 +1042,7 @@
     {
       "date": "2026-09-17",
       "title": "What sits below the NOI line",
-      "blurb": "A broker's NOI and an owner's NOI are different numbers for the same building, and the difference is not a disagreement about operations — it is a disagreement about what counts as an operating expense. Three things get pushed below the line on a marketing package: the replacement reserve, the tenant improvement allowance and the leasing commission. All three are real, recurring, unavoidable cash. A lender underwrites after them; so does a buyer who intends to own the building. The cover page does not. On the seeded 200,000-foot office building offered at $48M, they come to $308,800 a year, and the advertised 5.50% cap is 4.86% to the buyer — 64 basis points, or $5,614,545 of price, which is also exactly the difference between the $48M ask and the $42.39M at which the real NOI earns the advertised cap. Two rules make it honest. Capital that recurs is an expense: replacing a twenty-fifth of a roof every year forever is a cost of doing business, whatever an accountant calls it. And leasing capital is not optional, nor is its annual cost its invoice — a building on five-year leases re-tenants a fifth of itself a year, so spending nothing this year means the cost is late rather than absent. The largest line is also the least certain: at $144,000 if every rolling tenant renews and $472,000 if none does, a 3.3× range driven by nothing but an assumption, which the card draws as a range with the blend marked on it rather than printing one figure and hoping.",
+      "blurb": "A broker's NOI and an owner's NOI are different numbers for the same building, and the difference is not a disagreement about operations — it is a disagreement about what counts as an operating expense. Three things get pushed below the line on a marketing package: the replacement reserve, the tenant improvement allowance and the leasing commission. All three are real, recurring, unavoidable cash. A lender underwrites after them; so does a buyer who intends to own the building. The cover page does not. On the seeded 200,000-foot office building offered at $48M, they come to $1,344,000 a year, and the advertised 5.50% cap is 2.70% to the buyer — 280 basis points, or $24,436,364 of price, which is also exactly the difference between the $48M ask and the $23.56M at which the real NOI earns the advertised cap. Two rules make it honest. Capital that recurs is an expense: replacing a twenty-fifth of a roof every year forever is a cost of doing business, whatever an accountant calls it. And leasing capital is not optional, nor is its annual cost its invoice — a building on five-year leases re-tenants a fifth of itself a year, so spending nothing this year means the cost is late rather than absent. The largest line is also the least certain: at $720,000 if every rolling tenant renews and $2,360,000 if none does, a 3.3× range driven by nothing but an assumption, which the card draws as a range with the blend marked on it rather than printing one figure and hoping.",
       "href": "/tools#below-the-line"
     },
     {
@@ -766,7 +1108,7 @@
     {
       "date": "2026-09-17",
       "title": "A building on someone else’s land",
-      "blurb": "The ground lease now has its own calculation, and it is the one structure where the ordinary screening arithmetic is not slightly off but wrong by a multiple — in the flattering direction. A leasehold is a wasting asset. When the lease ends the building goes back to the landowner and the leasehold is worth nothing, so its value is the present value of the cash flows over the years that remain and nothing after them. Capitalise its NOI at a fee-simple cap, which is what a screening model does unless told otherwise, and you have valued a perpetuity that expires. On the seeded lease — $8M of NOI, $2M of ground rent, forty years left — that shortcut says $120M and the honest answer is $97.5M. The page draws both bars so the gap is visible rather than argued. And the gap grows as the clock runs: the same lease with ten years left is 62.8% imaginary. Underneath it, the number a ground-lease lender actually underwrites, which is not the DSCR. On an unsubordinated lease the ground rent sits ahead of the mortgage — miss it and the landlord can terminate the lease, which takes the building and the mortgage with it — so the test is how many times the NOI covers the ground rent. This one covers four times today. It covers 2.22 times after the reset, because the rent resets to a percentage of land value rather than stepping by a fixed escalation, and nothing in the lease caps that. If land doubles, coverage falls to 1.11. The card also says whether the thing is financeable at all: an unsubordinated lease has to outlast the loan by a wide margin or no lender will look at it. Last, the other half of the same lease. The landlord holds the rent plus the land coming back, which is closer to a bond than a building — and it moves the opposite way as the term shortens, because the clock that destroys the leasehold is the clock that returns the land sooner. Two halves of one asset, priced from opposite ends of the same lease. That is why they trade to different buyers.",
+      "blurb": "The ground lease now has its own calculation, and it is the one structure where the ordinary screening arithmetic is not slightly off but wrong by a multiple — in the flattering direction. A leasehold is a wasting asset. When the lease ends the building goes back to the landowner and the leasehold is worth nothing, so its value is the present value of the cash flows over the years that remain and nothing after them. Capitalise its NOI at a fee-simple cap, which is what a screening model does unless told otherwise, and you have valued a perpetuity that expires. On the seeded lease — $8M of NOI, $2M of ground rent, forty years left — that shortcut says $120M and the honest answer, the year-16 reset included, is $93.9M. The page draws both bars so the gap is visible rather than argued. And the gap grows as the clock runs: the same lease with ten years left is 62.8% imaginary. Underneath it, the number a ground-lease lender actually underwrites, which is not the DSCR. On an unsubordinated lease the ground rent sits ahead of the mortgage — miss it and the landlord can terminate the lease, which takes the building and the mortgage with it — so the test is how many times the NOI covers the ground rent. This one covers four times today. It covers 3.22 times on the year-16 income after the reset, because the rent resets to a percentage of land value rather than stepping by a fixed escalation, and nothing in the lease caps that. If land doubles, coverage falls to 1.61. The card also says whether the thing is financeable at all: an unsubordinated lease has to outlast the loan by a wide margin or no lender will look at it. Last, the other half of the same lease. The landlord holds the rent plus the land coming back, which is closer to a bond than a building — and it moves the opposite way as the term shortens, because the clock that destroys the leasehold is the clock that returns the land sooner. Two halves of one asset, priced from opposite ends of the same lease. That is why they trade to different buyers.",
       "href": "/tools#ground-lease"
     },
     {
@@ -802,7 +1144,7 @@
     {
       "date": "2026-09-17",
       "title": "What a 1031 exchange actually defers",
-      "blurb": "The card above it prices the tax bill at a sale. This one answers what happens if you roll the gain into the next deal instead — and it opens on a trade that looks completely sensible and still owes $305,000. Sell for $26M, buy for $30M with more debt on it, and the price test passes comfortably; $1.22M of proceeds stayed in your pocket, and nothing about borrowing more on the other side cures that. Debt runs the other way: coming down on the mortgage is taxable even when every dollar of cash is reinvested, but cash you add to the replacement offsets it. So the page draws three tests rather than one, and names the one that binds. Two more things it says out loud. The bill on boot is filled depreciation-first, at the higher rate, so the first dollars out are the expensive ones. And deferred is not forgiven: the replacement here costs $30M and carries a $20.5M basis, because the rolled-in gain comes off it and is standing there again at the next sale. The clock is drawn rather than listed — 45 days and 180 days both run from the day you close, not one after the other, and a November closing loses 29 days off the back of the window because the replacement has to be bought before that year's return is filed.",
+      "blurb": "The card above it prices the tax bill at a sale. This one answers what happens if you roll the gain into the next deal instead — and it opens on a trade that looks completely sensible and still owes $305,000. Sell for $26M, buy for $30M with more debt on it, and the price test passes comfortably; $1.22M of proceeds stayed in your pocket, and nothing about borrowing more on the other side cures that. Debt runs the other way: coming down on the mortgage is taxable even when every dollar of cash is reinvested, but cash you add to the replacement offsets it. So the page draws three tests rather than one, and names the one that binds. Two more things it says out loud. The bill on boot is filled depreciation-first, at the higher rate, so the first dollars out are the expensive ones. And deferred is not forgiven: the replacement here costs $30M and carries a $20.5M basis, because the rolled-in gain comes off it and is standing there again at the next sale. The clock is drawn rather than listed — 45 days and 180 days both run from the day you close, not one after the other, and a November closing loses 29 days off the back of the window because the replacement has to be bought by that year's return's due date, extensions included.",
       "href": "/tools#exchange-1031"
     },
     {

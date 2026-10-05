@@ -17,11 +17,147 @@ import seniorSeed from "@/data/research/senior_housing.json";
 import mhcSeed from "@/data/research/manufactured_housing.json";
 import specialtySeed from "@/data/research/specialty.json";
 import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
+import { US_STATE_ABBREV } from "@/lib/address";
+import { fmrBenchmarkRows, fmrOf, newestFmrOnly, type Fmr } from "@/lib/fmr";
+import { figureNote, figureRead, rentOf } from "@/lib/tracker-read";
 
 export function seedRules(): RegulatoryRule[] {
   return (rulesSeed.rules as unknown as RegulatoryRule[]).filter(
     (r) => r && r.id && r.jurisdiction_state && r.effect
   );
+}
+
+/** The rules on file, said as they are: how many, and how many link their
+ *  source — a rule filed without one (New Jersey's municipal rent control,
+ *  a patchwork of local ordinances the file points at rather than cites) is
+ *  counted, never called source-linked. */
+export function ruleCounts(): { all: number; sourced: number } {
+  const rules = seedRules();
+  return {
+    all: rules.length,
+    sourced: rules.filter((r) => typeof r.source === "string" && r.source.trim() !== "").length,
+  };
+}
+
+/** A state's name for a page, from the address table ("Virginia", "New
+ *  Jersey", "District of Columbia"), by its code. */
+const STATE_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(US_STATE_ABBREV).map(([name, code]) => [
+    code,
+    name
+      .split(" ")
+      .map((w) => (w === "of" ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(" "),
+  ]),
+);
+
+/** A rule's type in words: the file's own type with its underscores spaces,
+ *  but an acronym in capitals and two types that read badly as words said
+ *  plainly. */
+const RULE_TYPE_WORDS: Record<string, string> = {
+  topa: "TOPA",
+  topa_exemption: "TOPA exemption",
+  rent_control_absence: "no local rent control",
+  licensing: "rental licensing",
+};
+
+/**
+ * A rule's name for a sentence, from the research file's own fields: what
+ * kind of rule it is and where it holds — "rent control (Montgomery County,
+ * MD)", "TOPA (Washington, DC)", "no local rent control (Virginia)". The
+ * file gives no rule a title of its own; the deal page's rules panel names
+ * one by the same two fields. Null for an id the file does not hold (an
+ * alert's rule id is whatever the intel sweep matched), so a page never
+ * shows a reader a raw id.
+ */
+export function ruleName(id: string | null | undefined): string | null {
+  if (!id) return null;
+  const rule = seedRules().find((r) => r.id === id);
+  if (!rule) return null;
+  const words = RULE_TYPE_WORDS[rule.rule_type] ?? rule.rule_type.replace(/_/g, " ");
+  const state = rule.jurisdiction_state.trim().toUpperCase();
+  const place = rule.jurisdiction_local ? `${rule.jurisdiction_local}, ${state}` : (STATE_NAME[state] ?? state);
+  return `${words} (${place})`;
+}
+
+/** A value's JSON with every object's keys sorted, so a rule's conditions
+ *  compare equal whatever order they come back in — Postgres's jsonb stores
+ *  keys by length before byte order, never as the file wrote them. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/** What a rule says: everything but the dates and the status its source was
+ *  last checked under. */
+function ruleText(r: RegulatoryRule): string {
+  return canonicalJson({
+    jurisdiction_state: r.jurisdiction_state,
+    jurisdiction_local: r.jurisdiction_local ?? null,
+    rule_type: r.rule_type,
+    applies_if: r.applies_if ?? null,
+    exempt_if: r.exempt_if ?? null,
+    effect: r.effect,
+    quote: r.quote ?? null,
+    source: r.source ?? null,
+  });
+}
+
+/**
+ * The rules a deal is read against: the checked-in file's, with the
+ * database's copy consulted only for what the database alone writes.
+ * Nothing writes a rule's TEXT to the database but scripts/seed-research.mjs
+ * — the steward stamps `as_of` when it re-verifies a rule against its source
+ * and never edits legal text, the daily intel job only reads the ids — so a
+ * row there is the file as it stood when last seeded, and taking it over the
+ * file kept a rule the file had since corrected (California's and
+ * Washington's new-building exemptions, read as rolling ages) until someone
+ * reseeded. So a rule in the file takes the file's words, and the
+ * database's later `as_of` only where its words are the file's own, since a
+ * re-verification dates the words it checked. A rule only the database
+ * holds is kept as it is.
+ */
+export function mergeRules(dbRows: RegulatoryRule[] | null | undefined): RegulatoryRule[] {
+  const seeds = seedRules();
+  const byId = new Map(seeds.map((r) => [r.id, r]));
+  for (const row of dbRows ?? []) {
+    if (!row?.id) continue;
+    const seed = byId.get(row.id);
+    if (!seed) {
+      byId.set(row.id, row);
+      continue;
+    }
+    if (ruleText(row) === ruleText(seed) && typeof row.as_of === "string" && row.as_of > seed.as_of) {
+      byId.set(row.id, { ...seed, as_of: row.as_of });
+    }
+  }
+  return [...byId.values()];
+}
+
+/** The month the 2–4 unit on-market figures are for: the research file's
+ *  block is `on_market_depth_may_2026`, Redfin's tracker "periods through
+ *  2026-05-31" as its source records — single-month medians for May 2026. */
+const ON_MARKET_DEPTH_AS_OF = "2026-05-31";
+
+/**
+ * A metro's 2–4 unit sale median from the research file, with its change on
+ * a year earlier as the file states it and the month it is for — so a page
+ * printing the figure prints its month from the same place, never a figure
+ * typed on the page. Null where the file carries no median for the metro.
+ */
+export function twoToFourMedian(metroKey: string): { price: number; yoy: string | null; asOf: string } | null {
+  const value = multifamilySeed.supply_demand?.on_market_depth_may_2026?.value as
+    | Record<string, { median_sale_price?: number; yoy?: string }>
+    | undefined;
+  const row = value?.[metroKey];
+  if (!row || typeof row.median_sale_price !== "number") return null;
+  return { price: row.median_sale_price, yoy: typeof row.yoy === "string" && row.yoy.trim() ? row.yoy : null, asOf: ON_MARKET_DEPTH_AS_OF };
 }
 
 /** Benchmarks derived from the sector JSONs. Kept in code (not hand-copied
@@ -57,7 +193,7 @@ export function seedBenchmarks(): Benchmark[] {
         sector: "multifamily",
         metro: label[key] ?? key,
         source: md.sources?.[0] ?? "",
-        as_of: "2026-05-31",
+        as_of: ON_MARKET_DEPTH_AS_OF,
         status: (md.status as Benchmark["status"]) ?? "sourced",
       };
       if (typeof row.median_sale_price === "number") {
@@ -93,71 +229,51 @@ export function seedBenchmarks(): Benchmark[] {
       }
     }
   }
-  const fmr = multifamilySeed.supply_demand?.rents_fy2026_hud_fmr_dc_area;
-  if (fmr?.value) {
-    for (const [br, v] of Object.entries(fmr.value)) {
-      if (typeof v === "number") {
-        out.push({
-          sector: "multifamily",
-          metro: "Washington DC area",
-          metric: `hud_fmr_fy2026_${br}`,
-          low: v,
-          high: v,
-          unit: "usd_month",
-          source: fmr.sources?.[0] ?? "",
-          // as_of = when WE verified it. The FY effective window lives in the
-          // note — stamping the effective date made current-law FY2026 rents
-          // wear a stale badge.
-          as_of: "2026-08-24",
-          status: (fmr.status as Benchmark["status"]) ?? "sourced",
-          note: ["FY2026, effective 2025-10-01 through 2026-09-30", fmr.note].filter(Boolean).join(". "),
-        });
-      }
-    }
-  }
-  // Metro-level FY2026 FMRs from metros.json (DC-area rows already come from
-  // multifamily.json above — skip its metro to avoid near-duplicate rows).
-  for (const m of metrosSeed.metros ?? []) {
-    if (m.id === "dc") continue;
-    const fmr = m.fmr_fy2026 as { "2br"?: number | null; status?: string; sources?: string[]; note?: string } | undefined;
-    if (typeof fmr?.["2br"] === "number") {
-      out.push({
-        sector: "multifamily",
-        metro: m.name,
-        metric: "hud_fmr_fy2026_2br",
-        low: fmr["2br"],
-        high: fmr["2br"],
-        unit: "usd_month",
-        source: fmr.sources?.[0] ?? "",
-        as_of: "2026-08-24",
-        status: (fmr.status as Benchmark["status"]) ?? "sourced",
-        note: ["FY2026, effective 2025-10-01 through 2026-09-30", fmr.note].filter(Boolean).join(". "),
-      });
-    }
-  }
+  // HUD's fair market rents, a row a bedroom: the Washington area's from
+  // multifamily.json's block, every other metro's from its metros.json
+  // entry — through lib/fmr's one builder, which scripts/seed-research.mjs
+  // and scripts/fetch-fmr.mjs write the table with too. The fiscal year is
+  // the block's own, in the metric and the note; `as_of` is the day the
+  // figures were read, never the day they take effect.
+  out.push(...fmrBenchmarkRows(metrosSeed, multifamilySeed));
 
   // Per-metro sector snapshots (office / industrial / multifamily
   // fundamentals from brokerage research, two-source bar) — one benchmark
   // row per figure actually carried, flowing to deal pages and Compare via
   // benchmarksForDeal. Divergent trackers encode as the observed low–high
   // spread, never averaged; a null figure emits no row (a gap is a gap).
+  // Every row carries its OWN figure's link and citation — the house, the
+  // area and the period its block's `vacancy_read` / `rent_read` /
+  // `cap_read` states (lib/tracker-read) — never the block's first source,
+  // which is another figure's as often as not (Chicago's cap, Essex
+  // Realty's April average, had been credited to JPMorgan, the vacancy's
+  // source, and its office rent, Cushman's CBD MarketBeat, to Tenantbase's
+  // Q1 print); a figure the file ties to no link carries none. `as_of`
+  // stays the day the research was read, and the citation says so.
   type SnapshotBlock = {
     vacancy_pct?: number | null;
     vacancy_pct_low?: number | null;
     vacancy_pct_high?: number | null;
     asking_rent_psf?: number | null;
+    asking_rent_psf_low?: number | null;
+    asking_rent_psf_high?: number | null;
     cap_rate_low_pct?: number | null;
     cap_rate_high_pct?: number | null;
     status?: string;
     sources?: string[];
     note?: string;
+    vacancy_read?: unknown;
+    rent_read?: unknown;
+    cap_read?: unknown;
   };
   for (const m of metrosSeed.metros ?? []) {
     const snap = (
       m as { sector_snapshot?: Record<string, SnapshotBlock | string> | null }
     ).sector_snapshot;
     if (!snap) continue;
-    const snapAsOf = typeof snap.as_of === "string" ? snap.as_of : "2026-08-25";
+    // The snapshot's own date, or none: an empty `as_of` reads "undated"
+    // (lib/research `asOfLabel`), never a date the file does not state.
+    const snapAsOf = typeof snap.as_of === "string" ? snap.as_of : "";
     for (const [sector, blk] of Object.entries(snap)) {
       if (sector === "as_of" || typeof blk === "string" || !blk) continue;
       const base = {
@@ -165,39 +281,50 @@ export function seedBenchmarks(): Benchmark[] {
         metro: m.name,
         as_of: snapAsOf,
         status: (blk.status as Benchmark["status"]) ?? "sourced",
-        source: blk.sources?.[0] ?? "",
         note: blk.note ?? null,
       };
       const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
       const vHigh = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
       if (typeof vLow === "number") {
+        const read = figureRead(blk.vacancy_read, blk.sources);
         out.push({
           ...base,
           metric: `${sector}_vacancy_pct`,
           low: vLow,
           high: typeof vHigh === "number" ? vHigh : vLow,
           unit: "pct",
+          source: read.links[0] ?? "",
+          cite: figureNote(read),
         });
       }
-      if (typeof blk.asking_rent_psf === "number") {
+      // A rent the file states as a band is a row with both ends, never
+      // a point made of its midpoint.
+      const rent = rentOf(blk);
+      if (rent) {
+        const read = figureRead(blk.rent_read, blk.sources);
         out.push({
           ...base,
           metric: `${sector}_asking_rent_psf`,
-          low: blk.asking_rent_psf,
-          high: blk.asking_rent_psf,
+          low: rent.low,
+          high: rent.high,
           unit: "usd_sf_yr",
+          source: read.links[0] ?? "",
+          cite: figureNote(read),
         });
       }
       if (
         typeof blk.cap_rate_low_pct === "number" &&
         typeof blk.cap_rate_high_pct === "number"
       ) {
+        const read = figureRead(blk.cap_read, blk.sources);
         out.push({
           ...base,
           metric: `${sector}_cap_rate_pct`,
           low: blk.cap_rate_low_pct,
           high: blk.cap_rate_high_pct,
           unit: "pct",
+          source: read.links[0] ?? "",
+          cite: figureNote(read),
         });
       }
     }
@@ -236,7 +363,7 @@ export function seedBenchmarks(): Benchmark[] {
         high: Math.round(r.high * 10000) / 100,
         unit: "pct",
         source: r.sources?.[0] ?? "",
-        as_of: doc.as_of ?? "2026-08-21",
+        as_of: doc.as_of ?? "",
         status: (r.status as Benchmark["status"]) ?? "sourced",
         note: [r.tier, r.note].filter(Boolean).join(" — "),
       });
@@ -253,7 +380,7 @@ export function seedBenchmarks(): Benchmark[] {
       high: pmms.value,
       unit: "pct",
       source: pmms.sources?.[0] ?? "",
-      as_of: pmms.as_of ?? "2026-08-20",
+      as_of: pmms.as_of ?? "",
       status: (pmms.status as Benchmark["status"]) ?? "sourced",
       note: pmms.note ?? null,
     });
@@ -262,12 +389,15 @@ export function seedBenchmarks(): Benchmark[] {
 }
 
 /** Merge DB benchmark rows over the checked-in seeds (DB wins per key) —
- *  shared by the deal panel and the market page so both tell the same story. */
+ *  shared by the deal panel and the market page so both tell the same story.
+ *  A fair market rent of an older fiscal year than the newest present — a
+ *  database row still keyed to last year beside the file's this year — is
+ *  left out (lib/fmr `newestFmrOnly`), never shown as current. */
 export function mergeBenchmarks(dbRows: Benchmark[] | null | undefined): Benchmark[] {
   const key = (b: Benchmark) => `${b.sector}|${b.metro}|${b.metric}`;
   const byKey = new Map(seedBenchmarks().map((b) => [key(b), b]));
   for (const b of dbRows ?? []) byKey.set(key(b), b);
-  return [...byKey.values()];
+  return newestFmrOnly([...byKey.values()]);
 }
 
 /** Benchmarks relevant to one deal. Matched by covered-market NAME first —
@@ -275,8 +405,9 @@ export function mergeBenchmarks(dbRows: Benchmark[] | null | undefined): Benchma
  *  string as the fallback for labels the market matcher doesn't know. Prefix
  *  match on purpose: seed labels carry suffixes ("Baltimore MD",
  *  "Washington DC area"). DMV suburbs get their OWN rows (each entry in
- *  metros.json carries the DC-HMFA FY2026 FMR, DCHA-confirmed metro-wide),
- *  so they no longer need to borrow the "Washington DC area" rows. */
+ *  metros.json carries the Washington HUD area's figures, metro-wide), so
+ *  they no longer need to borrow the "Washington DC area" rows. Only the
+ *  newest fiscal year's fair market rents come back, whatever was passed. */
 export function benchmarksForDeal(
   benchmarks: Benchmark[],
   city?: string | null,
@@ -284,11 +415,18 @@ export function benchmarksForDeal(
 ): Benchmark[] {
   const c = (city ?? "").trim().toLowerCase();
   const m = (metroName ?? "").trim().toLowerCase();
-  return benchmarks.filter((b) => {
+  return newestFmrOnly(benchmarks).filter((b) => {
     if (!b.metro) return false;
     const label = b.metro.toLowerCase();
     return (!!c && label.startsWith(c)) || (!!m && label.startsWith(m));
   });
+}
+
+/** A covered metro's fair market rent, by its metros.json id — the one
+ *  reader (lib/fmr `fmrOf`) over the research file's entry; null where the
+ *  metro or its block is not on file. */
+export function metroFmr(id: string): Fmr | null {
+  return fmrOf((metrosSeed.metros ?? []).find((m) => m.id === id));
 }
 
 /** The buyer profile the rules evaluate against until a real setting exists.
@@ -324,8 +462,14 @@ export function buildSubject(input: {
   sizeText?: string | null;
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
-  /** injected for deterministic tests; defaults to the wall-clock year */
+  /** injected for deterministic tests; defaults to `today`'s year, else the
+   *  wall-clock year */
   currentYear?: number;
+  /** the day the rules are read, an ISO day — a page reads it outside its
+   *  render and hands it in; defaults to the wall-clock day. A rule's text
+   *  that states a window or an effective date is read against it
+   *  (lib/dated-window), so the evaluation says what has ended. */
+  today?: string;
   /** the deal is rental housing (lib/asset-words); false files it as
    *  commercial property, which the rent-control, TOPA and just-cause rules
    *  are written not to reach; undefined (nothing read yet) keeps the
@@ -353,7 +497,8 @@ export function buildSubject(input: {
     // The deal-facts answer beats the OM/manual claim — the buyer may be
     // correcting a wrong listing figure.
     built_year: numField("year_built") ?? input.yearBuilt ?? undefined,
-    current_year: input.currentYear ?? new Date().getFullYear(),
+    current_year: input.currentYear ?? (input.today && /^\d{4}-/.test(input.today) ? Number(input.today.slice(0, 4)) : new Date().getFullYear()),
+    today: input.today ?? new Date().toISOString().slice(0, 10),
     // Post-close intent only — the occupancy STRING (current status) stays
     // unknown, so vacant-tax and rental-license questions stay honestly open.
     ...(willOccupy !== undefined ? { owner_occupied: willOccupy } : {}),
@@ -362,9 +507,11 @@ export function buildSubject(input: {
     // Portfolio totals ALWAYS include this deal's own units — the ≤N-unit
     // small-landlord tests (PG ≤5, NY Good Cause ≤10) must fail on an
     // acquisition that alone exceeds the cap, even with the default
-    // "no other units" assumption the panel declares.
-    owner_total_rental_units_in_county: (otherUnits ?? 0) + (units ?? 0),
-    owner_total_rental_units_in_state: (otherUnits ?? 0) + (units ?? 0),
+    // "no other units" assumption the panel declares. With the deal's own
+    // count unknown the total is unknown too: counted as none, a building
+    // of any size had passed the ≤5 test as a small landlord's.
+    owner_total_rental_units_in_county: units === undefined ? undefined : (otherUnits ?? 0) + units,
+    owner_total_rental_units_in_state: units === undefined ? undefined : (otherUnits ?? 0) + units,
     ...(otherUnits !== undefined ? { owner_other_rental_units_in_dc: otherUnits } : {}),
     transaction: "sale_of_rental_housing_accommodation",
     // An office, a hotel, a storage facility: the rules conditioned on

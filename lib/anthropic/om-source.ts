@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic, { toFile } from "@anthropic-ai/sdk";
 import { getAnthropic } from "./client";
 import { isDenseLayer, pageTaggedText, pdfTextLayer, type PdfTextLayer } from "@/lib/pdf-text";
+import { citablePageCount, countPdfPages } from "@/lib/pdf";
 
 /**
  * How the OM rides along on an analysis request.
@@ -67,25 +68,56 @@ export async function omSourceFor(
   filename = "om.pdf",
   opts?: { textFirst?: boolean; title?: string },
 ): Promise<OmSource> {
+  return (await pickOmSource(pdf, filename, opts)).om;
+}
+
+/**
+ * The same transport, with the memorandum's length in pages where the read
+ * can say it — what a cited page is held to (lib/facts `locatedPage`). The
+ * text layer's own count when the layer was read (pdfjs walked every page,
+ * dense or not). Otherwise — the screen read the PDF itself, so Ask does
+ * too — the length the caller states (`statedPages`, the extraction's
+ * stored `totalPages`) held to the byte counter (lib/pdf
+ * `citablePageCount`): the counter alone over-counts an incrementally saved
+ * file, so its re-emitted pages validated pages the deck does not have.
+ * Null where nothing finds a page.
+ */
+export async function omSourceWithPages(
+  pdf: Buffer,
+  filename = "om.pdf",
+  opts?: { textFirst?: boolean; title?: string; statedPages?: number | null },
+): Promise<{ om: OmSource; pages: number | null }> {
+  const { om, layerPages } = await pickOmSource(pdf, filename, opts);
+  return { om, pages: layerPages ?? citablePageCount(opts?.statedPages, countPdfPages(pdf)) };
+}
+
+async function pickOmSource(
+  pdf: Buffer,
+  filename: string,
+  opts?: { textFirst?: boolean; title?: string },
+): Promise<{ om: OmSource; layerPages: number | null }> {
+  let layerPages: number | null = null;
   if (opts?.textFirst) {
     const mode = omReadMode();
     if (mode !== "pdf") {
       const layer = await pdfTextLayer(pdf);
+      // A file pdfjs cannot open reads as no pages: no count from it.
+      if (layer.pages.length > 0) layerPages = layer.pages.length;
       // `text` means any text at all — the raw count, before the running
       // lines are discounted; `auto` asks whether the layer is the deck.
       if (mode === "text" ? layer.pages.some((p) => p.chars > 0) : isDenseLayer(layer)) {
-        return omFromPages(layer, opts.title);
+        return { om: omFromPages(layer, opts.title), layerPages };
       }
     }
   }
-  if (pdf.length <= MAX_INLINE_PDF_BYTES) return omFromBuffer(pdf);
+  if (pdf.length <= MAX_INLINE_PDF_BYTES) return { om: omFromBuffer(pdf), layerPages };
   try {
     const client = getAnthropic();
     const file = await client.beta.files.upload(
       { file: await toFile(pdf, filename, { type: "application/pdf" }) },
       { headers: { "anthropic-beta": "files-api-2025-04-14" } },
     );
-    return { kind: "file", fileId: file.id };
+    return { om: { kind: "file", fileId: file.id }, layerPages };
   } catch (err) {
     console.error("[anthropic] Files upload for large OM failed", err);
     throw new Error(

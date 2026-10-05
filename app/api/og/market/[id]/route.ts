@@ -16,11 +16,14 @@ import { marketPageFor } from "@/lib/public-pages";
 import { skylineFor } from "@/lib/skyline";
 import { fetchSkylinePhoto } from "@/lib/skyline-fetch";
 import { fetchMetroOverhead } from "@/lib/metro-overhead";
-import { OG_CARD, OVERHEAD_CARD_CREDIT, cardPhotoCredit, marketCard } from "@/lib/og-card";
-
-/** Commons renders a thumbnail at the width asked; the card's own width is
- *  enough, and a smaller file than the page's 1600px band. */
-const PHOTO_WIDTH = 1280;
+import {
+  OG_CARD,
+  OG_PHOTO_WIDTH,
+  OVERHEAD_CARD_CREDIT,
+  cachedMarketCard,
+  cardPhotoCredit,
+  marketCard,
+} from "@/lib/og-card";
 
 export async function GET(
   _req: Request,
@@ -30,33 +33,29 @@ export async function GET(
   const page = marketPageFor(id);
   if (!page) return new NextResponse(null, { status: 404 });
 
-  let photo: Buffer | null = null;
-  let credit: string | null = null;
-  const shot = skylineFor(id);
-  const shotCredit = shot ? cardPhotoCredit(shot) : null;
-  if (shot && shotCredit) {
-    const got = await fetchSkylinePhoto(id, PHOTO_WIDTH);
-    if (got) {
-      photo = Buffer.from(got.body);
-      credit = shotCredit;
+  // Drawn once a market a process and held (lib/og-card): a crawler's
+  // second ask, or anyone's, is the card already drawn.
+  const card = await cachedMarketCard(page.id, async () => {
+    let photo: Buffer | null = null;
+    let credit: string | null = null;
+    const shot = skylineFor(page.id);
+    const shotCredit = shot ? cardPhotoCredit(shot) : null;
+    if (shot && shotCredit) {
+      const got = await fetchSkylinePhoto(page.id, OG_PHOTO_WIDTH);
+      if (got) {
+        photo = Buffer.from(got.body);
+        credit = shotCredit;
+      }
     }
-  }
-  if (!photo) {
-    const got = await fetchMetroOverhead(id, OG_CARD.width, OG_CARD.height);
-    if (got) {
-      photo = got.bytes;
-      credit = OVERHEAD_CARD_CREDIT;
+    if (!photo) {
+      const got = await fetchMetroOverhead(page.id, OG_CARD.width, OG_CARD.height);
+      if (got) {
+        photo = got.bytes;
+        credit = OVERHEAD_CARD_CREDIT;
+      }
     }
-  }
-
-  let card: Buffer | null = null;
-  if (photo && credit) {
-    try {
-      card = await marketCard(photo, page.name, credit);
-    } catch {
-      card = null;
-    }
-  }
+    return photo && credit ? marketCard(photo, page.name, credit) : null;
+  });
   // Nothing to picture the market with: the site's own card, never a blank.
   if (!card) {
     return new NextResponse(null, { status: 307, headers: { location: "/opengraph-image" } });

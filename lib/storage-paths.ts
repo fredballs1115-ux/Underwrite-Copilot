@@ -10,7 +10,8 @@
  *   <userId>/<dealId>.model-tmp                       a worker-mode reconcile's parked model
  *   documents/<dealId>/<uuid>-<name>                  source documents (deal_documents)
  *   supplements/<dealId>/<uuid>-<name>                tab attachments (deals.supplements)
- *   photos/<dealId>/<stamp>-<hero|thumb>.jpg          the building's own photograph (deals.photo)
+ *   photos/<dealId>/<stamp>-<hero|thumb|full>.jpg     the building's own photograph (deals.photo)
+ *   flood/<dealId>/<stamp>.jpg                        the Flood view's drawn frame (deals.photo.floodFrame)
  *   <teamId|userId>/branding-logo-<suffix>.<png|jpg>  report branding
  *
  * Why a gate: the paths are read back off ordinary database columns that the
@@ -24,7 +25,7 @@
  * at the row, so the two layers agree.
  */
 
-export type DealObjectKind = "om" | "model-tmp" | "document" | "supplement" | "photo";
+export type DealObjectKind = "om" | "model-tmp" | "document" | "supplement" | "photo" | "flood";
 
 export type StorageScope =
   | { kind: "deal"; dealId: string; only?: readonly DealObjectKind[] }
@@ -81,12 +82,33 @@ export function classifyDealPath(path: string, dealId: string): DealObjectKind |
     if (parts[0] === "documents") return "document";
     if (parts[0] === "supplements") return "supplement";
     if (parts[0] === "photos" && PHOTO_FILE.test(parts[2])) return "photo";
+    if (parts[0] === "flood" && FLOOD_FILE.test(parts[2])) return "flood";
   }
   return null;
 }
 
+/**
+ * A photograph's stored path, read back off deals.photo, where it is one of
+ * this deal's photograph files; else null. The column is the deal's owner's
+ * to write, and the picture routes put the path in a header (the validator),
+ * where a line break had made them answer 500 (research pass 22). A path this
+ * returns is one the storage gate would read, and is header-safe: it holds
+ * only the characters the minting helpers produce.
+ */
+export function dealPhotoPathOf(dealId: string, path: unknown): string | null {
+  return typeof path === "string" && classifyDealPath(path, dealId) === "photo" ? path : null;
+}
+
+/** A drawn flood frame's file name (#472): a stamp. */
+const FLOOD_FILE = /^[a-z0-9]+\.jpg$/;
+
+/** The deal's flood frame (#472): `flood/<dealId>/<stamp>.jpg`. */
+export function floodFramePath(dealId: string, stamp: string): string {
+  return `flood/${dealId}/${stamp}.jpg`;
+}
+
 /** A photograph derivative's file name: a stamp and which size it is. */
-const PHOTO_FILE = /^[a-z0-9]+-(hero|thumb)\.jpg$/;
+const PHOTO_FILE = /^[a-z0-9]+-(hero|thumb|full)\.jpg$/;
 
 /** True when the path is a branding logo in the account's or team's folder. */
 export function isBrandingPath(
@@ -151,8 +173,9 @@ export function supplementPath(dealId: string, id: string, fileName: string): st
   return `supplements/${dealId}/${id}-${safeFileName(fileName)}`;
 }
 
-/** The building's photograph at one of its two sizes: `photos/<dealId>/<stamp>-hero.jpg`. */
-export function dealPhotoPath(dealId: string, stamp: string, size: "hero" | "thumb"): string {
+/** The building's photograph at one of its sizes: `photos/<dealId>/<stamp>-hero.jpg`,
+ *  the square `-thumb`, and the `-full` kept where the source is larger than the hero. */
+export function dealPhotoPath(dealId: string, stamp: string, size: "hero" | "thumb" | "full"): string {
   return `photos/${dealId}/${stamp}-${size}.jpg`;
 }
 

@@ -187,6 +187,13 @@ describe("buildRentRollWorkbook — structure", () => {
     expect((cf.getCell(CF_ROW.equityMultiple, 2).value as CellVal).formula).toContain("SUM(");
   });
 
+  it("writes no serial for a day that does not exist, so the page and the workbook date the same leases", () => {
+    expect(isoToSerial("2027-12-31")).toBe(46_752);
+    // The engine would roll 30 February into 2 March; the page calls it undated.
+    expect(isoToSerial("2027-02-30")).toBeNull();
+    expect(isoToSerial("2028-31-12")).toBeNull();
+  });
+
   it("writes the rent roll's own data as inputs, not formulas", async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);
@@ -199,6 +206,51 @@ describe("buildRentRollWorkbook — structure", () => {
     expect(Math.round((expiry.getTime() - Date.UTC(1899, 11, 30)) / 86_400_000)).toBe(
       isoToSerial("2027-12-31"),
     );
+  });
+});
+
+describe("buildRentRollWorkbook — it says what it assumes, in words only", () => {
+  const assumptions = async (buf: Buffer) => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet("Assumptions")!;
+    return (row: number, col: number) => String(ws.getCell(row, col).value ?? "");
+  };
+  const NOTES = {
+    asOf: "Today, Oct 1, 2026, the day this file was made — the rent roll states no as-of date; enter it.",
+    absorption: "A placeholder: the 15,000 SF vacant leased over 36 months — not the market's absorption.",
+    rate: "10-yr Treasury 4.12% (FRED, Sep 30, 2026) + 225 bps industrial spread, a screening default — enter your quote.",
+    vacancy: "The deal model's vacancy (Rent roll actual — 85.0% SF-weighted occupancy).",
+    reimbursement: "0%: this export assumes no tenant reimburses an operating expense.",
+  };
+
+  it("opens the Assumptions tab on the vacancy and recovery it leaves to the reader", async () => {
+    const zero = await assumptions(await buildRentRollWorkbook(LEASES, { ...INPUTS, reimbursementPct: 0 }));
+    expect(zero(3, 1)).toMatch(/^Before you read the IRR: general vacancy \(row 27\) comes off every year's revenue/);
+    expect(zero(3, 1)).toContain("expense recovery (row 30) is 0%");
+    // A workbook whose recovery is set says nothing of a zero it does not have.
+    const set = await assumptions(buffer);
+    expect(set(3, 1)).toContain("general vacancy (row 27)");
+    expect(set(3, 1)).not.toContain("is 0%");
+    // The per-lease bumps are on the Rent Roll tab and run nothing; it says so.
+    expect(set(15, 3)).toContain("each lease's own escalation on the Rent Roll tab is shown, not used");
+  });
+
+  it("prints the caller's note beside each seeded input, and never calls today the roll's as-of date", async () => {
+    const noted = await assumptions(await buildRentRollWorkbook(LEASES, { ...INPUTS, notes: NOTES }));
+    expect(noted(6, 3)).toBe(NOTES.asOf);
+    expect(noted(23, 3)).toBe(NOTES.absorption);
+    expect(noted(27, 3)).toBe(NOTES.vacancy);
+    expect(noted(30, 3)).toBe(NOTES.reimbursement);
+    expect(noted(41, 3)).toBe(NOTES.rate);
+    const bare = await assumptions(buffer);
+    expect(bare(6, 3)).not.toMatch(/rent roll's as-of date/i);
+  });
+
+  it("changes no figure: the noted workbook recalculates to the same returns", async () => {
+    const { value } = await loadWorkbook(await buildRentRollWorkbook(LEASES, { ...INPUTS, notes: NOTES }));
+    expect(value("Cash Flow", CF_ROW.leveredIrr, 2) as number).toBeCloseTo(model.leveredIrr!, 6);
+    expect(buildRentRollCashFlow(LEASES, { ...INPUTS, notes: NOTES }).leveredIrr).toBe(model.leveredIrr);
   });
 });
 

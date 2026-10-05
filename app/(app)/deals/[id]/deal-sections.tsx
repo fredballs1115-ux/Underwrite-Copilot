@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { placedByClause } from "@/lib/placed-by";
+import { currentBriefLine } from "@/lib/permit-split";
+import { screenedOn } from "@/lib/screen-run";
 import { PendingButton } from "../../pending-button";
 import {
   addSupplementNote,
@@ -16,8 +18,11 @@ import { CompsMap, type MapComp } from "./comps-map";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
-import { gapScale, type GapUnit } from "@/lib/gap-detail";
-import type { DealFact } from "@/lib/facts";
+import { gapDisagreementLine, gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
+import { typicalRange as readTypicalRange } from "@/lib/typical-range";
+import { basePosition, firstNumber, rangeInOrder } from "@/lib/verdict-range";
+import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
+import { locatedPage, type DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
 import { useToast } from "../../toaster";
@@ -155,8 +160,10 @@ const IconPaperclip = (p: { className?: string }) => (
 /* ================================================================== */
 
 function SectionHeader({ title, aside }: { title: string; aside?: ReactNode }) {
+  // An aside with no room beside the title takes its own row beneath it,
+  // rather than squeezing its words onto three lines.
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
       {aside}
     </div>
@@ -312,8 +319,16 @@ export function deriveRisks(results: Results): RiskItem[] {
 
   for (const r of results.reconciliation?.rows ?? []) {
     if (r.direction === "unfavorable") {
+      // Graded by the size its gap line states, against the model's own
+      // figure (lib/gap-detail), on the property-actuals card's "In line"
+      // band. The sample's $174k NOI gap is 4.7% of the model's NOI, and
+      // that card calls the same gap In line. A gap inside the band is
+      // never HIGH. A size the row does not state, a dollar gap on another
+      // footing, and a rate's gap (the band is the income's, not a cap's)
+      // keep the old grade.
+      const share = incomeGapShare(r);
       risks.push({
-        severity: "high",
+        severity: share != null && share <= NOI_IN_LINE_BAND ? "low" : "high",
         title: `${r.metric}: model less favorable than the OM`,
         detail: r.gap,
         source: "Reconciler",
@@ -351,7 +366,7 @@ export function deriveRisks(results: Results): RiskItem[] {
       risks.push({
         severity: "medium",
         title: `Aggressive vs. market: ${c.assumption}`,
-        detail: `${c.note} (OM ${c.omSays} vs. typical ${c.typicalRange})`,
+        detail: `${c.note} (OM ${c.omSays} vs. typical ${c.typicalRange}, a rule of thumb)`,
         source: "Market",
         tab: "market",
       });
@@ -378,14 +393,23 @@ export function deriveRisks(results: Results): RiskItem[] {
 export function OverviewView({
   results,
   active,
+  screening = false,
   onNavigate,
   stale = [],
+  staleWhy = "failed",
 }: {
   results: Results;
   active: boolean;
+  /** a screen (not a side job) is running: the progress rail above counts
+   *  its six steps, so the meter's own count of five results stands down —
+   *  "0/5" under "Step 2 of 6" read as two answers to one question */
+  screening?: boolean;
   onNavigate: (tab: string) => void;
-  /** results the latest (failed) screen never reached — the previous screen's */
+  /** results the latest screen has not rewritten — the previous screen's
+   *  (lib/screen-run `previousScreenResults`) */
   stale?: ReadonlyArray<keyof Results>;
+  /** why: the latest screen failed before them, or is still running */
+  staleWhy?: "failed" | "running";
 }) {
   const risks = deriveRisks(results);
   const counts = { high: 0, medium: 0, low: 0 };
@@ -413,6 +437,7 @@ export function OverviewView({
           result={results.verdict}
           compact
           stale={staleSet.has("verdict")}
+          staleWhy={staleWhy}
           onMore={() => onNavigate("verdict")}
         />
       ) : (
@@ -428,9 +453,18 @@ export function OverviewView({
         </div>
       )}
 
-      {/* Completeness meter — a progress cue while screening; a single quiet
-          line once everything is done (it earns no card space forever). */}
-      {active || done < steps.length ? (
+      {/* Completeness meter — a card while results are missing or a side job
+          runs; a single quiet line once everything is done (it earns no card
+          space forever). While a screen runs, the rail above is the progress
+          cue: the meter stands down, and only a re-screen's previous-screen
+          results are said, in a line of their own. */}
+      {screening ? (
+        staleCount > 0 ? (
+          <p className="px-1 text-xs leading-relaxed text-caution">
+            {`Until the run in progress reaches ${staleCount === 1 ? "it" : "them"}, ${staleCount} of this deal's results ${staleCount === 1 ? "is" : "are"} the previous screen's.`}
+          </p>
+        ) : null
+      ) : active || done < steps.length ? (
         <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">
@@ -458,8 +492,9 @@ export function OverviewView({
           </div>
           {staleCount > 0 && (
             <p className="mt-2 text-xs leading-relaxed text-caution">
-              {staleCount} of these are from the previous screen — the latest run failed before
-              reaching them. Run it again to bring them up to date.
+              {staleWhy === "running"
+                ? `${staleCount} of these are from the previous screen — the run in progress replaces each as it reaches it.`
+                : `${staleCount} of these are from the previous screen — the latest run failed before reaching them. Run it again to bring them up to date.`}
             </p>
           )}
         </div>
@@ -654,9 +689,12 @@ export function TermsView({
 export function ChallengerView({
   result,
   dealName,
+  totalPages = null,
 }: {
   result: ChallengerResult;
   dealName?: string;
+  /** the memorandum's own length: a cited page past it is never sent */
+  totalPages?: number | null;
 }) {
   const ordered = [...(result.challenges ?? [])].sort(
     (a, b) => SEV[a.severity].rank - SEV[b.severity].rank,
@@ -666,10 +704,10 @@ export function ChallengerView({
       <SectionHeader
         title="Assumption challenger"
         aside={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <SeverityTally challenges={ordered} />
             {ordered.some((c) => c.question) && (
-              <CopyAllQuestions challenges={ordered} dealName={dealName} />
+              <CopyAllQuestions challenges={ordered} dealName={dealName} totalPages={totalPages} />
             )}
           </div>
         }
@@ -745,7 +783,7 @@ function ChallengeCard({ c }: { c: Challenge }) {
 /** One click → a numbered, email-ready list of every broker question. */
 /** Assemble the challenges into a ready-to-send broker email: subject line,
  *  questions grouped by severity, OM page refs — paste and hit send. */
-function buildBrokerEmail(challenges: Challenge[], dealName?: string): string {
+export function buildBrokerEmail(challenges: Challenge[], dealName?: string, totalPages: number | null = null): string {
   const deal = dealName?.trim() || "the deal";
   const groups: [Challenge["severity"], string][] = [
     ["high", "Deal-critical"],
@@ -758,7 +796,11 @@ function buildBrokerEmail(challenges: Challenge[], dealName?: string): string {
       const qs = challenges.filter((c) => c.severity === sev && c.question);
       if (!qs.length) return null;
       const lines = qs.map((c) => {
-        const page = c.page?.trim() ? ` (OM ${c.page.trim()})` : "";
+        // Only a page the memorandum has: an email to its broker citing a
+        // page their deck does not hold is the one place a misread page
+        // leaves the site.
+        const cited = locatedPage(c.page, totalPages);
+        const page = cited != null ? ` (OM p. ${cited})` : "";
         return `${++n}. ${c.question}${page}`;
       });
       return `${heading}:\n${lines.join("\n")}`;
@@ -783,9 +825,11 @@ function buildBrokerEmail(challenges: Challenge[], dealName?: string): string {
 function CopyAllQuestions({
   challenges,
   dealName,
+  totalPages,
 }: {
   challenges: Challenge[];
   dealName?: string;
+  totalPages: number | null;
 }) {
   const toast = useToast();
   return (
@@ -794,14 +838,14 @@ function CopyAllQuestions({
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(
-            buildBrokerEmail(challenges, dealName),
+            buildBrokerEmail(challenges, dealName, totalPages),
           );
           toast("Broker email copied — subject line and all.", "success");
         } catch {
           toast("Couldn't copy — select the text instead.", "error");
         }
       }}
-      className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+      className="whitespace-nowrap text-xs font-medium text-brand transition-colors hover:text-brand-strong"
     >
       Copy broker email
     </button>
@@ -877,7 +921,7 @@ export function BrokerComps({
   /** rendered on the public /demo page — Pro gates point to signup, not billing */
   publicDemo?: boolean;
   /** subject location for the comps map (Feature 4); null hides the map */
-  mapContext?: { subjectLabel: string; market: string; omUrl: string | null } | null;
+  mapContext?: { subjectLabel: string; market: string; omUrl: string | null; totalPages?: number | null } | null;
   /** the subject's own basis (lib/comp-detail's subjectBasis), the tick the
    *  sale comps' bars are drawn against; null draws the bars with no tick */
   subject?: SubjectBasis | null;
@@ -901,13 +945,17 @@ export function BrokerComps({
       mapContext
         ? [
             ...saleComps.map((c, i): MapComp => {
-              const pageNum = c.page?.match(/\d+/)?.[0];
+              // A page the memorandum has, never the model's raw citation.
+              const pageNum = locatedPage(c.page, mapContext.totalPages);
               return {
                 id: `om-${i}`,
                 kind: "om",
                 name: c.name,
                 detail: c.detail,
                 sourceLabel: pageNum ? `OM p. ${pageNum}` : "OM",
+                // The OM route signs on click; the #page fragment is kept
+                // across its redirect (the Location carries none), as on the
+                // source chips.
                 sourceHref:
                   pageNum && mapContext.omUrl ? `${mapContext.omUrl}#page=${pageNum}` : null,
                 queries: geocodeCandidates(c.name, c.detail, mapContext.market),
@@ -1324,6 +1372,9 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
     d: DIR[r.direction] ?? DIR.neutral,
     share: scale.shares[i] ?? null,
     unit: scale.units[i] ?? null,
+    // The bar is the two figures' own gap (lib/gap-detail); where the
+    // reconciler's line says another, the row says so under it.
+    differs: gapDisagreementLine(r),
   }));
   const legend =
     "Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.";
@@ -1357,7 +1408,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
           up the table takes over. */}
       <div className="sm:hidden">
         <ul className="grid gap-2" aria-label="Reconciliation as cards">
-          {view.map(({ r, d, share, unit }, i) => (
+          {view.map(({ r, d, share, unit, differs }, i) => (
             <li key={i} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <p className="min-w-0 break-words text-sm font-medium">{r.metric}</p>
@@ -1379,6 +1430,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
                 </div>
               </dl>
               {r.gap && <p className="mt-2 text-sm text-ink">{r.gap}</p>}
+              {differs && <p data-gap-differs className="mt-1 text-[11px] text-caution">{differs}</p>}
               {share !== null && unit && <GapBar share={share} unit={unit} />}
             </li>
           ))}
@@ -1396,7 +1448,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
             </tr>
           </thead>
           <tbody>
-            {view.map(({ r, d, share, unit }, i) => {
+            {view.map(({ r, d, share, unit, differs }, i) => {
               return (
                 <tr
                   key={i}
@@ -1417,6 +1469,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
                       {d.label}
                     </span>
                     {r.gap && <p className="mt-1 text-ink">{r.gap}</p>}
+                    {differs && <p data-gap-differs className="mt-1 text-[11px] text-caution">{differs}</p>}
                     {share !== null && unit && <GapBar share={share} unit={unit} />}
                   </td>
                 </tr>
@@ -1656,7 +1709,7 @@ function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]
       </summary>
       <ul className="mt-3 space-y-1.5 text-muted">
         {brief.lines.map((line) => (
-          <li key={line} className="leading-relaxed">{line}</li>
+          <li key={line} className="leading-relaxed">{currentBriefLine(line)}</li>
         ))}
       </ul>
     </details>
@@ -1706,14 +1759,6 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 /** Parse "5.25%–5.75%" / "5.25 to 5.75" style ranges into [lo, hi]. */
-function parseRange(sv: string): [number, number] | null {
-  const nums = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/g);
-  if (!nums || nums.length < 2) return null;
-  const lo = parseFloat(nums[0]);
-  const hi = parseFloat(nums[1]);
-  return hi > lo ? [lo, hi] : null;
-}
-
 function PositionBar({
   assessment,
   omSays,
@@ -1725,8 +1770,8 @@ function PositionBar({
 }) {
   // Plot the OM's value against the typical band — "how far outside typical"
   // is the actual analyst question, not just which side of it.
-  const band = parseRange(typicalRange);
-  const om = firstNum(omSays);
+  const band = readTypicalRange(typicalRange);
+  const om = firstNumber(omSays);
   if (band && om != null) {
     const [lo, hi] = band;
     const pad = (hi - lo) * 0.35 || Math.abs(hi) * 0.1 || 1;
@@ -1901,18 +1946,23 @@ function VerdictHero({
   result,
   compact = false,
   stale = false,
+  staleWhy = "failed",
   onMore,
 }: {
   result: VerdictResult;
   compact?: boolean;
-  /** the latest screen failed before re-running the verdict — this call was
-   *  written about the terms as they were before that run */
+  /** the latest screen has not re-run the verdict — this call was written
+   *  about the terms as they were before that run */
   stale?: boolean;
+  /** why: that screen failed before the verdict, or is still running */
+  staleWhy?: "failed" | "running";
   onMore?: () => void;
 }) {
   const v = VERDICT[result.verdict] ?? VERDICT.caution;
   const topRisks = result.topRisks ?? [];
   const nextSteps = result.nextSteps ?? [];
+  // The day the call was written, so a call weeks old never reads as today's.
+  const on = screenedOn(result.generatedAt);
   return (
     <section
       className={`overflow-hidden rounded-2xl border border-line border-l-4 bg-surface shadow-sm ${v.rail}`}
@@ -1921,12 +1971,22 @@ function VerdictHero({
         <span className="text-xs font-medium uppercase tracking-wider text-muted">
           Verdict
         </span>
+        {on && (
+          <span className="text-xs text-muted" data-qa="verdict-date">
+            {" · "}
+            {on}
+          </span>
+        )}
         {stale && (
           <>
             {" "}
             <span
               className="ml-2 rounded-full bg-caution/10 px-2 py-px text-[11px] font-medium text-caution"
-              title="The latest screen failed before it reached the verdict. This call was written about the terms as they stood before that run — run the screen again to refresh it."
+              title={
+                staleWhy === "running"
+                  ? "A new screen of this deal is running. This call was written about the terms as they stood before it — the run replaces it when it reaches the verdict."
+                  : "The latest screen failed before it reached the verdict. This call was written about the terms as they stood before that run — run the screen again to refresh it."
+              }
             >
               From the previous screen
             </span>
@@ -2005,14 +2065,17 @@ function VerdictHero({
 export function VerdictView({
   result,
   stale = false,
+  staleWhy = "failed",
 }: {
   result: VerdictResult;
-  /** the latest screen failed before re-running the verdict */
+  /** the latest screen has not re-run the verdict */
   stale?: boolean;
+  /** why: that screen failed before the verdict, or is still running */
+  staleWhy?: "failed" | "running";
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <VerdictHero result={result} stale={stale} />
+      <VerdictHero result={result} stale={stale} staleWhy={staleWhy} />
       {result.screen && <ScreeningRanges screen={result.screen} />}
     </div>
   );
@@ -2136,23 +2199,17 @@ const RANGE_CONF: Record<ScreenRange["confidence"], { label: string; cls: string
   low: { label: "Low", cls: "bg-kill/10 text-kill" },
 };
 
-/** Pull the first numeric out of a display string ("$1,495" → 1495). */
-function firstNum(sv: string): number | null {
-  const m = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-  return m ? parseFloat(m[0]) : null;
-}
 
-function RangeCard({ r }: { r: ScreenRange }) {
+function RangeCard({ r: stored }: { r: ScreenRange }) {
+  // Read in numeric order (lib/verdict-range): a verdict stored when the
+  // conservative end came first can hold its larger figure as "low".
+  const r = rangeInOrder(stored);
   const conf = RANGE_CONF[r.confidence] ?? RANGE_CONF.medium;
   // Positional encoding: WHERE the base sits inside low→high is the most
-  // diagnostic fact about a range (hugging the sponsor's end is a tell).
-  const lo = firstNum(r.low);
-  const hi = firstNum(r.high);
-  const base = firstNum(r.base);
-  const pos =
-    lo != null && hi != null && base != null && hi > lo
-      ? Math.min(1, Math.max(0, (base - lo) / (hi - lo)))
-      : null;
+  // diagnostic fact about a range. The dot is one neutral colour: the
+  // higher figure is not always the sponsor's (a higher vacancy is the
+  // buyer's end), so the position is drawn, never graded.
+  const pos = basePosition(r);
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
@@ -2175,15 +2232,9 @@ function RangeCard({ r }: { r: ScreenRange }) {
             style={{ width: `${pos * 100}%` }}
           />
           <span
-            className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${
-              pos > 0.7 ? "bg-caution" : "bg-brand"
-            }`}
+            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-2 ring-surface"
             style={{ left: `${pos * 100}%` }}
-            title={
-              pos > 0.7
-                ? "Base sits near the optimistic end of the range"
-                : "Where the base sits inside the range"
-            }
+            title="Where the base sits inside the range"
           />
         </div>
       )}
@@ -2250,6 +2301,8 @@ function DealKillerCard({ k, index }: { k: DealKiller; index: number }) {
 
 export type TabSupplement = {
   notes: { id: string; text: string; createdAt: string }[];
+  /** `url` is the route that signs the file when it is clicked
+   *  (lib/deal-file-link), null where the path is not the deal's own. */
   files: { id: string; name: string; createdAt: string; url: string | null }[];
 };
 
@@ -2334,6 +2387,10 @@ function RemoveButton({
   );
 }
 
+/** A note or a file kept with the deal (deals.supplements), shown back under
+ *  the section and on the Documents tab. Nothing in the analysis reads it —
+ *  not the screen, the model or Ask — so the words promise a note kept with
+ *  the deal, never a correction to a figure. */
 export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -2347,7 +2404,7 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
         <IconPlus
           className={`h-4 w-4 transition-transform ${open ? "rotate-45" : ""}`}
         />
-        Add info or upload to this section
+        Add a note or a file to this section
       </button>
       {open && (
         <div className="mt-4 space-y-4">
@@ -2356,10 +2413,10 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
             <input type="hidden" name="tab" value={tab} />
             <textarea
               name="text"
-              aria-label="Note for this section"
+              aria-label="Note to keep with this deal"
               required
               rows={2}
-              placeholder="Add a note, a correction, or a figure the analysis missed…"
+              placeholder="A note to keep with this deal…"
               className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
             />
             <button
@@ -2385,8 +2442,8 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
               </button>
             </form>
             <p className="mt-1.5 text-[11px] text-muted">
-              Rent roll, T-12, comp sheet, anything — PDF, Excel, CSV, or image
-              (up to 32 MB).
+              Kept with the deal for reference — the analysis does not read
+              notes or files added here. PDF, Excel, CSV or image, up to 32 MB.
             </p>
           </div>
         </div>

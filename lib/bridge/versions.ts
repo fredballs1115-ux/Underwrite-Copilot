@@ -2,18 +2,20 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeUnderwrite, type UnderwriteResult } from "@/lib/underwrite/engine";
 import { buildBridge, type Bridge } from "./attribution";
-import { changedPaths } from "./fields";
 import type { Assumptions } from "./model";
+import { needsSnapshot, nextAutoLabel, saveFailure, type SaveFailure } from "./version-rules";
 
 /**
  * Persistence for the Assumption Bridge: immutable version snapshots plus a
  * cache of the bridge between any two of them.
  *
  * A snapshot is taken automatically whenever a deal's derived assumptions
- * actually MOVE (re-screen, a supplement that changes NOI, an address/price
- * correction), and manually when the user saves a scenario off the sensitivity
- * playground. Identical assumptions are never snapshotted twice — a version
- * list full of duplicates is a version list nobody reads.
+ * actually MOVE from its latest base snapshot (re-screen, a supplement that
+ * changes NOI, an address/price correction, the rate index moving), and
+ * manually when the user saves a scenario. A scenario is never a base, so
+ * saving one takes no automatic copy of the base after it — a version list
+ * full of duplicates is a version list nobody reads. The rules are pure and
+ * tested in ./version-rules.
  */
 
 export interface DealVersion {
@@ -72,16 +74,6 @@ export async function listDealVersions(
   return (data ?? []) as unknown as DealVersion[];
 }
 
-/** `v1`, `v2`, … skipping labels already taken (including manual ones). */
-export function nextAutoLabel(existing: readonly { version_label: string }[]): string {
-  const taken = new Set(existing.map((v) => v.version_label));
-  for (let i = 1; i < 1000; i++) {
-    const label = `v${i}`;
-    if (!taken.has(label)) return label;
-  }
-  return `v${Date.now()}`;
-}
-
 export interface SnapshotOptions {
   dealId: string;
   userId: string;
@@ -95,49 +87,85 @@ export interface SnapshotOptions {
 export type SnapshotOutcome =
   | { status: "created"; version: DealVersion }
   | { status: "duplicate"; version: DealVersion }
-  | { status: "failed"; error: string };
+  /** `reason` is what the write was refused for (./version-rules'
+   *  `saveFailure`); `error` the database's own words, for the log only */
+  | { status: "failed"; reason: SaveFailure; error: string };
 
 /**
- * Snapshot an assumption set. Returns `duplicate` (without writing) when the
- * most recent version already carries the same assumptions — that's the common
- * case on every page render, and it must be cheap and silent.
+ * Snapshot an assumption set.
+ *
+ * An AUTOMATIC snapshot returns `duplicate` (without writing) when the latest
+ * base snapshot already carries the same assumptions — the common case on
+ * every page render, and it must be cheap and silent. A MANUAL save is always
+ * honoured — the user labelling the current state is the point, even if the
+ * numbers match.
+ *
+ * An automatic label that a concurrent snapshot took first (the unique
+ * index) is not a failure: the labels and the base are read again, and the
+ * snapshot is either taken under the next label or found to be one already.
  */
 export async function snapshotVersion(
   supabase: SupabaseClient,
   opts: SnapshotOptions,
 ): Promise<SnapshotOutcome> {
-  const existing = await listDealVersions(supabase, opts.dealId);
-  const latest = existing[0];
   const manual = opts.automatic === false;
+  const asked = opts.label?.trim() || null;
+  let lastError = "";
 
-  // An automatic snapshot is suppressed when nothing moved. A MANUAL save is
-  // always honoured — the user labelling the current state is the point, even
-  // if the numbers match.
-  if (!manual && latest && changedPaths(latest.assumptions, opts.assumptions).length === 0) {
-    return { status: "duplicate", version: latest };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const [labelsRes, baseRes] = await Promise.all([
+      // Every label the deal uses — newest first, so a server row cap still
+      // holds the highest vN — never the sixty the page lists.
+      supabase
+        .from("deal_versions")
+        .select("version_label")
+        .eq("deal_id", opts.dealId)
+        .order("created_at", { ascending: false })
+        .limit(10_000),
+      supabase
+        .from("deal_versions")
+        .select(VERSION_COLS)
+        .eq("deal_id", opts.dealId)
+        .eq("automatic", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (labelsRes.error || baseRes.error) {
+      const error = labelsRes.error ?? baseRes.error;
+      return { status: "failed", reason: saveFailure(error), error: error?.message ?? "Could not read the versions." };
+    }
+    const base = (baseRes.data as unknown as DealVersion | null) ?? null;
+    if (!manual && base && !needsSnapshot(opts.assumptions, [base])) {
+      return { status: "duplicate", version: base };
+    }
+
+    const labels = ((labelsRes.data ?? []) as { version_label: string }[]).map((r) => r.version_label);
+    const label = asked ?? nextAutoLabel(labels);
+    const results = resultsFrom(computeUnderwrite(opts.assumptions));
+
+    const { data, error } = await supabase
+      .from("deal_versions")
+      .insert({
+        deal_id: opts.dealId,
+        user_id: opts.userId,
+        version_label: label,
+        note: opts.note?.trim() || null,
+        assumptions: opts.assumptions,
+        results,
+        automatic: !manual,
+      })
+      .select(VERSION_COLS)
+      .maybeSingle();
+
+    if (!error && data) return { status: "created", version: data as unknown as DealVersion };
+    lastError = error?.message ?? "Could not save the version.";
+    // A label the user typed that is taken is theirs to change; one this
+    // module picked is read again and picked again.
+    if (error && saveFailure(error) === "label_taken" && !asked) continue;
+    return { status: "failed", reason: saveFailure(error), error: lastError };
   }
-
-  const label = opts.label?.trim() || nextAutoLabel(existing);
-  const results = resultsFrom(computeUnderwrite(opts.assumptions));
-
-  const { data, error } = await supabase
-    .from("deal_versions")
-    .insert({
-      deal_id: opts.dealId,
-      user_id: opts.userId,
-      version_label: label,
-      note: opts.note?.trim() || null,
-      assumptions: opts.assumptions,
-      results,
-      automatic: !manual,
-    })
-    .select(VERSION_COLS)
-    .maybeSingle();
-
-  if (error || !data) {
-    return { status: "failed", error: error?.message ?? "Could not save the version." };
-  }
-  return { status: "created", version: data as unknown as DealVersion };
+  return { status: "failed", reason: "failed", error: lastError };
 }
 
 /**

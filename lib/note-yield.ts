@@ -36,13 +36,30 @@
 //
 // THE COLLATERAL'S VALUE IS THE OM'S. Loan-to-value at the balance and at
 // the price are two divisions by the value the memorandum states — the
-// cushion under the lender and under the buyer — never a value of ours.
+// cushion under the lender and under the buyer — never a value of ours. And
+// only for a note nothing ranks ahead of: a mezzanine loan, a second or
+// junior lien, a B-note, subordinate debt or a position behind a senior loan
+// is at risk from its LAST dollar, which sits on top of the senior balance —
+// $15M behind a $60M senior loan on a $70M value had read 21% where the
+// stack is 107%. The memorandum states no senior balance (the extraction has
+// no row for one), so the loan-to-value is withheld, never computed. The
+// position is read from the words only where they place THIS note (a second
+// lien, a B-note, a junior participation, "behind a $60M senior loan"); a
+// mention of other debt beside a first-lien note leaves it first, a negated
+// one ("no mezzanine or junior debt") is no mention, and a bare mention with
+// nothing to place the note is said as unclear, never as a senior loan ahead
+// of it (the audit of 2026-10-01).
 
 import { withArticle } from "@/lib/article";
 import { parseUsd } from "@/lib/money";
 import { irr } from "@/lib/underwrite/engine";
 
 export type NoteStatus = "performing" | "non_performing";
+
+/** Where the note sits, as its words place it: "first" (nothing named
+ *  ahead of it), "behind" (the words put this note behind other debt), or
+ *  "unclear" (they name other debt without saying which comes first). */
+export type NotePosition = "first" | "behind" | "unclear";
 
 export interface NoteTerms {
   /** the unpaid principal balance, as stated */
@@ -51,6 +68,10 @@ export interface NoteTerms {
   ratePct: number | null;
   /** the maturity as an ISO date; null where the OM states none, or only a year */
   maturity: string | null;
+  /** the OM states the maturity's month and no day ("Mar 2028"): read as
+   *  the month's last day, and said inside that month as due "this month"
+   *  (`NoteRead.thisMonth`); absent where it states the day */
+  maturityIsMonth?: boolean;
   /** true where the OM says interest-only; false where it states an
    *  amortization; null where it says neither — or both, an interest-only
    *  period beside an amortization (`amortYears` set) */
@@ -61,6 +82,13 @@ export interface NoteTerms {
   status: NoteStatus | null;
   /** the collateral's value as the OM states it */
   collateralValue: number | null;
+  /** the note sits behind other debt, or may, as the memorandum's words for
+   *  it say (`isSubordinateNote`): its loan-to-value needs a senior balance
+   *  the memorandum does not state, and is withheld */
+  subordinate: boolean;
+  /** which of the two: placed behind other debt, or named beside it with no
+   *  order stated (`notePosition`); absent reads as `subordinate` says */
+  position?: NotePosition;
 }
 
 export interface NoteRead {
@@ -71,8 +99,12 @@ export interface NoteRead {
   cents: number | null;
   /** a year's interest on the balance over the price, percent */
   currentYieldPct: number | null;
-  /** whole months from the reading's date to maturity */
+  /** whole months from the reading's date to maturity — the arithmetic's
+   *  count, 0 inside the last month; null past maturity */
   monthsLeft: number | null;
+  /** days from the reading's date to maturity, negative once it has gone
+   *  by — what "past" and "due" are said from, never the whole months */
+  daysLeft: number | null;
   /** the monthly IRR × 12, percent — null without the terms to run it, or
    *  past maturity */
   ytmPct: number | null;
@@ -81,12 +113,20 @@ export interface NoteRead {
    *  years from today's balance", or run interest-only where the OM states
    *  an interest-only period beside an amortization */
   paymentBasis: string | null;
-  /** the balance over the collateral's stated value, percent */
+  /** the balance over the collateral's stated value, percent — null on a
+   *  subordinate note, whose loan-to-value runs on top of a senior balance
+   *  the memorandum does not state */
   ltvAtBalancePct: number | null;
-  /** the price over the collateral's stated value, percent */
+  /** the price over the collateral's stated value, percent — null on a
+   *  subordinate note, as above */
   ltvAtPricePct: number | null;
-  /** past maturity on the reading's date */
+  /** past maturity on the reading's date: its day has gone by. On the day
+   *  itself the note is due, not past it */
   matured: boolean;
+  /** the maturity is stated as a month alone and the reading's date falls
+   *  in it: due "this month", never "today" or "in under a month" on a day
+   *  the memorandum never named */
+  thisMonth: boolean;
 }
 
 // ── Reading the terms ───────────────────────────────────────────────────
@@ -113,27 +153,60 @@ export function parseMaturity(text: string | null | undefined): string | null {
 /**
  * A date as the OM writes it, in the formats `parseMaturity` reads, inside
  * the years the caller accepts — a loan's maturity falls this century, a
- * ninety-nine-year ground lease's end can fall in the next (#421).
+ * ninety-nine-year ground lease's end can fall in the next (#421). A month
+ * with no day is the month's end; a reader that must say which day it took
+ * reads `readStatedDate`.
  */
 export function parseStatedDate(text: string | null | undefined, minYear: number, maxYear: number): string | null {
+  return readStatedDate(text, minYear, maxYear, "last")?.iso ?? null;
+}
+
+/** A date the memorandum states, and whether it states the day. */
+export interface StatedDate {
+  /** the ISO day: for a month alone, the side the caller asked for */
+  iso: string;
+  /** the memorandum states a month and a year and no day ("June 2027",
+   *  "06/2027"): the day is the reader's choice, never the memorandum's, so
+   *  a sentence inside the month says "this month" — never "today", and
+   *  never "under a month" on the strength of a day nobody stated */
+  month: boolean;
+}
+
+/**
+ * A date as the OM writes it (the formats above), and whether it names the
+ * day. A month alone is read on the side the caller names (the audit of
+ * 2026-10-04: every month was read as its LAST day, so a lease stated "June
+ * 2027" ended "today" on June 30, and an abatement read early ran "under a
+ * month" all June): its FIRST day where an earlier end is the one that does
+ * not flatter the buyer — a lease, a contract, an abatement, a right to
+ * leave — its LAST where a later one is, a rent restriction.
+ */
+export function readStatedDate(
+  text: string | null | undefined,
+  minYear: number,
+  maxYear: number,
+  side: "first" | "last",
+): StatedDate | null {
   const validYear = (y: number) => y >= minYear && y <= maxYear;
+  const day = (y: number, mo: number, d: number): StatedDate => ({ iso: iso(y, mo, d), month: false });
+  const month = (y: number, mo: number): StatedDate => ({ iso: iso(y, mo, side === "first" ? 1 : lastDay(y, mo)), month: true });
   const s = (text ?? "").trim().replace(/\s+/g, " ");
   if (!s) return null;
   let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) {
     const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? iso(y, mo, d) : null;
+    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? day(y, mo, d) : null;
   }
   m = s.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
   if (m) {
     const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
     const [mo, d] = [Number(m[1]), Number(m[2])];
-    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? iso(y, mo, d) : null;
+    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? day(y, mo, d) : null;
   }
   m = s.match(/\b(\d{1,2})\/(\d{4})\b/);
   if (m) {
     const [mo, y] = [Number(m[1]), Number(m[2])];
-    return validYear(y) && mo >= 1 && mo <= 12 ? iso(y, mo, lastDay(y, mo)) : null;
+    return validYear(y) && mo >= 1 && mo <= 12 ? month(y, mo) : null;
   }
   m = s.match(/\b([A-Za-z]{3,9})\.?\s+(?:(\d{1,2})(?:st|nd|rd|th)?,?\s+)?(\d{4})\b/);
   if (m) {
@@ -142,14 +215,99 @@ export function parseStatedDate(text: string | null | undefined, minYear: number
     if (!mo || !validYear(y)) return null;
     if (m[2]) {
       const d = Number(m[2]);
-      return d >= 1 && d <= lastDay(y, mo) ? iso(y, mo, d) : null;
+      return d >= 1 && d <= lastDay(y, mo) ? day(y, mo, d) : null;
     }
-    return iso(y, mo, lastDay(y, mo));
+    return month(y, mo);
   }
   return null;
 }
 
-type MetricRows = { metrics?: Array<{ label: string; value: string }> } | null | undefined;
+/** Whether a reading's ISO day falls in the month of another ISO day — an
+ *  end stated as a month alone, read inside that month. */
+export const sameMonth = (todayIso: string, endIso: string): boolean => todayIso.slice(0, 7) === endIso.slice(0, 7);
+
+/** Whether a reading's ISO day falls in the year of another ISO day — an
+ *  end stated as a year alone ("2071"), read inside that year. */
+export const sameYear = (todayIso: string, endIso: string): boolean => todayIso.slice(0, 4) === endIso.slice(0, 4);
+
+type MetricRows =
+  | {
+      metrics?: Array<{ label: string; value: string }>;
+      /** the interest as the extraction states it — its sentence and the
+       *  loan's terms, read for the note's position */
+      interest?: { summary?: string | null; loan?: string | null } | null;
+    }
+  | null
+  | undefined;
+
+// The note named AHEAD of the other loan: "senior to a $10M B-note", "ahead
+// of the mezzanine loan", "a $5M mezzanine loan sits behind it".
+const THIS_NOTE = String.raw`(?:it|this\s+(?:loan|note|mortgage|lien))\b`;
+const RANKS_AHEAD = new RegExp(
+  String.raw`\bsenior\s+to\b|\bahead\s+of\b|\bbehind\s+${THIS_NOTE}|\b(?:subordinat(?:e|ed)|junior)\s+to\s+${THIS_NOTE}`,
+  "i",
+);
+// The note placed BEHIND another: "behind a $60M senior loan", "a position
+// behind the senior lender", "subordinate to the A-note", "junior to the
+// first mortgage". "Behind" alone is no position: a borrower "4 months
+// behind on payments" is a payment status.
+const RANKS_BEHIND = new RegExp(
+  String.raw`\bbehind\s+(?!${THIS_NOTE})(?:an?|the|its|\$)[^.;]{0,60}?\b(?:loans?|liens?|mortgages?|notes?|lenders?|debt|financing)\b|\b(?:subordinat(?:e|ed)|junior)\s+to\b(?!\s+${THIS_NOTE})`,
+  "i",
+);
+// Words that describe THIS note as subordinate by what it is: a second
+// lien, a B-note or B-piece, a junior or subordinate participation, piece,
+// note or lien, a note said to be junior, or the sale of a mezzanine loan.
+const SUBORDINATE_SELF =
+  /\b(?:second|2nd|third|3rd)[\s-]+(?:lien|mortgage|position|priority|trust[\s-]+deed|deed[\s-]+of[\s-]+trust)\b|\bb[\s-]?notes?\b|\bb[\s-]pieces?\b|\b(?:junior|subordinat(?:e|ed))[\s-]+(?:participations?|pieces?|tranches?|interests?|notes?|loans?|liens?|positions?|debt|financing|mortgages?)\b|\b(?:is|are|ranks?|sits?)\s+(?:junior|subordinat(?:e|ed))\b|\b(?:sale|offering|purchase|acquisition)\s+of\s+(?:an?|the)\s+(?:\$[\d.,]+\s*[mk]?\s+)?(?:(?:non[\s-]?)?performing\s+)?mezz(?:anine)?\b|\(\s*mezz(?:anine)?\s*\)/i;
+// A junior piece OF a first loan is still junior: "a junior participation
+// in a $50M first mortgage loan", "the B-note of a first mortgage".
+const PIECE_OF_FIRST = /\b(?:junior|subordinat(?:e|ed)|b)[\s-]+(?:participations?|pieces?|tranches?|interests?|notes?)\s+(?:in|of)\b/i;
+// A mention of other debt that does not say whose it is.
+const OTHER_DEBT = /\bmezz(?:anine)?\b|\bjunior\b|\bsubordinat(?:e|ed)\b/i;
+// The note's own first position.
+const FIRST_SELF =
+  /\b(?:first|1st)[\s-]+(?:lien|mortgage|position|priority|trust[\s-]+deed|deed[\s-]+of[\s-]+trust)\b|\bsenior\s+(?:secured\s+)?(?:loan|note|mortgage|lien|position|debt)\b|\bA-notes?\b/i;
+// A mention struck by its own negation: "no mezzanine or junior debt", "not
+// subordinated to any other debt", "without any subordinate financing",
+// "non-subordinated". Its words are no evidence either way.
+const SUB_KEY = String.raw`(?:mezz(?:anine)?|junior|subordinat(?:e|ed|ion)|b[\s-]?notes?|b[\s-]pieces?|second[\s-]+(?:liens?|mortgages?)|2nd[\s-]+(?:liens?|mortgages?)|other\s+(?:debt|liens?|financing))`;
+const NEGATED = new RegExp(
+  String.raw`\b(?:no|not|non|nor|without|never|neither|free\s+(?:and\s+clear\s+)?of)[\s-]+(?:(?:any|other|additional|further|outstanding|existing)\s+){0,3}${SUB_KEY}(?:\s*(?:,|\bor\b|\bnor\b|\band\b)\s*(?:(?:any|other)\s+)?${SUB_KEY})*(?:\s+(?:to|debt|loans?|liens?|financing|interests?|positions?|notes?)\b(?:\s+(?:any|other|the|an?)\b)*(?:\s+(?:debt|loans?|liens?|financing|mortgages?))?)?`,
+  "gi",
+);
+
+/**
+ * Where the words for a note place it (the audit of 2026-10-01: a first-lien
+ * note "4 months behind on payments", or one stating "no mezzanine or junior
+ * debt", had been printed as sitting behind a senior loan):
+ * - "behind" where the words place THIS note behind other debt — a second
+ *   lien, a B-note, a junior participation, "behind a $60M senior loan",
+ *   "subordinate to the A-note" — unless they name it ahead of the other
+ *   ("a $40M A-note senior to a $10M B-note");
+ * - "first" where they name nothing behind which it sits, or name its own
+ *   first position beside a mention of other debt ("first mortgage note;
+ *   the borrower also has a mezzanine loan");
+ * - "unclear" where they mention other debt and nothing places the note.
+ * A negated mention is struck before any of it is read.
+ */
+export function notePosition(words: string | null | undefined): NotePosition {
+  const w = (words ?? "").replace(NEGATED, " ");
+  const behind = RANKS_BEHIND.test(w);
+  if (RANKS_AHEAD.test(w) && !behind) return "first";
+  if (behind) return "behind";
+  const first = FIRST_SELF.test(w);
+  if (SUBORDINATE_SELF.test(w)) return first && !PIECE_OF_FIRST.test(w) ? "first" : "behind";
+  if (OTHER_DEBT.test(w)) return first ? "first" : "unclear";
+  return "first";
+}
+
+/** Whether a note's loan-to-value must be withheld: its words place it
+ *  behind other debt, or name other debt with no order stated — a
+ *  loan-to-value withheld is the error that prints no wrong figure. */
+export function isSubordinateNote(words: string | null | undefined): boolean {
+  return notePosition(words) !== "first";
+}
 
 const rowOf = (ex: MetricRows, re: RegExp, not?: RegExp) =>
   (ex?.metrics ?? []).find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
@@ -194,9 +352,20 @@ export function noteTermRows<M extends { label: string; value: string }>(metrics
 }
 
 /** The note's terms from the rows the extraction is asked to label them
- *  — each only as stated, null where the OM says nothing. */
+ *  — each only as stated, null where the OM says nothing. Its position is
+ *  read from the interest's own sentence and terms and the note's rows. */
 export function readNoteTerms(ex: MetricRows): NoteTerms {
   const { balanceRow, rateRow, maturityRow, amortRow, ioRow, statusRow, valueRow } = noteRowsOf(ex);
+  // The payment status is no position ("4 months behind on payments"), so
+  // its row is not read for one.
+  const position = [
+    ex?.interest?.summary,
+    ex?.interest?.loan,
+    ...[balanceRow, rateRow, maturityRow, amortRow, ioRow].flatMap((r) => (r ? [r.label, r.value] : [])),
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const placed = notePosition(position);
 
   const amortText = amortRow?.value ?? "";
   const statesIo =
@@ -207,6 +376,9 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
   const monthsHit = amortText.match(/(\d{2,3})\s*(?:-month|months?|mos?\b)/i);
   const years = yearsHit ? Number(yearsHit[1]) : monthsHit && Number(monthsHit[1]) >= 60 ? Number(monthsHit[1]) / 12 : NaN;
   const amortYears = Number.isFinite(years) && years > 0 ? years : null;
+  // A month alone is its last day (`parseMaturity`'s rule), marked so its
+  // last month says "this month".
+  const maturity = maturityRow ? readStatedDate(maturityRow.value, 1990, 2100, "last") : null;
   const statusText = statusRow ? `${statusRow.label} ${statusRow.value}`.toLowerCase() : "";
   const status: NoteStatus | null = !statusRow
     ? null
@@ -219,12 +391,15 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
   return {
     balance: balanceRow ? money(balanceRow.value) : null,
     ratePct: rateRow ? pct(rateRow.value) : null,
-    maturity: maturityRow ? parseMaturity(maturityRow.value) : null,
+    maturity: maturity?.iso ?? null,
+    ...(maturity?.month ? { maturityIsMonth: true } : {}),
     // Both stated is neither: the OM does not say which applies from today.
     interestOnly: statesIo ? (amortYears != null ? null : true) : amortYears != null ? false : null,
     amortYears,
     status,
     collateralValue: valueRow ? money(valueRow.value) : null,
+    subordinate: placed !== "first",
+    position: placed,
   };
 }
 
@@ -232,11 +407,48 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
 
 /** Whole months from one day to another — a month is counted only once its
  *  day is reached, so a note maturing on the 1st, read on the 15th, has one
- *  month fewer than the calendar suggests. */
+ *  month fewer than the calendar suggests. The count the arithmetic runs on
+ *  (a month of interest is a whole month); never what says a day is past,
+ *  since every day of the last month counts none (`daysBetween`). */
 export function monthsBetween(fromIso: string, toIso: string): number {
   const [y1, m1, d1] = fromIso.split("-").map(Number);
   const [y2, m2, d2] = toIso.split("-").map(Number);
   return (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+}
+
+/** Whole days from one ISO day to another, in UTC — negative where the
+ *  second is earlier. What a sentence that says a date is past, due or
+ *  before another is decided by: whole months call a day four weeks off
+ *  "none left", and read a maturity next month as one gone by. */
+export function daysBetween(fromIso: string, toIso: string): number {
+  const at = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((at(toIso) - at(fromIso)) / 86_400_000);
+}
+
+/**
+ * Years from one ISO day to another, to the day: the whole months, and the
+ * days past the last of them as a share of the month they fall in, over
+ * twelve. Equal to whole months ÷ 12 wherever the two days of the month
+ * are the same — the anniversaries a hold's years end on — so a date one
+ * day past an anniversary is in the year after it, where whole months put
+ * a lease ending 12 months and 17 days out "in year 1".
+ */
+export function yearsBetween(fromIso: string, toIso: string): number {
+  const months = monthsBetween(fromIso, toIso);
+  const [y, m, d] = fromIso.split("-").map(Number);
+  // The day the whole months reach, and the one a month on, each held to its
+  // month's last day (Jan 31 and a month is Feb 28).
+  const anchor = (k: number) => {
+    const last = new Date(Date.UTC(y, m - 1 + k + 1, 0)).getUTCDate();
+    const at = new Date(Date.UTC(y, m - 1 + k, Math.min(d, last)));
+    return at.toISOString().slice(0, 10);
+  };
+  const from = anchor(months);
+  const span = daysBetween(from, anchor(months + 1));
+  return (months + daysBetween(from, toIso) / span) / 12;
 }
 
 /**
@@ -247,13 +459,23 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
   if (price == null || !(price > 0) || terms.balance == null || !(terms.balance > 0)) return null;
   const balance = terms.balance;
   const today = iso(asOf.getUTCFullYear(), asOf.getUTCMonth() + 1, asOf.getUTCDate());
-  const months = terms.maturity ? monthsBetween(today, terms.maturity) : null;
-  const matured = months != null && months < 1;
+  // Past maturity by the DAY (the time audit of 2026-10-01): whole months
+  // called a note maturing in four weeks one gone by, "past its Mar 2028
+  // maturity" on Feb 2. The day itself is due, not past.
+  const daysLeft = terms.maturity ? daysBetween(today, terms.maturity) : null;
+  // A maturity stated as a month alone is due all that month, and past only
+  // once the month is out — whichever of its days the reading took.
+  const thisMonth = !!terms.maturityIsMonth && !!terms.maturity && sameMonth(today, terms.maturity);
+  const matured = !thisMonth && daysLeft != null && daysLeft < 0;
+  // The whole months the yield runs over — none inside the last month, so a
+  // note due within it has no yield to maturity to solve (a month's
+  // payments are the arithmetic's unit).
+  const months = terms.maturity && !matured ? Math.max(0, monthsBetween(today, terms.maturity)) : null;
   const r = terms.ratePct != null ? terms.ratePct / 100 : null;
 
   let ytmPct: number | null = null;
   let paymentBasis: string | null = null;
-  if (r != null && months != null && !matured) {
+  if (r != null && months != null && months >= 1) {
     const i = r / 12;
     const amortizing = terms.interestOnly === false && terms.amortYears != null;
     let payment: number;
@@ -287,11 +509,16 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
     price,
     cents: (price / balance) * 100,
     currentYieldPct: r != null ? ((balance * r) / price) * 100 : null,
-    monthsLeft: months != null && !matured ? months : null,
+    monthsLeft: months,
+    daysLeft,
     ytmPct,
     paymentBasis,
-    ltvAtBalancePct: terms.collateralValue != null ? (balance / terms.collateralValue) * 100 : null,
-    ltvAtPricePct: terms.collateralValue != null ? (price / terms.collateralValue) * 100 : null,
+    // Behind a senior loan the note's last dollar sits on top of a balance
+    // the memorandum does not state: withheld, never struck on the note's
+    // own balance alone.
+    ltvAtBalancePct: terms.collateralValue != null && !terms.subordinate ? (balance / terms.collateralValue) * 100 : null,
+    ltvAtPricePct: terms.collateralValue != null && !terms.subordinate ? (price / terms.collateralValue) * 100 : null,
     matured,
+    thisMonth,
   };
 }

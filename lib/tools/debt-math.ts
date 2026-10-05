@@ -22,6 +22,7 @@
  */
 
 import { sizeLoan, valueFromCap, type LoanTest } from "@/lib/tools/deal-math";
+import { MAX_LOAN_TERM_YEARS, heldTo } from "@/lib/tools/limits";
 
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -122,7 +123,8 @@ export function readDebt(t: DebtTerms): DebtRead {
     return { ...EMPTY, note: "Enter the loan term in whole years — the years until the balloon." };
   }
 
-  const termYears = Math.min(Math.round(t.termYears), 40);
+  // Held to the longest the card runs (lib/tools/limits), and the card says so.
+  const termYears = heldTo(Math.round(t.termYears), MAX_LOAN_TERM_YEARS);
   const ioYears = positive(t.ioYears) ? Math.min(Math.floor(t.ioYears), termYears) : 0;
   const amortYears = positive(t.amortYears) ? t.amortYears : null;
 

@@ -100,6 +100,42 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(conv.getCell(13).value).toBe("2026-09-08");
   });
 
+  it("a call the latest screen has not re-run says so beside the call it shows", async () => {
+    const ws = (
+      await load([
+        { ...STABILIZED, verdictBehind: "running" },
+        { ...CONVERSION, verdictBehind: "failed" },
+        { ...LEGACY, verdict: null, verdictBehind: "running" },
+      ])
+    ).getWorksheet("Pipeline")!;
+    const cells = [6, 7, 8].map((r) => ws.getRow(r).getCell(11).value);
+    expect(cells).toContain("Re-screening (was Caution)");
+    expect(cells).toContain("Screen failed (was Caution)");
+    // No call on file: a first screen running prints no invented call.
+    expect(cells).toContain("—");
+  });
+
+  it("a buy-box fit judged on the first signal says so on its cell, as the pipeline card's \"First read\" does", async () => {
+    const ws = (
+      await load([
+        { ...STABILIZED, fit: "near", fitFirstRead: true },
+        { ...CONVERSION, fit: "fits" },
+        { ...LEGACY, fit: null, fitFirstRead: true },
+      ])
+    ).getWorksheet("Pipeline")!;
+    const cells = [6, 7, 8].map((r) => ws.getRow(r).getCell(10));
+    const first = cells.find((c) => String(c.value).startsWith("Near"))!;
+    expect(first.value).toBe("Near (first read)");
+    expect(first.font?.italic).toBe(true);
+    expect(JSON.stringify(first.note)).toContain("judged on the first pass over the memorandum");
+    // The full screen's fit stands as it was, unmarked and with no note.
+    const full = cells.find((c) => String(c.value).startsWith("Fits"))!;
+    expect(full.value).toBe("Fits");
+    expect(full.note).toBeUndefined();
+    // No fit at all is a dash, never a mark on nothing.
+    expect(cells.map((c) => c.value)).toContain("—");
+  });
+
   it("a share's price keeps its figure and carries what it buys as the cell's note; a building's has none (#415)", async () => {
     const ws = (await load([{ ...STABILIZED, interest: "49% share" }, CONVERSION])).getWorksheet("Pipeline")!;
     const share = ws.getRow(6).getCell(7);
@@ -143,6 +179,32 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     const ws = (await load([])).getWorksheet("Pipeline")!;
     const cfs = (ws as unknown as { conditionalFormattings: unknown[] }).conditionalFormattings;
     expect(cfs).toEqual([]);
+  });
+
+  it("the live pipeline is the deals still in play: a closed deal is neither live nor dead", async () => {
+    const sum = (
+      await load([
+        STABILIZED,
+        { ...STABILIZED, name: "Closed deal", stage: "closed", price: "$30,000,000" },
+        { ...CONVERSION, name: "Closed conversion", stage: "closed" },
+        { ...STABILIZED, name: "Dead deal", stage: "dead", price: "$10,000,000" },
+      ])
+    ).getWorksheet("Summary")!;
+    const byLabel = new Map<string, unknown>();
+    sum.eachRow((row) => {
+      const label = row.getCell(2).value;
+      if (typeof label === "string") byLabel.set(label, row.getCell(3).value);
+    });
+    expect(byLabel.get("Deals (Closed and Dead excluded)")).toBe(1);
+    // The asking value is the one open deal's, never the closed deals' too.
+    const asking = [...byLabel.keys()].filter((l) => l.startsWith("Asking value"));
+    expect(asking).toEqual(["Asking value (1 with a stated price)"]);
+    expect(byLabel.get(asking[0])).toBe(50_000_000);
+    // A closed plan deal is no live plan deal.
+    expect(byLabel.get("Plan deals (judged on yield on cost)")).toBe(0);
+    // The stage table still counts the closed, under their own name.
+    expect(byLabel.get("Closed")).toBe(2);
+    expect(byLabel.get("Dead")).toBe(1);
   });
 
   it("the summary counts the live plan deals, dead ones excluded", async () => {

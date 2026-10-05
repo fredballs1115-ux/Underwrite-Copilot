@@ -4,10 +4,13 @@ import Link from "next/link";
 import { MarketBand } from "@/app/place-band";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
+  basisLabel,
   buildComps,
   summarizeMarkets,
   fmtCapRange,
+  explorerLeads,
   fmtBasisRange,
+  marketsIn,
   type MarketGroup,
 } from "@/lib/market-memory";
 import { RatesStrip } from "@/app/rates-strip";
@@ -18,8 +21,9 @@ import { SectorJobsRank } from "./sector-jobs-rank";
 import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
 import { SurveyVacancyBoard } from "./survey-vacancy-board";
 import { DATA_METROS } from "@/lib/market-match";
+import { regionCountLabel } from "@/lib/market-count";
 import { marketMeta, marketPageFor, sectorPageFor } from "@/lib/public-pages";
-import { heatShade } from "./heat-shade";
+import { marketHeading, publicMetadata } from "@/lib/page-meta";
 import { MetroLive } from "./metro-live";
 import { ReadOnlyMetroView } from "./read-only-metro";
 import { LessorRentLine } from "./lessor-rent-line";
@@ -31,31 +35,44 @@ import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
 import { RealtorLine } from "./realtor-line";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { DC_AREA_METRO, FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrOf, fmrTwoBed, fmrWhen, readFmrMetric } from "@/lib/fmr";
+import { datedLong } from "@/lib/debt-index";
+import { asOfLabel } from "@/lib/research";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
 import { looseValue, SECTORS } from "@/lib/research-sectors";
-import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
+import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS, compsFeedLive } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
-import multifamilySeed from "@/data/research/multifamily.json";
 import {
   sectorLeaderboard,
+  sectorStandings,
   type SnapBlock,
+  type Standing,
 } from "@/lib/sector-leaderboard";
-import { CopyCite } from "./copy-cite";
+import { blockCitations, rentOf, rentText, snapshotAge, snapshotReadOn } from "@/lib/tracker-read";
+import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
+import { MarketNote } from "./market-note";
 import { SubmarketsPanel } from "./submarkets-panel";
-import {
-  MarketCompare,
-  type CompareMetro,
-  type CompareSector,
-} from "./market-compare";
+import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
+import { listSubmarkets } from "@/lib/market/store";
+import type { Submarket } from "@/lib/market/types";
+import { MarketCompare } from "./market-compare";
+import { COMPARE_METROS } from "./compare-metros";
+import { Fold } from "./fold";
+import { RuleItem } from "./rule-item";
+import { IntelItems, digestLine, type IntelItem } from "./intel-items";
+import { SourceRef } from "./source-ref";
+import { ExampleListings } from "./example-listings";
+import { examplesFor } from "@/lib/example-listings";
+import { FmrRow } from "./fmr-row";
 
-// The compare tool's compact per-metro facts, derived once from the research
-// layer — FMR row, rule count, comps-feed state. Serializable: it crosses the
-// server → client boundary as props.
 /** "By asset type" — the metro's sector fundamentals from the research
  *  layer's snapshot blocks: vacancy (a spread when trackers diverge — the
  *  divergence is shown, never averaged), asking rent, and cap-rate bands,
- *  each with its status chip and provenance note. Metros without a snapshot
+ *  each with its status chip and provenance note, and each figure credited
+ *  to its own house, area and period and linked to its own source
+ *  (lib/tracker-read `blockCitations`) — the snapshot's day is the day the
+ *  research was read, never the figures' date. Metros without a snapshot
  *  say so honestly. */
 const SECTOR_LABEL: Record<string, string> = {
   multifamily: "Multifamily",
@@ -63,50 +80,29 @@ const SECTOR_LABEL: Record<string, string> = {
   industrial: "Industrial",
   retail: "Retail",
 };
-// Where each metro sits in its sector's cross-metro ranking (tightest first),
-// keyed sector → metro id — same shared builder the leaderboard table and the
-// homepage lens render, so a brief's chip can never disagree with the table.
-// Metros without a numeric vacancy for a sector simply have no rank entry.
-const SECTOR_RANKS: Record<
-  string,
-  Record<string, { rank: number; total: number }>
-> = Object.fromEntries(
-  ["office", "industrial", "multifamily", "retail"].map((sec) => {
-    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
-    return [
-      sec,
-      Object.fromEntries(
-        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
-      ),
-    ];
-  }),
-);
-/** A research note, folded: its first sentence shows, the rest opens on
- *  demand. The whole text stays in the HTML — the page lint, live-verify and
- *  a screen reader all still read it — so it is one click away rather than
- *  on the page at once. A single-sentence note renders as itself. */
-function Fold({ text, className = "" }: { text: string; className?: string }) {
-  const m = /^([\s\S]+?[.!?])\s+([\s\S]+)$/.exec(text);
-  if (!m) return <p className={className}>{text}</p>;
-  return (
-    <details className={className}>
-      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        {m[1]}{" "}
-        <span className="text-[11px] font-medium text-brand">more</span>
-      </summary>
-      <p className="mt-1">{m[2]}</p>
-    </details>
-  );
-}
-
+// Where each metro's figure stands in its sector's cross-metro ranking
+// (tightest first), keyed sector → metro id — the same shared builder the
+// leaderboard table and the coverage board read (lib/sector-leaderboard
+// `sectorStandings`), so a brief's chip can never disagree with the table.
+// A figure the sources do not let the ranking place — undated, over a year
+// old, a narrower stock, a spread of two reads — has a standing with its
+// reason and no rank; a metro with no vacancy figure has none.
+const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 function SectorSnapshotPanel({
   snapshot,
+  today,
   metroId,
+  standings = {},
   national = [],
   metroRates = [],
 }: {
   snapshot: Record<string, unknown> | null;
+  /** the day the page is read (an ISO day): past the research rule's limit
+   *  the day the research was read is said with its age and marked stale */
+  today: string;
   metroId?: string;
+  /** each tracked sector's standings (`sectorStandings`), read for the day */
+  standings?: Record<string, Record<string, Standing>>;
   /** the national rates table (`liveRates`), for each commercial sector's
    *  lessor rent index line — the nation's figure, said so, under the
    *  metro's tracker fundamentals */
@@ -119,14 +115,24 @@ function SectorSnapshotPanel({
   const entries = Object.entries(snapshot ?? {}).filter(
     (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
   );
-  const asOf = typeof snapshot?.as_of === "string" ? snapshot.as_of : null;
+  // The day the research sweep read the blocks — never the figures' own
+  // date, which each figure's credit line states — and, past the research
+  // rule's limit (lib/research-age), its age and the stale mark: the
+  // figures still show.
+  const readOn = snapshotReadOn(snapshot);
+  const stale = staleMark(snapshotAge(snapshot, today));
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
         By asset type
-        {asOf && (
+        {readOn && (
           <span className="ml-1.5 font-normal normal-case tracking-normal">
-            · fundamentals as of {asOf}
+            {`· research read ${datedLong(readOn)}`}
+            {stale && (
+              <span className="text-caution" data-qa="research-stale">
+                {` (${stale})`}
+              </span>
+            )}
           </span>
         )}
       </p>
@@ -147,16 +153,20 @@ function SectorSnapshotPanel({
                   : `vacancy ${vLow}–${vHigh}%`,
               );
             }
-            if (typeof b.asking_rent_psf === "number") {
-              bits.push(
-                `asking $${b.asking_rent_psf.toFixed(2)}/SF${b.rent_basis ? ` (${b.rent_basis})` : ""}`,
-              );
+            // A band as the file states it, never a point made of one.
+            const rent = rentOf(b);
+            if (rent) {
+              bits.push(`asking ${rentText(rent)}/SF${b.rent_basis ? ` (${b.rent_basis})` : ""}`);
             }
             if (
               typeof b.cap_rate_low_pct === "number" &&
               typeof b.cap_rate_high_pct === "number"
             ) {
-              bits.push(`cap ${b.cap_rate_low_pct}–${b.cap_rate_high_pct}%`);
+              bits.push(
+                b.cap_rate_low_pct === b.cap_rate_high_pct
+                  ? `cap ${b.cap_rate_low_pct}%`
+                  : `cap ${b.cap_rate_low_pct}–${b.cap_rate_high_pct}%`,
+              );
             }
             return (
               <li key={sector} className="rounded-lg border border-line/70 p-2.5">
@@ -167,16 +177,8 @@ function SectorSnapshotPanel({
                   <span className="font-mono text-xs tabular-nums text-ink">
                     {bits.length > 0 ? bits.join(" · ") : "figures pending"}
                   </span>
-                  {metroId && SECTOR_RANKS[sector]?.[metroId] && (
-                    <Link
-                      href={`/market?sector=${sector}`}
-                      prefetch={false}
-                      title={`rank among covered-market ${SECTOR_LABEL[sector] ?? sector} vacancy reads, tightest first`}
-                      className="rounded-full border border-line px-1.5 py-px text-[10px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
-                    >
-                      #{SECTOR_RANKS[sector][metroId].rank} of{" "}
-                      {SECTOR_RANKS[sector][metroId].total}
-                    </Link>
+                  {metroId && standings[sector]?.[metroId] && (
+                    <StandingChip sector={sector} metroId={metroId} standing={standings[sector][metroId]} />
                   )}
                   <span
                     className={`ml-auto rounded px-1.5 py-px text-[10px] font-medium ${
@@ -187,17 +189,8 @@ function SectorSnapshotPanel({
                   >
                     {b.status ?? "sourced"}
                   </span>
-                  {b.sources?.[0] && (
-                    <a
-                      href={b.sources[0]}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-                    >
-                      source
-                    </a>
-                  )}
                 </div>
+                <FigureCredits figures={blockCitations(b)} />
                 <SectorJobsLine rates={metroRates} sector={sector} />
                 <LessorRentLine national={national} sector={sector} />
                 {b.note && (
@@ -215,62 +208,6 @@ function SectorSnapshotPanel({
   );
 }
 
-const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
-  const fmr = (m as { fmr_fy2026?: CompareMetro["fmr"] | null }).fmr_fy2026 ?? {};
-  const beds: CompareMetro["fmr"] = { status: fmr.status };
-  for (const k of ["0br", "1br", "2br", "3br"] as const) {
-    const v = fmr[k];
-    if (typeof v === "number") beds[k] = v;
-  }
-  // Sector fundamentals for the compare table, from the same snapshot blocks
-  // the "By asset type" panel renders — nulls simply produce no entry.
-  const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
-    .sector_snapshot;
-  let sectors: CompareMetro["sectors"];
-  if (snap) {
-    sectors = {};
-    for (const sec of ["office", "industrial", "multifamily", "retail"] as const) {
-      const blk = snap[sec] as
-        | {
-            vacancy_pct?: number | null;
-            vacancy_pct_low?: number | null;
-            vacancy_pct_high?: number | null;
-            asking_rent_psf?: number | null;
-            cap_rate_low_pct?: number | null;
-            cap_rate_high_pct?: number | null;
-          }
-        | undefined;
-      if (!blk) continue;
-      const s: CompareSector = {};
-      const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
-      const vHigh = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
-      if (typeof vLow === "number") {
-        s.vLow = vLow;
-        if (typeof vHigh === "number") s.vHigh = vHigh;
-      }
-      if (typeof blk.asking_rent_psf === "number") s.rent = blk.asking_rent_psf;
-      if (
-        typeof blk.cap_rate_low_pct === "number" &&
-        typeof blk.cap_rate_high_pct === "number"
-      ) {
-        s.capLow = blk.cap_rate_low_pct;
-        s.capHigh = blk.cap_rate_high_pct;
-      }
-      if (Object.keys(s).length > 0) sectors[sec] = s;
-    }
-  }
-  return {
-    id: m.id,
-    name: m.name,
-    region: (m as { region?: string }).region ?? "More markets",
-    fmr: beds,
-    sectors,
-    ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
-    compsLive:
-      typeof m.comps_provider === "string" && m.comps_provider !== "discovery",
-  };
-});
-
 // Each metro and sector page names itself (#430): its own title, what it
 // holds, and itself as canonical — forty-odd pages had gone out as one.
 export async function generateMetadata({
@@ -279,30 +216,11 @@ export async function generateMetadata({
   searchParams?: Promise<{ metro?: string; sector?: string }>;
 }): Promise<Metadata> {
   const { metro, sector } = (await searchParams) ?? {};
-  const meta = marketMeta(marketPageFor(metro), sectorPageFor(sector));
-  // A child's openGraph and twitter REPLACE the root's wholesale (the demo
-  // page's note), so the preview's title, description and picture are all
-  // stated here — a shared market page had gone out under the homepage's
-  // title and card (#436).
-  return {
-    title: meta.title,
-    description: meta.description,
-    alternates: { canonical: meta.canonical },
-    openGraph: {
-      type: "website",
-      url: meta.canonical,
-      siteName: "Underwrite Copilot",
-      title: meta.title,
-      description: meta.description,
-      images: [meta.image],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: meta.title,
-      description: meta.description,
-      images: [meta.image],
-    },
-  };
+  // A child's openGraph and twitter REPLACE the root's wholesale, so the
+  // preview's title, description and picture are all stated — a shared
+  // market page had gone out under the homepage's title and card (#436).
+  // The one helper every public page states its own through.
+  return publicMetadata(marketMeta(marketPageFor(metro), sectorPageFor(sector)));
 }
 
 const CALL_META: Record<string, { label: string; cls: string }> = {
@@ -321,26 +239,46 @@ export default async function MarketDataPage({
     sector: sectorParam,
     submarketError,
   } = (await searchParams) ?? {};
+  const pageMetro = marketPageFor(metroParam);
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
 
   // Own-account only (Feature 6): the deals THIS user created — never a
   // teammate's, never another account's. RLS also allows team deals, so the
   // explicit user_id filter is what keeps this memory private to the buyer.
-  const { data, error } = user
-    ? await supabase
-        .from("deals")
-        .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
-        .eq("user_id", user.id)
-        .not("extraction", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(500)
-    : { data: null, error: null };
+  // The reader's own submarkets are read beside it: the page puts the
+  // covered markets first for a reader with neither.
+  const [{ data, error }, submarkets] = user
+    ? await Promise.all([
+        supabase
+          .from("deals")
+          .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+          .eq("user_id", user.id)
+          .not("extraction", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        // Migration 0033 not applied yet: the table is missing, the list
+        // is empty, and a create attempt says so itself.
+        listSubmarkets(supabase, user.id).catch((): Submarket[] => []),
+      ])
+    : [{ data: null, error: null }, [] as Submarket[]];
 
   const groups = data
     ? summarizeMarkets(buildComps(data as Parameters<typeof buildComps>[0]))
     : [];
   const totalScreens = groups.reduce((n, g) => n + g.count, 0);
+  // A card is one market × one asset class; the line counts the markets.
+  const marketCount = marketsIn(groups);
+  // A reader with no screens on file and no submarkets came for the covered
+  // markets ("Browse the covered markets →"): the explorer leads, and the
+  // two empty states follow it rather than pushing it below the fold.
+  const explorerFirst = explorerLeads({
+    signedIn: !!user,
+    memoryFailed: !!error,
+    groups: groups.length,
+    submarkets: submarkets.length,
+  });
+  const explorer = <MetroExplorer selected={metroParam} />;
 
   return (
     <div className="space-y-6">
@@ -356,15 +294,24 @@ export default async function MarketDataPage({
         // Anonymous visitors land here from the homepage/why/demo marquee —
         // lead with the research layer itself, not "your" data they don't
         // have yet. The signed-in memory blocks below are user-gated.
+        // A metro's own page (`?metro=`, one of forty-odd a search engine
+        // reads apart) names the metro in its one h1, as its title does; the
+        // band further down keeps its h3, as every section of /market does.
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            The covered markets
+            {marketHeading(pageMetro)}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Rules, FMRs, benchmarks and sales coverage for the covered markets.
-          </p>
+          {/* A metro area read without a brief has no rules, fair market
+              rents or sales coverage; its own view says what it holds. */}
+          {pageMetro && !pageMetro.briefed ? null : (
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              Rules, FMRs, benchmarks and sales coverage for the covered markets.
+            </p>
+          )}
         </div>
       )}
+
+      {explorerFirst ? explorer : null}
 
       {!user ? null : error && /relation|does not exist|schema/i.test(error.message) ? (
         <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
@@ -392,9 +339,12 @@ export default async function MarketDataPage({
         </div>
       ) : (
         <>
+          {/* The memory keeps only the screens that left a cap or a basis
+              behind (lib/market-memory `buildComps`), so that is what the
+              count says it counts. */}
           <p className="text-xs text-muted">
-            {totalScreens} screen{totalScreens === 1 ? "" : "s"} across{" "}
-            {groups.length} market{groups.length === 1 ? "" : "s"}.
+            {totalScreens} screen{totalScreens === 1 ? "" : "s"} with a cap or basis on file, across{" "}
+            {marketCount} market{marketCount === 1 ? "" : "s"}.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((g) => (
@@ -408,12 +358,12 @@ export default async function MarketDataPage({
           own market exports, checked against deal assumptions. Part of the
           market picture, so it lives here rather than in a section of its own;
           /submarkets redirects to this anchor. */}
-      {user ? <SubmarketsPanel userId={user.id} errorCode={submarketError} /> : null}
+      {user ? <SubmarketsPanel submarkets={submarkets} errorCode={submarketError} /> : null}
 
-      <MetroExplorer selected={metroParam} />
+      {explorerFirst ? null : explorer}
       {/* Side-by-side: any two covered markets on one shared dollar scale,
           straight off the research layer. */}
-      <MarketCompare metros={COMPARE_METROS} />
+      <MarketCompare metros={COMPARE_METROS} today={todayIso()} />
       {/* The research layer at a glance — every market × every asset class. */}
       <SectorHeatGrid />
       {/* The same board over the demand side: every metro area × every
@@ -431,7 +381,8 @@ export default async function MarketDataPage({
 
 // ── Mid-Atlantic market table (research build) ───────────────────────────────
 // The seeded + DB-merged benchmarks as one table: 2-4 unit medians, monthly
-// sales, and active listings per metro, plus the DC-area FY2026 FMR row —
+// sales, and active listings per metro, plus the DC area's fair market rents
+// (the newest fiscal year on file, named from the rows' own metric) —
 // visible from day one (it doesn't depend on the user's own screens), every
 // row with provenance. Recorded-sales COVERAGE for auto-comps is stated
 // from the provider registry so it can't drift.
@@ -454,17 +405,29 @@ async function MidAtlanticTable() {
   );
   const metros = [...new Set(mf.map((b) => b.metro))].filter(
     (m) =>
-      m !== "Washington DC area" &&
+      m !== DC_AREA_METRO &&
       coveredCities.has(m.split(",")[0].trim().toLowerCase())
   );
   const get = (metro: string, metric: string) =>
     mf.find((b) => b.metro === metro && b.metric === metric);
-  const fmr = mf.filter((b) => b.metro === "Washington DC area");
+  // The Washington area's fair market rents, bedroom by bedroom, each read
+  // through lib/fmr's metric reader — one fiscal year, since the merge keeps
+  // only the newest — so the line names the year its rows are for.
+  const dcFmr = mf
+    .flatMap((b) => {
+      const m = readFmrMetric(b.metric);
+      return b.metro === DC_AREA_METRO && m && typeof b.low === "number" ? [{ b, low: b.low, ...m }] : [];
+    })
+    .sort((x, y) => FMR_BEDS.indexOf(x.bed) - FMR_BEDS.indexOf(y.bed));
+  const dcEffective = fmrEffectiveOf(dcFmr[0]?.b.note);
+  // The year's day it took effect — or, past its last day, that it ended.
+  const dcWhen = dcFmr.length > 0 ? fmrWhen({ fy: dcFmr[0].fy, effective: dcEffective }, todayIso()) : null;
   const priceRows = metros
     .map((m) => ({ metro: m, price: get(m, "median_sale_price_2_4_unit"), sales: get(m, "monthly_sales_2_4_unit"), listings: get(m, "active_listings_2_4_unit") }))
     .filter((r) => r.price)
     .sort((a, b) => (a.price!.low ?? 0) - (b.price!.low ?? 0));
   if (priceRows.length === 0) return null;
+  const tableStale = staleMark(researchAge(priceRows[0].price!.as_of, todayIso()));
 
   const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
   const range = (b: { low: number | null; high: number | null } | undefined) =>
@@ -481,7 +444,15 @@ async function MidAtlanticTable() {
           Mid-Atlantic 2–4 unit market
         </h2>
         <span className="text-[11px] text-muted">
-          {priceRows[0].price!.as_of} · Redfin public dataset
+          {`${priceRows[0].price!.as_of} · Redfin public dataset`}
+          {/* The month's figures are dated its last day; past the research
+              rule's limit (lib/research-age) the date says its age and that
+              it is stale — the deal page's rows say the same of these rows. */}
+          {tableStale && (
+            <span className="text-caution" data-qa="research-stale">
+              {` (${tableStale})`}
+            </span>
+          )}
         </span>
       </div>
       <div className="mt-3 overflow-x-auto">
@@ -510,16 +481,26 @@ async function MidAtlanticTable() {
           </tbody>
         </table>
       </div>
-      {fmr.length > 0 && (
+      {dcFmr.length > 0 && (
         <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
-          DC-area FY2026 HUD fair-market rents:{" "}
-          {fmr
-            .map(
-              (b) =>
-                `${b.metric.replace("hud_fmr_fy2026_", "").toUpperCase()} $${(b.low ?? 0).toLocaleString()}`
-            )
-            .join(" · ")}{" "}
-          <span className="text-[11px]">(sourced; verify against the HUD schedule)</span>
+          {`DC-area ${fmrLabel(dcFmr[0].fy)} HUD fair market rents${dcWhen?.text ? `, ${dcWhen.text}` : ""}: `}
+          {dcFmr.map((r) => `${r.bed.toUpperCase()} $${r.low.toLocaleString("en-US")}`).join(" · ")}{" "}
+          <span className="text-[11px]">
+            {`(${dcFmr[0].b.status})`}
+            {dcFmr[0].b.source && linkOk(dcFmr[0].b.source) !== false && (
+              <>
+                {" "}
+                <a
+                  href={dcFmr[0].b.source}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  source
+                </a>
+              </>
+            )}
+          </span>
         </p>
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
@@ -583,7 +564,7 @@ function MetroChips({ active }: { active: string }) {
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">
               {region}{" "}
               <span className="ml-1 font-normal normal-case tracking-normal">
-                · {group.length} metro{group.length === 1 ? "" : "s"}
+                {`· ${regionCountLabel(region, group.length)}`}
               </span>
             </h3>
             <div className="mt-1.5 flex flex-wrap gap-1.5">{group.map((m) => chip(m.id, m.name))}</div>
@@ -608,6 +589,12 @@ function MetroChips({ active }: { active: string }) {
   );
 }
 
+/** Today as an ISO day — read here, outside the render, since it reads the
+ *  clock; the fair market rent row says a year past its end has ended. */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 async function MetroExplorer({ selected }: { selected?: string }) {
   const metros = metrosSeed.metros ?? [];
   // A metro area read without a brief (#404) gets its own page body: the
@@ -620,7 +607,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
       liveRealtor(readOnly.name),
     ]);
     return (
-      <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <section id="explorer" className="shadow-card scroll-mt-6 rounded-2xl border border-line bg-surface p-5">
         <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
         <MetroChips active={readOnly.id} />
         <ReadOnlyMetroView metro={readOnly} rates={rates} zori={zori} realtor={realtor} />
@@ -637,8 +624,8 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // real rows replace hand-entered stats; zero rows renders nothing rather
   // than a hollow "0".
   const ingestMarket = (active as { ingest_market?: string }).ingest_market;
-  let stock: { parcels: number; sales: number } | null = null;
-  if (ingestMarket) {
+  const stockRead = async (): Promise<{ parcels: number; sales: number } | null> => {
+    if (!ingestMarket) return null;
     try {
       const supabase = await createSupabaseServerClient();
       const [p, s] = await Promise.all([
@@ -651,74 +638,54 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           .select("id", { count: "exact", head: true })
           .eq("market", ingestMarket),
       ]);
-      if ((p.count ?? 0) > 0 || (s.count ?? 0) > 0) {
-        stock = { parcels: p.count ?? 0, sales: s.count ?? 0 };
-      }
+      return (p.count ?? 0) > 0 || (s.count ?? 0) > 0 ? { parcels: p.count ?? 0, sales: s.count ?? 0 } : null;
     } catch {
       // migration 0028 not run — no line
+      return null;
     }
-  }
-  // The metro's own figures, live from FRED — its unemployment, jobs,
-  // permits and house prices, read the way the rates strip is and cached
-  // per metro. A metro FRED does not publish for gets no panel.
-  const live = await liveMetroRates(active.id);
-  // The national table too (the strip's own cached read): each commercial
-  // sector's lessor rent index rides under its tracker fundamentals.
-  const national = await liveRates();
-  // What landlords are asking this month (Zillow's index, monthly), set
-  // against what HUD will pay — two different numbers, both shown.
-  const zori = await liveZori(active.name);
-  // The for-sale market this month (Realtor.com's inventory, monthly) —
-  // the demand side an apartment underwrite is quietly assuming.
-  const realtor = await liveRealtor(active.name);
-  const fmr = active.fmr_fy2026 as {
-    "0br"?: number | null;
-    "1br"?: number | null;
-    "2br"?: number | null;
-    "3br"?: number | null;
-    range?: [number, number];
-    status?: string;
-    note?: string;
-    sources?: string[];
-  } | null;
-  // Full bedroom row where the research carries one (LA's Federal-Register
-  // revision, SF's housing-authority sheet, Newark's NJ-Treasury table) —
-  // 2BR stays the emphasized headline everywhere.
-  const fmrBeds = (["0br", "1br", "2br", "3br"] as const)
-    .map((k) => ({ label: k.toUpperCase(), value: fmr?.[k] }))
-    .filter((b): b is { label: string; value: number } => typeof b.value === "number");
+  };
+  // None of the reads waits on another, so they run together — one read's
+  // wall clock, not five, as the read-only branch above already does.
+  const [stock, live, national, zori, realtor] = await Promise.all([
+    stockRead(),
+    // The metro's own figures, live from FRED — its unemployment, jobs,
+    // permits and house prices, read the way the rates strip is and cached
+    // per metro. A metro FRED does not publish for gets no panel.
+    liveMetroRates(active.id),
+    // The national table too (the strip's own cached read): each commercial
+    // sector's lessor rent index rides under its tracker fundamentals.
+    liveRates(),
+    // What landlords are asking this month (Zillow's index, monthly), beside
+    // HUD's two-bedroom fair market rent — two different measures, both shown.
+    liveZori(active.name),
+    // The for-sale market this month (Realtor.com's inventory, monthly) —
+    // the demand side an apartment underwrite is quietly assuming.
+    liveRealtor(active.name),
+  ]);
+  // HUD's fair market rent through the one reader (lib/fmr): the fiscal
+  // year, the day it takes effect and HUD's name for the area are the
+  // block's own, so the row cannot print one year's rents as another's.
+  const fmr = fmrOf(active);
   const providers = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
+  // "Live" only where the provider registry runs the feed (compsFeedLive): a
+  // provider documented and waiting on its fields is said as that.
+  const compsProvider = providers[active.comps_provider as string] ?? null;
   const compsLine =
     active.comps_provider === null
       ? "No live sales feed for this metro yet."
       : active.comps_provider === "discovery"
         ? "Recorded-sales comps staged in discovery mode — the health check resolves the endpoints."
-        : `Recorded-sales comps LIVE via ${providers[active.comps_provider as string]?.name ?? active.comps_provider}.`;
-  // Explicit metro-id → research-metro mapping: name-prefix matching missed
-  // the DMV entry (its metro string is "DMV core (DC / PG County MD / NoVA)")
-  // for the three DMV metros.
-  const EXAMPLE_METRO: Record<string, string> = {
-    dc: "DMV core",
-    pg_county: "DMV core",
-    montgomery_county: "DMV core",
-    nova: "DMV core",
-    philadelphia: "Philadelphia",
-    baltimore: "Baltimore",
-  };
-  const wanted = EXAMPLE_METRO[active.id];
-  const examples = wanted
-    ? ((multifamilySeed.top_east_coast_metros ?? []).find((m) =>
-        m.metro.toLowerCase().startsWith(wanted.toLowerCase())
-      )?.example_properties ?? [])
-    : [];
-  const noteStatus = (active.market_notes as { status?: string } | null)?.status ?? "sourced";
-  const noteMeta =
-    noteStatus === "verified"
-      ? "bg-emerald-500/10 text-emerald-600"
-      : "bg-brand/10 text-brand";
+        : compsFeedLive(active.comps_provider)
+          ? `Recorded-sales comps LIVE via ${compsProvider?.name ?? active.comps_provider}.`
+          : `Recorded-sales comps: ${compsProvider?.name ?? active.comps_provider} is documented, not yet wired.`;
+  // The research's example listings for this market: each with the day the
+  // research saw it listed and its source, and only where it is in this
+  // market (lib/example-listings) — the DMV block's Dumfries, Virginia duplex
+  // is Northern Virginia's, never Maryland's.
+  const examples = examplesFor(active.id);
 
   return (
-    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+    <section id="explorer" className="shadow-card scroll-mt-6 rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
       <MetroChips active={active.id} />
 
@@ -730,13 +697,16 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           metro={active.id}
           eyebrow={(active as { region?: string }).region ?? "More markets"}
           name={active.name}
+          eager
         />
-        <p className="text-sm leading-relaxed">
-          {(active.market_notes as { value?: string } | null)?.value}
-          <span className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${noteMeta}`}>
-            {noteStatus}
-          </span>
-        </p>
+        {/* The market's note as written, the day its research was read
+            beside it and aging by the research rule, and under it what its
+            own dates say today (app/market/market-note). */}
+        <MarketNote
+          note={(active.market_notes as { value?: string; status?: string } | null) ?? null}
+          readOn={snapshotReadOn((active as { sector_snapshot?: unknown }).sector_snapshot)}
+          today={todayIso()}
+        />
 
         <SectorSnapshotPanel
           snapshot={
@@ -744,102 +714,16 @@ async function MetroExplorer({ selected }: { selected?: string }) {
               sector_snapshot?: Record<string, unknown> | null;
             }).sector_snapshot ?? null
           }
+          today={todayIso()}
           metroId={active.id}
+          standings={sectorStandings(TRACKED_SECTORS, todayIso())}
           national={national}
           metroRates={live}
         />
 
-        {typeof fmr?.["2br"] === "number" ? (
-          <div className="text-sm">
-            <span className="text-[11px] uppercase tracking-wide text-muted">
-              FY2026 fair market rent
-            </span>{" "}
-            {fmrBeds.map((b, i) => (
-              <span key={b.label}>
-                {i > 0 && <span className="text-muted"> · </span>}
-                <span className="text-muted">{b.label}</span>{" "}
-                <span
-                  className={`font-mono tabular-nums ${
-                    b.label === "2BR" ? "font-semibold" : "text-muted"
-                  }`}
-                >
-                  ${b.value.toLocaleString()}
-                </span>
-              </span>
-            ))}
-            <span className="text-muted">/mo</span>
-            <span
-              className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${
-                fmr.status === "verified"
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : "bg-brand/10 text-brand"
-              }`}
-            >
-              {fmr.status ?? "sourced"}
-            </span>
-            {fmr.range && (
-              <span className="text-xs text-muted">
-                {" "}
-                (payment-standard range ${fmr.range[0].toLocaleString()}–$
-                {fmr.range[1].toLocaleString()})
-              </span>
-            )}
-            {fmr.sources?.[0] && (
-              <a
-                href={fmr.sources[0]}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-2 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-              >
-                source
-              </a>
-            )}
-            {/* Bedroom ladder, drawn — widths scale to the real dollars in
-                the row above (aria-hidden: the numbers already read as text). */}
-            {fmrBeds.length >= 2 && (
-              <div className="mt-2 max-w-md space-y-1" aria-hidden>
-                {fmrBeds.map((b) => {
-                  const max = Math.max(...fmrBeds.map((x) => x.value));
-                  const w = Math.max(8, Math.round((b.value / max) * 100));
-                  return (
-                    <div key={b.label} className="flex items-center gap-2">
-                      <span className="w-7 shrink-0 text-[10px] font-medium text-muted">
-                        {b.label}
-                      </span>
-                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
-                        <div
-                          className={`h-full rounded-full transition-[width] duration-500 ${
-                            b.label === "2BR" ? "bg-brand" : "bg-brand/40"
-                          }`}
-                          style={{ width: `${w}%` }}
-                        />
-                      </div>
-                      <span className="w-14 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">
-                        ${b.value.toLocaleString()}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <CopyCite
-              text={`${active.name} — FY2026 2BR fair market rent $${fmr["2br"].toLocaleString()}/mo (${fmr.status ?? "sourced"}${fmr.sources?.[0] ? `; source: ${fmr.sources[0]}` : ""}) · via Underwrite Copilot market brief`}
-            />
-            {fmr.note && (
-              <Fold
-                text={fmr.note}
-                className="mt-1 text-[11px] leading-relaxed text-muted"
-              />
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-muted">
-            FY2026 FMR for this metro: not yet confirmed —{" "}
-            {fmr?.note ?? "queued in the research gaps."}
-          </p>
-        )}
+        <FmrRow name={active.name} fmr={fmr} today={todayIso()} />
 
-        <ZoriLine z={zori} fmr2br={typeof fmr?.["2br"] === "number" ? fmr["2br"] : null} />
+        <ZoriLine z={zori} fmr2br={fmrTwoBed(fmr)} today={todayIso()} />
 
         <RealtorLine r={realtor} />
 
@@ -857,30 +741,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           ) : (
             <ul className="mt-2 space-y-2">
               {rules.map((r) => (
-                <li key={r.id} className="text-sm leading-snug">
-                  <span
-                    className={`mr-2 rounded px-1.5 py-px text-[10px] font-medium ${
-                      r.status === "verified"
-                        ? "bg-emerald-500/10 text-emerald-600"
-                        : r.status === "sourced"
-                          ? "bg-brand/10 text-brand"
-                          : "bg-amber-500/10 text-amber-600"
-                    }`}
-                  >
-                    {r.status}
-                  </span>
-                  {r.effect.split(". ")[0].replace(/\.\s*$/, "")}.
-                  {r.source && (
-                    <a
-                      href={r.source}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-1.5 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-                    >
-                      statute
-                    </a>
-                  )}
-                </li>
+                <RuleItem key={r.id} rule={r} today={todayIso()} />
               ))}
             </ul>
           )}
@@ -915,31 +776,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           Screen a deal in {active.name} →
         </Link>
 
-        {examples.length > 0 && (
-          <div>
-            <h3 className="text-[11px] uppercase tracking-wide text-muted">
-              Example properties from the research
-            </h3>
-            <ul className="mt-2 space-y-1.5">
-              {examples.map((e) => (
-                <li key={e.address} className="text-sm">
-                  <span className="font-medium">{e.address}</span>
-                  {typeof e.price === "number" && (
-                    <>
-                      {" "}
-                      <span className="ml-1 font-mono tabular-nums">
-                        ${e.price.toLocaleString()}
-                      </span>
-                    </>
-                  )}{" "}
-                  <span className="ml-1 text-xs text-muted">
-                    {e.metric} — {e.note}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <ExampleListings examples={examples} today={todayIso()} />
       </div>
     </section>
   );
@@ -952,22 +789,44 @@ async function MetroExplorer({ selected }: { selected?: string }) {
 // industrial, because a 5% industrial market and a 5% office market are not
 // the same news. Cells with no numeric read render as gaps and say why, so
 // the grid shows coverage honestly rather than implying completeness.
-const HEAT_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
+const HEAT_SECTORS = TRACKED_SECTORS;
+
+/**
+ * The days the research sweep read the covered markets' snapshots, as the
+ * boards say them — "read Aug 25, 2026", or the span where they differ —
+ * never the figures' own date (each figure is a house's print of its own
+ * period, which the cell's title and the metro brief say); and, past the
+ * research rule's limit on `today` (lib/research-age), the oldest read's age
+ * and the stale mark. The coverage board and the sector leaderboard read
+ * this one helper.
+ */
+function snapshotsRead(today: string): { asOf: string; stale: string | null } {
+  const days = [
+    ...new Set(
+      (metrosSeed.metros ?? [])
+        .map((m) => snapshotReadOn((m as { sector_snapshot?: unknown }).sector_snapshot))
+        .filter((d): d is string => d !== null),
+    ),
+  ].sort();
+  const asOf =
+    days.length === 0
+      ? "undated"
+      : days.length === 1
+        ? `read ${datedLong(days[0])}`
+        : `read ${datedLong(days[0])} to ${datedLong(days[days.length - 1])}`;
+  const mark = staleMark(researchAge(oldestDate(days), today));
+  return { asOf, stale: mark ? (days.length > 1 ? `the oldest ${mark}` : mark) : null };
+}
 
 function SectorHeatGrid() {
-  // Rank position per (sector, metro) drives the shade; the shared builder is
-  // the same one the leaderboard, the rank chips, and /demo read.
-  const ranks = new Map<string, { t: number; label: string }>();
+  // Each market's standing per sector drives its cell: the figure and its own
+  // period always, the shade only where the column ranks it — the shared
+  // builder the leaderboard, the rank chips, and /demo read.
+  const standings = sectorStandings(HEAT_SECTORS, todayIso());
+  const cells = new Map<string, CoverageCell>();
   for (const sec of HEAT_SECTORS) {
-    const rows = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
-    rows.forEach((r, i) => {
-      const hi = r.vHigh ?? r.vLow!;
-      ranks.set(`${sec}|${r.id}`, {
-        // 0 = tightest in this column, 1 = loosest.
-        t: rows.length > 1 ? i / (rows.length - 1) : 0,
-        label: r.vLow === hi ? `${r.vLow}` : `${r.vLow}–${hi}`,
-      });
-    });
+    const marketsIn = Object.entries(standings[sec] ?? {});
+    for (const [id, st] of marketsIn) cells.set(`${sec}|${id}`, coverageCell(st, st.total));
   }
   const metros = (metrosSeed.metros ?? []) as {
     id: string;
@@ -979,11 +838,10 @@ function SectorHeatGrid() {
     const r = m.region ?? "More markets";
     if (!regions.includes(r)) regions.push(r);
   }
-  const filled = ranks.size;
+  const filled = cells.size;
+  const rankedCells = [...cells.values()].filter((c) => c.t !== null).length;
   const total = metros.length * HEAT_SECTORS.length;
-  // Emerald (tight) → amber (loose), low alpha so the figure stays readable
-  // — the one shade every board on this page uses (app/market/heat-shade).
-  const shade = heatShade;
+  const { asOf: boardAsOf, stale: boardStale } = snapshotsRead(todayIso());
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -992,8 +850,13 @@ function SectorHeatGrid() {
           The whole board — vacancy by market and asset class
         </h2>
         <span className="text-[11px] text-muted">
-          {filled} of {total} cells carry a numeric read · shaded within each
-          column, so office compares to office
+          {`Research ${boardAsOf}`}
+          {boardStale && (
+            <span className="text-caution" data-qa="research-stale">
+              {` (${boardStale})`}
+            </span>
+          )}
+          {` · ${filled} of ${total} cells carry a numeric read, ${rankedCells} of them ranked · shaded within each column, so office compares to office`}
         </span>
       </div>
       <div className="mt-3 overflow-x-auto">
@@ -1038,29 +901,11 @@ function SectorHeatGrid() {
                           {m.name}
                         </Link>
                       </td>
-                      {HEAT_SECTORS.map((s) => {
-                        const cell = ranks.get(`${s}|${m.id}`);
-                        return (
-                          <td key={s} className="px-1 py-1">
-                            {cell ? (
-                              <div
-                                className="rounded-md px-1.5 py-1 text-center font-mono text-xs tabular-nums text-ink"
-                                style={{ backgroundColor: shade(cell.t) }}
-                                title={`${SECTOR_LABEL[s]} vacancy — shaded by rank within this column, tightest first`}
-                              >
-                                {cell.label}
-                              </div>
-                            ) : (
-                              <div
-                                className="rounded-md border border-dashed border-line/70 px-1.5 py-1 text-center text-[11px] text-muted"
-                                title="No numeric level on file for this market and asset class — a recorded gap, never estimated."
-                              >
-                                —
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
+                      {HEAT_SECTORS.map((s) => (
+                        <td key={s} className="px-1 py-1">
+                          <CoverageBoardCell sector={s} cell={cells.get(`${s}|${m.id}`) ?? null} />
+                        </td>
+                      ))}
                     </tr>
                   ))}
               </Fragment>
@@ -1069,8 +914,10 @@ function SectorHeatGrid() {
         </table>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        Sourced figures; a band is shown as a band; a dash is a recorded gap,
-        explained in the metro brief.
+        Sourced figures, each with its own period; a band is shown as a band;
+        a dashed cell is a figure the column does not rank (undated, over a
+        year old, a narrower stock or a spread of two reads); a dash is a
+        recorded gap, explained in the metro brief.
       </p>
     </section>
   );
@@ -1150,9 +997,13 @@ async function RentBoardLive() {
 // four snapshot-tracked classes produce rows; other sector tabs render the
 // research doc alone.
 async function SectorLeaderboard({ sector }: { sector: string }) {
-  const { rows, heldOpen } = sectorLeaderboard(sector);
+  // One row per distinct figure, ranked where the sources let the ranking
+  // place it, read for today (lib/sector-leaderboard).
+  const { rows, ranked, heldOpen } = sectorLeaderboard(sector, todayIso());
   if (rows.length === 0 && heldOpen.length === 0) return null;
-  const label = SECTOR_LABEL[sector] ?? sector;
+  // Past the research rule's limit the table still ranks and shows its
+  // figures, and says the day they were read, its age and that it is stale.
+  const research = snapshotsRead(todayIso());
   // The demand side, live: the same markets ranked by their payrolls in the
   // sector that fills this kind of building (all payrolls for apartments),
   // one cached read of that metric across the metros. A failed read leaves
@@ -1166,98 +1017,19 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
       console.warn("sector payrolls read failed:", err instanceof Error ? err.message : err);
     }
   }
-  const anyRent = rows.some((r) => r.rent !== null);
-  const anyCap = rows.some((r) => r.capLow !== null);
-  const band = (lo: number, hi: number | null) =>
-    hi === null || hi === lo ? `${lo}%` : `${lo}–${hi}%`;
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-          {label} across the covered markets
-        </h3>
-        <span className="text-[11px] text-muted">
-          ranked tightest to loosest · vintages vary by print — each metro page
-          declares them
-        </span>
-      </div>
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[440px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
-              <th className="py-1.5 pr-2 font-medium">#</th>
-              <th className="py-1.5 pr-3 font-medium">Market</th>
-              <th className="py-1.5 pr-3 font-medium">Vacancy</th>
-              {anyRent && <th className="py-1.5 pr-3 font-medium">Asking $/SF</th>}
-              {anyCap && <th className="py-1.5 pr-3 font-medium">Cap range</th>}
-              <th className="py-1.5 font-medium">Src</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => {
-              // Sorted with every vacancy-ranked row first, so index = rank.
-              return (
-                <tr key={r.id} className="border-b border-line/60">
-                  <td className="py-1.5 pr-2 font-mono text-[11px] tabular-nums text-muted">
-                    {r.vLow !== null ? i + 1 : "—"}
-                  </td>
-                  <td className="py-1.5 pr-3">
-                    <Link
-                      href={`/market?metro=${r.id}`}
-                      prefetch={false}
-                      className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-                    >
-                      {r.name}
-                    </Link>
-                  </td>
-                  <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
-                    {r.vLow !== null ? band(r.vLow, r.vHigh) : "level open"}
-                  </td>
-                  {anyRent && (
-                    <td
-                      className="py-1.5 pr-3 font-mono text-xs tabular-nums"
-                      title={r.rentBasis ?? undefined}
-                    >
-                      {r.rent !== null ? `$${r.rent.toFixed(2)}` : "—"}
-                    </td>
-                  )}
-                  {anyCap && (
-                    <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
-                      {r.capLow !== null && r.capHigh !== null
-                        ? band(r.capLow, r.capHigh)
-                        : "—"}
-                    </td>
-                  )}
-                  <td className="py-1.5 text-[11px] text-muted">
-                    {r.source && linkOk(r.source) !== false ? (
-                      <a
-                        href={r.source}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                      >
-                        source
-                      </a>
-                    ) : (
-                      "on file"
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {heldOpen.length > 0 && (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-          Direction on file, numeric level held open: {heldOpen.join(" · ")} —
-          the metro pages carry the sourced notes.
-        </p>
-      )}
+      <LeaderboardTable
+        sector={sector}
+        rows={rows}
+        ranked={ranked}
+        heldOpen={heldOpen}
+        stale={research.stale ? `research ${research.asOf} (${research.stale})` : null}
+      />
       {payrollMetric && payrolls.length > 0 && (
         <SectorJobsRank
           metric={payrollMetric}
-          markets={rows.map((r) => ({ id: r.id, name: r.name }))}
+          markets={rows.flatMap((r) => r.markets)}
           rates={payrolls}
         />
       )}
@@ -1288,6 +1060,10 @@ function SectorExplorer({ selected }: { selected?: string }) {
     null;
   const verdict = doc.small_investor_verdict;
   const cycleStatus = doc.cycle_position?.status ?? "sourced";
+  // The day the sector's research was read, and past the research rule's
+  // limit (lib/research-age) its age and the stale mark beside it.
+  const docAsOf = typeof doc.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(doc.as_of) ? doc.as_of : null;
+  const docStale = staleMark(researchAge(docAsOf, todayIso()));
   const statusCls = (st: string | undefined) =>
     st === "verified"
       ? "bg-pass/10 text-pass"
@@ -1301,8 +1077,18 @@ function SectorExplorer({ selected }: { selected?: string }) {
         <h2 className="text-sm font-semibold tracking-tight">
           Every asset class, researched
         </h2>
+        {/* The day the research was read — not any figure's own date — and
+            what the table holds: a tier's cap as its source states it, a
+            range or one figure. "Ranges, never single numbers" sat above
+            6% and 6.2% (the research pass of 2026-10-01). */}
         <span className="text-[11px] text-muted">
-          as of {doc.as_of ?? "2026-08-21"} · ranges, never single numbers
+          {docAsOf ? `research read ${datedLong(docAsOf)}` : asOfLabel(doc.as_of)}
+          {docStale && (
+            <span className="text-caution" data-qa="research-stale">
+              {` (${docStale})`}
+            </span>
+          )}
+          {" · each tier's cap as its source states it, a range or one figure"}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1331,17 +1117,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
             >
               {cycleStatus}
             </span>
-            {doc.cycle_position.sources?.[0] &&
-              linkOk(doc.cycle_position.sources[0]) !== false && (
-                <a
-                  href={doc.cycle_position.sources[0]}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-1.5 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-                >
-                  source
-                </a>
-              )}
+            <SourceRef source={doc.cycle_position.sources?.[0]} className="ml-1.5 text-[11px] text-muted" />
           </p>
         )}
 
@@ -1366,17 +1142,10 @@ function SectorExplorer({ selected }: { selected?: string }) {
                     </td>
                     <td className="py-1.5 text-[11px] text-muted">
                       {r.status ?? "sourced"}
-                      {r.sources?.[0] && linkOk(r.sources[0]) !== false && (
+                      {r.sources?.[0] && (
                         <>
                           {" · "}
-                          <a
-                            href={r.sources[0]}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                          >
-                            source
-                          </a>
+                          <SourceRef source={r.sources[0]} />
                         </>
                       )}
                     </td>
@@ -1484,13 +1253,7 @@ interface DigestHead {
 async function IntelDigestCard() {
   const supabase = await createSupabaseServerClient();
   let digest: DigestHead | null = null;
-  let items: {
-    url: string;
-    title: string;
-    source: string | null;
-    relevance: number | null;
-    action: string | null;
-  }[] = [];
+  let items: IntelItem[] = [];
   try {
     const [{ data: d }, { data: it }] = await Promise.all([
       supabase
@@ -1501,7 +1264,7 @@ async function IntelDigestCard() {
         .maybeSingle(),
       supabase
         .from("market_intel_items")
-        .select("url, title, source, relevance, action")
+        .select("url, title, source, relevance, action, published_at, created_at")
         .gte("relevance", 6)
         .order("created_at", { ascending: false })
         .limit(6),
@@ -1515,10 +1278,10 @@ async function IntelDigestCard() {
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">Daily intel</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Weekday intel</h2>
         {digest && (
           <span className="text-[11px] text-muted">
-            latest digest {digest.digest_date} · {digest.item_count} notable
+            {digestLine(digest)}
           </span>
         )}
       </div>
@@ -1527,27 +1290,7 @@ async function IntelDigestCard() {
           Nothing notable from the weekday intel job yet.
         </p>
       ) : (
-        <ul className="mt-3 space-y-2.5">
-          {items.map((it) => (
-            <li key={it.url} className="text-sm leading-snug">
-              <span className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted">
-                {it.relevance}/10
-              </span>
-              <a
-                href={it.url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-brand"
-              >
-                {it.title}
-              </a>
-              {it.source && <span className="ml-1 text-xs text-muted">({it.source})</span>}
-              {it.action && (
-                <p className="ml-12 mt-0.5 text-xs text-muted">→ {it.action}</p>
-              )}
-            </li>
-          ))}
-        </ul>
+        <IntelItems items={items} />
       )}
     </section>
   );
@@ -1578,10 +1321,7 @@ function MarketCard({ g }: { g: MarketGroup }) {
 
       <dl className="mt-4 space-y-2.5">
         <Stat label="Going-in cap" value={g.cap ? fmtCapRange(g.cap) : null} />
-        <Stat
-          label={g.perUnit?.basis === "sf" ? "Basis / SF" : "Basis / unit"}
-          value={g.perUnit ? fmtBasisRange(g.perUnit) : null}
-        />
+        <Stat label={basisLabel(g)} value={g.perUnit ? fmtBasisRange(g.perUnit) : null} />
       </dl>
 
       {calls.length > 0 && (

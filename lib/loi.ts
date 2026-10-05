@@ -22,11 +22,34 @@ const PLAN_WORK: Record<StrategyKind, string | null> = {
  *  not control — the letter says so. A renovation or a lease-up does not. */
 const NEEDS_ENTITLEMENTS = new Set<StrategyKind>(["conversion", "development"]);
 
+/** A fact the letter takes from the memorandum (lib/loi-terms): its own
+ *  words ("" where it states none) and its page ("" where not located). */
+interface StatedFact {
+  stated: string;
+  page: string;
+}
+
 export interface LoiParams {
   /** the deal's plan, when it has one: a conversion or a development gets an
    *  entitlements contingency and a diligence clause that names the work; a
    *  value-add or a lease-up names the work only. Null on a stabilized asset. */
   plan?: { kind: StrategyKind; label: string } | null;
+  /** a leasehold, as the memorandum states it: the letter names the
+   *  leasehold interest under its ground lease as what is bought, marked
+   *  for review. Null on a fee simple. */
+  leasehold?: StatedFact | null;
+  /** a seller that is not the owner, as the memorandum states it: the
+   *  letter names the court-appointed receiver or the lender that took the
+   *  property back, marked for review. Null where the owner sells. */
+  seller?: ({ method: "receivership" | "reo" } & StatedFact) | null;
+  /** a short sale, as the memorandum states it: the owner sells for less
+   *  than its loan's balance, so the letter makes the closing conditional on
+   *  its lender approving the sale and the payoff it will accept, marked for
+   *  review. Null on every other sale. */
+  shortSale?: StatedFact | null;
+  /** a portfolio's properties, as the memorandum lists them: the letter
+   *  lists them by name, marked for review. Empty for one property. */
+  properties?: { name: string; address: string }[];
   buyerName: string;
   propertyName: string;
   propertyAddress: string;
@@ -69,23 +92,88 @@ function para(
   });
 }
 
-function numbered(n: number, title: string, body: string): Paragraph[] {
+/** A numbered clause. One the memorandum decided (`review`, the note beside
+ *  it) is highlighted, with the note under it, as the opening's stretches
+ *  are; every other clause is plain. */
+function numbered(n: number, title: string, body: string, review?: string): Paragraph[] {
   return [
     para(`${n}. ${title}`, { bold: true, before: 200, after: 40 }),
-    para(body, { before: 0 }),
+    ...(review ? [sentence([{ review: body }], 0), reviewNote(review)] : [para(body, { before: 0 })]),
   ];
+}
+
+/** A stretch of a sentence: plain, or read off the memorandum and marked
+ *  (highlighted) for the reviewer. */
+type Part = string | { review: string };
+
+function sentence(parts: Part[], before = 120): Paragraph {
+  return new Paragraph({
+    spacing: { before, after: 120 },
+    children: parts.map(
+      (p) =>
+        new TextRun({
+          text: typeof p === "string" ? p : p.review,
+          color: INK,
+          size: 22,
+          font: "Calibri",
+          ...(typeof p === "string" ? {} : { highlight: "yellow" as const }),
+        }),
+    ),
+  });
+}
+
+/** The note beside a line the memorandum decided: bracketed, italic and
+ *  highlighted, so it is read and taken out before the letter is sent. */
+function reviewNote(text: string): Paragraph {
+  return new Paragraph({
+    spacing: { before: 0, after: 120 },
+    children: [
+      new TextRun({
+        text: `[${text}]`,
+        italics: true,
+        color: INK,
+        size: 20,
+        font: "Calibri",
+        highlight: "yellow",
+      }),
+    ],
+  });
+}
+
+/** How much of the memorandum's own sentence a note quotes. */
+const QUOTE_MAX = 240;
+
+/** The memorandum's own words for a note — quoted, never re-worded; cut at
+ *  a word where they run long — and its page where located. */
+function quoted(f: StatedFact): string {
+  const t = f.stated.trim().replace(/\s+/g, " ").replace(/[.;,:\s]+$/, "");
+  const page = f.page.trim();
+  if (!t) return page ? ` (${page})` : "";
+  const at = t.lastIndexOf(" ", QUOTE_MAX);
+  const cut = t.length > QUOTE_MAX ? `${t.slice(0, at > 0 ? at : QUOTE_MAX)}…` : t;
+  return ` — “${cut}”${page ? `, ${page}` : ""}`;
 }
 
 /**
  * A clean, deliberately conservative non-binding LOI draft: the standard
  * skeleton an acquisitions team marks up, not a novel legal instrument.
- * Every figure comes from the form the analyst just reviewed.
+ * Every figure comes from the form the analyst just reviewed. What is
+ * bought and from whom comes from the memorandum where it says the sale is
+ * not the property from its owner (lib/loi-terms) — a leasehold, a
+ * receiver's or a lender's sale, a portfolio — each such line highlighted
+ * beside a note for review, and no clause added for it. A short sale is
+ * the one the memorandum adds a clause for: it closes only on its lender's
+ * approval, so that condition is drafted, highlighted beside its note. The
+ * deals this skeleton is the wrong document for never reach it
+ * (lib/loi-refusal).
  */
 export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
   // XML 1.0 cannot carry these control characters; docx writes them verbatim
   // and Word then refuses the file — strip every string that reaches a run.
   const clean = (s: string) =>
     s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  const cleanFact = <F extends StatedFact>(f: F | null | undefined): F | null =>
+    f ? { ...f, stated: clean(f.stated), page: clean(f.page) } : null;
   p = {
     ...p,
     buyerName: clean(p.buyerName),
@@ -95,7 +183,66 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     deposit: clean(p.deposit),
     dateStr: clean(p.dateStr),
     firmName: p.firmName ? clean(p.firmName).trim() : null,
+    leasehold: cleanFact(p.leasehold),
+    seller: cleanFact(p.seller),
+    shortSale: cleanFact(p.shortSale),
+    properties: (p.properties ?? []).map((x) => ({ name: clean(x.name).trim(), address: clean(x.address).trim() })),
   };
+
+  // What is bought and from whom, where the memorandum says it is not the
+  // property from its owner: a leasehold under its ground lease, a
+  // portfolio's properties, a receiver or a lender selling. Each such
+  // stretch is marked, with a note quoting the memorandum, and no clause is
+  // added for it — the legal terms are the buyer's counsel's to write. With
+  // none of them the opening is the usual sentence, word for word.
+  const properties = p.properties ?? [];
+  const several = properties.length > 1;
+  const what: string | null = p.leasehold
+    ? several
+      ? "the leasehold interest in the properties listed below under the ground lease (together, the “Property”)"
+      : "the leasehold interest in the above-referenced property under the ground lease (the “Property”)"
+    : several
+      ? "the properties listed below (together, the “Property”)"
+      : null;
+  const from: string | null = p.seller
+    ? p.seller.method === "receivership"
+      ? "the court-appointed receiver selling it (“Seller”)"
+      : "the lender that took it back (“Seller”)"
+    : null;
+  const opening: Paragraph[] =
+    what || from
+      ? [
+          sentence([
+            `${p.buyerName} (“Buyer”) is pleased to submit this non-binding letter of intent to acquire `,
+            what ? { review: what } : "the above-referenced property (the “Property”)",
+            " from ",
+            from ? { review: from } : "its owner (“Seller”)",
+            " on the principal terms set out below.",
+          ]),
+          ...(p.leasehold
+            ? [reviewNote(`Review before sending: the memorandum sells a leasehold under a ground lease${quoted(p.leasehold)}.`)]
+            : []),
+          ...(p.seller
+            ? [
+                reviewNote(
+                  p.seller.method === "receivership"
+                    ? `Review before sending: the memorandum says a court-appointed receiver is selling the property${quoted(p.seller)}.`
+                    : `Review before sending: the memorandum says the lender that took the property back is selling it${quoted(p.seller)}.`,
+                ),
+              ]
+            : []),
+          ...(several
+            ? [
+                ...properties.map((x, i) => sentence([{ review: `(${i + 1}) ${x.name}${x.address ? ` — ${x.address}` : ""}` }])),
+                reviewNote("Review before sending: the properties as the memorandum lists them."),
+              ]
+            : []),
+        ]
+      : [
+          para(
+            `${p.buyerName} (“Buyer”) is pleased to submit this non-binding letter of intent to acquire the above-referenced property (the “Property”) from its owner (“Seller”) on the principal terms set out below.`,
+          ),
+        ];
 
   const financing =
     p.ltvPct !== null
@@ -114,9 +261,21 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     work && p.plan && NEEDS_ENTITLEMENTS.has(p.plan.kind)
       ? `Buyer’s obligation to close shall be contingent upon Buyer obtaining, at Buyer’s cost and in form and substance satisfactory to Buyer, all zoning approvals, entitlements, permits and other governmental consents necessary for Buyer’s intended ${work}. Seller shall reasonably cooperate with Buyer’s applications, and the parties shall agree in the PSA on any extension of the Due Diligence Period or the Closing required to pursue them.`
       : null;
+  // A short sale closes only once the owner's lender approves the sale and
+  // the payoff it will accept (lib/loi-terms): a condition of closing, as
+  // the entitlements contingency is one, with no figure in it — highlighted
+  // beside the memorandum's own words, since the memorandum decided it.
+  const lenderApproval: [string, string, string] | null = p.shortSale
+    ? [
+        "Lender Approval",
+        "The Closing shall be conditioned upon Seller’s lender approving, in writing, the sale of the Property on the terms of the PSA and the payoff it will accept from the sale. Seller shall request that approval promptly after execution of the PSA, and the parties shall agree in the PSA on any extension of the Closing required to obtain it.",
+        `Review before sending: the memorandum says this is a short sale its lender must approve${quoted(p.shortSale)}.`,
+      ]
+    : null;
 
-  // Numbered in order, so an added clause renumbers the ones after it.
-  const sections: [string, string][] = [
+  // Numbered in order, so an added clause renumbers the ones after it. A
+  // third entry is the review note of a clause the memorandum decided.
+  const sections: ([string, string] | [string, string, string])[] = [
     [
       "Purchase Price",
       `${p.price}, payable in cash at closing, subject to customary prorations and adjustments.`,
@@ -128,6 +287,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     ["Due Diligence Period", diligence],
     ["Financing", financing],
     ...(entitlements ? [["Entitlements and Approvals", entitlements] as [string, string]] : []),
+    ...(lenderApproval ? [lenderApproval] : []),
     [
       "Closing",
       `Closing shall occur within ${p.closeDays} days after expiration of the Due Diligence Period, subject to customary closing conditions.`,
@@ -189,10 +349,8 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
       bold: true,
       before: 200,
     }),
-    para(
-      `${p.buyerName} (“Buyer”) is pleased to submit this non-binding letter of intent to acquire the above-referenced property (the “Property”) from its owner (“Seller”) on the principal terms set out below.`,
-    ),
-    ...sections.flatMap(([title, body], i) => numbered(i + 1, title, body)),
+    ...opening,
+    ...sections.flatMap(([title, body, review], i) => numbered(i + 1, title, body, review)),
     para(
       "NON-BINDING: This letter is an expression of mutual interest only. Except for this paragraph, no provision of this letter creates any legally binding obligation on either party, and no such obligation shall arise unless and until a definitive PSA is executed and delivered by both parties. Either party may discontinue discussions at any time for any reason.",
       { bold: true, before: 280 },

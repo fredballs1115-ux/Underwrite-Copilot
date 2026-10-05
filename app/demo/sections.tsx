@@ -22,6 +22,7 @@ import {
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { subjectBasis } from "@/lib/comp-detail";
+import { screenYearOf } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
 import type {
   ExtractionResult,
@@ -133,6 +134,7 @@ export function DemoSections({ data }: { data: DemoData }) {
           <ChallengerView
             result={data.challenges}
             dealName="The Maddox at Brewerytown"
+            totalPages={data.extraction.totalPages ?? null}
           />
         )}
         {tab === "comps" && (
@@ -143,7 +145,7 @@ export function DemoSections({ data }: { data: DemoData }) {
             active={false}
             isPro={false}
             publicDemo
-            subject={subjectBasis(data.extraction.metrics, inferStrategy(data.extraction).kind)}
+            subject={subjectBasis(data.extraction.metrics, inferStrategy(data.extraction).kind, screenYearOf(data.extraction))}
           />
         )}
         {tab === "market" && <MarketCheck result={data.market} />}

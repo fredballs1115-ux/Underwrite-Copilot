@@ -54,8 +54,8 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         key: "assumptions",
         label: "Assumptions",
         blurb:
-          "Every input with its source and the document that won — OM claims versus rent-roll and T-12 actuals.",
-        node: <Assumptions metrics={model.metrics} />,
+          "Every input with the document that won — OM claims versus rent-roll and T-12 actuals — and the ones no document states, marked assumed.",
+        node: <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />,
       },
       {
         key: "conflicts",
@@ -164,8 +164,9 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
       </div>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
         The screen doesn&rsquo;t stop at a verdict — it builds a working
-        underwriting model you can download as Excel. These are the live
-        product views, not screenshots.
+        underwriting model from your documents. These are its live views,
+        not screenshots; the Excel download is a separate workbook, built
+        from the memorandum&rsquo;s terms.
       </p>
 
       {/* Step pills double as slide labels and direct navigation. */}

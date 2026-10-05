@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { publicMetadata } from "@/lib/page-meta";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
 import { ScreenRunStrip } from "@/app/screen-run-strip";
@@ -16,21 +16,20 @@ const RULE_COUNT = seedRules().length;
 const MAJOR_MARKET_COUNT = (metrosSeed.metros ?? []).filter(
   (m) => (m as { region?: string }).region === "Major US markets"
 ).length;
-const WIRED_MARKETS = (metrosSeed.metros ?? [])
-  .filter((m) => (m as { ingest_market?: string }).ingest_market)
-  .map((m) => m.name);
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
 // the same trap the homepage had. next.config expireTime caps the rest.
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+// The title names the site already, so it stands without the layout's
+// " · Underwrite Copilot" (lib/page-meta).
+export const metadata = publicMetadata({
   title: "Why Underwrite Copilot",
   description:
     "Why Underwrite Copilot exists: screen more offering memoranda without cutting corners. Deterministic math, page-level citations, and a fast read on whether a deal fits your mandate.",
-  alternates: { canonical: "/why" },
-};
+  canonical: "/why",
+});
 
 // Copy rules for this page: short sentences, plain words, no hype, no
 // exclamation marks, no rhetorical questions. Every claim maps to something the
@@ -53,8 +52,8 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Deterministic where it counts",
     body: [
-      "Claude reads the document. The math does not run on a language model. Excel formulas, reconciliation deltas, and the mandate-fit score are computed in code and covered by tests.",
-      "The same deal returns the same numbers every time. The model does the reading; the arithmetic is ours, and it is checkable.",
+      "Claude reads the document. The math does not run on a language model. The cash flows, the returns, the loan sizing, the Excel formulas and the mandate-fit score are computed in code and covered by tests.",
+      "Given the same inputs, the math returns the same numbers every time. The model does the reading; the arithmetic is ours, and it is checkable.",
     ],
   },
   {
@@ -74,9 +73,9 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "It knows the ground",
     body: [
-      `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and the ${MAJOR_MARKET_COUNT} biggest US markets, DC to Brooklyn to LA to Chicago. It answers with the statute linked, or names the exact open question — year built, whether you'll live in a unit — and takes your answer right on the deal. Unknown jurisdictions say so — never a silent pass.`,
-      `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today, plus a bulk property database of government deed records with ${WIRED_MARKETS.join(", ")} pipelines wired. Public records, clearly labeled. Not an appraisal.`,
-      `And every covered market carries an asset-type read — office, industrial, multifamily, and retail vacancy, asking rents, and cap bands from named research houses, each figure dated and source-linked. Where the trackers disagree the brief shows the spread instead of averaging it away, and a gap stays a recorded gap. Deal pages benchmark against the same rows automatically, your sector first.`,
+      `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and ${MAJOR_MARKET_COUNT} of the largest US markets, DC to Brooklyn to LA to Chicago. It answers with its source linked where the rule cites one, or names the exact open question — year built, whether you'll live in a unit — and takes your answer right on the deal. Unknown jurisdictions say so — never a silent pass.`,
+      `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today. Public records, clearly labeled. Not an appraisal.`,
+      `And every covered market carries an asset-type read — office, industrial, multifamily, and retail vacancy where a named research house prints one, with asking rents and cap bands where they are sourced, each figure dated and source-linked. Where the trackers disagree the brief shows the spread instead of averaging it away, and a gap stays a recorded gap. Deal pages benchmark against the same rows automatically, your sector first.`,
     ],
   },
   {
@@ -89,8 +88,8 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "What it is not",
     body: [
-      "This is a screening tool, not a full underwriting model. It works at the annual level.",
-      "It does not replace ARGUS, a monthly cash-flow build, or your own diligence. It gets you to a fast, honest read on whether a deal earns that work.",
+      "This is a screening tool, not a full underwriting model. It runs one rent growth rate, one stabilized vacancy (reached through a lease-up where the plan has one) and one loan, never lease by lease.",
+      "It does not replace ARGUS, a lease-by-lease cash-flow build, or your own diligence. It gets you to a fast, honest read on whether a deal earns that work.",
     ],
   },
 ];
@@ -118,7 +117,7 @@ export default function WhyPage() {
       <main id="main" className="flex-1">
         {/* The argument opens on a real place: downtown Washington, the
             covered market at the centre of the DMV core. */}
-        <PlaceBand metro="dc">
+        <PlaceBand metro="dc" eager>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Why Underwrite Copilot
           </h1>
@@ -148,8 +147,8 @@ export default function WhyPage() {
               See it on a real deal
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Start with a fully worked sample, or upload an OM and get a verdict
-              in a few minutes.
+              Start with a fully worked sample, or upload an OM and get a
+              verdict.
             </p>
             <div className="mt-4 flex flex-wrap gap-2.5">
               <Link

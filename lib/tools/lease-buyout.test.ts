@@ -253,6 +253,34 @@ describe("what it says with nothing to go on", () => {
   });
 });
 
+describe("the note says its dollars the way the card does", () => {
+  // A figure four digits long with no dollar sign and no comma — the note
+  // printed "worth 1498772 to the landlord" under tiles that said $1.50M.
+  const RAW_FIGURE = /(?<![$\d,.])\d{4,}(?![\d,])/;
+
+  it("writes every dollar with its sign and its commas", () => {
+    const r = readBuyout(SEED);
+    expect(r.note).toContain("Ending the lease is worth $1,498,772 to the landlord");
+    expect(r.note).toContain(
+      "Taking the spread alone would have said $2,933,935 — $1,435,163 too much",
+    );
+    expect(r.note).toContain("the landlord can pay $1,498,772 and the tenant needs $3,178,017");
+    expect(r.note).not.toMatch(RAW_FIGURE);
+  });
+
+  it("says a rent a foot to the cent, and an over-market lease as over", () => {
+    const under = readBuyout({ ...SEED, landlordRatePct: null });
+    expect(under.note).toContain(
+      "The space is $14.00 a foot under market, $560,000 a year across it.",
+    );
+    const over = readBuyout({ ...SEED, inPlaceRentPsf: 46, landlordRatePct: null });
+    expect(over.note).toContain("The space is $4.00 a foot over market, $160,000 a year across it.");
+    const none = readBuyout({ ...SEED, yearsRemaining: 0 });
+    expect(none.note).toContain("The $14.00 a foot of spread is still there on the last day");
+    for (const n of [under.note, over.note, none.note]) expect(n).not.toMatch(RAW_FIGURE);
+  });
+});
+
 function round(n: number): number {
   return Math.round(n);
 }

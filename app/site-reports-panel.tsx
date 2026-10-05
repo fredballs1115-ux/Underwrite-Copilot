@@ -43,7 +43,6 @@ const ZONING_LABEL = {
   conforming: "Conforming",
   legal_non_conforming: "Legal non-conforming",
   non_conforming: "Non-conforming",
-  stated: "As stated",
 } as const;
 
 export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteReportsRead | null; modelLine?: string }) {
@@ -56,7 +55,9 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
     tiles.push({
       key: "phase-i",
       label: "Phase I",
-      value: f ? findingLabel(f) : "Cited",
+      // A finding the reader cannot name is headlined in its own words,
+      // whole in the tile's title.
+      value: f === "stated" ? clause(p1.words) || "Cited" : f ? findingLabel(f) : "Cited",
       sub: p1.date ? `Dated ${reportMonth(p1.date)}` : "Undated",
       tone: f === "rec" ? "kill" : f === "crec" || p1.age === "redo" ? "caution" : f === "none" || f === "de_minimis" || f === "hrec" ? "pass" : "neutral",
       title: p1.words || undefined,
@@ -87,8 +88,8 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
     tiles.push({
       key: "zoning",
       label: "Zoning",
-      value: ZONING_LABEL[z],
-      sub: z === "stated" ? clause(r.zoning.words) : "As stated",
+      value: z === "stated" ? clause(r.zoning.words) : ZONING_LABEL[z],
+      sub: "As stated",
       tone: z === "conforming" ? "pass" : z === "stated" ? "neutral" : "caution",
       title: r.zoning.words,
     });

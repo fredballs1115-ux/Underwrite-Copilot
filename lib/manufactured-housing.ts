@@ -74,10 +74,25 @@ const AGE = /^(?:age\s+(?:restrictions?|restricted|designation|qualified|qualifi
 const RV_SITES = /^(?:rv|r\.v\.)\s+(?:sites?|pads?|spaces?|lots?)\b(?!.*\b(?:rents?|rates?|income|occupied)\b)/i;
 const RENT_CONTROL = /^(?:(?:lot\s+)?rent\s+(?:control|stabilization|regulation)s?)\b/i;
 
+/** A bare source word — "Public", "City", "Private" — says nothing on its
+ *  own; beside a label that names the water, the sewer or both it is that
+ *  label's source ("Water/Sewer: Public"). */
+const BARE_SOURCE = /^\s*(city|municipal|public|county|town|village|borough|township|private|privately[- ]owned|on-?site|park[- ]owned|community[- ]owned)\s*\.?\s*$/i;
+
+/** A utility row's words: the value, or — where the value is a bare source
+ *  word — the source put to what the label names. */
+function utilityWords(label: string, value: string): string {
+  const bare = BARE_SOURCE.exec(value);
+  if (!bare) return value;
+  const l = label.toLowerCase();
+  const what = /water\s*(?:and|&|\/)\s*sewer|utilit/.test(l) ? "water and sewer" : /^water/.test(l) ? "water" : /^(?:sewer|wastewater)/.test(l) ? "sewer" : null;
+  return what ? `${bare[1]} ${what}` : value;
+}
+
 /** A row a utility label names is read only where its words name a source:
  *  a "Utilities" or "Water" row carrying a dollar expense is none. */
-const namesSource = (value: string) => {
-  const u = readUtilities(value);
+const namesSource = (label: string, value: string) => {
+  const u = readUtilities(utilityWords(label, value));
   return u.water != null || u.sewer != null;
 };
 
@@ -91,7 +106,7 @@ export function mhTermRows<M extends { label: string; value: string }>(metrics: 
     pick(LOT_RENT),
     pick(MARKET_LOT_RENT),
     pick(PARK_OWNED),
-    pick(WATER_SEWER, (m) => namesSource(m.value)),
+    pick(WATER_SEWER, (m) => namesSource(m.label, m.value)),
     pick(AGE),
   ].filter((m): m is M => m != null);
 }
@@ -256,6 +271,8 @@ export interface ManufacturedHousingRead {
   /** market less in place, a month: positive where the rents are under
    *  market */
   gap: number | null;
+  /** that gap as a share of the lot rent in place, % — $70 under a $430
+   *  lot rent is 16.3%, never the share of the market's $500 */
   gapPct: number | null;
   /** the gap a year across the occupied pads, where both are known */
   gapAnnual: number | null;
@@ -352,10 +369,16 @@ export function readManufacturedHousing(ex: ExtractionResult | null | undefined)
   const homeRent = homeRow ? monthlyRentOf(homeRow.value) : null;
   const homeAboveLot = homeRent != null && lotRent != null && homeRent > lotRent ? Math.round((homeRent - lotRent) * 100) / 100 : null;
 
-  const utilityRow = find(WATER_SEWER, (r) => namesSource(r.value));
+  // The water and the sewer, read together where the memorandum states them
+  // on rows of their own ("Water: City", "Sewer: Private septic").
+  const utilityRows = rows.filter((m) => WATER_SEWER.test(m.label.trim()) && namesSource(m.label, m.value));
+  const utilityRow = utilityRows[0] ?? null;
   const billingRow = find(UTILITY_BILLING);
-  const utilities = utilityRow
-    ? readUtilities(utilityRow.value, billingRow?.value ?? "")
+  const utilities = utilityRows.length
+    ? {
+        ...readUtilities(utilityRows.map((r) => utilityWords(r.label, r.value)).join("; "), billingRow?.value ?? ""),
+        stated: utilityRows.length === 1 ? utilityRows[0].value.trim() : utilityRows.map((r) => `${r.label.trim()}: ${r.value.trim()}`).join("; "),
+      }
     : billingRow && billingOf(billingRow.value)
       ? { stated: "", water: null, sewer: null, kind: null, label: "", billing: billingOf(billingRow.value), billingStated: billingRow.value.trim() }
       : null;
@@ -469,7 +492,7 @@ function sentencesOf(r: Omit<ManufacturedHousingRead, "sentences" | "headline">)
       : `the memorandum's market ${rent(r.marketLotRent)}`;
     if (r.gap > 0) {
       const year = r.gapAnnual != null && r.occupied != null ? `, ${usd(r.gapAnnual)} a year across the ${count(r.occupied)} occupied pads were every lot at market` : "";
-      out.push(`The average lot rent is ${rent(r.lotRent)} a month against ${market}: ${rent(r.gap)} a month (${pct1(r.gapPct ?? 0)}) under${year}.`);
+      out.push(`The average lot rent is ${rent(r.lotRent)} a month against ${market}: ${rent(r.gap)} a month under, ${pct1(r.gapPct ?? 0)} of the rent in place${year}.`);
       out.push(
         `A resident who owns the home pays thousands to move it, so the lot rent can rise — but each increase runs through the notice the law requires${
           r.rentControl?.regulated ? " and the rent rules the memorandum names" : ""

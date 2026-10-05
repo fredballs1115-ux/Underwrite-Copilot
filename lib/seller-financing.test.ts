@@ -15,6 +15,7 @@ import { gluedWords } from "./render-lint";
 import { extractionInstruction } from "@/lib/anthropic/prompts";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
+import { screenYearOf } from "@/lib/criteria";
 
 const row = (label: string, value: string, page = "p. 12") => ({ label, value, flagged: false, page, basis: "na" as const });
 // The sample's $68M apartment building, the seller offering to carry 70%
@@ -118,6 +119,55 @@ describe("the note on every summary", () => {
     const note = sellerFinancingNote(s);
     expect(note).toContain("SELLER-FINANCING TRAPS, checked by name");
     expect(note).toContain("(d) THE SECOND");
+  });
+
+  // Research pass 23: on a note the seller's financing was dropped silently —
+  // it finances the purchase of the loan, which no surface said.
+  it("on a note: the financing of the note purchase, as stated, said as that and never run", async () => {
+    const { notePurchaseFinancing, notePurchaseFinancingLine, sellerFinancingDocLine } = await import("./seller-financing");
+    const { keyTermRows } = await import("./key-terms");
+    const { dealContextFor } = await import("./deal-context");
+    const onNote = sample(
+      [
+        row("Seller financing amount", "60% of the purchase price"),
+        row("Seller financing rate", "6.00%"),
+        row("Seller financing term", "3 years"),
+        row("Seller financing amortization", "Interest-only"),
+      ],
+      { interest: { kind: "note", summary: "Sale of the first mortgage note", share: "", groundLease: "", loan: "", page: "" } },
+    );
+    // Never run against the model.
+    expect(readSellerFinancing(onNote, inputs)).toBeNull();
+    expect(sellerFinancingTag(onNote)).toBeNull();
+    // Read as stated, a share struck on the note's own price.
+    const t = notePurchaseFinancing(onNote)!;
+    expect(t).toMatchObject({ amount: 40_800_000, sharePct: 60, ratePct: 6, termYears: 3, interestOnly: true });
+    const line =
+      "The seller offers to finance the note purchase: $40.8M (60% of the price) at 6.00% for 3 years, interest-only as stated — financing of the buyer's purchase of the loan, not of the property, and not run against the model";
+    expect(notePurchaseFinancingLine(t)).toBe(line);
+    // The memo's and the shared screen's one line, either way.
+    expect(sellerFinancingDocLine(onNote)).toBe(line);
+    expect(sellerFinancingDocLine(sample())).toBe("The seller offers to carry financing: $47.6M (70% of the price) at 5.00% for 5 years, amortizing over 25 years");
+    expect(sellerFinancingDocLine(SAMPLE_DEAL.extraction as ExtractionResult)).toBe("");
+    // The deal context says it.
+    expect(dealContextFor(onNote)).toContain(
+      "The memorandum says the seller will finance the note purchase: $40.8M (60% of the price) at 6.00% for 3 years, interest-only as stated. It finances the buyer's purchase of the loan, not the property, so it is read as stated and not run against the model",
+    );
+    // The key terms lead it beside the note's own terms, each labelled as the purchase's.
+    const labels = keyTermRows(onNote.metrics, "stabilized", screenYearOf(onNote), 8, "note").map((m) => m.label);
+    expect(labels).toContain("Seller financing amount (for the note purchase; not run against the model)");
+    expect(labels).toContain("Seller financing rate (for the note purchase; not run against the model)");
+    expect(labels).not.toContain("Seller financing amount");
+    // On the property it reads as before.
+    expect(keyTermRows(sample().metrics, "stabilized", screenYearOf(sample()), 12).map((m) => m.label)).toContain("Seller financing amount");
+    // The workbook's cover lists it, and says the model does not run it.
+    const meta = deriveUnderwriteInputs(onNote, "note").meta.sellerNote;
+    expect(meta?.line).toBe(line);
+    expect(meta?.read).toContain("does not run it");
+    // Nothing on anything but a note.
+    expect(notePurchaseFinancing(sample())).toBeNull();
+    expect(notePurchaseFinancing(sample([], { interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" } }))).toBeNull();
+    expect(gluedWords(`${line} ${dealContextFor(onNote)}`)).toEqual([]);
   });
 
   it("the prompt asks for the rows the reader reads, by their labels", () => {

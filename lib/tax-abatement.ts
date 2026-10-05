@@ -23,9 +23,14 @@
 // owner loses when the abatement ends; at the cap the price was set at it
 // is a sum of the price (the tax-reassessment card's rule on /tools).
 //
-// THE END IS READ EARLY. A year alone is the year's FIRST day, the side
-// that does not flatter the buyer, and a term counted from a stated start
-// is the start plus the term, said as counted.
+// THE END IS READ EARLY. A month or a year alone is its FIRST day, the side
+// that does not flatter the buyer — so an abatement stated to end "June
+// 2027" is gone from June 1, never carried to the month's last day, and one
+// stated to end "2027" is gone from January 1: where a lease stated as a
+// month or a year alone is said to end "this month" or "this year" inside
+// it (lib/ground-lease-term `DatedSpan`), an abatement has ended — and a
+// term counted from a stated start is the start plus the term, said as
+// counted.
 //
 // THE SALE IS THE CLOCK. An abatement that ends inside the model's hold
 // leaves its exit struck on a NOI the building no longer earns; one that
@@ -46,7 +51,7 @@ import { noiFigures } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import type { MetricRow } from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween } from "@/lib/note-yield";
+import { monthsBetween, yearsBetween } from "@/lib/note-yield";
 
 const isRow = (m: unknown): m is MetricRow =>
   !!m && typeof m === "object" && typeof (m as MetricRow).label === "string" && typeof (m as MetricRow).value === "string";
@@ -91,22 +96,32 @@ const TERM_FROM_START = /\b(\d{1,2})[\s-]*(?:years?|yrs?)\b.*\b(?:from|commenc\w
 export interface AbatementEnd {
   /** the end, an ISO date */
   ends: string;
-  /** "date" as written, "year" a year alone (its first day), "term" a term
-   *  counted from a stated start */
-  from: "date" | "year" | "term";
+  /** "date" as written, "month" or "year" a month or a year alone (its
+   *  first day), "term" a term counted from a stated start */
+  from: "date" | "month" | "year" | "term";
   stated: string;
-  /** years left today — negative where the stated end has passed */
+  /** years left today in whole months — the figure said; negative where
+   *  the stated end has passed */
   yearsLeft: number;
+  /** years left to the DAY (lib/ground-lease-term `DatedSpan`): what says
+   *  the abatement has ended or ends before the sale — whole months called
+   *  one with four weeks to run "ended" */
+  yearsToTheDay: number;
 }
+
+/** The end is read early: on its own day the abatement is gone, and the
+ *  day before it is not — by the day, never by whole months. */
+export const abatementEnded = (e: AbatementEnd): boolean => e.yearsToTheDay <= 0;
 
 function endOf(row: MetricRow | null, asOf: Date, pageCount: number | null): AbatementEnd | null {
   if (!row) return null;
   const dated = datedEnd(row, "first", asOf, pageCount);
-  if (dated) return { ends: dated.ends, from: dated.from, stated: dated.stated, yearsLeft: dated.yearsLeft };
+  if (dated) return { ends: dated.ends, from: dated.from, stated: dated.stated, yearsLeft: dated.yearsLeft, yearsToTheDay: dated.yearsToTheDay };
   const m = row.value.match(TERM_FROM_START);
   if (!m) return null;
   const ends = `${Number(m[2]) + Number(m[1])}-01-01`;
-  return { ends, from: "term", stated: row.value.trim(), yearsLeft: monthsBetween(asOf.toISOString().slice(0, 10), ends) / 12 };
+  const today = asOf.toISOString().slice(0, 10);
+  return { ends, from: "term", stated: row.value.trim(), yearsLeft: monthsBetween(today, ends) / 12, yearsToTheDay: yearsBetween(today, ends) };
 }
 
 // A row that says there is none: "Tax abatement: None", "N/A".
@@ -154,6 +169,9 @@ const money = (n: number) =>
   n >= 1e6 ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `$${Math.round(n).toLocaleString("en-US")}`;
 const compact = (n: number) => (n >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`);
 const years1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)} years`;
+/** The years an abatement has left, said: "4.3 years", or inside its last
+ *  month, where whole months count none, "under a month". */
+const leftOf = (e: AbatementEnd) => (Math.round(e.yearsLeft * 12) < 1 ? "under a month" : years1(e.yearsLeft));
 
 // Classes let on gross leases: the owner pays the bill, and every dollar of
 // a step-up comes out of its NOI.
@@ -218,9 +236,9 @@ export function readTaxAbatement(ex: ExtractionResult | null | undefined, asOf: 
   return { ...read, sentences, headline: sentences.join(" ") };
 }
 
-/** "Jan 2031"; a year alone as the year. */
+/** "Jan 2031"; a year alone, or a term counted to a year, as the year. */
 export function abatementEndLabel(e: AbatementEnd): string {
-  return endLabel({ ends: e.ends, from: e.from === "date" ? "date" : "year" });
+  return endLabel({ ends: e.ends, from: e.from === "term" ? "year" : e.from });
 }
 
 function sentencesOf(r: Omit<TaxAbatementRead, "sentences" | "headline">): string[] {
@@ -230,8 +248,8 @@ function sentencesOf(r: Omit<TaxAbatementRead, "sentences" | "headline">): strin
     const when = abatementEndLabel(r.end);
     const counted = r.end.from === "term" ? ` (${r.end.stated}, counted from its stated start)` : "";
     out.push(
-      r.end.yearsLeft > 0
-        ? `The property's taxes are abated${what ? ` ${what}` : ""} until ${when}${counted}, ${years1(r.end.yearsLeft)} from today.`
+      !abatementEnded(r.end)
+        ? `The property's taxes are abated${what ? ` ${what}` : ""} until ${when}${counted}, ${leftOf(r.end)} from today.`
         : `The abatement${what ? ` ${what}` : ""} ended ${when}${counted} by the memorandum's own date: the trailing figures may still carry abated months.`,
     );
   } else {
@@ -271,9 +289,9 @@ export function taxAbatementModelLine(r: TaxAbatementRead, m: TaxAbatementModel)
   if (!r.end) return `${grow}, as if the abatement never ended; the memorandum states no end to say when it does.`;
   const hold = m.holdMonths / 12;
   const when = abatementEndLabel(r.end);
-  if (r.end.yearsLeft <= 0) return `${grow}; the abatement has ended by the memorandum's own date, so check that the in-place NOI carries the full bill.`;
-  if (r.end.yearsLeft < hold) {
-    const into = years1(r.end.yearsLeft);
+  if (abatementEnded(r.end)) return `${grow}; the abatement has ended by the memorandum's own date, so check that the in-place NOI carries the full bill.`;
+  if (r.end.yearsToTheDay < hold) {
+    const into = leftOf(r.end);
     return `${grow}: the abatement ends ${when}, ${into} into its ${Math.round(hold)}-year hold, so its exit is struck on a NOI the building no longer earns${
       atCap ? ` — the step-up is ${atCap}` : ""
     }.`;
@@ -289,7 +307,7 @@ export function taxAbatementModelLine(r: TaxAbatementRead, m: TaxAbatementModel)
 export function taxAbatementTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const r = readTaxAbatement(ex, asOf);
   if (!r) return null;
-  if (r.end && r.end.yearsLeft <= 0) return "Abatement ended";
+  if (r.end && abatementEnded(r.end)) return "Abatement ended";
   const step = r.stepUp != null ? `, +${compact(r.stepUp)}/yr` : "";
   if (!r.end) return `Tax abated${step}`;
   const whole = Math.floor(r.end.yearsLeft);
@@ -304,7 +322,7 @@ export function taxAbatementShortLine(r: TaxAbatementRead): string {
   if (r.program) parts.push(r.program);
   if (r.end) {
     parts.push(
-      r.end.yearsLeft > 0 ? `ends ${abatementEndLabel(r.end)}, ${years1(r.end.yearsLeft)} from today` : `ended ${abatementEndLabel(r.end)}`,
+      !abatementEnded(r.end) ? `ends ${abatementEndLabel(r.end)}, ${leftOf(r.end)} from today` : `ended ${abatementEndLabel(r.end)}`,
     );
   } else {
     parts.push("no end stated");

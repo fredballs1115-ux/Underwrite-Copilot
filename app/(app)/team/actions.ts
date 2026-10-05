@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/client";
-import { classifyStripeError, isStaleCustomer } from "@/lib/stripe/diagnose";
+import { isStaleCustomer, stripeErrorCode } from "@/lib/stripe/diagnose";
 import { getTeam, revokeSharesOfDepartingMember } from "@/lib/teams";
 import { syncTeamSeats } from "@/lib/stripe/seats";
 import {
@@ -234,7 +234,7 @@ export async function startTeamCheckout() {
       } catch (err) {
         if (isRedirectError(err)) throw err;
         console.error(`team: pro->team subscription update failed for team ${team.id}:`, err);
-        redirect(`/team?error=${classifyStripeError(err) ?? "upgrade"}`);
+        redirect(`/team?error=${stripeErrorCode(err, "upgrade")}`);
       }
 
       // Mirror the handover locally so no window shows both plans active;
@@ -285,7 +285,7 @@ export async function startTeamCheckout() {
     } catch (err) {
       if (isRedirectError(err)) throw err;
       console.error(`team: customer verification failed for team ${team.id}:`, err);
-      redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
+      redirect(`/team?error=${stripeErrorCode(err, "checkout")}`);
     }
   }
   if (!customerId) {
@@ -302,7 +302,7 @@ export async function startTeamCheckout() {
       );
     } catch (err) {
       console.error(`team: stripe.customers.create failed for team ${team.id}:`, err);
-      redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
+      redirect(`/team?error=${stripeErrorCode(err, "checkout")}`);
     }
     customerId = customer.id;
     // Billing columns on teams are service-role-only — persist via admin, and
@@ -345,7 +345,7 @@ export async function startTeamCheckout() {
   } catch (err) {
     if (isRedirectError(err)) throw err;
     console.error(`team: create checkout session failed for team ${team.id} (base ${basePriceId}, seat ${seatPriceId}):`, err);
-    redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
+    redirect(`/team?error=${stripeErrorCode(err, "checkout")}`);
   }
 
   if (session.url) redirect(session.url);
@@ -468,7 +468,7 @@ export async function openTeamPortal() {
   } catch (err) {
     if (isRedirectError(err)) throw err;
     console.error(`team portal: customer verification failed for team ${team.id}:`, err);
-    redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
+    redirect(`/team?error=${stripeErrorCode(err, "checkout")}`);
   }
   let session;
   try {
@@ -478,7 +478,7 @@ export async function openTeamPortal() {
     });
   } catch (err) {
     console.error(`team: portal session failed for team ${team.id}:`, err);
-    redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
+    redirect(`/team?error=${stripeErrorCode(err, "checkout")}`);
   }
   redirect(session.url);
 }

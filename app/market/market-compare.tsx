@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { FMR_BEDS, fmrLabel, fmrWhen, type FmrBed } from "@/lib/fmr";
+import { researchAge, staleMark } from "@/lib/research-age";
 
 // Compact, serializable per-metro facts the server derives from the research
 // layer (metros.json) — this component only arranges them. Bars share ONE
@@ -9,23 +11,48 @@ import Link from "next/link";
 export type CompareSector = {
   vLow?: number;
   vHigh?: number;
-  rent?: number;
+  /** the asking rent a foot as the research states it, written — "$13.27",
+   *  or a band as a band ("$10–15"), never a midpoint */
+  rent?: string;
   capLow?: number;
   capHigh?: number;
+  /** the cell's figures' own house, area and period (lib/tracker-read), for
+   *  its title — never the day the research was read */
+  cite?: string;
+  /** each figure's own period, printed beside it ("Q2 2026", "undated") —
+   *  the card had shown only the day the research was read, each figure's
+   *  period in a hover title (the research pass of 2026-10-01) */
+  vPeriod?: string;
+  rentPeriod?: string;
+  capPeriod?: string;
+  /** the area a figure several markets share is for ("Suburban Maryland"),
+   *  said beside it, so a county's cell never passes it off as the county's */
+  shared?: string;
 };
 
 export type CompareMetro = {
   id: string;
   name: string;
   region: string;
-  fmr: Partial<Record<"0br" | "1br" | "2br" | "3br", number>> & {
+  /** HUD's fair market rent through lib/fmr's reader: each bedroom it
+   *  states, the fiscal year its block names and its status */
+  fmr: Partial<Record<FmrBed, number>> & {
+    fy?: number;
     status?: string;
   };
   sectors?: Partial<
     Record<"office" | "industrial" | "multifamily" | "retail", CompareSector>
   >;
   ruleCount: number;
-  compsLive: boolean;
+  /** the recorded-sales feed: running, a source named but not wired, or none */
+  compsFeed: "live" | "documented" | "none";
+  /** the day the research sweep read the snapshot, said ("Aug 25, 2026") —
+   *  never the figures' own date, which each cell's title states; null where
+   *  the file states none */
+  researchReadOn?: string | null;
+  /** the same day as an ISO day, for the research rule's age
+   *  (lib/research-age) — null where the file states none */
+  researchReadIso?: string | null;
 };
 
 const SECTOR_ROWS = ["office", "industrial", "multifamily", "retail"] as const;
@@ -39,24 +66,54 @@ function sectorCell(s: CompareSector | undefined): string {
     s.vHigh != null && s.vHigh !== s.vLow
       ? `${s.vLow}–${s.vHigh}%`
       : `${s.vLow}%`;
-  const extras: string[] = [];
-  if (typeof s.rent === "number") extras.push(`$${s.rent.toFixed(2)}/SF`);
+  // Each figure with its own period beside it — once for the cell where the
+  // figures share one — and the shared area where the figure is several
+  // markets' own.
+  const parts: { text: string; period: string }[] = [{ text: v, period: s.vPeriod ?? "undated" }];
+  if (s.rent) parts.push({ text: `${s.rent}/SF`, period: s.rentPeriod ?? "undated" });
   if (typeof s.capLow === "number" && typeof s.capHigh === "number")
-    extras.push(`cap ${s.capLow}–${s.capHigh}%`);
-  return extras.length > 0 ? `${v} · ${extras.join(" · ")}` : v;
+    parts.push({ text: `cap ${s.capLow}–${s.capHigh}%`, period: s.capPeriod ?? "undated" });
+  const said = (period: string) => [s.shared, period].filter(Boolean).join(", ");
+  const periods = new Set(parts.map((p) => p.period));
+  return periods.size === 1
+    ? `${parts.map((p) => p.text).join(" · ")} (${said(parts[0].period)})`
+    : parts.map((p) => `${p.text} (${said(p.period)})`).join(" · ");
 }
 
-const BEDS = ["0br", "1br", "2br", "3br"] as const;
+/** The days the research was read for the two metros, said once where they
+ *  agree — the day read, never the figures' own period, which is each
+ *  house's print's and rides in each cell's title — and, past the research
+ *  rule's limit on `today`, each day's age and the stale mark
+ *  (lib/research-age): the figures still show, said as stale. */
+function researchDates(a: CompareMetro, b: CompareMetro, today?: string): string {
+  const said = (m: CompareMetro): string | null => {
+    if (!m.researchReadOn) return null;
+    const mark = today ? staleMark(researchAge(m.researchReadIso ?? null, today)) : null;
+    return `${m.researchReadOn}${mark ? ` (${mark})` : ""}`;
+  };
+  const da = said(a);
+  const db = said(b);
+  if (da && db && da !== db) return `research read ${da} (${a.name}) and ${db} (${b.name})`;
+  const d = da ?? db;
+  return d ? `research read ${d}` : "research undated";
+}
 
-function Ladder({ m, max }: { m: CompareMetro; max: number }) {
-  const rows = BEDS.map((b) => ({ label: b.toUpperCase(), value: m.fmr[b] })).filter(
+/** "FY… fair market rent" with the year the block states; no year typed —
+ *  and, past the year's last day, that it ended (lib/fmr `fmrWhen`). */
+function fmrHeading(m: CompareMetro, today?: string): string {
+  if (typeof m.fmr.fy !== "number") return "Fair market rent";
+  const when = today ? fmrWhen({ fy: m.fmr.fy, effective: null }, today) : null;
+  return `${fmrLabel(m.fmr.fy)} fair market rent${when?.ended ? `, ${when.text}` : ""}`;
+}
+
+function Ladder({ m, max, today }: { m: CompareMetro; max: number; today?: string }) {
+  const rows = FMR_BEDS.map((b) => ({ label: b.toUpperCase(), value: m.fmr[b] })).filter(
     (r): r is { label: string; value: number } => typeof r.value === "number",
   );
   if (rows.length === 0) {
     return (
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        FY2026 FMR not yet confirmed for this metro — an honest gap, never an
-        estimate.
+        {`${fmrHeading(m, today)} not yet confirmed for this metro — an honest gap, never an estimate.`}
       </p>
     );
   }
@@ -113,7 +170,7 @@ function Picker({
   );
 }
 
-export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
+export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today?: string }) {
   const [aId, setAId] = useState(metros.find((m) => m.id === "philadelphia")?.id ?? metros[0]?.id ?? "");
   const [bId, setBId] = useState(metros.find((m) => m.id === "dc")?.id ?? metros[1]?.id ?? "");
   const a = metros.find((m) => m.id === aId);
@@ -123,10 +180,12 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
   // One shared scale — the tallest bar across BOTH metros is 100%.
   const max = Math.max(
     1,
-    ...[a, b].flatMap((m) => BEDS.map((k) => m.fmr[k] ?? 0)),
+    ...[a, b].flatMap((m) => FMR_BEDS.map((k) => m.fmr[k] ?? 0)),
   );
+  // Two figures of one fiscal year only: a spread across two years is the
+  // year's change as much as the markets'.
   const spread =
-    typeof a.fmr["2br"] === "number" && typeof b.fmr["2br"] === "number"
+    typeof a.fmr["2br"] === "number" && typeof b.fmr["2br"] === "number" && a.fmr.fy === b.fmr.fy
       ? a.fmr["2br"] - b.fmr["2br"]
       : null;
 
@@ -150,7 +209,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
           <div key={label} className="rounded-xl border border-line bg-paper p-4">
             <Picker metros={metros} value={m.id} onChange={set} label={label} />
             <p className="mt-2 text-[10px] uppercase tracking-wide text-muted">
-              FY2026 fair market rent
+              {fmrHeading(m, today)}
               {m.fmr.status && (
                 <span
                   className={`ml-1.5 rounded px-1.5 py-px text-[9px] font-medium normal-case tracking-normal ${
@@ -163,7 +222,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
                 </span>
               )}
             </p>
-            <Ladder m={m} max={max} />
+            <Ladder m={m} max={max} today={today} />
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
               <span>
                 <span className="font-semibold text-ink">{m.ruleCount}</span>{" "}
@@ -171,8 +230,8 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
               </span>
               <span>
                 comps feed:{" "}
-                <span className={m.compsLive ? "font-medium text-emerald-600" : ""}>
-                  {m.compsLive ? "live" : "documented, not wired"}
+                <span className={m.compsFeed === "live" ? "font-medium text-emerald-600" : ""}>
+                  {m.compsFeed === "live" ? "live" : m.compsFeed === "documented" ? "documented, not wired" : "none yet"}
                 </span>
               </span>
             </div>
@@ -188,7 +247,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
       {(a.sectors || b.sectors) && (
         <div className="mt-4 overflow-x-auto">
           <p className="text-[10px] uppercase tracking-wide text-muted">
-            Asset-type read · vacancy, asking rent, cap where sourced
+            {`Asset-type read · vacancy, asking rent, cap where sourced, each with its own period · ${researchDates(a, b, today)}`}
           </p>
           <table className="mt-1.5 w-full min-w-[28rem] text-left text-[11px]">
             <thead>
@@ -208,6 +267,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
                     <td
                       key={m.id}
                       className="py-1.5 pr-2 font-mono tabular-nums text-muted"
+                      title={m.sectors?.[sec]?.cite}
                     >
                       {sectorCell(m.sectors?.[sec])}
                     </td>

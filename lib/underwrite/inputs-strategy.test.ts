@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
@@ -456,6 +456,29 @@ describe("deriveUnderwriteInputs — a manufactured-housing park's gap to market
   });
 });
 
+describe("deriveUnderwriteInputs — a self-storage facility's premium over street and its lease-up (#471)", () => {
+  it("says the read in a line and what the model does with the premium and the vacancy", () => {
+    const m = deriveUnderwriteInputs(
+      ex(
+        [
+          metric("Asking price", "$9,800,000"),
+          metric("NOI (in-place)", "$600,000"),
+          metric("Units", "612"),
+          metric("Occupancy", "80%"),
+          metric("In-place rent", "$1.38/SF/month"),
+          metric("Street rate", "$1.14/SF/month"),
+        ],
+        { assetClass: "self_storage" },
+      ),
+      "fallback",
+    );
+    expect(m.meta.storage?.line).toBe("Self-storage: 80% occupied by units; in-place $1.38/SF a month against street $1.14/SF a month (+21.1%)");
+    expect(m.meta.storage?.read).toMatch(/^The model grows today's rent, the rate increases' premium included; with every tenant at street its year-one rent would be \$\d+k lower/);
+    expect(m.meta.storage?.read).toContain(`Its ${Math.round(m.inputs.vacancyPct * 1000) / 10}% vacancy is held flat across its years`);
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.storage).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 
@@ -532,8 +555,15 @@ describe("deriveUnderwriteInputs — an auction's starting bid is where the pric
 });
 
 describe("deriveUnderwriteInputs — a multi-tenant property's listed tenants (#457)", () => {
-  // Years counted from the day the test runs, so the roll never moves with it.
-  const y = new Date().getUTCFullYear();
+  // Read on a pinned day: the model reads the roster off the clock, and a
+  // test counting years from the real one failed every December 2–31.
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const y = 2026;
   const t = (name: string, over: Record<string, string>) => ({
     name, role: "inline" as const, inSale: "yes" as const, sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
   });

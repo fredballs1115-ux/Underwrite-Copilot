@@ -50,6 +50,7 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { usdExact } from "@/lib/tools/format";
 
 /** Months in the year the downtime and the tenancy are measured against. */
 const MONTHS = 12;
@@ -351,7 +352,19 @@ function noteFor(x: StorageRead, t: StorageTerms): string {
     return `${withArticle(`${t.ecriPct}%`, true)} increase breaks even at ${withArticle(`${x.breakEvenMoveOutPct}%`)} move-out, against the ${nonNegative(t.moveOutPct) ? t.moveOutPct : 0}% assumed — ${x.headroomPts} points of room.${decay}`;
   }
   if (x.breakEvenMoveOutPct === null) {
-    return `The street rate is high enough against the in-place rent that a leaver's unit re-lets for more than the raised tenant was paying, so there is no trade to make — every move-out is a gain.`;
+    // Two different facilities land here. Only where the street rate, net of
+    // the downtime, reaches the RAISED rent is a move-out a gain; where it
+    // sits between the old rent and the raised one, a leaver re-lets for
+    // more than they paid but less than the raised tenant would, so each
+    // move-out gives back part of the gain — the increase simply cannot
+    // lose revenue at any response. The first version said "more than the
+    // raised tenant" of both: $105 street against $100 raised to $110.
+    const downtime = nonNegative(t.downtimeMonths) ? Math.min(MONTHS, t.downtimeMonths) : 0;
+    const relet = (t.streetRent ?? 0) * ((MONTHS - downtime) / MONTHS);
+    const raised = (t.inPlaceRent ?? 0) * (1 + (t.ecriPct ?? 0) / 100);
+    return relet >= raised
+      ? `The street rate is high enough against the in-place rent that a leaver's unit re-lets for more than the raised tenant was paying, so there is no trade to make — every move-out is a gain.`
+      : `The street rate is above what sitting tenants pay, so the increase cannot lose revenue at any move-out rate — a leaver's unit re-lets for more than they paid, though for less than the raised rent, so each move-out gives back part of the gain rather than costing revenue.`;
   }
   if (x.headroomPts !== null && x.headroomPts <= 0) {
     return `The move-out assumed is at or past the ${x.breakEvenMoveOutPct}% this increase breaks even at, so it costs revenue rather than earning it — ${usd(Math.abs(x.revenueGain ?? 0))} a year.`;
@@ -359,8 +372,10 @@ function noteFor(x: StorageRead, t: StorageTerms): string {
   return "Enter the street rate and the increase to see how much room is left.";
 }
 
+/** Whole dollars through the shared writer, the size alone: the sentence
+ *  says the direction in words ("costs revenue"). */
 function usd(n: number): string {
-  return `$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+  return usdExact(Math.abs(n));
 }
 
 function rnd(n: number, places = 0): number {

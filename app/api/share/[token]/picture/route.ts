@@ -23,6 +23,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT, readPictureBytes } from "@/lib/deal-picture";
 import { resolveShare } from "@/lib/share-resolve";
+import { dealPhotoPathOf } from "@/lib/storage-paths";
 
 export async function GET(
   req: Request,
@@ -39,7 +40,12 @@ export async function GET(
   if (!picture) return new NextResponse(null, { status: 404 });
 
   const size = new URL(req.url).searchParams.get("size") === "thumb" ? "thumb" : "hero";
-  const etag = `W/"${picture[size]}"`;
+  // The stored path is the deal owner's to write (deals.photo): one that is
+  // not this deal's photograph is never read, and never put in a header
+  // (lib/storage-paths `dealPhotoPathOf`; research pass 22).
+  const path = dealPhotoPathOf(dealId, picture[size]);
+  if (!path) return new NextResponse(null, { status: 404 });
+  const etag = `W/"${path}"`;
   const headers = {
     etag,
     "cache-control": "private, no-cache",

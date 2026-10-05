@@ -2,10 +2,10 @@
  * Today's rates, and which of them may become a number in a box.
  *
  * Every figure on the site that moves with the market comes through one
- * table: the Treasury curve, SOFR and its averages, the policy rates, the
- * credit spreads, the mortgage survey, bank CRE lending and its standards,
+ * table: the Treasury curve, SOFR and its averages, the policy rates,
+ * corporate credit, the mortgage survey, bank CRE lending and its standards,
  * inflation and the cost of building, jobs, and the multifamily supply
- * pipeline — forty-odd FRED series the weekday cron writes
+ * pipeline — the fifty national FRED series the weekday cron writes
  * (`scripts/fetch-rates.mjs` → the `rates` table) and this module reads back
  * for the strip across the top of `/tools` and the bottom of `/market`, and
  * for the seeds that pre-fill a calculator field.
@@ -70,6 +70,8 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { monthOf } from "@/lib/zori";
+import { HVS_RATES_URL } from "@/lib/hvs-tables";
 import table from "@/data/fred-series.json";
 
 /** How often a series publishes; `annual` is the Housing Vacancy Survey's
@@ -79,7 +81,8 @@ export type Cadence = "daily" | "weekly" | "monthly" | "quarterly" | "annual";
 
 /**
  * What the stored figure is — which decides how it is shown and how it
- * moves. `count` is thousands at an annual rate (the national starts);
+ * moves. `count` is thousands at an annual rate (the national starts),
+ * shown with its unit ("344k/yr");
  * `units` is a plain count of things (a metro's permits in a month).
  */
 export type Unit = "pct" | "spread" | "pts" | "count" | "units";
@@ -164,8 +167,10 @@ export type MetroMetric =
  */
 export type SeriesSource = "fred" | "bls" | "census";
 
-/** Where the Census Bureau publishes the Housing Vacancy Survey's rate tables. */
-export const HVS_RATES_URL = "https://www.census.gov/housing/hvs/data/rates.html";
+/** Where the Census Bureau publishes the Housing Vacancy Survey's rate tables
+ *  — the one address the tiles link and the pull reads the tables' names
+ *  from (lib/hvs-tables). */
+export { HVS_RATES_URL };
 
 export interface SeriesMeta {
   /** The key in the `rates` table. */
@@ -856,7 +861,11 @@ export function formatValue(r: Pick<LiveRate, "value" | "meta">): string {
     case "pts":
       return `${signed(r.value, 1)}%`;
     case "count":
-      return `${Math.round(r.value).toLocaleString("en-US")}k`;
+      // Thousands of units at an annual rate (FRED's "seasonally adjusted
+      // annual rate"): the month's pace, a year of it. Bare, "344k" read as
+      // a count of something with its unit in a hover title alone; the unit
+      // is on the figure (the research pass of 2026-10-01).
+      return `${Math.round(r.value).toLocaleString("en-US")}k/yr`;
     case "units":
       return Math.round(r.value).toLocaleString("en-US");
   }
@@ -1047,16 +1056,47 @@ export function treasuryForTerm(curve: readonly CurveSeed[], months: number | nu
   return best;
 }
 
-/** "Sep 14" — the strip has no room for a year and the figures are all recent. */
-export function shortDate(obsDate: string): string {
+/**
+ * A figure's date by its cadence, the year always in it: a daily or weekly
+ * figure its day ("Sep 17, 2026"), a monthly one its month ("Aug 2026"), a
+ * quarterly one its quarter ("Q2 2026"), an annual one its year ("2025").
+ *
+ * The one formatter every live figure is dated through. FRED dates a monthly
+ * figure the first of its month and a quarterly one the first of its quarter,
+ * so a day says a Q2 figure is an April morning's ("CRE delinquency as of Apr
+ * 1"), and a day with no year says a series that stopped in 2024 is this
+ * year's ("Tampa Bay FL 7.7% (Oct 1)" for the fourth quarter of 2024) — the
+ * strip and the boards printed both until 2026-10-01.
+ */
+export function periodLabel(obsDate: string, cadence: Cadence): string {
   const at = Date.parse(`${obsDate}T00:00:00Z`);
   if (!Number.isFinite(at)) return obsDate;
-  return new Date(at).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+  const d = new Date(at);
+  if (cadence === "quarterly") return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
+  if (cadence === "annual") return String(d.getUTCFullYear());
+  if (cadence === "monthly") return monthOf(obsDate);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
+
+/** The period a live figure is for: its own date, said by its own cadence. */
+export function periodOf(r: { obsDate: string; meta: Pick<SeriesMeta, "cadence"> }): string {
+  return periodLabel(r.obsDate, r.meta.cadence);
+}
+
+/**
+ * Who publishes a figure, where a tile names it beside its link: the BLS or
+ * the Census Bureau for a series pulled from them, and Freddie Mac for its
+ * mortgage survey — FRED carries the survey, and the table's own label says
+ * whose it is. Null for everything else, which the strip's heading and the
+ * link itself credit to FRED.
+ */
+export function publisherTag(meta: Pick<SeriesMeta, "source" | "label">): string | null {
+  if (meta.source === "bls") return "BLS";
+  if (meta.source === "census") return "Census";
+  if (/^Freddie Mac\b/.test(meta.label)) return "Freddie Mac";
+  return null;
+}
+
 
 /** The series' own page on FRED — the level's page for a transformed series. */
 export function fredUrl(id: string): string {

@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
+import { PDFJS_JPX_DECODER, pdfjsWasmUrl } from "./pdfjs-wasm";
+import { TEST_JPX } from "./test-jpx";
 import {
   COVER_PAGES,
   FLAT_SHARE,
@@ -20,6 +23,7 @@ import { findOmImages, scanShaped } from "./om-photo";
 import {
   HERO_MAX_PX,
   HERO_MIN_PX,
+  PHOTO_RULES_SINCE,
   PICTURE_SEARCH_VERSION,
   coverOf,
   currentPicture,
@@ -27,6 +31,7 @@ import {
   galleryOf,
   hashOf,
   pictureMayBeInMemorandum,
+  readCover,
   searchedRecently,
   staleOmPicture,
 } from "./deal-picture";
@@ -148,7 +153,8 @@ describe("the cover of a memorandum the byte scan cannot read", () => {
 
   it("never reads a file that asks for a password to open", async () => {
     const pdf = await testMemorandum([{ images: [await testPicture(W, H, "jpeg")] }], "user-password");
-    expect(await decodeOmCover(pdf)).toEqual({ cover: null, opened: false, pageOneRead: false });
+    // The file's own answer, which every read gives again: complete.
+    expect(await decodeOmCover(pdf)).toEqual({ cover: null, opened: false, pageOneRead: false, complete: true });
   });
 
   it("finds a cover a few pages in, and none past the first pages", async () => {
@@ -168,6 +174,80 @@ describe("the cover of a memorandum the byte scan cannot read", () => {
     const logoOnly = await testMemorandum([{ images: [await logo()], text: "Offering Memorandum" }], "aes-128");
     expect((await decodeOmCover(logoOnly)).cover).toBeNull();
     expect((await decodeOmCover(new TextEncoder().encode("%PDF-1.7\nnot a pdf at all"))).cover).toBeNull();
+  });
+});
+
+describe("a cover stored as JPEG 2000", () => {
+  const SOURCE_JPX = means(testPixels(TEST_JPX.width, TEST_JPX.height, TEST_JPX.variant), 3);
+
+  it("is told where pdfjs's decoders are: the package's own wasm folder, with the slash pdfjs wants", () => {
+    const url = pdfjsWasmUrl();
+    expect(url).toBeDefined();
+    expect(url!.endsWith("/")).toBe(true);
+    expect(existsSync(`${url}${PDFJS_JPX_DECODER}`)).toBe(true);
+  });
+
+  for (const security of ["none", "aes-128"] as const) {
+    it(`decodes it ${security === "none" ? "plain" : "secured"}, into the photograph's own pixels`, async () => {
+      // Without the decoders' location pdfjs could not decode it at all,
+      // and this cover page read as holding no photograph.
+      const pdf = await testMemorandum([{ images: [TEST_JPX], text: "The Maddox" }, { text: "Executive summary" }], security);
+      expect(findOmImages(pdf)).toEqual([]);
+      const read = await decodeOmCover(pdf);
+      expect(read).toMatchObject({ opened: true, pageOneRead: true, complete: true });
+      expect(read.cover).toMatchObject({ width: TEST_JPX.width, height: TEST_JPX.height, page: 1 });
+      // The picture that went in, less the wavelet's loss.
+      means(read.cover!.pixels, read.cover!.channels).forEach((m, c) => expect(Math.abs(m - SOURCE_JPX[c])).toBeLessThan(3));
+    });
+  }
+
+  it("is lifted as pixels, since the file stores no JPEG of it, and its two sizes are made as any cover's are", async () => {
+    const got = await coverOf(await testMemorandum([{ images: [TEST_JPX] }]));
+    expect(got && !Buffer.isBuffer(got) ? { w: got.width, h: got.height } : null).toEqual({ w: TEST_JPX.width, h: TEST_JPX.height });
+    const derived = await derivePicture(got!);
+    // 640 across, enlarged cleanly to the hero's floor (#446).
+    expect({ w: derived.width, h: derived.height }).toEqual({ w: HERO_MIN_PX, h: 750 });
+    expect((await sharp(derived.thumb).metadata()).width).toBe(240);
+  });
+
+  it("takes the cover page's JPEG 2000 photograph over a larger JPEG further in, as it would a JPEG", async () => {
+    const pdf = await testMemorandum([{ images: [TEST_JPX] }, { images: [await testPicture(1920, 1200, "jpeg", 2)] }]);
+    expect((await decodeOmCover(pdf)).cover).toMatchObject({ width: TEST_JPX.width, page: 1 });
+  });
+});
+
+describe("a read the time budget cuts short is never an answer", () => {
+  it("says a read out of time is incomplete, and a read to its end, or of a file that cannot be opened, complete", async () => {
+    const photo = await testPicture(W, H, "jpeg");
+    const pdf = await testMemorandum([{ text: "Offering Memorandum" }, { images: [photo] }], "aes-128");
+    // No time at all: nothing was looked at, so nothing is known.
+    expect(await decodeOmCover(pdf, { budgetMs: 0 })).toEqual({ cover: null, opened: false, pageOneRead: false, complete: false });
+    // Time enough: the photograph on the page after the cover, and an answer.
+    const full = await decodeOmCover(pdf);
+    expect(full).toMatchObject({ opened: true, pageOneRead: true, complete: true });
+    expect(full.cover).toMatchObject({ width: W, page: 2 });
+    // Read to its end with no photograph on the cover pages: a real "none".
+    const maps = await testMemorandum([{ text: "Contents" }, { images: [await testMap(1600, 1100, "jpeg")] }], "aes-128");
+    expect(await decodeOmCover(maps)).toMatchObject({ cover: null, opened: true, complete: true });
+    // A file that is no PDF is the file's own answer, which every read gives.
+    expect((await decodeOmCover(new TextEncoder().encode("%PDF-1.7\nnot a pdf at all"))).complete).toBe(true);
+  });
+
+  it("gives a secured memorandum cut short no answer, where the byte scan cannot see in, and a plain one the scan's guess", async () => {
+    const photo = await testPicture(W, H, "jpeg");
+    // The case the old search wrote down as "no photograph" for a month.
+    const locked = await testMemorandum([{ images: [photo] }], "aes-128");
+    expect(await readCover(locked, { budgetMs: 0 })).toEqual({ cover: null, complete: false });
+    // Given its time, the same file's cover is found.
+    const found = await readCover(locked);
+    expect(found.complete).toBe(true);
+    expect(found.cover && !Buffer.isBuffer(found.cover) ? { w: found.cover.width, h: found.cover.height } : null).toEqual({ w: W, h: H });
+    // A plain file cut short: the scan still lifts its JPEG, as it always did.
+    const plain = await readCover(await testMemorandum([{ images: [photo] }]), { budgetMs: 0 });
+    expect(plain.complete).toBe(true);
+    expect(Buffer.isBuffer(plain.cover) && plain.cover.equals(photo)).toBe(true);
+    // A secured file read to its end with nothing in it: complete, and none.
+    expect(await readCover(await testMemorandum([{ text: "No pictures" }], "aes-128"))).toEqual({ cover: null, complete: true });
   });
 });
 
@@ -301,14 +381,20 @@ describe("the cover page's photograph, never a map (#444)", () => {
 
   it("judges again a photograph lifted under older rules, and never the reader's own", () => {
     const picture = { hero: "h.jpg", thumb: "t.jpg", width: 800, height: 500, source: "om" as const, at: "2026-09-01T00:00:00Z" };
-    expect(staleOmPicture({ picture, pictureSearchV: PICTURE_SEARCH_VERSION - 1 })).toBe(true);
+    expect(staleOmPicture({ picture, pictureSearchV: PHOTO_RULES_SINCE - 1 })).toBe(true);
     expect(staleOmPicture({ picture })).toBe(true);
     expect(staleOmPicture({ picture, pictureSearchV: PICTURE_SEARCH_VERSION })).toBe(false);
     expect(staleOmPicture({ picture: { ...picture, source: "upload" }, pictureSearchV: 1 })).toBe(false);
-    expect(currentPicture({ picture, pictureSearchV: PICTURE_SEARCH_VERSION - 1 })).toBeNull();
+    expect(currentPicture({ picture, pictureSearchV: PHOTO_RULES_SINCE - 1 })).toBeNull();
     expect(currentPicture({ picture, pictureSearchV: PICTURE_SEARCH_VERSION })).toBe(picture);
+    // Rules that change only what it takes to say "none" leave a photograph
+    // lifted since PHOTO_RULES_SINCE standing, while a verdict of none from
+    // those rules is looked at again.
+    expect(currentPicture({ picture, pictureSearchV: PHOTO_RULES_SINCE })).toBe(picture);
+    expect(PICTURE_SEARCH_VERSION).toBeGreaterThan(PHOTO_RULES_SINCE);
+    expect(searchedRecently({ pictureCheckedAt: new Date().toISOString(), pictureSearchV: PHOTO_RULES_SINCE })).toBe(false);
     // The pipeline asks for it again as a memorandum not yet looked in.
-    const stale = { picture, pictureSearchV: PICTURE_SEARCH_VERSION - 1 };
+    const stale = { picture, pictureSearchV: PHOTO_RULES_SINCE - 1 };
     expect(pictureMayBeInMemorandum({ omPath: "u/d.pdf", isSample: false, cache: stale })).toBe(true);
     expect(pictureMayBeInMemorandum({ omPath: "u/d.pdf", isSample: true, cache: stale })).toBe(false);
     expect(
@@ -353,7 +439,7 @@ describe("the memorandum's other photographs (#448)", () => {
     const read = await decodeOmPhotos(pdf, (p) => {
       pages.push(p.page);
     });
-    expect(read).toEqual({ opened: true, found: 3, aborted: false });
+    expect(read).toEqual({ opened: true, found: 3, aborted: false, cut: false });
     expect(pages).toEqual([1, 3, 5]);
   });
 
@@ -367,13 +453,13 @@ describe("the memorandum's other photographs (#448)", () => {
   it("stops at the most it keeps, and reads no further than its pages", async () => {
     const pdf = await memorandum();
     const first: number[] = [];
-    expect(await decodeOmPhotos(pdf, (p) => void first.push(p.page), { max: 1 })).toEqual({ opened: true, found: 1, aborted: false });
+    expect(await decodeOmPhotos(pdf, (p) => void first.push(p.page), { max: 1 })).toEqual({ opened: true, found: 1, aborted: false, cut: false });
     expect(first).toEqual([1]);
     const late = await testMemorandum([
       ...Array.from({ length: GALLERY_PAGES }, (_, i) => ({ text: `Page ${i + 1}` })),
       { images: [await testPicture(W, H, "jpeg", 2)] },
     ]);
-    expect(await decodeOmPhotos(late, () => {})).toEqual({ opened: true, found: 0, aborted: false });
+    expect(await decodeOmPhotos(late, () => {})).toEqual({ opened: true, found: 0, aborted: false, cut: false });
   });
 
   it("gives way the moment a cover is waiting, and an incomplete gallery is never a gallery", async () => {
@@ -384,14 +470,23 @@ describe("the memorandum's other photographs (#448)", () => {
       pages.push(p.page);
       waiting = true;
     }, { yieldTo: () => waiting });
-    expect(read).toEqual({ opened: true, found: 1, aborted: true });
+    expect(read).toEqual({ opened: true, found: 1, aborted: true, cut: false });
     expect(pages).toEqual([1]);
     expect(await galleryOf(pdf, [], () => true)).toBeNull();
   });
 
+  it("says when the time budget cut the read short, so what it found is never taken for the file's all (the pre-ship audit of 2026-09-30)", async () => {
+    const pdf = await memorandum();
+    const read = await decodeOmPhotos(pdf, () => {}, { budgetMs: 0 });
+    expect(read.cut).toBe(true);
+    expect(read.aborted).toBe(false);
+    const gallery = await galleryOf(pdf, [], undefined, { budgetMs: 0 });
+    expect(gallery?.cut).toBe(true);
+  });
+
   it("reads nothing from a file that asks for a password to open", async () => {
     const locked = await testMemorandum([{ images: [await testPicture(W, H, "jpeg", 2)] }], "user-password");
-    expect(await decodeOmPhotos(locked, () => {})).toEqual({ opened: false, found: 0, aborted: false });
+    expect(await decodeOmPhotos(locked, () => {})).toEqual({ opened: false, found: 0, aborted: false, cut: false });
   });
 
   it("derives each photograph beside the cover as the cover is, with its page", async () => {
@@ -399,7 +494,9 @@ describe("the memorandum's other photographs (#448)", () => {
     const cover = await coverOf(pdf);
     expect(cover).not.toBeNull();
     const hash = await hashOf(cover!);
-    const gallery = await galleryOf(pdf, [hash!]);
+    const read = await galleryOf(pdf, [hash!]);
+    expect(read?.cut).toBe(false);
+    const gallery = read?.photos;
     expect(gallery?.map((g) => g.page)).toEqual([3, 5]);
     for (const g of gallery ?? []) {
       // Enlarged cleanly like a small cover (#446), and a thumbnail beside it.

@@ -2,16 +2,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
+import { FREE_DEALS_LINE, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
-import { benchmark30 } from "@/lib/debt-index";
+import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct, screenYearOf } from "@/lib/criteria";
+import { benchmark30, datedLong } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
-import { seedBenchmarks } from "@/lib/research-data";
-import { sectorLeaderboard } from "@/lib/sector-leaderboard";
+import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
+import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
+import { monthOf } from "@/lib/zori";
+import { rankLabel } from "@/lib/rank";
+import { sectorStandings } from "@/lib/sector-leaderboard";
+import { blockCitations, snapshotAge } from "@/lib/tracker-read";
+import { researchAge, staleMark } from "@/lib/research-age";
+import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
+import { LegalPanel } from "./legal-panel";
 import { scoreMandateFit } from "@/lib/mandate";
 import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strategy";
 import { DemoSections, type DemoData } from "./sections";
@@ -51,83 +58,10 @@ export const metadata: Metadata = {
   },
 };
 
-/** The deal page's Regulation & benchmarks panel for the sample deal —
- *  derived by lib/sample-legal through the real rules engine. Full-width
- *  presentation with provenance (source link, verified chip, as-of), the
- *  covered-market chip, and the dormancy explainer for event-keyed rules. */
-function LegalPanel() {
-  const legal = sampleLegal();
-  return (
-    <section className="mt-8 rounded-2xl border border-line bg-surface p-5 shadow-card">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Regulation &amp; benchmarks
-        </h2>
-        <span className="text-[11px] text-muted">
-          assumes a natural-person buyer with no other units here
-        </span>
-      </div>
-      {legal.metroName && (
-        <Link
-          href={legal.metroId ? `/market?metro=${legal.metroId}` : "/market"}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand outline-none transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40"
-        >
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
-          Covered market: {legal.metroName} — open the market brief →
-        </Link>
-      )}
-      <p className="mt-3 text-sm text-muted">
-        {legal.screenedCount} rule{legal.screenedCount === 1 ? "" : "s"} on file for {legal.jurisdiction} ·{" "}
-        {legal.triggeredCount === 0
-          ? "none triggered by this deal's facts"
-          : `${legal.triggeredCount} triggered by this deal's facts`}
-      </p>
-      <ul className="mt-3 space-y-3">
-        {legal.rules.map((r) => (
-          <li key={r.typeLabel} className="rounded-lg border border-line/70 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded bg-line/60 px-1.5 py-px text-[11px] font-semibold text-muted">
-                {r.outcomeLabel}
-              </span>
-              <span className="text-[11px] uppercase tracking-wide text-muted">
-                {r.typeLabel}
-              </span>
-              <span className="ml-auto inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-                <span className="rounded bg-emerald-500/10 px-1.5 py-px font-medium text-emerald-600">
-                  {r.status}
-                </span>
-                <span>as of {r.asOf}</span>
-                {r.source && (
-                  <a
-                    href={r.source}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                  >
-                    source
-                  </a>
-                )}
-              </span>
-            </div>
-            <p className="mt-1.5 text-sm leading-relaxed">{r.effect}</p>
-            {r.dormantNote && (
-              <p className="mt-1 text-[12px] font-medium text-caution">
-                {r.dormantNote}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
-      {legal.stateFact && (
-        <p className="mt-3 text-[12px] text-muted">
-          Plain-state fact carried in the verified rule text: {legal.stateFact}
-        </p>
-      )}
-    </section>
-  );
-}
-
 export default async function DemoPage() {
+  // Today, read once outside the render: a fair market rent's year, the
+  // rankings' year-old rule and every research date's age (lib/research-age).
+  const today = fmrToday();
   // Everything below is computed by the SAME functions the logged-in app
   // runs — evaluateBuyBox, scoreMandateFit, deriveUnderwriteInputs — over
   // the sample fixture, so the demo can never drift from the product.
@@ -167,6 +101,8 @@ export default async function DemoPage() {
         omNoi != null
           ? compareNoi(omNoi, SAMPLE_DEAL.t12.summary.noi!, omPick)
           : null,
+      // An apartment roll, read per unit a month as the app reads it.
+      assetClass: SAMPLE_DEAL.asset_class,
     },
     buyBox: {
       checks: evaluateBuyBox(
@@ -193,7 +129,7 @@ export default async function DemoPage() {
   };
   const metrics = data.extraction.metrics;
   // The shared price reader, as the deal page uses it.
-  const price = findPriceMetric(metrics, inferStrategy(data.extraction).kind)?.value ?? null;
+  const price = findPriceMetric(metrics, inferStrategy(data.extraction).kind, screenYearOf(data.extraction))?.value ?? null;
   const sfValue = buildingSfRow(metrics)?.value ?? null;
   const unitValue = unitCountRow(metrics)?.value ?? null;
   // A bare unit count ("248") reads wrong in a Size slot — say what it counts.
@@ -242,10 +178,39 @@ export default async function DemoPage() {
   const phillyRows = seedBenchmarks().filter((b) =>
     b.metro.startsWith("Philadelphia"),
   );
+  // The 2–4 unit median with the month it is for and its change, read from
+  // the research file (Redfin's single-month median) rather than typed here.
+  const phillyMedian = twoToFourMedian("philadelphia_pa");
+  // Past the research rule's limit from its month's last day, the month
+  // keeps its place with its age and the stale mark (lib/research-age).
+  const phillyMedianStale = phillyMedian ? staleMark(researchAge(phillyMedian.asOf, today)) : null;
+  // HUD's two-bedroom fair market rent with the fiscal year its research
+  // block names (lib/fmr), never a figure or a year typed on the page.
+  const phillyFmr = metroFmr("philadelphia");
+  const phillyFmr2br = phillyFmr?.rents["2br"] ?? null;
+  // Past the fiscal year's last day the figure says its year ended.
+  const phillyFmrWhen = phillyFmr ? fmrWhen(phillyFmr, today) : null;
   const band = (metric: string): string | null => {
     const r = phillyRows.find((b) => b.metric === metric);
     if (!r || typeof r.low !== "number") return null;
     return r.high !== r.low ? `${r.low}–${r.high}%` : `${r.low}%`;
+  };
+  // Each figure's own period in view and its whole credit as its title —
+  // who published it, for what area and when (lib/tracker-read), the way
+  // the homepage's band and gallery and /market's panel credit the same
+  // figures; "undated" where the research states no period.
+  const phillySnapshot = (metrosSeed.metros ?? []).find((m) => m.id === "philadelphia")?.sector_snapshot as
+    | Record<string, unknown>
+    | undefined;
+  // The tracker's figures still show past the research rule's limit; the
+  // line then says the day they were read, their age and that they are stale.
+  const phillyTrackerAge = snapshotAge(phillySnapshot, today);
+  const phillyTrackerStale = staleMark(phillyTrackerAge);
+  const credit = (sector: string, label: "Vacancy" | "Rent") => {
+    const fig = blockCitations(phillySnapshot?.[sector]).find((f) => f.label === label);
+    // The narrower stock a figure covers rides with its period ("Class A
+    // space, Q2 2026"), so a Class A rent never reads as the market's.
+    return { period: [fig?.read.slice, fig?.read.period ?? "undated"].filter(Boolean).join(", "), title: fig?.words };
   };
   const phillySectors = {
     office: band("office_vacancy_pct"),
@@ -260,14 +225,15 @@ export default async function DemoPage() {
   };
   // Where each Philadelphia read sits across the covered markets — the same
   // shared leaderboard builder behind the market page's rankings and rank
-  // chips, so the sample screen can never disagree with them. A sector with
-  // no numeric vacancy (retail's held-open level) simply gets no rank.
+  // chips (lib/sector-leaderboard), so the sample screen can never disagree
+  // with them. A figure the ranking cannot place (a spread of two reads,
+  // undated, over a year old) says why rather than taking a rank; a sector
+  // with no numeric vacancy (retail's held-open level) gets nothing.
+  const standings = sectorStandings(["office", "industrial", "multifamily", "retail"], today);
   const phillyRank = (sector: string): string | null => {
-    const ranked = sectorLeaderboard(sector).rows.filter(
-      (r) => r.vLow !== null,
-    );
-    const i = ranked.findIndex((r) => r.id === "philadelphia");
-    return i >= 0 ? `#${i + 1} of ${ranked.length}` : null;
+    const s = standings[sector]?.["philadelphia"];
+    if (!s) return null;
+    return s.rank !== null ? `${rankLabel({ rank: s.rank, tied: s.tied })} of ${s.total}` : `not ranked: ${s.reason}`;
   };
   const phillyRanks = {
     office: phillyRank("office"),
@@ -309,7 +275,7 @@ export default async function DemoPage() {
       <main id="main" className="flex-1">
         {/* The sample deal's own city, from above: Center City, Philadelphia
             — Brewerytown is two miles north-west of the frame. */}
-        <PlaceBand metro="philadelphia" width="max-w-5xl">
+        <PlaceBand metro="philadelphia" width="max-w-5xl" eager>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               A complete screen, worked end to end
@@ -372,7 +338,7 @@ export default async function DemoPage() {
               same engine on the sample's real Philadelphia jurisdiction. The
               sample's one rule happens to be dormant on a purchase, and the
               panel says so instead of hiding it — that honesty IS the demo. */}
-          <LegalPanel />
+          <LegalPanel legal={sampleLegal(today)} />
 
           {/* Interactive: the challenger's real broker questions, revealed on
               click — the reader plays analyst before seeing the drafted ask. */}
@@ -444,7 +410,7 @@ export default async function DemoPage() {
               Run this screen on your own OM
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/70">
-              First {FREE_DEALS} deals free · no card.
+              {FREE_DEALS_LINE} · no card.
             </p>
             <Link
               href="/login?mode=signup"
@@ -458,8 +424,9 @@ export default async function DemoPage() {
 
       {/* The research layer — real rules + real data behind the sample's
           jurisdiction (site-polish 2). Everything here is genuine: the rule
-          is verified against the statute, the FMR is the published FY2026
-          figure, and signed-in samples pull live recorded sales. */}
+          is verified against the statute, the FMR is HUD's published figure
+          for the fiscal year its research block names, and signed-in
+          samples pull live recorded sales. */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-5xl px-6 py-12">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">
@@ -471,8 +438,10 @@ export default async function DemoPage() {
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-line bg-surface p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded bg-kill/10 px-2 py-0.5 text-[11px] font-semibold text-kill">
-                  Applies
+                {/* Dormant, as the rules panel below evaluates it: the rule
+                    keys off an eviction filing, never the purchase. */}
+                <span className="rounded bg-caution/10 px-2 py-0.5 text-[11px] font-semibold text-caution">
+                  Dormant until an eviction
                 </span>
                 <span className="text-[11px] uppercase tracking-wide text-muted">
                   eviction procedure · Philadelphia
@@ -482,7 +451,7 @@ export default async function DemoPage() {
                 </span>
               </div>
               <p className="mt-2 text-sm leading-relaxed">
-                Philadelphia Code § 9-811: 30 days in the Eviction Diversion Program before any filing. The screen prices that delay in.
+                Philadelphia Code § 9-811: 30 days in the Eviction Diversion Program before any filing — a month to add to any eviction the owner files.
               </p>
               <a
                 href="https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160"
@@ -495,70 +464,89 @@ export default async function DemoPage() {
             </div>
             <div className="rounded-xl border border-line bg-surface p-4">
               <p className="text-[11px] uppercase tracking-wide text-muted">
-                Real benchmarks for this submarket
+                Published benchmarks · wider than the submarket
               </p>
               <dl className="mt-2 grid grid-cols-2 gap-3">
-                <div>
-                  <dt className="text-[11px] text-muted">FY2026 2BR fair market rent</dt>
-                  <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">$1,810/mo</dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] text-muted">2–4 unit median · +6.9% YoY</dt>
-                  <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">$363,500</dd>
-                </div>
+                {phillyFmr && phillyFmr2br !== null && (
+                  <div>
+                    <dt className="text-[11px] text-muted">{`${fmrLabel(phillyFmr.fy)} 2BR fair market rent${phillyFmrWhen?.ended ? `, ${phillyFmrWhen.text}` : ""}`}</dt>
+                    <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
+                      {`$${phillyFmr2br.toLocaleString("en-US")}/mo`}
+                    </dd>
+                    {/* HUD's area is four states wide, not the city's: named, since the
+                        box's heading can only say the figures are wider than the submarket. */}
+                    <dd className="mt-0.5 text-[10px] leading-snug text-muted">{phillyFmr.area}</dd>
+                  </div>
+                )}
+                {phillyMedian && (
+                  <div>
+                    <dt className="text-[11px] text-muted">
+                      {`2–4 unit median, ${monthOf(phillyMedian.asOf)}${phillyMedian.yoy ? ` · ${phillyMedian.yoy} YoY` : ""}`}
+                      {phillyMedianStale && (
+                        <span className="text-caution" data-qa="research-stale">{` (${phillyMedianStale})`}</span>
+                      )}
+                    </dt>
+                    <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
+                      {`$${phillyMedian.price.toLocaleString("en-US")}`}
+                    </dd>
+                  </div>
+                )}
               </dl>
               <p className="mt-2 text-[11px] text-muted">
                 Signed in, recorded sales around Brewerytown pull from the city&apos;s OPA records, source-linked.
               </p>
               {(phillySectors.office || phillySectors.multifamily) && (
                 <p className="mt-2 border-t border-line/60 pt-2 text-[11px] leading-relaxed text-muted">
-                  Philadelphia by asset type:{" "}
+                  Philadelphia by asset type
+                  {phillyTrackerStale && phillyTrackerAge.asOf && (
+                    <span className="text-caution" data-qa="research-stale">
+                      {` (research read ${datedLong(phillyTrackerAge.asOf)}; ${phillyTrackerStale})`}
+                    </span>
+                  )}
+                  {": "}
                   {phillySectors.office && (
                     <>
                       office vacancy{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("office", "Vacancy").title}>
                         {phillySectors.office}
                       </span>
-                      {phillyRanks.office && <> ({phillyRanks.office})</>}
+                      {` (${[credit("office", "Vacancy").period, phillyRanks.office].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.industrial && (
                     <>
                       {" · "}industrial{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Vacancy").title}>
                         {phillySectors.industrial}
                       </span>
+                      {` (${[credit("industrial", "Vacancy").period, phillyRanks.industrial].filter(Boolean).join(", ")})`}
                       {typeof phillySectors.industrialRent === "number" && (
                         <>
                           {" at "}
-                          <span className="font-mono tabular-nums text-ink">
+                          <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Rent").title}>
                             ${phillySectors.industrialRent.toFixed(2)}/SF
                           </span>
+                          {` (${credit("industrial", "Rent").period})`}
                         </>
-                      )}
-                      {phillyRanks.industrial && (
-                        <> ({phillyRanks.industrial})</>
                       )}
                     </>
                   )}
                   {phillySectors.multifamily && (
                     <>
                       {" · "}multifamily{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("multifamily", "Vacancy").title}>
                         {phillySectors.multifamily}
                       </span>
-                      {phillyRanks.multifamily && (
-                        <> ({phillyRanks.multifamily})</>
-                      )}
+                      {` (${[credit("multifamily", "Vacancy").period, phillyRanks.multifamily].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.retail && (
                     <>
                       {" · "}retail{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("retail", "Vacancy").title}>
                         {phillySectors.retail}
                       </span>
-                      {phillyRanks.retail && <> ({phillyRanks.retail})</>}
+                      {` (${[credit("retail", "Vacancy").period, phillyRanks.retail].filter(Boolean).join(", ")})`}
                     </>
                   )}{" "}
                   — ranges are tracker spreads, never averaged; ranks run
@@ -573,7 +561,7 @@ export default async function DemoPage() {
               )}
             </div>
           </div>
-          <SampleLeverageCard capPct={sampleCapPct} bench30={bench30} tenYear={debt.tenYear} />
+          <SampleLeverageCard capPct={sampleCapPct} bench30={bench30} tenYear={debt.tenYear} today={today} />
           <SampleDemandCard demand={demand} />
         </div>
       </section>

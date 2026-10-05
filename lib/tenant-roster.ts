@@ -50,7 +50,7 @@ import { assetClassKey } from "@/lib/asset-words";
 import { buildingSfRow, parseSf } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
-import { readRollover, type LeaseRow, type RollResult } from "@/lib/tools/rollover";
+import { readRollover, rollYearOf, type LeaseRow, type RollResult } from "@/lib/tools/rollover";
 import { readSingleTenant } from "@/lib/single-tenant";
 
 /** The model's hold, in years: HOLD_MONTHS (lib/underwrite/inputs) over
@@ -290,8 +290,11 @@ export function readRoster(ex: ExtractionResult | null | undefined, asOf: Date =
       : null;
 
   // The schedule: every listed tenant with an area and an end, bucketed by
-  // the first date it may leave.
-  const yearsFrom = (t: RosterTenant) => (t.monthToMonth ? 0 : t.ends ? t.ends.yearsLeft : null);
+  // the first date it may leave — counted to the DAY (lib/affordable
+  // `DatedEnd.yearsToTheDay`), so a lease ending 12 months and 17 days out
+  // rolls in year 2, where whole months rounded up put it in year 1, and a
+  // lease ending on an anniversary rolls in the year it closes.
+  const yearsFrom = (t: RosterTenant) => (t.monthToMonth ? 0 : t.ends ? t.ends.yearsToTheDay : null);
   const placed = tenants.filter((t) => t.sf != null && yearsFrom(t) != null);
   const unplaced = tenants.filter((t) => !placed.includes(t)).map((t) => t.name);
   const rows: LeaseRow[] = placed.map((t) => ({
@@ -299,13 +302,14 @@ export function readRoster(ex: ExtractionResult | null | undefined, asOf: Date =
     sf: t.sf!,
     rentPerSf: t.rentPsf,
     expiryYears: yearsFrom(t)!,
-    breakYears: t.early ? Math.max(0, t.early.yearsLeft) : null,
+    breakYears: t.early ? Math.max(0, t.early.yearsToTheDay) : null,
   }));
   const roll = rows.length >= 2 ? readRollover({ rows, holdYears: ROSTER_HOLD_YEARS, buildingSf }) : null;
   const byRent = !!roll && roll.totalRent > 0 && roll.rentedLeases === roll.leaseCount;
   const rollBasis: RosterRead["rollBasis"] = byRent ? "rent" : "area";
-  const termOf = (r: LeaseRow) => Math.max(0, r.breakYears != null ? Math.min(r.expiryYears, r.breakYears) : r.expiryYears);
-  const bucketOf = (r: LeaseRow) => Math.max(1, Math.ceil(termOf(r) || 1));
+  // Who rolls in a year by the schedule's own rule (`rollYearOf`), so the
+  // names under a year are the shares in it: a break already open had been
+  // listed in year 1 here and counted at its expiry there.
   const years: RosterYear[] = roll
     ? roll.years.map((y) => ({
         year: y.year,
@@ -314,7 +318,7 @@ export function readRoster(ex: ExtractionResult | null | undefined, asOf: Date =
           : roll.leasedSf > 0
             ? Math.round((y.sfExpiring / roll.leasedSf) * 1000) / 10
             : 0,
-        tenants: rows.filter((r) => bucketOf(r) === y.year).map((r) => r.tenant),
+        tenants: rows.filter((r) => rollYearOf(r) === y.year).map((r) => r.tenant),
       }))
     : [];
   const rollWithinHoldPct = roll ? Math.round(years.reduce((a, y) => a + y.sharePct, 0) * 10) / 10 : null;

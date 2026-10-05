@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
-import { deriveAnalytics, median, type AnalyticsRow } from "./analytics";
+import {
+  deriveAnalytics,
+  fmtUsdCompact,
+  median,
+  middleRead,
+  middleText,
+  parsedPhrase,
+  stageCountLine,
+  stageCounts,
+  type AnalyticsRow,
+} from "./analytics";
+import { MEDIAN_FLOOR } from "./public-comps/core";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const metric = (label: string, value: string): ExtractedMetric => ({
   label,
@@ -169,5 +182,88 @@ describe("deriveAnalytics — the $/unit series is multifamily's, never a pool o
     expect(deals.find((d) => d.id === "4")?.perUnit).toBeCloseTo(180_000_000 / 612, 3);
     const units = deals.map((d) => d.perUnit).filter((v): v is number => v != null);
     expect(median(units)).toBeCloseTo((50_000_000 / 248 + 180_000_000 / 612) / 2, 3);
+  });
+});
+
+describe("deriveAnalytics — the deal's one class, filed by its words (lib/asset-words dealClassKey)", () => {
+  it("a deck's 'Garden-style multifamily' plots on the price-per-unit chart, the analyst's class read first", () => {
+    const deals = deriveAnalytics([
+      row("1", "Garden Court", { ...STABILIZED, assetClass: "Garden-style multifamily" }, { asset_class: "auto" }),
+      // Filed multifamily by the analyst; the deck called it something else.
+      row("2", "Filed", { ...STABILIZED, assetClass: "Mixed-use" }, { asset_class: "multifamily" }),
+      // Filed an office: no price per unit, whatever the deck says.
+      row("3", "Tysons", { ...STABILIZED, assetClass: "Apartments" }, { asset_class: "office" }),
+    ]);
+    expect(deals.find((d) => d.id === "1")?.perUnit).toBeCloseTo(50_000_000 / 248, 3);
+    expect(deals.find((d) => d.id === "2")?.perUnit).toBeCloseTo(50_000_000 / 248, 3);
+    expect(deals.find((d) => d.id === "3")?.perUnit).toBeNull();
+  });
+});
+
+describe("middleRead — a median needs three figures (the site's MEDIAN_FLOOR)", () => {
+  const pct = (v: number) => `${v.toFixed(1)}%`;
+
+  it("reads the floor from lib/public-comps, never a copy of it", () => {
+    expect(MEDIAN_FLOOR).toBe(3);
+  });
+
+  it("three figures or more are a median", () => {
+    const r = middleRead([5.4, 5.0, 6.1]);
+    expect(r).toEqual({ kind: "median", n: 3, value: 5.4 });
+    expect(middleText(r, pct)).toBe("5.4%");
+    expect(middleRead([5.0, 5.2, 5.6, 6.0])).toEqual({ kind: "median", n: 4, value: 5.4 });
+  });
+
+  it("one figure is that deal's, never a median", () => {
+    const r = middleRead([5.2]);
+    expect(r).toEqual({ kind: "one", n: 1, value: 5.2 });
+    expect(middleText(r, pct)).toBe("5.2%");
+  });
+
+  it("two figures are the two, low and high — never their midpoint called a median", () => {
+    const r = middleRead([5.4, 5.0]);
+    expect(r).toEqual({ kind: "two", n: 2, low: 5.0, high: 5.4 });
+    expect(middleText(r, pct)).toBe("5.0%–5.4%");
+    expect(middleText(middleRead([240_000, 215_000]), fmtUsdCompact)).toBe("$215k–$240k");
+    // Two that agree print once.
+    expect(middleText(middleRead([5.2, 5.2]), pct)).toBe("5.2%");
+  });
+
+  it("nothing is nothing, and a value that is not a number is not a figure", () => {
+    expect(middleRead([])).toEqual({ kind: "none", n: 0 });
+    expect(middleText(middleRead([]), pct)).toBeNull();
+    expect(middleRead([Number.NaN, 5.2])).toEqual({ kind: "one", n: 1, value: 5.2 });
+  });
+
+  it("says the count behind a read as what it is — never '1 deals'", () => {
+    expect(parsedPhrase(0)).toBe("none parsed");
+    expect(parsedPhrase(1)).toBe("the one deal that parsed");
+    expect(parsedPhrase(2)).toBe("the two deals that parsed");
+    expect(parsedPhrase(7)).toBe("7 deals parsed");
+  });
+});
+
+describe("stageCounts — a closed deal is neither live nor dead", () => {
+  it("counts the deals still in play as live, the closed as closed, the dead as dead", () => {
+    const deals = deriveAnalytics([
+      row("1", "Maddox", STABILIZED),
+      row("2", "Harbor View", STABILIZED, { stage: "under_contract" }),
+      row("3", "Elm Street Lofts", STABILIZED, { stage: "closed" }),
+      row("4", "Tysons Plaza", STABILIZED, { stage: "dead" }),
+      // A legacy stage folds onto the ladder (lib/stages) and is in play.
+      row("5", "Old row", STABILIZED, { stage: "pursuing" }),
+    ]);
+    expect(stageCounts(deals)).toEqual({ live: 3, closed: 1, dead: 1 });
+    expect(stageCountLine(stageCounts(deals))).toBe("3 live · 1 closed · 1 dead");
+    // No closed deal, no closed count.
+    expect(stageCountLine({ live: 4, closed: 0, dead: 2 })).toBe("4 live · 2 dead");
+    expect(stageCountLine(stageCounts([]))).toBe("0 live · 0 dead");
+  });
+
+  it("the analytics page prints its tile and its funnel's caption through them, never its own live filter", () => {
+    const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
+    expect(page).toContain("stageCountLine(counts)");
+    expect(page).toContain("stageCounts(deals)");
+    expect(page).not.toMatch(/stage\s*!==\s*"dead"/);
   });
 });

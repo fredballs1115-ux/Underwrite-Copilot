@@ -37,28 +37,52 @@
 // companion series (`moe`), because a sample's quarterly figure for one
 // metro is wide — Richmond's ±5 points on a 7% rate — and a figure shown
 // without it would be read as more than it is.
+//
+// THE TABLES' NAMES ARE READ OFF THE RATES PAGE. The bureau names the
+// year's tables by year, so the pull reads
+// https://www.census.gov/housing/hvs/data/rates.html first and takes the
+// newest current-year table and the newest history it links
+// (lib/hvs-tables `hvsTablesFrom`). The runner printed that page's links
+// (zori.yml probe_url, run 37231906743, 2026-10-04: 200, text/html, 64 KB,
+// twelve data files, root-relative hrefs — tab4_msa_26_rvr.xlsx and
+// tab4b_msa_15_25_rvr.xlsx among them, tab4a_msa_05_2014_rvr.xlsx the
+// 2005–2014 table, never read). A page that answers and lists neither table
+// fails the run; a page that cannot be read falls back to the two names
+// above, with a warning on the run's page.
 
 import { createClient } from "@supabase/supabase-js";
 import { createRequire } from "node:module";
 import ExcelJS from "exceljs";
+// A failure said on the run's page, not only in its log (plain Node strips its types).
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
+// Which workbooks the rates page links (plain Node strips its types too).
+import { HVS_FALLBACK_BASE, HVS_FALLBACK_FILES, HVS_RATES_URL, hvsTablesFrom, tableYears } from "../lib/hvs-tables.ts";
 
 const require = createRequire(import.meta.url);
 const { metroSeries = [] } = require("../data/fred-series.json");
 const SERIES = metroSeries.filter((s) => s.source === "census");
 
 // HVS_BASE is a test hook: the parser is checked against workbooks of the
-// same shape served locally, since the sandbox cannot reach census.gov.
-const BASE = process.env.HVS_BASE ?? "https://www.census.gov/housing/hvs/data/rates/";
-/** The current year's table and the eleven-year history, newest first —
- *  both linked from https://www.census.gov/housing/hvs/data/rates.html,
- *  the page every tile links to. */
-const FILES = ["tab4_msa_26_rvr.xlsx", "tab4b_msa_15_25_rvr.xlsx"];
+// same shape served locally, since the sandbox cannot reach census.gov. Set,
+// each workbook the page names is fetched from it by its name. HVS_PAGE
+// points the page read at a local copy the same way.
+const BASE = process.env.HVS_BASE ?? null;
+const PAGE = process.env.HVS_PAGE ?? HVS_RATES_URL;
+const AGENT = { "user-agent": "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com)" };
 
 const dryRun = process.env.DRY_RUN === "1";
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!dryRun && (!url || !key)) {
-  console.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required (or DRY_RUN=1).");
+// A missing secret is a failed run, never a quiet one.
+const unset = dryRun ? [] : missingSecrets({ SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "fetch-hvs",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets), or run with DRY_RUN=1 to fetch and print without writing.",
+    ),
+  );
   process.exit(1);
 }
 const supabase = dryRun ? null : createClient(url, key, { auth: { persistSession: false } });
@@ -154,14 +178,73 @@ async function readWorkbook(buf, file) {
   return out;
 }
 
+/**
+ * The workbooks to read, newest first, as the rates page links them — or,
+ * only where the page itself cannot be read, the names the pull last knew,
+ * said so on the run's page. A page that answers and links neither table
+ * stops the run: a guessed name would read last year's table as this one's.
+ */
+async function tablesToRead() {
+  let html = null;
+  let why = null;
+  try {
+    const res = await fetch(PAGE, { headers: AGENT, signal: AbortSignal.timeout(60_000) });
+    if (res.ok) html = await res.text();
+    else why = `HTTP ${res.status} from ${PAGE}`;
+  } catch (err) {
+    why = err instanceof Error ? err.message : String(err);
+  }
+  if (html === null) {
+    console.log(
+      annotation(
+        "warning",
+        `HVS: the rates page could not be read (${why}), so this run reads the names the pull last knew — ${HVS_FALLBACK_FILES.join(" and ")} — which a new year's tables replace`,
+        "Census HVS page unread",
+      ),
+    );
+    return HVS_FALLBACK_FILES.map((name) => ({ name, url: (BASE ?? HVS_FALLBACK_BASE) + name }));
+  }
+  const { current, history, gapped } = hvsTablesFrom(html, PAGE);
+  for (const t of gapped) {
+    console.log(`HVS: the page also links ${t.name} (${tableYears(t)}), which ends short of the current table and is not read`);
+  }
+  if (!current && !history) {
+    console.log(
+      annotation(
+        "error",
+        `HVS: the rates page (${PAGE}) links neither a current-year metro rental vacancy table (tab4_msa_<yy>_rvr.xlsx) nor a history (tab4<letter>_msa_<yy>_<yy>_rvr.xlsx); nothing was fetched or written`,
+        "Census HVS pull failed",
+      ),
+    );
+    process.exit(1);
+  }
+  for (const [what, t] of [["current-year table", current], ["history", history]]) {
+    if (!t) console.log(annotation("warning", `HVS: the rates page links no metro rental vacancy ${what}; this run reads the other alone`, "Census HVS table missing"));
+  }
+  const chosen = [current, history].filter((t) => t !== null);
+  console.log(`HVS: the rates page links ${chosen.map((t) => `${t.name} (${tableYears(t)})`).join(" and ")}`);
+  return chosen.map((t) => ({ name: t.name, url: BASE ? BASE + t.name : t.url }));
+}
+
+const FILES = await tablesToRead();
 const figures = [];
-for (const file of FILES) {
-  const res = await fetch(BASE + file, {
-    headers: { "user-agent": "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com)" },
-    signal: AbortSignal.timeout(60_000),
-  });
+/** A workbook that could not be read: one annotation each, since a run that
+ *  reads the other still writes and stays green. */
+const workbookFailed = (file, why) =>
+  console.log(annotation("warning", `HVS: ${file}: ${why}; its quarters are not written this run`, "Census HVS workbook failed"));
+for (const { name: file, url: fileUrl } of FILES) {
+  let res;
+  try {
+    res = await fetch(fileUrl, {
+      headers: AGENT,
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch (err) {
+    workbookFailed(file, err instanceof Error ? err.message : String(err));
+    continue;
+  }
   if (!res.ok) {
-    console.error(`HVS: HTTP ${res.status} from ${BASE + file}`);
+    workbookFailed(file, `HTTP ${res.status} from ${fileUrl}`);
     continue;
   }
   const buf = Buffer.from(await res.arrayBuffer());
@@ -175,11 +258,11 @@ for (const file of FILES) {
         (dryRun ? " · dry run, not written" : ""),
     );
   } catch (err) {
-    console.error(`HVS: ${file}: ${err instanceof Error ? err.message : String(err)}`);
+    workbookFailed(file, err instanceof Error ? err.message : String(err));
   }
 }
 if (figures.length === 0) {
-  console.error("HVS: no figure read from either workbook");
+  console.log(annotation("error", "HVS: no figure read from either workbook; nothing was written", "Census HVS pull failed"));
   process.exit(1);
 }
 
@@ -208,15 +291,28 @@ for (const s of SERIES) {
       `matched "${names.join('" / "')}"${names.length > 1 ? " (two spellings, one area)" : ""}`,
   );
 }
-for (const miss of missed) console.error(`${miss}: no row in either workbook`);
+// One annotation for the misses: each metro named keeps its last quarter.
+if (missed.length > 0) {
+  console.log(
+    annotation(
+      "warning",
+      `HVS: ${missed.length} of ${SERIES.length} metros have no row in either workbook and keep their last quarter: ${missed.join(", ")}`,
+      "Census HVS: metros missed",
+    ),
+  );
+}
 
 if (supabase && out.length > 0) {
   const { error } = await supabase.from("rates").upsert(out, { onConflict: "series_id,obs_date" });
   if (error) {
-    console.error(`rates upsert: ${error.message}`);
+    console.log(annotation("error", `rates upsert: ${error.message}; nothing was written`, "Census HVS pull failed"));
     process.exit(1);
   }
   console.log(`rates: upserted ${out.length} rows`);
 }
 console.log(`HVS ROLL-UP: ${matched} of ${SERIES.length} metros matched${missed.length ? `; missed: ${missed.join(", ")}` : ""}`);
-process.exit(matched === 0 ? 1 : 0);
+if (matched === 0) {
+  console.log(annotation("error", "HVS: no metro matched a row, so the pull fails (see the warnings above).", "Census HVS pull failed"));
+  process.exit(1);
+}
+process.exit(0);

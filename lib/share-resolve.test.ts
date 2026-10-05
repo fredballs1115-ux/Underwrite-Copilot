@@ -75,6 +75,8 @@ const state = vi.hoisted(() => ({
   client: null as unknown as SupabaseClient,
   imageryCalls: 0,
   imageryAnswers: true,
+  /** the frames the route asked the kept aerial for, as "w x h" */
+  frames: [] as string[],
   pictureReads: [] as string[],
   pictureAnswers: true,
 }));
@@ -82,17 +84,14 @@ const state = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => state.client,
 }));
-vi.mock("@/lib/imagery", () => ({
-  IMAGE_CREDIT: { aerial: "USGS The National Map (public domain)" },
-  fetchOneImage: async (source: string) => {
+// The route's one source: the deal's aerial, kept per deal per process
+// (lib/deal-aerial, driven for real in lib/deal-aerial.test.ts).
+vi.mock("@/lib/deal-aerial", () => ({
+  heldDealAerial: async (_s: unknown, _id: string, _a: unknown, _c: unknown, frame: { w: number; h: number }) => {
     state.imageryCalls += 1;
+    state.frames.push(`${frame.w}x${frame.h}`);
     if (!state.imageryAnswers) return null;
-    return {
-      source,
-      response: new Response(new Uint8Array([137, 80, 78, 71]), {
-        headers: { "content-type": "image/png" },
-      }),
-    };
+    return { bytes: Buffer.from([137, 80, 78, 71]), type: "image/png", at: "39.97,-75.18,area" };
   },
 }));
 
@@ -176,6 +175,7 @@ describe("GET /api/share/[token]/aerial — the picture lives exactly as long as
   beforeEach(() => {
     state.imageryCalls = 0;
     state.imageryAnswers = true;
+    state.frames = [];
   });
   const get = (token: string, query = "?w=960&h=400") =>
     GET(new NextRequest(`https://app.test/api/share/${token}/aerial${query}`), {
@@ -188,8 +188,17 @@ describe("GET /api/share/[token]/aerial — the picture lives exactly as long as
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
     expect(res.headers.get("x-image-credit")).toContain("USGS");
+    expect(res.headers.get("x-image-source")).toBe("aerial");
     expect(res.headers.get("cache-control")).toBe("private, max-age=86400");
     expect(state.imageryCalls).toBe(1);
+  });
+
+  it("draws only the shared screen's own frame, whatever size the link asks for", async () => {
+    state.client = fakeDb({ deal_shares: [share()], deals: [deal({ team_id: null })] }).client;
+    for (const query of ["?w=960&h=400", "?w=301&h=202", "?w=1280&h=1280", "?w=48&h=48", "", "?w=x&h=-5"]) {
+      expect((await get(TOKEN, query)).status).toBe(200);
+    }
+    expect(new Set(state.frames)).toEqual(new Set(["960x400"]));
   });
 
   it("a revoked, expired or malformed link is a bare 404 and asks no source for a picture", async () => {
@@ -255,6 +264,21 @@ describe("GET /api/share/[token]/picture — the deal's own photograph, as long 
     state.client = fakeDb({ deal_shares: [share({ revoked: true })], deals: [deal({ team_id: null, photo: { picture: PICTURE } })] }).client;
     expect((await get(TOKEN)).status).toBe(404);
     expect((await get("not-a-uuid")).status).toBe(404);
+    expect(state.pictureReads).toEqual([]);
+  });
+
+  it("a stored path that is not this deal's photograph is a 404 with no read, never a header (research pass 22)", async () => {
+    // deals.photo is the deal owner's to write: a line break in the path had
+    // made the route answer 500 building its validator.
+    for (const hero of ["photos/deal-1/1-hero.jpg\r\nSet-Cookie: a=b", "photos/deal-2/1700000000000-hero.jpg", 42]) {
+      state.client = fakeDb({
+        deal_shares: [share()],
+        deals: [deal({ team_id: null, photo: { picture: { ...PICTURE, hero } } })],
+      }).client;
+      const res = await get(TOKEN);
+      expect(res.status, String(hero)).toBe(404);
+      expect(res.headers.get("etag")).toBeNull();
+    }
     expect(state.pictureReads).toEqual([]);
   });
 

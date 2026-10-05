@@ -29,6 +29,7 @@
 // show one skyline twice, where their overheads tell the buildings apart.
 
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
+import { DEAL_BANNER, DEAL_CARD, DEAL_THUMB } from "@/lib/image-frames";
 import { isPreview } from "@/lib/photo-preview";
 import type { MarketPicture } from "@/lib/market-picture";
 
@@ -43,6 +44,9 @@ export interface BannerSource {
   /** a market photograph's market, named on the picture so it never
    *  passes for the building (#438) */
   market?: string;
+  /** a market photograph's table id (lib/skyline), for the page's one
+   *  credit line with the photographer's and the licence's links */
+  marketId?: string;
   /** a market photograph's alt text: what it shows, and whose it is */
   alt?: string;
   /** the deal's own photograph, not yet looked for in its memorandum
@@ -94,14 +98,41 @@ export interface BannerFrame {
 }
 
 /** The overhead's frame at card size: 16:9, twice a 320px column for a
- *  sharp picture on a dense screen. */
-export const BANNER: BannerFrame = { w: 640, h: 360 };
+ *  sharp picture on a dense screen. Each frame here is lib/image-frames' —
+ *  the aerial route draws those frames and no others. */
+export const BANNER: BannerFrame = DEAL_BANNER;
 
 /** The pipeline's cards (#428): 16:10, twice a 360px card. */
-export const CARD: BannerFrame = { w: 720, h: 450 };
+export const CARD: BannerFrame = DEAL_CARD;
 
 /** A list row's thumbnail (#442): square, three times a phone's 56px slot. */
-export const THUMB: BannerFrame = { w: 168, h: 168 };
+export const THUMB: BannerFrame = DEAL_THUMB;
+
+/** The market photograph a card leads with before anything has loaded: its
+ *  first source, a pending memorandum photograph aside (that one is asked
+ *  for OVER the next and shows only once it loads). */
+export function leadMarketId(sources: BannerSource[]): string | null {
+  const lead = sources.find((s) => !s.pending);
+  return lead?.kind === "market" ? (lead.marketId ?? null) : null;
+}
+
+/** The market photographs on screen, for the page's one credit line (#438),
+ *  in the cards' order, each once: a card's own report where it has made
+ *  one (the picture it settled on — a market photograph that failed, or one
+ *  a memorandum photograph loaded over, is no longer on screen, and its
+ *  photographer is not credited for it), else the photograph it leads with,
+ *  which is what the server drew. */
+export function shownMarketIds(
+  cards: { id: string; pictures?: BannerSource[] }[],
+  reported: ReadonlyMap<string, string | null>,
+): string[] {
+  const out: string[] = [];
+  for (const c of cards) {
+    const id = reported.has(c.id) ? (reported.get(c.id) ?? null) : leadMarketId(c.pictures ?? []);
+    if (id && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
 
 export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): BannerSource[] {
   const id = encodeURIComponent(f.dealId);
@@ -128,6 +159,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       src: f.market.src,
       credit: f.market.credit,
       market: f.market.name,
+      marketId: f.market.id,
       alt: `${f.market.place}: the market this deal is in, ${f.market.name}. No photograph of the building yet.`,
     });
   }

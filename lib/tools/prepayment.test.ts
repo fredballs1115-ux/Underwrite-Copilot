@@ -74,6 +74,24 @@ describe("rule 1 — yield maintenance is cheap when rates have risen", () => {
     expect(readPrepayment({ ...SEED, treasuryRatePct: 3.75 }).yieldMaintenanceRaw).toBe(0);
   });
 
+  it("says rates rose past the coupon only where they did", () => {
+    // A 5% loan at a 4.80% Treasury: the lender loses $92,388 by being
+    // repaid — real, just under the $200,000 floor. The note had said
+    // "rates have risen past the 5% coupon, so the lender loses nothing"
+    // whenever the floor bound.
+    const under = readPrepayment({ ...SEED, loanRatePct: 5, treasuryRatePct: 4.8 });
+    expect(under.atFloor).toBe(true);
+    expect(under.yieldMaintenanceRaw).toBe(92_388);
+    expect(under.note).not.toContain("risen past");
+    expect(under.note).not.toContain("loses nothing");
+    expect(under.note).toContain("the lender does lose interest by being repaid — $92,388");
+    // At the coupon itself there is no loss, and the words say so exactly.
+    expect(readPrepayment({ ...SEED, treasuryRatePct: 3.75 }).note).toContain(
+      "Rates have reached the 3.75% coupon",
+    );
+    expect(readPrepayment(SEED).note).toContain("Rates have risen past the 3.75% coupon");
+  });
+
   it("has no floor to fall back on when none is stated", () => {
     const r = readPrepayment({ ...SEED, floorPct: null });
     expect(r.floorAmount).toBe(0);
@@ -124,6 +142,19 @@ describe("rule 4 — the open window costs nothing", () => {
     expect(r.cost).toBe(0);
     expect(r.costOfNotWaiting).toBeNull();
     expect(r.note).toContain("prepays at par");
+  });
+
+  it("reads a blank window as unknown, never as an open loan", () => {
+    // The card read a blank "Open in" as zero and said the loan "prepays at
+    // par" over $591,795 of yield maintenance. Unknown is not open: the
+    // cheaper of the two routes still costs what it costs, and there is no
+    // monthly rate of waiting to say without the months.
+    const r = readPrepayment({ ...FALLEN, monthsToOpen: null });
+    expect(r.cheaper).toBe("yield maintenance");
+    expect(r.cost).toBe(591_795);
+    expect(r.costOfNotWaiting).toBeNull();
+    expect(r.note).not.toContain("prepays at par");
+    expect(readPrepayment({ ...SEED, monthsToOpen: null }).cheaper).toBe("defeasance");
   });
 
   it("prices closing sooner as a monthly rate", () => {
@@ -196,6 +227,27 @@ describe("what it says with nothing to go on", () => {
     expect(r.yieldMaintenance).toBeNull();
     expect(r.defeasance).toBeNull();
     expect(r.note).toContain("Enter the Treasury rate");
+  });
+});
+
+describe("the note says its dollars the way the card does", () => {
+  // It printed "Getting out PAYS 385213" under a tile that said -$385,213.
+  const RAW_FIGURE = /(?<![$\d,.])\d{4,}(?![\d,])/;
+
+  it("writes every dollar with its sign and its commas", () => {
+    const r = readPrepayment(SEED);
+    expect(r.note).toContain("Getting out PAYS $385,213 through defeasance");
+    expect(r.note).toContain("Yield maintenance would be $200,000");
+    expect(r.note).toContain(
+      "The Treasury portfolio costs $460,213 LESS than the balance it retires, so defeasance is a gain before its $75,000 of hard costs",
+    );
+    expect(r.note).toContain("makes it $1,238,275 below market");
+    const fallen = readPrepayment(FALLEN);
+    expect(fallen.note).toContain("Getting out costs $591,795 through yield maintenance.");
+    expect(fallen.note).toContain("Closing sooner is $24,658 a month of waiting bought back.");
+    const unpriced = readPrepayment({ ...SEED, treasuryRatePct: null });
+    expect(unpriced.note).toContain("The loan pays $92,623 a month and balloons at $19,054,138.");
+    for (const n of [r.note, fallen.note, unpriced.note]) expect(n).not.toMatch(RAW_FIGURE);
   });
 });
 

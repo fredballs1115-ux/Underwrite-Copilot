@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { fetchLiveHeadlines } from "@/lib/news/live";
+import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
 import { LiveHeadlinesView } from "./live-headlines";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "./scored-feed";
 
@@ -65,7 +67,9 @@ function LiveHeadlinesFallback() {
  */
 async function LiveHeadlinesSection() {
   const live = await fetchLiveHeadlines();
-  return <LiveHeadlinesView live={live} />;
+  // The masthead's day is the reader's (lib/reader-day), from the cookie
+  // the signed-in layout writes.
+  return <LiveHeadlinesView live={live} timeZone={readerTimeZone((await cookies()).get(TZ_COOKIE)?.value)} />;
 }
 
 export default async function NewsPage({
@@ -90,8 +94,11 @@ export default async function NewsPage({
       supabase
         .from("regulatory_alerts")
         .select("id, rule_id, headline, url, detail, detected_at")
-        // A dismissed banner must stay dismissed here too.
-        .is("dismissed_at", null)
+        // The archive: the newest alerts whether or not a banner was
+        // dismissed. A dismissal is one browser's (regulatory-alert-banner),
+        // and the shared `dismissed_at` column is not read — every signed-in
+        // user could write it until migration 0036 took the grant back, so
+        // it would have let anyone hide an alert from all.
         .order("detected_at", { ascending: false })
         .limit(5),
     ]);

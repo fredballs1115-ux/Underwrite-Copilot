@@ -228,6 +228,27 @@ export function nfhlOverlayUrl(req: AerialRequest & { layerId: number; root?: st
   return `${req.root ?? NFHL_ROOT}/export?${params.toString()}`;
 }
 
+/**
+ * FEMA's zones for the same frame, drawn in the site's own palette (#472,
+ * lib/flood-style's `floodDynamicLayers`) and at `scale` times the pixels for
+ * the same ground (dpi 96 × scale, so FEMA's scale limits are unchanged) — a
+ * form to POST to the export, since the class list is some 80 KB.
+ */
+export function nfhlRestyledForm(
+  req: AerialRequest & { dynamicLayers: object[]; scale?: number },
+): URLSearchParams {
+  const scale = req.scale ?? 1;
+  return new URLSearchParams({
+    ...frameParams(req),
+    size: `${Math.round(req.width * scale)},${Math.round(req.height * scale)}`,
+    dpi: String(96 * scale),
+    format: "png32",
+    transparent: "true",
+    dynamicLayers: JSON.stringify(req.dynamicLayers),
+    f: "image",
+  });
+}
+
 /** Hosts the CSP must allow as image sources for any of the above to render. */
 export const BASEMAP_IMG_HOSTS = [
   "https://basemap.nationalmap.gov",

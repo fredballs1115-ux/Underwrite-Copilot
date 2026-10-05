@@ -15,6 +15,12 @@
  *
  * Pure — no I/O, no LLM. Every figure comes from the caller; nothing here
  * invents a budget or an NOI the OM did not state.
+ *
+ * A budget that already carries the loan's interest — its own words say it
+ * includes an interest reserve, capitalized interest, carry or financing
+ * costs (`budgetIncludesInterestReserve`) — gets no second reserve on top:
+ * adding one counts the interest twice, overstates the cost and understates
+ * the yield on it.
  */
 
 export interface TakeOutTerms {
@@ -47,6 +53,10 @@ export interface ConstructionDebtInputs {
   /** average share of the loan outstanding across the works (an S-curve draw
    *  averages a little over half); default 0.55 */
   drawProfile?: number;
+  /** the stated budget already carries the loan's interest reserve
+   *  (`budgetIncludesInterestReserve`): no reserve is added on top, and the
+   *  loan is the LTC cap on the stated cost */
+  budgetIncludesReserve?: boolean;
 }
 
 export interface TakeOutCapacity {
@@ -61,8 +71,11 @@ export interface TakeOutCapacity {
 export interface ConstructionDebtResult {
   /** price + budget */
   hardSoftCost: number;
-  /** interest carried inside the construction loan across the works */
+  /** interest carried inside the construction loan across the works — 0
+   *  where the stated budget already carries it (`reserveInBudget`) */
   interestReserve: number;
+  /** the stated budget includes its interest reserve, so none was added */
+  reserveInBudget: boolean;
   /** price + budget + interest reserve */
   totalCost: number;
   /** the construction loan at the LTC cap, reserve included */
@@ -94,7 +107,66 @@ export function mortgageConstant(ratePct: number, amortYears: number): number {
 
 export const DEFAULT_DRAW_PROFILE = 0.55;
 
+/** The construction panel's starting terms where nothing better is to hand,
+ *  each said on the panel as the screening default it is: the construction
+ *  rate where the rates table seeds no floating index (else SOFR plus the
+ *  construction spread, lib/debt-index), the construction lender's
+ *  loan-to-cost cap, the exit cap where the screening model gives none (the
+ *  model's own exit-cap default is 6% too, lib/underwrite/inputs), and the
+ *  road to take-out where the OM states no timeline. */
+export const FLAT_CONSTRUCTION_RATE_PCT = 8;
+export const DEFAULT_MAX_LTC_PCT = 60;
+export const DEFAULT_EXIT_CAP_PCT = 6;
+export const DEFAULT_WORKS_YEARS = 2;
+
 const pos = (n: number | null | undefined): n is number => n != null && Number.isFinite(n) && n > 0;
+
+// What carries a construction loan's interest.
+const CARRY_PHRASE =
+  /\binterest\s+reserves?\b|\bcapitali[sz]ed\s+interest\b|\bconstruction(?:\s+loan)?\s+interest\b|\binterest\s+carry\b|\bcarry(?:ing)?\s+costs?\b|\bcarry\b|\bfinanc(?:ing|e)\s+(?:costs?|fees?|charges?)\b|\bfinancing\b/gi;
+// Words that say a figure takes something in, or leaves it out. A list in a
+// row's own label ("Hard, soft and financing costs") names what the row
+// holds; in a figure's words "and" can add to it, so only the label's lists
+// count.
+const INCLUDES_CUE = /\b(?:incl(?:\.|uding|udes|uded|usive\s+of)?|with)(?=\W|$)|\bw\//gi;
+const EXCLUDES_CUE =
+  /\b(?:excl(?:\.|uding|udes|uded|usive\s+of)?|ex\.|net\s+of|before|without|less|except|other\s+than|not\s+including|prior\s+to)(?=\W|$)/gi;
+const LIST_CUE = /\band\b|&/gi;
+const INCLUDED_AFTER = /^\s*(?:(?:is|are)\s+)?included\b/i;
+const EXCLUDED_AFTER = /^\s*(?:(?:is|are)\s+)?(?:excluded|not\s+included)\b/i;
+// A clause ends at a break — never at the comma inside "$6,000,000", nor at
+// the period of "incl.".
+const CLAUSE_BREAK = /[;:()|–—]|,(?!\d{3}\b)/g;
+
+function carryIncluded(text: string, listsCount: boolean): boolean {
+  for (const m of text.matchAll(CARRY_PHRASE)) {
+    const at = m.index ?? 0;
+    const lead = text.slice(0, at);
+    const clause = lead.slice(Math.max(0, ...[...lead.matchAll(CLAUSE_BREAK)].map((b) => (b.index ?? 0) + b[0].length)));
+    const tail = text.slice(at + m[0].length).split(CLAUSE_BREAK)[0] ?? "";
+    // The cue nearest the phrase decides: "incl. land, excl. financing" is out.
+    const last = (re: RegExp) => Math.max(-1, ...[...clause.matchAll(re)].map((c) => c.index ?? 0));
+    const takesIn = Math.max(last(INCLUDES_CUE), listsCount ? last(LIST_CUE) : -1);
+    const leavesOut = last(EXCLUDES_CUE);
+    if (leavesOut > takesIn || EXCLUDED_AFTER.test(tail)) continue;
+    if (takesIn >= 0 || INCLUDED_AFTER.test(tail)) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether a stated budget already carries the construction loan's interest:
+ * its row's own label, or its figure's words, say it includes an interest
+ * reserve, capitalized interest, carry or financing costs ("Total project
+ * cost (incl. interest reserve)", "$180,000,000 including capitalized
+ * interest", "Hard, soft and financing costs"). A phrase the words leave out
+ * ("excl. financing costs", "before interest reserve") or merely name, with
+ * nothing saying it is inside the figure, is not — a reserve left out is
+ * added, which errs toward the higher cost.
+ */
+export function budgetIncludesInterestReserve(label: string | null | undefined, value?: string | null): boolean {
+  return carryIncluded(label ?? "", true) || carryIncluded(value ?? "", false);
+}
 
 /**
  * The take-out at stabilization: the permanent loan the finished project's
@@ -134,10 +206,13 @@ export function sizeConstructionDebt(inp: ConstructionDebtInputs): ConstructionD
 
   const hardSoftCost = inp.price + inp.budget;
   // Loan L = ltc · (C + reserve) and reserve = L · r · t · p  ⇒  L = ltc·C / (1 − ltc·r·t·p).
-  const carry = ltc * r * inp.worksYears * p;
+  // A stated budget that already carries its reserve is the whole cost: the
+  // loan is the cap on it, and no second reserve is added.
+  const reserveInBudget = inp.budgetIncludesReserve === true;
+  const carry = reserveInBudget ? 0 : ltc * r * inp.worksYears * p;
   if (carry >= 1) return null;
   const constructionLoan = (ltc * hardSoftCost) / (1 - carry);
-  const interestReserve = constructionLoan * r * inp.worksYears * p;
+  const interestReserve = reserveInBudget ? 0 : constructionLoan * r * inp.worksYears * p;
   const totalCost = hardSoftCost + interestReserve;
 
   const takeOut = takeOutCapacity(inp.stabilizedNoi, inp.takeOut);
@@ -149,6 +224,7 @@ export function sizeConstructionDebt(inp: ConstructionDebtInputs): ConstructionD
   return {
     hardSoftCost,
     interestReserve,
+    reserveInBudget,
     totalCost,
     constructionLoan,
     takeOut,

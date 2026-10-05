@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import type { AskEntry } from "@/lib/deals";
+import { parsePageNumber } from "@/lib/facts";
 import { askDeal, type AskState } from "./ask-actions";
 
 // UTC-pinned so server and client render identical strings (hydration).
@@ -42,12 +43,23 @@ export function AskPanel({
   hasOm,
   isSample,
   isPro,
+  omUrl = null,
+  askers = null,
 }: {
   dealId: string;
   qa: AskEntry[];
   hasOm: boolean;
   isSample: boolean;
   isPro: boolean;
+  /** the deal's OM route (lib/om-link), which signs the file when clicked:
+   *  an answer's page chips open it at `#page=N`, as the fact chips do —
+   *  only on an answer asked of the memorandum the deal holds now */
+  omUrl?: string | null;
+  /** a team deal's askers: the reader's own user id, and each teammate's
+   *  name by user id, the way the pipeline names who added a deal
+   *  (`full_name`, else the email). Null on a personal deal, which names
+   *  no one. */
+  askers?: { me: string | null; names: Record<string, string> } | null;
 }) {
   const [state, action] = useActionState<AskState, FormData>(askDeal, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -58,6 +70,14 @@ export function AskPanel({
   }, [state]);
 
   const askable = hasOm && !isSample;
+  // Who asked, on a team deal, after the date: the reader as "you", a
+  // teammate by name, and no one where the name is not the reader's to see
+  // (a former teammate's profile) or the entry predates askers being
+  // recorded.
+  const askedBy = (by: string | undefined): string => {
+    const who = !askers || !by ? null : by === askers.me ? "you" : (askers.names[by] ?? null);
+    return who ? ` · asked by ${who}` : "";
+  };
 
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -69,34 +89,60 @@ export function AskPanel({
           </span>
         )}
       </div>
+      {/* No answer time is promised: nothing measures one (the house rule
+          lib/screen-duration keeps for the screen). */}
       <p className="mt-0.5 text-xs text-muted">
-        Answers cite the OM&rsquo;s pages; allow ~20 seconds.
+        Answers cite the OM&rsquo;s pages.
       </p>
 
       {qa.length > 0 && (
         <ol className="mt-4 space-y-4">
           {qa.map((e, i) => (
-            <li key={`${e.at}-${i}`}>
+            <li key={`${e.at}-${i}`} data-qa={e.earlier ? "ask-earlier" : undefined}>
               <p className="text-sm font-medium">
                 {e.q}
                 <span className="ml-2 text-xs font-normal text-muted">
                   {safeWhen(e.at)}
+                  {askedBy(e.by)}
                 </span>
+                {/* The deck has been replaced since: this answer, and its
+                    pages, are the earlier memorandum's (lib/deals). */}
+                {e.earlier && (
+                  <span className="ml-2 rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-medium text-caution">
+                    asked of the earlier memorandum
+                  </span>
+                )}
               </p>
               <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted">
                 {e.answer}
               </p>
               {e.cites.length > 0 && (
                 <p className="mt-1.5 flex flex-wrap gap-1.5">
-                  {e.cites.map((c, j) => (
-                    <span
-                      key={j}
-                      title={c.note}
-                      className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted"
-                    >
-                      {c.page}
-                    </span>
-                  ))}
+                  {e.cites.map((c, j) => {
+                    // A chip opens the OM at its page, as the fact chips do —
+                    // only where the answer was asked of the OM the link opens.
+                    const page = !e.earlier && omUrl ? parsePageNumber(c.page) : null;
+                    return page != null ? (
+                      <a
+                        key={j}
+                        href={`${omUrl}#page=${page}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={c.note ? `${c.note} — open the OM at this page` : "Open the OM at this page"}
+                        className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted underline-offset-2 transition-colors hover:bg-line/60 hover:text-ink"
+                      >
+                        {c.page}
+                      </a>
+                    ) : (
+                      <span
+                        key={j}
+                        title={c.note}
+                        className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted"
+                      >
+                        {c.page}
+                      </span>
+                    );
+                  })}
                 </p>
               )}
             </li>

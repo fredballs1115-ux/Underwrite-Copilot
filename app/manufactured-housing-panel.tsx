@@ -87,8 +87,9 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
     tiles.push({
       key: "rent-control",
       label: "Rent rules",
-      value: r.rentControl.regulated === true ? "Regulated" : r.rentControl.regulated === false ? "Not regulated" : "As stated",
-      sub: r.rentControl.regulated === false ? "The memorandum's claim" : r.rentControl.stated,
+      // Rules the reader cannot read as either are headlined in their own words.
+      value: r.rentControl.regulated === true ? "Regulated" : r.rentControl.regulated === false ? "Not regulated" : r.rentControl.stated,
+      sub: r.rentControl.regulated === false ? "The memorandum's claim" : r.rentControl.regulated === true ? r.rentControl.stated : "As stated",
       tone: r.rentControl.regulated === true ? "caution" : "neutral",
     });
   }
@@ -174,8 +175,14 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
               {r.marketLotRent != null && (
                 <li className="flex items-center gap-1.5">
                   <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
+                  {/* The gap's share is of the lot rent in place, and says so: "16.3%"
+                      alone read as a share of the market's rent. */}
                   {`The memorandum's market ${rent(r.marketLotRent)}${
-                    r.gap != null && r.gap > 0 ? ` (${rent(r.gap)} under, ${pct1(r.gapPct ?? 0)})` : r.gap != null ? " (no higher than the rent in place)" : ""
+                    r.gap != null && r.gap > 0
+                      ? ` (${rent(r.gap)} above today's lot rent, ${pct1(r.gapPct ?? 0)} of it)`
+                      : r.gap != null
+                        ? " (no higher than the rent in place)"
+                        : ""
                   }`}
                 </li>
               )}

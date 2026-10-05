@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ValuationBridge, AggressivenessTally } from "@/lib/valuation/reconcile";
+import { tallySentence, type ValuationBridge, type AggressivenessTally } from "@/lib/valuation/reconcile";
 import { FIELD_LABELS, VALUATION_FIELDS, type ValuationField } from "@/lib/valuation/types";
 
 /** One column of the comparison table, flattened server-side. */
@@ -12,11 +12,16 @@ export interface ColumnData {
   extracted: boolean;
   /** the user's own underwriting, pinned last and not editable here */
   internal: boolean;
+  /** the source document's link: the route that signs it when it is
+   *  clicked (lib/deal-file-link) */
   documentUrl: string | null;
   note: string | null;
   values: Partial<Record<ValuationField, number | null>>;
   citations: Partial<Record<ValuationField, { page: string; snippet: string }>>;
   derivedFields: ValuationField[];
+  /** a cell's own note: a short chip and what it means ("all-in" on a cap
+   *  struck on the price plus the capital deducted below it) */
+  notes?: Partial<Record<ValuationField, { chip: string; title: string }>>;
   implied: {
     ok: boolean;
     error?: string;
@@ -227,11 +232,20 @@ export function ValuationsView({
                 {columns.map((c) => {
                   const cite = c.citations[field];
                   const derived = c.derivedFields.includes(field);
+                  const note = c.notes?.[field];
                   return (
                     <td key={c.id} className="px-3 py-2 text-right font-mono text-ink">
                       <span title={cite ? `${cite.page}${cite.snippet ? ` — “${cite.snippet}”` : ""}` : undefined}>
                         {fmt(field, c.values[field])}
                       </span>
+                      {note ? (
+                        <span
+                          className="ml-1 rounded bg-faint px-1 text-[10px] font-sans font-medium text-muted"
+                          title={note.title}
+                        >
+                          {note.chip}
+                        </span>
+                      ) : null}
                       {derived ? (
                         <span
                           className="ml-1 rounded bg-caution/15 px-1 text-[10px] font-sans font-medium text-caution"
@@ -310,7 +324,22 @@ export function ValuationsView({
       <p className="text-xs leading-relaxed text-muted">
         Superscripts are page references — hover for the quote, click to open.{" "}
         <span className="font-medium text-caution">der</span> = a cap rate derived from value and
-        NOI. A dash = the source is silent. The IRR row runs each price through your model; its
+        NOI.
+        {columns.some((c) => c.notes?.goingInCap?.chip === "all-in") ? (
+          <>
+            {" "}
+            <span className="font-medium">all-in</span>
+            {" = a cap on the price plus the capital deducted below it, so value = NOI ÷ cap − capital."}
+          </>
+        ) : null}
+        {columns.some((c) => Object.values(c.notes ?? {}).some((n) => n?.chip === "edited")) ? (
+          <>
+            {" "}
+            <span className="font-medium">edited</span>
+            {" = a figure you entered over the document’s, so it carries no page reference."}
+          </>
+        ) : null}{" "}
+        A dash = the source is silent. The IRR row runs each price through your model; its
         superscript counts borrowed assumptions.
       </p>
 
@@ -362,11 +391,7 @@ export function ValuationsView({
         <section className="rounded-lg border border-line bg-surface">
           <div className="flex flex-wrap items-baseline gap-x-3 border-b border-line px-4 py-3">
             <h2 className="text-sm font-semibold text-ink">Who&apos;s more optimistic</h2>
-            <p className="text-sm text-muted">
-              {tally.aCount > tally.bCount ? aLabel : tally.bCount > tally.aCount ? bLabel : "Neither"}{" "}
-              is more aggressive on {Math.max(tally.aCount, tally.bCount)} of {tally.comparable}{" "}
-              comparable input{tally.comparable === 1 ? "" : "s"}.
-            </p>
+            <p className="text-sm text-muted">{tallySentence(tally, aLabel, bLabel)}</p>
           </div>
           <table className="w-full text-sm">
             <tbody>

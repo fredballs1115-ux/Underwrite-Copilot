@@ -60,6 +60,21 @@
 -- All of them are idempotent and safe to re-run. 0029 in particular is
 -- DELETE-only (it trims regulatory rules to the 15-market scope) — if the
 -- database was seeded before that cut, run 0029 again; it cannot double-delete.
+--
+-- 0036 adds no table or column either, so it is read four other ways: by the
+-- four triggers it creates, by the grants it takes away, by what its
+-- worker's-queue guard says, and by the alert banner's write it closes (any
+-- role that can still update the two dismissal columns, and any write policy
+-- left on the table, is named). On its grants row, "still_missing" names each
+-- public-record RPC a signed-out caller can still run — the thing 0036
+-- closes — or that does not exist yet, since a grant on a function 0028
+-- never made has not been taken away: run 0028 and 0030_public_data_layer,
+-- then 0036 again (it is idempotent). The queue guard's row reads the
+-- trigger's and the function's definitions, not just their names: the
+-- first draft of 0036 had both, fired only on a changed created_at, and let
+-- a re-queued screen keep its old place in line. A ❌ there means the draft
+-- is what ran — run 0036 again — or, with 0016's row ❌ too, that 0016 has
+-- not run (the guard needs its payload column): run 0016, then 0036.
 -- ============================================================================
 
 with
@@ -145,6 +160,23 @@ with
             array['deals_storage_guard', 'deal_documents_storage_guard'])
   ),
 
+  -- Triggers, for a migration whose work is a guard on a table that exists.
+  trg (seq, migration, unblocks, needs) as (
+    values
+      (360, '0036_security_hardening.sql',
+            'Share links held to 30 days with a token the database makes; the free-deal cap on sample flips and team moves; the worker’s queue in the order runs were asked for; Ask’s question cap',
+            array['deal_shares_mint_guard', 'enforce_free_deal_cap_update',
+                  'analysis_jobs_queue_guard', 'deal_qa_append_only'])
+  ),
+
+  -- Grants: a function a signed-out caller must not be able to run.
+  priv (seq, migration, unblocks, needs) as (
+    values
+      (361, '0036_security_hardening.sql (grants half)',
+            'Owner names and mailing addresses kept behind sign-in: the public-record RPCs closed to the anon key. ❌ names each one a signed-out caller can still run — or that does not exist yet: then run 0028 and 0030_public_data_layer first, and 0036 again.',
+            array['nearby_sales', 'nearest_property'])
+  ),
+
   tbl_res as (
     select
       t.seq,
@@ -185,6 +217,91 @@ with
         where to_regproc('public.' || x) is null
       ) as missing
     from fn f
+  ),
+
+  trg_res as (
+    select
+      t.seq,
+      t.migration,
+      t.unblocks,
+      array(
+        select x from unnest(t.needs) as x
+        where not exists (
+          select 1
+          from pg_trigger g
+          join pg_class c on c.oid = g.tgrelid
+          join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and g.tgname = x and not g.tgisinternal
+        )
+      ) as missing
+    from trg t
+  ),
+
+  priv_res as (
+    select
+      p.seq,
+      p.migration,
+      p.unblocks,
+      array(
+        select x from unnest(p.needs) as x
+        where to_regproc('public.' || x) is null
+           or has_function_privilege('anon', to_regproc('public.' || x)::oid, 'execute')
+      ) as missing
+    from priv p
+  ),
+
+  -- A guard read by what it says: the worker's-queue trigger must fire on a
+  -- change of status or payload as well as created_at, and its function must
+  -- restamp a row a user's write puts back in the queue.
+  queue_res as (
+    select
+      362 as seq,
+      '0036_security_hardening.sql (the queue guard''s rules)' as migration,
+      'A re-queued screen goes to the back of the worker''s queue, never back to its old place in line. ❌ names the part still in its first draft: run 0036 again (and 0016 first, if its row above is ❌).' as unblocks,
+      array_remove(array[
+        case when not exists (
+          select 1
+          from pg_trigger g
+          join pg_class c on c.oid = g.tgrelid
+          join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relname = 'analysis_jobs'
+            and g.tgname = 'analysis_jobs_queue_guard' and not g.tgisinternal
+            and pg_get_triggerdef(g.oid) like '%BEFORE INSERT OR UPDATE OF created_at, status, payload ON %'
+        ) then 'trigger analysis_jobs_queue_guard on created_at, status, payload' end,
+        case when not exists (
+          select 1
+          from pg_proc p
+          join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.proname = 'analysis_jobs_queue_guard'
+            and regexp_replace(p.prosrc, '\s+', ' ', 'g')
+                like '%(new.status = ''queued'' and old.status is distinct from ''queued'')%'
+            and regexp_replace(p.prosrc, '\s+', ' ', 'g')
+                like '%(new.status = ''queued'' and new.payload is not null and old.payload is null)%'
+        ) then 'analysis_jobs_queue_guard() restamping a re-queued row' end
+      ], null) as missing
+  ),
+
+  -- A write taken away: no signed-in session may update a regulatory alert,
+  -- a row every user's banner reads. Names each role that still can, and
+  -- each write policy still on the table.
+  alerts_res as (
+    select
+      363 as seq,
+      '0036_security_hardening.sql (the alert banner''s write)' as migration,
+      'No signed-in user can stamp a regulatory alert every other user sees: 0034''s two-column grant taken back, 0023''s open update policy dropped. ❌ names what is still open: run 0036 again (0023 first, if the table is named).' as unblocks,
+      case
+        when to_regclass('public.regulatory_alerts') is null then array['regulatory_alerts (0023)']
+        else array(
+          select format('update (%s) for %s', c.col, r.role)
+          from unnest(array['anon', 'authenticated']) as r(role)
+          cross join unnest(array['dismissed_at', 'dismissed_by']) as c(col)
+          where has_column_privilege(r.role, to_regclass('public.regulatory_alerts'), c.col, 'UPDATE')
+          union all
+          select format('policy "%s" for %s', p.policyname, lower(p.cmd))
+          from pg_policies p
+          where p.schemaname = 'public' and p.tablename = 'regulatory_alerts' and p.cmd <> 'SELECT'
+        )
+      end as missing
   )
 
 select
@@ -196,5 +313,9 @@ from (
   select * from tbl_res
   union all select * from col_res
   union all select * from fn_res
+  union all select * from trg_res
+  union all select * from priv_res
+  union all select * from queue_res
+  union all select * from alerts_res
 ) r
 order by r.seq;

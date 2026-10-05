@@ -9,6 +9,7 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { evaluateRules, type RuleEvaluation } from "@/lib/research";
 import { buildSubject, seedRules } from "@/lib/research-data";
 import { metroForAddress } from "@/lib/market-match";
+import { researchAge, staleMark } from "@/lib/research-age";
 
 export type SampleLegalRule = {
   /** e.g. "eviction procedure · Philadelphia" */
@@ -21,6 +22,14 @@ export type SampleLegalRule = {
   effect: string;
   status: string;
   asOf: string;
+  /** past the research rule's limit on the day read (lib/research-age): the
+   *  date's age and the mark, "191 days old, stale" — shown beside the date,
+   *  which stays; null while the date is current */
+  stale: string | null;
+  /** what the rule's own text says has ended on the day read — a window its
+   *  figure was stated for, a date a change takes effect — each one sentence
+   *  (the evaluation's `dated`, lib/dated-window); empty while nothing has */
+  dated: string[];
   source: string | null;
 };
 
@@ -54,13 +63,18 @@ const DORMANT_NOTES: Record<string, string> = {
   vacancy_registration: "dormant until a unit registers vacant",
 };
 
-export function sampleLegal(): SampleLegal {
+/** The sample's legal read on `today` (an ISO day): the rules the engine
+ *  evaluates for its jurisdiction, each dated, and marked stale past the
+ *  research rule's limit — so a page reads the day outside its render and
+ *  hands it in, and a cached page is never read on its process's first day. */
+export function sampleLegal(today: string): SampleLegal {
   const rules = seedRules();
   const subject = buildSubject({
     address: SAMPLE_DEAL.address,
     sizeText: "248 units",
     yearBuilt: null,
     sectorFields: null,
+    today,
   });
   const evals = evaluateRules(rules, subject);
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
@@ -78,6 +92,8 @@ export function sampleLegal(): SampleLegal {
     effect: e.rule.effect,
     status: e.rule.status,
     asOf: e.rule.as_of,
+    stale: staleMark(researchAge(e.rule.as_of, today)),
+    dated: e.dated.map((n) => n.text),
     source: e.rule.source,
   });
 

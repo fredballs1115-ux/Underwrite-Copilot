@@ -1,9 +1,11 @@
 import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
-import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type StrategyKind } from "@/lib/deal-strategy";
+import { priceRange, priceRangeShort, screenYearOf } from "@/lib/criteria";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
-import { interestContextLine, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestContextLine, readInterest } from "@/lib/interest";
 import { assumableContextLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableContextLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantContextLine } from "@/lib/single-tenant";
@@ -12,14 +14,34 @@ import { readSale, saleContextLine } from "@/lib/sale-terms";
 import { readRoster, rosterContextLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddContextLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementContextLine } from "@/lib/tax-abatement";
-import { readSellerFinancing, sellerFinancingContextLine } from "@/lib/seller-financing";
+import {
+  notePurchaseFinancing,
+  notePurchaseFinancingContextLine,
+  readSellerFinancing,
+  sellerFinancingContextLine,
+} from "@/lib/seller-financing";
 import { readSiteReports, siteReportsContextLine } from "@/lib/site-reports";
 import { readStudentHousing, studentContextLine } from "@/lib/student-housing";
 import { mhContextLine, readManufacturedHousing } from "@/lib/manufactured-housing";
+import { readSelfStorage, storageContextLine } from "@/lib/self-storage";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
   n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+
+/**
+ * A price the OM states as a range — pricing guidance, a whisper — said once,
+ * with the end every figure is struck at (#466): the price readers take its
+ * top (lib/criteria `parsePrice`), the end that does not flatter a return,
+ * and a step that reads the memorandum's "$40–42M" would otherwise strike its
+ * own cap or basis on either end. "" where the price row states one figure.
+ */
+function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind): string {
+  const row = findPriceMetric(extraction?.metrics ?? [], kind, screenYearOf(extraction));
+  const r = row ? priceRange(row.value) : null;
+  if (!row || !r) return "";
+  return `The ${row.label.trim().toLowerCase()} is stated as a range, ${priceRangeShort(r)}: every figure here is struck at its top, ${compact(r.high)}, the end that does not flatter a return.`;
+}
 
 /**
  * What the screen established about the deal, in two to four sentences, for
@@ -33,12 +55,22 @@ const compact = (n: number): string =>
  * unknown and the OM offers one property: nothing established, nothing
  * asserted. Pure — no I/O — so it is testable and the worker can
  * use it.
+ *
+ * The deal's kind is read with the first signal beside the extraction, as
+ * the deal page and the market check's figures read it (lib/deal-strategy
+ * `inferStrategy`): a deal only the first signal calls a conversion is a
+ * conversion in every step's context, never "Stabilized" in one and a plan
+ * in the next. Ask passes the signal and the answered flood zone too, as the
+ * pipeline does; it had passed neither, so a deal the signal calls a
+ * conversion read "Stabilized" there. A caller with no signal reads as
+ * before.
  */
 export function dealContextFor(
   extraction: ExtractionResult | null,
   site?: { flood?: SiteFlagsResult["flood"] } | null,
+  signal?: { take?: string; dealName?: string | null } | null,
 ): string | null {
-  const strategy = inferStrategy(extraction);
+  const strategy = inferStrategy(extraction, signal ?? null);
   // A portfolio is said whatever the strategy: several properties in one
   // OM change what every whole-deal figure means (lib/portfolio).
   const portfolio = readPortfolio(extraction);
@@ -75,6 +107,9 @@ export function dealContextFor(
   // A note the seller offers to carry (#462): its terms, and what its value
   // turns on — never its rate alone.
   const sellerNote = readSellerFinancing(extraction, null);
+  // On a note, the seller's financing is of the note's purchase: said as
+  // that, as stated, and never run against the model.
+  const noteFinancing = notePurchaseFinancing(extraction);
   // What the third-party reports found (#465): the Phase I, the immediate
   // repairs, the seismic PML and the zoning — each a lender's condition.
   const reports = readSiteReports(extraction);
@@ -84,15 +119,22 @@ export function dealContextFor(
   // A manufactured-housing park (#470): its lot rent against the market's,
   // the homes it owns, the water and sewer it runs and its age restriction.
   const park = readManufacturedHousing(extraction);
+  // A self-storage facility (#471): its two occupancies, the rent sitting
+  // tenants pay against the street rate and whose platform it rides on.
+  const storage = readSelfStorage(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
   const flood = floodContextLine(site?.flood);
+  // A price stated as a range (#466): which end every figure is struck at.
+  const range = priceRangeLine(extraction, strategy.kind);
   const head = [
     ...(interest ? [interestContextLine(interest)] : []),
     ...(sale ? [saleContextLine(sale)] : []),
+    ...(range ? [range] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
+    ...(noteFinancing ? [notePurchaseFinancingContextLine(noteFinancing)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(roster ? [rosterContextLine(roster)] : []),
@@ -101,22 +143,28 @@ export function dealContextFor(
     ...(hotel ? [hotelContextLine(hotel)] : []),
     ...(student ? [studentContextLine(student)] : []),
     ...(park ? [mhContextLine(park)] : []),
+    ...(storage ? [storageContextLine(storage)] : []),
     ...(reports ? [siteReportsContextLine(reports)] : []),
     ...(flood ? [flood] : []),
   ];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];
   if (strategy.kind === "unknown") return head.length || tail.length ? [...head, ...tail].join(" ") : null;
   const plan = planSummary(extraction, strategy);
-  const lines = [`Deal type: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
+  // Whose strategy it is on a note or a leased fee (the deal header's own
+  // label): the steps read the type as the collateral's, never the price's.
+  const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
   if (plan?.stabilizedNoi) {
     lines.push(
       `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${
         plan.totalCost != null && plan.yieldOnCost != null
-          ? ` — over ${compact(plan.totalCost)} of total cost it is ${withArticle(`${(Math.round(plan.yieldOnCost * 1000) / 10).toFixed(1)}%`)} yield on cost`
+          ? ` — over ${compact(plan.totalCost)} of total cost it is ${withArticle(yieldOnCostText(plan.yieldOnCost))} yield on cost`
           : ""
       }, not today's income and not a cap rate on the price.`,
     );
   }
+  // A share's price grossed up beside its entity's loan is the equity's
+  // whole: the plan strikes no total cost on it, and says why.
+  if (plan?.costWithheld) lines.push(plan.costWithheld);
   if (plan?.costPerUnit != null && plan.units != null) {
     // The basis a comp or a per-unit norm is held against on a plan deal:
     // what a finished unit costs all-in — never the shell's or the land's
