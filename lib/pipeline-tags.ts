@@ -4,10 +4,11 @@
 // covenant on the rents, the rent rules, the one lease, the listed
 // tenants, a renovation program, a tax abatement, a hotel's contracts, the
 // third-party reports, and the reads of a student building, a park, a
-// storage facility, a mixed-use building and condominium units (no tag
-// reads a module's tables here: the pipeline's client draws these, so each
-// tone is read off the slot's own words) — in ONE order, each with its
-// tone and its tooltip, so the list row and the card draw one list
+// storage facility, a mixed-use building and condominium units, and last
+// the reader's own 1031 exchange against the deal (no tag reads a
+// module's tables here: the pipeline's client draws these, so each tone is
+// read off the slot's own words) — in ONE order, each with its tone and
+// its tooltip, so the list row and the card draw one list
 // (lib/pipeline-slots reads each slot). And the card's rule for which of
 // them its picture carries: a chip there is never cut, so one that cannot
 // fit whole on a picture as wide as its card's waits on the card's own
@@ -138,6 +139,20 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
       slots.condo,
       "brand",
       "condominium units in an association its declaration governs — the deal page reads the buyer's share of the votes, a year of the dues and a lender's limit on a single owner",
+    ),
+    // The reader's 1031 exchange against the deal (lib/exchange-deal): a
+    // date that keeps the deal out of it (offers due after a deadline, the
+    // identification period over) warns; what the price buys, a question
+    // for exchange counsel, is muted; the clock alone is the brand's.
+    tag(
+      "exchange",
+      slots.exchange,
+      slots.exchange && /^1031: (?:offers due after|ID period over)/.test(slots.exchange)
+        ? "caution"
+        : slots.exchange && /ask counsel|lease under 30/.test(slots.exchange)
+          ? "muted"
+          : "brand",
+      "your 1031 exchange's deadlines against this deal's offers-due date and what its price buys — the deal header says them; your buy box holds the exchange",
     ),
   ].filter((t): t is DealTag => t !== null);
 }

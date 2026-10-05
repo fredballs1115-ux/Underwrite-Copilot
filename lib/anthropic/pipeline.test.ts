@@ -859,6 +859,36 @@ describe("runAnalysis — the happy path", () => {
     expect(again.buyBoxChecks).toBeNull();
   });
 
+  it("the verdict is handed the buyer's 1031 exchange against the deal, on the screen's day, and its brief says it (lib/exchange-deal)", async () => {
+    const { getBuyBoxForDeal } = await import("@/lib/criteria-server");
+    const box = { minCapPct: 5, exchange: { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const } };
+    (state.deals.d1 as Record<string, unknown>).offers_due = "2026-11-02";
+    vi.mocked(getBuyBoxForDeal).mockResolvedValueOnce(box);
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    const line =
+      "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; offers are due Nov 2, 2026, after your identification deadline, Oct 30, 2026: to keep it in your exchange it must be identified by Oct 30, 2026, before it is bid on";
+    expect(input.exchangeLine).toBe(line);
+    // The box's lines name the exchange beside the criteria.
+    expect(input.buyBox).toContain("1031 exchange: the relinquished property transferred Sep 15, 2026; a partnership files the return (Form 1065)");
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    const brief = buildBrief(input);
+    expect(brief).toContain(`## The buyer's 1031 exchange, checked in code\n\n${line}.`);
+    expect(brief).toContain("whether what the price buys qualifies is a question for the buyer's exchange counsel — never decide it");
+    // A box with no exchange hands none.
+    vi.mocked(synthesizeVerdict).mockClear();
+    vi.mocked(getBuyBoxForDeal).mockResolvedValueOnce({ minCapPct: 5 });
+    await runAnalysis("d1");
+    expect(vi.mocked(synthesizeVerdict).mock.calls[0][0].exchangeLine).toBeNull();
+    expect(buildBrief(vi.mocked(synthesizeVerdict).mock.calls[0][0])).not.toContain("1031");
+  });
+
   it("the verdict is handed the deal context the comps and the market check read, built once — on a resumed run too (research pass 18)", async () => {
     const share = {
       ...EXTRACTION,

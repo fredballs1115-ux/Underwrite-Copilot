@@ -651,6 +651,29 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").sandwichLine).toBe("");
   }, 30000);
 
+  it("says the reader's 1031 exchange under the title, on the reader's day, only where the memo route passes it (lib/exchange-deal)", async () => {
+    const deal = { ...SAMPLE_DEAL, offers_due: "2026-11-02" } as unknown as DealRow;
+    const exchange = { block: { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const }, readerDay: "2026-10-05" };
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05", exchange);
+    const line =
+      "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; offers are due Nov 2, 2026, after your identification deadline, Oct 30, 2026: to keep it in your exchange it must be identified by Oct 30, 2026, before it is bid on";
+    expect(data.exchangeLine).toBe(line);
+    expect(data.exchangeCaution).toBe(true);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain(line);
+    // Offers due before the deadline: the clock alone, in the brand's tone.
+    const early = buildMemoData({ ...deal, offers_due: "2026-10-20" } as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05", exchange);
+    expect(early.exchangeLine).toBe("1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027");
+    expect(early.exchangeCaution).toBe(false);
+    // No exchange passed — the report's first page, the demo — or one whose
+    // period is over: nothing.
+    expect(buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05").exchangeLine).toBe("");
+    expect(buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05", { ...exchange, readerDay: "2027-06-01" }).exchangeLine).toBe("");
+  }, 30000);
+
   it("says the rent rules that reach the building under the title, on the day it is given (lib/rent-regulation), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

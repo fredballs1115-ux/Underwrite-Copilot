@@ -1,3 +1,4 @@
+import { sanitizeExchange } from "@/lib/criteria";
 import { EXCHANGE_FILERS, exchangeWindow, type ExchangeBlock } from "@/lib/exchange-window";
 
 /**
@@ -15,7 +16,9 @@ const inputCls =
   "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40";
 
 export function ExchangeFields({ exchange, today }: { exchange: ExchangeBlock | null | undefined; today: string }) {
-  const w = exchangeWindow(exchange, new Date(`${today}T12:00:00Z`));
+  // The stored box is its owner's to write by hand: read through the save's
+  // own rule, so a filer not on the list is no filer.
+  const w = exchangeWindow(sanitizeExchange(exchange), new Date(`${today}T12:00:00Z`));
   return (
     <section id="exchange" data-qa="buy-box-exchange" className="rounded-2xl border border-line bg-surface p-6 shadow-card">
       <h2 className="text-sm font-semibold tracking-tight">A 1031 exchange</h2>

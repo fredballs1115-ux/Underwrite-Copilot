@@ -100,6 +100,12 @@ export interface VerdictInputs {
    *  verdict judges fit on the calls the page's chip shows rather than
    *  re-deriving them; absent with no box */
   buyBoxChecks?: { checks: BuyBoxCheck[]; tripped: string[] } | null;
+  /** the buyer's 1031 exchange against this deal, computed in code on the
+   *  screen's day (lib/exchange-deal `line`): the deadlines, then the first
+   *  thing the deal and the exchange say together — a date fact or a
+   *  question for exchange counsel, never a verdict; absent where the box
+   *  holds no exchange, or its period is over */
+  exchangeLine?: string | null;
   /** the latest published rates, dated, with the spread the site's model
    *  adds for the deal's class (lib/debt-index `ratesPromptLine`) — the line
    *  the challenger is handed; absent where the table seeds nothing */
@@ -302,6 +308,17 @@ export function buildBrief(input: VerdictInputs): string {
               "Judge this deal's fit against these criteria explicitly: reference clear misses in the reason and topRisks, and if the deal fails the box on price/basis, say what entry price WOULD fit in nextSteps — the code computes no entry price, so one you name is your own estimate, and say so. A deal can be well-underwritten and still be outside the box — say so plainly.",
             ]),
       ].join("\n"),
+    );
+  }
+
+  // The buyer's 1031 exchange against this deal, computed in code
+  // (lib/exchange-deal): its deadlines against the deal's offers-due day and
+  // what the price buys. A date fact or a question for the buyer's exchange
+  // counsel — never a call on what qualifies.
+  if (input.exchangeLine?.trim()) {
+    sections.push(
+      "## The buyer's 1031 exchange, checked in code",
+      `${input.exchangeLine.trim()}.\nThe deadlines are dates, and whether what the price buys qualifies is a question for the buyer's exchange counsel — never decide it. Where a deadline bears on the deal's timing, name it in nextSteps.`,
     );
   }
 

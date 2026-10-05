@@ -67,6 +67,7 @@ import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
 import { condoNote, readCondo } from "@/lib/condo";
 import { readSandwichLease, sandwichNote } from "@/lib/sandwich-lease";
+import { exchangeForDeal } from "@/lib/exchange-deal";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -706,6 +707,19 @@ async function regenerateVerdict(
       buyBoxChecks = null;
     }
   }
+  // The buyer's 1031 exchange against this deal (lib/exchange-deal), on the
+  // worker's UTC day: the deadline the deal carries — read on its own, so a
+  // read that fails costs the brief this line and never the verdict — else
+  // the memorandum's, and what the price buys.
+  let exchangeLine: string | null = null;
+  if (box?.exchange) {
+    try {
+      const { data: due } = await admin.from("deals").select("offers_due").eq("id", dealId).maybeSingle();
+      exchangeLine = exchangeForDeal(box.exchange, extraction, (due?.offers_due as string | null | undefined) ?? null)?.line ?? null;
+    } catch {
+      exchangeLine = null;
+    }
+  }
 
   const verdict = await synthesizeVerdict({
     extraction,
@@ -723,6 +737,7 @@ async function regenerateVerdict(
     market: (data?.market as MarketResult) ?? null,
     buyBox,
     buyBoxChecks,
+    exchangeLine,
     // The latest published rates, the line the challenger is handed: the
     // debt deal-killer is read against a dated index and the site's own
     // screening spread, never a rate remembered as current.

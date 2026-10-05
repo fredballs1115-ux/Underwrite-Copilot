@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { PICTURE_CHIPS, PICTURE_TIERS, chipWidth, dealTags, pictureRoom, placeTags, placeTagsByTier } from "./pipeline-tags";
 import type { PipelineSlots } from "./pipeline-slots";
+import type { ExtractionResult } from "./anthropic/types";
+import { exchangeForDeal } from "./exchange-deal";
 
 const slots = (over: Partial<PipelineSlots>): PipelineSlots => ({ cap: null, price: null, yoc: null, ...over });
 
@@ -62,13 +64,14 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         storage: "Lease-up, 72% occupied",
         mixedUse: "Commercial 29% of income",
         condo: "Bulk 42 of 120 (35%)",
+        exchange: "1031: identify by Oct 30",
         broker: "CBRE",
         basis: "$274k/unit",
       }),
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "sandwich", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse", "condo",
+      "flood", "sale", "interest", "sandwich", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse", "condo", "exchange",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -101,6 +104,42 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     for (const words of ["Going concern", "Operating business", "Operator lease, 0.85x coverage"])
       expect(dealTags(slots({ goingConcern: words }))[0], words).toMatchObject({ key: "goingConcern", tone: "caution" });
     expect(dealTags(slots({ goingConcern: "Operator lease" }))[0].tone).toBe("brand");
+  });
+
+  it("says the reader's 1031 exchange in the composition's own tone, read off the tag's words (lib/exchange-deal)", () => {
+    const today = new Date(Date.UTC(2026, 9, 5, 12));
+    const block = { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const };
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "", basis: "na" as const });
+    const deal = (interest?: Record<string, string>, metrics: ReturnType<typeof row>[] = []) =>
+      ({ dealName: "X", assetClass: "multifamily", totalPages: 40, metrics, ...(interest ? { interest } : {}) }) as unknown as ExtractionResult;
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    // Every tag the reader writes: the clock, each date fact and each question.
+    const reads = [
+      exchangeForDeal(block, deal(), "2026-10-20", today),
+      exchangeForDeal(block, deal(), "2026-11-02", today),
+      exchangeForDeal(block, deal(), "2027-04-01", today),
+      exchangeForDeal({ relinquishedTransferOn: "2026-08-01" }, deal(), null, today),
+      exchangeForDeal({ relinquishedTransferOn: "2026-12-01" }, deal(), null, today),
+      exchangeForDeal(block, deal({ kind: "note", ...blank }), null, today),
+      exchangeForDeal(block, deal({ kind: "partial_interest", ...blank }), null, today),
+      exchangeForDeal(block, deal({ kind: "leasehold", ...blank, summary: "Leasehold under a ground lease" }, [row("Ground lease expiration", "June 30, 2049")]), null, today),
+    ];
+    expect(reads.map((r) => r?.tag)).toEqual([
+      "1031: identify by Oct 30",
+      "1031: offers due after ID",
+      "1031: offers due after close",
+      "1031: ID period over",
+      "1031: identify by Jan 15",
+      "1031: note — ask counsel",
+      "1031: share — ask counsel",
+      "1031: lease under 30 yrs",
+    ]);
+    for (const r of reads) {
+      const t = dealTags(slots({ exchange: r!.tag }))[0];
+      expect(t, r!.tag).toMatchObject({ key: "exchange", tone: r!.tone });
+      expect(t.title, r!.tag).toMatch(/^1031: [^:]+: your 1031 exchange's deadlines against this deal's offers-due date and what its price buys/);
+    }
+    expect(reads.map((r) => r!.tone)).toEqual(["brand", "caution", "caution", "caution", "brand", "muted", "muted", "muted"]);
   });
 
   it("says a regime that applies, or the memorandum's claim of one, in the warning tone, and one to check in the muted tone (lib/rent-regulation)", () => {

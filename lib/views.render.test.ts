@@ -9565,6 +9565,85 @@ describe("ExchangeFields (the buy box's 1031 exchange) — three optional fields
     expect(html).toMatch(/<option value="" selected="">Not set, read as an individual<\/option>/);
     expect(html).not.toContain('data-qa="exchange-window"');
     expect(a11yIssues(html)).toEqual([]);
+    // A box written by hand with a filer not on the list reads it as unset.
+    const hand = render(React.createElement(ExchangeFields, { exchange: { relinquishedTransferOn: "2026-10-01", filer: "llc" as never }, today: "2026-10-05" }));
+    expect(visibleText(hand)).toContain("close by Mar 30, 2027. A partnership's or an S corporation's calendar-year return is due Mar 15, 2027");
+  });
+});
+
+// ── The buyer's 1031 clock against a deal (lib/exchange-deal) ──────────────
+import { ExchangeChip } from "@/app/(app)/deals/[id]/exchange-chip";
+import { exchangeForDeal } from "@/lib/exchange-deal";
+
+const EXCHANGE_TODAY = new Date("2026-10-05T12:00:00Z");
+// Begun Sep 15, a partnership's: identify by Oct 30, close by Mar 14.
+const EXCHANGE_BLOCK = { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const };
+const exchangeDeck = (interest?: Record<string, string>) =>
+  ({ dealName: "Harbor View", assetClass: "multifamily", totalPages: 40, metrics: [], ...(interest ? { interest } : {}) }) as unknown as ExtractionResult;
+
+describe("ExchangeChip (lib/exchange-deal) — the buyer's 1031 clock beside the deal header's offers-due control", () => {
+  it("draws the identification day in the brand's tone, a date fact in the caution tone and a question in the muted one, each linked to the buy box and said whole to a screen reader", () => {
+    const clock = render(React.createElement(ExchangeChip, { exchange: exchangeForDeal(EXCHANGE_BLOCK, exchangeDeck(), "2026-10-20", EXCHANGE_TODAY) }));
+    dumpView("exchange-chip", clock);
+    expect(clock).toContain('data-qa="exchange-chip"');
+    expect(clock).toContain('data-tone="brand"');
+    expect(clock).toContain('href="/criteria#exchange"');
+    const clockText = visibleText(clock);
+    expect(clockText).toContain("1031: identify by Oct 30");
+    expect(clockText).toContain("Identify your replacement property by Oct 30, 2026 (in 25 days), the 45th day from the Sep 15, 2026 transfer; close by Mar 14, 2027.");
+    const late = render(React.createElement(ExchangeChip, { exchange: exchangeForDeal(EXCHANGE_BLOCK, exchangeDeck(), "2026-11-02", EXCHANGE_TODAY) }));
+    expect(late).toContain('data-tone="caution"');
+    expect(late).toContain("text-caution");
+    expect(visibleText(late)).toContain("1031: offers due after ID");
+    expect(visibleText(late)).toContain(
+      "Offers are due Nov 2, 2026, after your identification deadline, Oct 30, 2026: to keep it in your exchange it must be identified by Oct 30, 2026, before it is bid on.",
+    );
+    const note = render(
+      React.createElement(ExchangeChip, {
+        exchange: exchangeForDeal(EXCHANGE_BLOCK, exchangeDeck({ kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" }), null, EXCHANGE_TODAY),
+      }),
+    );
+    expect(note).toContain('data-tone="muted"');
+    expect(visibleText(note)).toContain("1031: note — ask counsel");
+    for (const html of [clock, late, note]) {
+      expect(a11yIssues(html)).toEqual([]);
+      expect(gluedWords(visibleText(html))).toEqual([]);
+    }
+    // No exchange in the box, or its period over: no chip.
+    expect(renderToStaticMarkup(React.createElement(ExchangeChip, { exchange: null }))).toBe("");
+    expect(exchangeForDeal({ relinquishedTransferOn: "2026-01-02" }, exchangeDeck(), null, EXCHANGE_TODAY)).toBeNull();
+  });
+
+  it("is the reader's alone: the shared screen and its loader never read the buy box or the exchange", () => {
+    for (const file of ["app/share/[token]/share-view.tsx", "app/share/[token]/page.tsx"]) {
+      const src = readFileSync(file, "utf8");
+      expect(src, file).not.toMatch(/exchange-deal|exchange-window|ExchangeChip|getBuyBoxForDeal|getActiveBuyBox/);
+    }
+  });
+});
+
+describe("Pipeline — the reader's 1031 exchange tag (lib/exchange-deal)", () => {
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says offers due after the identification deadline in the caution tone, and the clock alone in the brand's, on the row and the card", () => {
+    const late = exchangeForDeal(EXCHANGE_BLOCK, exchangeDeck(), "2026-11-02", EXCHANGE_TODAY)!.tag;
+    const clock = exchangeForDeal(EXCHANGE_BLOCK, exchangeDeck(), "2026-10-20", EXCHANGE_TODAY)!.tag;
+    const deals = [
+      card({ id: "x1", name: "Harbor View", verdict: "caution", slots: { cap: "5.9%", price: "$41,250,000", yoc: null, exchange: late }, market: "Baltimore, MD", coveredMarket: "Baltimore" }),
+      card({ id: "x2", name: "Elm Street Lofts", verdict: "pass", slots: { cap: "6.0%", price: "$14,000,000", yoc: null, exchange: clock }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth" }),
+    ];
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs(deals), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("1031: offers due after ID");
+      expect(text, initialView).toContain("1031: identify by Oct 30");
+      const lateChip = html.match(/<span[^>]*title="1031: offers due after ID:[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(lateChip, initialView).toContain("text-caution");
+      const clockChip = html.match(/<span[^>]*title="1031: identify by Oct 30:[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(clockChip, initialView).toContain("text-brand");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
   });
 });
 

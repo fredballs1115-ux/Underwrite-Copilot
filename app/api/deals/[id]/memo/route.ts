@@ -1,11 +1,14 @@
 import React from "react";
+import { cookies } from "next/headers";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
 import {
   MemoDocument,
   buildMemoData,
   type MemoData,
+  type MemoExchange,
 } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
@@ -106,12 +109,17 @@ export async function GET(
   // The buyer's standing criteria, so the forwarded page carries the fit call.
   // Best-effort: no box (or a pre-0008 schema) just means no buy-box row.
   let buyBoxChecks: BuyBoxCheck[] = [];
+  // The reader's 1031 exchange, where the box holds one (lib/exchange-deal):
+  // its deadlines against this deal, read on the reader's own day
+  // (lib/reader-day) as the deal header's chip reads them.
+  let exchange: MemoExchange | null = null;
   try {
     const ownership = deal as unknown as {
       user_id: string;
       team_id: string | null;
     };
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
+    if (box?.exchange) exchange = { block: box.exchange, readerDay: readerToday((await cookies()).get(TZ_COOKIE)?.value) };
     if (box) {
       // The same source the deal page judges: the extraction widened with the
       // first signal and the deal's structured address, and the deal's kind
@@ -132,6 +140,7 @@ export async function GET(
     }
   } catch {
     buyBoxChecks = [];
+    exchange = null;
   }
 
   // Custom firm branding (Feature 6) — best-effort; any failure (pre-0021
@@ -181,7 +190,7 @@ export async function GET(
     );
     // The rent allowance in force is read on the route's UTC day — the day
     // the file is named for (lib/rent-regulation).
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, new Date().toISOString().slice(0, 10));
+    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, new Date().toISOString().slice(0, 10), exchange);
     // MemoDocument renders a <Document>; cast to the element type renderToBuffer
     // expects (it's typed for a Document element, not a wrapping component).
     const element = React.createElement(MemoDocument, {

@@ -53,6 +53,8 @@ import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
 import { condoShortLine, readCondo } from "@/lib/condo";
 import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
+import { exchangeForDeal } from "@/lib/exchange-deal";
+import type { ExchangeBlock } from "@/lib/exchange-window";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -303,6 +305,23 @@ function sandwichLineFor(extraction: ExtractionResult | null, today: string): st
   return r ? sandwichShortLine(r) : "";
 }
 
+/** The reader's buy box's 1031 exchange and the reader's own day
+ *  (lib/reader-day), as the memo route reads them. */
+export interface MemoExchange {
+  block: ExchangeBlock | null | undefined;
+  readerDay: string;
+}
+
+/** The reader's 1031 exchange against the deal (lib/exchange-deal), on the
+ *  reader's own day: the clock and its first flag in one line, and whether a
+ *  date keeps the deal out of the exchange. Null where the caller passes no
+ *  exchange, or its period is over. */
+function exchangeFor(deal: DealRow, extraction: ExtractionResult | null, exchange: MemoExchange | null | undefined) {
+  if (!exchange?.block) return null;
+  const due = (deal as { offers_due?: string | null }).offers_due ?? null;
+  return exchangeForDeal(exchange.block, extraction, due, new Date(`${exchange.readerDay}T12:00:00Z`));
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -414,6 +433,13 @@ export type MemoData = {
    *  its cover and the master lease's end (lib/sandwich-lease), in one
    *  line; "" on anything but a master lease of the building */
   sandwichLine?: string;
+  /** the reader's 1031 exchange against the deal — its deadlines and the
+   *  first thing the deal and the exchange say together (lib/exchange-deal
+   *  `line`); "" where the reader's buy box holds none, and on every
+   *  document but the reader's own memo */
+  exchangeLine?: string;
+  /** the exchange's line is a date that keeps the deal out of it */
+  exchangeCaution?: boolean;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -559,8 +585,13 @@ export function buildMemoData(
    *  decides the rent allowance in force. The clock's UTC day where a caller
    *  passes none (the full report's first page, built on the same day). */
   today: string = new Date().toISOString().slice(0, 10),
+  /** the reader's 1031 exchange (the buy box's) and the reader's own day,
+   *  from the memo route; absent elsewhere — the report's first page and the
+   *  demo carry none */
+  exchange?: MemoExchange | null,
 ): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
+  const dealExchange = exchangeFor(deal, extraction ?? null, exchange);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -727,6 +758,8 @@ export function buildMemoData(
     goingConcernLine: pdfSafe(goingConcernLineFor(extraction ?? null, today)),
     condoLine: pdfSafe(condoLineFor(extraction ?? null, today)),
     sandwichLine: pdfSafe(sandwichLineFor(extraction ?? null, today)),
+    exchangeLine: pdfSafe(dealExchange?.line ?? ""),
+    exchangeCaution: dealExchange?.tone === "caution",
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
@@ -1269,6 +1302,14 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* FEMA's flood zone at the building (#426): a Special Flood
                 Hazard Area is a cost and a lender's condition. */}
             {data.floodLine && <Text style={[s.sub, { color: "#9b1c1c" }]}>{data.floodLine}</Text>}
+            {/* The reader's 1031 exchange against the deal
+                (lib/exchange-deal): a date that keeps the deal out of it in
+                the warning tone. */}
+            {data.exchangeLine && (
+              <Text style={[s.sub, data.exchangeCaution ? { color: "#8a5a00", fontFamily: "Helvetica-Bold" } : { color: "#114e54" }]}>
+                {data.exchangeLine}
+              </Text>
+            )}
           </View>
           {data.verdictWord ? (
             <View

@@ -49,7 +49,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, basis: null });
+    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -225,6 +225,18 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(ex([m("Master lease rent", "$1,100,000"), m("Sublease income", "$1,820,000")], { interest: plain }), null).sandwich).toBeNull();
   });
 
+  it("says the reader's 1031 exchange against the deal only where the caller passes it (lib/exchange-deal), on the slots' day", () => {
+    const rows = ex([m("Asking price", "$20,000,000"), m("Units", "240")]);
+    const place = { address: null, siteFlags: null, today: "2026-10-05" };
+    const block = { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const };
+    expect(pickSlots(rows, null, "auto", place, { block, offersDue: "2026-10-20" }).exchange).toBe("1031: identify by Oct 30");
+    expect(pickSlots(rows, null, "auto", place, { block, offersDue: "2026-11-02" }).exchange).toBe("1031: offers due after ID");
+    // No exchange passed, none in the box, or its period over: no slot.
+    expect(pickSlots(rows, null, "auto", place).exchange).toBeNull();
+    expect(pickSlots(rows, null, "auto", place, { block: undefined, offersDue: "2026-11-02" }).exchange).toBeNull();
+    expect(pickSlots(rows, null, "auto", { ...place, today: "2027-06-01" }, { block, offersDue: null }).exchange).toBeNull();
+  });
+
   it("says a storage facility's lease-up or premium over street (#471), and nothing on anything else", () => {
     const rows = [m("Asking price", "$9,800,000"), m("Occupancy", "72%"), m("In-place rent", "$1.20/SF/mo"), m("Street rate", "$1.00/SF/mo")];
     expect(pickSlots({ ...ex(rows), assetClass: "self_storage" }, null).storage).toBe("Lease-up, 72% occupied, In-place 20% over street");
@@ -317,7 +329,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, basis: null });
+    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

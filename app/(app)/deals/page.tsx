@@ -350,11 +350,14 @@ export default async function DealsPage({
       // as on the deal page (lib/pipeline-slots). The rent rules are read at
       // the address the row now holds, with the site flags stored for it,
       // on the reader's own day.
+      // The reader's 1031 exchange, from the box the row is judged against,
+      // set against the deadline the row carries (lib/exchange-deal) — on
+      // the reader's own day, as the deal header reads it.
       slots: pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class, {
         address: rowAddress,
         siteFlags: storedFlags,
         today: todayIso,
-      }),
+      }, box?.exchange ? { block: box.exchange, offersDue: dueById.get(d.id) ?? null } : null),
       jobStatus,
       // A first screen before its terms are read: an empty slot is "not
       // read yet" and shimmers, never the dash that says "not stated"

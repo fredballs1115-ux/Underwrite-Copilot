@@ -32,6 +32,8 @@ import { mixedUseTag } from "@/lib/mixed-use";
 import { goingConcernTag } from "@/lib/going-concern";
 import { condoTag } from "@/lib/condo";
 import { sandwichTag } from "@/lib/sandwich-lease";
+import { exchangeForDeal } from "@/lib/exchange-deal";
+import type { ExchangeBlock } from "@/lib/exchange-window";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
@@ -143,6 +145,12 @@ export interface PipelineSlots {
    *  states both rents. Its term is the interest's tag ("Master lease, 15
    *  yrs left") */
   sandwich?: string | null;
+  /** the reader's 1031 exchange against the deal — "1031: identify by Oct
+   *  30", "1031: offers due after ID", "1031: note — ask counsel"
+   *  (lib/exchange-deal); absent or null where the caller passed no
+   *  exchange (the reader's buy box holds none, or its period is over). The
+   *  box is the reader's: never on the shared screen */
+  exchange?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -225,6 +233,15 @@ export interface SlotPlace {
   today: string;
 }
 
+/** The reader's buy box's 1031 exchange and the deadline the deal carries
+ *  (`deals.offers_due`, an ISO day), for the slot that sets the deal against
+ *  the exchange's two deadlines (lib/exchange-deal) on the slots' day. Only
+ *  the reader's own pages pass it; the box is never the shared screen's. */
+export interface SlotExchange {
+  block: ExchangeBlock | null | undefined;
+  offersDue: string | null;
+}
+
 /** The row's slots. `storedClass` is the class the deal was filed under
  *  ("auto" where the analyst left it to the deck), read with the
  *  extraction's through `shownAssetClass` wherever a slot speaks in the
@@ -233,12 +250,15 @@ export interface SlotPlace {
  *  on the deal page, and every other slot waits for the terms. `place` is
  *  where the deal is and the day it is read on: the rent rules are read only
  *  where it is given, and the slot is null where it is not; a forward
- *  purchase's clock counts from its day, else from the clock's. */
+ *  purchase's clock counts from its day, else from the clock's. `exchange`
+ *  is the reader's 1031 exchange and the deal's deadline: the exchange slot
+ *  is read only where it is given. */
 export function pickSlots(
   extraction: ExtractionResult | null,
   signal: FirstSignal | null,
   storedClass?: string | null,
   place?: SlotPlace | null,
+  exchange?: SlotExchange | null,
 ): PipelineSlots {
   if (!extraction) return { cap: null, price: signalAskPrice(signal), yoc: null };
   const metrics = extraction.metrics ?? [];
@@ -327,6 +347,9 @@ export function pickSlots(
     // A sandwich position (lib/sandwich-lease): the sublease income less the
     // master rent, and its cover, where both rents are stated.
     sandwich: sandwichTag(extraction, asOf),
+    // The reader's 1031 exchange (lib/exchange-deal): the deal's deadline
+    // and what its price buys against the exchange's two deadlines.
+    exchange: exchange ? (exchangeForDeal(exchange.block, extraction, exchange.offersDue, asOf)?.tag ?? null) : null,
     // The price by the unit or the foot, as a listing card shows it (#469),
     // in the deal's one class.
     basis: basisTag(extraction, strategy.kind, storedClass),

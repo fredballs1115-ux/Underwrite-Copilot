@@ -36,6 +36,8 @@ import { CondoPanel } from "@/app/condo-panel";
 import { readCondo } from "@/lib/condo";
 import { SandwichPanel } from "@/app/sandwich-panel";
 import { readSandwichLease } from "@/lib/sandwich-lease";
+import { exchangeForDeal } from "@/lib/exchange-deal";
+import { ExchangeChip } from "./exchange-chip";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1439,6 +1441,11 @@ export default async function DealPage({
               fromMemorandum={offersDue != null && offersDue === offeringDue?.iso ? offeringDue.page : null}
               calendarHref={offersDue ? `/api/deals/${id}/offers-due.ics` : null}
             />
+            {/* The buyer's 1031 clock (lib/exchange-deal), where the reader's
+                buy box holds an exchange still running: the deadlines against
+                this deal's offers-due day and what its price buys, read on the
+                reader's own day. Never on the shared screen. */}
+            <ExchangeChip exchange={exchangeForDeal(buyBox?.exchange, extraction, offersDue, new Date(`${todayIso}T12:00:00Z`))} />
             <StageSelect
               key={((deal as { stage?: string }).stage as string) ?? "screening"}
               dealId={id}
