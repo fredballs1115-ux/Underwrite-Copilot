@@ -6,6 +6,7 @@ import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
 import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, type CapWithheld } from "@/lib/compare-interest";
+import { PLAN_CAP_NA } from "@/lib/cap-slot";
 import { pctText } from "@/lib/plan-facts";
 import type { BuyBoxCoverage } from "@/lib/criteria";
 import { fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
@@ -492,7 +493,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       label: "Going-in cap",
       get: (c) =>
         c.planDeal
-          ? "n/a — plan"
+          ? PLAN_CAP_NA
           : c.withheld === "note" || c.withheld === "position"
             ? c.noteYtm != null
               ? `${pct(c.noteYtm)} ${OWN_YIELD_WORDS[c.withheld].to}`

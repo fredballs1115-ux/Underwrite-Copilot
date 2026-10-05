@@ -47,13 +47,32 @@ export const CAP_WITHHELD: Record<CapWithheldKind, { na: string; title: string }
 export const ownYieldOf = (w: CapWithheldKind | null | undefined) => OWN_YIELD[w === "position" ? "position" : "note"];
 
 /**
- * The cap slot as one cell of text, as the pipeline's CSV writes it: the
- * cap; else a note's or a position's own yield with what it runs to, the
- * figure the card shows ("17.0% to maturity"); else why the cap is
- * withheld; else blank. A plan deal's yield on cost has its own column.
+ * A plan deal's cap cell — a value-add, a lease-up, a conversion, a
+ * development, judged on its yield on total cost, never on a going-in cap
+ * — in ONE set of words for every cell that writes it: the meeting
+ * workbook's (lib/pipeline-workbook), the pipeline CSV's (`capCellText`)
+ * and the compare table's. The CSV had left the cell blank beside the
+ * workbook's "n/a — plan", and a blank reads as a cap the memorandum does
+ * not state (research pass 35).
  */
-export function capCellText(slots: { cap: string | null; noteYield?: string | null; capWithheld?: CapWithheldKind | null }): string {
+export const PLAN_CAP_NA = "n/a — plan";
+
+/**
+ * The cap slot as one cell of text, as the pipeline's CSV writes it: the
+ * cap; else, on a plan deal, that it is judged on its yield on cost —
+ * `PLAN_CAP_NA`, the meeting workbook's words, its yield on cost in a
+ * column of its own; else a note's or a position's own yield with what it
+ * runs to, the figure the card shows ("17.0% to maturity"); else why the
+ * cap is withheld; else blank, a cap not stated.
+ */
+export function capCellText(slots: {
+  cap: string | null;
+  noteYield?: string | null;
+  capWithheld?: CapWithheldKind | null;
+  plan?: boolean | null;
+}): string {
   if (slots.cap) return slots.cap;
+  if (slots.plan) return PLAN_CAP_NA;
   if (slots.noteYield) return `${slots.noteYield} ${ownYieldOf(slots.capWithheld).to}`;
   return slots.capWithheld ? CAP_WITHHELD[slots.capWithheld].na : "";
 }

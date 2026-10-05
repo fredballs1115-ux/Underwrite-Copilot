@@ -59,6 +59,12 @@ export interface PipelineSlots {
    *  asset shows a cap — to two decimals ("6.27%"), as the deal header
    *  prints it; null for a stabilized asset or an unstated plan */
   yoc: string | null;
+  /** a plan deal — value-add, lease-up, conversion, development — judged on
+   *  its yield on total cost, so its cap cell says so (lib/cap-slot
+   *  `PLAN_CAP_NA`, the meeting workbook's "n/a — plan") whether or not the
+   *  memorandum states the figures for a yield; absent before the
+   *  extraction lands */
+  plan?: boolean;
   /** what the price buys where it is not the building outright — "49%
    *  share", "Note", "Leasehold", "Leased fee" (lib/interest
    *  `interestTag`); absent or null on a fee simple */
@@ -313,6 +319,10 @@ export function pickSlots(
     // report print it (lib/plan-facts `yieldOnCostText`): "6.3%" here had
     // stood beside the header's "6.27%" for one figure.
     yoc: plan?.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : null,
+    // The meeting workbook's `planDeal` (lib/pipeline-export-row reads the
+    // same `planSummary`): the CSV's cap cell says "n/a — plan" where the
+    // workbook's does.
+    plan: plan != null,
     // A share's price, a note's or the land's under a ground lease is not
     // the building's, and the row says so beside the figure.
     interest: interestTag(extraction, asOf),

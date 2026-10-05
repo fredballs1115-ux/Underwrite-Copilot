@@ -95,7 +95,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; capWithheld?: "note" | "position" | "share" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; plan?: boolean; capWithheld?: "note" | "position" | "share" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -654,8 +654,10 @@ export function Pipeline({
       const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
       return `"${safe.replaceAll('"', '""')}"`;
     };
-    // A plan deal's cap cell is empty and its yield on cost sits in its own
-    // column — the same two columns the meeting .xlsx carries.
+    // A plan deal's cap cell says "n/a — plan" and its yield on cost sits in
+    // its own column — the same two cells the meeting .xlsx writes, in its
+    // words (lib/cap-slot `PLAN_CAP_NA`); the cell had been blank, which
+    // reads as a cap the memorandum does not state.
     const header = ["Deal", "Asset class", "Market", "Market read", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Self-storage", "Rent regulation", "Forward purchase", "Mixed-use", "Operating business", "Condominium", "Sandwich position", "1031 exchange", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
@@ -724,7 +726,8 @@ export function Pipeline({
         d.slots.exchange ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
-        // A note's or a position's cap is withheld, its own yield in the
+        // A plan deal's cap is "n/a — plan", as the meeting workbook says
+        // it. A note's or a position's cap is withheld, its own yield in the
         // column as the card shows it ("17.0% to maturity"), else the cap
         // said withheld rather than left blank (#423).
         capCellText(d.slots),

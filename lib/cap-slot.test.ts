@@ -3,7 +3,7 @@
 // lib/compare-interest, so the card, the CSV and the meeting workbook say a
 // withheld cap one way.
 import { describe, expect, it } from "vitest";
-import { CAP_WITHHELD, OWN_YIELD, capCellText, ownYieldOf } from "./cap-slot";
+import { CAP_WITHHELD, OWN_YIELD, PLAN_CAP_NA, capCellText, ownYieldOf } from "./cap-slot";
 import { OWN_YIELD_WORDS, SHARE_CAP_WORDS } from "./compare-interest";
 
 describe("capCellText — the pipeline CSV's cap cell", () => {
@@ -22,8 +22,14 @@ describe("capCellText — the pipeline CSV's cap cell", () => {
     expect(capCellText({ cap: null, noteYield: null, capWithheld: "share" })).toBe("n/a — share");
   });
 
+  it("a plan deal judged on its yield on cost, in the meeting workbook's words — never a blank that reads as a cap not stated (research pass 35)", () => {
+    expect(capCellText({ cap: null, plan: true })).toBe("n/a — plan");
+    expect(capCellText({ cap: null, plan: true })).toBe(PLAN_CAP_NA);
+  });
+
   it("blank where nothing is stated", () => {
     expect(capCellText({ cap: null })).toBe("");
+    expect(capCellText({ cap: null, plan: false })).toBe("");
   });
 });
 

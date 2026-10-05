@@ -50,7 +50,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
+    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, plan: false, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -326,6 +326,9 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     // `yieldOnCostText`): the card's "6.7%" stood beside the header's "6.72%".
     expect(s.yoc).toBe("6.72%");
     expect(s.yoc).toBe(yieldOnCostText(3_400_000 / 50_600_000));
+    // A plan deal, so the CSV's cap cell says the .xlsx's "n/a — plan" too
+    // (lib/cap-slot `capCellText`, research pass 35).
+    expect(s.plan).toBe(true);
   });
 
   it("a development priced at its land: the land cost is the price, the yield on cost is over land + budget", () => {
@@ -335,7 +338,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.00%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
+    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.00%", plan: true, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

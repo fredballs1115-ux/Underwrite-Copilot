@@ -17,7 +17,7 @@ import { pipelineExportRow, type ExportRowContext } from "./pipeline-export-row"
 import { buildPipelineWorkbook, type PipelineExportRow } from "./pipeline-workbook";
 import { compareReturns } from "./compare-figures";
 import { SHARE_CAP_WORDS, capSlotWithheld, goingInCapFigure } from "./compare-interest";
-import { capCellText } from "./cap-slot";
+import { PLAN_CAP_NA, capCellText } from "./cap-slot";
 import { interestShortLine, interestTag, readInterest } from "./interest";
 import { deriveInternalComps } from "./internal-comps";
 import { deriveAnalytics, fmtUsdCompact } from "./analytics";
@@ -107,6 +107,33 @@ describe("a plan's yield on cost and a going-in cap, at the header's two decimal
     expect(cell.numFmt).toBe("0.00%");
     // "0.00%" over the raw fraction is 6.27%; over a re-parsed "6.3%" it was 6.30%.
     expect(((cell.value as number) * 100).toFixed(2)).toBe("6.27");
+  });
+
+  it("the CSV's cap cell says the meeting workbook's \"n/a — plan\", its yield in its own column, whether or not one is stated (research pass 35)", async () => {
+    // A plan whose memorandum states no stabilized NOI has no yield to show,
+    // and is still judged on one, never a deal whose cap went unstated.
+    const unstated = ex([m("Asking price", "$18,500,000"), m("Units", "120")], {
+      strategy: { kind: "value_add", summary: "Renovate 120 units", capitalBudget: "", timeline: "" },
+    });
+    for (const [e, yoc] of [
+      [valueAdd, "6.27%"],
+      [unstated, null],
+    ] as const) {
+      const slots = pickSlots(e, null);
+      expect(slots.plan).toBe(true);
+      expect(slots.yoc).toBe(yoc);
+      // One set of words for the two cells (lib/cap-slot `PLAN_CAP_NA`): the
+      // CSV's had been blank beside the workbook's.
+      expect(capCellText(slots)).toBe(PLAN_CAP_NA);
+      const row = pipelineExportRow({ name: "Plan", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", verdict: null, extraction: e, stage: "screening" }, ctx);
+      expect(row.planDeal).toBe(true);
+      expect((await workbookRow(row)).getCell(8).value).toBe(PLAN_CAP_NA);
+    }
+    expect(PLAN_CAP_NA).toBe("n/a — plan");
+    // A building's cap stands, and a cap nobody stated is still a blank.
+    expect(pickSlots(ex([m("Asking price", "$41,950,000"), m("Going-in cap rate", "5.45%")]), null).plan).toBe(false);
+    expect(capCellText(pickSlots(ex([m("Asking price", "$41,950,000"), m("Going-in cap rate", "5.45%")]), null))).toBe("5.45%");
+    expect(capCellText(pickSlots(ex([m("Asking price", "$41,950,000")]), null))).toBe("");
   });
 
   it("the compare table prints the yield and a stated cap as the header does", () => {

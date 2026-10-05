@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import { buildPipelineWorkbook, type PipelineExportRow } from "./pipeline-workbook";
+import { PLAN_CAP_NA } from "./cap-slot";
 
 const base: Omit<PipelineExportRow, "name" | "dealType" | "planDeal" | "cap" | "yieldOnCost"> = {
   stage: "screening",
@@ -97,6 +98,8 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(conv.getCell(2).value).toBe("1200 K Street");
     expect(conv.getCell(5).value).toBe("Conversion");
     expect(conv.getCell(8).value).toBe("n/a — plan");
+    // The pipeline CSV's words for the same cell (lib/cap-slot).
+    expect(conv.getCell(8).value).toBe(PLAN_CAP_NA);
     // Written raw: the cell's "0.00%" shows 11.67%, the deal header's figure,
     // where "11.7%" read back had shown 11.70%.
     expect(conv.getCell(9).value).toBe(0.11667);

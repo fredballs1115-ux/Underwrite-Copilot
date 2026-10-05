@@ -7,6 +7,7 @@ import { parsePct, parsePrice, priceRange, type BuyBoxCoverage } from "@/lib/cri
 import { FIRST_READ_TITLE } from "@/lib/first-read";
 import { FOLD_WORD, checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
+import { PLAN_CAP_NA } from "@/lib/cap-slot";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -392,7 +393,8 @@ export async function buildPipelineWorkbook(
             ? "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. Its yield to maturity at its price stands in its place."
             : "A preferred equity position has no going-in cap: its price buys a rate and a redemption, never a slice of the building. Its yield to redemption at its price stands in its place.";
       } else {
-        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : d.capWithheld ? `n/a — ${d.capWithheld}` : "—");
+        // A plan deal's words are the pipeline CSV's too (lib/cap-slot).
+        capCell.value = d.cap ?? (d.planDeal ? PLAN_CAP_NA : d.capWithheld ? `n/a — ${d.capWithheld}` : "—");
       }
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };
