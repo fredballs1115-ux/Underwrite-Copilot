@@ -247,7 +247,10 @@ describe("a current pay the memorandum does not state", () => {
     const whole = readPosition(position(metric("Preferred return", "12%")), 10_000_000, ON)!;
     expect(whole.yieldPct).toBeNull();
     expect(whole.headline).toBe(
-      "A preferred equity position of $10.0M at a 12.00% preferred return, to be redeemed by Jun 2029: the memorandum states no current pay, so no yield to redemption is read.",
+      "A preferred equity position of $10.0M at a 12.00% preferred return, to be redeemed by Jun 2029: the memorandum does not split its preferred return into current pay and accrual, so no yield to redemption is read.",
+    );
+    expect(positionCaption(whole)).toBe(
+      "32 months to its Jun 2029 redemption; the memorandum does not split its preferred return into current pay and accrual, so no yield to redemption is read.",
     );
     expect(positionTag(whole)).toBe("Pref equity, 12% to Jun 2029");
     // A current pay the words state as none is a zero, and the yield is read.
@@ -257,6 +260,28 @@ describe("a current pay the memorandum does not state", () => {
       expect(z.yieldPct).not.toBeNull();
       expect(z.sentences.join(" ")).toContain("nothing is paid in cash");
     }
+  });
+
+  it("reads a return said to be paid on a schedule as current pay, and a shortfall's accrual as a shortfall's (audit C3a)", () => {
+    // Each had read "the memorandum states no current pay".
+    for (const words of ["12%, paid monthly", "12% preferred return, paid currently", "12% per annum, payable quarterly in arrears"]) {
+      const r = readPosition(position(metric("Preferred return", words)), 10_000_000, ON)!;
+      expect(r.terms, words).toMatchObject({ totalPct: 12, currentPayPct: 12, currentPayDerived: false, accrualPct: null });
+      expect(r.currentPayYear, words).toBe(1_200_000);
+      expect(r.yieldPct!.toFixed(1), words).toBe("12.0");
+      expect(r.headline, words).not.toContain("states no current pay");
+      expect(positionCaption(r), words).toBe("32 months to its Jun 2029 redemption, on its current pay alone — the memorandum states no accrual.");
+    }
+    // "Any shortfall accrues in full" is said of a shortfall: 12% current,
+    // never 0% current and 12% accruing.
+    const shortfall = readPosition(position(metric("Preferred return", "12%, paid current; any shortfall accrues in full")), 10_000_000, ON)!;
+    expect(shortfall.terms).toMatchObject({ currentPayPct: 12, accrualPct: null, shortfallAccrues: true });
+    expect(shortfall.yieldPct!.toFixed(1)).toBe("12.0");
+    expect(shortfall.headline).toMatch(/^A preferred equity position of \$10\.0M at 12\.00% current pay, to be redeemed by Jun 2029: 12\.0% to redemption/);
+    expect(shortfall.sentences.join(" ")).toContain("$1.20M a year is paid in cash; any shortfall in it accrues, as stated");
+    // A part paid on a schedule is the current part beside an accrual.
+    const parts = readPosition(position(metric("Preferred return", "12%: 8% paid monthly, 4% accrues")), 10_000_000, ON)!;
+    expect(parts.terms).toMatchObject({ currentPayPct: 8, accrualPct: 4 });
   });
 });
 

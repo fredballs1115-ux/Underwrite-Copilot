@@ -81,6 +81,10 @@ export interface PositionTerms {
   /** the current pay is not stated but the total and the accrual are: the
    *  current pay is the one less the other, said as derived */
   currentPayDerived: boolean;
+  /** the words say any shortfall in the current pay accrues ("paid current;
+   *  any shortfall accrues in full"): said as such, never read as the whole
+   *  return accruing */
+  shortfallAccrues: boolean;
   accrualPct: number | null;
   /** the accrual is not stated but the total and the current pay are: the
    *  accrual is the one less the other, said as derived */
@@ -173,9 +177,17 @@ const partPct = (text: string, part: RegExp): number | null => {
 };
 
 /** The words a cash part is named with: "8% current pay", "8% current",
- *  "8% paid currently" (the batch audit: "12% (8% current, 4% accrued)" had
- *  read no current pay). */
-const CURRENT_PART = /(?:paid\s+)?current(?:ly)?(?:[\s-]*pay)?/;
+ *  "8% paid currently", "8% paid monthly" (the batch audit: "12% (8%
+ *  current, 4% accrued)" had read no current pay). */
+const PAID_ON = String.raw`(?:paid|payable|distributed)\s+(?:current(?:ly)?|monthly|quarterly|annually|semi[\s-]*annually|in\s+arrears|each\s+(?:month|quarter))`;
+const CURRENT_PART = new RegExp(String.raw`${PAID_ON}|(?:paid\s+)?current(?:ly)?(?:[\s-]*pay)?`);
+/** A return said to be paid in cash on a schedule, with no part named:
+ *  "12%, paid monthly", "12% per annum, payable quarterly in arrears" — the
+ *  current pay in all (audit C3a: each had read as no current pay). */
+const PAID_IN_CASH = new RegExp(String.raw`\b${PAID_ON}\b`, "i");
+/** A clause said of a shortfall or an unpaid amount: its accrual is the
+ *  shortfall's, never the whole return's ("any shortfall accrues in full"). */
+const SHORTFALL_CLAUSE = /[^.;]*\b(?:shortfall|deficien\w*|unpaid|if\s+not\s+paid|not\s+(?:paid|distributed)\s+(?:currently|when\s+due))\b[^.;]*/gi;
 /** The words an accrual is named with: "4% accruing", "4% accrues". */
 const ACCRUAL_PART = /accru/;
 /** A current pay the words state as none: "0%", "0% current pay", "no
@@ -228,16 +240,26 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
   // is none, never a zero (the batch audit: a stated accrual beside no
   // stated current pay had read "nothing is paid in cash" and a 3.8% yield).
   const returnText = returnRow?.value ?? "";
-  const statedZero = (text: string) => (ZERO_CURRENT.test(text) ? 0 : null);
+  // A shortfall's accrual is the shortfall's: its clause is set aside before
+  // the parts are read, and said apart (audit C3a: "paid current; any
+  // shortfall accrues in full" had read 0% current and 12% accruing).
+  const shortfallAccrues = [returnRow?.value, currentRow?.value, accrualRow?.value].some(
+    (v) => v != null && [...v.matchAll(SHORTFALL_CLAUSE)].some((m) => /accru/i.test(m[0])),
+  );
+  const ownWords = (text: string) => text.replace(SHORTFALL_CLAUSE, " ");
+  const statedZero = (text: string) => (ZERO_CURRENT.test(ownWords(text)) ? 0 : null);
   let currentPayPct = currentRow
     ? (onePct(currentRow.value) ?? statedZero(currentRow.value))
-    : (partPct(returnText, CURRENT_PART) ?? statedZero(returnText));
-  let accrualPct = accrualRow ? onePct(accrualRow.value) : partPct(returnText, ACCRUAL_PART);
+    : (partPct(ownWords(returnText), CURRENT_PART) ?? statedZero(returnText));
+  let accrualPct = accrualRow ? onePct(accrualRow.value) : partPct(ownWords(returnText), ACCRUAL_PART);
   let accrualDerived = false;
   let currentPayDerived = false;
   // The total less one part is the other — said as derived — only where the
   // total is one figure and the part stated is not above it.
-  const total = returnRow ? totalOf(returnText) : null;
+  const total = returnRow ? totalOf(ownWords(returnText)) : null;
+  // A return said to be paid on a schedule, no accrual named but a
+  // shortfall's, is the current pay in all.
+  if (currentPayPct == null && accrualPct == null && total != null && PAID_IN_CASH.test(ownWords(returnText))) currentPayPct = total;
   if (accrualPct == null && total != null && currentPayPct != null && total > currentPayPct) {
     accrualPct = Math.round((total - currentPayPct) * 1e6) / 1e6;
     accrualDerived = true;
@@ -254,6 +276,7 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
     totalPct: total,
     currentPayPct,
     currentPayDerived,
+    shortfallAccrues,
     accrualPct,
     accrualDerived,
     compounds: accrualPct != null ? compoundingOf(compoundWords) : null,
@@ -401,6 +424,14 @@ function rateWords(t: PositionTerms): string {
   return parts.join(" and ");
 }
 
+/** Why no cash part is read: a preferred return stated whole, its split not
+ *  stated, or no current pay stated at all (audit C3a: "states no current
+ *  pay" had been said of a return stated in all). */
+const noCurrentPayWords = (t: PositionTerms): string =>
+  t.preferredReturn != null && t.accrualPct == null
+    ? "the memorandum does not split its preferred return into current pay and accrual"
+    : "the memorandum states no current pay";
+
 function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): string[] {
   const t = r.terms;
   const out: string[] = [];
@@ -415,7 +446,7 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
     out.push(`${lead}. The memorandum states no redemption date, so no yield to redemption is read.`);
   } else if (t.currentPayPct == null) {
     // No cash part stated: never run as zero (the batch audit).
-    out.push(`${lead}: the memorandum states no current pay, so no yield to redemption is read.`);
+    out.push(`${lead}: ${noCurrentPayWords(t)}, so no yield to redemption is read.`);
   } else {
     out.push(`${lead}.`);
   }
@@ -427,10 +458,10 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
   if (r.currentPayYear != null || accrues) {
     const cash =
       r.currentPayYear == null
-        ? "the memorandum states no current pay"
+        ? noCurrentPayWords(t)
         : r.currentPayYear === 0
           ? "nothing is paid in cash"
-          : `${money2(r.currentPayYear)} a year is paid in cash`;
+          : `${money2(r.currentPayYear)} a year is paid in cash${t.shortfallAccrues ? "; any shortfall in it accrues, as stated" : ""}`;
     let owed = "";
     if (accrues && r.accruedSimple != null && r.accruedCompound == null) {
       // The compounding earns the preferred return, which the current pay
@@ -515,7 +546,7 @@ export function positionCaption(r: PositionRead | null): string {
   if (r.monthsLeft == null) return "";
   const months = `${r.monthsLeft} ${r.monthsLeft === 1 ? "month" : "months"}`;
   // No cash part stated: no yield was solved, and the small print says why.
-  if (t.currentPayPct == null) return `${months} to its ${when} redemption; the memorandum states no current pay, so no yield to redemption is read.`;
+  if (t.currentPayPct == null) return `${months} to its ${when} redemption; ${noCurrentPayWords(t)}, so no yield to redemption is read.`;
   // No yield drawn (no price read): the yield's basis is named only beside
   // a yield (the second pre-merge audit).
   if (r.yieldPct == null) return `${months} to its ${when} redemption.`;
