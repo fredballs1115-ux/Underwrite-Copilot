@@ -110,10 +110,11 @@ export interface PipelineExportRow {
    *  cell says so beside the fit it shows */
   fitFirstRead?: boolean | null;
   verdict: string | null; // pass | caution | pass_on
-  /** the call on file is the previous screen's: a re-screen is running, or
-   *  the latest screen failed before its verdict (lib/screen-run
-   *  `verdictBehind`) — the cell says so beside the call it shows */
-  verdictBehind?: "running" | "failed" | null;
+  /** the call on file is the previous screen's: a re-screen is running,
+   *  the latest screen failed before its verdict, or it stopped making
+   *  progress on the way (lib/screen-run `verdictBehind`) — the cell says
+   *  so beside the call it shows */
+  verdictBehind?: "running" | "failed" | "stalled" | null;
   offersDue: string | null; // YYYY-MM-DD
   createdAt: string; // ISO
   addedBy: string | null;
@@ -332,7 +333,14 @@ export async function buildPipelineWorkbook(
       const v = d.verdict ? VERDICT_LABEL[d.verdict] : null;
       // A call the latest screen has not re-run is the previous screen's,
       // printed beside this run's terms — said, never passed off as current.
-      const behind = v && d.verdictBehind ? (d.verdictBehind === "running" ? "Re-screening" : "Screen failed") : null;
+      const behind =
+        v && d.verdictBehind
+          ? d.verdictBehind === "running"
+            ? "Re-screening"
+            : d.verdictBehind === "stalled"
+              ? "Screen stalled"
+              : "Screen failed"
+          : null;
       row.getCell(11).value = behind ? `${behind} (was ${v!.label})` : (v?.label ?? "—");
       row.getCell(11).font = v
         ? behind

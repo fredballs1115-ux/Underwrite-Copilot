@@ -57,10 +57,11 @@ export type Col = {
   verdict: string | null;
   reason: string | null;
   /** why the call on file is the previous screen's, if it is: a re-screen
-   *  still running toward its verdict, or one that failed before reaching
-   *  it (lib/screen-run `verdictBehind`). Such a call is shown as the run,
-   *  the way the pipeline card shows it, and never crowned "best". */
-  behind?: "running" | "failed" | null;
+   *  still running toward its verdict, one that failed before reaching it,
+   *  or one that stopped making progress on the way (lib/screen-run
+   *  `verdictBehind`). Such a call is shown as the run, the way the
+   *  pipeline card shows it, and never crowned "best". */
+  behind?: "running" | "failed" | "stalled" | null;
   hasModel: boolean;
   /** deterministic mandate fit + a one-line why (misses / near-misses) */
   fit: "fits" | "near" | "outside" | null;
@@ -243,6 +244,23 @@ function CallPill({ c, className = "" }: { c: Col; className?: string }) {
       >
         <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
         {p ? "Re-screening…" : "Screening…"}
+      </span>
+    );
+  }
+  // A run that stopped making progress is no re-screen in progress: said
+  // as the pipeline card says it (lib/screen-run `isStalled`).
+  if (c.behind === "stalled") {
+    return (
+      <span
+        data-qa="call-behind"
+        className={`rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-medium text-caution ${className}`}
+        title={
+          p
+            ? `The latest screen stopped making progress before its verdict — the previous call was ${p.label}. Open the deal to start it again.`
+            : "The screen stopped making progress — open the deal to start it again"
+        }
+      >
+        Stalled
       </span>
     );
   }

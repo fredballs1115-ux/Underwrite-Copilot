@@ -92,7 +92,9 @@ export async function GET(req: Request) {
       rows.length
         ? supabase
             .from("analysis_jobs")
-            .select("deal_id, status, step, created_at")
+            // Its last write too: a run that stopped making progress is
+            // said as stalled, never as a re-screen (lib/screen-run).
+            .select("deal_id, status, step, created_at, updated_at")
             .in(
               "deal_id",
               rows.map((d) => d.id),
@@ -136,6 +138,7 @@ export async function GET(req: Request) {
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
       today,
+      now: now.getTime(),
     }),
   );
 

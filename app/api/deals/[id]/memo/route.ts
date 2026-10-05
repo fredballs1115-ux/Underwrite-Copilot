@@ -83,7 +83,9 @@ export async function GET(
   // it until the run finishes, or is run again (lib/screen-run).
   const { data: latestJob } = await supabase
     .from("analysis_jobs")
-    .select("status, step")
+    // Its last write too: a run that stopped making progress is waited on
+    // by nothing, and the refusal says so (lib/screen-run `isStalled`).
+    .select("status, step, updated_at")
     .eq("deal_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -91,7 +93,7 @@ export async function GET(
   const behind = verdictBehind(latestJob);
   if (behind) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=${behind === "running" ? "memorunning" : "memostale"}`, req.url),
+      new URL(`/deals/${id}?error=${behind === "running" ? "memorunning" : behind === "stalled" ? "memostalled" : "memostale"}`, req.url),
       302,
     );
   }

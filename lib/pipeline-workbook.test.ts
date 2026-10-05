@@ -113,6 +113,11 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(cells).toContain("Screen failed (was Caution)");
     // No call on file: a first screen running prints no invented call.
     expect(cells).toContain("—");
+    // A run that stopped making progress is said as stalled, never as a
+    // re-screen still running (lib/screen-run `isStalled`, research pass 30).
+    const stalled = (await load([{ ...STABILIZED, verdictBehind: "stalled" }])).getWorksheet("Pipeline")!;
+    const stalledCell = [6, 7, 8].map((r) => stalled.getRow(r).getCell(11).value).find((v) => typeof v === "string" && v !== "—");
+    expect(stalledCell).toBe("Screen stalled (was Caution)");
   });
 
   it("a buy-box fit judged on the first signal says so on its cell, as the pipeline card's \"First read\" does", async () => {

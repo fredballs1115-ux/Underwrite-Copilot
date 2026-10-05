@@ -100,6 +100,16 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     take: "An office-to-residential conversion of a 1962 tower, sold vacant.",
   };
 
+  it("says a re-screen that stopped making progress is stalled, on the route's own clock, never running (research pass 30)", () => {
+    const now = Date.parse("2026-09-08T12:00:00Z");
+    const at = (msAgo: number) => new Date(now - msAgo).toISOString();
+    const row = (updated_at: string) =>
+      pipelineExportRow(deal(), { ...ctx, now, job: { status: "running", step: "challenge", updated_at } });
+    expect(row(at(11 * 60_000)).verdictBehind).toBe("stalled");
+    expect(row(at(30_000)).verdictBehind).toBe("running");
+    expect(pipelineExportRow(deal(), { ...ctx, now, job: { status: "error", step: "comps", updated_at: at(3_600_000) } }).verdictBehind).toBe("failed");
+  });
+
   it("reads the deal's kind as the pipeline card does, from the extraction and the first signal", () => {
     const row = pipelineExportRow(deal({ extraction: wexley, first_signal: SIGNAL }), ctx);
     expect(row.dealType).toBe("Conversion");

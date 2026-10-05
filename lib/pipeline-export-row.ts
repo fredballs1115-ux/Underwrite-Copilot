@@ -59,6 +59,10 @@ export interface ExportRowContext {
   /** the day the rows are read on, an ISO day — the route's own UTC day:
    *  it decides the rent allowance in force (lib/rent-regulation) */
   today: string;
+  /** the moment the rows are read, in ms — a run that stopped making
+   *  progress by then is stalled, never "Re-screening" (lib/screen-run
+   *  `isStalled`); the caller's clock where it is not given */
+  now?: number;
 }
 
 export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): PipelineExportRow {
@@ -134,7 +138,7 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // pipeline page marks it (the card's "First read").
     fitFirstRead: fit != null && !extraction && signal != null,
     verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
-    verdictBehind: verdictBehind(ctx.job),
+    verdictBehind: verdictBehind(ctx.job, ctx.now),
     offersDue: ctx.offersDue,
     createdAt: d.created_at,
     addedBy: ctx.addedBy,

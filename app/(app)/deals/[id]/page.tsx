@@ -91,7 +91,7 @@ import { parseFactRow, type DealFact } from "@/lib/facts";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
-import { storedPreviousResults, verdictBehind } from "@/lib/screen-run";
+import { jobAgeMs, storedPreviousResults, verdictBehind } from "@/lib/screen-run";
 import { readingMemorandum } from "@/lib/screen-reading";
 import {
   SCREEN_DURATION_SAMPLE,
@@ -180,6 +180,14 @@ function knownPointOf(
   return cacheFresh(cache, Date.now(), address) && typeof cache?.lat === "number" && typeof cache?.lng === "number"
     ? { lat: cache.lat, lng: cache.lng }
     : null;
+}
+
+/** The deal's job row with its age on this server's clock (lib/screen-run
+ *  `jobAgeMs`) — read here, outside the render, since it reads the clock. */
+function jobWithAge<T extends { updated_at?: string | null; status: string; step: string | null }>(
+  row: T | null,
+): (T & { ageMs: number | null }) | null {
+  return row ? { ...row, ageMs: jobAgeMs(row, Date.now()) } : null;
 }
 
 export default async function DealPage({
@@ -366,7 +374,7 @@ export default async function DealPage({
 
   const documents = (docsData ?? []) as DealDocument[];
 
-  const job = jobData as {
+  const jobRow = jobData as {
     status: string;
     step: string | null;
     progress: number;
@@ -374,6 +382,10 @@ export default async function DealPage({
     updated_at?: string | null;
     created_at?: string | null;
   } | null;
+  // The row's age on THIS server's clock: a run past the stale line is
+  // stalled (lib/screen-run `isStalled`) from the page's first paint, and
+  // the browser never judges it on a clock of its own.
+  const job = jobWithAge(jobRow);
 
   // A screen that failed midway, or one still running, leaves a MIXED
   // generation: the results from its step onward still belong to the
@@ -395,7 +407,9 @@ export default async function DealPage({
           note:
             verdictLag === "running"
               ? "The previous screen's call — a new screen of this deal is running and replaces it when it reaches the verdict"
-              : "The previous screen's call — the latest screen failed before it reached the verdict",
+              : verdictLag === "stalled"
+                ? "The previous screen's call — the latest screen stopped making progress before it reached the verdict; start it again on this page"
+                : "The previous screen's call — the latest screen failed before it reached the verdict",
         }
       : { label: basePill.label, cls: basePill.cls }
     : null;

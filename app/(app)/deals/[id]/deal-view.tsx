@@ -79,7 +79,7 @@ import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import { revealScrollLeft } from "@/lib/tab-strip";
-import { screenStopped, type ResultKey } from "@/lib/screen-run";
+import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
@@ -100,12 +100,11 @@ type Job = {
    *  one job row (lib/jobs) — so the progress clock counts from the run's
    *  start rather than from the page load */
   created_at?: string | null;
+  /** how long ago the row was last written, on the server's clock at the
+   *  read (lib/screen-run `isStalled`): a run past the stale line is
+   *  stalled, and the page says so from its first paint */
+  ageMs?: number | null;
 } | null;
-
-// A run that hasn't written progress in this long is treated as stalled: the
-// background process likely died (a deploy/restart), so we offer a restart
-// instead of spinning the rail forever. Matches the server's stale-reclaim.
-const STALL_MS = 10 * 60 * 1000;
 
 type Results = {
   extraction: ExtractionResult | null;
@@ -252,6 +251,12 @@ const MODEL_ERRORS: Record<string, string> = {
     "The latest screen of this deal hasn’t reached its verdict yet — the memo waits for it, so it never pairs the new terms with the last call.",
   reportrunning:
     "The latest screen of this deal hasn’t reached its verdict yet — the report waits for it, so it never pairs the new terms with the last call.",
+  // A run that stopped making progress (lib/screen-run `isStalled`) is
+  // waited on by nothing: start it again, then export.
+  memostalled:
+    "The latest screen of this deal stopped making progress before its verdict — start it again on this page, and the memo pairs today’s terms with today’s call once it finishes.",
+  reportstalled:
+    "The latest screen of this deal stopped making progress before its verdict — start it again on this page, and the report pairs today’s terms with today’s call once it finishes.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
@@ -447,20 +452,27 @@ export function DealView({
   const notified = useRef(false);
   // Say "you were signed out" once, not on every 2-second poll.
   const signedOut = useRef(false);
-  // A run whose job row hasn't advanced in STALL_MS almost certainly lost its
-  // background process (a deploy/restart). Computed in the poll (where reading
-  // the clock is a side effect, not render), it flips the rail to a restart.
-  const [stalled, setStalled] = useState(false);
-  const wasStalled = useRef(false);
+  // A run whose job row hasn't advanced past the stale line almost certainly
+  // lost its background process (a deploy/restart): it flips the rail to a
+  // restart. Read off the age the job carries (lib/screen-run `isStalled`,
+  // the pipeline card's own rule), so the first paint is already right.
+  const stalled = isStalled(job);
+  const wasStalled = useRef(stalled);
   const operatorFailure = job?.status === "error" && needsOperator(job.error);
 
+  // A row in flight — the poll keeps reading it, a stalled one included, so
+  // a run the worker picks up again is seen.
   const active = isActive(job?.status);
+  // A run actually under way: a stalled one is not, so nothing below says
+  // "in progress", draws a skeleton or holds Replace OM back for it.
+  const live = active && !stalled;
   // Why any result below is the previous screen's: a failed run never
-  // reached it, or the run in progress has not yet (lib/screen-run).
-  const staleWhy: "failed" | "running" = job?.status === "error" ? "failed" : "running";
+  // reached it, the run in progress has not yet, or the run stopped making
+  // progress before it (lib/screen-run).
+  const staleWhy: BehindWhy = job?.status === "error" ? "failed" : stalled ? "stalled" : "running";
   // A screen, not a side job, is under way: the rail's "Step N of 6" is the
   // progress cue, and the overview's own count of results stands down.
-  const screening = active && !SIDE_JOBS.has(job?.step ?? "");
+  const screening = live && !SIDE_JOBS.has(job?.step ?? "");
   // The latest screen stopped before its end (lib/screen-run): an empty
   // section then points at the reason at the top of the page, rather than
   // saying the screen "hasn't run" with a second button for the one there.
@@ -496,16 +508,16 @@ export function DealView({
         const stepChanged = data.step !== lastStep.current;
         const endedStep = data.step ?? lastStep.current;
         lastStep.current = data.step;
-        setJob(data);
-        // Detect a stalled run: still active but its row hasn't been written in
-        // the stale window (the background process likely died).
-        const isRunning = data.status === "running" || data.status === "queued";
-        const nowStalled =
-          isRunning && !!data.updated_at && Date.now() - Date.parse(data.updated_at) > STALL_MS;
-        setStalled(nowStalled);
+        // The row's age, for the stall rule (lib/screen-run `isStalled`).
+        const next: NonNullable<Job> = {
+          ...data,
+          ageMs: data.updated_at ? Date.now() - Date.parse(data.updated_at) : null,
+        };
+        setJob(next);
         // The header was drawn while the run was reading: a figure not read
         // yet shimmered. A run that stalls is reading nothing, so the page is
         // drawn again once, and a missing figure takes its dash.
+        const nowStalled = isStalled(next);
         if (nowStalled && !wasStalled.current) router.refresh();
         wasStalled.current = nowStalled;
 
@@ -638,12 +650,12 @@ export function DealView({
     key: SectionKey,
   ): "done" | "running" | "pending" | "idle" {
     const steps = SECTION_STEPS[key];
-    if (active && job?.step && steps.includes(job.step)) return "running";
+    if (live && job?.step && steps.includes(job.step)) return "running";
     switch (key) {
       case "overview":
         return results.verdict || results.extraction
           ? "done"
-          : active
+          : live
             ? "running"
             : "idle";
       case "financials":
@@ -663,7 +675,7 @@ export function DealView({
       case "documents":
         return "idle";
     }
-    if (active && steps.length) {
+    if (live && steps.length) {
       const cur = PIPELINE.indexOf(job?.step ?? "");
       const first = PIPELINE.indexOf(steps[0]);
       if (first >= 0 && (cur < 0 || first > cur)) return "pending";
@@ -730,7 +742,7 @@ export function DealView({
 
   return (
     <div className="flex flex-col gap-5">
-      {active && !stalled && (
+      {live && (
         <div className="flex flex-col gap-2">
           <ProgressRail job={job!} typicalScreen={typicalScreen} />
           <NotifyOffer />
@@ -852,7 +864,7 @@ export function DealView({
             {/* Feature 1: prompt for the actuals docs. Hidden while a screen
                 runs, on the sample, and once both docs are folded in. */}
             {(() => {
-              if (active || isSample || !hasOm) return null;
+              if (live || isSample || !hasOm) return null;
               const slot = (
                 kind: "rent_roll" | "t12",
                 stored: boolean,
@@ -871,7 +883,7 @@ export function DealView({
             })()}
             <OverviewView
               results={results}
-              active={active}
+              active={live}
               screening={screening}
               onNavigate={navigateLegacy}
               stale={staleResults}
@@ -910,7 +922,7 @@ export function DealView({
         {section === "financials" && (
           <FinancialsPanel
             results={results}
-            active={active}
+            active={live}
             stopped={stopped != null}
             step={job?.step ?? null}
             hasOm={hasOm}
@@ -940,7 +952,7 @@ export function DealView({
             onSelect={selectAnalysis}
             counts={analysisCounts}
             results={results}
-            active={active}
+            active={live}
             stopped={stopped != null}
             step={job?.step ?? null}
             dealId={dealId}
@@ -976,7 +988,7 @@ export function DealView({
               hasVerdict={!!results.verdict}
               documents={documents}
               supplements={supplements}
-              active={active}
+              active={live}
               manualFacts={
                 // Typed-facts deal = no OM, not the sample. Samples have no
                 // OM either but are static demo data — never editable.
@@ -1428,8 +1440,9 @@ function AnalysesPanel({
   omUrl: string | null;
   /** the latest screen has not re-run the verdict (lib/screen-run) */
   staleVerdict?: boolean;
-  /** why: that screen failed before the verdict, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: that screen failed before the verdict, is still running, or
+   *  stopped making progress on the way */
+  staleWhy?: BehindWhy;
   /** the subject's own basis, read where the first signal is in scope, so
    *  the comps table's tick and the deal header agree on the deal's kind */
   compSubject?: SubjectBasis | null;

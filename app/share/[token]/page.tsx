@@ -79,9 +79,11 @@ export default async function SharePage({
   // or still be running toward it: the call shown then belongs to the
   // previous completed screen, and so may the comp and market reads — say
   // so, the same way the sender's own deal page does (lib/screen-run).
+  // Its last write too: a run that stopped making progress is said as
+  // stopped, never as a re-screen in progress (lib/screen-run `isStalled`).
   const { data: latestJob } = await admin
     .from("analysis_jobs")
-    .select("status, step")
+    .select("status, step, updated_at")
     .eq("deal_id", dealId)
     .order("created_at", { ascending: false })
     .limit(1)

@@ -5,7 +5,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { placedByClause } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
-import { screenedOn } from "@/lib/screen-run";
+import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { PendingButton } from "../../pending-button";
 import {
   addSupplementNote,
@@ -409,8 +409,9 @@ export function OverviewView({
   /** results the latest screen has not rewritten — the previous screen's
    *  (lib/screen-run `previousScreenResults`) */
   stale?: ReadonlyArray<keyof Results>;
-  /** why: the latest screen failed before them, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: the latest screen failed before them, is still running, or
+   *  stopped making progress before them */
+  staleWhy?: BehindWhy;
   /** the latest screen stopped before its end (lib/screen-run
    *  `screenStopped`): what is missing is missing because it stopped, and
    *  the reason is at the top of the page — never "no concerns", which
@@ -502,7 +503,9 @@ export function OverviewView({
             <p className="mt-2 text-xs leading-relaxed text-caution">
               {staleWhy === "running"
                 ? `${staleCount} of these are from the previous screen — the run in progress replaces each as it reaches it.`
-                : `${staleCount} of these are from the previous screen — the latest run failed before reaching them. Run it again to bring them up to date.`}
+                : staleWhy === "stalled"
+                  ? `${staleCount} of these are from the previous screen — the latest run stopped making progress before reaching them. Start it again to bring them up to date.`
+                  : `${staleCount} of these are from the previous screen — the latest run failed before reaching them. Run it again to bring them up to date.`}
             </p>
           )}
         </div>
@@ -1964,8 +1967,9 @@ function VerdictHero({
   /** the latest screen has not re-run the verdict — this call was written
    *  about the terms as they were before that run */
   stale?: boolean;
-  /** why: that screen failed before the verdict, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: that screen failed before the verdict, is still running, or
+   *  stopped making progress on the way */
+  staleWhy?: BehindWhy;
   onMore?: () => void;
 }) {
   const v = VERDICT[result.verdict] ?? VERDICT.caution;
@@ -1995,7 +1999,9 @@ function VerdictHero({
               title={
                 staleWhy === "running"
                   ? "A new screen of this deal is running. This call was written about the terms as they stood before it — the run replaces it when it reaches the verdict."
-                  : "The latest screen failed before it reached the verdict. This call was written about the terms as they stood before that run — run the screen again to refresh it."
+                  : staleWhy === "stalled"
+                    ? "The latest screen stopped making progress before it reached the verdict. This call was written about the terms as they stood before that run — start the screen again to refresh it."
+                    : "The latest screen failed before it reached the verdict. This call was written about the terms as they stood before that run — run the screen again to refresh it."
               }
             >
               From the previous screen
@@ -2080,8 +2086,9 @@ export function VerdictView({
   result: VerdictResult;
   /** the latest screen has not re-run the verdict */
   stale?: boolean;
-  /** why: that screen failed before the verdict, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: that screen failed before the verdict, is still running, or
+   *  stopped making progress on the way */
+  staleWhy?: BehindWhy;
 }) {
   return (
     <div className="flex flex-col gap-6">

@@ -39,6 +39,7 @@ import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./rende
 import { regulationForDeal } from "./rent-regulation";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
+import { STALE_MS } from "./screen-run";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -437,6 +438,70 @@ describe("DealView — the sample deal renders every section without a runtime e
     const never = textOf(render({ ...failedFirst("financials"), job: null }));
     expect(never).toMatch(/The screen hasn.t run for this deal yet\./);
     expect(never).toMatch(/Run the screen/);
+  });
+
+  it("a run that stopped making progress reads as stopped on every view — never 'in progress' — and Replace OM works (research pass 30)", () => {
+    // The process died under a re-screen at the challenger eleven minutes
+    // ago: the page's own read measured the row's age on the server's clock.
+    const stalledJob = {
+      status: "running",
+      step: "challenge",
+      progress: 30,
+      error: null,
+      updated_at: "2026-10-05T11:49:00Z",
+      created_at: "2026-10-05T11:45:00Z",
+      ageMs: STALE_MS + 60_000,
+    };
+    const stalled = (tab: string, analysis: string | null = null, job: unknown = stalledJob): Props =>
+      ({
+        ...sampleProps(tab, analysis),
+        isSample: false,
+        hasOm: true,
+        omUrl: "/api/deals/d1/om",
+        job,
+        staleResults: ["challenges", "comps", "market", "verdict"],
+      }) as unknown as Props;
+    const html = render(stalled("overview"));
+    dumpView("deal-stalled-overview", html);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    // The stall banner, from the first paint, and no rail or "in progress".
+    expect(text).toContain("This screen stalled");
+    expect(text).toContain("Start it again");
+    expect(text).not.toMatch(/Step 3 of 6/);
+    expect(text).not.toMatch(/Screening in progress|Until the run in progress|run in progress replaces/);
+    expect(text).toContain("4 of these are from the previous screen — the latest run stopped making progress before reaching them. Start it again to bring them up to date.");
+    expect(html).toContain('title="The latest screen stopped making progress before it reached the verdict.');
+    // No section's dot pulses as running.
+    const tabs = html.slice(html.indexOf('aria-label="Deal sections"'), html.indexOf('id="deal-tabpanel"'));
+    expect(tabs).not.toContain("pulse-bar");
+    // The OM can be replaced during a stall — a deck that kills the process
+    // could otherwise only ever be started again.
+    const docs = render(stalled("documents"));
+    const replace = /<button type="button"([^>]*)>(?:(?!<\/button>)[\s\S])*Replace OM<\/button>/.exec(docs);
+    expect(replace?.[1]).toBeDefined();
+    expect(replace?.[1]).not.toContain('disabled=""');
+    // A stalled FIRST screen: its unread sections say it stopped, no skeleton.
+    const first = (tab: string, analysis: string | null = null): Props =>
+      ({
+        ...stalled(tab, analysis, { ...stalledJob, step: "extract", progress: 10 }),
+        results: { extraction: null, challenges: null, comps: null, reconciliation: null, market: null, verdict: null },
+        staleResults: [],
+        playground: null,
+      }) as unknown as Props;
+    for (const [tab, analysis] of [["financials", null], ["analyses", "challenger"]] as const) {
+      const t = textOf(render(first(tab, analysis)));
+      expect(t, `${tab}/${analysis}`).toContain("The last screen stopped before this step — the reason is at the top of the page.");
+      expect(t, `${tab}/${analysis}`).not.toMatch(/Run the screen/);
+    }
+    expect(textOf(render(first("overview")))).toContain("The screen stopped before its verdict");
+    // The same run, still writing progress, is in progress.
+    const live = textOf(render(stalled("overview", null, { ...stalledJob, ageMs: 30_000 })));
+    expect(live).toMatch(/Step 3 of 6/);
+    expect(live).not.toContain("This screen stalled");
+    const liveDocs = render(stalled("documents", null, { ...stalledJob, ageMs: 30_000 }));
+    expect(/<button type="button"([^>]*)>(?:(?!<\/button>)[\s\S])*Replace OM<\/button>/.exec(liveDocs)?.[1]).toContain('disabled=""');
   });
 
   it("a re-screen still running marks the results it has not reached, and says it is running", () => {

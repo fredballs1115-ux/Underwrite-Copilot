@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
 import { firstSentence } from "@/lib/first-sentence";
-import { screenedOn } from "@/lib/screen-run";
+import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import type {
   BrokerCompsResult,
@@ -67,10 +67,12 @@ export interface ShareViewProps {
   /** the link's expiry, ISO */
   expiresAt: string;
   /** the sender's latest screen has not rewritten the verdict: it failed
-   *  before reaching it, or is still running toward it (lib/screen-run) */
+   *  before reaching it, is still running toward it, or stopped making
+   *  progress on the way (lib/screen-run) */
   verdictStale: boolean;
-  /** why, when it is stale: a failed run, or a re-screen in progress */
-  staleWhy?: "failed" | "running";
+  /** why, when it is stale: a failed run, a re-screen in progress, or one
+   *  that stalled — never said to be running */
+  staleWhy?: BehindWhy;
   /** the comp and market reads the latest screen has not rewritten either —
    *  the previous screen's, beside this run's terms */
   staleReads?: ReadonlyArray<"comps" | "market">;
@@ -256,12 +258,14 @@ function splitOf(b: { lines: string[]; national?: number }, local: string, each:
 
 /** A read the sender's latest screen has not rewritten: the previous
  *  screen's, beside this run's terms, and said so. */
-function PreviousRead({ why }: { why: "failed" | "running" }) {
+function PreviousRead({ why }: { why: BehindWhy }) {
   return (
     <p className="mt-1 text-xs text-caution" data-qa="previous-read">
       {why === "running"
         ? "From the previous screen — the sender\u2019s re-screen has not reached it yet."
-        : "From the previous screen — the sender\u2019s latest run did not reach it."}
+        : why === "stalled"
+          ? "From the previous screen — the sender\u2019s latest run stopped before it."
+          : "From the previous screen — the sender\u2019s latest run did not reach it."}
     </p>
   );
 }
@@ -455,7 +459,9 @@ export function ShareView({
           <p className="mt-2 text-xs text-caution">
             {staleWhy === "running"
               ? "From the previous completed screen — the sender is re-screening this deal, and this call is replaced when the run reaches its verdict."
-              : "From the previous completed screen — the sender\u2019s latest run of this deal did not finish."}
+              : staleWhy === "stalled"
+                ? "From the previous completed screen — the sender\u2019s latest run of this deal stopped before it finished."
+                : "From the previous completed screen — the sender\u2019s latest run of this deal did not finish."}
           </p>
         )}
         {verdict.reason && (

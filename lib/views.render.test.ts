@@ -1405,6 +1405,18 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect((html.match(/data-qa="call-behind"/g) ?? []).length).toBe(4);
     // A deal nothing has screened says so, never "Screening".
     expect(text).toContain("Not screened");
+    // A re-screen that stopped making progress is Stalled, the pipeline
+    // card's word, never "Re-screening…" (research pass 30), and not crowned.
+    const stalledHtml = renderToStaticMarkup(
+      React.createElement(CompareTable, { cols: [{ ...COLS[0], irr: 24.0, em: 2.9, behind: "stalled" }, COLS[1]] }),
+    );
+    expect(a11yIssues(stalledHtml), "a11y compare stalled").toEqual([]);
+    const stalledText = visibleText(stalledHtml);
+    expect(gluedWords(stalledText)).toEqual([]);
+    expect((stalledText.match(/\bStalled\b/g) ?? []).length).toBe(2);
+    expect(stalledText).not.toContain("Re-screening");
+    expect(stalledHtml).toContain("The latest screen stopped making progress before its verdict — the previous call was");
+    expect((stalledHtml.split("<li ")[1].match(/>best</g) ?? []).length).toBe(0);
     // "Best" goes to the conversion alone, the one call no run is replacing:
     // its IRR and its multiple, in its phone card and in the table's row.
     const cards = html.split("<li ").slice(1);
@@ -2670,6 +2682,30 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(rs).toContain("From the previous screen — the sender’s re-screen has not reached it yet.");
     // The call is dated.
     expect(rs).toMatch(/First-pass verdict · Sep 12, 2026/);
+
+    // The sender's re-screen stopped making progress (research pass 30):
+    // the partner is never told the sender is re-screening a dead run.
+    const stalledShare = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: conversion.dealName ?? "",
+        assetClass: "multifamily",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: true,
+        staleWhy: "stalled",
+        staleReads: ["market"],
+        picture: null,
+        extraction: conversion,
+        comps: { summary: "Three sales support the basis.", saleComps: [], leaseComps: [], redFlags: [] } as unknown as BrokerCompsResult,
+        market: { summary: "Rents are firm.", checks: [] } as unknown as MarketResult,
+        verdict: { ...verdict, generatedAt: "2026-09-12T14:03:00.000Z" },
+      }),
+    );
+    expect(a11yIssues(stalledShare), "a11y share-stalled").toEqual([]);
+    const st = visibleText(stalledShare);
+    expect(gluedWords(st)).toEqual([]);
+    expect(st).toContain("From the previous completed screen — the sender’s latest run of this deal stopped before it finished.");
+    expect(st).toContain("From the previous screen — the sender’s latest run stopped before it.");
+    expect(st).not.toMatch(/re-screening|re-screen has not reached/);
 
     const expired = renderToStaticMarkup(
       React.createElement(Expired, { reason: "The sender revoked this link." }),
