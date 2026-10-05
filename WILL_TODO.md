@@ -376,8 +376,9 @@ yours:
    balance, "per unit" times the count, "per acre" times the acres, each
    marked derived. Today such a price is refused and the deal reads as
    unpriced.
-6. **An NOI stated a month at a time**: multiply by twelve with the words
-   kept, or refuse it.
+6. ~~**An NOI stated a month at a time**~~ — done (research pass 40): the
+   model runs twelve times the month the memorandum states, and every note
+   says the month (`lib/stated-period.ts`).
 7. **Which end of a stated cap range the exit takes** (the low end today,
    the flattering one for an exit).
 8. **A leasehold or master lease ending inside the hold**: run the model

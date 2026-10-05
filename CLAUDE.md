@@ -1587,9 +1587,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   ledger is open on the async context, `runAnalysis` writes the summary to
   `analysis_jobs.usage` (migration 0035) and one log line, Ask logs its
   own; the list prices live in `lib/anthropic/models.ts` (`PRICES`, by id
-  prefix) beside the model levers, whose comment says the one thing to
-  know: the prompt cache is per model, so the OM-reading steps move
-  together or not at all. The operator's picture is the pure
+  prefix) beside the model levers, whose comment says what is and is not
+  known: the cache is per model, and whether one step reads another's
+  cache of the OM is not established (each step sends its own
+  structured-output format, which the API turns into a system prompt of
+  its own), so a screen's cost is read off its ledger, never assumed
+  (research pass 41). The operator's picture is the pure
   `app/(app)/data-health/cost-card.tsx`, rendered on fixtures in
   `lib/cost-card.render.test.ts`. **Beside it, what each feed last
   wrote** (#383): `lib/feed-health.ts` (pure) judges every pull on ITS
@@ -5982,7 +5985,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 - Claude PDF facts to design around: the 1M-context models (Opus 4.8, Sonnet 4.6)
   read PDFs up to ~600 pages / 32MB in one request; enable Citations for
   page-level "verify against source"; cache the OM across the pipeline steps to
-  keep cost down. These models use adaptive thinking (no `budget_tokens`).
+  keep cost down. Thinking is off as the screen's calls are made (none
+  sends a `thinking` field), and `MAX_TOKENS` is sized for the answers
+  alone; a newer model that thinks by default needs its caps reviewed
+  first (`lib/anthropic/models.ts`).
 - The broker-comp scrutiny step reads comps OUT of the OM itself — no external
   comps data source (deliberate: avoids data-licensing constraints). The
   SEPARATE public-records pull (`lib/public-comps/`, `/comps`) has its own
