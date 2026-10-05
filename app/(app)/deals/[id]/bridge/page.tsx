@@ -17,8 +17,13 @@ import {
 import { BridgeView, type VersionOption } from "./bridge-view";
 import { saveScenarioVersion, deleteDealVersion } from "./actions";
 import { DealCrumb } from "../deal-crumb";
+import { dealTitle } from "@/lib/deal-title";
 
-export const metadata: Metadata = { title: "Assumption bridge" };
+/** "Assumption bridge — <the deal's name>" (lib/deal-title). */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return dealTitle(id, "Assumption bridge");
+}
 
 const pct1 = (v: number | null | undefined) =>
   v == null ? "—" : `${(v * 100).toFixed(1)}%`;

@@ -81,6 +81,8 @@ import { PublicRecordCard } from "./public-record-card";
 import { buildingSfRow, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import type { Metadata } from "next";
+import { dealTitle } from "@/lib/deal-title";
 import { omLinkFor } from "@/lib/om-link";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { isPro } from "@/lib/billing";
@@ -202,6 +204,12 @@ function jobWithAge<T extends { updated_at?: string | null; status: string; step
   row: T | null,
 ): (T & { ageMs: number | null }) | null {
   return row ? { ...row, ageMs: jobAgeMs(row, Date.now()) } : null;
+}
+
+/** The tab says the deal (lib/deal-title), never the homepage's tagline. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return dealTitle(id);
 }
 
 export default async function DealPage({

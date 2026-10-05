@@ -36,8 +36,13 @@ import {
   updateValuation,
 } from "./actions";
 import { DealCrumb } from "../deal-crumb";
+import { dealTitle } from "@/lib/deal-title";
 
-export const metadata: Metadata = { title: "Valuations" };
+/** "Valuations — <the deal's name>" (lib/deal-title). */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return dealTitle(id, "Valuations");
+}
 
 const ERRORS: Record<string, string> = {
   file: "Pick a BOV file to upload.",
