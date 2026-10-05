@@ -224,8 +224,13 @@ export function modelReturnsRead(
               ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
               : interestOf(ex).entityLoan != null
                 ? isWholeShare(interestOf(ex).sharePct)
-                  ? // All of the entity's interests (a stated 100%, research pass 28).
-                    "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                  ? // All of the entity's interests (a stated 100%, research
+                    // pass 28) — or all the tenant-in-common interests, held
+                    // by no entity, whose loan is the property's (the lead's
+                    // item 16).
+                    isTenancyInCommon(ex)
+                    ? "This price buys all the tenant-in-common interests, and beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                    : "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
                   : isTenancyInCommon(ex)
                     ? // An undivided interest held as a tenant in common: its
                       // loan is the property's (research pass 37).

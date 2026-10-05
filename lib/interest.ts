@@ -1532,8 +1532,16 @@ export function interestShortLine(r: InterestRead): string {
             ? `An undivided ${shareText(r.sharePct)} interest in the property, held as a tenant in common`
             : "An undivided interest in the property, held as a tenant in common";
         if (r.sharePct == null) return `${head}, its percentage not stated`;
+        // All the tenant-in-common interests are together the whole
+        // property, never "an undivided 100% interest" (the lead's item 16).
+        if (isWholeShare(r.sharePct)) {
+          const all = "All the tenant-in-common interests in the property";
+          if (r.askingPrice == null) return all;
+          return r.entityLoan != null
+            ? `${all} — ${money(r.askingPrice)} for the equity's whole; the stated ${money(r.entityLoan)} loan on the property sits on top of it`
+            : `${all} — ${money(r.askingPrice)} for the whole, nothing grossed up`;
+        }
         if (r.askingPrice == null || r.impliedWhole == null) return head;
-        if (isWholeShare(r.sharePct)) return `${head} — ${money(r.askingPrice)} for the whole, nothing grossed up`;
         return r.entityLoan != null
           ? `${head} — ${money(r.askingPrice)} for the interest is ${money(r.impliedWhole)} for the equity's whole; the stated ${money(r.entityLoan)} loan on the property sits on top of it`
           : `${head} — ${money(r.askingPrice)} for the interest is ${money(r.impliedWhole)} for the whole`;

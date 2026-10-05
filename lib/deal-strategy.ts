@@ -1041,7 +1041,8 @@ export interface PlanSummary {
     | "Land cost"
     | "Whole price, the share grossed up"
     | "Equity's whole, the share grossed up"
-    | "Equity's whole, all the entity's interests";
+    | "Equity's whole, all the entity's interests"
+    | "Equity's whole, all the tenant-in-common interests";
   /** why a price the OM states is not the project's, where it is not — a
    *  note's, the land's under a ground lease, a share with no stated
    *  percentage (#415); null otherwise, and the price then reads "not
@@ -1243,7 +1244,11 @@ export function planSummary(
       : interest.kind === "partial_interest" && shown != null
         ? entityLoan != null
           ? allInterests
-            ? "Equity's whole, all the entity's interests"
+            ? // All the tenant-in-common interests are together the whole
+              // property, held by no entity (the lead's item 16).
+              isTenancyInCommon(extraction)
+              ? "Equity's whole, all the tenant-in-common interests"
+              : "Equity's whole, all the entity's interests"
             : "Equity's whole, the share grossed up"
           : allInterests
             ? "Price"
@@ -1490,8 +1495,11 @@ export function assessPlausibility(
   // Beside a stated total project cost above it, a share's grossed-up price
   // is the equity's whole too (research pass 37).
   const projectCost = shareProjectCostOf(extraction, price);
+  // All the tenant-in-common interests are together the whole property,
+  // held by no entity (the lead's item 16, beside audit C3b LOW-1).
+  const allWhat = isTenancyInCommon(extraction) ? "all the tenant-in-common interests" : "all the entity's interests";
   const priceWord = allInterests
-    ? "price for all the entity's interests"
+    ? `price for ${allWhat}`
     : interest.sharePct != null
       ? entityLoan != null || projectCost != null
         ? "whole equity the share implies"
@@ -1500,7 +1508,7 @@ export function assessPlausibility(
   const wholeNote =
     entityLoan != null
       ? allInterests
-        ? ` The ${money(price)} for all the entity's interests is the equity's whole, not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
+        ? ` The ${money(price)} for ${allWhat} is the equity's whole, not the asset's: ${entityLoanWords(extraction, money(entityLoan))} sits on top of it.`
         : ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the asset's: ${entityLoanWords(extraction, money(entityLoan))} sits on top of it.`
       : projectCost != null
         ? ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the project's: the memorandum's stated ${money(projectCost)} total project cost sits above it.`
@@ -1764,6 +1772,8 @@ function planLine(plan: PlanSummary, contextSays = false, extraction: Extraction
             plan.equityWhole != null
               ? plan.priceLabel === "Equity's whole, all the entity's interests"
                 ? "the price for all the entity's interests is the equity's whole, not the building's"
+                : plan.priceLabel === "Equity's whole, all the tenant-in-common interests"
+                ? "the price for all the tenant-in-common interests is the equity's whole, not the building's"
                 : "the share's price grossed up is the equity's whole, not the building's"
               : "the OM states no price"
           }, so the acquisition inside it is not separable)`
