@@ -5,7 +5,7 @@
 // mandate's bound, the deal's figure, and the call in plain English.
 // (Universal module: used by server pages and the background pipeline.)
 
-import { compactUsd, scaledText } from "@/lib/money";
+import { SCALE_WORDS, compactUsd, scaleOf, scaledText } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { EXCHANGE_FILERS, exchangeDay, type ExchangeBlock } from "@/lib/exchange-window";
@@ -553,14 +553,17 @@ export function parseMoney(raw: string): number | null {
     s = s.replace(/^[-−–]\s*/, "");
     sign = -1;
   }
-  s = s.replace(/[,$\s]/g, "").toLowerCase();
-  const m = s.match(/^\$?(\d+(?:\.\d+)?)(mm|m|k|b)?/);
+  // A scale is read only where it ends its word (lib/money's one table and
+  // its `\b`, as parseUsd reads it): the spaces stay in, so the first
+  // letter of the next word is never a scale. With every space dropped,
+  // "$450,000 more" read as 450,000 million and "$600,000 base rent" as
+  // 600,000 billion.
+  s = s.replace(/[,$]/g, "").toLowerCase();
+  const m = s.match(new RegExp(String.raw`^\s*(\d+(?:\.\d+)?)\s*(${SCALE_WORDS})?\b`));
   if (!m) return null;
   const n = Number(m[1]);
   if (!Number.isFinite(n)) return null;
-  const suffix = m[2];
-  const mult = suffix === "b" ? 1e9 : suffix === "m" || suffix === "mm" ? 1e6 : suffix === "k" ? 1e3 : 1;
-  return sign * n * mult;
+  return sign * n * scaleOf(m[2]);
 }
 
 // ── A price stated as a range (#466) ─────────────────────────────────────

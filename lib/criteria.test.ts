@@ -1120,6 +1120,30 @@ describe("the fifth review's price, per-unit, cap, size, occupancy and money cas
     expect(parseMoney("Call for offers")).toBeNull();
     expect(parseMoney("$0")).toBe(0);
   });
+
+  it("parseMoney reads a scale only where it ends its word, never the next word's first letter", () => {
+    // Every space had been dropped before the scale was read, so the next
+    // word's first letter multiplied the figure.
+    expect(parseMoney("$450,000 more or less")).toBe(450_000);
+    expect(parseMoney("$600,000 base rent")).toBe(600_000);
+    expect(parseMoney("$1,200,000 before reserves")).toBe(1_200_000);
+    expect(parseMoney("$91,667 monthly")).toBe(91_667);
+    expect(parseMoney("$2,500,000 budgeted")).toBe(2_500_000);
+    expect(parseMoney("500 keys")).toBe(500);
+    expect(parseMoney("1,200 beds")).toBe(1_200);
+    // The shorthand an OM writes still reads, spaced or not, with words after.
+    expect(parseMoney("$3.2M total")).toBe(3_200_000);
+    expect(parseMoney("$450K per year")).toBe(450_000);
+    expect(parseMoney("$68.5 million")).toBe(68_500_000);
+    expect(parseMoney("63 million")).toBe(63_000_000);
+    expect(parseMoney("1.2mm")).toBe(1_200_000);
+    expect(parseMoney("$2bn")).toBe(2_000_000_000);
+    expect(parseMoney("$1.5 billion")).toBe(1_500_000_000);
+    expect(parseMoney("$300 thousand")).toBe(300_000);
+    expect(parseMoney("$1.5M/yr")).toBe(1_500_000);
+    expect(parseMoney("$45k-$50k")).toBe(45_000);
+    expect(parseMoney("$ 42,000,000")).toBe(42_000_000);
+  });
 });
 
 // The sixth review read the reader layer again after the fifth's fixes and

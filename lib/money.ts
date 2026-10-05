@@ -44,6 +44,14 @@ const WORD_RANGE = /^\s*(?:to|through)\b\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(k|thou
 
 const scaled = (digits: string, scale: string | undefined) => Number(digits) * (scale ? SCALE[scale.toLowerCase()] ?? 1 : 1);
 
+/** The scale words, longest first, as the readers' alternation spells them. */
+export const SCALE_WORDS = "k|thousand|mm|million|m|bn|billion|b";
+
+/** What a scale word multiplies by; 1 for none or a word not in the table. */
+export function scaleOf(word: string | undefined): number {
+  return word ? (SCALE[word.toLowerCase()] ?? 1) : 1;
+}
+
 /**
  * Parse a human dollar string into whole dollars. Understands the notations
  * analysts actually type: "68000000", "$68,000,000", "$68.5M", "63 million",
