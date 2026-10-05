@@ -11,6 +11,7 @@ import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
@@ -266,6 +267,11 @@ export async function GET(
         // bid are left out over the leasehold card's own sentence — the
         // deal page's read of the same model (lib/compare-interest).
         interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs)),
+        // And where the plausibility check finds the figures do not tie, on
+        // the deal page's own read (its kind with the first signal): the
+        // page withholds its tiles, and the report its grids (research pass
+        // 38).
+        findings: assessPlausibility(extraction, inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null)),
       });
       // The plan page for the kind the deal page reads — the extraction and
       // the first signal — the same read buildReportData gates the IRR page on.

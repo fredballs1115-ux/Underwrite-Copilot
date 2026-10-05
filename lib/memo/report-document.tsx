@@ -1264,7 +1264,10 @@ export function buildReportData(
   // screening model was built", which is a report whose route built none
   // (the batch audit: the page said so over the model's reads).
   const planLeftOut = planDeal && !plan && sensitivity != null ? planLeftOutWhy(extraction, firstSignalOf(deal)) : null;
-  const readsWithheld = !!withheld || !!planLeftOut;
+  // A finding against the returns leaves the grids and the max bid out and
+  // the model's reads of the terms in, as the deal page prints them beside
+  // its withheld tiles (`readsStand`, research pass 38).
+  const readsWithheld = (!!withheld && !sensitivity?.readsStand) || !!planLeftOut;
   const modelRead = <T,>(v: T | null | undefined): T | null => (readsWithheld ? null : (v ?? null));
   // The grids the report prints, and the page they land on where the memo
   // and the call each take one: the memo's target-return chip names it.
@@ -2379,9 +2382,14 @@ export function ReportDocument({
         <PageChrome title="Sensitivity analysis" count="left out" dealName={dealName} branding={memo.branding}>
           <Text style={{ fontSize: 9, color: C.ink, marginBottom: 6 }}>{str(input.withheld)}</Text>
           {/* The terms the memorandum states, each its line alone: the
-              model's reads are left out with its grids (#183). */}
+              model's reads are left out with its grids (#183) — but for a
+              finding against the returns alone, where they stand beside it
+              as on the deal page (research pass 38), and these print. */}
           {plan ? null : caveats}
           <AssumptionsBlock read={modelVsMarket} />
+          <AssumableBlock view={input.assumable} />
+          <AssumableBlock view={input.sellerNote} />
+          <LeaseholdBlock view={input.leasehold} />
         </PageChrome>
       )}
 

@@ -369,9 +369,15 @@ export interface SensitivityData {
    *  one is */
   maxBidWithheld?: string | null;
   /** why the report leaves the model's returns out, or null where it may
-   *  print them (`placeholderReturnsLine`, else `leaseReturnsLine`); null
-   *  where no sources or interest read were given */
+   *  print them (`placeholderReturnsLine`, else `leaseReturnsLine`, else
+   *  `misreadReturnsLine`); null where no sources, interest read or
+   *  findings were given */
   withheld?: string | null;
+  /** `withheld` is a finding against the returns (`misreadReturnsLine`):
+   *  the grids and the max bid are left out, while the model's reads of the
+   *  memorandum's terms print, as the deal page prints them beside its
+   *  withheld tiles; absent where `withheld` leaves those out too */
+  readsStand?: boolean;
   /** what the modelled price is — the ask, a share grossed up to the whole,
    *  an auction's floor, NOI over the going-in cap — as the derived model
    *  marks it; null where no sources were given */
@@ -504,6 +510,11 @@ export interface SensitivityOptions {
    *  bid are left out with the leasehold card's own sentence, as the deal
    *  page's playground withholds its tiles (research pass 38) */
   interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null;
+  /** the plausibility check's findings (lib/deal-strategy
+   *  `assessPlausibility`, the deal page's own read): where one stands
+   *  against the returns (`findingWithholdsReturns`), the grids and the max
+   *  bid are left out under the playground's own reason (research pass 38) */
+  findings?: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null;
 }
 
 /**
@@ -765,6 +776,19 @@ export function misreadPageLine(
   return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${f.title}, and returns built on figures that do not tie would be a misread's.`;
 }
 
+/**
+ * The report's own words for the playground's rule (`misreadPageLine`):
+ * while a finding stands against the returns, the IRR grids and the max bid
+ * are left out with the finding's claim — the page withheld its tiles beside
+ * grids the report still printed (research pass 38). Null where none stands.
+ */
+export function misreadReturnsLine(
+  findings: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null | undefined,
+): string | null {
+  const f = (findings ?? []).find(findingWithholdsReturns);
+  return f ? `The IRR grids and the max bid are left out: ${f.title}, and returns built on figures that do not tie would be a misread's.` : null;
+}
+
 /** Everything the report's sensitivity page renders, in one pure build. */
 export function buildSensitivityData(
   inputs: UnderwriteInputs,
@@ -789,6 +813,8 @@ export function buildSensitivityData(
   // deal page withholds its own, and the report says why in its place.
   const vacant = nearlyVacantReason(inputs, opts.occupancyPct);
   const solved = vacant ? null : solveMaxBid(inputs, maxBidFloors.floors, levers);
+  const firstReason = placeholderReturnsLine(inputs, opts.sources) ?? leaseReturnsLine(opts.interest);
+  const misread = misreadReturnsLine(opts.findings);
   return {
     grid,
     priceGrid,
@@ -815,8 +841,11 @@ export function buildSensitivityData(
     noBid: box && solved && solved.price == null ? noBidRead(inputs, box, levers) : null,
     maxBidWithheld: vacant,
     // A placeholder's reason first; else a leasehold whose lease ends inside
-    // the hold, said in the leasehold card's own sentence.
-    withheld: placeholderReturnsLine(inputs, opts.sources) ?? leaseReturnsLine(opts.interest),
+    // the hold, said in the leasehold card's own sentence; else a finding
+    // against the returns, the deal page's own rule — the grids had printed
+    // beside the page's withheld tiles (research pass 38).
+    withheld: firstReason ?? misread,
+    ...(firstReason == null && misread != null ? { readsStand: true } : {}),
     priceSource: opts.sources?.purchasePrice ?? null,
     baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
   };
