@@ -178,6 +178,23 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
     // The class's own words still name it on a class the site reads otherwise.
     const station = deal({ assetClass: "Retail (convenience store / gas station)" }, [row("EBITDA", "$410,000")]);
     expect(operatingBusinessOf(station)).toBe("fuel");
+    // A convenience store alone is a store, never a fuel station, and is
+    // asked about no tanks it does not have (the pre-merge audit, C1 L13).
+    const store = deal({ assetClass: "Convenience Store", strategy: { kind: "stabilized", summary: "Sale of the going concern: the store business and its real estate", capitalBudget: "", timeline: "" } }, [
+      row("EBITDA (T-12)", "$310,000"),
+    ]);
+    expect(operatingBusinessOf(store)).toBe("convenience_store");
+    const storeRead = readGoingConcern(store, TODAY)!;
+    expect(storeRead.headline).toMatch(/^The memorandum sells a convenience store with its real estate/);
+    expect(storeRead.headline).not.toContain("fuel");
+    expect(goingConcernShortLine(storeRead)).toMatch(/^Convenience store: sold with the business/);
+    const storeNote = goingConcernNote(storeRead);
+    expect(storeNote).toContain("(d) THE SITE — what the seller's Phase I found on ground an operation has run on, and a storage tank only where the memorandum or the Phase I names one;");
+    expect(storeNote).not.toContain("THE TANKS AND THE SITE");
+    expect(operatingBusinessOf(deal({ assetClass: "C-store" }, []))).toBe("convenience_store");
+    // Fuel's own words still read fuel, the store beside them or not.
+    for (const words of ["Gas Station / Convenience Store", "Truck stop", "Filling station", "Service station and c-store"])
+      expect(operatingBusinessOf(deal({ assetClass: words }, [])), words).toBe("fuel");
     // And a single tenant's name names it where the class says nothing.
     const wash = deal({ assetClass: "Net lease", singleTenant: { ...WASH.singleTenant!, tenant: "Express Car Wash LLC" } }, [row("Annual base rent", "$276,000")]);
     expect(operatingBusinessOf(wash)).toBe("car_wash");

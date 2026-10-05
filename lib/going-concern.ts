@@ -58,6 +58,7 @@ const NOT_STATED = /^(?:n\/?a|not\s+(?:applicable|stated|provided|available|disc
 /** The businesses this reader names, each by the words a memorandum uses. */
 export type OperatingBusiness =
   | "fuel"
+  | "convenience_store"
   | "car_wash"
   | "marina"
   | "golf"
@@ -69,10 +70,15 @@ export type OperatingBusiness =
   | "senior_care";
 
 const BUSINESS_WORDS: ReadonlyArray<readonly [OperatingBusiness, RegExp]> = [
+  // Fuel only by fuel's own words — a gas, fuel, filling or service station,
+  // a truck stop, a travel centre — never a convenience store alone, which
+  // is a business of its own with no pumps or tanks (the pre-merge audit:
+  // "Convenience Store" was named "a fuel station and its store").
   [
     "fuel",
-    /\b(?:gas(?:oline)?\s+stations?|fuel(?:ing)?\s+(?:stations?|centers?|plazas?)|filling\s+stations?|service\s+stations?|convenience\s+stores?|c-stores?|truck\s+stops?|travel\s+(?:centers?|plazas?))\b/i,
+    /\b(?:gas(?:oline)?\s+stations?|fuel(?:ing)?\s+(?:stations?|centers?|plazas?)|filling\s+stations?|service\s+stations?|truck\s+stops?|travel\s+(?:centers?|plazas?))\b/i,
   ],
+  ["convenience_store", /\bconvenience\s+stores?\b|\bc-stores?\b/i],
   ["car_wash", /\bcar\s*wash(?:es)?\b|\bexpress\s+(?:tunnel\s+)?wash\b/i],
   ["marina", /\bmarinas?\b|\bboat\s*(?:yards?|storage)\b|\bdry[\s-]stack\b/i],
   ["golf", /\bgolf\s+(?:courses?|clubs?|links)\b|\bcountry\s+clubs?\b/i],
@@ -89,6 +95,7 @@ const BUSINESS_WORDS: ReadonlyArray<readonly [OperatingBusiness, RegExp]> = [
 
 const BUSINESS_NAME: Record<OperatingBusiness, string> = {
   fuel: "a fuel station and its store",
+  convenience_store: "a convenience store",
   car_wash: "a car wash",
   marina: "a marina",
   golf: "a golf course",
@@ -386,8 +393,15 @@ export function goingConcernContextLine(r: GoingConcernRead): string {
   return `Operating business: ${r.headline}`;
 }
 
-const TRAPS =
-  "OPERATING-BUSINESS TRAPS, checked by name where the OM gives the inputs: (a) THE ALLOCATION — the real estate, the fixtures and the business, as stated or not at all; (b) THE OPERATOR — whose earnings these are, and what the property is worth with another operator or none; (c) THE CONTRACTS — a fuel supply agreement and its branding, a dealer's rights on a leased station, a submerged-land lease and its permits, a franchise, a licence that does not transfer; (d) THE TANKS AND THE SITE — the tanks' age, compliance and release history, and a state fund's coverage; (e) THE COVERAGE — on a lease, the unit's EBITDAR over the rent and its trend, and the tenant's reporting; (f) THE EXIT — a buyer of a business pays a multiple of its earnings and a buyer of real estate a cap on its rent: which one is the exit.";
+// The site's trap: a fuel station's tanks by name; on any other business
+// the site, and a tank only where one is named (the pre-merge audit: a
+// convenience store with no pumps was asked about its tanks).
+const SITE_TRAP_FUEL = "(d) THE TANKS AND THE SITE — the tanks' age, compliance and release history, and a state fund's coverage;";
+const SITE_TRAP = "(d) THE SITE — what the seller's Phase I found on ground an operation has run on, and a storage tank only where the memorandum or the Phase I names one;";
+const trapsFor = (business: OperatingBusiness | null) =>
+  `OPERATING-BUSINESS TRAPS, checked by name where the OM gives the inputs: (a) THE ALLOCATION — the real estate, the fixtures and the business, as stated or not at all; (b) THE OPERATOR — whose earnings these are, and what the property is worth with another operator or none; (c) THE CONTRACTS — a fuel supply agreement and its branding, a dealer's rights on a leased station, a submerged-land lease and its permits, a franchise, a licence that does not transfer; ${
+    business === "fuel" ? SITE_TRAP_FUEL : SITE_TRAP
+  } (e) THE COVERAGE — on a lease, the unit's EBITDAR over the rent and its trend, and the tenant's reporting; (f) THE EXIT — a buyer of a business pays a multiple of its earnings and a buyer of real estate a cap on its rent: which one is the exit.`;
 
 // A care operation's own questions, after the six (round 6): each a
 // question to ask, never a figure or a claim of law.
@@ -398,7 +412,7 @@ const CARE_TRAPS =
  *  operation's own after the six. */
 export function goingConcernNote(r: GoingConcernRead): string {
   const care = r.business === "snf" || r.business === "senior_care";
-  return `OPERATING BUSINESS AS STATED: ${r.headline} ${TRAPS}${care ? ` ${CARE_TRAPS}` : ""}`;
+  return `OPERATING BUSINESS AS STATED: ${r.headline} ${trapsFor(r.business)}${care ? ` ${CARE_TRAPS}` : ""}`;
 }
 
 /** The rows a key-terms block leads with, each only where stated: the
