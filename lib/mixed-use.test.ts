@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult, ExtractedTenant } from "@/lib/anthropic/types";
 import {
+  COMMERCIAL_INCOME_ROW,
+  COMMERCIAL_OCCUPANCY_ROW,
+  COMMERCIAL_SF_ROW,
+  RESIDENTIAL_INCOME_ROW,
   annualIncomeOf,
   mixedUseContextLine,
   mixedUseModelLine,
@@ -11,6 +15,7 @@ import {
   readMixedUse,
 } from "./mixed-use";
 import { gluedWords } from "./render-lint";
+import { extractionInstruction } from "./anthropic/prompts";
 
 const TODAY = new Date("2026-10-05T12:00:00Z");
 const row = (label: string, value: string, page = "p. 9") => ({ label, value, page, flagged: false });
@@ -152,5 +157,28 @@ describe("a mixed-use building's two incomes, read as stated (pass 28, round 7)"
     const r = readMixedUse(MIXED, TODAY)!;
     for (const text of [r.headline, mixedUseShortLine(r), mixedUseContextLine(r), mixedUseModelLine(r, { exitCapPct: 0.056, rentGrowthPct: 0.03 }) ?? ""])
       expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the prompt asks for what the reader reads", () => {
+  it("names each mixed-use row by a label the reader's own pattern takes, and never asks for a split", () => {
+    const prompt = extractionInstruction("mixed_use");
+    const labels: [string, RegExp][] = [
+      ["Residential income", RESIDENTIAL_INCOME_ROW],
+      ["Commercial income", COMMERCIAL_INCOME_ROW],
+      ["Commercial SF", COMMERCIAL_SF_ROW],
+      ["Commercial occupancy", COMMERCIAL_OCCUPANCY_ROW],
+    ];
+    for (const [label, re] of labels) {
+      expect(prompt).toContain(`"${label}"`);
+      expect(re.test(label), label).toBe(true);
+    }
+    expect(prompt).toContain("Never split a total into the two halves yourself and never compute a share");
+    // Each label, as the extraction writes it, is read.
+    const r = readMixedUse(
+      deal([row("Residential income", "$1,520,000"), row("Commercial income", "$610,000"), row("Commercial SF", "9,500 SF"), row("Commercial occupancy", "80%")], "Mixed-Use"),
+      TODAY,
+    )!;
+    expect([r.residentialIncome, r.commercialIncome, r.commercialSf, r.commercialOccupancyPct]).toEqual([1_520_000, 610_000, 9_500, 80]);
   });
 });
