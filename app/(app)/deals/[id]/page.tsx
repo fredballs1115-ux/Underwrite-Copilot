@@ -93,6 +93,7 @@ import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { jobAgeMs, storedPreviousResults, verdictBehind } from "@/lib/screen-run";
 import { documentKindWarning } from "@/lib/document-kind";
+import { sameMemorandum, sameMemorandumTail, type SameMemorandum, type TwinDeal } from "@/lib/same-memorandum";
 import { readingMemorandum } from "@/lib/screen-reading";
 import {
   SCREEN_DURATION_SAMPLE,
@@ -378,6 +379,26 @@ export default async function DealPage({
     : Promise.resolve(null);
 
   const documents = (docsData ?? []) as DealDocument[];
+
+  // The same memorandum, byte for byte, on an EARLIER deal the reader can see
+  // (lib/same-memorandum): the fingerprint every screen stores with its
+  // extraction, read once this deal's own screen has stored one. Said on the
+  // newer deal with a link; never a reason to refuse anything. Started now,
+  // awaited where the page is drawn.
+  const fingerprint =
+    deal.om_storage_path && !(deal as { is_sample?: boolean }).is_sample ? (extraction?.omFingerprint ?? null) : null;
+  const twinRead: Promise<SameMemorandum | null> = fingerprint
+    ? (async () => {
+        let q = supabase
+          .from("deals")
+          .select("id, name, created_at")
+          .neq("id", id)
+          .eq("extraction->>omFingerprint", fingerprint);
+        if (deal.created_at) q = q.lt("created_at", deal.created_at);
+        const { data } = await q.order("created_at", { ascending: true }).limit(6);
+        return sameMemorandum((data ?? []) as TwinDeal[]);
+      })().catch(() => null)
+    : Promise.resolve(null);
 
   const jobRow = jobData as {
     status: string;
@@ -1066,6 +1087,7 @@ export default async function DealPage({
   const floodLegendEntries = await floodLegendRead;
   const marketMemory = await memoryRead;
   const typicalScreen = await typicalScreenRead;
+  const sameFile = await twinRead;
 
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
@@ -1113,6 +1135,17 @@ export default async function DealPage({
       {documentKindNotice && (
         <p role="status" data-qa="document-kind" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
           {documentKindNotice}
+        </p>
+      )}
+
+      {/* The same file already on an earlier deal (lib/same-memorandum). */}
+      {sameFile && (
+        <p role="status" data-qa="same-memorandum" className="rounded-lg bg-brand/5 px-3 py-2 text-sm">
+          {"This same memorandum, byte for byte, is already on "}
+          <Link href={`/deals/${sameFile.id}`} className="font-medium text-brand hover:text-brand-strong">
+            {sameFile.name}
+          </Link>
+          {sameMemorandumTail(sameFile)}
         </p>
       )}
 
