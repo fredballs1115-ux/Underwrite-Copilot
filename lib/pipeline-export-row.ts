@@ -5,7 +5,7 @@
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
-import { capSlotWithheld } from "@/lib/compare-interest";
+import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
@@ -62,8 +62,10 @@ export interface ExportRowContext {
   /** the teammate who added the deal, where it is not the reader's own */
   addedBy: string | null;
   /** the day the rows are read on, an ISO day — the route's own UTC day:
-   *  it decides the rent allowance in force (lib/rent-regulation) and the
-   *  clock to a forward purchase's delivery (lib/forward-purchase) */
+   *  it decides the rent allowance in force (lib/rent-regulation), the
+   *  clock to a forward purchase's delivery (lib/forward-purchase) and every
+   *  other dated cell — what the price buys and a leasehold's years left, a
+   *  note's yield to its maturity, a lease's or an abatement's years left */
   today: string;
   /** the moment the rows are read, in ms — a run that stopped making
    *  progress by then is stalled, never "Re-screening" (lib/screen-run
@@ -75,6 +77,10 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
   const extraction = d.extraction as ExtractionResult | null;
   const metrics = extraction?.metrics ?? [];
   const signal = (d.first_signal as FirstSignal | null | undefined) ?? null;
+  // The route's day, which every dated cell is read on — the interest's
+  // tag, a lease's years left, a note's months to maturity — as the pipeline
+  // card reads them on the reader's (the tags had read the clock).
+  const asOf = new Date(`${ctx.today}T12:00:00Z`);
   // The deal's kind first, read as the pipeline card and the deal page read
   // it: the extraction and the first signal. A plan deal (value-add,
   // lease-up, conversion, development) has no going-in cap — its stabilized
@@ -105,17 +111,17 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     dealType: strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction),
     planDeal: plan != null,
     price: findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? null,
-    interest: interestTag(extraction),
+    interest: interestTag(extraction, asOf),
     debt: assumableTag(extraction),
     affordable: affordableTag(extraction),
-    tenancy: singleTenantTag(extraction),
-    hotel: hotelTag(extraction),
-    sale: saleTag(extraction),
-    roster: rosterTag(extraction),
+    tenancy: singleTenantTag(extraction, asOf),
+    hotel: hotelTag(extraction, asOf),
+    sale: saleTag(extraction, asOf),
+    roster: rosterTag(extraction, asOf),
     valueAdd: valueAddTag(extraction),
-    abatement: taxAbatementTag(extraction),
+    abatement: taxAbatementTag(extraction, asOf),
     sellerNote: sellerFinancingTag(extraction),
-    reports: siteReportsTag(extraction),
+    reports: siteReportsTag(extraction, asOf),
     student: studentHousingTag(extraction),
     mh: manufacturedHousingTag(extraction),
     storage: selfStorageTag(extraction),
@@ -135,17 +141,24 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     ),
     // A forward purchase (lib/forward-purchase), read on the route's day as
     // the pipeline card reads it on the reader's.
-    forward: forwardTag(readForwardPurchase(extraction, new Date(`${ctx.today}T12:00:00Z`), strategy)),
-    mixedUse: mixedUseTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
-    goingConcern: goingConcernTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
-    condo: condoTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
-    sandwich: sandwichTag(extraction, new Date(`${ctx.today}T12:00:00Z`)),
+    forward: forwardTag(readForwardPurchase(extraction, asOf, strategy)),
+    mixedUse: mixedUseTag(extraction, asOf),
+    goingConcern: goingConcernTag(extraction, asOf),
+    condo: condoTag(extraction, asOf),
+    sandwich: sandwichTag(extraction, asOf),
     // The pipeline card's own cap reader: the memorandum's, else the first
     // signal's (the deal header's fallback, before the extraction lands
     // too); none on a plan deal, none where the slot is withheld — a note,
     // a position, a share beside its entity's loan — and the cell says so.
     cap: statedCapSlot(extraction, plan != null, signal),
     capWithheld: !plan ? capSlotWithheld(extraction) : null,
+    // A note's yield to maturity, or a position's to redemption, at its
+    // price — the figure the pipeline card shows in the cap slot ("17.0% to
+    // maturity"), read on the route's day; the cell had said "n/a — note".
+    noteYield: (() => {
+      const own = plan ? null : noteCapSlot(extraction, asOf);
+      return own?.ytmPct != null ? ownYieldText(own.ytmPct) : null;
+    })(),
     // The plan's own figure, unrounded: the workbook writes it into a
     // percent cell, where a string rounded to "6.3%" and read back printed
     // the header's 6.27% as "6.30%".

@@ -9,7 +9,7 @@ import { shownAssetClass } from "@/lib/asset-class";
 import { findGoingInCap, screenYearOf, unitCountRow } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, signalGoingInCap, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
-import { capSlotWithheld, noteCapSlot } from "@/lib/compare-interest";
+import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -286,15 +286,17 @@ export function pickSlots(
   // so a deal never shows a price on one surface and none on the other.
   const strategy = inferStrategy(extraction, signal);
   const plan = planSummary(extraction, strategy);
+  // The day every dated slot is read on — a note's months to maturity, a
+  // lease's years left, a deadline — the reader's own where the caller hands
+  // it (lib/reader-day), else the clock's. The interest's tag and the
+  // note's yield had read the clock beside slots read on the reader's day.
+  const asOf = place?.today ? new Date(`${place.today}T12:00:00Z`) : new Date();
   // A note's cap slot (#423's rule): the collateral's cap withheld, the
   // note's yield to maturity in its place where the note pays or may — and
   // a position's to redemption, and a share's beside its entity's loan
   // withheld with the reason (lib/compare-interest `capSlotWithheld`).
-  const note = plan ? null : noteCapSlot(extraction);
+  const note = plan ? null : noteCapSlot(extraction, asOf);
   const withheld = plan ? null : capSlotWithheld(extraction);
-  // The day a dated slot is read on: the reader's own where the caller
-  // hands it (lib/reader-day), else the clock's.
-  const asOf = place?.today ? new Date(`${place.today}T12:00:00Z`) : new Date();
   return {
     // The going-in cap only, and only on an operating asset: the same rule
     // the meeting .xlsx, the analytics and the comp memory apply, so a
@@ -303,7 +305,7 @@ export function pickSlots(
     // memorandum states none, the first signal's, as the deal header reads it.
     cap: statedCapSlot(extraction, plan != null, signal),
     capWithheld: withheld,
-    noteYield: note?.ytmPct != null ? `${note.ytmPct.toFixed(1)}%` : null,
+    noteYield: note?.ytmPct != null ? ownYieldText(note.ytmPct) : null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask
     // fills the slot before the extraction lands, as on the deal page —
@@ -315,7 +317,7 @@ export function pickSlots(
     yoc: plan?.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : null,
     // A share's price, a note's or the land's under a ground lease is not
     // the building's, and the row says so beside the figure.
-    interest: interestTag(extraction),
+    interest: interestTag(extraction, asOf),
     // Debt a buyer can take over is a screening fact of its own in 2026:
     // the row says so beside the price, and the deal page prices it.
     debt: assumableTag(extraction),
@@ -323,24 +325,24 @@ export function pickSlots(
     // the row says so beside the price, where a scan of the pipeline reads.
     affordable: affordableTag(extraction),
     // One lease is the whole income: the row says how long it has left.
-    tenancy: singleTenantTag(extraction),
+    tenancy: singleTenantTag(extraction, asOf),
     // A hotel's contracts and its PIP change what the price buys.
-    hotel: hotelTag(extraction),
+    hotel: hotelTag(extraction, asOf),
     // An auction's price is whatever clears; a court's or a lender's sale
     // is as-is — said beside the price.
-    sale: saleTag(extraction),
+    sale: saleTag(extraction, asOf),
     // A shadow anchor is not bought, and a roll inside the hold is the
     // income the model counts and the buyer may not have.
-    roster: rosterTag(extraction),
+    roster: rosterTag(extraction, asOf),
     // A renovation program's premium and its return on cost (#460).
     valueAdd: valueAddTag(extraction),
     // The NOI is on an abated tax bill that ends (#461): how long it has,
     // and what the owner pays more once it does.
-    abatement: taxAbatementTag(extraction),
+    abatement: taxAbatementTag(extraction, asOf),
     // A note the seller will carry, and its rate (#462).
     sellerNote: sellerFinancingTag(extraction),
     // The most serious thing the third-party reports found (#465).
-    reports: siteReportsTag(extraction),
+    reports: siteReportsTag(extraction, asOf),
     // Who is selling it (#467): the brokerage the memorandum names.
     broker: brokerageOf(extraction),
     // A student building's pre-leasing against last year's (#468).

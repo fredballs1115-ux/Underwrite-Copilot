@@ -111,7 +111,11 @@ function toCol(
   // header's yield on cost, the pipeline card's going-in cap — the first
   // signal's where the memorandum states none, as on both — each said as
   // the memorandum's (lib/compare-figures).
-  const figs = compareReturns(ex, r ?? null, strat, undefined, signal);
+  // Read on the reader's own day, as the pipeline card reads them: a note's
+  // yield to its maturity and what the price buys (a leasehold's years
+  // left) had read the clock.
+  const asOf = new Date(`${today}T12:00:00Z`);
+  const figs = compareReturns(ex, r ?? null, strat, asOf, signal);
   const planDeal = figs.planDeal;
   const cap = figs.cap;
   // The price and the year-1 NOI: the model's, else the memorandum's — the
@@ -186,12 +190,12 @@ function toCol(
     capOverTenYear: cap != null && tenYearPct != null ? capSpreadRead(cap, tenYearPct) : null,
     interest: figs.tag,
     affordable: affordableTag(ex),
-    tenancy: singleTenantTag(ex),
-    roster: rosterTag(ex),
+    tenancy: singleTenantTag(ex, asOf),
+    roster: rosterTag(ex, asOf),
     valueAdd: valueAddTag(ex),
-    abatement: taxAbatementTag(ex),
+    abatement: taxAbatementTag(ex, asOf),
     sellerNote: sellerFinancingTag(ex),
-    reports: siteReportsTag(ex),
+    reports: siteReportsTag(ex, asOf),
     broker: brokerageOf(ex),
     student: studentHousingTag(ex),
     mh: manufacturedHousingTag(ex, Infinity),
@@ -213,17 +217,17 @@ function toCol(
     ),
     // A forward purchase (lib/forward-purchase), read on the reader's day
     // with the kind the column reads.
-    forward: forwardTag(readForwardPurchase(ex, new Date(`${today}T12:00:00Z`), strat)),
+    forward: forwardTag(readForwardPurchase(ex, asOf, strat)),
     // A mixed-use building's commercial share (lib/mixed-use).
-    mixedUse: mixedUseTag(ex, new Date(`${today}T12:00:00Z`)),
+    mixedUse: mixedUseTag(ex, asOf),
     // An operating business on its real estate (lib/going-concern).
-    goingConcern: goingConcernTag(ex, new Date(`${today}T12:00:00Z`)),
+    goingConcern: goingConcernTag(ex, asOf),
     // Condominium units bought in bulk (lib/condo).
-    condo: condoTag(ex, new Date(`${today}T12:00:00Z`)),
+    condo: condoTag(ex, asOf),
     // A sandwich position's spread (lib/sandwich-lease).
-    sandwich: sandwichTag(ex, new Date(`${today}T12:00:00Z`)),
-    hotel: hotelTag(ex),
-    sale: saleTag(ex),
+    sandwich: sandwichTag(ex, asOf),
+    hotel: hotelTag(ex, asOf),
+    sale: saleTag(ex, asOf),
     noteYtm: figs.noteYtmPct,
     withheld: figs.withheld,
     // FEMA's zone at the building from the stored site-flags lookup (#426);

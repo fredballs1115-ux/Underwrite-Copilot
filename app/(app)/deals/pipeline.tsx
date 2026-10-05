@@ -40,6 +40,7 @@ import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-dea
 // extraction lands — the deal page's buy-box panel says the same, and the
 // CSV and the meeting workbook mark the figure with the same words.
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
@@ -134,44 +135,10 @@ export type DealCard = {
 // and an export of this "use client" module is only a client reference there.
 export type { PipelineView } from "@/lib/pipeline-view";
 
-/** Why a note's cap slot holds its yield, or "n/a" (lib/compare-interest
- *  `noteCapSlot`): the collateral's cap is not the buyer's figure. */
-const NOTE_CAP_TITLE =
-  "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. The note's yield to maturity at its price stands in its place, where the note pays or may.";
-
-/** A note's and a preferred equity position's own yield in the cap slot, in
- *  words (lib/compare-interest `OWN_YIELD_WORDS`, whose module the browser
- *  does not load): what it runs to, the column's micro-label, the slot where
- *  none can be stated, the card's label and the tooltip. */
-const OWN_YIELD: Record<"note" | "position", { to: string; micro: string; na: string; label: string; title: string }> = {
-  note: { to: "to maturity", micro: "ytm", na: "n/a — note", label: "Note yield", title: NOTE_CAP_TITLE },
-  position: {
-    to: "to redemption",
-    micro: "ytr",
-    na: "n/a — position",
-    label: "Position yield",
-    title:
-      "A preferred equity position has no going-in cap: its price buys a rate and a redemption, never a slice of the building. Its yield to redemption at its price stands in its place, where the redemption date has not gone by.",
-  },
-};
-
-/** Why a cap slot holds no cap, in the words every surface says it in
- *  (lib/compare-interest `capSlotWithheld` and `SHARE_CAP_WORDS`): the slot
- *  where no figure stands, and its tooltip. A share beside the loan its
- *  entity carries has no yield of its own to show in the cap's place. */
-const CAP_WITHHELD: Record<"note" | "position" | "share", { na: string; title: string }> = {
-  note: OWN_YIELD.note,
-  position: OWN_YIELD.position,
-  share: {
-    na: "n/a — share",
-    title:
-      "Beside the loan its entity carries, a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
-  },
-};
-
-/** The words of the yield standing in a cap slot: a note's, else a
- *  position's (only those two carry one). */
-const ownYieldOf = (w: DealCard["slots"]["capWithheld"]) => OWN_YIELD[w === "position" ? "position" : "note"];
+// The cap slot's words where it holds no cap of the deal's own — a note's
+// or a position's own yield, or why the cap is withheld — live in
+// lib/cap-slot, import-free, so the CSV's cell is tested and the words are
+// held to the server's copy.
 
 /** A card as the map reads it. */
 function mapDealOf(d: DealCard): MapDeal {
@@ -739,9 +706,10 @@ export function Pipeline({
         d.slots.exchange ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
-        // A note's or a position's cap is withheld, said so rather than
-        // left blank (#423).
-        d.slots.cap ?? (d.slots.capWithheld ? CAP_WITHHELD[d.slots.capWithheld].na : ""),
+        // A note's or a position's cap is withheld, its own yield in the
+        // column as the card shows it ("17.0% to maturity"), else the cap
+        // said withheld rather than left blank (#423).
+        capCellText(d.slots),
         d.slots.yoc ?? "",
         // A fit judged on the first signal, before the extraction lands, is
         // marked on each of its figures as the card marks it — "Near (first

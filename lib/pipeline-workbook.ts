@@ -5,6 +5,7 @@ import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage, type Stage } from "@/
 import { assetClassLabel } from "@/lib/asset-class";
 import { parsePct, parsePrice, priceRange } from "@/lib/criteria";
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -124,6 +125,11 @@ export interface PipelineExportRow {
    *  interest `capSlotWithheld`) — the cell says "n/a — note", "n/a —
    *  position" or "n/a — share" */
   capWithheld?: "note" | "position" | "share" | null;
+  /** a note's yield to maturity, or a position's to redemption, at its
+   *  price — "17.0%", the pipeline card's figure (lib/compare-interest
+   *  `ownYieldText`) — written in the cap cell with what it runs to; null
+   *  where none can be stated, and the cell says the cap is withheld */
+  noteYield?: string | null;
   /** a plan deal's stabilized NOI over total cost, as a fraction — 0.0627
    *  — written raw into the cell, whose "0.00%" shows the "6.27%" the deal
    *  header prints; never a rounded string read back */
@@ -329,6 +335,16 @@ export async function buildPipelineWorkbook(
       if (capNum != null) {
         capCell.value = capNum / 100;
         capCell.numFmt = PCT2;
+      } else if (!d.planDeal && d.noteYield && (d.capWithheld === "note" || d.capWithheld === "position")) {
+        // The pipeline card's figure in the slot: a note's or a position's
+        // own yield, said with what it runs to — text, so it draws no bar
+        // among the column's caps — and why it stands where a cap would.
+        const words = OWN_YIELD_WORDS[d.capWithheld];
+        capCell.value = `${d.noteYield} ${words.to}`;
+        capCell.note =
+          d.capWithheld === "note"
+            ? "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. Its yield to maturity at its price stands in its place."
+            : "A preferred equity position has no going-in cap: its price buys a rate and a redemption, never a slice of the building. Its yield to redemption at its price stands in its place.";
       } else {
         capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : d.capWithheld ? `n/a — ${d.capWithheld}` : "—");
       }

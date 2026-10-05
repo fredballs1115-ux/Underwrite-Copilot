@@ -77,6 +77,11 @@ export const OWN_YIELD_WORDS: Record<OwnYield, { label: string; to: string; na: 
   position: { label: "Yield to redemption", to: "to redemption", na: "n/a — position" },
 };
 
+/** A note's or a position's own yield as every summary prints it in the cap
+ *  slot — the deal header, the pipeline card and its CSV, the meeting
+ *  workbook: one decimal, "17.0%". */
+export const ownYieldText = (pct: number): string => `${pct.toFixed(1)}%`;
+
 /** How near the model's price must be to the whole's for its returns to be
  *  the whole asset's rather than a share's price against a building. */
 const SAME_PRICE = 0.02;
@@ -225,6 +230,6 @@ export function goingInCapFigure(
   }
   const words = OWN_YIELD_WORDS[own.of];
   return own.ytmPct != null
-    ? { label: words.label, value: `${own.ytmPct.toFixed(1)}%` }
+    ? { label: words.label, value: ownYieldText(own.ytmPct) }
     : { label: "Going-in cap", value: words.na };
 }

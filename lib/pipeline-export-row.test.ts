@@ -10,6 +10,7 @@ import { buildPipelineWorkbook } from "./pipeline-workbook";
 import { pickSlots } from "./pipeline-slots";
 import { pipelineExportRow, type ExportDeal, type ExportRowContext } from "./pipeline-export-row";
 import { yieldOnCostText } from "./plan-facts";
+import { noteCapSlot, ownYieldText } from "./compare-interest";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
 
@@ -256,13 +257,31 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(row.cap).toBeNull();
     expect(row.capWithheld).toBe("note");
     expect(row.cap).toBe(pickSlots(note, null).cap);
-    const buf = await buildPipelineWorkbook([row], new Date("2026-09-08T12:00:00Z"), null);
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buf as unknown as ArrayBuffer);
-    // Row 6 is the deal; column 8 the cap — never the collateral's 9.50%.
-    expect(wb.getWorksheet("Pipeline")!.getRow(6).getCell(8).value).toBe("n/a — note");
+    // The note pays: its yield to maturity at its price, read on the route's
+    // day, is the figure the pipeline card shows in the slot (research pass
+    // 34 — the cell had said "n/a — note" beside the card's yield).
+    const own = noteCapSlot(note, new Date(`${ctx.today}T12:00:00Z`));
+    expect(own?.ytmPct).not.toBeNull();
+    expect(row.noteYield).toBe(ownYieldText(own!.ytmPct!));
+    const sheet = async (r: typeof row) => {
+      const buf = await buildPipelineWorkbook([r], new Date("2026-09-08T12:00:00Z"), null);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ArrayBuffer);
+      // Row 6 is the deal; column 8 the cap.
+      return wb.getWorksheet("Pipeline")!.getRow(6).getCell(8);
+    };
+    const cell = await sheet(row);
+    expect(cell.value).toBe(`${row.noteYield} to maturity`);
+    // Never the collateral's 9.50%, and why the yield stands there is said.
+    expect(String(cell.value)).not.toContain("9.50");
+    expect(JSON.stringify(cell.note)).toContain("A note has no going-in cap");
+    // A note that does not pay has no yield to state: the cap is withheld.
+    const npl = { ...note, metrics: note.metrics.map((r) => (r.label === "Payment status" ? m("Payment status", "Non-performing") : r)) };
+    const nplRow = pipelineExportRow(deal({ extraction: npl }), ctx);
+    expect(nplRow.noteYield).toBeNull();
+    expect((await sheet(nplRow)).value).toBe("n/a — note");
     // A building's cap stands.
-    expect(pipelineExportRow(deal(), ctx)).toMatchObject({ cap: "5.90%", capWithheld: null });
+    expect(pipelineExportRow(deal(), ctx)).toMatchObject({ cap: "5.90%", capWithheld: null, noteYield: null });
   });
 
   it("says whose strategy the deal type is on a note or a leased fee, as the deal header does", async () => {

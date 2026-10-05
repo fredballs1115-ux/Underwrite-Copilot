@@ -16,6 +16,8 @@ import { pipelineExportRow, type ExportRowContext } from "./pipeline-export-row"
 import { buildPipelineWorkbook, type PipelineExportRow } from "./pipeline-workbook";
 import { compareReturns } from "./compare-figures";
 import { SHARE_CAP_WORDS, capSlotWithheld, goingInCapFigure } from "./compare-interest";
+import { capCellText } from "./cap-slot";
+import { interestTag } from "./interest";
 import { deriveInternalComps } from "./internal-comps";
 import { pctText, yieldOnCostText } from "./plan-facts";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
@@ -200,5 +202,66 @@ describe("the going-in cap: the memorandum's, else the first signal's, withheld 
     });
     expect(capSlotWithheld(leasedFee)).toBeNull();
     expect(pickSlots(leasedFee, null).cap).toBe("4.00%");
+  });
+});
+
+describe("a note's and a position's own yield, wherever the cap slot is printed (finding 10)", () => {
+  const today = "2026-10-05";
+  const on = { address: null, siteFlags: null, today };
+  const note = ex(
+    [
+      m("Asking price", "$52,000,000"),
+      m("Going-in cap rate", "8.65%"),
+      m("Unpaid principal balance", "$60,000,000"),
+      m("Note rate", "6.50%"),
+      m("Maturity date", "March 31, 2029"),
+      m("Payment status", "Performing"),
+    ],
+    { interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "p. 2" } },
+  );
+  const position = ex(
+    [
+      m("Asking price", "$8,000,000"),
+      m("Preferred equity amount", "$8,000,000"),
+      m("Preferred return", "12% preferred return, 8% current pay"),
+      m("Current pay rate", "8.0%"),
+      m("Mandatory redemption date", "June 2029"),
+    ],
+    { interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "p. 2" } },
+  );
+
+  for (const [what, e, to] of [
+    ["a note", note, "to maturity"],
+    ["a position", position, "to redemption"],
+  ] as const) {
+    it(`${what}: the card's figure in the CSV and the meeting workbook, never "n/a"`, async () => {
+      const slots = pickSlots(e, null, null, on);
+      expect(slots.cap).toBeNull();
+      expect(slots.noteYield).toMatch(/^\d+\.\d%$/);
+      // The CSV's cell (lib/cap-slot), as the card shows it.
+      expect(capCellText(slots)).toBe(`${slots.noteYield} ${to}`);
+      // The meeting workbook, read on the same day.
+      const row = pipelineExportRow({ name: what, asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", verdict: null, extraction: e, stage: "screening" }, ctx);
+      expect(row.noteYield).toBe(slots.noteYield);
+      expect((await workbookRow(row)).getCell(8).value).toBe(`${slots.noteYield} ${to}`);
+    });
+  }
+});
+
+describe("the card's dated slots on the reader's day, never the clock (finding 18)", () => {
+  const leasehold = ex([m("Asking price", "$30,000,000"), m("Going-in cap rate", "6.00%"), m("Ground lease expiration", "December 31, 2071")], {
+    interest: { kind: "leasehold", summary: "", share: "", groundLease: "", loan: "", page: "p. 4" },
+  });
+  const on = (today: string) => ({ address: null, siteFlags: null, today });
+
+  it("what the price buys is counted from the day the page hands in", () => {
+    const at = (today: string) => interestTag(leasehold, new Date(`${today}T12:00:00Z`));
+    expect(pickSlots(leasehold, null, null, on("2026-10-05")).interest).toBe(at("2026-10-05"));
+    // Years on, the tag counts from that day, not from the machine's.
+    expect(at("2041-06-01")).not.toBe(at("2026-10-05"));
+    expect(pickSlots(leasehold, null, null, on("2041-06-01")).interest).toBe(at("2041-06-01"));
+    // The meeting workbook reads it on the route's day, as the card does.
+    const row = pipelineExportRow({ name: "Leasehold", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", verdict: null, extraction: leasehold, stage: "screening" }, { ...ctx, today: "2041-06-01" });
+    expect(row.interest).toBe(at("2041-06-01"));
   });
 });
