@@ -1059,14 +1059,14 @@ export function DealView({
 /* Section panels                                                      */
 /* ------------------------------------------------------------------ */
 
-/** Financials: the extracted terms first; the Excel model workflow lives in a
- *  collapsed block below — supporting detail, one click away. */
 /** An empty section after the latest screen stopped before it: the reason
  *  and its action are at the top of the page, so the section says so and
  *  offers no second button (research pass 30). */
 const STOPPED_BEFORE =
   "The last screen stopped before this step — the reason is at the top of the page.";
 
+/** Financials: the extracted terms first; the Excel model workflow lives in a
+ *  collapsed block below — supporting detail, one click away. */
 function FinancialsPanel({
   results,
   active,
