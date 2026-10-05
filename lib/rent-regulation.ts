@@ -35,7 +35,9 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import table from "@/data/research/rent_allowances.json";
 import { evaluateRules, OPEN_QUESTION_LABELS, type RegulatoryRule, type RuleEvaluation } from "@/lib/research";
 import { buildSubject, seedRules } from "@/lib/research-data";
-import { assetWords, countNoun } from "@/lib/asset-words";
+import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
+import { shownAssetClass } from "@/lib/asset-class";
+import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 
 // ── The file ─────────────────────────────────────────────────────────────
@@ -349,6 +351,32 @@ export function readRegulation(
     claimOnly,
     headline: parts.join(" "),
   };
+}
+
+/** A deal as every surface holds it: its row's extraction, address, stored
+ *  site flags and filed class. */
+export interface DealForRegulation {
+  extraction: ExtractionResult | null | undefined;
+  address: { state?: string; city?: string; county?: string; submarket?: string; label?: string } | null;
+  /** deals.site_flags: the Census place and county are read from a lookup
+   *  answered for the address the deal has now (`answeredSiteFlags`) */
+  siteFlags?: SiteFlagsResult | null;
+  /** deals.asset_class, the analyst's class where they filed one */
+  assetClass?: string | null;
+}
+
+/**
+ * The read for a deal row — the one call every surface makes, so the deal
+ * page, the pipeline, the documents and the screen read one regulation for
+ * one deal: the class the deck turned out to be where the analyst left it
+ * Auto (lib/asset-class `shownAssetClass`), and the Census place and county
+ * only from flags answered for the deal's current address.
+ */
+export function regulationForDeal(d: DealForRegulation, today: string, rules?: RegulatoryRule[]): RegulationRead | null {
+  const flags = answeredSiteFlags(d.siteFlags ?? null, d.address?.label ?? null);
+  const census = flags && flags.status === "ok" && flags.place !== undefined ? { place: flags.place, county: flags.county ?? null } : null;
+  const classKey = assetClassKey(shownAssetClass(d.assetClass ?? null, d.extraction ?? null));
+  return readRegulation(d.extraction, { address: d.address, census, classKey, rules }, today);
 }
 
 // ── What each surface says ───────────────────────────────────────────────

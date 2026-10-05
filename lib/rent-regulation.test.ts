@@ -9,6 +9,7 @@ import {
   allowanceSentence,
   readRegulation,
   regulationContextLine,
+  regulationForDeal,
   regulationModelLine,
   regulationNote,
   regulationShortLine,
@@ -211,3 +212,32 @@ describe("the words", () => {
     }
   });
 });
+
+describe("a deal row read in one call", () => {
+  const address = { state: "NY", city: "Brooklyn", county: "Kings County", label: "100 Walk-up St, Brooklyn, NY 11215" };
+  const flags = (label: string) =>
+    ({
+      status: "ok",
+      subject: { lat: 40.67, lng: -73.98, label },
+      tractGeoid: null,
+      place: { name: "New York city", geoid: "3651000" },
+      county: { name: "Kings County", geoid: "36047" },
+      opportunityZone: null,
+      flood: null,
+      retrievedAt: "2026-10-01T00:00:00Z",
+      note: "",
+    }) as const;
+
+  it("reads the class the deck turned out to be, and the Census place only from flags for this address", () => {
+    const deal = walkUp([row("Rent-regulated units", "41")]);
+    const r = regulationForDeal({ extraction: deal, address, siteFlags: flags(address.label), assetClass: "auto" }, "2026-10-05")!;
+    expect(r.regimes[0].outcome).toBe("applies");
+    expect(regulationTag(r)).toBe("Rent-stabilized, 41 of 48");
+    // Flags looked up for another address are not this building's place.
+    const stale = regulationForDeal({ extraction: deal, address, siteFlags: flags("9 Elsewhere Ave, Queens, NY"), assetClass: null }, "2026-10-05")!;
+    expect(stale.regimes[0].ruleId).toBe("ny-nyc-rent-stabilization-coverage");
+    // A deal filed as an office says nothing of rent rules.
+    expect(regulationForDeal({ extraction: walkUp(), address, siteFlags: null, assetClass: "office" }, "2026-10-05")).toBeNull();
+  });
+});
+
