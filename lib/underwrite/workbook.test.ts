@@ -9,6 +9,7 @@ import type { UnderwriteInputs } from "./engine";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { regulationForDeal } from "@/lib/rent-regulation";
+import { STRATEGY_READING } from "@/lib/deal-strategy";
 
 /**
  * Proof that the generated workbook's formulas are LIVE and compute the same
@@ -773,12 +774,18 @@ describe("where the price did not buy the building, no building basis or cap is 
       "fallback",
     );
     expect(position.meta.interest?.basisWithheld?.word).toBe("position");
-    for (const [m, word] of [[loan, "share"], [position, "position"]] as const) {
+    // The price tile names what the figure is: beside the entity's loan, the
+    // share's price grossed up is the equity's whole (the plan's own words);
+    // a position's price is the position's, as stated.
+    for (const [m, word, tile] of [
+      [loan, "share", "EQUITY'S WHOLE (49% SHARE GROSSED UP)"],
+      [position, "position", "PURCHASE PRICE"],
+    ] as const) {
       const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(m));
       const summary = w.getWorksheet("Deal Summary")!;
       expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe(`n/a — ${word}`);
       expect(opsLabels(w)).not.toContain("Price / Unit");
-      const tiles = findRow(summary, 1, "PURCHASE PRICE");
+      const tiles = findRow(summary, 1, tile);
       expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
       noErrors(h);
     }
@@ -791,6 +798,40 @@ describe("where the price did not buy the building, no building basis or cap is 
     expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toMatchObject({ formula: expect.stringContaining("/PurchasePrice") });
     expect(opsLabels(w)).toContain("Price / Unit");
   }, 60000);
+
+  // Research pass 35 (F4): a 49% share's tab led with "PURCHASE PRICE
+  // $68,000,000" — the share costs $33,320,000; $68M is the whole grossed up
+  // — and the IRR, multiple and coverage beside it are the whole building's.
+  it("names a share's grossed-up price as the whole on the tile, wrapped, with the caveat under the band", async () => {
+    const share = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" } }),
+      "fallback",
+    );
+    expect(share.meta.priceLabel).toBe("Whole Price (49% share grossed up)");
+    const { wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(share));
+    const summary = w.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "WHOLE PRICE (49% SHARE GROSSED UP)");
+    expect(() => findRow(summary, 1, "PURCHASE PRICE")).toThrow();
+    // Live as before: the tile reads the one price cell the model runs at.
+    expect(summary.getCell(tiles + 1, 1).value).toMatchObject({ formula: "PurchasePrice" });
+    expect(summary.getCell(tiles, 1).alignment?.wrapText).toBe(true);
+    expect(summary.getRow(tiles).height).toBeGreaterThan(14);
+    // Whose returns the tiles' are, under them.
+    expect(summary.getCell(tiles + 2, 1).value).toBe(share.meta.interest!.modelCaveat);
+    expect(String(summary.getCell(tiles + 2, 1).value)).toContain("the share earns its 49% of those cash flows");
+    // All of the entity's interests beside its loan: the equity's whole.
+    const all = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "partial_interest", share: "100% of the membership interests" } }, [
+        { label: "Entity loan balance", value: "$30,000,000", flagged: false, page: "p. 9" },
+      ]),
+      "fallback",
+    );
+    expect(all.meta.priceLabel).toBe("Equity's Whole (all the entity's interests)");
+    // A price as stated keeps its name: the fixture's own fee simple, and a
+    // note, whose price is the note's.
+    expect(model.meta.priceLabel ?? null).toBeNull();
+    expect(deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "note" } }), "fallback").meta.priceLabel ?? null).toBeNull();
+  }, 30000);
 });
 
 // ── Labels and colours that say what their cells are ──────────────────────
@@ -1487,6 +1528,53 @@ describe("the cover says what is being sold, and what the model is and is not on
     // A price that buys the building keeps the label as it stands.
     expect(await labels(sold("fee_simple"))).toEqual(Array(3).fill("Stabilized"));
   });
+
+  // Research pass 35 (F4): a note's cover read "Deal type  Stabilized (the
+  // collateral)", then "An operating asset bought for its in-place income;
+  // NOI ÷ price is the going-in cap.", and two lines on that its cap rate
+  // and IRR "are not figures this buyer earns".
+  it("leaves the strategy's reading out where the deal type is the collateral's, and keeps it where the price buys the building", async () => {
+    const sold = (kind: "note" | "leased_fee" | "fee_simple", strategy: "stabilized" | "value_add" = "stabilized") =>
+      deriveUnderwriteInputs(
+        {
+          ...extraction,
+          strategy: { kind: strategy, summary: "", capitalBudget: "", timeline: "" },
+          interest: { kind, summary: "", share: "", groundLease: "", loan: "", page: "" },
+          metrics: [
+            ...extraction.metrics,
+            ...(kind === "note" ? [{ label: "Unpaid principal balance", value: "$62,500,000", flagged: false, page: "p. 3" }] : []),
+          ],
+        },
+        "fallback",
+      );
+    const read = async (m: ReturnType<typeof sold>) => {
+      const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+      const cover = wb.getWorksheet("Cover")!;
+      const assum = wb.getWorksheet("Assumptions")!;
+      const cr = findRow(cover, 2, "Deal type");
+      const cells: string[] = [];
+      for (const ws of [cover, assum]) ws.eachRow((row) => row.eachCell((c) => cells.push(String(c.value ?? ""))));
+      return { cover, cr, under: cover.getCell(cr + 1, 3).value, assumNote: assum.getCell(findRow(assum, 1, "Deal Type"), 3).value ?? null, cells };
+    };
+    const STABILIZED_READING = STRATEGY_READING.stabilized;
+    for (const kind of ["note", "leased_fee"] as const) {
+      const r = await read(sold(kind));
+      expect(r.cells.some((c) => c.includes(STABILIZED_READING)), kind).toBe(false);
+      expect(r.assumNote, kind).toBeNull();
+      // What is being sold follows the deal type, its caveat under it.
+      expect(findRow(r.cover, 2, "What is being sold"), kind).toBe(r.cr + 1);
+    }
+    // A plan on the collateral keeps what this model books, without the
+    // strategy's reading of a price over the building.
+    const plan = await read(sold("note", "value_add"));
+    expect(String(plan.under)).toMatch(/^This annual model books the capital budget in year 1/);
+    expect(plan.cells.some((c) => c.includes(STRATEGY_READING.value_add))).toBe(false);
+    expect(plan.assumNote).toBe("Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.");
+    // A price that buys the building reads as before, on both tabs.
+    const fee = await read(sold("fee_simple"));
+    expect(fee.under).toBe(STABILIZED_READING);
+    expect(fee.assumNote).toBe(STABILIZED_READING);
+  }, 60000);
 
   it("a covenant on the rents (#453): the restriction, then what the model's one growth rate is not on it", async () => {
     const units = extraction.metrics.find((m) => m.label === "Units")?.value;

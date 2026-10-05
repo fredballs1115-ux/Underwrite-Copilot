@@ -150,6 +150,13 @@ export interface WorkbookMeta {
      *  where the price is the building's */
     basisWithheld?: { word: string; why: string } | null;
   } | null;
+  /** what the Deal Summary's price tile is called where the model's price
+   *  is not the price the memorandum states for what is sold: a share's
+   *  price grossed up to the whole ("Whole Price (49% share grossed up)"),
+   *  or, beside the entity's stated loan, the equity's whole — the plan's
+   *  own words for it (lib/deal-strategy `planSummary`). Absent where the
+   *  model runs at the price as stated. */
+  priceLabel?: string | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -719,12 +726,17 @@ export function deriveUnderwriteInputs(
   // A leased fee's price note says what the model runs as its income, which
   // only the NOI's derivation below knows: it is written there.
   let leasedFeePrice = false;
+  // The Deal Summary's name for the price where it is not the price as
+  // stated for what is sold (WorkbookMeta `priceLabel`): set below where a
+  // share's price is grossed up, or is the equity's whole.
+  let priceLabel: string | null = null;
   if (price != null && interest.kind === "partial_interest" && isWholeShare(interest.sharePct)) {
     // All of the entity's interests (a stated 100%, research pass 28): the
     // price is the whole's as stated, nothing grossed up — said so, never as
     // a share with no stated percentage. Beside the entity's stated loan it
     // is the equity's whole, and the loan sits on top of it, as below.
     const entityLoan = entityLoanOf(extraction);
+    if (entityLoan != null) priceLabel = "Equity's Whole (all the entity's interests)";
     const of = `The OM's ${usd0(price)}${spanNote ? ` (${spanNote})` : ""} for all of the owning entity's interests`;
     mark(
       "purchasePrice",
@@ -743,6 +755,11 @@ export function deriveUnderwriteInputs(
     // loan is not added to the price — that is the model's arithmetic, and
     // the owner's call.
     const entityLoan = entityLoanOf(extraction);
+    // The tile says what the figure is, in the plan's own words: the whole
+    // the share's price implies, or beside the entity's loan the equity's
+    // whole — never a "Purchase Price" the share does not cost.
+    const shareWord = `${Math.round(share * 10) / 10}%`;
+    priceLabel = `${entityLoan != null ? "Equity's Whole" : "Whole Price"} (${shareWord} share grossed up)`;
     mark(
       "purchasePrice",
       "derived",
@@ -1226,6 +1243,7 @@ export function deriveUnderwriteInputs(
       assetClass: assetClassLabel(extraction?.assetClass) || "—",
       unitNoun,
       interest: interestMeta(extraction),
+      priceLabel,
       assumable: assumableMeta(extraction, inputs),
       sellerNote: sellerNoteMeta(extraction, inputs),
       leasehold: leaseholdMeta(extraction, inputs),

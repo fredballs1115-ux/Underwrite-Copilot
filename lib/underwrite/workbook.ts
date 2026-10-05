@@ -297,15 +297,31 @@ function buildCover(
     // label (lib/interest): the type describes the collateral, the
     // leaseholder's building or the lessee's equipment, never what the
     // price buys.
-    fact("Deal type", dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment));
-    const reading = ws.getCell(r, 3);
-    reading.value = isPlanDeal(dealKind)
-      ? `${STRATEGY_READING[dealKind]} This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.`
-      : STRATEGY_READING[dealKind];
-    reading.font = { name: ARIAL, size: 9, color: MUTED };
-    reading.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(r).height = isPlanDeal(dealKind) ? 54 : 28;
-    r++;
+    const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment);
+    fact("Deal type", kindLabel);
+    // Where the label says whose strategy it is, the strategy's own reading
+    // ("NOI ÷ price is the going-in cap") is of a building this price does
+    // not buy — and "What is being sold" below says what the model is on
+    // it — so the reading is left out. What this model books on a plan deal
+    // is true whatever the price buys, and stays.
+    const ofCollateral = kindLabel !== STRATEGY_LABEL[dealKind];
+    const booksLine =
+      "This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.";
+    const readingText = isPlanDeal(dealKind)
+      ? ofCollateral
+        ? booksLine
+        : `${STRATEGY_READING[dealKind]} ${booksLine}`
+      : ofCollateral
+        ? null
+        : STRATEGY_READING[dealKind];
+    if (readingText) {
+      const reading = ws.getCell(r, 3);
+      reading.value = readingText;
+      reading.font = { name: ARIAL, size: 9, color: MUTED };
+      reading.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = isPlanDeal(dealKind) && !ofCollateral ? 54 : 28;
+      r++;
+    }
   }
   // What is being sold (#414): a note, a share, a leasehold — and what this
   // model is and is not on it, before anyone reads a return off it.
@@ -748,9 +764,18 @@ function buildAssumptions(
     const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], interest?.kind, interest?.equipment);
     label(ws.getCell(r, 2), kindLabel);
     const note = ws.getCell(r, 3);
+    // As on the cover: where the label says whose strategy it is, the
+    // strategy's reading is of a building this price does not buy and is
+    // left out; what the rows below are on a plan deal stays.
+    const ofCollateral = kindLabel !== STRATEGY_LABEL[dealKind];
+    const planLine = "Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.";
     note.value = isPlanDeal(dealKind)
-      ? `${STRATEGY_READING[dealKind]} Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.`
-      : STRATEGY_READING[dealKind];
+      ? ofCollateral
+        ? planLine
+        : `${STRATEGY_READING[dealKind]} ${planLine}`
+      : ofCollateral
+        ? null
+        : STRATEGY_READING[dealKind];
     note.font = { name: ARIAL, size: 9, color: MUTED };
     if (kindLabel !== STRATEGY_LABEL[dealKind]) {
       // The qualified label is longer than the column: wrapped, with the
@@ -1257,10 +1282,14 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // ── KPI BAND ── five headline tiles the IC reads first. Values are live
   // formulas over the same named cells the rest of the book uses. A price
   // no document stated is the model's placeholder, marked as the Project
-  // Overview marks an assumed size.
+  // Overview marks an assumed size; a share's price grossed up to the whole
+  // is named as that whole (`meta.priceLabel`), never a price the share
+  // costs.
   let r = 3;
+  const priceTile =
+    model.sources.purchasePrice?.provenance === "assumption" ? "Purchase Price (assumed)" : (meta.priceLabel ?? "Purchase Price");
   const kpis: [string, string, string][] = [
-    [model.sources.purchasePrice?.provenance === "assumption" ? "Purchase Price (assumed)" : "Purchase Price", "PurchasePrice", FMT.usd],
+    [priceTile, "PurchasePrice", FMT.usd],
     ["Levered IRR", `IFERROR(IRR(${levRange}),"—")`, FMT.pct1],
     ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult],
     ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, FMT.pct1],
@@ -1276,7 +1305,9 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     l.value = lab.toUpperCase();
     l.font = { name: ARIAL, size: 8, bold: true, color: MUTED };
     l.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
-    l.alignment = { horizontal: "center", vertical: "middle" };
+    // Wrapped, so a longer name ("WHOLE PRICE (49% SHARE GROSSED UP)") takes
+    // a second line inside its tile rather than being cut at its edge.
+    l.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     // Outlined as a tile pair: label carries the top edge, value the bottom.
     l.border = { top: tileEdge, left: tileEdge, right: tileEdge };
     const v = ws.getCell(r + 1, col);
@@ -1287,7 +1318,8 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     v.alignment = { horizontal: "center", vertical: "middle" };
     v.border = { bottom: tileEdge, left: tileEdge, right: tileEdge };
   });
-  ws.getRow(r).height = 14;
+  // A tile's name past what one line of its tile holds gets the second line.
+  ws.getRow(r).height = kpis.some(([lab]) => lab.length > 28) ? 24 : 14;
   ws.getRow(r + 1).height = 24;
   const dealKind = meta.strategy ?? "unknown";
   const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
