@@ -508,10 +508,12 @@ export function DealView({
         const stepChanged = data.step !== lastStep.current;
         const endedStep = data.step ?? lastStep.current;
         lastStep.current = data.step;
-        // The row's age, for the stall rule (lib/screen-run `isStalled`).
+        // The row's age as the server measured it (the status route), for
+        // the stall rule (lib/screen-run `isStalled`) — never this browser's
+        // clock against the database's timestamp, which may run fast.
         const next: NonNullable<Job> = {
           ...data,
-          ageMs: data.updated_at ? Date.now() - Date.parse(data.updated_at) : null,
+          ageMs: typeof data.ageMs === "number" && Number.isFinite(data.ageMs) ? data.ageMs : null,
         };
         setJob(next);
         // The header was drawn while the run was reading: a figure not read
