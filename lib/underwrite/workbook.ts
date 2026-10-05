@@ -2606,12 +2606,14 @@ function buildSensitivity(
         const { irr, em } = cells[ri][ci];
         const ic = wsSens.getCell(r, IRR_COLS.from + ci);
         ic.value = { formula: `IF(${irr}="","",${irr})` } as ExcelJS.CellFormulaValue;
-        ic.numFmt = FMT.pct1;
+        // A return the deal page withholds shows the word over its live
+        // formula, as the Deal Summary's do (audit C4, L1).
+        ic.numFmt = withheld ? FMT.withheld : FMT.pct1;
         ic.alignment = { horizontal: "center" };
         ic.font = { name: ARIAL, size: 9, bold: ri === 2 && ci === 2, color: INK };
         const ec = wsSens.getCell(r, EM_COLS.from + ci);
         ec.value = { formula: `IF(${em}="","",${em})` } as ExcelJS.CellFormulaValue;
-        ec.numFmt = FMT.mult;
+        ec.numFmt = withheld ? FMT.withheld : FMT.mult;
         ec.alignment = { horizontal: "center" };
         ec.font = { name: ARIAL, size: 9, bold: ri === 2 && ci === 2, color: INK };
       });
@@ -2621,7 +2623,8 @@ function buildSensitivity(
 
     // Color scales: red → white → green, low to high (higher is better for
     // both IRR and EM). Excel renders these; recalc engines just ignore them.
-    for (const cols of [IRR_COLS, EM_COLS]) {
+    // None over withheld returns: a shade ranks the figures the word hides.
+    for (const cols of withheld ? [] : [IRR_COLS, EM_COLS]) {
       wsSens.addConditionalFormatting({
         ref: `${cellA1(bodyTop, cols.from)}:${cellA1(bodyBottom, cols.to)}`,
         rules: [

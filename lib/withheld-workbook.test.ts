@@ -79,6 +79,18 @@ const rowOf = (ws: ExcelJS.Worksheet, col: number, text: string): number => {
   return found;
 };
 
+/** The Sensitivity tab's IRR and multiple matrices: every cell reading a
+ *  scenario off the hidden engine tab. */
+const sensMatrixCells = (ws: ExcelJS.Worksheet): ExcelJS.Cell[] => {
+  const out: ExcelJS.Cell[] = [];
+  ws.eachRow((row) => {
+    row.eachCell((c) => {
+      if (/Sensitivity Engine/.test(formulaOf(c) ?? "")) out.push(c);
+    });
+  });
+  return out;
+};
+
 describe("the report leaves its grids out wherever the page withholds its tiles (research pass 40, H1)", () => {
   it("says the page's own reason for a building run nearly vacant — first, as the page does", () => {
     const { d, s } = reportOf(VACANT);
@@ -138,9 +150,21 @@ describe("the workbook's Deal Summary says withheld over its live formulas (rese
     // The cap on year-1 NOI stands beside a finding, as the page's cap does.
     expect(ws.getCell(rowOf(ws, 4, "Going-In Cap on the Land's Price (Yr-1 NOI / Price)"), 5).numFmt).toBe("0.00%");
     // The Sensitivity tab says whose grids they are, on its blank row.
-    expect(String(wb.getWorksheet("Sensitivity")!.getCell(3, 1).value)).toBe(
+    const sens = wb.getWorksheet("Sensitivity")!;
+    expect(String(sens.getCell(3, 1).value)).toBe(
       "The deal page withholds this model's returns and the full report leaves its grids out — the Deal Summary says why.",
     );
+    // And its matrices show the word over their live formulas: the centre
+    // of "Exit Cap × Hold Period" is the very IRR the tiles withhold (audit
+    // C4, L1).
+    const matrix = sensMatrixCells(sens);
+    expect(matrix.length).toBe(150);
+    for (const c of matrix) {
+      expect(formulaOf(c)).toBeTruthy();
+      expect(c.numFmt).toBe(WITHHELD_FMT);
+    }
+    // No colour scale ranks the figures the word hides.
+    expect((sens as unknown as { conditionalFormattings: unknown[] }).conditionalFormattings).toEqual([]);
   }, 45000);
 
   it("marks a nearly vacant building's returns and its cap on year-1 NOI, in the page's order", async () => {
@@ -182,6 +206,9 @@ describe("the workbook's Deal Summary says withheld over its live formulas (rese
     });
     expect(said).toBe(false);
     expect(wb.getWorksheet("Sensitivity")!.getCell(3, 1).value).toBeNull();
+    const matrix = sensMatrixCells(wb.getWorksheet("Sensitivity")!);
+    expect(matrix.length).toBe(150);
+    expect(matrix.every((c) => c.numFmt === "0.0%" || c.numFmt === '0.00"x";"—";"—"')).toBe(true);
   }, 45000);
 });
 
