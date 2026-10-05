@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { priceRange, priceRangeShort } from "@/lib/criteria";
+import { ToolRow } from "./tool-row";
 
 /**
  * The deal's header, laid out the way a listing opens (#433): the
@@ -147,10 +148,12 @@ export function DealHero({
 
         {picture ? <div className="min-w-0 [grid-area:pic]">{picture}</div> : null}
 
+        {/* The tools, then the deal's state: on a phone a row each that
+            scrolls sideways (ToolRow), from `sm` one wrapping row. */}
         {actions || controls ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-line bg-faint/50 px-4 py-3 [grid-area:actions] [&:has(+_div:empty)]:rounded-b-[15px]">
-            {actions}
-            {controls ? <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">{controls}</div> : null}
+          <div className="flex flex-col gap-2 border-t border-line bg-faint/50 px-4 py-3 [grid-area:actions] sm:flex-row sm:flex-wrap sm:items-center [&:has(+_div:empty)]:rounded-b-[15px]">
+            {actions ? <ToolRow row="tools">{actions}</ToolRow> : null}
+            {controls ? <ToolRow row="controls">{controls}</ToolRow> : null}
           </div>
         ) : null}
 

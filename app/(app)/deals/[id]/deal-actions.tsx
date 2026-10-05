@@ -45,8 +45,12 @@ export function DealActions({
   // Nothing to offer is no menu, never an empty one.
   if (!canRename && !canDelete) return null;
 
+  // On a phone the button sits in the deal header's scrolling row of
+  // controls, so the menu's containing block is that row (DealHero's
+  // ToolRow), outside the scroller: it opens at the row's right edge rather
+  // than inside the scroll, which would cut it off (research pass 36).
   return (
-    <div className="relative">
+    <div className="sm:relative">
       <button
         ref={triggerRef}
         type="button"

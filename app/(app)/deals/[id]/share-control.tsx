@@ -58,8 +58,13 @@ export function ShareControl({
     }
   }
 
+  // The panel opens from the button's left edge, the toolbar's first: it
+  // had opened from the right one and run 206px off a phone's left edge
+  // (research pass 36). On a phone the button sits in the deal header's
+  // scrolling row of tools, so the panel's containing block is that row
+  // (DealHero's ToolRow), outside the scroller, and it opens across it.
   return (
-    <div className="relative">
+    <div className="sm:relative">
       <button
         ref={triggerRef}
         type="button"
@@ -92,7 +97,7 @@ export function ShareControl({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-line bg-surface p-4 shadow-card">
+        <div className="absolute left-0 z-20 mt-2 w-80 rounded-xl border border-line bg-surface p-4 shadow-card max-sm:right-0 max-sm:w-auto">
           <p className="text-sm font-semibold tracking-tight">
             Share this screen
           </p>
