@@ -228,9 +228,20 @@ export function readValueAdd(ex: ExtractionResult | null | undefined): ValueAddR
   return { ...read, sentences, headline: sentences.join(" ") };
 }
 
+/** The doors the program has left, said as the doors still to do where some
+ *  are already done — so the sentence and the panel's bar, whose whole is
+ *  the doors done and the doors to go, name one program, not a 192-door one
+ *  beside a 248-door one (research pass 36). The arithmetic is the doors
+ *  left times a door's cost either way. */
+function doorsLeftText(r: Pick<ValueAddRead, "doors" | "renovated">): string | null {
+  if (r.doors == null) return null;
+  const doors = `${r.doors.toLocaleString("en-US")} ${r.doors === 1 ? "door" : "doors"}`;
+  return r.renovated != null && r.renovated > 0 ? `the ${doors} still to do` : doors;
+}
+
 function sentencesOf(r: Omit<ValueAddRead, "headline" | "sentences">): string[] {
   const parts: string[] = [];
-  const doorsText = r.doors != null ? `${r.doors.toLocaleString("en-US")} ${r.doors === 1 ? "door" : "doors"}` : "the classic units";
+  const doorsText = doorsLeftText(r) ?? "the classic units";
   if (r.costPerDoor != null && r.premium != null) {
     parts.push(
       `The program renovates ${doorsText} at ${money(r.costPerDoor)} each for ${dollars(Math.round(r.premium * 100) / 100)} a month more rent: ${pct(r.returnOnCostPct!)} a year on the cost of every door once it is done${
@@ -293,10 +304,13 @@ export function valueAddModelLine(r: ValueAddRead, m: ValueAddModel): string {
   const cap = m.exitCapPct;
   const breakEven = (r.costPerDoor * cap) / 12;
   const perDoor = (r.premium * 12) / cap - r.costPerDoor;
+  // Across the doors the program has left: where some are done, said as
+  // the doors still to do, as the read says them.
+  const across = (r.renovated ?? 0) > 0 ? (doorsLeftText(r) ?? "the program") : "the program";
   const value =
     r.doors != null
       ? `At the model's ${(cap * 100).toFixed(2)}% exit cap a door's premium is worth ${money((r.premium * 12) / cap)} against its ${money(r.costPerDoor)} cost — ${
-          perDoor >= 0 ? `${money(perDoor)} a door, ${money(perDoor * r.doors)} across the program,` : `${money(-perDoor)} a door lost,`
+          perDoor >= 0 ? `${money(perDoor)} a door, ${money(perDoor * r.doors)} across ${across},` : `${money(-perDoor)} a door lost,`
         } and the premium breaks even at ${dollars(Math.round(breakEven * 100) / 100)} a month.`
       : `At the model's ${(cap * 100).toFixed(2)}% exit cap the premium breaks even at ${dollars(Math.round(breakEven * 100) / 100)} a month.`;
   const model =

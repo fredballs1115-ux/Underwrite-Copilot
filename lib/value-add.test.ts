@@ -69,8 +69,11 @@ describe("readValueAdd — the program as the memorandum states it", () => {
 
   it("says the return on cost, the proof against the pro forma, and what the period asks of turnover", () => {
     const r = readValueAdd(PROGRAM())!;
+    // The doors left, said as the doors still to do beside the 56 done, so
+    // the read and the panel's bar of 248 name one program (research pass
+    // 36); the cost is still the 192 doors' at $15,000.
     expect(r.headline).toBe(
-      "The program renovates 192 doors at $15,000 each for $250 a month more rent: 20% a year on the cost of every door once it is done, $2.88M in all. " +
+      "The program renovates the 192 doors still to do at $15,000 each for $250 a month more rent: 20% a year on the cost of every door once it is done, $2.88M in all. " +
         "On the 56 doors already renovated, the premium achieved is $235 a month, as stated — under the $250 the program is priced on. " +
         "A 24-month program needs 50% of the classic units to turn each year, since a unit is renovated when its tenant leaves. " +
         "The building turns 45% a year, as stated: at that pace the program takes 2.2 years.",
@@ -84,6 +87,8 @@ describe("readValueAdd — the program as the memorandum states it", () => {
     )!;
     expect(r.premium).toBe(200);
     expect(r.premiumFrom).toBe("rents");
+    // No door is stated done: the doors left are the whole program.
+    expect(r.headline).toContain("The program renovates 120 doors at $12,000 each");
     expect(r.headline).toContain("The premium is the renovated rent of $1,600 less the classic rent of $1,400, as stated.");
     expect(r.headline).toContain("No premium achieved on renovated units is stated: the premium is a projection until a door proves it.");
     expect(r.turnoverNeededPct).toBeNull();
@@ -103,10 +108,15 @@ describe("the program on every summary", () => {
     const r = readValueAdd(PROGRAM())!;
     const line = valueAddModelLine(r, { holdMonths: 60, exitCapPct: 0.055, capitalYr1: 2_880_000, rentGrowthPct: 0.03 });
     expect(line).toBe(
-      "At the model's 5.50% exit cap a door's premium is worth $54,545 against its $15,000 cost — $39,545 a door, $7.59M across the program, and the premium breaks even at $68.75 a month. " +
+      "At the model's 5.50% exit cap a door's premium is worth $54,545 against its $15,000 cost — $39,545 a door, $7.59M across the 192 doors still to do, and the premium breaks even at $68.75 a month. " +
         "The screening model spends $2.88M of capital in its first year and grows today's rent at 3.0%: the premium is in none of its returns, so its IRR is not the program's.",
     );
     expect(gluedWords(line)).toEqual([]);
+    // With no door stated done, the doors left are the program.
+    const whole = readValueAdd(PROGRAM([row("Units to renovate", "192"), row("Renovation cost per unit", "$15,000"), row("Renovation premium", "$250")]))!;
+    expect(valueAddModelLine(whole, { holdMonths: 60, exitCapPct: 0.055, capitalYr1: 2_880_000, rentGrowthPct: 0.03 })).toContain(
+      "$39,545 a door, $7.59M across the program,",
+    );
   });
 
   it("the tag, the short line, the context, the traps and the key terms", () => {
@@ -115,7 +125,7 @@ describe("the program on every summary", () => {
     expect(valueAddShortLine(r)).toBe(
       "Value-add program: 192 doors to renovate; $15,000 a door; $250 a month premium (20% on cost); $235 achieved on renovated units; 24-month program",
     );
-    expect(valueAddContextLine(r).startsWith("The renovation program: The program renovates 192 doors")).toBe(true);
+    expect(valueAddContextLine(r).startsWith("The renovation program: The program renovates the 192 doors still to do")).toBe(true);
     const note = valueAddNote(r);
     expect(note).toContain("VALUE-ADD TRAPS, checked by name");
     expect(note).toContain("(a) THE PREMIUM'S PROOF — the $235 achieved on renovated units");

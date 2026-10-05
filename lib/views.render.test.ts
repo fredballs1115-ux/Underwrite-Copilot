@@ -8365,10 +8365,15 @@ describe("ValueAddPanel — the doors, the premium against its break-even, and t
     expect(text).toContain("Value-add program");
     expect(text).toContain("20% on cost");
     expect(text).toContain("Premium proven on renovated units");
-    // The doors: one bar, the done filled and the rest light.
-    expect(text).toContain("248 in the program");
-    expect(text).toContain("56 renovated");
-    expect(text).toContain("192 to renovate");
+    // The doors: one bar, the done filled and the rest light — one program,
+    // said one way: 248 in all, 56 done and 192 to go, and the read
+    // renovates the 192 still to do (research pass 36: a bar headed "248 in
+    // the program" had sat beside "renovates 192 doors").
+    expect(text).toContain("248 in all");
+    expect(text).toContain("56 done");
+    expect(text).toContain("192 to go");
+    expect(text).toContain("The program renovates the 192 doors still to do at $15,000 each");
+    expect(text).not.toContain("in the program");
     expect(html.match(/data-bar="va-done"/g)).toHaveLength(1);
     expect(html.match(/data-bar="va-left"/g)).toHaveLength(1);
     // The premium: priced on and achieved on one scale, the break-even a

@@ -69,10 +69,14 @@ export function ValueAddPanel({
       <PanelRead sentences={r.sentences} />
 
       {r.doors != null && total != null && (
+        // One program, said one way: the doors in all, the doors done and
+        // the doors to go — the read above renovates the doors to go, "the
+        // 192 doors still to do", where a bar headed "248 in the program"
+        // had sat beside "renovates 192 doors".
         <div className="mt-2.5" data-qa="value-add-doors">
           <div className="flex items-baseline justify-between gap-x-3 text-[11px]">
             <span className="font-medium text-ink">The doors</span>
-            <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-muted">{`${total.toLocaleString("en-US")} in the program`}</span>
+            <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-muted">{`${total.toLocaleString("en-US")} in all`}</span>
           </div>
           <div className="mt-0.5 flex h-3 overflow-hidden rounded-full bg-faint" aria-hidden>
             {r.renovated != null && r.renovated > 0 && (
@@ -82,9 +86,9 @@ export function ValueAddPanel({
           </div>
           <Key>
             {r.renovated != null && r.renovated > 0 && (
-              <KeyItem mark="swatch" tone="bg-brand/80">{`${r.renovated.toLocaleString("en-US")} renovated`}</KeyItem>
+              <KeyItem mark="swatch" tone="bg-brand/80">{`${r.renovated.toLocaleString("en-US")} done`}</KeyItem>
             )}
-            <KeyItem mark="swatch" tone="bg-brand/30">{`${r.doors.toLocaleString("en-US")} to renovate`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-brand/30">{`${r.doors.toLocaleString("en-US")} to go`}</KeyItem>
           </Key>
         </div>
       )}
