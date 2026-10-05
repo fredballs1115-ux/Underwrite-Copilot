@@ -62,8 +62,10 @@ const FMT = {
   pct1: "0.0%",
   pct2: "0.00%",
   // Two places, as the report prints a multiple ("1.53x"): one figure, one
-  // way of writing it.
-  mult: '0.00"x"',
+  // way of writing it — and, as the report and the deal page write it, a
+  // dash where it is at or below zero, which is no multiple of anything
+  // (research pass 40, L4). The cell keeps its live formula and its value.
+  mult: '0.00"x";"—";"—"',
   int: "#,##0",
   ratio: '0.00"x"',
   // A return the deal page withholds (research pass 40, H1): the cell keeps

@@ -136,7 +136,7 @@ describe("the eighth review's document cases", () => {
     expect(heatCellEm(cell(-17.9))).toBe("—");
     expect(heatCellEm(cell(0))).toBe("—");
     expect(heatCellEm(cell(null))).toBe("—");
-    expect(heatCellEm(cell(1.94))).toBe("1.9x");
+    expect(heatCellEm(cell(1.94))).toBe("1.94x");
   });
 
   it("4. the verdict prompt's ranges bullet carries the plan carve-out, not only the deal-killers bullet", () => {

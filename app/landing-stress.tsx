@@ -16,7 +16,7 @@
 
 import { useMemo, useState } from "react";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
-import { fmtPct, fmtX, runScenario } from "@/lib/underwrite/playground";
+import { fmtEm, fmtPct, runScenario } from "@/lib/underwrite/playground";
 import { noIrrText } from "@/lib/underwrite/no-irr";
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { SLIDER_SWEEP_BPS } from "@/lib/marketing-constants";
@@ -283,7 +283,7 @@ export function StressBench({
               Equity multiple
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-              {fmtX(r.leveredEquityMultiple)}
+              {fmtEm(r.leveredEquityMultiple)}
             </dd>
           </div>
           <div>

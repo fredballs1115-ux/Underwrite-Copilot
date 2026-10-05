@@ -12,6 +12,7 @@ import {
   yearOneNoi,
   fmtPct,
   fmtX,
+  fmtEm,
   fmtBpsDelta,
   fmtPtDelta,
   type ScenarioMetrics,
@@ -473,7 +474,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
               dirty={compare}
               withheld={current.leveredIrrPct == null && current.noIrr != null}
             />
-            <Metric label="Equity multiple" value={fmtX(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtX(base.leveredEquityMultiple)} dirty={compare} />
+            <Metric label="Equity multiple" value={fmtEm(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtEm(base.leveredEquityMultiple)} dirty={compare} />
             <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={compare} />
             <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={compare} />
           </>

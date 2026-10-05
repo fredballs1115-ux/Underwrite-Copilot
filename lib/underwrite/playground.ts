@@ -181,6 +181,15 @@ export const fmtPct = (dec: number | null, digits = 1): string =>
 export const fmtX = (x: number | null, digits = 2): string =>
   x == null || !Number.isFinite(x) ? "—" : `${x.toFixed(digits)}x`;
 
+/** An equity multiple, written one way on every surface that prints the
+ *  screening model's (research pass 40, L4 and L5): two places, and a dash
+ *  where it is at or below zero — distributions over equity at or below
+ *  nothing are not a multiple of anything, as the full report has always
+ *  said them ("—", never "-1.65x"). The workbook's cells format the same way
+ *  over their live formulas (lib/underwrite/workbook `FMT.mult`). */
+export const fmtEm = (x: number | null): string =>
+  x == null || !Number.isFinite(x) || x <= 0 ? "—" : `${x.toFixed(2)}x`;
+
 /** "+25bps" / "−50bps" / "base" for the cap & growth levers. */
 export function fmtBpsDelta(value: number, base: number): string {
   const bps = Math.round((value - base) * 10_000);

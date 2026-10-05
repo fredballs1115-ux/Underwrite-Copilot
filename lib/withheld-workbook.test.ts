@@ -175,7 +175,7 @@ describe("the workbook's Deal Summary says withheld over its live formulas (rese
     const { wb } = await workbookOf(fine);
     const ws = wb.getWorksheet("Deal Summary")!;
     expect(ws.getCell(rowOf(ws, 4, "Levered IRR"), 5).numFmt).toBe("0.0%");
-    expect(ws.getCell(rowOf(ws, 4, "Levered Equity Multiple"), 5).numFmt).toBe('0.00"x"');
+    expect(ws.getCell(rowOf(ws, 4, "Levered Equity Multiple"), 5).numFmt).toBe('0.00"x";"—";"—"');
     let said = false;
     ws.eachRow((row) => {
       if (/withheld on the deal page/.test(String(row.getCell(1).value ?? ""))) said = true;

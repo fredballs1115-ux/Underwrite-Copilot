@@ -184,13 +184,16 @@ export function heatCellIrr(cell: HeatCell): string {
   return `${pct === "-0.0" ? "0.0" : pct}%`;
 }
 
-/** "1.9x" — the cell's secondary line. An equity multiple is distributions
+/** "1.94x" — the cell's secondary line. An equity multiple is distributions
  *  over equity, so a figure at or below zero is not a multiple of anything:
- *  the cell shows a dash rather than stating "-17.9x" as a fact. */
+ *  the cell shows a dash rather than stating "-17.9x" as a fact. Two places,
+ *  as the base case above the grid, the deal page and the workbook print one
+ *  (research pass 40, L5: the grid's base cell read "1.5x" beside the base
+ *  case's "1.53x"). */
 export function heatCellEm(cell: HeatCell): string {
   return cell.em == null || !Number.isFinite(cell.em) || cell.em <= 0
     ? "—"
-    : `${cell.em.toFixed(1)}x`;
+    : `${cell.em.toFixed(2)}x`;
 }
 
 /** Legacy compact form, kept for anything still printing one line. */

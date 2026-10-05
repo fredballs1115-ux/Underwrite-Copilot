@@ -1584,9 +1584,9 @@ describe("the workbook reads on paper", () => {
     const summary = wb.getWorksheet("Deal Summary")!;
     const tiles = findRow(summary, 1, "PURCHASE PRICE");
     expect(summary.getCell(tiles, 3).value).toBe("EQUITY MULTIPLE");
-    expect(summary.getCell(tiles + 1, 3).numFmt).toBe('0.00"x"');
+    expect(summary.getCell(tiles + 1, 3).numFmt).toBe('0.00"x";"—";"—"');
     for (const lab of ["Unlevered Equity Multiple (before AM fee)", "Levered Equity Multiple"]) {
-      expect(summary.getCell(findRow(summary, 4, lab), 5).numFmt, lab).toBe('0.00"x"');
+      expect(summary.getCell(findRow(summary, 4, lab), 5).numFmt, lab).toBe('0.00"x";"—";"—"');
     }
     const sens = wb.getWorksheet("Sensitivity")!;
     let em = 0;
@@ -1595,7 +1595,7 @@ describe("the workbook reads on paper", () => {
         const col = Number(c.col);
         const formula = c.value && typeof c.value === "object" && "formula" in c.value ? String(c.value.formula) : "";
         if (col >= 8 && col <= 12 && /Sensitivity Engine/.test(formula)) {
-          expect(c.numFmt).toBe('0.00"x"');
+          expect(c.numFmt).toBe('0.00"x";"—";"—"');
           em++;
         }
       }),

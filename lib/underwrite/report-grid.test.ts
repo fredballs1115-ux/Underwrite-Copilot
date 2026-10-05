@@ -178,9 +178,9 @@ describe("heatLegend", () => {
 describe("cell text", () => {
   it("splits IRR and EM lines", () => {
     expect(heatCellIrr({ irrPct: 0.152, em: 1.94 })).toBe("15.2%");
-    expect(heatCellEm({ irrPct: 0.152, em: 1.94 })).toBe("1.9x");
+    expect(heatCellEm({ irrPct: 0.152, em: 1.94 })).toBe("1.94x");
     expect(heatCellIrr({ irrPct: null, em: 1.2 })).toBe("—");
-    expect(heatCellText({ irrPct: 0.152, em: 1.94 })).toBe("15.2% / 1.9x");
+    expect(heatCellText({ irrPct: 0.152, em: 1.94 })).toBe("15.2% / 1.94x");
   });
 
   it("never prints negative zero", () => {
