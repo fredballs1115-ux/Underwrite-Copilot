@@ -11,7 +11,8 @@ import { sentencesOf } from "@/lib/first-sentence";
  *
  *   - THE REGIMES: each the site's rules say reaches the building, with
  *     whether it applies or possibly applies (and the questions a
- *     "possibly" leaves open) and the rule's own source.
+ *     "possibly" leaves open), a rule the site has not verified marked so,
+ *     and the rule's own source.
  *   - THE REGULATED SHARE: the memorandum's regulated units as a share of
  *     its count, one bar, only where both are stated and agree.
  *   - THE ALLOWANCE AGAINST THE MODEL: each figure the regime allows for
@@ -136,6 +137,12 @@ export function RegulationPanel({
                   {g.outcome === "applies" ? "Applies" : "Possibly applies"}
                 </span>
                 <span className="font-medium text-ink">{capital(g.name)}</span>
+                {/* A rule the site has not verified, marked as the rules panel marks it. */}
+                {g.unverified && (
+                  <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted" data-qa="regime-unverified">
+                    Unverified
+                  </span>
+                )}
                 {g.outcome !== "applies" && g.unknowns.length > 0 && (
                   <span className="text-muted">{`Open: ${g.unknowns.join("; ")}`}</span>
                 )}

@@ -33,7 +33,7 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import table from "@/data/research/rent_allowances.json";
-import { evaluateRules, OPEN_QUESTION_LABELS, type RegulatoryRule, type RuleEvaluation } from "@/lib/research";
+import { evaluateRules, jurisdictionOf, OPEN_QUESTION_LABELS, type RegulatoryRule, type RuleEvaluation } from "@/lib/research";
 import { buildSubject, seedRules } from "@/lib/research-data";
 import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/asset-class";
@@ -177,6 +177,9 @@ export interface RegimeRead {
   outcome: "applies" | "possibly_applies";
   /** the open questions behind a "possibly", in words */
   unknowns: string[];
+  /** a rule the site has not verified (`unverifiedRule`): read as possibly
+   *  applying, never as applying, and marked so as the rules panel marks it */
+  unverified: boolean;
   allowance: AllowanceRead | null;
   /** the rule's own source and the day it was read */
   source: string | null;
@@ -259,6 +262,18 @@ export function allowanceSentence(name: string, a: AllowanceRead): string {
   return `Under ${name}, the allowance for ${a.applies_to} ${periodText(a)} is ${figuresText(a)} (${a.order}).${next}`;
 }
 
+/** A rule the site has not verified — its research found nothing to cite
+ *  ("unverified_not_found"), or it carries no source. New Jersey's municipal
+ *  rule says itself that every municipality but the two screened by their
+ *  own rules is unscreened ("rules unknown, check the ordinance before
+ *  offer"), and had been read as applying to every rental building in the
+ *  state (the audit of 2026-10-05). */
+export const unverifiedRule = (rule: Pick<RegulatoryRule, "status" | "source">): boolean =>
+  rule.status === "unverified_not_found" || !rule.source;
+
+/** The open question an unverified rule carries: its own caution. */
+export const UNVERIFIED_OPEN = "whether one reaches this address, which the site's rule has not verified — check the ordinance before an offer";
+
 function regimeClause(r: RegimeRead): string {
   if (r.outcome === "applies") return `${r.name} applies by the site's rules`;
   const open = r.unknowns.length ? ` (open: ${r.unknowns.join("; ")})` : "";
@@ -301,18 +316,29 @@ export function readRegulation(
       today,
     });
     const evals: RuleEvaluation[] = evaluateRules(input.rules ?? seedRules(), subject);
+    // Where a regime of the deal's own place holds it (Newark's, Jersey
+    // City's), that place is screened by its own rule: a statewide rule the
+    // site has not verified is not read beside it.
+    const ownPlace = evals.some((e) => Object.hasOwn(REGIMES, e.rule.id) && !!e.rule.jurisdiction_local && jurisdictionOf(e.rule, subject) === "yes");
     regimes = evals
       .filter((e) => Object.hasOwn(REGIMES, e.rule.id) && (e.outcome === "applies" || e.outcome === "possibly_applies"))
-      .map((e): RegimeRead => ({
-        ruleId: e.rule.id,
-        name: REGIMES[e.rule.id].name,
-        short: REGIMES[e.rule.id].short,
-        outcome: e.outcome as "applies" | "possibly_applies",
-        unknowns: [...new Set(e.unknowns.map((k) => OPEN_QUESTION_LABELS[k] ?? k.replace(/_/g, " ")))],
-        allowance: allowanceOn(e.rule.id, today),
-        source: e.rule.source ?? null,
-        asOf: e.rule.as_of,
-      }))
+      .filter((e) => !(ownPlace && !e.rule.jurisdiction_local && unverifiedRule(e.rule)))
+      .map((e): RegimeRead => {
+        const unverified = unverifiedRule(e.rule);
+        const open = e.unknowns.map((k) => OPEN_QUESTION_LABELS[k] ?? k.replace(/_/g, " "));
+        return {
+          ruleId: e.rule.id,
+          name: REGIMES[e.rule.id].name,
+          short: REGIMES[e.rule.id].short,
+          // An unverified rule possibly applies, never applies.
+          outcome: unverified ? "possibly_applies" : (e.outcome as "applies" | "possibly_applies"),
+          unknowns: [...new Set(unverified ? [UNVERIFIED_OPEN, ...open] : open)],
+          unverified,
+          allowance: allowanceOn(e.rule.id, today),
+          source: e.rule.source ?? null,
+          asOf: e.rule.as_of,
+        };
+      })
       .sort(
         (a, b) =>
           (a.outcome === "applies" ? 0 : 1) - (b.outcome === "applies" ? 0 : 1) ||

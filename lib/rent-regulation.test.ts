@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import rulesFile from "@/data/research/regulatory_rules.json";
+import { RegulationPanel } from "@/app/regulation-panel";
 import {
   ALLOWANCES,
   LEGAL_RENT_ROW,
@@ -9,6 +12,7 @@ import {
   REGIME_ROW,
   REGIMES,
   UNITS_ROW,
+  UNVERIFIED_OPEN,
   allowanceOn,
   allowanceSentence,
   readRegulation,
@@ -19,10 +23,11 @@ import {
   regulationShortLine,
   regulationTag,
   regulationTermRows,
+  unverifiedRule,
 } from "./rent-regulation";
 import { readAffordable } from "./affordable";
 import { unitCountFromMetrics } from "./criteria";
-import { gluedWords } from "./render-lint";
+import { gluedWords, visibleText } from "./render-lint";
 import { extractionInstruction } from "./anthropic/prompts";
 
 type Row = ExtractionResult["metrics"][number];
@@ -255,6 +260,50 @@ describe("the prompt asks for what the reader reads", () => {
       "2026-10-05",
     )!;
     expect([r.stated, r.regulatedUnits, r.legalRent, r.preferentialRent]).toEqual(["Rent stabilization", 41, "$1,650", "$1,480"]);
+  });
+});
+
+// The audit of 2026-10-05: New Jersey's municipal rule — no source, filed
+// "unverified_not_found", its own text saying every municipality but Newark
+// and Jersey City is unscreened — told every rental building in the state
+// "A New Jersey municipal rent ordinance applies", Newark's included.
+describe("a rule the site has not verified", () => {
+  const nj = (city: string, units: string, built: string) =>
+    readRegulation(ex([row("Units", units), row("Year built", built)]), { address: { state: "NJ", city }, classKey: "multifamily" }, "2026-10-05");
+
+  it("possibly applies, its own caution the open question, and is marked unverified", () => {
+    const r = nj("Princeton", "120", "2010")!;
+    expect(r.regimes.map((g) => [g.ruleId, g.outcome, g.unverified])).toEqual([["nj-municipal-rent-control", "possibly_applies", true]]);
+    expect(r.regimes[0].unknowns).toEqual([UNVERIFIED_OPEN]);
+    expect(r.headline).toContain(`A New Jersey municipal rent ordinance possibly applies (open: ${UNVERIFIED_OPEN}).`);
+    expect(r.headline).not.toContain("applies by the site's rules");
+    expect(regulationTag(r)).toBe("Rent rules: check");
+    expect(regulationShortLine(r)).toBe("Rent regulation: A New Jersey municipal rent ordinance possibly applies");
+    expect(regulationModelLine(r, 3)).toContain("a New Jersey municipal rent ordinance possibly applies");
+    // Every regime rule with a source and a verified or sourced status is read as before.
+    expect(unverifiedRule({ status: "verified", source: "https://example.gov" })).toBe(false);
+    expect(unverifiedRule({ status: "sourced", source: null })).toBe(true);
+    expect(nj("Newark", "120", "1960")!.regimes.every((g) => !g.unverified)).toBe(true);
+  });
+
+  it("is not read where the place's own rule reaches the deal", () => {
+    const newark = nj("Newark", "120", "1960")!;
+    expect(newark.regimes.map((g) => g.ruleId)).toEqual(["nj-newark-rent-control"]);
+    expect(regulationTag(newark)).not.toBe("NJ rent ordinance");
+    expect(newark.headline).not.toContain("New Jersey municipal");
+    // Jersey City's own rule exempts a building of four units or fewer; the
+    // statewide rule is not read in its place.
+    expect(nj("Jersey City", "3", "1950")).toBeNull();
+  });
+
+  it("is marked on the panel as the rules panel marks it", () => {
+    const html = renderToStaticMarkup(React.createElement(RegulationPanel, { regulation: nj("Princeton", "120", "2010"), today: "2026-10-05" }));
+    expect(html).toContain('data-qa="regime-unverified"');
+    expect(visibleText(html)).toContain("Possibly applies");
+    expect(visibleText(html)).toContain("Unverified");
+    // A verified rule carries no such mark.
+    const verified = renderToStaticMarkup(React.createElement(RegulationPanel, { regulation: readRegulation(walkUp(), BROOKLYN, "2026-10-05"), today: "2026-10-05" }));
+    expect(verified).not.toContain('data-qa="regime-unverified"');
   });
 });
 
