@@ -288,3 +288,41 @@ describe("a leasehold whose lease ends inside the hold has no sale to return on 
     expect(table.match(/n\/a — lease ends in year 3/g)?.length).toBe(3);
   });
 });
+
+describe("a plan deal's caveat speaks of returns only where the tiles show them (the second audit, LOW-6)", () => {
+  // "On a plan deal these returns run the screening model … a bid solved on
+  // them is a screening figure" had printed under tiles reading "n/a — no
+  // price", naming returns and a bid the card does not show.
+  const VA = { kind: "value_add" as const, summary: "Interior renovation of 200 units", capitalBudget: "", timeline: "" };
+  const plan = (rows: [string, string, string?][]) => deal("Multifamily", rows, { strategy: VA });
+  const caveatOf = (html: string) => html.includes('data-qa="playground-plan-caveat"');
+
+  it("stays off under every withheld tile: a placeholder's, a nearly vacant building's, a non-tying deal's", () => {
+    // No price read: the model's is a placeholder.
+    const unpriced = drawn(plan([["NOI (in-place)", "1,100,000", "in_place"], ["Units", "200"], ["Renovation budget", "3,000,000"]]), { strategy: "value_add" });
+    expect(unpriced.text.match(/n\/a — no price/g)?.length).toBe(4);
+    expect(caveatOf(unpriced.html)).toBe(false);
+    expect(unpriced.text).not.toContain("a bid solved on them is a screening figure");
+    // A building the model runs 97% vacant.
+    const vacant = drawn(
+      plan([["Asking price", "20,000,000"], ["Units", "200"], ["Occupancy", "3%", "in_place"], ["NOI (in-place)", "45,000", "in_place"], ["Renovation budget", "3,000,000"]]),
+      { strategy: "value_add" },
+    );
+    expect(vacant.text.match(/n\/a — 97% vacant/g)?.length).toBe(4);
+    expect(caveatOf(vacant.html)).toBe(false);
+    // Figures that do not tie, a finding standing against the returns.
+    const priced = plan([["Asking price", "20,000,000"], ["Units", "200"], ["NOI (in-place)", "1,100,000", "in_place"], ["Renovation budget", "3,000,000"]]);
+    const finding = { code: "noi_exceeds_price" as const, severity: "high" as const, title: "NOI (in-place) of $21.0M is above the $20.0M price", detail: "" };
+    const untied = drawn(priced, { strategy: "value_add", findings: [finding] });
+    expect(untied.text.match(/n\/a — figures don't tie/g)?.length).toBe(4);
+    expect(caveatOf(untied.html)).toBe(false);
+  });
+
+  it("stands over a plan deal's returns where the tiles show them", () => {
+    const priced = plan([["Asking price", "20,000,000"], ["Units", "200"], ["NOI (in-place)", "1,100,000", "in_place"], ["Renovation budget", "3,000,000"]]);
+    const { html, text } = drawn(priced, { strategy: "value_add" });
+    expect(text).not.toMatch(/n\/a — /);
+    expect(caveatOf(html)).toBe(true);
+    expect(text).toContain("a bid solved on them is a screening figure");
+  });
+});

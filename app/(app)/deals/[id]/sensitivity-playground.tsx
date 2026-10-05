@@ -425,9 +425,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           {costAssumptionsLine(inputs)}
         </p>
       )}
-      {planDeal && (
+      {planDeal && !withheld && (
         // The full report leaves these out on a plan deal for this reason
-        // (lib/memo/report-document); the page says it beside them.
+        // (lib/memo/report-document); the page says it beside them — and,
+        // as the cost line, never under withheld tiles, where "these
+        // returns" and "a bid solved on them" would name figures the card
+        // does not show (the second audit, LOW-6).
         <p className="mt-1.5 text-[11px] leading-relaxed text-caution" data-qa="playground-plan-caveat">
           {PLAN_RETURNS_CAVEAT}
         </p>
