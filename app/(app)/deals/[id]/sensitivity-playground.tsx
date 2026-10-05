@@ -20,7 +20,7 @@ import {
 import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
-import { solveMaxBid, timesWords, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
+import { noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 import {
   MISREAD_WORD,
   misreadPageLine,
@@ -326,11 +326,17 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     };
     if (floors.minIrr == null && floors.minCoc == null && floors.minCap == null)
       return null;
-    return solveMaxBid(bidAgainst != null ? { ...inputs, purchasePrice: bidAgainst } : inputs, floors, {
+    const solveOn = bidAgainst != null ? { ...inputs, purchasePrice: bidAgainst } : inputs;
+    const levers = {
       exitCapPct: caps.values[capIdx],
       rentGrowthPct: growths.values[growthIdx],
       vacancyPct: vacs.values[vacIdx],
-    });
+    };
+    const solved = solveMaxBid(solveOn, floors, levers);
+    // Where no price clears the floors together, the report's own sentence:
+    // which floor never clears and how far the others clear alone (audit
+    // C3a, MED-7) — one deal, one reason.
+    return { ...solved, noBid: solved.price == null ? noBidSentence(floors, noBidRead(solveOn, floors, levers)) : null };
   }, [box, withheld, bidAgainst, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx]);
 
   const reset = () => {
@@ -831,7 +837,9 @@ function MaxBidCard({
   sharePct = null,
   shareNoun = "share",
 }: {
-  bid: MaxBidSolution;
+  /** the solve, and where no price clears, the report's sentence why
+   *  (lib/underwrite/solver `noBidSentence`), null where it names nothing */
+  bid: MaxBidSolution & { noBid?: string | null };
   box: BuyBox;
   /** the price the bid is set against: the modelled one, or the reader's
    *  own where the model's is a placeholder (`against: "yours"`) */
@@ -863,8 +871,8 @@ function MaxBidCard({
       </div>
       {bid.price == null ? (
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          No price in range clears your floors under this scenario — the deal
-          economics, not the price, are the blocker.
+          {bid.noBid ??
+            "No price in range clears your floors under this scenario — the deal economics, not the price, are the blocker."}
         </p>
       ) : bid.unbounded ? (
         // Every floor still clears at the top of the range searched — the

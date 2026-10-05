@@ -7,6 +7,7 @@
 
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import type { PlaygroundLevers } from "./playground";
+import { compactUsd } from "@/lib/money";
 
 /** Return floors as DECIMALS (0.13 = a 13% IRR floor). The buy box stores
  *  percent-points (minIrrPct: 13) — callers divide by 100. */
@@ -246,4 +247,79 @@ export function solveMaxBid(
     unbounded: false,
     at: solvedMetrics,
   };
+}
+
+/**
+ * Where no price clears the buy box's floors together, which floor never
+ * clears and which clear on their own (research pass 35: the hotel's report
+ * listed three floors and named none, under a grid whose IRR cleared at 10%
+ * off). Each floor solved alone, over the same range and under the same
+ * levers as the bid; and the one reason the engine can prove for a
+ * cash-on-cash floor: year 1's cash flow before debt service negative
+ * whatever the price, since neither its NOI nor its capital spending moves
+ * with the price. Beside the solve, so the deal page's max-bid card and the
+ * report read one sentence for one deal (audit C3a, MED-7).
+ */
+export interface NoBidRead {
+  alone: { key: keyof BidFloors; price: number | null; unbounded: boolean }[];
+  /** year 1's NOI is under its capital spending and reserves, so its cash
+   *  flow is negative at every price */
+  yearOneNegative: boolean;
+  /** year 1's capital budget where it is what turns year 1 negative — the
+   *  year's NOI covers its other capital lines; null otherwise */
+  yearOneCapital: number | null;
+}
+
+const FLOOR_ORDER = ["minIrr", "minCoc", "minCap"] as const;
+
+export function noBidRead(inputs: UnderwriteInputs, floors: BidFloors, levers: Partial<PlaygroundLevers>): NoBidRead {
+  const set = FLOOR_ORDER.filter((k) => floors[k] != null);
+  const alone = set.map((key) => {
+    const one = set.length === 1 ? { price: null, unbounded: false } : solveMaxBid(inputs, { [key]: floors[key] }, levers);
+    return { key, price: one.price, unbounded: one.unbounded };
+  });
+  const y1 = computeUnderwrite({ ...inputs, expenseLines: inputs.expenseLines.map((l) => ({ ...l })), ...levers }).cashFlow[0];
+  const yearOneNegative = !!y1 && y1.noi - y1.totalCapEx < 0;
+  const yearOneCapital =
+    yearOneNegative && y1.capitalImprovements > 0 && y1.noi - (y1.totalCapEx - y1.capitalImprovements) >= 0 ? y1.capitalImprovements : null;
+  return { alone, yearOneNegative, yearOneCapital };
+}
+
+/**
+ * Where no price clears the box's floors together, the sentence that names
+ * them from each floor's own solve (`noBidRead`): the floor that clears at
+ * no tested price, with the reason the engine proves for a cash-on-cash
+ * floor, then how far each other floor clears on its own. Null where there
+ * is nothing to name beyond the floors themselves — every floor fails even
+ * alone — and the caller's sentence stands.
+ */
+export function noBidSentence(floors: BidFloors, nb: NoBidRead | null): string | null {
+  if (!nb || nb.alone.length === 0) return null;
+  const words = (k: keyof BidFloors) => floorWords(k, floors);
+  const never = nb.alone.filter((a) => a.price == null);
+  const alone = nb.alone.filter((a) => a.price != null);
+  const clearsAlone = alone.map(
+    (a, i) => `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${a.unbounded ? `at every price searched, up to ${timesWords(MAX_BID_SEARCH_X)} the modelled price` : `up to ${fmtBid(a.price!)}`}`,
+  );
+  const aloneLine = clearsAlone.length > 0 ? `${clearsAlone.join(", and ").replace(/^y/, "Y")}.` : "";
+  if (never.length === 0) {
+    // Each floor clears on its own, never all of them at one price.
+    return `No price inside the tested range clears your buy box's floors together. ${aloneLine}`;
+  }
+  if (never.length > 1 && alone.length === 0) return null;
+  const because =
+    never.some((a) => a.key === "minCoc") && nb.yearOneNegative
+      ? nb.yearOneCapital != null
+        ? `year 1 carries ${compactUsd(nb.yearOneCapital)} of capital, which leaves its cash flow negative at any price`
+        : "year 1's cash flow is negative at any price"
+      : "";
+  const list = never.map((a) => words(a.key));
+  const named = list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} or ${list[list.length - 1]}`;
+  const head = `No price inside the tested range clears your ${named} floor`;
+  const why = because ? (never.length === 1 ? `: ${because}` : ` (the cash-on-cash because ${because})`) : "";
+  if (alone.length === 0) {
+    // The box's one floor: the reason where the engine proves one.
+    return because ? `${head}${why}.` : null;
+  }
+  return `${head}${why}. ${aloneLine}`;
 }
