@@ -289,8 +289,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((html.match(/class="hidden w-24 shrink-0 justify-end sm:flex"/g) ?? []).length).toBe(rows);
     expect((html.match(/>Stalled</g) ?? []).length).toBe(2);
     expect((html.match(/>Failed</g) ?? []).length).toBe(4);
-    // The two exports travel together at the filter row's right edge.
-    expect(html).toMatch(/class="flex items-center gap-2 md:ml-auto"/);
+    // The two exports travel together at the filter row's right edge, and
+    // wrap rather than run off a 320px page (research pass 33).
+    expect(html).toMatch(/class="flex flex-wrap items-center gap-2 md:ml-auto"/);
     // A stored class prints its words: the storage deal's row and the
     // asset filter both say "Self-storage", and the key never shows.
     expect(text).toContain("Self-storage");
@@ -656,7 +657,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
       }),
     );
     expect(a11yIssues(html), "a11y new-deal form").toEqual([]);
-    const field = html.match(/<input[^>]*aria-label="Deal name"[^>]*>/)?.[0] ?? "";
+    // Named by a label the reader sees, not a placeholder that goes when
+    // they type (research pass 33).
+    const label = html.match(/<label[^>]*><span[^>]*>Deal name<\/span><input[^>]*>/)?.[0] ?? "";
+    const field = label.match(/<input[^>]*>/)?.[0] ?? "";
     expect(field).toContain('name="name"');
     expect(field).toContain("required");
     expect(field).not.toMatch(/readonly|disabled/i);

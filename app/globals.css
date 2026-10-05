@@ -118,6 +118,15 @@ body {
   outline-color: #fff;
   box-shadow: 0 0 0 6px rgb(0 0 0 / 0.6);
 }
+/* A pipeline card clips whatever is drawn outside it (its picture's round
+   corners), so its link's ring — or, choosing deals to compare, its
+   button's — is drawn on the card itself (research pass 33: a focused card
+   showed no ring at all). */
+[data-deal-tile]:has(> a:focus-visible),
+[data-deal-tile]:has(> button[aria-pressed]:focus-visible) {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
 /* A mosaic tile clips whatever is drawn outside it, so its ring is drawn
    inside, over the photograph. */
 [data-mosaic-tile]:focus-visible {

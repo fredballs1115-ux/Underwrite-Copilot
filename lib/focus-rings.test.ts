@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -45,6 +45,28 @@ describe("the focus ring, wherever a keyboard reaches", () => {
     expect(ring).toMatch(/content: ""/);
     expect(ring).toMatch(/inset 0 0 0 3px #fff/);
     expect(src("app/(app)/deals/[id]/property-visual.tsx")).toMatch(/data-mosaic-tile=\{g\.i\}/);
+  });
+
+  it("is drawn on a pipeline card, which clips its link's own, and white on the card's photo arrows", () => {
+    const body = ruleBody("[data-deal-tile]:has(> a:focus-visible),\n[data-deal-tile]:has(> button[aria-pressed]:focus-visible)") ?? "";
+    expect(body).toMatch(/outline: 2px solid var\(--color-brand\)/);
+    const pipeline = src("app/(app)/deals/pipeline.tsx");
+    expect(pipeline).toMatch(/data-deal-tile=\{d\.id\}/);
+    expect(pipeline).toMatch(/data-flip-step=\{step\}[\s\S]{0,200}focus-on-photo/);
+  });
+
+  it("is never asked of a Tailwind focus-visible outline utility, which the unlayered rule overrides", () => {
+    // Such a utility never applies (its colour, width or offset): a ring a
+    // context needs is an unlayered rule above, keyed on the context.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((n) => {
+        const p = join(dir, n);
+        return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(n) ? [p] : [];
+      });
+    const offenders = walk(join(process.cwd(), "app")).filter((f) =>
+      /focus-visible:(?:-?outline-(?:offset-\d|white|brand|black|\d))/.test(readFileSync(f, "utf8")),
+    );
+    expect(offenders).toEqual([]);
   });
 
   it("never sits in the base layer, where `outline-none` would take it off some sixty controls", () => {
