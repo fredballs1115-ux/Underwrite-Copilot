@@ -28,6 +28,8 @@ import {
 } from "./rent-regulation";
 import { readAffordable } from "./affordable";
 import { unitCountFromMetrics } from "./criteria";
+import { evaluateRules } from "./research";
+import { buildSubject, seedRules } from "./research-data";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { extractionInstruction } from "./anthropic/prompts";
 
@@ -453,6 +455,28 @@ describe("a rule the site has not verified", () => {
     // Jersey City's own rule exempts a building of four units or fewer; the
     // statewide rule is not read in its place.
     expect(nj("Jersey City", "3", "1950")).toBeNull();
+  });
+
+  // The pre-merge audit (C1, L9): the rules panel still listed the statewide
+  // rule on a Newark deal as "possibly applies (the ordinance itself, which
+  // the site has not verified)" beside the rent rules that had dropped it.
+  it("is not read by the rules panel either where the place's own rule reaches the deal, and both panels read one set", () => {
+    const panel = (city: string) =>
+      evaluateRules(
+        seedRules(),
+        buildSubject({ address: { state: "NJ", city }, sizeText: "120 units", yearBuilt: 1960, residential: true, today: "2026-10-05" }),
+      ).filter((e) => e.outcome === "applies" || e.outcome === "possibly_applies");
+    const newark = panel("Newark");
+    expect(newark.map((e) => e.rule.id)).toContain("nj-newark-rent-control");
+    expect(newark.map((e) => e.rule.id)).not.toContain("nj-municipal-rent-control");
+    expect(panel("Jersey City").map((e) => e.rule.id)).not.toContain("nj-municipal-rent-control");
+    // Elsewhere in the state the rule is read on both, as possibly applying.
+    expect(panel("Princeton").find((e) => e.rule.id === "nj-municipal-rent-control")?.outcome).toBe("possibly_applies");
+    // The rent rules list exactly the regimes the panel lists.
+    for (const city of ["Newark", "Princeton"]) {
+      const regimes = panel(city).filter((e) => ["nj-newark-rent-control", "nj-jersey-city-rent-control", "nj-municipal-rent-control"].includes(e.rule.id));
+      expect(nj(city, "120", "1960")!.regimes.map((g) => g.ruleId).sort(), city).toEqual(regimes.map((e) => e.rule.id).sort());
+    }
   });
 
   it("is marked on the panel as the rules panel marks it", () => {

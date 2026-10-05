@@ -35,7 +35,6 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import table from "@/data/research/rent_allowances.json";
 import {
   evaluateRules,
-  jurisdictionOf,
   OPEN_QUESTION_LABELS,
   RULE_UNVERIFIED,
   unverifiedRule,
@@ -405,14 +404,13 @@ export function readRegulation(
       residential,
       today,
     });
-    const evals: RuleEvaluation[] = evaluateRules(input.rules ?? seedRules(), subject);
     // Where a regime of the deal's own place holds it (Newark's, Jersey
     // City's), that place is screened by its own rule: a statewide rule the
-    // site has not verified is not read beside it.
-    const ownPlace = evals.some((e) => Object.hasOwn(REGIMES, e.rule.id) && !!e.rule.jurisdiction_local && jurisdictionOf(e.rule, subject) === "yes");
+    // site has not verified is not read beside it — the evaluation's own
+    // rule (lib/research `evaluateRules`), so the rules panel reads it too.
+    const evals: RuleEvaluation[] = evaluateRules(input.rules ?? seedRules(), subject);
     regimes = evals
       .filter((e) => Object.hasOwn(REGIMES, e.rule.id) && (e.outcome === "applies" || e.outcome === "possibly_applies"))
-      .filter((e) => !(ownPlace && !e.rule.jurisdiction_local && unverifiedRule(e.rule)))
       .map((e): RegimeRead => {
         const unverified = unverifiedRule(e.rule);
         // The evaluation's own unverified question is said here in the

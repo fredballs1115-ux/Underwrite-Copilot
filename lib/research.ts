@@ -390,6 +390,11 @@ export const RULE_UNVERIFIED = "rule_unverified";
 export const unverifiedRule = (rule: Pick<RegulatoryRule, "status" | "source">): boolean =>
   rule.status === "unverified_not_found" || !rule.source;
 
+/** A rule's family: a rent cap's coverage rule is a rent rule, as the cap
+ *  is (New Jersey's municipal rule is filed as rent control, Newark's and
+ *  Jersey City's as its coverage). */
+const ruleFamily = (type: string): string => (type === "rent_control_coverage" ? "rent_control" : type);
+
 /**
  * A rule's exemption conditions with its cross-reference resolved: an
  * `exempt_if` of `{ see_rule: "<id>" }` means "exempt where the rule it names
@@ -418,9 +423,20 @@ export function exemptionConditions(
  *  at most "possibly applies", with that question named. */
 export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): RuleEvaluation[] {
   const out: RuleEvaluation[] = [];
+  // A place screened by its own rule: where a local rule of a family holds
+  // the deal (Newark's rent control, Jersey City's), a statewide rule of the
+  // same family the site has not verified — New Jersey's municipal rule,
+  // whose own words say those two are screened by their own rules — is not
+  // read beside it. Said here, so the rules panel and the rent rules
+  // (lib/rent-regulation) read one rule (the pre-merge audit: the panel
+  // listed it as possibly applying where the rent rules had dropped it).
+  const ownPlace = new Set(
+    rules.filter((r) => !!r.jurisdiction_local && jurisdictionOf(r, subject) === "yes").map((r) => `${r.jurisdiction_state.toUpperCase()}:${ruleFamily(r.rule_type)}`),
+  );
   for (const rule of rules) {
     const where = jurisdictionOf(rule, subject);
     if (where === "no") continue;
+    if (!rule.jurisdiction_local && unverifiedRule(rule) && ownPlace.has(`${rule.jurisdiction_state.toUpperCase()}:${ruleFamily(rule.rule_type)}`)) continue;
     const applies = evalConditions(rule.applies_if, subject);
     const exemptIf = exemptionConditions(rule, rules);
     const exempt = evalConditions(exemptIf, subject);
