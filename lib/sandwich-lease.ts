@@ -233,12 +233,12 @@ export function sandwichContextLine(r: SandwichRead): string {
   return `Sandwich position (a master lease of the building, sublet): ${r.headline}`;
 }
 
-const TRAPS =
-  "SANDWICH-LEASE TRAPS, checked by name where the OM gives the inputs: (a) THE TERM AND THE OPTIONS — the master lease's end and its options, and their rent, against the subleases' own ends; (b) THE SPREAD AND WHO PAYS FIRST — the master rent is owed whatever the subtenants pay, its increases against the subleases', and the subtenants' credit; (c) THE FEE OWNER'S LENDER — whether the master lease sits behind the fee owner's mortgage, and whether a non-disturbance agreement keeps it standing through a foreclosure; (d) CONSENT TO ASSIGN AND SUBLET — what the master lease requires of the owner's consent to this sale and to new subleases; (e) THE END — what the master lease requires handed back, and what the subtenants' leases say when it ends.";
-
-/** The facts, then the traps by name, for the assumption review. */
+/** The facts, for the assumption review. The traps by name are the
+ *  interest note's (lib/interest `MASTER_LEASE_TRAPS`), which every master
+ *  leasehold's notes lead with: said here too, the challenger read the same
+ *  five traps twice (the batch-2 audit). */
 export function sandwichNote(r: SandwichRead): string {
-  return `SANDWICH POSITION AS STATED: ${r.headline} ${TRAPS}`;
+  return `SANDWICH POSITION AS STATED: ${r.headline}`;
 }
 
 /** The rows a key-terms block leads with, each only where stated: the two

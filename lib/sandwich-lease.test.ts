@@ -58,8 +58,10 @@ describe("a sandwich position's spread and term (pass 28, round 9)", () => {
     expect(sandwichTag(SANDWICH, TODAY)).toBe("Spread $720k, 1.65× cover");
     expect(sandwichShortLine(r)).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2041");
     expect(sandwichContextLine(r)).toMatch(/^Sandwich position \(a master lease of the building, sublet\): The subleases bring in/);
-    for (const trap of ["(a) THE TERM AND THE OPTIONS", "(b) THE SPREAD AND WHO PAYS FIRST", "(c) THE FEE OWNER'S LENDER", "(d) CONSENT TO ASSIGN AND SUBLET", "(e) THE END"])
-      expect(sandwichNote(r)).toContain(trap);
+    // The facts alone: the traps are the interest note's, said once
+    // (lib/interest `MASTER_LEASE_TRAPS`, held by its own test).
+    expect(sandwichNote(r)).toBe(`SANDWICH POSITION AS STATED: ${r.headline}`);
+    expect(sandwichNote(r)).not.toMatch(/TRAPS/);
     for (const text of [r.headline, sandwichShortLine(r), sandwichContextLine(r)]) expect(gluedWords(text)).toEqual([]);
   });
 

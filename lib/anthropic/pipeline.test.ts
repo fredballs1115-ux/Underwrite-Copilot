@@ -1522,11 +1522,14 @@ describe("runAnalysis — the happy path", () => {
     expect(note).toContain(
       "SANDWICH POSITION AS STATED: The subleases bring in $1.82M a year against the $1.10M master rent: a spread of $720k, the position's income before its own costs, the sublease income covering the master rent 1.65×.",
     );
-    expect(note).toContain("SANDWICH-LEASE TRAPS, checked by name");
-    for (const trap of ["(a) THE TERM AND THE OPTIONS", "(c) THE FEE OWNER'S LENDER", "(d) CONSENT TO ASSIGN AND SUBLET"]) expect(note, trap).toContain(trap);
+    // The master lease's traps, once: the interest note leads with them
+    // and the sandwich note carries the facts alone (the batch-2 audit).
+    expect(note.match(/MASTER-LEASE TRAPS, checked by name/g)?.length).toBe(1);
+    expect(note).not.toContain("SANDWICH-LEASE TRAPS");
+    for (const trap of ["(a) THE TERM AND THE OPTIONS", "(c) THE FEE OWNER'S LENDER", "(d) CONSENT TO ASSIGN AND SUBLET"]) expect(note.split(trap).length - 1, trap).toBe(1);
     const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
     expect(context).toContain("Sandwich position (a master lease of the building, sublet): The subleases bring in $1.82M a year");
-    expect(context).not.toContain("SANDWICH-LEASE TRAPS");
+    expect(context).not.toMatch(/LEASE TRAPS/);
     expect(errSpy).not.toHaveBeenCalled();
   });
 
