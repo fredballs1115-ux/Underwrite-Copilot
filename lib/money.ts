@@ -180,7 +180,18 @@ export function compactUsd(n: number, o: CompactUsdOptions = {}): string {
   if (!Number.isFinite(n)) return "—";
   const abs = Math.abs(n);
   const body = compactBody(abs, o);
-  return `${n < 0 && /[1-9]/.test(body) ? "−" : ""}$${body}`;
+  return `${minusFor(n, body)}$${body}`;
+}
+
+/**
+ * The site's sign before a figure written from its absolute value — the rule
+ * `compactUsd` writes a dollar by, for any figure that may run negative (a
+ * percent, a count): U+2212 ("−3.65%") where the figure is under zero and
+ * what is shown of it is not all zeros, nothing otherwise, never a
+ * hyphen-minus (research pass 38: a cap-mismatch finding read "-3.65%").
+ */
+export function minusFor(n: number, shown: string): string {
+  return n < 0 && /[1-9]/.test(shown) ? "−" : "";
 }
 
 function compactBody(abs: number, o: CompactUsdOptions): string {

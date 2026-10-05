@@ -24,7 +24,7 @@
  *      the screen says "these can't both be right" instead of "105%".
  */
 
-import { compactUsd } from "@/lib/money";
+import { compactUsd, minusFor } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { dealTypeLabel, entityLoanOf, entityLoanWords, groundRentOf, interestOf, isGpStake, isTenancyInCommon, isWholeShare, shareProjectCostOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -429,7 +429,13 @@ export function findingWithholdsReturns(f: Pick<PlausibilityFinding, "code" | "s
 }
 
 const money = (n: number): string => compactUsd(n);
-const pct = (x: number, dp = 1): string => `${(x * 100).toFixed(dp)}%`;
+// A negative figure — an implied cap on an NOI under zero — carries the
+// site's minus (lib/money `minusFor`), never a hyphen-minus: the cap-mismatch
+// finding's title had read "-3.65%" (research pass 38).
+const pct = (x: number, dp = 1): string => {
+  const shown = (Math.abs(x) * 100).toFixed(dp);
+  return `${minusFor(x, shown)}${shown}%`;
+};
 
 // The one price reader — shared with the buy-box check, the mandate score
 // and every summary slot through lib/criteria's METRIC_FIND, so no surface
