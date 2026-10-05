@@ -585,15 +585,29 @@ async function liveMarketFromDb(
     if (!metro && !others) return { primary: null, others: [], failed: null };
     const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)), failedRead);
     const national = readRates(nationalRows, now);
+    // Whether every read of the market's OWN figures failed — its series and
+    // its benchmarks — apart from the national lines: a brief left holding
+    // only the nation's lines is no read of the market, and its header
+    // would say it read the metro's figures (the batch-2 audit).
+    let ownReadFailed = false;
     const readMarket = async (
       market: { id: string; name: string; placedBy?: { county: string; area: string } },
       withNational: boolean,
       portfolio: Parameters<typeof liveMarketBrief>[0]["portfolio"],
     ): Promise<LiveMarketBrief | null> => {
+      const metas = metroSeriesFor(market.id).series;
+      const attempts = metas.reduce((n, m) => n + (m.moe ? 2 : 1), 0) + 1;
+      let own = 0;
+      const ownFailed = () => {
+        own++;
+        failedRead();
+      };
       const [rateRows, bench] = await Promise.all([
-        fetchSeriesRows(admin, metroSeriesFor(market.id).series, failedRead),
-        fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS], failedRead),
+        fetchSeriesRows(admin, metas, ownFailed),
+        fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS], ownFailed),
       ]);
+      ownReadFailed = own > 0 && own >= attempts;
+      if (ownReadFailed) return null;
       return liveMarketBrief({
         metro: market,
         rates: readMetroRates(market.id, rateRows, now),
@@ -625,12 +639,18 @@ async function liveMarketFromDb(
       if (b) read.push(b);
     }
     const unread = (others?.read.length ?? 0) - read.length + (others?.notRead ?? 0);
+    ownReadFailed = false;
     const primary = metro
       ? await readMarket(metro, true, whole ? { ...whole, othersRead: read.map((b) => b.metro), notRead: unread } : null)
       : null;
-    // The deal's market was wanted, nothing came back, and reads failed: a
-    // failed read, never a market with no figures to read.
-    return { primary, others: read, failed: metro && !primary && failures > 0 ? readFailedFor(metro) : null };
+    // The deal's market was wanted, nothing came back, and reads failed — or
+    // every read of its own figures failed, whatever the nation's lines did:
+    // a failed read, never a market with no figures to read.
+    return {
+      primary,
+      others: read,
+      failed: metro && !primary && (failures > 0 || ownReadFailed) ? readFailedFor(metro) : null,
+    };
   } catch (err) {
     console.warn(`[pipeline] live market figures unavailable for deal ${dealId}:`, err instanceof Error ? err.message : err);
     return { primary: null, others: [], failed: readFailedFor(placed) };

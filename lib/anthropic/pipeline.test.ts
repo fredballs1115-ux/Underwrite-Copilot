@@ -34,6 +34,9 @@ interface State {
   failDealReads?: number;
   /** every read of `rates` and `benchmarks` answers with an error */
   failFigureReads?: boolean;
+  /** reads of every series but these, and of `benchmarks`, answer with an
+   *  error: the market's own figures fail while the nation's answer */
+  onlySeries?: string[];
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -147,6 +150,9 @@ class FakeQuery {
     // The two public-figure tables the market check reads, filtered the one
     // way the read filters them: a series by its id, a metro by its name.
     if ((table === "rates" || table === "benchmarks") && state.failFigureReads) {
+      return { data: null, error: { message: "TypeError: fetch failed" } };
+    }
+    if (state.onlySeries && (table === "benchmarks" || (table === "rates" && !state.onlySeries.includes(String(this.where("series_id")))))) {
       return { data: null, error: { message: "TypeError: fetch failed" } };
     }
     if (table === "rates") {
@@ -696,6 +702,22 @@ describe("runAnalysis — the happy path", () => {
     }
     expect((state.deals.d1.market as MarketResult).liveBrief?.metro).toBe("Washington DC");
     expect((state.deals.d1.market as MarketResult).liveReadFailed).toBeUndefined();
+    // Every read of the market's own figures failed while the nation's
+    // answered: a failed read, never a brief of national lines under a
+    // header saying the metro's figures were read (the batch-2 audit).
+    state = freshState();
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [{ series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 }];
+    state.onlySeries = ["DGS10"];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    expect((state.deals.d1.market as MarketResult).liveBrief).toBeNull();
+    expect((state.deals.d1.market as MarketResult).liveReadFailed).toEqual({ market: "Washington DC", grain: "metro" });
     warn.mockRestore();
   });
 
