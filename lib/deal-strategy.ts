@@ -112,6 +112,28 @@ export const IMPLIED_CAP_FLOOR = 0.02;
 export const BUDGET_FLOOR_PER_UNIT = 1_000;
 export const BUDGET_FLOOR_SHARE = 0.01;
 
+/** The band a building's basis is held to, a unit and a foot — outside it no
+ *  US market trades or delivers, and the figure is a misread (rule 4 of the
+ *  plausibility check). A data center is priced by its power, so it is held
+ *  to the floor alone; an outdoor-storage yard trades by the acre and is held
+ *  to no per-foot band (`basisOutsideBand`). */
+export const BASIS_PER_UNIT_BAND = { min: 15_000, max: 2_500_000 } as const;
+export const BASIS_PER_SF_BAND = { min: 5, max: 3_000 } as const;
+
+/**
+ * Whether a basis — a price, or a plan's total cost, over the building's count
+ * or its feet — sits outside the band any market trades at (rule 4): the one
+ * test the plausibility check makes and the pipeline card's basis keeps to, so
+ * no surface prints a basis the check calls misread (research pass 38: a card
+ * read "$2k/unit" beside the panel's finding).
+ */
+export function basisOutsideBand(value: number, per: "unit" | "sf", assetClass: string | null | undefined): boolean {
+  if (per === "unit") return value < BASIS_PER_UNIT_BAND.min || value > BASIS_PER_UNIT_BAND.max;
+  if (isOutdoorStorageYard(assetClass)) return false;
+  const ceiling = assetClassKey((assetClass ?? "").toLowerCase()) === "data_center" ? Number.POSITIVE_INFINITY : BASIS_PER_SF_BAND.max;
+  return value < BASIS_PER_SF_BAND.min || value > ceiling;
+}
+
 /**
  * The first signal's going-in cap, where it can be a cap on the price at
  * all: the signal is a fast read with no label to check, so a figure at or
@@ -741,8 +763,10 @@ export function isOutdoorStorageYard(assetClass: string | null | undefined): boo
  *  different rows as the price. Read against the screen's year, as
  *  findPriceMetric is. */
 export function findPricedMetric(metrics: MetricLike[], kind: StrategyKind, screenYear: number): MetricLike | null {
+  // The price reader's own figure: a value that is no price — "185,000 per
+  // unit", "6.25% cap rate" (lib/criteria `priceRefusal`) — is no figure.
   const isFigure = (v: string) => {
-    const n = parseMoney(v);
+    const n = parsePrice(v);
     return n != null && n >= 10_000;
   };
   const exclude = METRIC_FIND.price.exc(screenYear);
@@ -758,7 +782,8 @@ export function findPricedMetric(metrics: MetricLike[], kind: StrategyKind, scre
  *  print where a price goes. */
 export function signalAskPrice(signal: { askPrice?: string | null } | null | undefined): string | null {
   const ask = signal?.askPrice?.trim();
-  return ask && parseMoney(ask) != null ? ask : null;
+  // A cap, a share of a balance or a figure per unit is no price either.
+  return ask && parsePrice(ask) != null ? ask : null;
 }
 
 // An OM whose only price is a land or site line and which carries no income
@@ -1288,11 +1313,12 @@ function costFindings(
   // trades by the usable acre. Neither is a misread (the site-researcher's
   // pass of 2026-09-30): the data center is held to the band's floor only,
   // the yard to no per-SF band at all.
-  const perSfCeiling = assetClassKey(cls) === "data_center" ? Number.POSITIVE_INFINITY : 3_000;
+  // The band itself is `basisOutsideBand`, which the pipeline card's basis
+  // keeps to as well.
   const yard = isOutdoorStorageYard(extraction.assetClass);
   if (!landOnly && basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
     const perUnit = basisTotal / units;
-    if (perUnit < 15_000 || perUnit > 2_500_000) {
+    if (basisOutsideBand(perUnit, "unit", cls)) {
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",
@@ -1302,7 +1328,7 @@ function costFindings(
     }
   } else if (!landOnly && !yard && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
     const perSf = basisTotal / sf;
-    if (perSf < 5 || perSf > perSfCeiling) {
+    if (basisOutsideBand(perSf, "sf", cls)) {
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",

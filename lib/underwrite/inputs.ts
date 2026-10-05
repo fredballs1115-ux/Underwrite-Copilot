@@ -53,6 +53,7 @@ import {
   parsePrice,
   parseSf,
   priceRange,
+  priceRefusal,
   screenYearOf,
 } from "@/lib/criteria";
 import {
@@ -864,7 +865,17 @@ export function deriveUnderwriteInputs(
     mark("purchasePrice", "derived", "NOI ÷ going-in cap");
   } else {
     price = 10_000_000;
-    mark("purchasePrice", "assumption", "Enter the purchase price");
+    // A price row whose value is no price ("6.25% cap rate", "185,000 per
+    // unit" — lib/criteria `priceRefusal`) is named, as written, so the note
+    // never reads as if the memorandum stated nothing (research pass 38).
+    const refused = priceMetric ? priceRefusal(priceMetric.value) : null;
+    mark(
+      "purchasePrice",
+      "assumption",
+      priceMetric && refused
+        ? `The OM's ${priceMetric.label.trim().toLowerCase()} reads “${priceMetric.value.trim()}” — ${refused}, not a price; enter the purchase price`
+        : "Enter the purchase price",
+    );
   }
 
   // The price the OM stated, or null. A placeholder never bounds a budget

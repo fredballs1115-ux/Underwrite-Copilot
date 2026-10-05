@@ -11,15 +11,17 @@ import {
   assessPlausibility,
   findPricedMetric,
   inferStrategy,
+  isOutdoorStorageYard,
   isPlanDeal,
   planSummary,
   plausibilityNote,
+  unitCountFromMetrics,
   type DealStrategy,
 } from "@/lib/deal-strategy";
-import { buyBoxCoverage, foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { buildingSfFromMetrics, buyBoxCoverage, foldBuyBoxChecks, parsePrice, priceRange, priceRefusal, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { checkedSentence } from "@/lib/fit-label";
 import type { MandateScore } from "@/lib/mandate";
-import { entityLoanWords, interestOf, isGpStake, isTenancyInCommon, isWholeShare } from "@/lib/interest";
+import { entityLoanWords, interestOf, isGpStake, isMasterLeasehold, isTenancyInCommon, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
 import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-slots";
@@ -165,6 +167,12 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   if (kind === "partial_interest" && sharePct == null) {
     return "THE BUILDING'S BASIS: none — the OM states no percentage for the share, so the whole its price implies cannot be read, and the share's price is never divided over the whole building's units or area.";
   }
+  // A master lease of the building, sublet (a sandwich position): the price
+  // buys the position between the two rents, not the building (research
+  // pass 38: the card had read its price over the building as "$20/SF").
+  if (isMasterLeasehold(ex)) {
+    return "THE BUILDING'S BASIS: none — this sells a master lease of the building, sublet to its tenants: the price buys the position between the master rent and the sublease income, not the building, and is never divided over the building's units or area.";
+  }
   const words = assetWords(shownAssetClass(storedClass, ex));
   const noun = words.noun ?? { one: "unit", many: "units" };
   const metrics = ex.metrics ?? [];
@@ -213,6 +221,14 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
     return `THE BUILDING'S BASIS, computed in code: ${tag} — ${what}, over ${over}.${never} Build the basis range on this figure.`;
   }
   const price = row ? parsePrice(row.value) : null;
+  // A price row whose value is no price — a percentage, a share of a loan's
+  // balance, a figure per unit (lib/criteria `priceRefusal`): said as
+  // written, and nothing is divided by it (research pass 38: "6.25% cap
+  // rate" read as a $6.25 price, then "the OM states no building area").
+  const refused = row && price == null ? priceRefusal(row.value) : null;
+  if (row && refused) {
+    return `THE BUILDING'S BASIS: none — the OM's ${row.label.trim().toLowerCase()} reads “${row.value.trim()}”, ${refused}, not the price, so the deal reads as unpriced and no basis is computed from it.`;
+  }
   const sale = price == null ? readSale(ex) : null;
   if (sale?.startingBid != null) {
     const allIn =
@@ -222,6 +238,22 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
     return `THE BUILDING'S BASIS: none — the OM states no asking price, and the ${dollars(sale.startingBid)} starting bid${allIn} is where the bidding opens, not a price: a cap or a return struck on it is the ceiling of what the building yields and a basis struck on it the floor of what it costs, never the deal's.`;
   }
   if (price == null) return "THE BUILDING'S BASIS: none — the OM states no asking price to compute one from.";
+  // A basis the plausibility check finds outside any market's band is never
+  // handed on as one, nor a range built on it (research pass 38: "$2k/unit
+  // … Build the basis range on this figure" beside the check's own finding).
+  const over = words.basis === "sf" ? "the building's area" : `the OM's ${noun.one} count`;
+  if (assessPlausibility(ex, strategy).some((f) => f.code === "basis_out_of_band")) {
+    return `THE BUILDING'S BASIS: none handed on — the price over ${over} falls outside the band any market trades at, which the plausibility check reads as a misread of the price or of ${over}; no basis range is built on it.`;
+  }
+  if (words.basis === "sf" && isOutdoorStorageYard(ex.assetClass)) {
+    return "THE BUILDING'S BASIS: none — an outdoor-storage yard trades by the usable acre, and its price over the shop building on it is no basis.";
+  }
+  if (words.basis === "acre") {
+    return "THE BUILDING'S BASIS: none — the price buys land, which trades by the acre or by the buildable foot, and the code strikes no basis on it.";
+  }
+  // Only where the memorandum states no count or area does the line say so.
+  const stated = words.basis === "sf" ? buildingSfFromMetrics(metrics) != null : unitCountFromMetrics(metrics) != null;
+  if (stated) return `THE BUILDING'S BASIS: none computed — the ${dollars(price)} price over ${over} is no basis the code strikes.`;
   return `THE BUILDING'S BASIS: none computed — the OM states no ${words.basis === "sf" ? "building area" : `${noun.one} count`} to set the price over.`;
 }
 

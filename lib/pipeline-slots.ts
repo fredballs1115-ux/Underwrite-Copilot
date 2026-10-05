@@ -8,8 +8,8 @@ import { compactUsd } from "@/lib/money";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { shownAssetClass } from "@/lib/asset-class";
 import { screenYearOf, unitCountRow } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
-import { interestOf, interestTag } from "@/lib/interest";
+import { basisOutsideBand, findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
+import { interestOf, interestTag, isMasterLeasehold } from "@/lib/interest";
 import { capSlotWithheld, noteCapSlot, ownYieldText, statedCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
@@ -194,14 +194,23 @@ export interface PipelineSlots {
  * none by the foot on an outdoor-storage yard, which trades by the acre
  * (the deck's own words, lib/deal-strategy `isOutdoorStorageYard`). The
  * class is the deal's one class (`shownAssetClass`): the analyst's where
- * they filed one, the deck's where they left "Auto".
+ * they filed one, the deck's where they left "Auto". None on a master lease
+ * of the building (a sandwich position, lib/interest `isMasterLeasehold`),
+ * whose price buys a lease between two rents, not the building, and none
+ * outside the band the plausibility check holds a basis to (lib/deal-
+ * strategy `basisOutsideBand`): the card had read "$2k/unit" beside the
+ * panel's finding that the price or the count was misread (research pass 38).
  */
 export function basisTag(extraction: ExtractionResult, kind: StrategyKind, storedClass?: string | null): string | null {
+  if (isMasterLeasehold(extraction)) return null;
   const metrics = extraction.metrics ?? [];
   const words = assetWords(shownAssetClass(storedClass, extraction));
   const b = subjectBasis(metrics, kind, screenYearOf(extraction), interestOf(extraction), extraction.assetClass);
-  if (words.basis === "sf") return b.perSf != null ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
-  if (words.basis === "unit" && b.perUnit != null) {
+  const cls = shownAssetClass(storedClass, extraction);
+  if (words.basis === "sf") {
+    return b.perSf != null && !basisOutsideBand(b.perSf, "sf", cls) ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
+  }
+  if (words.basis === "unit" && b.perUnit != null && !basisOutsideBand(b.perUnit, "unit", cls)) {
     const noun = countNoun(unitCountRow(metrics)?.label, words.key).replace(/s$/, "");
     return `${compactUsd(b.perUnit, { trim: true })}/${noun}`;
   }

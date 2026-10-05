@@ -33,7 +33,7 @@ import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
 import { rowMarketLabel } from "@/lib/placed-by";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
-import { parseMoney, priceRange, priceRangeShort, type BuyBoxCoverage } from "@/lib/criteria";
+import { parsePrice, priceRange, priceRangeShort, type BuyBoxCoverage } from "@/lib/criteria";
 import { compareSortValues, pipelineSortValue, type PipelineSortKey, type SortDir } from "@/lib/pipeline-sort";
 import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
 import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-deal";
@@ -182,7 +182,9 @@ function compactPrice(raw: string): string {
   // first cut showed its bottom alone, the flattering end, as the price.
   const range = priceRange(raw);
   if (range) return priceRangeShort(range);
-  const n = parseMoney(raw);
+  // The price reader's own figure: a value that is no price ("6.25% cap
+  // rate", "185,000 per unit") stays as written rather than a "$6".
+  const n = parsePrice(raw);
   if (n == null || !(n > 0)) return raw;
   // Rounded as every surface rounds a compact figure (lib/money): "$5.5M"
   // here had stood beside the memo's "$5.6M" for a $5,550,000 price.

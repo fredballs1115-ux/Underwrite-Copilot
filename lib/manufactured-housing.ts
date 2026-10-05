@@ -48,7 +48,7 @@
 import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey } from "@/lib/asset-words";
-import { parseCount, parsePct, priceRange } from "@/lib/criteria";
+import { figureRange, parseCount, parsePct } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 
@@ -215,7 +215,7 @@ function privateLabel(u: MhUtilities | null): string | null {
  * and for a figure outside $50 to $5,000 a month.
  */
 export function monthlyRentOf(stated: string): number | null {
-  if (priceRange(stated)) return null;
+  if (figureRange(stated)) return null;
   const m = /\$\s*(\d[\d,]*(?:\.\d{1,2})?)/.exec(stated) ?? /(?:^|\s)(\d[\d,]*(?:\.\d{1,2})?)(?!\s*%)/.exec(stated);
   if (!m) return null;
   let n = Number(m[1].replace(/,/g, ""));
@@ -228,7 +228,7 @@ export function monthlyRentOf(stated: string): number | null {
 /** A market rent's range read at its low end — the smaller gap, the side
  *  that does not flatter the buyer. */
 function marketRentOf(stated: string): { rent: number | null; range: { low: number; high: number } | null } {
-  const range = priceRange(stated);
+  const range = figureRange(stated);
   if (range) {
     const monthly = /\b(?:mo|month|monthly)\b/i.test(stated);
     const scale = !monthly && /\b(?:yr|year|annual|annually)\b/i.test(stated) ? 1 / 12 : 1;

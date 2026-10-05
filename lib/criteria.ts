@@ -366,7 +366,9 @@ export function findPriceRow(
   screenYear: number,
 ): MetricLike | null {
   const ask = findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc(screenYear));
-  if (ask && parseMoney(ask.value) != null) return ask;
+  // An ask whose value is no price ("6.25% cap rate", "75% of UPB", "185,000
+  // per unit" — `priceRefusal`) states no figure, as "Call for offers" does.
+  if (ask && parsePrice(ask.value) != null) return ask;
   return kind === "development"
     ? (findMetric(metrics, METRIC_FIND.landPrice.inc, METRIC_FIND.landPrice.exc) ?? ask)
     : ask;
@@ -586,16 +588,18 @@ const PRICE_RANGE = new RegExp(
 );
 
 /**
- * A price the OM states as a RANGE — pricing guidance, a whisper — as its
- * two ends: "$40,000,000 – $42,000,000", "$40M-$42M", "$40–42M", "$40 to
- * $42 million", "between $40M and $42M". The second figure's scale carries
- * to a first written without one ("$40–42M" is $40M to $42M) wherever that
- * makes a range at all, so "$950,000 – $1.1M" keeps its first figure whole.
- * Null for a single figure, and for two figures that are not a range: a
- * second no larger than the first ("$42,000,000 – $500,000 credit",
- * "$42,000,000 – 5.25% cap") or more than twice it.
+ * Two figures stated as a RANGE, as its two ends: "$40,000,000 –
+ * $42,000,000", "$40M-$42M", "$40–42M", "$40 to $42 million", "between $40M
+ * and $42M". The second figure's scale carries to a first written without
+ * one ("$40–42M" is $40M to $42M) wherever that makes a range at all, so
+ * "$950,000 – $1.1M" keeps its first figure whole. Null for a single figure,
+ * and for two figures that are not a range: a second no larger than the
+ * first ("$42,000,000 – $500,000 credit", "$42,000,000 – 5.25% cap") or more
+ * than twice it. Any two figures — a market lot rent's "$500–$550 a month"
+ * too (lib/manufactured-housing); a price's range is `priceRange`, which
+ * refuses a value that is no price.
  */
-export function priceRange(raw: string): { low: number; high: number } | null {
+export function figureRange(raw: string): { low: number; high: number } | null {
   const m = PRICE_RANGE.exec(raw.trim());
   if (!m) return null;
   const n1 = Number(m[1].replace(/,/g, ""));
@@ -611,16 +615,73 @@ export function priceRange(raw: string): { low: number; high: number } | null {
   return { low, high };
 }
 
+// ── A price row's value that is no price (research pass 38) ──────────────
+
+// The figure a value leads with, as `parseMoney` reads it: an approximation
+// word, a bracket or a sign, the dollar, the digits and their scale.
+const LEAD_FIGURE =
+  /^(?:(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*)?(?:between\s+)?\(?\s*[-−–]?\s*(?:us\$|usd|\$)?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:k|thousand|mm|million|m|bn|billion|b)(?![a-z]))?/i;
+// What a figure is counted per: a unit by any of the nouns a class counts in,
+// a foot by any of its spellings, an acre, a building. Only these: "per the
+// OM", "per broker" and "per appraisal" say where the ask came from.
+const PER_WHAT = String.raw`(?:units?|doors?|keys?|beds?|rooms?|pads?|sites?|lots?|homes?|houses?|spaces?|stalls?|suites?|apartments?|apts?|slips?|berths?|bays?|acres?|ac|sf|s\.f\.?|sq\.?\s*f(?:oo|ee)?t|square\s+f(?:oo|ee)t|r?sf|nrsf|gsf|nsf|usf|gla|nra|rba|gba|nla|foot|feet|ft|buildings?|propert(?:y|ies)|parcels?)\b`;
+const PER_PERIOD = String.raw`(?:years?|yr|annum|annually|months?|mo|monthly)\b`;
+const PER = (what: string) => new RegExp(String.raw`^\s*(?:\$?\s*\/\s*${what}|(?:per|a|an|each)\s+${what})`, "i");
+// The words right after the figure, and what they make it: never the price.
+const NO_PRICE: [RegExp, string][] = [
+  [/^\s*(?:%|pct\b|percent\b|per\s?cent\b)/i, "a percentage"],
+  [/^\s*(?:¢|cents?\b)/i, "a share of the loan's balance"],
+  [/^\s*(?:of\s+(?:the\s+)?)?(?:par|upb)\b|^\s*of\s+(?:the\s+)?(?:face|unpaid|outstanding|balance|principal)\b/i, "a share of the loan's balance"],
+  [/^\s*[x×](?![a-z])/i, "a multiple"],
+  [/^\s*(?:psf\b|p\.s\.f\.?|each\b)/i, "a figure per unit, per foot or per acre"],
+  [PER(PER_WHAT), "a figure per unit, per foot or per acre"],
+  [PER(PER_PERIOD), "a figure per year or per month"],
+];
+
+/**
+ * Why a price row's value is no price, in a few words — "a percentage", "a
+ * share of the loan's balance", "a multiple", "a figure per unit, per foot or
+ * per acre", "a figure per year or per month" — or null where it is one. Read
+ * off the words right after the figure the value leads with, or after a
+ * range's second figure: "6.25% cap rate", "75% of UPB", "80 cents on the
+ * dollar", "185,000 per unit", "425/SF", "1,850,000 per acre". Each states a
+ * fact about the price, never the price: read as the whole price, "6.25% cap
+ * rate" put a $6.25 ask on a 410,000 SF warehouse and "75% of UPB" a $75 one
+ * on a $20M note. A dollar figure with its cap or its share in words after
+ * it — "$42,000,000 (5.25% cap)", "$15,000,000 (75% of UPB)" — is the price.
+ */
+export function priceRefusal(raw: string): string | null {
+  const s = raw.trim();
+  const lead = (figureRange(s) ? PRICE_RANGE.exec(s) : null) ?? LEAD_FIGURE.exec(s);
+  if (!lead) return null;
+  const tail = s.slice(lead[0].length);
+  for (const [words, why] of NO_PRICE) if (words.test(tail)) return why;
+  return null;
+}
+
+/**
+ * A price the OM states as a RANGE — pricing guidance, a whisper — as its two
+ * ends (`figureRange`); null for a value that is no price (`priceRefusal`): a
+ * range of figures per unit is no range of prices.
+ */
+export function priceRange(raw: string): { low: number; high: number } | null {
+  return priceRefusal(raw) ? null : figureRange(raw);
+}
+
 /**
  * A PRICE, read on the side that does not flatter the buyer: the top of a
  * range the OM states — a lower price lifts every return and every cap
  * struck on it — else the one figure `parseMoney` reads. Every reader of an
  * asking price goes through here; `parseMoney` stays the reader of every
  * other figure, since an income's or a cost's unflattering side is not its
- * top. It read "$40,000,000 – $42,000,000" guidance as $40M before.
+ * top. It read "$40,000,000 – $42,000,000" guidance as $40M before. A value
+ * that is no price (`priceRefusal`: a percentage, a share of a loan's
+ * balance, a figure per unit, foot or acre) is none, so the deal reads as
+ * unpriced and its row stays in the key terms as written (research pass 38).
  */
 export function parsePrice(raw: string): number | null {
-  const r = priceRange(raw);
+  if (priceRefusal(raw)) return null;
+  const r = figureRange(raw);
   return r ? r.high : parseMoney(raw);
 }
 
@@ -1594,7 +1655,7 @@ export function evaluateBuyBox(
         ? range.low
         : range.high
       : metric
-        ? parseMoney(metric.value)
+        ? parsePrice(metric.value)
         : null;
     const shown = (n: number) => (range ? `${fmtM(range.low)}–${fmtM(range.high)}` : fmtM(n));
     const noun = metric && /\b(land|site)\b/i.test(metric.label) ? "land cost" : "ask";

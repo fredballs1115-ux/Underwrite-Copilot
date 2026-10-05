@@ -825,6 +825,13 @@ export function noteYieldSentence(n: NoteRead | null): string {
       : `Paid as agreed to its ${due} maturity it yields ${pctText(n.ytmPct)} on the price (${n.paymentBasis})${current} — the memorandum does not say whether it is performing.`;
   }
   if (n.currentYieldPct != null) {
+    // A maturity stated, its payments run, and still no yield solves: the
+    // price and the balance are too far apart for one (research pass 38 —
+    // a $75 price for a $20M note read "states no maturity" beside its own
+    // stated March 2028 maturity).
+    if (due) {
+      return `A year's interest is ${pctText(n.currentYieldPct)} of the price; no yield to its ${due} maturity solves on the ${money(n.price)} price against the ${money(n.terms.balance ?? n.price)} balance — the two are too far apart for one, so the price or the balance was most likely misread.`;
+    }
     return `A year's interest is ${pctText(n.currentYieldPct)} of the price; the memorandum states no maturity, so there is no yield to maturity to give.`;
   }
   return "";
