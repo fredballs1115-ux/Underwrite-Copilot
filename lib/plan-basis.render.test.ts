@@ -74,6 +74,48 @@ describe("a plan's all-in basis the plausibility check finds outside the band (r
     );
   });
 
+  it("judges the basis over the count the plan states, and says it over that count (audit C3b MED-2)", () => {
+    // An office-to-hotel conversion: $120M over the 160 proposed keys is
+    // $750k a key, inside the band. The check had divided by today's 40
+    // units, flagged $3.0M a key and withheld the plan's basis.
+    const hotel = (keys: string) =>
+      ex({
+        assetClass: "Hospitality",
+        dealName: "The Exchange (office to hotel)",
+        strategy: { kind: "conversion", summary: "Convert a 40-unit office building to a 160-key hotel", capitalBudget: "", timeline: "" },
+        metrics: [
+          m("Asking price", "$20,000,000"),
+          m("Units", "40"),
+          m("Keys (proposed)", keys),
+          m("Total project cost", "$120,000,000"),
+          m("NOI (stabilized, pro forma)", "$9,000,000"),
+        ],
+      });
+    const sound = hotel("160");
+    expect(assessPlausibility(sound).map((f) => f.code)).not.toContain("basis_out_of_band");
+    expect(checked(sound)).toMatchObject({ costPerUnit: 750_000 });
+    expect(checked(sound).basisWithheld ?? null).toBeNull();
+    // The reverse: a planned count that puts the basis outside the band is
+    // judged on it, whatever today's count says.
+    const two = hotel("2");
+    expect(assessPlausibility(two).find((f) => f.code === "basis_out_of_band")?.title).toBe("$120.0M of total cost over 2 keys is $60.0M per key");
+    expect(checked(two).basisWithheld).toContain("over the 2 planned keys");
+  });
+
+  it("says a development's unlabelled count as the count it states, never the building today's (audit C3b MED-2)", () => {
+    const dev = ex({
+      assetClass: "Multifamily",
+      dealName: "Ridge Site",
+      strategy: { kind: "development", summary: "Ground-up apartments", capitalBudget: "", timeline: "" },
+      metrics: [m("Total project cost", "$3,000,000"), m("NOI (stabilized, pro forma)", "$400,000"), m("Units", "240")],
+    });
+    const plan = checked(dev);
+    expect(plan.basisWithheld).toBe(
+      "No all-in basis is struck: the $3.0M total cost over the 240 units it states, not labelled proposed or planned, is outside the band any market delivers at, so the total cost or the count was most likely misread.",
+    );
+    expect(plan.basisWithheld).not.toContain("building today");
+  });
+
   it("keeps a basis inside the band as before", () => {
     const fine = ex({ ...vaCheap, metrics: vaCheap.metrics.map((r) => (r.label === "Asking price" ? m("Asking price", "30,000,000") : r)) });
     const plan = checked(fine);

@@ -1341,8 +1341,13 @@ function costFindings(
   //    the basis is TOTAL COST over the planned units (rule 4): $12k of
   //    land per apartment to be built, or $4/SF for a dead office shell,
   //    is exactly what such deals trade at, so the shell's or the site's
-  //    price is never held to an operating market's band.
-  const units = unitCountFromMetrics(metrics);
+  //    price is never held to an operating market's band. On a plan deal
+  //    the count is the plan's own (`planCountRow`: a conversion's or a
+  //    development's count labelled proposed or planned), the count the total
+  //    cost buys, and today's building's only where the plan states none (the
+  //    audit C3b MED-2: an office-to-hotel conversion's $120M over its 40
+  //    units today read $3.0M a key, where its 160 proposed keys are $750k).
+  const units = (planDeal ? plan?.units : null) ?? unitCountFromMetrics(metrics);
   const sf = buildingSfFromMetrics(metrics);
   const cls = (extraction.assetClass ?? "").toLowerCase();
   // The class says the basis and the noun (lib/asset-words): a hotel is
@@ -1662,16 +1667,19 @@ export function planWithBasisChecked(
   const planned = notYetDelivered(plan.kind) ? "planned " : "";
   // The count the check divided by: the plan's own, else — where a
   // conversion's or a development's memorandum labels no count proposed or
-  // planned (`costPerUnitWithheld`) — the one it states for the building
-  // today, said as that and never as planned.
+  // planned (`costPerUnitWithheld`) — the one it states, said as that and
+  // never as planned: on a conversion it is the building's today, while a
+  // ground-up development has no building today, so its count is said only
+  // as unlabelled (the audit C3b MED-2).
   const today = plan.units == null ? unitCountFromMetrics(extraction.metrics ?? []) : null;
+  const todayWords = plan.kind === "conversion" ? " it states for the building today" : " it states, not labelled proposed or planned,";
   const over =
     sf != null
       ? `the building's ${Math.round(sf).toLocaleString("en-US")} SF`
       : plan.units != null
         ? `the ${plan.units.toLocaleString("en-US")} ${planned}${plan.units === 1 ? noun.one : noun.many}`
         : today != null
-          ? `the ${today.toLocaleString("en-US")} ${today === 1 ? noun.one : noun.many} it states for the building today`
+          ? `the ${today.toLocaleString("en-US")} ${today === 1 ? noun.one : noun.many}${todayWords}`
           : `its ${planned}${noun.many}`;
   return {
     ...plan,
