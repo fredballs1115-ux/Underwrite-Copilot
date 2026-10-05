@@ -13,8 +13,9 @@ import { datedLong } from "@/lib/debt-index";
 import { documentNotices } from "@/lib/data-notices";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
-import { modelReadsWithheld, placeholderWorkbookLine } from "./report-grid";
+import { WORKBOOK_WITHHELD_WORD, modelReadsWithheld, placeholderWorkbookLine, withheldWorkbookRead } from "./report-grid";
 import { noIrrText } from "./no-irr";
+import type { PlausibilityFinding } from "@/lib/deal-strategy";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -64,6 +65,11 @@ const FMT = {
   mult: '0.00"x"',
   int: "#,##0",
   ratio: '0.00"x"',
+  // A return the deal page withholds (research pass 40, H1): the cell keeps
+  // its live formula and shows the word for every value it can take — a
+  // positive, a negative, a zero and the words a no-IRR cell returns — so
+  // nothing reads as a figure until the reader gives it a format of its own.
+  withheld: Array(4).fill(`"${WORKBOOK_WITHHELD_WORD}"`).join(";"),
 } as const;
 
 /** How many characters of 10 pt text a line of the Cover's 64-wide column C
@@ -167,10 +173,21 @@ export async function buildUnderwriteWorkbook(
    *  were read on, printed on the cover and set as the file's created and
    *  modified time (it was 1970) */
   builtAt: Date = new Date(),
+  /** the plausibility check's findings on the deal page's own read (lib/
+   *  deal-strategy `assessPlausibility` over the extraction and the first
+   *  signal): where one stands against the returns, the Deal Summary marks
+   *  them withheld over their live formulas and says why, as the page
+   *  withholds its tiles (research pass 40, H1); absent, only the model's
+   *  own vacancy is read for that */
+  findings?: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
   const holdYears = result.holdYears;
+  // The returns the deal page withholds — a building run nearly vacant, a
+  // finding against them — said once and marked wherever the workbook
+  // prints them; every cell keeps its formula.
+  const withheld = withheldWorkbookRead(inputs, model.meta.occupancyPct, findings);
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
@@ -212,11 +229,11 @@ export async function buildUnderwriteWorkbook(
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
-  buildDealSummary(wsSummary, model, cf, holdYears);
+  buildDealSummary(wsSummary, model, cf, holdYears, withheld);
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
   const debtHeadRow = buildDebtSchedule(wsDebt, inputs);
   buildOperatingMetrics(wsOps, cf, model, holdYears);
-  buildSensitivity(wsSens, wsEng, inputs, model.sources.purchasePrice?.noPrice != null);
+  buildSensitivity(wsSens, wsEng, inputs, model.sources.purchasePrice?.noPrice != null, withheld != null);
 
   const visible = [
     wsCover,
@@ -1371,7 +1388,16 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
 }
 
 // ── DEAL SUMMARY ────────────────────────────────────────────────────────────
-function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap, holdYears: number) {
+function buildDealSummary(
+  ws: ExcelJS.Worksheet,
+  model: DerivedModel,
+  cf: CfMap,
+  holdYears: number,
+  /** the returns the deal page withholds, and why (lib/underwrite/report-grid
+   *  `withheldWorkbookRead`): marked over their live formulas, the reason in
+   *  the band; null where they stand */
+  withheld: { line: string; cap: boolean } | null = null,
+) {
   const { meta } = model;
   ws.getColumn(1).width = 30;
   ws.getColumn(2).width = 18;
@@ -1415,12 +1441,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // Whether it solves on the model as built, so the tile has room for the
   // words it will show.
   const irrSolves = computeUnderwrite(model.inputs).returns.leveredIrrPct != null;
+  // A return the deal page withholds shows the word over its live formula
+  // (research pass 40, H1), the reason said in the band below — and the cap
+  // on year-1 NOI with them where the page's cap field withholds it too.
+  const retFmt = (fmt: string) => (withheld ? FMT.withheld : fmt);
+  const capFmt = (fmt: string) => (withheld?.cap ? FMT.withheld : fmt);
   const kpis: [string, string, string][] = [
     [priceTile, "PurchasePrice", priceFmt],
-    ["Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, FMT.pct1],
-    ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult],
-    ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, FMT.pct1],
-    ["Year-1 DSCR", dscrY1, FMT.ratio],
+    ["Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, retFmt(FMT.pct1)],
+    ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, retFmt(FMT.mult)],
+    ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, retFmt(FMT.pct1)],
+    ["Year-1 DSCR", dscrY1, retFmt(FMT.ratio)],
   ];
   // Tiles live in columns 1,2,4,5 + one merged pair — keep it simple: five
   // tiles across columns 1..5 with the spacer col 3 carrying the middle tile.
@@ -1444,12 +1475,13 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     v.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
     v.alignment = { horizontal: "center", vertical: "middle", ...(lab === "Levered IRR" ? { wrapText: true } : {}) };
     v.border = { bottom: tileEdge, left: tileEdge, right: tileEdge };
-    // The reason no IRR solves is words: smaller, so they sit in the tile.
-    if (lab === "Levered IRR" && !irrSolves) v.font = { name: ARIAL, size: 9, bold: true, color: BRAND };
+    // The reason no IRR solves is words: smaller, so they sit in the tile —
+    // unless the tile shows the one word a withheld return shows.
+    if (lab === "Levered IRR" && !irrSolves && !withheld) v.font = { name: ARIAL, size: 9, bold: true, color: BRAND };
   });
   // A tile's name past what one line of its tile holds gets the second line.
   ws.getRow(r).height = kpis.some(([lab]) => lab.length > 28) ? 24 : 14;
-  ws.getRow(r + 1).height = irrSolves ? 24 : 40;
+  ws.getRow(r + 1).height = irrSolves || withheld ? 24 : 40;
   const dealKind = meta.strategy ?? "unknown";
   const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
   // What the tiles' returns rest on, said under them before anyone quotes
@@ -1460,11 +1492,15 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // lib/interest) — the deal page and the compare table withhold a note's,
   // a position's and such a share's returns; and on a placeholder price or
   // an assumed year-1 NOI they are the placeholder's — the report and the
-  // deal page withhold them on that rule (lib/underwrite/report-grid).
+  // deal page withhold them on that rule (lib/underwrite/report-grid); and
+  // on a building the model runs nearly vacant, or beside a finding against
+  // the returns, the page's own reason for withholding them, the cells
+  // marked over their live formulas (research pass 40, H1).
   const bandNotes = [
     planDeal ? PLAN_RETURNS_CAVEAT_WORKBOOK : null,
     meta.interest?.modelCaveat ?? null,
     placeholderWorkbookLine(model.inputs, model.sources),
+    withheld?.line ?? null,
   ].filter((s): s is string => !!s);
   bandNotes.forEach((text, i) => {
     const row = r + 2 + i;
@@ -1678,8 +1714,9 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     // (price, closing, fees) plus the capital plan, so it reads a little
     // under the deal page's, the memo's and the report's, which divide by
     // the price plus the budget; the label says which.
-    // No cap on a price of zero or less, which is none (research pass 38).
-    ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // No cap on a price of zero or less, which is none (research pass 38);
+    // marked withheld on a building run nearly vacant, as the page's cap.
+    ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, capFmt(FMT.pct2));
     ret(
       "Yield on Cost (OM stabilized NOI / uses + capital plan)",
       `IF(OR(NOT(ISNUMBER(StabilizedNOI)),TotalCost=0),"n/a",StabilizedNOI/TotalCost)`,
@@ -1703,23 +1740,26 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     const onLand = basisWithheld != null && meta.interest?.kind === "leased_fee";
     // No cap or yield on a price or uses of zero or less, which are none: an
     // NOI under zero over the quotient it backed out read as the stated cap
-    // (research pass 38).
-    ret(onLand ? "Going-In Cap on the Land's Price (Yr-1 NOI / Price)" : "Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // (research pass 38). Marked withheld on a building run nearly vacant,
+    // as the page's cap field is (research pass 40).
+    ret(onLand ? "Going-In Cap on the Land's Price (Yr-1 NOI / Price)" : "Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, capFmt(FMT.pct2));
     // Year-1 NOI over the total uses — no stabilized figure, so never called
     // one (it read "Stabilized Yield (on cost)").
-    ret(onLand ? `${YEAR1_YIELD_LABEL} (the Land's)` : YEAR1_YIELD_LABEL, `IF(TotalUses<=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
+    ret(onLand ? `${YEAR1_YIELD_LABEL} (the Land's)` : YEAR1_YIELD_LABEL, `IF(TotalUses<=0,"n/a",${noiY1}/TotalUses)`, capFmt(FMT.pct2));
   }
-  ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
-  ret("Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, FMT.pct1, "LeveredIRR");
+  // The returns the tiles show, marked as the tiles are where the page
+  // withholds them (research pass 40, H1).
+  ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, retFmt(FMT.pct1));
+  ret("Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, retFmt(FMT.pct1), "LeveredIRR");
   // Its words wrap in their column, the row tall enough for them, where no
   // IRR solves on the model as built.
-  if (!irrSolves) {
+  if (!irrSolves && !withheld) {
     const c = ws.getCell(rr - 1, 5);
     c.alignment = { ...c.alignment, wrapText: true, vertical: "top" };
     ws.getRow(rr - 1).height = 38;
   }
-  ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, FMT.mult);
-  ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult, "LeveredEM");
+  ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, retFmt(FMT.mult));
+  ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, retFmt(FMT.mult), "LeveredEM");
   r = Math.max(r, rr) + 1;
 
   label(ws.getCell(r, 1), "Sensitivity matrices live on the Sensitivity tab; monthly detail and the amortization table on their own tabs.", { color: MUTED, size: 9 });
@@ -2255,6 +2295,10 @@ function buildSensitivity(
   /** the price was backed out of an NOI of zero or less, and is none: the
    *  price axis says so in words, live, until a price is typed */
   noPrice = false,
+  /** the deal page withholds the returns (lib/underwrite/report-grid
+   *  `withheldWorkbookRead`): one line under the tab's own says so, the
+   *  Deal Summary's band says why, and every cell stays live */
+  withheld = false,
 ) {
   const inc = defaultIncrements(inp);
   const steps = [-2, -1, 0, 1, 2];
@@ -2385,6 +2429,16 @@ function buildSensitivity(
     "Live — every cell is a full re-run of the model, its axes centered on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
     { color: MUTED, size: 9 },
   );
+  // On the row the tab leaves blank, so nothing below it moves: where the
+  // deal page withholds these returns, the grids are the same model's, and
+  // the Deal Summary's band says why (research pass 40, H1).
+  if (withheld) {
+    label(
+      wsSens.getCell(r + 1, 1),
+      "The deal page withholds this model's returns and the full report leaves its grids out — the Deal Summary says why.",
+      { color: MUTED, size: 9 },
+    );
+  }
   r += 2;
 
   const IRR_COLS = { from: 2, to: 6 }; // B..F

@@ -18,6 +18,7 @@ import { readPortfolio } from "@/lib/portfolio";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { regulationForDeal } from "@/lib/rent-regulation";
+import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 
 export const runtime = "nodejs";
 
@@ -170,8 +171,13 @@ export async function GET(
       console.warn(`workbook market read failed for ${id}:`, err instanceof Error ? err.message : err);
     }
     // A portfolio memorandum's properties (#411), the same reader as the
-    // deal page's card and the report's portfolio page.
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction));
+    // deal page's card and the report's portfolio page. And the plausibility
+    // check's findings on the deal page's own read (its kind with the first
+    // signal): where one stands against the returns, the Deal Summary marks
+    // them withheld over their live formulas, as the page withholds its
+    // tiles and the report its grids (research pass 40, H1).
+    const findings = assessPlausibility(extraction, inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null));
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), new Date(), findings);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";

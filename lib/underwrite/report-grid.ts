@@ -370,12 +370,14 @@ export interface SensitivityData {
   maxBidWithheld?: string | null;
   /** why the report leaves the model's returns out, or null where it may
    *  print them (`placeholderReturnsLine`, else `leaseReturnsLine`, else
-   *  `misreadReturnsLine`); null where no sources, interest read or
-   *  findings were given */
+   *  `nearlyVacantReturnsLine`, else `misreadReturnsLine`); null where no
+   *  sources, interest read, occupancy or findings were given and the model
+   *  runs the building under `NEARLY_VACANT` */
   withheld?: string | null;
-  /** `withheld` is a finding against the returns (`misreadReturnsLine`):
-   *  the grids and the max bid are left out, while the model's reads of the
-   *  memorandum's terms print, as the deal page prints them beside its
+  /** `withheld` is a building run nearly vacant or a finding against the
+   *  returns (`nearlyVacantReturnsLine`, `misreadReturnsLine`): the grids,
+   *  the base case and the max bid are left out, while the model's reads of
+   *  the memorandum's terms print, as the deal page prints them beside its
    *  withheld tiles; absent where `withheld` leaves those out too */
   readsStand?: boolean;
   /** what the modelled price is — the ask, a share grossed up to the whole,
@@ -501,8 +503,10 @@ export interface SensitivityOptions {
   termRead?: ((inputs: UnderwriteInputs) => { irr: number | null } | null) | null;
   /** the occupancy the model read, decimal (the derived model's
    *  `meta.occupancyPct`): where the model runs the building 90% vacant or
-   *  more, the max bid is withheld and the sentence names the occupancy
-   *  stated (`nearlyVacantReason`) */
+   *  more, the grids, the base case and the max bid are left out, as the
+   *  deal page withholds its tiles, and the sentence names the occupancy
+   *  stated (`nearlyVacantReturnsLine`) — the vacancy is the model's own,
+   *  so it is read whether or not this is given */
   occupancyPct?: number | null;
   /** what the price buys, read on this model by the compare table's rule
    *  (lib/compare-interest `modelReturnsRead` over `screeningCompareModel`):
@@ -812,6 +816,52 @@ export function misreadReturnsLine(
   return f ? `The IRR grids and the max bid are left out: ${f.title}, and returns built on figures that do not tie would be a misread's.` : null;
 }
 
+/**
+ * The report's own words for a building the model runs nearly vacant
+ * (`nearlyVacantReason`): the IRR grids, the base case and the max bid are
+ * left out with the page's reason, as the deal page withholds its tiles —
+ * the report had withheld its max bid alone and printed both grids and the
+ * base case beside the page's withheld tiles (research pass 40, H1(c)).
+ * Null under `NEARLY_VACANT`.
+ */
+export function nearlyVacantReturnsLine(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy?: number | null,
+): string | null {
+  const reason = nearlyVacantReason(inputs, occupancy);
+  return reason ? `The IRR grids and the max bid are left out: ${reason}` : null;
+}
+
+/** What a workbook cell the deal page withholds shows over its live
+ *  formula: one word, short enough for the narrowest return cell. */
+export const WORKBOOK_WITHHELD_WORD = "withheld";
+
+/**
+ * The workbook's Deal Summary where the deal page withholds the returns and
+ * the full report leaves its grids out (research pass 40, H1): a building
+ * the model runs nearly vacant, else a finding against the returns — the
+ * page's own order and its own reason. Said of cells that keep their live
+ * formulas under the word (`WORKBOOK_WITHHELD_WORD`), so the reader who
+ * enters the figures they would run can read them. `cap`: the cap on year-1
+ * NOI goes with the returns, as the page's cap field withholds a nearly
+ * vacant building's. Null where the returns stand.
+ */
+export function withheldWorkbookRead(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy: number | null | undefined,
+  findings: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null | undefined,
+): { line: string; cap: boolean } | null {
+  const vacant = nearlyVacantReason(inputs, occupancy);
+  const f = vacant ? null : (findings ?? []).find(findingWithholdsReturns);
+  if (!vacant && !f) return null;
+  const what = vacant ? "The returns and the cap on year-1 NOI are" : "The returns are";
+  const reason = vacant ?? `${f!.title}, and returns built on figures that do not tie would be a misread's.`;
+  return {
+    line: `${what} withheld on the deal page, and the full report leaves its grids and max bid out: ${reason} The cells marked “${WORKBOOK_WITHHELD_WORD}” keep their live formulas: give one a number format to read it.`,
+    cap: vacant != null,
+  };
+}
+
 /** Everything the report's sensitivity page renders, in one pure build. */
 export function buildSensitivityData(
   inputs: UnderwriteInputs,
@@ -837,7 +887,11 @@ export function buildSensitivityData(
   const vacant = nearlyVacantReason(inputs, opts.occupancyPct);
   const solved = vacant ? null : solveMaxBid(inputs, maxBidFloors.floors, levers);
   const firstReason = placeholderReturnsLine(inputs, opts.sources) ?? leaseReturnsLine(opts.interest);
-  const misread = misreadReturnsLine(opts.findings);
+  // Then the deal page's own order over its tiles: a building the model runs
+  // nearly vacant, then a finding against the returns. Each leaves the grids,
+  // the base case and the max bid out and the model's reads of the terms in,
+  // as the page prints them beside its withheld tiles (research pass 40, H1).
+  const standing = nearlyVacantReturnsLine(inputs, opts.occupancyPct) ?? misreadReturnsLine(opts.findings);
   return {
     grid,
     priceGrid,
@@ -864,11 +918,12 @@ export function buildSensitivityData(
     noBid: box && solved && solved.price == null ? noBidRead(inputs, box, levers) : null,
     maxBidWithheld: vacant,
     // A placeholder's reason first; else a leasehold whose lease ends inside
-    // the hold, said in the leasehold card's own sentence; else a finding
-    // against the returns, the deal page's own rule — the grids had printed
-    // beside the page's withheld tiles (research pass 38).
-    withheld: firstReason ?? misread,
-    ...(firstReason == null && misread != null ? { readsStand: true } : {}),
+    // the hold, said in the leasehold card's own sentence; else a building
+    // run nearly vacant, else a finding against the returns, the deal page's
+    // own rules — the grids had printed beside the page's withheld tiles
+    // (research passes 38 and 40).
+    withheld: firstReason ?? standing,
+    ...(firstReason == null && standing != null ? { readsStand: true } : {}),
     priceSource: opts.sources?.purchasePrice ?? null,
     baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
   };

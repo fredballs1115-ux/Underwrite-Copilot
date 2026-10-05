@@ -256,8 +256,9 @@ export async function GET(
       // solved on the box's floors, as the deal page solves it.
       // A leasehold's bid is solved on the capitalised exit; the term's own
       // read says what it returns on the lease's term (research pass 35).
-      // A building the model runs nearly vacant has no max bid: the deal
-      // page withholds its own, and the report says why in its place.
+      // A building the model runs nearly vacant has no returns worth a grid:
+      // the deal page withholds its tiles, and the report leaves its grids,
+      // base case and max bid out with the page's reason (research pass 40).
       sensitivity = buildSensitivityData(derived.inputs, hurdlePct, {
         sources: derived.sources,
         floors,
