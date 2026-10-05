@@ -5325,6 +5325,8 @@ describe("ShareView — a hotel development is spoken in keys", () => {
 // ── The sample screen's leverage check ──────────────────────────────────────
 import { renderToString } from "react-dom/server";
 import { SampleLeverageCard } from "@/app/demo/leverage-card";
+import { benchmark30 } from "@/lib/debt-index";
+import { seedBenchmarks } from "@/lib/research-data";
 
 describe("SampleLeverageCard — the sample's cap against the week's survey and the latest 10-year", () => {
   // The runner's own table (lib/live-rates.fixture): the survey at 6.95%
@@ -5356,8 +5358,11 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
     expect(served).toContain("the 10-year Treasury (");
   });
 
-  it("the snapshot is named as the snapshot, and no 10-year means no second line", () => {
-    const snapshot = { value: 6.65, asOf: "2026-08-20", source: "FRED PMMS, the checked-in snapshot", live: false };
+  it("the snapshot is named as the snapshot, by its publisher, and no 10-year means no second line", () => {
+    // The research layer's own row, read the way the demo reads it: the file
+    // cites Freddie Mac's release, so the card never credits the week to FRED.
+    const snapshot = benchmark30(null, seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"))!;
+    expect(snapshot).toMatchObject({ value: 6.65, asOf: "2026-08-20", live: false });
     const fallback = visibleText(render(React.createElement(SampleLeverageCard, {
       capPct: 5.45,
       bench30: snapshot,
@@ -5365,15 +5370,16 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
       today: "2026-09-21",
     })));
     expect(fallback).toContain("Negative leverage: going-in cap sits 120 bps below the 30-yr fixed");
-    expect(fallback).toContain("30-yr fixed (FRED PMMS, the checked-in snapshot, as of 2026-08-20)");
+    expect(fallback).toContain("30-yr fixed (Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20)");
+    expect(fallback).not.toContain("FRED");
     expect(fallback).not.toContain("10-year");
     // The research rule (lib/research-age): the snapshot's week is current
     // through its 180th day, Feb 16, 2027, and from Feb 17 it keeps its date
     // with its age and the stale mark.
     const card = (today: string) =>
       visibleText(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30: snapshot, tenYear: null, today })));
-    expect(card("2027-02-16")).toContain("(FRED PMMS, the checked-in snapshot, as of 2026-08-20)");
-    expect(card("2027-02-17")).toContain("(FRED PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
+    expect(card("2027-02-16")).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20)");
+    expect(card("2027-02-17")).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
     // A live survey keeps its own cadence's word, never the research rule's.
     expect(visibleText(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2027-06-01" })))).toContain(
       "30-yr fixed (FRED · MORTGAGE30US, as of 2026-09-17)",

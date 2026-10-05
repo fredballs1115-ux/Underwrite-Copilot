@@ -5,6 +5,7 @@ import {
   type LiveRate,
 } from "@/lib/live-rates";
 import { withArticle } from "@/lib/article";
+import { sourceParts } from "@/lib/source-parts";
 
 /**
  * The index a loan is quoted over, read off today's rates table — the half
@@ -139,15 +140,35 @@ export interface Benchmark30 {
   /** ISO date of the figure — the survey week, or the snapshot's own as-of */
   asOf: string;
   /** "FRED · MORTGAGE30US" for the live survey (", stale" appended where
-   *  the table has not been written for the survey's cadence), "FRED PMMS,
-   *  the checked-in snapshot" for the research layer's row */
+   *  the table has not been written for the survey's cadence); for the
+   *  research layer's row, its publisher as the row's own source names it
+   *  ("Freddie Mac PMMS, the checked-in snapshot"), or "publisher not
+   *  recorded, the checked-in snapshot" where the source names none */
   source: string;
   live: boolean;
 }
 
+/**
+ * The publisher a snapshot's source names, as the research file writes it:
+ * the words beside its link (lib/source-parts), less the kind of document
+ * they were read from — "Freddie Mac PMMS weekly release" is Freddie Mac's
+ * PMMS. Research pass 26, C16: the label had said "FRED PMMS" over a file
+ * that cites Freddie Mac's release and a newswire's copy of it, and FRED
+ * nowhere. Null where the source names none: a bare link is no publisher,
+ * and none is supplied from memory.
+ */
+function snapshotPublisher(source: string | null | undefined): string | null {
+  const words = sourceParts(source).words;
+  if (!words) return null;
+  const name = words
+    .replace(/\s+(?:(?:daily|weekly|monthly|quarterly|annual)\s+)?(?:(?:press|news)\s+)?releases?$/i, "")
+    .trim();
+  return name || null;
+}
+
 export function benchmark30(
   survey: SurveyRate | null | undefined,
-  snapshot: { low: number | null; as_of: string } | null | undefined,
+  snapshot: { low: number | null; as_of: string; source?: string | null } | null | undefined,
 ): Benchmark30 | null {
   if (survey) {
     return {
@@ -161,7 +182,7 @@ export function benchmark30(
     return {
       value: snapshot.low,
       asOf: snapshot.as_of,
-      source: "FRED PMMS, the checked-in snapshot",
+      source: `${snapshotPublisher(snapshot.source) ?? "publisher not recorded"}, the checked-in snapshot`,
       live: false,
     };
   }

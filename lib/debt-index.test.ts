@@ -16,6 +16,7 @@ import {
   type SurveyRate,
 } from "./debt-index";
 import { SERIES } from "./live-rates";
+import { seedBenchmarks } from "./research-data";
 
 // The runner's own table, figure for figure (lib/live-rates.fixture.ts).
 const rates = readRates(REAL_ROWS, FIXTURE_NOW);
@@ -121,8 +122,9 @@ describe("the all-in rate and its note", () => {
 
 describe("benchmark30 — the leverage check's 30-yr fixed, and which one it is", () => {
   const live: SurveyRate = { id: "MORTGAGE30US", pct: 6.95, asOf: "2026-09-17", fresh: true };
-  // The research layer's checked-in row (data/research/capital_markets.json).
-  const snapshot = { low: 6.65, as_of: "2026-08-20" };
+  // The research layer's checked-in row (data/research/capital_markets.json),
+  // as the seed reads it: its source is the file's first.
+  const snapshot = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed")!;
 
   it("the week's survey first, named as FRED's series", () => {
     expect(benchmark30(live, snapshot)).toEqual({
@@ -140,14 +142,32 @@ describe("benchmark30 — the leverage check's 30-yr fixed, and which one it is"
     expect(b?.source).toBe("FRED · MORTGAGE30US, stale");
   });
 
-  it("the checked-in snapshot only where the table has no survey, named as the snapshot", () => {
+  it("the checked-in snapshot only where the table has no survey, named as the snapshot by the publisher its source states", () => {
+    // Research pass 26, C16: the file cites Freddie Mac's weekly release (and
+    // a newswire's copy of it), never FRED — the label had said "FRED PMMS".
+    expect(snapshot.source).toContain("(Freddie Mac PMMS weekly release)");
+    expect(snapshot.source).not.toMatch(/\bFRED\b/);
     expect(benchmark30(null, snapshot)).toEqual({
       value: 6.65,
       asOf: "2026-08-20",
-      source: "FRED PMMS, the checked-in snapshot",
+      source: "Freddie Mac PMMS, the checked-in snapshot",
       live: false,
     });
     expect(benchmark30(undefined, snapshot)?.live).toBe(false);
+  });
+
+  it("names the publisher only as the source's own words state it — a bare link or a blank names none", () => {
+    const row = (source: string | null | undefined) => ({ low: 6.65, as_of: "2026-08-20", source });
+    expect(benchmark30(null, row("Freddie Mac"))?.source).toBe("Freddie Mac, the checked-in snapshot");
+    expect(benchmark30(null, row("https://example.org/news (Freddie Mac PMMS press release)"))?.source).toBe(
+      "Freddie Mac PMMS, the checked-in snapshot",
+    );
+    for (const none of ["https://example.org/news/", "", null, undefined]) {
+      expect(benchmark30(null, row(none))?.source).toBe("publisher not recorded, the checked-in snapshot");
+    }
+    // Whatever the row, the snapshot is never credited to FRED, which the
+    // file does not say published it.
+    for (const s of ["Freddie Mac", "", null]) expect(benchmark30(null, row(s))?.source).not.toContain("FRED");
   });
 
   it("nothing where neither states a figure — a blank is null, never zero", () => {
