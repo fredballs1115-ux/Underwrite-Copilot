@@ -665,7 +665,9 @@ export function Pipeline({
         rowMarketLabel(d) ?? "",
         d.slots.price ?? "",
         // The price by the unit, the key or the foot (#469); blank where
-        // the count or the area is not stated, and on a plan deal.
+        // the count or the area is not stated, and on a conversion or a
+        // development (whose basis is the all-in cost). A value-add's is the
+        // price over the building as it stands, not the plan's all-in basis.
         d.slots.basis ?? "",
         // Blank on a fee simple — the price is the building's.
         d.slots.interest ?? "",

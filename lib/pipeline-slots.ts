@@ -155,9 +155,13 @@ export interface PipelineSlots {
   exchange?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
-   *  null on a plan deal, a note, the land, a share with no stated
+   *  null on a conversion or a development (whose basis is the all-in cost,
+   *  not the shell's price), a note, the land, a share with no stated
    *  percentage or beside the loan its entity carries (its grossed-up price
-   *  is the equity's whole), or where the count or the area is not stated */
+   *  is the equity's whole), or where the count or the area is not stated.
+   *  A value-add's and a lease-up's is the price over the building as it
+   *  stands, never the plan's all-in basis per unit, which the plan's own
+   *  facts print under their own label */
   basis?: string | null;
 }
 
