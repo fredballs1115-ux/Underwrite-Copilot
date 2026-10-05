@@ -6,8 +6,10 @@
  * among them is said, never "each OM you've screened". No imports: the
  * deal view, a client component, reads it.
  */
-export function internalCompsLead(count: number, withTeam: boolean): string {
+export function internalCompsLead(count: number, withTeam: boolean, withTyped = false): string {
   const what = count === 1 ? "Your most recent screen" : `Your ${count} most recent screens`;
   const whose = withTeam ? ", yours and your team's," : "";
-  return `${what} of the same asset class${whose} as extracted from each OM — your own frame of reference, not third-party comp data.`;
+  // A deal typed by hand was extracted from no OM (audit C5, LOW-8).
+  const source = withTyped ? "as extracted from each OM or entered by hand" : "as extracted from each OM";
+  return `${what} of the same asset class${whose} ${source} — your own frame of reference, not third-party comp data.`;
 }

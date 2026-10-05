@@ -24,6 +24,7 @@ import { statedCapRead } from "@/lib/compare-interest";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 import { yieldOnCostText } from "@/lib/plan-facts";
+import { typedByHand } from "@/lib/manual-deal";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -56,6 +57,9 @@ export interface InternalComp {
   /** a teammate's screen, not the reader's own — set where the caller says
    *  who is reading (`viewerId`), so the block says whose screens it shows */
   teammate?: boolean;
+  /** the deal's facts were typed by hand, extracted from no OM
+   *  (lib/manual-deal `typedByHand`) — the block says so */
+  typedByHand?: boolean;
 }
 
 interface MetricLike {
@@ -285,6 +289,7 @@ export function deriveInternalComps(
       // To two decimals, as the sibling's own header and card print it.
       yieldOnCostLabel: yoc != null ? yieldOnCostText(yoc) : null,
       ...(viewerId !== undefined ? { teammate: row.user_id != null && row.user_id !== viewerId } : {}),
+      ...(typedByHand(ext) ? { typedByHand: true } : {}),
     });
     if (comps.length >= limit) break;
   }

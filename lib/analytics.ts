@@ -72,9 +72,15 @@ export interface AnalyticsRow {
  * teammate's deal. Whose deals the page pools is the owner's call; these
  * words follow the read.
  */
-export function analyticsScope(own: number, team: number): string {
-  if (team <= 0) return "What your own screens add up to — every figure below was extracted from an OM you screened, never restated.";
-  return `What the screens in your pipeline add up to — ${own} of yours and ${team} of your team's — every figure below was extracted from a screened OM, never restated.`;
+export function analyticsScope(own: number, team: number, typed = 0): string {
+  // A deal typed by hand (lib/manual-deal `typedByHand`) was extracted from
+  // no OM: where any is among them the words say so (audit C5, LOW-8).
+  if (team <= 0)
+    return typed > 0
+      ? "What your own screens add up to — every figure below is as extracted from an OM you screened or as you entered it by hand, never restated."
+      : "What your own screens add up to — every figure below was extracted from an OM you screened, never restated.";
+  const source = typed > 0 ? "is as extracted from a screened OM or as entered by hand" : "was extracted from a screened OM";
+  return `What the screens in your pipeline add up to — ${own} of yours and ${team} of your team's — every figure below ${source}, never restated.`;
 }
 
 export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {

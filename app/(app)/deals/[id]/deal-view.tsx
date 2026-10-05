@@ -1995,7 +1995,11 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
         From your pipeline
       </h2>
       <p className="mt-1 text-sm text-muted" data-qa="internal-comps-lead">
-        {internalCompsLead(comps.length, comps.some((c) => c.teammate))}
+        {internalCompsLead(
+          comps.length,
+          comps.some((c) => c.teammate),
+          comps.some((c) => c.typedByHand),
+        )}
       </p>
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">

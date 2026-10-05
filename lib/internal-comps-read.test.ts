@@ -78,9 +78,24 @@ describe("whose screens they are", () => {
     for (const s of [internalCompsLead(8, false), internalCompsLead(3, true)]) expect(s).not.toContain("each OM you've screened");
   });
 
+  it("never says a deal typed by hand was extracted from an OM (audit C5, LOW-8)", () => {
+    const typed = {
+      ...row("typed", "me", 3),
+      extraction: { ...row("typed", "me", 3).extraction, totalPages: 0, metrics: row("typed", "me", 3).extraction.metrics.map((m) => ({ ...m, page: "" })) },
+    };
+    const comps = deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [typed, row("read", "me", 2)], 8, "me");
+    expect(comps.map((c) => [c.dealId, c.typedByHand ?? false])).toEqual([
+      ["typed", true],
+      ["read", false],
+    ]);
+    expect(internalCompsLead(2, false, true)).toBe(
+      "Your 2 most recent screens of the same asset class as extracted from each OM or entered by hand — your own frame of reference, not third-party comp data.",
+    );
+  });
+
   it("is what the deal page draws, from a read that matches the class before any cut", () => {
     const view = readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8");
-    expect(view).toContain("internalCompsLead(comps.length, comps.some((c) => c.teammate))");
+    expect(view).toMatch(/internalCompsLead\(\s*comps\.length,\s*comps\.some\(\(c\) => c\.teammate\),\s*comps\.some\(\(c\) => c\.typedByHand\),?\s*\)/);
     const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
     expect(page).toContain('.select("id, asset_class, is_sample, created_at, ext_class:extraction->>assetClass")');
     expect(page).toContain("internalCompCandidates(");

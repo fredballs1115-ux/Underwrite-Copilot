@@ -85,5 +85,12 @@ describe("analytics — every screen, newest first, and whose", () => {
     const text = visibleText(renderToStaticMarkup(await AnalyticsPage())).replace(/\s+/g, " ");
     expect(text).toContain("What your own screens add up to");
     expect(analyticsScope(4, 0)).toBe("What your own screens add up to — every figure below was extracted from an OM you screened, never restated.");
+    // A deal typed by hand was extracted from no OM (audit C5, LOW-8).
+    expect(analyticsScope(4, 0, 1)).toBe(
+      "What your own screens add up to — every figure below is as extracted from an OM you screened or as you entered it by hand, never restated.",
+    );
+    expect(analyticsScope(3, 2, 1)).toBe(
+      "What the screens in your pipeline add up to — 3 of yours and 2 of your team's — every figure below is as extracted from a screened OM or as entered by hand, never restated.",
+    );
   });
 });

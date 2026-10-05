@@ -19,6 +19,8 @@ import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
 import { readAllResult } from "@/lib/read-all";
+import { typedByHand } from "@/lib/manual-deal";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export const metadata: Metadata = { title: "Analytics" };
 
@@ -63,6 +65,8 @@ export default async function AnalyticsPage() {
   // sample.
   const pooled = data.filter((r) => !r.is_sample && r.extraction != null);
   const own = pooled.filter((r) => r.user_id === user.id).length;
+  // A deal typed by hand was extracted from no OM, and the words say so.
+  const typed = pooled.filter((r) => typedByHand(r.extraction as ExtractionResult | null)).length;
   const capPoints = deals
     .filter((d) => d.capPct != null)
     .map((d) => ({ at: d.at, value: d.capPct!, name: d.name }));
@@ -132,7 +136,7 @@ export default async function AnalyticsPage() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Analytics</h1>
         <p className="mt-1 text-sm text-muted" data-qa="analytics-scope">
-          {analyticsScope(own, pooled.length - own)}
+          {analyticsScope(own, pooled.length - own, typed)}
         </p>
       </div>
 
