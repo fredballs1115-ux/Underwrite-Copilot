@@ -1223,7 +1223,7 @@ jobs:
           mark "#500 operating businesses, read as the operator's" grep -q "Gas stations, car washes and other operating businesses" p_whats-new.html
           mark "#501 condominium units bought in bulk" grep -q "Condominium units bought in bulk" p_whats-new.html
           mark "#502 when a screen stops, it says so" grep -q "When a screen stops, it says so" p_whats-new.html
-          mark "#503 every data source credited as its terms ask" grep -q "Every data source credited as its terms ask" p_whats-new.html
+          mark "#503 data sources credited beside their figures" grep -q "Data sources credited beside their figures" p_whats-new.html
           mark "#504 sharper card photos and a scene for every deal" grep -q "Sharper card photos, and a scene of its own for every deal" p_whats-new.html
           mark "#505 the market page, quicker" grep -q "The market page, quicker" p_whats-new.html
           mark "#506 flood insurance, as the law reaches it" grep -q "Flood insurance, as the law reaches it" p_whats-new.html
