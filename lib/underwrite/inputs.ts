@@ -57,9 +57,10 @@ import {
   renovationProgramBudget,
   type StrategyKind,
   unitCountFromMetrics,
+  unitCountRow,
 } from "@/lib/deal-strategy";
 import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
-import { assetClassKey, assetWords } from "@/lib/asset-words";
+import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
@@ -873,7 +874,12 @@ export function deriveUnderwriteInputs(
   const sfMetric = buildingSfRow(metrics);
   const sfParsed = sfMetric ? parseSf(sfMetric.value) : null;
   const words = assetWords(extraction?.assetClass);
-  const unitNoun = words.noun ?? { one: "unit", many: "units" };
+  // The count in the memorandum's own noun (lib/asset-words `countNoun`): a
+  // care home's "Licensed beds" are beds and a marina's "Wet slips" slips,
+  // never "units" because the class names no noun of its own (audit A, L2);
+  // else the class's, else units.
+  const countMany = countNoun(unitCountRow(metrics)?.label, extraction?.assetClass);
+  const unitNoun = { one: countMany.replace(/s$/, ""), many: countMany };
   const typicalSf = units != null && units > 0 && cd.sfPerUnit ? Math.round(units * cd.sfPerUnit) : null;
   const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : (typicalSf ?? 100_000));
   if (rrSf != null) {
@@ -1101,7 +1107,7 @@ export function deriveUnderwriteInputs(
       market: extraction?.market ?? "",
       // The workbook's cover prints this: the label, never a key or "auto".
       assetClass: assetClassLabel(extraction?.assetClass) || "—",
-      unitNoun: assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" },
+      unitNoun,
       interest: interestMeta(extraction),
       assumable: assumableMeta(extraction, inputs),
       sellerNote: sellerNoteMeta(extraction, inputs),

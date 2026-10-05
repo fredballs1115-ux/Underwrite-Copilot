@@ -964,6 +964,31 @@ describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
     expect(labels).toContain("Year-1 Rent / Key / Month");
     expect(labels.some((l) => /\/ Unit\b|^Units$/.test(l))).toBe(false);
   });
+
+  // Audit A, L2: a class with no noun of its own read its count as "units"
+  // whatever the memorandum called it.
+  it("names a count in the memorandum's own noun: a care home's beds, a marina's slips", async () => {
+    for (const [label, cls, one, many, title] of [
+      ["Licensed beds", "senior_housing", "bed", "beds", "Bed"],
+      ["Wet slips", "other", "slip", "slips", "Slip"],
+    ] as const) {
+      const ex: ExtractionResult = {
+        ...extraction,
+        assetClass: cls,
+        metrics: [...extraction.metrics.filter((x) => !/unit|sf|square/i.test(x.label)), { label, value: "120", flagged: false, page: "p. 4" }],
+      };
+      const m = deriveUnderwriteInputs(ex, "fallback");
+      expect(m.meta.units, label).toBe(120);
+      expect(m.meta.unitNoun, label).toEqual({ one, many });
+      const buf = await buildUnderwriteWorkbook(m);
+      const { wb } = await loadIntoHf(buf);
+      const ws = wb.getWorksheet("Operating Metrics")!;
+      const labels: string[] = [];
+      for (let r = 1; r <= ws.rowCount; r++) labels.push(String(ws.getCell(r, 1).value ?? ""));
+      expect(labels, label).toContain(`Price / ${title}`);
+      expect(labels.some((l) => /\/ Unit\b|^Units$/.test(l)), label).toBe(false);
+    }
+  });
 });
 
 // ── The Market Read tab ─────────────────────────────────────────────────────
