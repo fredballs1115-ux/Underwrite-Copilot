@@ -1627,6 +1627,34 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A sandwich position (lib/sandwich-lease), the same way.
   const sandwichRead = readSandwichLease(extraction);
   const sandwich = input.sandwich ?? (sandwichRead ? { line: sandwichShortLine(sandwichRead), read: "" } : null);
+  // The deal's terms beside the model, each the model's read where the
+  // caller derived one, else the memorandum's line alone: printed over the
+  // grids they speak to — the plan's or the IRR's — and, where the report
+  // has neither (a model left out, or none built), on the page that says
+  // so, never nowhere (#183).
+  const termLines = [forward, goingConcern, regulation, singleTenant, hotel, sale, roster, valueAdd, taxAbatement, siteReports, student, mh, storage, mixedUse, condo, sandwich];
+  const anyCaveat = termLines.some((t) => !!t?.line) || !!affordable?.modelCaveat;
+  const caveats = (
+    <>
+      <SingleTenantCaveat lease={forward} />
+      <SingleTenantCaveat lease={goingConcern} />
+      <AffordableCaveat read={affordable} />
+      <SingleTenantCaveat lease={regulation} />
+      <SingleTenantCaveat lease={singleTenant} />
+      <SingleTenantCaveat lease={hotel} />
+      <SingleTenantCaveat lease={sale} />
+      <SingleTenantCaveat lease={roster} />
+      <SingleTenantCaveat lease={valueAdd} />
+      <SingleTenantCaveat lease={taxAbatement} />
+      <SingleTenantCaveat lease={siteReports} />
+      <SingleTenantCaveat lease={student} />
+      <SingleTenantCaveat lease={mh} />
+      <SingleTenantCaveat lease={storage} />
+      <SingleTenantCaveat lease={mixedUse} />
+      <SingleTenantCaveat lease={condo} />
+      <SingleTenantCaveat lease={sandwich} />
+    </>
+  );
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1845,23 +1873,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
 
           {/* The plan deal has no sensitivity page, so its assumptions read
               lands here, under the grid it is judged on. */}
-          {!sensitivity && <SingleTenantCaveat lease={forward} />}
-          {!sensitivity && <SingleTenantCaveat lease={goingConcern} />}
-          {!sensitivity && <AffordableCaveat read={affordable} />}
-          {!sensitivity && <SingleTenantCaveat lease={regulation} />}
-          {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
-          {!sensitivity && <SingleTenantCaveat lease={hotel} />}
-          {!sensitivity && <SingleTenantCaveat lease={sale} />}
-          {!sensitivity && <SingleTenantCaveat lease={roster} />}
-          {!sensitivity && <SingleTenantCaveat lease={valueAdd} />}
-          {!sensitivity && <SingleTenantCaveat lease={taxAbatement} />}
-          {!sensitivity && <SingleTenantCaveat lease={siteReports} />}
-          {!sensitivity && <SingleTenantCaveat lease={student} />}
-          {!sensitivity && <SingleTenantCaveat lease={mh} />}
-          {!sensitivity && <SingleTenantCaveat lease={storage} />}
-          {!sensitivity && <SingleTenantCaveat lease={mixedUse} />}
-          {!sensitivity && <SingleTenantCaveat lease={condo} />}
-          {!sensitivity && <SingleTenantCaveat lease={sandwich} />}
+          {!sensitivity && caveats}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1896,23 +1908,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               {str(`The note, on its own terms: ${noteFigures}`)}
             </Text>
           ) : null}
-          <SingleTenantCaveat lease={forward} />
-          <SingleTenantCaveat lease={goingConcern} />
-          <AffordableCaveat read={affordable} />
-          <SingleTenantCaveat lease={regulation} />
-          <SingleTenantCaveat lease={singleTenant} />
-          <SingleTenantCaveat lease={hotel} />
-          <SingleTenantCaveat lease={sale} />
-          <SingleTenantCaveat lease={roster} />
-          <SingleTenantCaveat lease={valueAdd} />
-          <SingleTenantCaveat lease={taxAbatement} />
-          <SingleTenantCaveat lease={siteReports} />
-          <SingleTenantCaveat lease={student} />
-          <SingleTenantCaveat lease={mh} />
-          <SingleTenantCaveat lease={storage} />
-          <SingleTenantCaveat lease={mixedUse} />
-          <SingleTenantCaveat lease={condo} />
-          <SingleTenantCaveat lease={sandwich} />
+          {caveats}
 
           {/* The base case the grids are struck around, each input with
               where it came from — the workbook's Deal Summary. */}
@@ -2030,6 +2026,22 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       {!sensitivity && input.withheld && (
         <PageChrome title="Sensitivity analysis" count="left out" dealName={dealName} branding={memo.branding}>
           <Text style={{ fontSize: 9, color: C.ink, marginBottom: 6 }}>{str(input.withheld)}</Text>
+          {/* The terms the memorandum states, each its line alone: the
+              model's reads are left out with its grids (#183). */}
+          {plan ? null : caveats}
+          <AssumptionsBlock read={modelVsMarket} />
+        </PageChrome>
+      )}
+
+      {/* No grid page at all — no model was built for this report — and
+          terms the grids would have carried: they print here, never
+          nowhere (#183). */}
+      {!sensitivity && !plan && !input.withheld && (anyCaveat || (modelVsMarket?.checks.length ?? 0) > 0) && (
+        <PageChrome title="The deal's terms" count="no model built" dealName={dealName} branding={memo.branding}>
+          <Text style={s.sub}>
+            {str("No screening model was built for this report, so these are the memorandum's terms as read, without the model's read beside them.")}
+          </Text>
+          {caveats}
           <AssumptionsBlock read={modelVsMarket} />
         </PageChrome>
       )}

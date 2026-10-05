@@ -795,6 +795,15 @@ describe("ReportDocument (full report)", () => {
     )).replace(/\s+/g, " ");
     expect(bareText).toContain("Single tenant: Walgreens Co.");
     expect(bareText).not.toContain("At the model's sale in 5 years");
+    // A report with no grid page at all (no model built) still prints the
+    // lease, on a page that says why (#183).
+    const noModel = buildReportData(deal, "September 30, 2026", [], null);
+    const noModelText = (await pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input: noModel }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    )).replace(/\s+/g, " ");
+    expect(noModelText).toContain("The deal's terms");
+    expect(noModelText).toContain("No screening model was built for this report");
+    expect(noModelText).toContain("Single tenant: Walgreens Co.");
   }, 60000);
 
   it("prints what a hotel is sold with over the grids, and the PIP the model carries (#455)", async () => {
@@ -1161,6 +1170,14 @@ describe("ReportDocument (full report)", () => {
       derived.meta.regulation ?? null,
     );
     expect(withheld.regulation).toEqual({ line: derived.meta.regulation!.line, read: "" });
+    // ... and prints there, on the page that says the grids are left out —
+    // never nowhere (#183).
+    const withheldText = (await pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input: withheld }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    )).replace(/\s+/g, " ");
+    expect(withheldText).toContain("The model runs on a placeholder price.");
+    expect(withheldText).toContain("Rent regulation: NYC rent stabilization applies");
+    expect(withheldText).not.toContain("The model's one growth rate is the market-rate units'");
   }, 60000);
 
   it("carries a forward purchase as buildReportData's last argument, and prints it under the plan page's grid where the report has one (lib/forward-purchase)", async () => {
