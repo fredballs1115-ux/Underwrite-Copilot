@@ -299,4 +299,26 @@ describe("a card says nothing about a picture until the picture has loaded (rese
     expect(visibleText(ringed)).toContain(IMAGE_CREDIT.aerial);
     for (const html of [whole, flipped, caption, ringed]) expect(a11yIssues(html)).toEqual([]);
   });
+
+  it("sets the corner credit at 10px, in a chip no taller than the 9px one, AA over the brightest photograph (research pass 29)", () => {
+    const [photo] = own;
+    const whole = face({ source: photo, loaded: true, credit: photo.credit });
+    const chip = /<span class="([^"]*)">From the offering memorandum<\/span>/.exec(whole)?.[1].split(/\s+/) ?? [];
+    // Its type: 10px at the least, where it had been 9px.
+    const px = (prefix: string) => Number(chip.map((c) => new RegExp(`^${prefix}-\\[(\\d+(?:\\.\\d+)?)px\\]$`).exec(c)?.[1]).find(Boolean));
+    expect(px("text")).toBeGreaterThanOrEqual(10);
+    // Its height: its line and its padding above and below, no more than the
+    // 9px chip's 11.25px line and two pixels each way — it covers no more of
+    // the picture (its area, measured in Geist, a little under the 9px
+    // chip's for every credit a card wears).
+    const pad = chip.includes("py-px") ? 1 : chip.includes("py-0.5") ? 2 : chip.includes("py-0") ? 0 : NaN;
+    expect(px("leading") + 2 * pad).toBeLessThanOrEqual(9 * 1.25 + 2 * 2);
+    // White on black at its opacity, laid over a white photograph — the
+    // brightest there is — reads AA.
+    const alpha = Number(/^bg-black\/(\d+)$/.exec(chip.find((c) => c.startsWith("bg-black/")) ?? "")?.[1]) / 100;
+    expect(chip).toContain("text-white");
+    const linear = (v: number) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+    const under = linear(255 * (1 - alpha));
+    expect((1 + 0.05) / (under + 0.05)).toBeGreaterThanOrEqual(4.5);
+  });
 });

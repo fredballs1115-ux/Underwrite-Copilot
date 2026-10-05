@@ -389,7 +389,11 @@ export function BannerFace({
         // building, and its photographer and licence under it.
         <MarketCaption market={source.market} credit={source.credit} />
       ) : (
-        <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[9px] leading-tight text-white">
+        // 10px on a 12px line, a pixel above and below and four a side
+        // (research pass 29: 9px was under any comfortable size on a phone):
+        // measured in Geist, a little less of the picture than the 9px chip
+        // covered for every credit a card wears.
+        <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1 py-px text-[10px] leading-[12px] text-white">
           {credit}
         </span>
       )}

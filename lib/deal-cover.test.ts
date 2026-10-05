@@ -20,7 +20,8 @@ const contrast = (fg: readonly number[], bg: readonly number[]) => {
 
 /** Where a card's words sit, measured from its foot in CSS pixels: the
  *  caption's `pb-2` under the place's 13px line at `leading-tight`, under
- *  the eyebrow's 9px line at the page's 1.5. */
+ *  the eyebrow's 13.5px line — its 9px type's at the page's 1.5, which its
+ *  11px type keeps (research pass 29; the markup is held to it below). */
 const WORDS = { place: [8, 8 + 16.25], eyebrow: [8 + 16.25, 8 + 16.25 + 13.5] } as const;
 /** The heights a card's picture is drawn at: 224 × 140, the smallest the
  *  pipeline drew until research pass 29 (two columns beside the sidebar at
@@ -83,7 +84,7 @@ describe("a deal's cover (#442)", () => {
     // with the rest of each draw its own — its building's place, its street,
     // its trees — drawn for real at the card's frame; the worst pixel under
     // each line across the card's whole width. The place is white at 13px:
-    // AAA. The eyebrow is white at 90% and 9px: AA, as before.
+    // AAA. The eyebrow is white at 90% and 11px: AA, as it was at 9px.
     const [w, h] = COVER_FRAME.card;
     // The rows the words reach on the smallest card, and so on every card.
     const top = Math.floor((1 - WORDS.eyebrow[1] / Math.min(...CARD_HEIGHTS)) * h);
@@ -147,6 +148,17 @@ describe("a deal's cover (#442)", () => {
     expect(visibleText(card)).toContain("No photo yet");
     expect(visibleText(card)).toContain("Waco, TX");
     expect(a11yIssues(card)).toEqual([]);
+    // The words' type and lines, as the contrast test's geometry reads them
+    // (`WORDS`): the eyebrow 11px on its 13.5px line (research pass 29: it
+    // was 9px, under any comfortable size on a phone), the place 13px at
+    // leading-tight, and nothing on the cover under 10px.
+    const classesOf = (words: string) => new RegExp(`<span class="([^"]*)">${words}</span>`).exec(card)?.[1].split(/\s+/) ?? [];
+    expect(classesOf("No photo yet")).toEqual(expect.arrayContaining(["text-[11px]", "leading-[13.5px]", "text-white/90"]));
+    expect(classesOf("Waco, TX")).toEqual(expect.arrayContaining(["text-[13px]", "leading-tight", "text-white"]));
+    expect(card).toContain("pb-2 pt-9");
+    const sizes = [...card.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => Number(m[1]));
+    expect(sizes.length).toBeGreaterThan(0);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(10);
     const thumb = renderToStaticMarkup(React.createElement(DealCover, { cover, label: "Brazos Flats", size: "thumb" }));
     expect(thumb).toContain('aria-hidden="true"');
     expect(visibleText(thumb).trim()).toBe("");
