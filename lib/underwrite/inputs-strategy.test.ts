@@ -557,7 +557,7 @@ describe("deriveUnderwriteInputs — a forward purchase, said and never changed 
     const m = deriveUnderwriteInputs(btr, "fallback");
     expect(m.meta.forward?.line).toBe("Forward purchase: $72.0M paid at delivery (June 2028), the works the developer's; 5.50% at delivery on the stated NOI; deposit 10% at signing, non-refundable after due diligence");
     expect(m.meta.forward?.read).toBe(
-      "The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, June 2028, and the deposit paid at signing sits outside its cash flows. Its year-one NOI is an assumed 6.00% of the price, $4.32M, above the $3.96M the memorandum states at delivery.",
+      "The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, June 2028, and the deposit sits outside its cash flows. Its year-one NOI is an assumed 6.00% of the price, $4.32M, above the $3.96M the memorandum states at delivery.",
     );
     // No budget is the buyer's: the capital line's note says the developer
     // funds the works, never "enter the construction cost".

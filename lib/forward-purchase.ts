@@ -52,6 +52,12 @@ type MetricRow = { label: string; value: string; page?: string };
 const rowOf = (metrics: readonly MetricRow[], re: RegExp, not?: RegExp) =>
   metrics.find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
 
+/** A figure a dollar reader takes ("$1,000,000", "$2.4M", "1,500,000"),
+ *  each read by `parseUsd`, whose floor drops a day count or a year. */
+const DOLLAR_FIGURE = /\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:k|thousand|mm|million|m|bn|billion|b)?\b/gi;
+/** A deposit's words that say it grows after its first payment. */
+const STEPS_UP = /\bincreas\w*|\brais(?:es|ed|ing)\b|\bris(?:es|ing)\b|\bstep(?:s|ped|ping)?[\s-]+up\b|\badditional\b|\bsecond\s+deposit\b|\bfurther\s+deposit\b|\bfollowed\s+by\b|\btop(?:s|ped|ping)?[\s-]+up\b/i;
+
 const BTR_WORDS = /\bbuild[- ]to[- ]rent\b|\bbtr\b|\bsingle[- ]family rental\b|\brental homes?\b/i;
 
 /** "Delivery date", "Substantial completion", "Estimated delivery",
@@ -214,8 +220,22 @@ export function readForwardPurchase(
   const monthsToDelivery = delivery && !deliveryPassed ? Math.max(0, monthsBetweenIso(todayIso, delivery.iso)) : null;
 
   const depositRow = rowOf(metrics, DEPOSIT_ROW, NOT_BUYERS_DEPOSIT);
-  const depositAmount = depositRow ? parseUsd(depositRow.value) : null;
-  const depositPctStated = depositRow ? parsePct(depositRow.value) : null;
+  // A deposit that steps up ("$1,000,000 at signing, increasing to
+  // $4,800,000 at the start of construction") states more than one figure:
+  // no amount and no share is read off it, and the row is said as stated —
+  // its first figure had been said as the buyer's exposure, a 2.1% bar where
+  // the deposit at go-hard is 10% (the audit of 2026-10-05).
+  const depositText = depositRow?.value ?? "";
+  const dollars = [...depositText.matchAll(DOLLAR_FIGURE)].map((m) => parseUsd(m[0])).filter((n): n is number => n != null);
+  const pctFigures = depositText.match(/\d(?:[\d,]*\d)?(?:\.\d+)?\s*%/g)?.length ?? 0;
+  const statedPct = pctFigures === 1 ? parsePct(depositText) : null;
+  // A dollar figure and a share that are not one deposit ("$1,000,000 at
+  // signing; 10% at go-hard") are two.
+  const disagree =
+    dollars.length === 1 && statedPct != null && price != null && price > 0 && Math.abs((dollars[0] / price) * 100 - statedPct) > 0.5;
+  const stepped = STEPS_UP.test(depositText) || dollars.length > 1 || pctFigures > 1 || disagree;
+  const depositAmount = !stepped && dollars.length === 1 ? dollars[0] : null;
+  const depositPctStated = !stepped ? statedPct : null;
   const deposit = depositRow
     ? {
         text: depositRow.value.trim(),
@@ -340,7 +360,9 @@ export function forwardModelLine(
 ): string | null {
   if (!r) return null;
   const when = r.delivery ? `delivery, ${r.delivery.text}` : "delivery";
-  const deposit = r.deposit ? ", and the deposit paid at signing sits outside its cash flows" : "";
+  // Whenever the deposit row says it is paid (the audit of 2026-10-05: "paid
+  // at signing" was said of every deposit).
+  const deposit = r.deposit ? ", and the deposit sits outside its cash flows" : "";
   let noi = "";
   if (model?.noi1 != null && r.deliveryNoi != null) {
     const stated = r.deliveryNoi.value;

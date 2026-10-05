@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { ForwardPanel } from "@/app/forward-panel";
 import {
   DELIVERY_CAP_ROW,
   DELIVERY_ROW,
@@ -20,7 +23,7 @@ import {
   readDeliveryDate,
   readForwardPurchase,
 } from "./forward-purchase";
-import { gluedWords } from "./render-lint";
+import { gluedWords, visibleText } from "./render-lint";
 import { extractionInstruction } from "./anthropic/prompts";
 import { findGoingInCap } from "./criteria";
 
@@ -108,9 +111,13 @@ describe("a forward purchase, read as stated (pass 28)", () => {
   it("says the model's year-one NOI beside the memorandum's at delivery, and changes nothing", () => {
     const r = readForwardPurchase(btr, TODAY)!;
     expect(forwardModelLine(r, { noi1: 4_320_000, noiAssumed: true, price: 72_000_000 })).toBe(
-      "The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, June 2028, and the deposit paid at signing sits outside its cash flows. " +
+      "The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, June 2028, and the deposit sits outside its cash flows. " +
         "Its year-one NOI is an assumed 6.00% of the price, $4.32M, above the $3.96M the memorandum states at delivery.",
     );
+    // When the deposit is paid is the row's to say, never "at signing" for
+    // every deposit (the audit of 2026-10-05).
+    const goHard = readForwardPurchase(deal("Forward purchase at completion", [row("Purchase price", "$30,000,000"), row("Deposit", "$1,500,000 due at go-hard")]), TODAY);
+    expect(forwardModelLine(goHard, null)).not.toContain("paid at signing");
     expect(forwardModelLine(r, { noi1: 3_960_000, noiAssumed: false, price: 72_000_000 })).toContain(
       "Its year-one NOI is $3.96M, the same as the $3.96M the memorandum states at delivery.",
     );
@@ -198,6 +205,38 @@ describe("a forward purchase, read as stated (pass 28)", () => {
     } as unknown as ExtractionResult;
     expect(readForwardPurchase(standing, TODAY)).toBeNull();
     expect(readForwardPurchase(null, TODAY)).toBeNull();
+  });
+
+  // The audit of 2026-10-05: a deposit that steps up was said at its first
+  // figure — "(2.1% of the price)", a 2.1% bar and "deposit $1.00M" on the
+  // memo, where the exposure at go-hard is $4.8M (10%).
+  it("reads no amount and no share off a deposit that steps up, and says its row as stated", () => {
+    const stepped = deal("Forward purchase of a 240-unit community, purchased upon completion", [
+      row("Purchase price", "$48,000,000"),
+      row("Deposit", "$1,000,000 at signing, increasing to $4,800,000 at the start of construction"),
+    ]);
+    const r = readForwardPurchase(stepped, TODAY)!;
+    expect(r.deposit).toEqual({ text: "$1,000,000 at signing, increasing to $4,800,000 at the start of construction", amount: null, sharePct: null });
+    expect(r.headline).toContain(
+      "The deposit as stated: $1,000,000 at signing, increasing to $4,800,000 at the start of construction — the buyer's exposure before delivery.",
+    );
+    expect(r.headline).not.toContain("% of the price");
+    expect(forwardShortLine(r)).toContain("deposit $1,000,000 at signing, increasing to $4,800,000 at the start of construction");
+    const html = renderToStaticMarkup(React.createElement(ForwardPanel, { forward: r, today: "2026-10-05" }));
+    expect(html).not.toContain('data-bar="fwd-deposit"');
+    expect(visibleText(html)).toContain("Deposit, at risk before delivery. As stated: $1,000,000 at signing, increasing to $4,800,000 at the start of construction");
+    // Two shares, a step in words, or a dollar figure and a share that are
+    // not one deposit: the same.
+    for (const words of ["5% at signing, 10% at go-hard", "$1,000,000 at signing, rising to 10% of the price", "$1,000,000 at signing; 10% at go-hard"]) {
+      const d = readForwardPurchase(deal("Forward purchase at completion", [row("Purchase price", "$48,000,000"), row("Deposit", words)]), TODAY)!;
+      expect(d.deposit, words).toEqual({ text: words, amount: null, sharePct: null });
+    }
+    // One figure, or a dollar figure and its own share, read as before.
+    expect(readForwardPurchase(deal("Forward purchase at completion", [row("Purchase price", "$48,000,000"), row("Deposit", "$2,400,000 (5%) at signing")]), TODAY)!.deposit).toEqual({
+      text: "$2,400,000 (5%) at signing",
+      amount: 2_400_000,
+      sharePct: 5,
+    });
   });
 
   it("never reads a tenant's security deposit as the buyer's", () => {
