@@ -1,7 +1,18 @@
 // Reading every row past a project's row cap, and naming many ids a hundred
 // at a time (lib/read-all, research pass 42).
 import { describe, expect, it } from "vitest";
-import { ID_CHUNK, READ_PAGE, chunks, readAll, readAllResult, readByIds } from "./read-all";
+import { createClient } from "@supabase/supabase-js";
+import {
+  ID_CHUNK,
+  IN_LIST_CHARS,
+  READ_PAGE,
+  chunks,
+  chunksBySize,
+  readAll,
+  readAllResult,
+  readByIds,
+  readByValues,
+} from "./read-all";
 
 /** A table that answers at most `cap` rows a response, as a project's max
  *  rows does — a normal success, with no sign the rest exist. */
@@ -83,5 +94,63 @@ describe("chunks and readByIds", () => {
     let n = 0;
     expect(await readByIds([], () => (n++, Promise.resolve({ data: [], error: null })))).toEqual([]);
     expect(n).toBe(0);
+  });
+});
+
+// A news story's address, as the intel job reads it from Google News: a few
+// hundred characters, where an id is thirty-six.
+const story = (i: number) =>
+  `https://news.google.com/rss/articles/CBMi${"qAFBVV95cUxQb2RmT2pQdXl0bF8tZm1Ja3R1VTVRVHlFT0JHUzZKVzBlVDhUZUhs".repeat(4)}${i}?oc=5`;
+
+describe("chunksBySize and readByValues", () => {
+  it("cuts a list of long values by what a request line carries, as well as by count", () => {
+    const urls = Array.from({ length: 100 }, (_, i) => story(i));
+    const runs = chunksBySize(urls);
+    expect(runs.length).toBeGreaterThan(5);
+    expect(runs.flat()).toEqual(urls);
+    for (const run of runs) {
+      expect(run.reduce((n, u) => n + encodeURIComponent(u).length + 9, 0)).toBeLessThanOrEqual(IN_LIST_CHARS);
+    }
+    // ids keep their hundred a request, and a value longer than the line
+    // alone is a run of its own rather than a lost one
+    expect(chunksBySize(Array.from({ length: 250 }, (_, i) => `d${i}`)).map((r) => r.length)).toEqual([100, 100, 50]);
+    expect(chunksBySize(["x".repeat(5_000), "y"]).map((r) => r.length)).toEqual([1, 1]);
+    expect(chunksBySize([])).toEqual([]);
+  });
+
+  it("puts each run in a request line a proxy carries, where a hundred stories in one did not", async () => {
+    const urls: string[] = [];
+    const client = createClient("https://project.supabase.co", "anon-key", {
+      global: {
+        fetch: async (input: RequestInfo | URL) => {
+          urls.push(String(input));
+          return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+        },
+      },
+    });
+    const stories = Array.from({ length: 100 }, (_, i) => story(i));
+    await readByValues(stories, (run) => client.from("market_intel_items").select("url").in("url", run));
+    expect(urls.length).toBeGreaterThan(5);
+    for (const u of urls) expect(u.length).toBeLessThan(8_192);
+    // The old read: a hundred at once.
+    await client.from("market_intel_items").select("url").in("url", stories);
+    expect(urls.at(-1)!.length).toBeGreaterThan(8_192);
+  });
+
+  it("hands back the values of a run whose read failed, with no rows for them — never as none matched", async () => {
+    const values = Array.from({ length: 250 }, (_, i) => `v${i}`);
+    const said: number[] = [];
+    const { rows, unread } = await readByValues(
+      values,
+      (run) => {
+        if (run[0] === "v100") return Promise.resolve({ data: null, error: { message: "414 URI Too Long" } });
+        if (run[0] === "v200") return Promise.reject(new Error("socket hang up"));
+        return Promise.resolve({ data: run.filter((v) => Number(v.slice(1)) % 2 === 0).map((v) => ({ v })), error: null });
+      },
+      (_e, run) => said.push(run.length),
+    );
+    expect(unread).toEqual(values.slice(100));
+    expect(said).toEqual([100, 50]);
+    expect(rows.map((r) => r.v)).toEqual(values.slice(0, 100).filter((_, i) => i % 2 === 0));
   });
 });

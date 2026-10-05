@@ -18,7 +18,9 @@
 
 import { createClient } from "@supabase/supabase-js";
 // A failure said on the run's page, not only in its log (plain Node strips its types).
-import { missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
+// Reading by a list of values that fit a request line (no imports of its own).
+import { readByValues } from "../lib/read-all.ts";
 // Today's date, as every Claude step is told it (lib/anthropic/today): a law
 // "about to" change is judged against the day, never the model's training.
 import { todayLine } from "../lib/anthropic/today.ts";
@@ -121,15 +123,35 @@ const byUrl = new Map();
 for (const it of gathered) if (!byUrl.has(it.url)) byUrl.set(it.url, it);
 const candidates = [...byUrl.values()];
 
-const seen = new Set();
-for (let i = 0; i < candidates.length; i += 100) {
-  const chunk = candidates.slice(i, i + 100).map((c) => c.url);
-  const { data } = await supabase.from("market_intel_items").select("url").in("url", chunk);
-  for (const row of data ?? []) seen.add(row.url);
+// Which stories are already stored, read in runs that fit a request line: a
+// story's address runs to a few hundred characters, so a hundred in one URL
+// was tens of kilobytes. And a read that fails is not "none stored": its
+// stories would be scored, digested and alerted again, the red banner back
+// for a change already on file. Those stories wait for the next run.
+const { rows: storedRows, unread } = await readByValues(
+  candidates.map((c) => c.url),
+  (run) => supabase.from("market_intel_items").select("url").in("url", run),
+  (err, run) => console.error(`dedupe read failed for ${run.length} stories: ${err?.message ?? String(err)}`),
+);
+if (candidates.length > 0 && unread.length === candidates.length) {
+  throw new Error(`dedupe: no story could be checked against the stored ones (${unread.length} gathered)`);
 }
-const fresh = candidates.filter((c) => !seen.has(c.url)).slice(0, MAX_NEW_ITEMS);
+if (unread.length > 0) {
+  console.log(
+    annotation(
+      "warning",
+      `${unread.length} of ${candidates.length} stories could not be checked against the stored ones, so they were left for the next run rather than alerted twice.`,
+      "daily-intel: dedupe read failed",
+    ),
+  );
+}
+const seen = new Set(storedRows.map((row) => row.url));
+const notChecked = new Set(unread);
+const fresh = candidates.filter((c) => !seen.has(c.url) && !notChecked.has(c.url)).slice(0, MAX_NEW_ITEMS);
 const today = new Date().toISOString().slice(0, 10);
-console.log(`gathered ${gathered.length}, unique ${candidates.length}, new ${fresh.length}`);
+console.log(
+  `gathered ${gathered.length}, unique ${candidates.length}, new ${fresh.length}${unread.length ? `, ${unread.length} not checked` : ""}`,
+);
 if (fresh.length === 0) {
   console.log("nothing new — no digest today");
   process.exit(0);

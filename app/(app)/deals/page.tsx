@@ -30,7 +30,8 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { listJobStatus, screenedDay, screenedOn, type JobLike } from "@/lib/screen-run";
 import { screenedAnOm } from "@/lib/onboarding";
 import { olderScreen } from "@/lib/older-screen";
-import { readAllResult } from "@/lib/read-all";
+import { readAllResult, readByIds } from "@/lib/read-all";
+import { pipelineReadNote } from "@/lib/pipeline-read-note";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -172,9 +173,13 @@ export default async function DealsPage({
   const initialView = landingView((await cookies()).get(PIPELINE_VIEW_COOKIE)?.value);
   const googleEnabled = !!process.env.GOOGLE_MAPS_API_KEY;
 
-  // The latest job per deal (Screening… / Failed labels) and the teammate
-  // names for shared deals both depend only on the deal list, not on each
-  // other — fetch them together instead of one after the other.
+  // The latest job per deal (Screening… / Failed labels), the teammate names
+  // for shared deals and each deal's call-for-offers deadline depend only on
+  // the deal list, not on each other — fetched together, a hundred ids a
+  // request (lib/read-all): a whole pipeline's ids in one URL ran past what a
+  // request line carries, and the jobs' one read past the project's max rows
+  // (research pass 42). A read that fails is said over the list
+  // (lib/pipeline-read-note), never shown as no screen running, no deadline.
   const rows = (data ?? []) as Row[];
   const ids = rows.map((d) => d.id);
   const teammateIds = Array.from(
@@ -184,37 +189,46 @@ export default async function DealsPage({
         .map((d) => d.user_id),
     ),
   );
-  const [{ data: jobsData }, { data: mates }, { data: dueRows }] = await Promise.all([
-    ids.length
-      ? supabase
+  const failedRead = (what: string) => (e: unknown) => console.error(`[pipeline] ${what} read failed:`, e);
+  const [jobsData, mates, dueRows] = await Promise.all([
+    readByIds<{ deal_id: string } & JobLike>(
+      ids,
+      (chunk) =>
+        supabase
           .from("analysis_jobs")
           // step + updated_at: a failed run's step says which results it
           // left behind, and a live row that stopped writing reads as stalled.
           .select("deal_id, status, step, updated_at, created_at")
-          .in("deal_id", ids)
+          .in("deal_id", chunk)
           .order("created_at", { ascending: false })
-          // Only the newest row per deal is read below — cap the fetch so a
-          // long re-screen history can't grow this query without bound.
-          .limit(Math.max(100, ids.length * 3))
-      : Promise.resolve({ data: [] as ({ deal_id: string } & JobLike)[] }),
-    teammateIds.length
-      ? supabase.from("profiles").select("id, email, full_name").in("id", teammateIds)
-      : Promise.resolve({ data: [] as { id: string; email: string | null; full_name: string | null }[] }),
-    // Call-for-offers deadlines are best-effort: the column arrived in
-    // migration 0013, and the pipeline must keep working on a database that
-    // hasn't run it yet (the query just errors and every deadline reads null).
-    ids.length
-      ? supabase.from("deals").select("id, offers_due").in("id", ids)
-      : Promise.resolve({ data: [] as { id: string; offers_due: string | null }[] }),
+          // Only the newest row per deal is read below — a few a deal, so a
+          // long re-screen history can't grow a request past one response.
+          .limit(Math.max(100, chunk.length * 3)),
+      failedRead("job"),
+    ),
+    readByIds<{ id: string; email: string | null; full_name: string | null }>(
+      teammateIds,
+      (chunk) => supabase.from("profiles").select("id, email, full_name").in("id", chunk),
+      failedRead("teammate name"),
+    ),
+    // The deadline column arrived in migration 0013, run everywhere since.
+    readByIds<{ id: string; offers_due: string | null }>(
+      ids,
+      (chunk) => supabase.from("deals").select("id, offers_due").in("id", chunk),
+      failedRead("offers-due"),
+    ),
   ]);
+  const readNote = pipelineReadNote({ jobs: !jobsData, offersDue: !dueRows, names: !mates });
+  // Each chunk's rows arrive newest first, and a deal's rows all sit in its
+  // own chunk, so the first seen is its latest.
   const jobByDeal = new Map<string, JobLike>();
-  for (const j of (jobsData ?? []) as ({ deal_id: string } & JobLike)[]) {
+  for (const j of jobsData ?? []) {
     if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
   }
 
   const dueById = new Map<string, string>();
   const dueRead = new Set<string>();
-  for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
+  for (const r of dueRows ?? []) {
     dueRead.add(r.id);
     if (r.offers_due) dueById.set(r.id, r.offers_due);
   }
@@ -244,11 +258,7 @@ export default async function DealsPage({
     );
     for (const [id, due] of dueFills) dueById.set(id, due);
   }
-  const nameById = new Map(
-    ((mates ?? []) as { id: string; email: string | null; full_name: string | null }[]).map(
-      (m) => [m.id, m.full_name || m.email || "Teammate"],
-    ),
-  );
+  const nameById = new Map((mates ?? []).map((m) => [m.id, m.full_name || m.email || "Teammate"]));
 
   // Every deal placed by its address (#441): a deal uploaded with the
   // address box empty takes the one its memorandum states, and a typed line
@@ -548,6 +558,8 @@ export default async function DealsPage({
         // apart should they ever differ (a deal added or removed between the
         // count and the read), never a total it did not read.
         totalDeals={dealTotal ?? null}
+        // A read beside the deals that failed, said over the list.
+        readNote={readNote}
       />
       {/* The strip's own read streams after the pipeline rather than
           holding it back; nothing is drawn until it has stories. */}

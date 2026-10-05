@@ -320,6 +320,7 @@ export function Pipeline({
   onTeam = false,
   todayIso,
   totalDeals = null,
+  readNote = null,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -350,6 +351,10 @@ export function Pipeline({
    *  larger than the deals read — a deal added between the two — the header
    *  says both, never a total it did not read */
   totalDeals?: number | null;
+  /** what a read behind the list could not read just now (each deal's
+   *  latest screen, its offers-due date), said over the list — a failed
+   *  read is never shown as no rows */
+  readNote?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -896,6 +901,14 @@ export function Pipeline({
       {notice && (
         <p className="rounded-lg bg-pass/10 px-3 py-2 text-sm text-pass">
           {notice}
+        </p>
+      )}
+
+      {/* A read behind the list that failed is said, never shown as nothing
+          to show: no deadlines, no screen running (research pass 42). */}
+      {readNote && (
+        <p role="status" data-qa="pipeline-read-note" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
+          {readNote}
         </p>
       )}
 

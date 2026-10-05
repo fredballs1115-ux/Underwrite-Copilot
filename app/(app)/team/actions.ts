@@ -120,8 +120,10 @@ export async function removeMember(formData: FormData) {
   if (!team || team.role !== "owner") redirect("/team?error=owner");
 
   // A removed member must not keep reading the team's deals through the
-  // share links they minted — revoke those before their access goes.
-  await revokeSharesOfDepartingMember(supabase, team.id, memberId);
+  // share links they minted — revoke those before their access goes, and
+  // keep the seat until that is done: a link left live would go on being
+  // listed as one on the deal page.
+  if (!(await revokeSharesOfDepartingMember(supabase, team.id, memberId))) redirect("/team?error=removelinks");
 
   const { error } = await supabase
     .from("team_members")
@@ -148,8 +150,9 @@ export async function leaveTeam() {
   if (team.role === "owner") redirect("/team?error=ownerleave");
 
   // Before the membership row goes (and with it this client's access to the
-  // team's deals): the links they minted for those deals die with the seat.
-  await revokeSharesOfDepartingMember(supabase, team.id, user.id);
+  // team's deals): the links they minted for those deals die with the seat,
+  // and the seat stays until they have.
+  if (!(await revokeSharesOfDepartingMember(supabase, team.id, user.id))) redirect("/team?error=leavelinks");
 
   const { error } = await supabase
     .from("team_members")

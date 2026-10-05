@@ -72,6 +72,71 @@ export function chunks<T>(list: readonly T[], size = ID_CHUNK): T[][] {
   return out;
 }
 
+/** Characters a run of values takes in a request line at most, encoded:
+ *  about what ID_CHUNK UUIDs take. A value can be far longer than an id — a
+ *  news story's address runs to a few hundred characters — so a hundred of
+ *  those in one URL is tens of kilobytes, which no proxy carries. */
+export const IN_LIST_CHARS = 4000;
+
+/** What one value adds to an `in` filter's list once encoded: its own
+ *  characters, the quotes PostgREST wants around a value holding a comma, a
+ *  colon or a bracket, and the comma after it (%22 twice, %2C). */
+function encodedLength(value: string): number {
+  return encodeURIComponent(value).length + 9;
+}
+
+/** A list of values in runs of at most `size` that each fit `chars` of a
+ *  request line, once encoded. A value longer than that alone is a run of its
+ *  own. */
+export function chunksBySize(values: readonly string[], size = ID_CHUNK, chars = IN_LIST_CHARS): string[][] {
+  const out: string[][] = [];
+  let run: string[] = [];
+  let used = 0;
+  for (const v of values) {
+    const len = encodedLength(v);
+    if (run.length > 0 && (run.length >= size || used + len > chars)) {
+      out.push(run);
+      run = [];
+      used = 0;
+    }
+    run.push(v);
+    used += len;
+  }
+  if (run.length > 0) out.push(run);
+  return out;
+}
+
+/**
+ * Every row a read of a list of values matches, the values in runs that fit
+ * a request line (`chunksBySize`), one run at a time. A run whose read fails
+ * hands its error to `onError` and its values back in `unread`, with no rows
+ * for them — never as "none of these matched", which a dedupe would read as
+ * "all of these are new".
+ */
+export async function readByValues<T>(
+  values: readonly string[],
+  read: (run: string[]) => Result<T>,
+  onError?: (error: unknown, run: string[]) => void,
+): Promise<{ rows: T[]; unread: string[] }> {
+  const rows: T[] = [];
+  const unread: string[] = [];
+  for (const run of chunksBySize(values)) {
+    let failure: unknown = null;
+    try {
+      const { data, error } = await read(run);
+      if (error) failure = error;
+      else rows.push(...(data ?? []));
+    } catch (err) {
+      failure = err ?? new Error("read failed");
+    }
+    if (failure) {
+      onError?.(failure, run);
+      unread.push(...run);
+    }
+  }
+  return { rows, unread };
+}
+
 /** Requests in flight at once for one list of ids. */
 const ID_READS_IN_FLIGHT = 4;
 
