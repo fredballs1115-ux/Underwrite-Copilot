@@ -9,6 +9,15 @@ export const moneyCompact = (n: number): string =>
       : `$${Math.round(n)}`;
 
 /**
+ * A percent figure — a going-in cap, a yield on cost — as every surface that
+ * shows a deal prints it: to two decimals, the precision an offering
+ * memorandum states a cap in. The pipeline card prints the memorandum's
+ * "5.45%"; the compare table had printed the same cap "5.5%", and the
+ * meeting workbook a plan's "6.27%" yield as "6.30%".
+ */
+export const pctText = (pct: number): string => `${pct.toFixed(2)}%`;
+
+/**
  * A plan's yield on cost as every surface that shows the deal prints it, and
  * as the Claude steps are handed it: to two decimals, the precision of the
  * caps and the basis-point spreads it stands beside. "11.67%" over a "6.00%"
@@ -16,7 +25,7 @@ export const moneyCompact = (n: number): string =>
  * verdict quoting "8.75%" beside a strip's "8.8%" showed one number rounded
  * two ways on one page.
  */
-export const yieldOnCostText = (d: number): string => `${(d * 100).toFixed(2)}%`;
+export const yieldOnCostText = (d: number): string => pctText(d * 100);
 
 /**
  * The facts a plan is judged on, as label/value pairs — identical on every

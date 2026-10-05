@@ -90,9 +90,9 @@ const card = (over: Partial<DealCard> & Pick<DealCard, "id" | "name">): DealCard
 const CARDS: DealCard[] = [
   // A renovation program stated a door at a time (#460).
   card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "active_pursuit", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null, valueAdd: "Reno $250/mo, 20% on cost", basis: "$274k/unit" }, offersDue: "2026-09-30" }),
-  card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi_submitted", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
+  card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi_submitted", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.67%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   // Frisco names no place the Dallas market's list knows: its county placed it (#447).
-  card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
+  card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.20%" }, market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
   // A deal in a metro area the site reads without a brief: named as read, not briefed.
   // …and it carries the seller's loan, offered for assumption (#419).
   card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%", abatement: "Tax abated, 4 yrs left, +$450k/yr" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
@@ -231,9 +231,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
       if (c.stage === "dead") continue;
       expect(text, c.name).toContain(c.name);
     }
-    // The plan deals show their yield on cost where a cap would sit, the
-    // stabilized ones their cap; the teammate's deal names who added it.
-    expect(text).toContain("11.7%");
+    // The plan deals show their yield on cost where a cap would sit, at the
+    // deal header's two decimals (lib/pipeline-slots), the stabilized ones
+    // their cap; the teammate's deal names who added it.
+    expect(text).toContain("11.67%");
     expect(text).toContain("5.6%");
     // Guidance stated as a range shows as one, never its bottom alone (#466).
     expect(text).toContain("$9–9.5M");
@@ -551,7 +552,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
     expect(text).toContain("Yield on cost");
-    expect(text).toContain("11.7%");
+    expect(text).toContain("11.67%");
     // The view is one control, the current view pressed; the column heads
     // belong to the list, so the cards carry the sort select at every width.
     expect(html).toMatch(/aria-pressed="true"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Cards/);
@@ -1411,7 +1412,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
   });
   const COLS: Col[] = [
     col({ id: "a", name: "The Maddox at Brewerytown", reason: "Rents assume a premium the submarket has not printed.", fit: "near", fitNote: "Near on basis / unit", irr: 14.2, em: 1.82, coc: 6.1, cap: 5.6, leverage: leverageRead(5.6, 6.2), capOverTenYear: capSpreadRead(5.6, 4.94), price: "$68,000,000", noi: "$3,808,000" }),
-    col({ id: "b", name: "1400 Market — office to residential", verdict: "pass", reason: "The plan holds a 567 bps spread in the worst corner.", fit: "fits", strategy: "Conversion", planDeal: true, irr: 18.9, em: 2.1, coc: null, cap: null, yoc: 11.7, price: "$20,000,000", noi: "$21,000,000", market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
+    col({ id: "b", name: "1400 Market — office to residential", verdict: "pass", reason: "The plan holds a 567 bps spread in the worst corner.", fit: "fits", strategy: "Conversion", planDeal: true, irr: 18.9, em: 2.1, coc: null, cap: null, yoc: 11.67, price: "$20,000,000", noi: "$21,000,000", market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
     col({ id: "c", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", reason: "Vacancy above 20% with no leasing story.", fit: "outside", fitNote: "Misses: size, price", irr: 22.0, em: 2.4, coc: 8.0, cap: 8.1, leverage: leverageRead(8.1, 6.2), capOverTenYear: capSpreadRead(8.1, 4.94), price: "$60,000,000", noi: "$4,860,000", market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
     col({ id: "d", name: "Riverbend Site — 240 units", hasModel: false, verdict: null, strategy: "Development", planDeal: true, price: "$4,000,000", market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
   ];
@@ -1428,7 +1429,11 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     // The conversion's cap cell says it is judged on the plan, never a
     // dark building's cap; the rejected deal's 22% IRR is never crowned.
     expect(text).toMatch(/n\/a|plan/);
-    expect(text).toContain("11.7%");
+    // The yield on cost and the caps at the two decimals the deal header
+    // and the pipeline card print them at, never "11.7%" or "5.6%".
+    expect(text).toContain("11.67%");
+    expect(text).toContain("5.60%");
+    expect(text).not.toMatch(/\b11\.7%|\b5\.6%/);
     // Every figure in the return rows draws its spread bar: three IRRs,
     // three multiples, two cash-on-cash, two caps (the conversion's cap
     // cell draws none), one yield on cost — once in the table and once in
@@ -1537,7 +1542,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
         noiFrom: "om",
       }),
       // A plan deal with no model: the yield on cost its header prints.
-      { ...COLS[1], hasModel: false, irr: null, em: null, yoc: 11.7, yocFrom: "om", price: "$20,000,000", priceFrom: "om", noi: null },
+      { ...COLS[1], hasModel: false, irr: null, em: null, yoc: 11.67, yocFrom: "om", price: "$20,000,000", priceFrom: "om", noi: null },
     ];
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
     dumpView("compare-sources", html);
@@ -1555,15 +1560,15 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(tableLabels).toContain("Yield on cost (stabilized)");
     expect(tableLabels).not.toContain("Yield on cost (stabilized) · model");
     // Each figure of the memorandum's own is marked, once a layout.
-    for (const figure of ["6.1%", "11.7%", "$30,000,000", "$1,830,000", "$20,000,000"]) {
+    for (const figure of ["6.10%", "11.67%", "$30,000,000", "$1,830,000", "$20,000,000"]) {
       expect((text.match(new RegExp(`${figure.replace(/[$.]/g, "\\$&")} \\(OM\\)`, "g")) ?? []).length, figure).toBe(2);
     }
     // A model's figure is never marked.
-    expect(text).not.toMatch(/5\.6% \(OM\)|\$68,000,000 \(OM\)/);
+    expect(text).not.toMatch(/5\.60% \(OM\)|\$68,000,000 \(OM\)/);
     // Deals with no model at all: nothing says "model".
     const noModels = renderToStaticMarkup(React.createElement(CompareTable, { cols: cols.slice(1) }));
     expect(noModels).not.toContain(" · model");
-    expect(visibleText(noModels)).toContain("6.1% (OM)");
+    expect(visibleText(noModels)).toContain("6.10% (OM)");
   });
 
   it("pictures each building at the head of its column and its phone card, the credit on the picture (#418)", () => {
@@ -1801,9 +1806,10 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     // and its model's returns withheld with the reason, in every return row.
     expect(text).toContain("13.8% to maturity");
     expect((text.match(/n\/a — note/g) ?? []).length).toBeGreaterThanOrEqual(5);
-    // The share: its cap on the whole its price implies, and the returns
-    // the share's price did not buy withheld.
-    expect(text).toContain("4.7%");
+    // The share: its cap on the whole its price implies, at the two decimals
+    // every surface prints a cap at, and the returns the share's price did
+    // not buy withheld.
+    expect(text).toContain("4.66%");
     expect((text.match(/n\/a — share/g) ?? []).length).toBeGreaterThanOrEqual(3);
     // What each price buys, beside it.
     expect(text).toContain("$20,000,000 · Note");

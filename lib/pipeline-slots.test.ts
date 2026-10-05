@@ -8,6 +8,7 @@ import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassLabel } from "./asset-class";
 import { pickSlots, readingTerms, shownAssetClass } from "./pipeline-slots";
 import { noteCapSlot } from "./compare-interest";
+import { yieldOnCostText } from "./plan-facts";
 
 describe("shownAssetClass — a row never says \"Auto\"", () => {
   it("shows the stored class, the extraction's read for an auto-detect deal, and nothing before any read", () => {
@@ -169,8 +170,10 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     const capped = pickSlots(ex([...rows, m("Delivery cap rate", "6.00%"), m("NOI (Year 1)", "$2,880,000")], { strategy }), null, "industrial", on("2026-10-05"));
     expect(capped.forward).toBe("Build-to-suit, 6.00% at delivery");
     expect(capped.cap).toBeNull();
-    // The developer funds the works: the yield slot is the NOI at delivery over the price.
-    expect(capped.yoc).toBe("6.0%");
+    // The developer funds the works: the yield slot is the NOI at delivery
+    // over the price, to the two decimals the tag beside it says ("6.0%"
+    // had stood beside "6.00% at delivery" on one card).
+    expect(capped.yoc).toBe("6.00%");
     expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).forward).toBeNull();
   });
 
@@ -319,7 +322,10 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     );
     expect(s.cap).toBeNull();
     expect(s.price).toBe("$42,000,000");
-    expect(s.yoc).toBe(`${((3_400_000 / 50_600_000) * 100).toFixed(1)}%`);
+    // To two decimals, as the deal header prints it (lib/plan-facts
+    // `yieldOnCostText`): the card's "6.7%" stood beside the header's "6.72%".
+    expect(s.yoc).toBe("6.72%");
+    expect(s.yoc).toBe(yieldOnCostText(3_400_000 / 50_600_000));
   });
 
   it("a development priced at its land: the land cost is the price, the yield on cost is over land + budget", () => {
@@ -329,7 +335,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
+    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.00%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

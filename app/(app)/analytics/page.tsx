@@ -15,11 +15,15 @@ import {
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
 import { isPlanDeal } from "@/lib/deal-strategy";
+import { pctText } from "@/lib/plan-facts";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
 
 export const metadata: Metadata = { title: "Analytics" };
 
-const pct = (v: number) => `${v.toFixed(1)}%`;
+// A going-in cap and a yield on cost to two decimals, as each deal's own
+// header and pipeline card print it (lib/plan-facts): a dot labelled "5.5%"
+// was a deal whose card said "5.45%".
+const pct = pctText;
 
 /**
  * Portfolio analytics: what the user's own screens add up to. Every number

@@ -26,8 +26,10 @@ describe("compareReturns — the model's figures, else the memorandum's, each sa
     expect(r.planDeal).toBe(true);
     expect(r.yoc).toBeCloseTo(planSummary(valueAdd, strategy)!.yieldOnCost! * 100, 10);
     expect(r.yocFrom).toBe("om");
-    // The table's figure and the header's (and the pipeline card's) read one.
-    expect(`${r.yoc!.toFixed(1)}%`).toBe(pickSlots(valueAdd, null).yoc);
+    // The table's figure and the header's (and the pipeline card's) read
+    // one, to the two decimals each prints it at (lib/plan-facts).
+    expect(`${r.yoc!.toFixed(2)}%`).toBe(pickSlots(valueAdd, null).yoc);
+    expect(pickSlots(valueAdd, null).yoc).toBe("6.72%");
     // Never a cap on a plan deal, the memorandum's stated one included.
     expect(r.cap).toBeNull();
     expect(r.capFrom).toBeNull();

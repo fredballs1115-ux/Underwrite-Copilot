@@ -120,7 +120,8 @@ describe("deriveInternalComps — the sibling's kind is read first", () => {
     expect(b.priceLabel).toBe("$20.0M");
     // Its 11.7% "stabilized cap" is the finished project's figure, never a comp cap.
     expect(b.capLabel).toBeNull();
-    expect(b.yieldOnCostLabel).toBe("11.7%");
+    // To two decimals, as the sibling's own header prints it (lib/plan-facts).
+    expect(b.yieldOnCostLabel).toBe("11.67%");
     // $180M over 612 planned units — not the $20M shell over them.
     expect(b.basisLabel).toBe("$294k/unit all-in");
   });
@@ -221,7 +222,7 @@ describe("deriveInternalComps — what never becomes a comp figure", () => {
     ]);
     expect(c.kindLabel).toBe("Development");
     expect(c.priceLabel).toBe("$12.0M");
-    expect(c.yieldOnCostLabel).toBe("7.5%");
+    expect(c.yieldOnCostLabel).toBe("7.50%");
     expect(c.basisLabel).toBe("$400k/unit all-in");
   });
 

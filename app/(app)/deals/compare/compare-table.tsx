@@ -6,6 +6,7 @@ import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
 import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
+import { pctText } from "@/lib/plan-facts";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/10 text-pass" },
@@ -15,8 +16,14 @@ export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
 
 export const usd = (n: number | null | undefined) =>
   n == null ? null : "$" + Math.round(n).toLocaleString();
+/** A return — an IRR, a cash-on-cash, a note's yield — to one decimal. */
 export const pct = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(1) + "%";
+/** A going-in cap or a yield on cost to two decimals, as the deal header,
+ *  the pipeline card and the meeting workbook print it (lib/plan-facts):
+ *  this table had printed the card's "5.45%" as "5.5%" and a plan's
+ *  "6.27%" as "6.3%". */
+const pct2 = (n: number | null | undefined) => (n == null || !isFinite(n) ? null : pctText(n));
 export const mult = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(2) + "x";
 
@@ -461,7 +468,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
             ? c.noteYtm != null
               ? `${pct(c.noteYtm)} ${OWN_YIELD_WORDS[c.withheld].to}`
               : OWN_YIELD_WORDS[c.withheld].na
-            : pct(c.cap),
+            : pct2(c.cap),
       mono: true,
       num: (c) => (c.planDeal ? null : c.cap),
       // The model's cap, else the memorandum's (lib/compare-figures); a
@@ -485,7 +492,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       // cost"), so the row stays while one is compared: the model's figure,
       // else the one the deal's header prints; "not stated" where neither
       // has one, rather than a dash.
-      get: (c) => pct(c.yoc) ?? (c.planDeal ? "not stated" : null),
+      get: (c) => pct2(c.yoc) ?? (c.planDeal ? "not stated" : null),
       mono: true,
       num: (c) => c.yoc,
       src: (c) => (c.yoc != null ? c.yocFrom : null),

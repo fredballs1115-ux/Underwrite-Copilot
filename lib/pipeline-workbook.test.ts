@@ -34,7 +34,8 @@ const CONVERSION: PipelineExportRow = {
   dealType: "Conversion",
   planDeal: true,
   cap: null,
-  yieldOnCost: "11.7%",
+  // The plan's own fraction (lib/pipeline-export-row), never a rounded string.
+  yieldOnCost: 0.11667,
 };
 
 const LEGACY: PipelineExportRow = {
@@ -93,7 +94,9 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(conv.getCell(2).value).toBe("1200 K Street");
     expect(conv.getCell(5).value).toBe("Conversion");
     expect(conv.getCell(8).value).toBe("n/a — plan");
-    expect(conv.getCell(9).value).toBeCloseTo(0.117, 6);
+    // Written raw: the cell's "0.00%" shows 11.67%, the deal header's figure,
+    // where "11.7%" read back had shown 11.70%.
+    expect(conv.getCell(9).value).toBe(0.11667);
     expect(conv.getCell(9).numFmt).toBe("0.00%");
     // The columns after the new pair still land where the headers say.
     expect(conv.getCell(11).value).toBe("Caution");

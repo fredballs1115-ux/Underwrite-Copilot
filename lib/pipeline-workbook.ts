@@ -121,8 +121,10 @@ export interface PipelineExportRow {
    *  "position" where it is a preferred equity position's (lib/compare-
    *  interest `noteCapSlot`) — the cell says "n/a — note" or "n/a — position" */
   capWithheld?: "note" | "position" | null;
-  /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
-  yieldOnCost: string | null;
+  /** a plan deal's stabilized NOI over total cost, as a fraction — 0.0627
+   *  — written raw into the cell, whose "0.00%" shows the "6.27%" the deal
+   *  header prints; never a rounded string read back */
+  yieldOnCost: number | null;
   fit: "fits" | "near" | "outside" | null;
   /** the fit is judged on the screen's first signal, the extraction not
    *  landed yet — the pipeline card's "First read" (lib/first-read); the
@@ -330,13 +332,12 @@ export async function buildPipelineWorkbook(
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };
 
-      const yocNum = d.yieldOnCost ? parsePct(d.yieldOnCost) : null;
       const yocCell = row.getCell(9);
-      if (yocNum != null) {
-        yocCell.value = yocNum / 100;
+      if (d.yieldOnCost != null && Number.isFinite(d.yieldOnCost)) {
+        yocCell.value = d.yieldOnCost;
         yocCell.numFmt = PCT2;
       } else {
-        yocCell.value = d.yieldOnCost ?? "—";
+        yocCell.value = "—";
       }
       yocCell.font = baseFont;
       yocCell.alignment = { horizontal: "right" };

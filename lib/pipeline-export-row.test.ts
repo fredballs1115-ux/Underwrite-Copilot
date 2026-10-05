@@ -9,6 +9,7 @@ import type { BuyBox } from "./criteria";
 import { buildPipelineWorkbook } from "./pipeline-workbook";
 import { pickSlots } from "./pipeline-slots";
 import { pipelineExportRow, type ExportDeal, type ExportRowContext } from "./pipeline-export-row";
+import { yieldOnCostText } from "./plan-facts";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
 
@@ -221,9 +222,12 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(row.dealType).toBe("Conversion");
     expect(row.planDeal).toBe(true);
     expect(row.cap).toBeNull();
-    expect(row.yieldOnCost).toBe("7.0%");
+    // The plan's own fraction, which the cell's "0.00%" prints as the card's
+    // two decimals — never "7.0%" read back.
+    expect(row.yieldOnCost).toBeCloseTo(0.07, 10);
     // The card's own slots say the same.
-    expect(row.yieldOnCost).toBe(pickSlots(wexley, SIGNAL).yoc);
+    expect(yieldOnCostText(row.yieldOnCost!)).toBe(pickSlots(wexley, SIGNAL).yoc);
+    expect(pickSlots(wexley, SIGNAL).yoc).toBe("7.00%");
     expect(row.cap).toBe(pickSlots(wexley, SIGNAL).cap);
     // A row screened before the first signal existed reads as before.
     const before = pipelineExportRow(deal({ extraction: wexley }), ctx);

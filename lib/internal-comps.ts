@@ -20,6 +20,7 @@ import {
 import { interestOf, interestTag } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
+import { yieldOnCostText } from "@/lib/plan-facts";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -46,8 +47,8 @@ export interface InternalComp {
   kind: StrategyKind;
   /** "Conversion", "Value-add"… on a plan deal; null for a stabilized asset */
   kindLabel: string | null;
-  /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" — its answer
-   *  where a stabilized asset shows a cap */
+  /** a plan deal's stabilized NOI over total cost, e.g. "11.67%" — its
+   *  answer where a stabilized asset shows a cap */
   yieldOnCostLabel: string | null;
 }
 
@@ -195,7 +196,8 @@ export function deriveInternalComps(
         : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis),
       kind: strategy.kind,
       kindLabel: plan ? strategy.label : null,
-      yieldOnCostLabel: yoc != null ? `${(yoc * 100).toFixed(1)}%` : null,
+      // To two decimals, as the sibling's own header and card print it.
+      yieldOnCostLabel: yoc != null ? yieldOnCostText(yoc) : null,
     });
     if (comps.length >= limit) break;
   }

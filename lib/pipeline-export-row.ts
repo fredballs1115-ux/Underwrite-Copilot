@@ -145,7 +145,10 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // says the cap is withheld).
     cap: extraction ? statedCapSlot(extraction, plan != null) : null,
     capWithheld: extraction && !plan ? (noteCapSlot(extraction)?.of ?? null) : null,
-    yieldOnCost: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
+    // The plan's own figure, unrounded: the workbook writes it into a
+    // percent cell, where a string rounded to "6.3%" and read back printed
+    // the header's 6.27% as "6.30%".
+    yieldOnCost: plan?.yieldOnCost ?? null,
     fit,
     // Judged on the first signal alone until the extraction lands, as the
     // pipeline page marks it (the card's "First read").

@@ -12,6 +12,7 @@ import { interestOf, interestTag } from "@/lib/interest";
 import { noteCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import { assumableTag } from "@/lib/assumable-debt";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
@@ -52,7 +53,8 @@ export interface PipelineSlots {
   noteYield?: string | null;
   price: string | null;
   /** a plan deal's yield on total cost — its answer where a stabilized
-   *  asset shows a cap — null for a stabilized asset or an unstated plan */
+   *  asset shows a cap — to two decimals ("6.27%"), as the deal header
+   *  prints it; null for a stabilized asset or an unstated plan */
   yoc: string | null;
   /** what the price buys where it is not the building outright — "49%
    *  share", "Note", "Leasehold", "Leased fee" (lib/interest
@@ -292,7 +294,10 @@ export function pickSlots(
     // fills the slot before the extraction lands, as on the deal page —
     // only when it is a figure, never an "unpriced" or "call for offers".
     price: findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(signal),
-    yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
+    // To two decimals, as the deal header, the plan strip, the memo and the
+    // report print it (lib/plan-facts `yieldOnCostText`): "6.3%" here had
+    // stood beside the header's "6.27%" for one figure.
+    yoc: plan?.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : null,
     // A share's price, a note's or the land's under a ground lease is not
     // the building's, and the row says so beside the figure.
     interest: interestTag(extraction),
