@@ -89,6 +89,7 @@ import { readSandwichLease, sandwichModelLine, sandwichShortLine } from "@/lib/s
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
+import { defaultExitGap } from "./cost-note";
 
 /** Property actuals fed into the model (Feature 1): when present, the rent
  *  roll's occupancy/SF and the T-12's NOI/expense ratio replace the OM
@@ -1376,8 +1377,26 @@ export function deriveUnderwriteInputs(
     capPct && ownEntry != null && Math.abs(ownEntry - capPct) >= 0.0005
       ? `; the model's own year-1 NOI over its price is ${(ownEntry * 100).toFixed(2)}%`
       : "";
+  // With no cap stated the exit is the flat default, and where the model's
+  // own entry — a stated price and a stated NOI, the price the building's —
+  // sits 5 bps or more from it, the note names the gap (research pass 38;
+  // lib/underwrite/cost-note `defaultExitGap`, which the playground says
+  // under its tiles too). The default itself is the owner's.
+  const defaultEntry =
+    !capPct &&
+    price > 0 &&
+    sources.purchasePrice?.provenance !== "assumption" &&
+    sources.inPlaceRentAnnual?.provenance !== "assumption" &&
+    buildingPriceOf(extraction, price) != null
+      ? noi / price
+      : null;
+  const defaultGap = capPct ? null : defaultExitGap(0.06, defaultEntry);
   mark("exitCapPct", capPct ? "derived" : "assumption",
-    capPct ? `Defaulted to the OM's stated going-in cap${ownEntryClause} — set your exit view` : "Default 6.0% — set your exit view",
+    capPct
+      ? `Defaulted to the OM's stated going-in cap${ownEntryClause} — set your exit view`
+      : defaultGap
+        ? `${defaultGap} — set your exit view`
+        : "Default 6.0% — set your exit view",
     capPct ? pageOf(capMetric) : undefined);
   mark("saleCostPct", "assumption", "Default 2.0% of sale price");
 

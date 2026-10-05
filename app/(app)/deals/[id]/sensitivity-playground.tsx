@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
-import { costAssumptionsLine } from "@/lib/underwrite/cost-note";
+import { costAssumptionsLine, defaultExitGap } from "@/lib/underwrite/cost-note";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import { modelLoanCoverageLine } from "@/lib/sizer-terms";
 import {
@@ -72,6 +72,13 @@ export interface PlaygroundData {
    *  and the max bid are withheld with its claim (lib/underwrite/report-grid
    *  `misreadPageLine`); absent, they stand */
   findings?: PlausibilityFinding[] | null;
+  /** whether the price is the building's (lib/deal-strategy
+   *  `buildingPriceOf`; the derived model's `meta.interest.basisWithheld` is
+   *  none): only then is the model's own entry — its year-1 NOI over its
+   *  price — set against a default exit cap under the tiles (lib/underwrite/
+   *  cost-note `defaultExitGap`), as the exit's SOURCE note sets it; absent,
+   *  it is */
+  buildingPriced?: boolean;
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
@@ -299,6 +306,22 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // The DSCR the tile shows, against the coverage the debt sizer tests —
   // none where the tile withholds it.
   const coverageLine = withheld ? null : modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
+  // Where the memorandum states no going-in cap, the exit at rest is the
+  // model's default: its gap to the model's own entry — the year-1 NOI over
+  // the price the tiles run on, both the memorandum's — said under the tiles
+  // as the exit's SOURCE note says it (research pass 38: a 25.1% IRR rode
+  // 200 bps of compression nobody chose). Only while the exit lever sits on
+  // the default, and never over withheld tiles.
+  const exitDefault =
+    !withheld &&
+    capIdx === caps.baseIdx &&
+    data.buildingPriced !== false &&
+    sources?.exitCapPct?.provenance === "assumption" &&
+    sources.purchasePrice?.provenance !== "assumption" &&
+    sources.inPlaceRentAnnual?.provenance !== "assumption";
+  const atPrice = priceOverride ?? inputs.purchasePrice;
+  const entry = exitDefault && atPrice > 0 ? noiY1 / atPrice : null;
+  const exitGap = entry != null ? defaultExitGap(caps.values[capIdx], entry) : null;
   // Why the tiles are withheld, said over them: what the price buys (the
   // first-draft card's own line), then the report's placeholder reason.
   const interestLine =
@@ -427,6 +450,16 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       {!withheld && (
         <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
           {costAssumptionsLine(inputs)}
+        </p>
+      )}
+      {exitGap && entry != null && (
+        // A default exit under the model's own entry is compression riding
+        // in the returns — said in the caution tone; over it, plainly.
+        <p
+          className={`mt-1.5 text-[11px] leading-relaxed ${entry > caps.values[capIdx] ? "text-caution" : "text-muted"}`}
+          data-qa="playground-exit-gap"
+        >
+          {`Exit cap — ${exitGap}.`}
         </p>
       )}
       {planDeal && !withheld && (

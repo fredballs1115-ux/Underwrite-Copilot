@@ -32,3 +32,24 @@ export function costAssumptionsLine(i: CostInputs): string {
     ? `These returns carry ${hold}, ${sale} and ${pct(tax)} of the price in transfer and recordation tax on the purchase. Set each in the Excel model.`
     : `These returns carry ${hold} and ${sale}, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.`;
 }
+
+/**
+ * Where the memorandum states no going-in cap, the exit is the model's
+ * default: the gap between it and the model's own entry — its year-1 NOI over
+ * its price — said, so the compression or expansion the default carries is
+ * seen (research pass 38: a $10M office at an 8.00% entry read a 25.1% IRR on
+ * the 6.00% default exit, 200 bps of compression nobody chose). "Default
+ * 6.00%; the model's own year-1 NOI over its price is 8.00%: 200 bps of
+ * compression ride in these returns". Null under 5 bps, or without an entry.
+ * The exit's SOURCE note and the line under the playground's tiles read this
+ * one sentence; which default the exit takes is the owner's.
+ */
+export function defaultExitGap(exitDec: number, entryDec: number | null | undefined): string | null {
+  if (entryDec == null || !Number.isFinite(entryDec) || !(entryDec > 0) || !Number.isFinite(exitDec)) return null;
+  const bps = Math.round((entryDec - exitDec) * 10_000);
+  if (Math.abs(bps) < 5) return null;
+  const two = (d: number) => `${(d * 100).toFixed(2)}%`;
+  return `Default ${two(exitDec)}; the model's own year-1 NOI over its price is ${two(entryDec)}: ${Math.abs(bps).toLocaleString("en-US")} bps of ${
+    bps > 0 ? "compression" : "expansion"
+  } ride in these returns`;
+}

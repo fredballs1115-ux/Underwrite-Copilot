@@ -673,7 +673,10 @@ describe("ReportDocument (full report)", () => {
     const uncapped = await render(
       deriveUnderwriteInputs({ ...extraction, metrics: extraction.metrics.filter((m) => !/cap/i.test(m.label)) }, SAMPLE_DEAL.name),
     );
-    expect(uncapped.text).toContain("Exit cap 6.00% · assumption Default 6.0% — set your exit view");
+    // …with the gap to the model's own entry (research pass 38).
+    expect(uncapped.text).toContain(
+      "Exit cap 6.00% · assumption Default 6.00%; the model's own year-1 NOI over its price is 5.71%: 29 bps of expansion ride in these returns — set your exit view",
+    );
     // The sample's own model, its T-12 folded in: the trailing year's day in
     // prose, never "TTM to 2026-05-31".
     const actuals = sampleDerivedInputs();

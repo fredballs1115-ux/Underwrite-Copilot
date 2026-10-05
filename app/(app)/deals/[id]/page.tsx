@@ -898,6 +898,10 @@ export default async function DealPage({
         // The panel's findings under the header: while figures that do not
         // tie stand, the tiles and the bid are withheld with the claim.
         findings: plausibility,
+        // Whether the price is the building's: only then is the model's own
+        // entry set against a default exit under the tiles, as the exit's
+        // SOURCE note sets it (research pass 38).
+        buildingPriced: !derived.meta.interest?.basisWithheld,
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own
