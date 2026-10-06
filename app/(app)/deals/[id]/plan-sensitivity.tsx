@@ -2,7 +2,7 @@ import { compactUsd } from "@/lib/money";
 import { ScrollRegion } from "@/app/scroll-region";
 import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
-import { yieldOnCostText } from "@/lib/plan-facts";
+import { planNoiText, yieldOnCostText } from "@/lib/plan-facts";
 import {
   SPREAD_LABEL,
   SPREAD_RULE_OF_THUMB,
@@ -57,7 +57,9 @@ export function PlanSensitivity({
   const grid = buildYieldOnCostGrid(plan, refCap.pct);
   const be = planBreakevens(plan, refCap.pct);
   if (!grid || !be) return null;
-  const noi = plan.stabilizedNoi!.value;
+  // Said with its month where the memorandum states it a month at a time,
+  // as the report's copy of these sentences says it (audit C6, LOW-1).
+  const noiText = planNoiText(plan.stabilizedNoi!, money);
   const budget = plan.budget!.budget;
   const refNote = refCapNote(refCap.provenance);
 
@@ -134,10 +136,10 @@ export function PlanSensitivity({
       <ul className="mt-3 space-y-1 text-sm leading-relaxed">
         <li>
           {be.noiCushion > 0
-            ? `Stabilized NOI can come in ${pct(be.noiCushion)} under the OM's ${money(noi)} — down to ${money(
+            ? `Stabilized NOI can come in ${pct(be.noiCushion)} under the OM's ${noiText} — down to ${money(
                 be.noiAtRefCap,
               )} — before the yield on cost falls to the ${pct(refCap.pct, 2)} reference cap.`
-            : `The OM's ${money(noi)} stabilized NOI already yields less than the ${pct(
+            : `The OM's ${noiText} stabilized NOI already yields less than the ${pct(
                 refCap.pct,
                 2,
               )} reference cap on ${money(plan.totalCost ?? 0)} of total cost — the plan is under water before any stress.`}

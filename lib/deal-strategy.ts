@@ -30,7 +30,7 @@ import { dealTypeLabel, entityLoanOf, entityLoanWords, groundRentOf, interestOf,
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
-import { yieldOnCostText } from "@/lib/plan-facts";
+import { planNoiText, yieldOnCostText } from "@/lib/plan-facts";
 import { monthFigureOf } from "@/lib/stated-period";
 import { condoUnitsOffered, priceUnitCount } from "@/lib/condo-units";
 import {
@@ -1203,11 +1203,14 @@ export function planSummary(
   // "Total project cost 48,500 ($000s)", read as $48,500, printed a
   // 6597.94% yield on cost on the card, the header, the plan's facts and
   // every Claude step's context, with no finding anywhere).
+  // The NOI with its month where the memorandum states it a month at a
+  // time: the twelve is where such a misread most often lies (audit C6,
+  // LOW-1).
   const yieldWithheld =
     rawYield != null && rawYield >= IMPLIED_CAP_CEILING && stabilizedNoi && totalCost != null
       ? forward
-        ? `No yield on cost is struck: the ${money(stabilizedNoi.value)} NOI at delivery over the ${money(totalCost)} price is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the price or the NOI was most likely misread.`
-        : `No yield on cost is struck: the ${money(stabilizedNoi.value)} stabilized NOI over the ${money(totalCost)} total cost is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the total cost or the NOI was most likely misread.`
+        ? `No yield on cost is struck: the ${planNoiText(stabilizedNoi, money)} NOI at delivery over the ${money(totalCost)} price is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the price or the NOI was most likely misread.`
+        : `No yield on cost is struck: the ${planNoiText(stabilizedNoi, money)} stabilized NOI over the ${money(totalCost)} total cost is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the total cost or the NOI was most likely misread.`
       : null;
   const yieldOnCost = yieldWithheld ? null : rawYield;
   // The finished product's count (lib/criteria `planCountRow`): on a

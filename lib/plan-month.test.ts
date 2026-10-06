@@ -6,6 +6,9 @@
 // $1,320,000 to "OM p. 3", which states no such figure. Every name is
 // invented.
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { PlanSensitivity } from "@/app/(app)/deals/[id]/plan-sensitivity";
 import ExcelJS from "exceljs";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRow } from "@/lib/deals";
@@ -58,4 +61,18 @@ describe("a plan's NOI stated a month at a time is said with its month wherever 
     expect(ws.getCell(r, 2).value).toBe(1_320_000);
     expect(String(ws.getCell(r, 3).value)).toBe("OM p. 3: $110,000 a month × 12");
   }, 30000);
+
+  it("the deal page's stress card and the yield-withheld sentence, as the report says them (audit C6, LOW-1)", () => {
+    const html = renderToStaticMarkup(createElement(PlanSensitivity, { plan, refCap: { pct: 0.06, provenance: "assumption" } }));
+    expect(html).toContain("under the OM&#x27;s $1.32M (twelve times the $110k a month stated) — down to");
+    // A year mislabelled monthly: the twelve is where the misread lies, so
+    // the sentence that withholds the yield says it.
+    const misread = {
+      ...VALUE_ADD,
+      metrics: [row("Asking price", "$17,000,000", "p. 2"), row("Stabilized NOI (monthly)", "$1,320,000"), row("Renovation budget", "$2,000,000", "p. 4")],
+    } as ExtractionResult;
+    const p = planSummary(misread, inferStrategy(misread))!;
+    expect(p.yieldOnCost).toBeNull();
+    expect(p.yieldWithheld).toMatch(/the \$15\.8\d?M \(twelve times the \$1\.3\d?M a month stated\) stabilized NOI over the \$19\.0M total cost/);
+  });
 });
