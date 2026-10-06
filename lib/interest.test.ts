@@ -1835,6 +1835,20 @@ describe("a Delaware statutory trust's beneficial interests are asked their own 
     const lp = ex(interest({ kind: "partial_interest", share: "49% LP interest" }));
     expect(interestNote(readInterest(lp, 20_000_000)!)).not.toContain("DELAWARE STATUTORY TRUST TRAPS");
   });
+
+  it("asks a trust its words do not name a Delaware statutory trust the trust's own questions (audit C6, LOW-5)", () => {
+    // An Illinois land trust's beneficial interest had been asked the
+    // Delaware statutory trust's questions, while its 1031 flag says "the
+    // trust".
+    const land = dst({ summary: "100% of the beneficial interests in an Illinois land trust holding title", share: "100% of the beneficial interests" });
+    expect(isDst(land)).toBe(true);
+    const note = interestNote(readInterest(land, askingPriceOf(land))!);
+    expect(note).not.toMatch(/DELAWARE STATUTORY TRUST|SPRINGING LLC/);
+    expect(note).toContain("TRUST TRAPS, asked by name where the OM gives the inputs: (a) THE TRUST AGREEMENT");
+    expect(gluedWords(note)).toEqual([]);
+    // A trust its words name as one keeps the DST's list.
+    expect(interestNote(readInterest(dst(), askingPriceOf(dst()))!)).toContain("DELAWARE STATUTORY TRUST TRAPS");
+  });
 });
 
 // Research pass 37: "50% of the general partner interest" read as 50% of the

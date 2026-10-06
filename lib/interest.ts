@@ -736,6 +736,10 @@ export interface InterestRead {
    *  tenant in common, a Delaware statutory trust's beneficial interests, or
    *  a share of the general partner's interest; null otherwise */
   holding: ShareHolding | null;
+  /** beneficial interests in a trust whose words name no Delaware statutory
+   *  trust (`namesDelawareTrust`): the trust's own questions are asked, never
+   *  a DST's (audit C6, LOW-5); absent otherwise */
+  trustNotDelaware?: true;
   /** a share of the general partner's interest: its own percentage of that
    *  interest, as stated (`gpStakePctOf`) — never the entity's; null
    *  otherwise */
@@ -1278,6 +1282,7 @@ export function readInterest(
     sharePct,
     inUnits,
     holding,
+    ...(holding === "dst" && !namesDelawareTrust(ex) ? { trustNotDelaware: true as const } : {}),
     stakePct,
     projectCost,
     askingPrice: price,
@@ -1399,7 +1404,10 @@ export function interestNote(r: InterestRead, opts: InterestLineOptions = {}): s
   // statutory trust's beneficial interests are asked their own questions
   // beside a share's.
   if (r.holding === "tic") traps.partial_interest = ticTraps(r.entityLoan);
-  if (r.holding === "dst") traps.partial_interest = `${traps.partial_interest} ${DST_TRAPS}`;
+  // A trust its words do not name a Delaware statutory trust (an Illinois
+  // land trust's beneficial interest) is asked the trust's own questions,
+  // as its 1031 flag calls it "the trust" (audit C6, LOW-5).
+  if (r.holding === "dst") traps.partial_interest = `${traps.partial_interest} ${r.trustNotDelaware ? TRUST_TRAPS : DST_TRAPS}`;
   // A share of the general partner's interest is a share of a share: its
   // traps are the general partner's — its promote, its capital, its fees,
   // its guarantees, its control — in place of a share's gross-up and
@@ -1438,6 +1446,12 @@ const GP_STAKE_TRAPS =
  */
 const DST_TRAPS =
   "DELAWARE STATUTORY TRUST TRAPS, asked by name where the OM gives the inputs: (a) WHAT THE TRUSTEE MAY NOT DO — ask for the trust agreement's limits on the trustee — on new capital, on refinancing, on new or renegotiated leases — as stated; (b) THE MASTER TENANT — ask whether the property is master leased and whether the master tenant is the sponsor's affiliate, and where it is master leased, read what the investors earn as the master lease rent, not the property's NOI, each as stated; (c) THE LOAD — ask for the offering costs and fees between the investor's cheque and the property, as stated; (d) THE SPRINGING LLC — ask whether the trust agreement provides for converting the trust to a limited liability company, and when that applies, as stated.";
+
+/** A trust's beneficial interests where its words name no Delaware
+ *  statutory trust (audit C6, LOW-5): what the trust agreement and the
+ *  lender's documents say, asked as questions, never a rule written here. */
+const TRUST_TRAPS =
+  "TRUST TRAPS, asked by name where the OM gives the inputs: (a) THE TRUST AGREEMENT — ask what kind of trust holds the title and who directs the trustee, as stated; (b) WHAT THE BENEFICIAL INTEREST CARRIES — ask what the beneficial interest lets its holder direct — a sale, a lease, a loan — as stated; (c) THE TRANSFER — ask whether the trust agreement and the lender's documents let the beneficial interest be assigned, and on what terms, as stated.";
 
 /**
  * The two shared traps read for an undivided interest held as a tenant in
