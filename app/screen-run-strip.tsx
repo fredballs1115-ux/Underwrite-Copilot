@@ -6,7 +6,8 @@ import { PausableTicker } from "./pausable-ticker";
 /** The trace's animation-play-state: running until its pause button says. */
 const PLAY = "var(--screenrun-play, running)";
 
-/** The screen, running — a looping six-stage trace band. Every line is
+/** The screen, running — a looping replay of the six stages, in the
+ *  pipeline's own order (reconcile last: its own run, once a model is added). Every line is
  *  DERIVED from the same sample fixture the demo renders — counts and the
  *  verdict word, not copywriting — so this strip can never claim an output
  *  shape the sample screen doesn't show. The animated block is aria-hidden;
@@ -32,19 +33,21 @@ export function ScreenRunStrip() {
     ["extract", `${metricCount} figures pulled — each carrying its OM page cite`],
     ["challenge", `${DEAL_KILLERS} deal-killers stressed first: basis · exit · debt`],
     ["comps", "broker comps ranked: supports · leans favorable · stretched"],
-    ["reconcile", `${gapCount} gaps called against your own model`],
     ["market", "assumptions graded vs typical ranges — labeled, never dressed as comps"],
     ["verdict", `${verdictWord} — reasons attached, honest edges shown`],
+    // A run of its own, made when the buyer adds their model, after which
+    // the verdict is synthesized again (lib/anthropic/pipeline).
+    ["reconcile", `when you add your model: ${gapCount} gaps called against it, verdict re-run`],
   ];
   return (
     <section
-      aria-label="A live trace of the six analysis stages on the sample deal"
+      aria-label="A replay of the six analysis stages on the sample deal"
       className="band-dark border-y border-white/10 text-white"
     >
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wider text-white/55">
-            The screen, running — a live trace of the six stages on the sample
+            The screen, running — a replay of the six stages on the sample
             deal
           </p>
           <Link
@@ -55,10 +58,10 @@ export function ScreenRunStrip() {
           </Link>
         </div>
         <p className="sr-only">
-          The six stages run in order: extraction with page cites, assumption
-          challenges on the three deal-killers, broker-comp ranking,
-          reconciliation against your model, the market check, and a verdict
-          with its reasons.
+          The screen runs in order: extraction with page cites, assumption
+          challenges on the three deal-killers, broker-comp ranking, the
+          market check, and a verdict with its reasons; when you add your own
+          model, a reconciliation against it re-runs the verdict.
         </p>
         <PausableTicker what="trace" className="mt-4 data-[ticker-paused]:[--screenrun-play:paused]">
           <div

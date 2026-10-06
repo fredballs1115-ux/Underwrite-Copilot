@@ -109,7 +109,8 @@ function Icon({ children, className = "h-5 w-5" }: { children: ReactNode; classN
 
 // The actual six-stage pipeline — a word or two each; the trace band under
 // the rail shows what each stage produces. Reconcile runs only where the
-// buyer adds their own model (lib/screen-run), and its tile says so.
+// buyer adds their own model, as a run of its own after the screen that
+// re-runs the verdict (lib/anthropic/pipeline), so it is last and says so.
 const STAGES: { title: string; note?: string; icon: ReactNode }[] = [
   {
     title: "Extract",
@@ -140,16 +141,6 @@ const STAGES: { title: string; note?: string; icon: ReactNode }[] = [
     ),
   },
   {
-    title: "Reconcile",
-    note: "with your model",
-    icon: (
-      <Icon>
-        <path d="M12 4v16M5 20h14M6 8h12" />
-        <path d="m6 8-3 6h6zM18 8l-3 6h6z" />
-      </Icon>
-    ),
-  },
-  {
     title: "Market",
     icon: (
       <Icon>
@@ -164,6 +155,16 @@ const STAGES: { title: string; note?: string; icon: ReactNode }[] = [
       <Icon>
         <circle cx="12" cy="12" r="9" />
         <path d="m8.5 12 2.5 2.5 4.5-5" />
+      </Icon>
+    ),
+  },
+  {
+    title: "Reconcile",
+    note: "when you add your model",
+    icon: (
+      <Icon>
+        <path d="M12 4v16M5 20h14M6 8h12" />
+        <path d="m6 8-3 6h6zM18 8l-3 6h6z" />
       </Icon>
     ),
   },
