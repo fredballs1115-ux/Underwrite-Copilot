@@ -103,6 +103,31 @@ describe("an NOI stated a month at a time is read as the year it makes (research
     expect(noiOfRow({ label: "NOI (T-12)", value: "$1,020,000" })).toEqual({ value: 1_020_000 });
   });
 
+  it("reads a total beside the label's month word, and an average under a monthly label, as a month (audit C6, MED-1)", () => {
+    // "Total" names the building's figure, not a year: beside a month word
+    // it is the month's total. An average under a label that already says
+    // monthly is the building's average month, never one unit's.
+    for (const [label, value] of [
+      ["Total NOI (monthly)", "$85,000"],
+      ["Total monthly NOI", "$85,000"],
+      ["NOI (monthly)", "$85,000 average"],
+    ] as const) {
+      expect(noiOfRow({ label, value }), `${label}: ${value}`).toEqual({ value: 1_020_000, month: 85_000 });
+      const deal: ExtractionResult = {
+        ...MONTHLY,
+        metrics: [row("Asking price", "$17,000,000", "p. 2"), row(label, value), row("Units", "100", "p. 2")],
+      };
+      // No 0.50% cap on the $17.0M price, and the model runs the year.
+      expect(assessPlausibility(deal, inferStrategy(deal)), label).toEqual([]);
+      expect(computeUnderwrite(deriveUnderwriteInputs(deal, "x").inputs).cashFlow[0].noi).toBeCloseTo(1_020_000, 4);
+    }
+    // A total with no month word, or beside "annual", stays the year.
+    expect(noiOfRow({ label: "Total NOI", value: "$1,020,000" })).toEqual({ value: 1_020_000 });
+    expect(noiOfRow({ label: "Total annual NOI", value: "$1,020,000" })).toEqual({ value: 1_020_000 });
+    // An average with no month word anywhere is still one unit's.
+    expect(noiOfRow({ label: "NOI", value: "$850 average" })).toEqual({ value: 850 });
+  });
+
   it("holds the plan to the same rule, and leaves a monthly income read as lib/mixed-use read it", () => {
     const conversion: ExtractionResult = {
       dealName: "C",
