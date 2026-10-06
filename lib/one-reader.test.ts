@@ -264,6 +264,10 @@ describe("the going-in cap: the memorandum's, else the first signal's, withheld 
       ["~6.1", 6.1],
       ["6.0% on 2025–6.5% pro forma", 6],
       ["6%–6.5%", 6],
+      // The going-in figure stated first, never a later exit or pro forma
+      // range (audit C6, LOW-9: each had read 6.0).
+      ["5.5% going-in; 6-7% exit", 5.5],
+      ["5.5% in place, 6.0-6.5% pro forma", 5.5],
     ];
     for (const [text, pct] of cases) expect(signalGoingInCap({ goingInCap: text })?.pct ?? null, text).toBe(pct);
     // The buy box, the analytics and the market memory read the same figure.

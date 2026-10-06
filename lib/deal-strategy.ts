@@ -162,8 +162,12 @@ export function signalGoingInCap(
   // the band); else a bare figure, which may say its unit in words or carry
   // an approximation ("5.5 percent", "6.25 cap", "~6.1"). A range's first
   // end is a figure under 100 of its own, never a year's digits: "6.0% on
-  // 2025–6.5% pro forma" is the 6.0% in place (audit C5, LOW-1).
-  const range = text.match(/(?<![\d.])(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%/i);
+  // 2025–6.5% pro forma" is the 6.0% in place (audit C5, LOW-1). A range is
+  // read only where it is the text's first percentage: "5.5% going-in; 6-7%
+  // exit" is the 5.5% stated first, never the exit's range (audit C6,
+  // LOW-9).
+  const rangeHit = text.match(/(?<![\d.])(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%/i);
+  const range = rangeHit && !/\d\s*(?:%|percent\b|per\s?cent\b)/i.test(text.slice(0, rangeHit.index)) ? rangeHit : null;
   const bare = text.match(
     /^\s*(?:~|≈|approx(?:\.|imately)?|about|est(?:\.|imated)?)?\s*(\d+(?:\.\d+)?)\s*(?:percent\b|per\s?cent\b|pct\b|cap(?:\s+rate)?\b)?\s*$/i,
   );
