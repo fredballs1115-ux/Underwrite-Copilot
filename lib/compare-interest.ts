@@ -272,7 +272,8 @@ export function noteCapSlot(
 
 /** Why a deal's going-in cap slot holds no cap: its price buys a loan or a
  *  position, which have a yield of their own (`OwnYield`), or a share beside
- *  the loan its entity carries. */
+ *  the loan its entity carries, or a share of the general partner's
+ *  interest. */
 export type CapWithheld = OwnYield | "share";
 
 /** The slot's reason as the pipeline's row carries it: `capSlotWithheld`'s,
@@ -290,7 +291,7 @@ export function capSlotReason(withheld: CapWithheld | null, own: { underWater?: 
 export const SHARE_CAP_WORDS = {
   na: "n/a — share",
   title:
-    "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, and a share of no stated percentage grosses up to nothing: neither is the building's price, and a cap stated against it is on a basis the memorandum never says, so no cap is shown.",
+    "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, and a share of no stated percentage grosses up to nothing; a share of the general partner's interest is a share of a share, which no figure grosses up. None is the building's price, and a cap stated against it is on a basis the memorandum never says, so no cap is shown.",
 } as const;
 
 /**
@@ -304,7 +305,11 @@ export const SHARE_CAP_WORDS = {
  *   - "share": a share beside the loan its entity carries (lib/interest
  *     `entityLoan`), whose price grossed up is the equity's whole, not the
  *     building's — no cap is struck on it (the audit of 2026-10-04), and
- *     one the memorandum states is on a basis it never says.
+ *     one the memorandum states is on a basis it never says; and a share of
+ *     the general partner's interest, whatever the loan (`isGpStake`): a
+ *     share of a share has no building price, basis or implied cap (research
+ *     pass 37), and the box had passed its building's stated cap beside a
+ *     return it withheld (audit C6, MED-5).
  * Every other share keeps the memorandum's cap, as the header has always
  * printed it; the compare table had left it blank where no model ran.
  */
@@ -313,7 +318,7 @@ export function capSlotWithheld(ex: ExtractionResult | null | undefined): CapWit
   const { kind, entityLoan } = interestOf(ex);
   if (kind === "note") return "note";
   if (kind === "preferred_equity") return "position";
-  if (kind === "partial_interest" && entityLoan != null) return "share";
+  if (kind === "partial_interest" && (entityLoan != null || isGpStake(ex))) return "share";
   return null;
 }
 

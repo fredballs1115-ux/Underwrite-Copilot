@@ -568,13 +568,23 @@ describe("the box holds a deal only to the figures its price buys", () => {
       "this sells a share of the general partner's interest, a share of a share: its price is never grossed up or divided over the building, and no per-unit basis is struck on it",
     );
     expect(redLines(gp)).toMatchObject({ tripped: [], unknown: ["cap rate", "basis / unit"] });
-    // With no entity loan the header prints the building's stated cap for a
-    // GP stake (capSlotWithheld withholds none), and the box judges that
-    // figure; its basis is still said in the GP stake's words.
+    // With no entity loan a GP stake is still a share of a share: no
+    // building cap stands in its slot or is judged by the box, whatever the
+    // loan (audit C6, MED-5: the box had passed its building's 6.50% beside
+    // a return it withheld as a share of a share).
     const gpNoLoan = deal("partial_interest", [["Asking price", "$3,000,000"], ...BUILDING], "50% of the general partner interest");
-    expect(sourceReadsOf(gpNoLoan, null).capWithheld).toBeNull();
-    expect(checkOf(read(gpNoLoan), "Going-in cap")?.status).toBe("pass");
+    expect(sourceReadsOf(gpNoLoan, null).capWithheld).toBe("share");
+    expect(checkOf(read(gpNoLoan), "Going-in cap")).toMatchObject({ status: "unknown", detail: checkOf(g, "Going-in cap")?.detail });
     expect(checkOf(read(gpNoLoan), "Basis / unit")?.detail).toContain("a share of the general partner's interest");
+    expect(redLines(gpNoLoan)).toMatchObject({ tripped: [], unknown: ["cap rate", "basis / unit"] });
+    // The header, the pipeline's slots and the memories say "n/a — share",
+    // and pool no cap.
+    expect(capSlotWithheld(gpNoLoan)).toBe("share");
+    expect(goingInCapFigure(gpNoLoan, "6.50%").value).toBe("n/a — share");
+    expect(statedCapRead(gpNoLoan, false)).toBeNull();
+    // A share of a stated percentage with no loan keeps its cap, as before.
+    const lpNoLoan = deal("partial_interest", [["Asking price", "$20,580,000"], ...BUILDING], "A 49% limited partnership interest");
+    expect(capSlotWithheld(lpNoLoan)).toBeNull();
   });
 
   it("a share with a stated percentage and no entity loan keeps its cap, the grossed-up whole's — its stated per-unit figure is no basis", () => {
