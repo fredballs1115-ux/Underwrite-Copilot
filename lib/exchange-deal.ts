@@ -27,7 +27,7 @@ import {
   type ExchangeWindow,
 } from "@/lib/exchange-window";
 import { endIsAhead } from "@/lib/ground-lease-term";
-import { interestOf, leaseholdTermOf, namesDelawareTrust, shareHoldingOf } from "@/lib/interest";
+import { interestOf, isWholeShare, leaseholdTermOf, namesDelawareTrust, shareHoldingOf } from "@/lib/interest";
 import { offersDueUpgrade } from "@/lib/offering";
 
 export interface DealExchange {
@@ -82,6 +82,9 @@ export function exchangeForDeal(
     // A trust is called a Delaware statutory trust only where its words say
     // so (audit C5, LOW-6).
     namesDst: namesDelawareTrust(extraction),
+    // All the tenant-in-common interests (a stated 100%) are the whole
+    // property's title (audit C6, LOW-4).
+    allInterests: !!extraction && isWholeShare(interestOf(extraction).sharePct),
     leaseYearsLeft: lease ? lease.yearsLeft : null,
     leaseOptionYears: lease?.options?.years ?? null,
     // A term that already counts its options is a ceiling: the thirty years

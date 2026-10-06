@@ -52,6 +52,27 @@ describe("the buy box's 1031 exchange against a deal (lib/exchange-window)", () 
       "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; the price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is a question for your exchange counsel",
     );
     expect(tic.line).not.toContain("owning entity");
+    // All the tenant-in-common interests (a stated 100%) are together title
+    // to the whole property, as the deal's lead says — never "an undivided
+    // interest" (audit C6, LOW-4).
+    const all = exchangeForDeal(
+      BLOCK,
+      deal([], {
+        kind: "partial_interest",
+        summary: "All of the undivided tenant-in-common interests in the fee simple, 100% in all",
+        share: "100% tenant-in-common interests",
+        groundLease: "",
+        loan: "",
+        page: "",
+      }),
+      null,
+      TODAY,
+    )!;
+    expect(all).toMatchObject({ tag: "1031: TIC — ask counsel", tone: "muted" });
+    expect(all.line).toBe(
+      "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; the price buys all the tenant-in-common interests, together title to the whole property; whether the exchange treats the purchase as real property is a question for your exchange counsel",
+    );
+    expect(gluedWords(all.line)).toEqual([]);
     // Beneficial interests are a Delaware statutory trust's only where the
     // words name one; an Illinois land trust's is "the trust" (audit C5,
     // LOW-6).

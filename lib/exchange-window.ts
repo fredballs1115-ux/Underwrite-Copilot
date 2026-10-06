@@ -232,6 +232,10 @@ export function exchangeFit(
      *  trust" — an Illinois land trust's beneficial interest is no DST
      *  (audit C5, LOW-6). Unset reads as named, as before. */
     namesDst?: boolean;
+    /** on a tenancy in common, a stated 100%: all the tenant-in-common
+     *  interests, together title to the whole property (lib/interest
+     *  `isWholeShare`; audit C6, LOW-4). Unset reads as a share. */
+    allInterests?: boolean;
     /** the lease's years left today and its options' years, where the
      *  price buys a leasehold (lib/interest's term); null where no end is
      *  read */
@@ -270,10 +274,13 @@ export function exchangeFit(
   } else if (deal.interestKind === "partial_interest" && deal.holding === "tic") {
     // Title to an undivided share of the real estate, not a share of an
     // entity (research pass 37): what the co-ownership is for the exchange
-    // is counsel's question.
+    // is counsel's question. All the interests together are title to the
+    // whole property, as the deal's lead says (audit C6, LOW-4).
     flags.push({
       kind: "tic",
-      text: `The price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is ${ASK}.`,
+      text: deal.allInterests
+        ? `The price buys all the tenant-in-common interests, together title to the whole property; whether the exchange treats the purchase as real property is ${ASK}.`
+        : `The price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is ${ASK}.`,
     });
   } else if (deal.interestKind === "partial_interest" && deal.holding === "dst" && deal.namesDst === false) {
     flags.push({
