@@ -646,4 +646,30 @@ describe("a second loan on offer or in place, by its own words, and a coupon tha
     // A fixed agency coupon priced off a Treasury, which never resets, stays fixed.
     expect(readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000"), row("Assumable loan rate", "3.45% (10-yr UST + 180 bps)")]))!.ratePct).toBe(3.45);
   });
+
+  it("reads a coupon said not to reset, or adjusted in passing, as the fixed coupon it is (audit C6, MED-3)", () => {
+    // Each had read "The loan's coupon resets, as stated", the tag
+    // "Assumable loan, resets", and priced nothing.
+    for (const words of [
+      "3.45% fixed, non-resetting",
+      "3.45% fixed (no rate reset)",
+      "3.45% fixed, non-adjusting",
+      "3.45%, fixed to maturity (not repriced on assumption)",
+      "3.45% (rate adjusted for the 0.25% MIP)",
+      "3.45% fixed; adjusted from 3.60% at the 2021 modification",
+      "3.45% fixed; the rate does not reset",
+    ]) {
+      const t = readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000"), row("Assumable loan rate", words)]))!;
+      expect(t.floating, words).toBeUndefined();
+      expect(t.ratePct, words).toBe(3.45);
+      const e = sample([...LOAN.filter((r) => !/rate/i.test(r.label)), row("Assumable loan rate", words)]);
+      // The premium a "rate adjusted for MIP" names is the one the card
+      // already adds ("+ MIP"), never a reset.
+      expect(assumableTag(e), words).toMatch(/^Assumable 3\.45%(?: \+ MIP)?$/);
+    }
+    // A reset still to come is still one.
+    for (const words of ["3.45% fixed; rate resets annually after year 5", "3.45%, reprices on 2028-06-01", "3.45%; rate will be adjusted in 2028"]) {
+      expect(readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000"), row("Assumable loan rate", words)]))!.floating?.resets, words).toBe(true);
+    }
+  });
 });

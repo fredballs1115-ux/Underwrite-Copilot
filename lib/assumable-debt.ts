@@ -296,8 +296,20 @@ const CAP_CLAUSE = /\b(?:(?:interest\s+)?rate\s+cap|capped)\b\s*(?:at|of|:)?\s*(
 const NAMES_SECOND_LOAN =
   /\bsupplemental\b|\b(?:second|2nd)[\s-]+(?:loan|lien|mortgage|note|trust\s+deed)\b|\(\s*(?:second|2nd)\s*\)|\bmezz(?:anine)?\b|\b(?:junior|subordinate)[\s-]+(?:loan|lien|mortgage|note|debt)\b|\b(?:both|two)\s+loans\b/i;
 /** Words that say a coupon is fixed only until a later date: it resets,
- *  adjusts or reprices ("adjustable" floats, FLOATS above). */
-const RESETS = /\bre-?set(?:s|ting)?\b|\badjust(?:s|ed|ing)?\b|\bre-?pric(?:es|ed|ing)\b/i;
+ *  adjusts or reprices, at a time the words name — "resets in year 6",
+ *  "adjusts to 5-year UST at year 5", "then reprices at", "rate resets
+ *  annually", "reprices on 2028-06-01", "will be adjusted in 2028"
+ *  ("adjustable" floats, FLOATS above). Never a coupon adjusted in passing
+ *  ("adjusted for the 0.25% MIP", "adjusted from 3.60% at the 2021
+ *  modification"), and never one said not to reset (`NO_RESET`, struck
+ *  first; audit C6, MED-3). */
+const RESETS =
+  /\b(?:re-?set(?:s|ting)?|adjust(?:s|ing|ment)|(?:will|to|shall|is|are)\s+(?:be\s+)?(?:adjusted|re-?priced|re-?set)|re-?pric(?:es|ing|e))\b\s*(?:(?:date|period|provision)\b|(?:in|at|on|after|to|every|over|each|annually|semi[\s-]*annually|periodically|thereafter|beginning|starting|upon|year)\b|(?:19|20)\d{2}\b|:)/i;
+/** Words that say a coupon does not reset: "non-resetting", "no rate
+ *  reset", "non-adjusting", "not repriced on assumption", "does not reset",
+ *  "without reset". */
+const NO_RESET =
+  /\b(?:non|no|not|never|without)[\s-]+(?:(?:rate|coupon|interest|be|been|to\s+be)\s+)*(?:re-?set|adjust|re-?pric)\w*(?:\s+(?:in|at|on|after|to|upon|over)\s+[a-z-]+)?/gi;
 /** Words that put a second loan on offer rather than in place. "May" only as
  *  the offer itself ("may be offered", "may be available") — never the
  *  month ("originated May 2019") nor what may be done with a loan in place
@@ -333,7 +345,7 @@ export function floatingRateOf(text: string | null | undefined): FloatingRate | 
   // A coupon that resets, adjusts or reprices — over a Treasury most often —
   // is fixed only until then, whatever "fixed" the words say of the years
   // before: no coupon to its maturity, so none is priced (audit C5, LOW-2).
-  if (RESETS.test(t)) return { index: index ? index[0] : null, spreadPct: index ? spreadOf(t) : null, resets: true };
+  if (RESETS.test(t.replace(NO_RESET, " "))) return { index: index ? index[0] : null, spreadPct: index ? spreadOf(t) : null, resets: true };
   if (!floats && !index) return null;
   if (!floats && /\bfixed\b/i.test(t)) return null;
   // A coupon stated beside a Treasury and its spread, with no word that it
