@@ -9176,6 +9176,366 @@
           "note": "Gadsden, AL — Gentry George, U.S. Fish and Wildlife Service, public domain; Noccalula Falls. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:20580",
+      "city": "Eagle Pass, Texas",
+      "area": "Eagle Pass, TX",
+      "wikipedia": [
+        "Eagle Pass, Texas",
+        "Rio Grande",
+        "Maverick County, Texas"
+      ],
+      "categories": [
+        "Eagle Pass, Texas",
+        "Buildings in Eagle Pass, Texas",
+        "Maverick County, Texas"
+      ],
+      "queries": [
+        "Eagle Pass Texas downtown",
+        "Eagle Pass Texas Rio Grande",
+        "Eagle Pass Texas Main Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:21420",
+      "city": "Enid, Oklahoma",
+      "area": "Enid, OK",
+      "wikipedia": [
+        "Enid, Oklahoma",
+        "Garfield County, Oklahoma",
+        "Cherokee Strip"
+      ],
+      "categories": [
+        "Enid, Oklahoma",
+        "Downtown Enid, Oklahoma",
+        "Buildings in Enid, Oklahoma"
+      ],
+      "queries": [
+        "Enid Oklahoma downtown",
+        "Enid Oklahoma skyline",
+        "Enid Oklahoma grain elevators"
+      ]
+    },
+    {
+      "metroId": "cbsa:24140",
+      "city": "Goldsboro, North Carolina",
+      "area": "Goldsboro, NC",
+      "wikipedia": [
+        "Goldsboro, North Carolina",
+        "Wayne County, North Carolina",
+        "Neuse River"
+      ],
+      "categories": [
+        "Goldsboro, North Carolina",
+        "Buildings in Goldsboro, North Carolina",
+        "Wayne County, North Carolina"
+      ],
+      "queries": [
+        "Goldsboro North Carolina downtown",
+        "Goldsboro NC Center Street",
+        "Goldsboro North Carolina"
+      ]
+    },
+    {
+      "metroId": "cbsa:24420",
+      "city": "Grants Pass, Oregon",
+      "area": "Grants Pass, OR",
+      "wikipedia": [
+        "Grants Pass, Oregon",
+        "Rogue River (Oregon)",
+        "Josephine County, Oregon"
+      ],
+      "categories": [
+        "Grants Pass, Oregon",
+        "Rogue River (Oregon)",
+        "Buildings in Grants Pass, Oregon"
+      ],
+      "queries": [
+        "Grants Pass Oregon downtown",
+        "Grants Pass Rogue River",
+        "Grants Pass Oregon sign"
+      ]
+    },
+    {
+      "metroId": "cbsa:25220",
+      "city": "Hammond, Louisiana",
+      "area": "Hammond, LA",
+      "wikipedia": [
+        "Hammond, Louisiana",
+        "Tangipahoa Parish, Louisiana",
+        "Southeastern Louisiana University"
+      ],
+      "categories": [
+        "Hammond, Louisiana",
+        "Buildings in Hammond, Louisiana",
+        "Tangipahoa Parish, Louisiana"
+      ],
+      "queries": [
+        "Hammond Louisiana downtown",
+        "Hammond Louisiana historic district",
+        "Tangipahoa Parish Louisiana"
+      ]
+    },
+    {
+      "metroId": "cbsa:25260",
+      "city": "Hanford, California",
+      "area": "Hanford-Corcoran, CA",
+      "wikipedia": [
+        "Hanford, California",
+        "Kings County, California",
+        "Corcoran, California"
+      ],
+      "categories": [
+        "Hanford, California",
+        "Buildings in Hanford, California",
+        "Kings County, California"
+      ],
+      "queries": [
+        "Hanford California downtown",
+        "Hanford California courthouse",
+        "Kings County California"
+      ]
+    },
+    {
+      "metroId": "cbsa:25980",
+      "city": "Hinesville, Georgia",
+      "area": "Hinesville, GA",
+      "wikipedia": [
+        "Hinesville, Georgia",
+        "Liberty County, Georgia",
+        "Fort Stewart"
+      ],
+      "categories": [
+        "Hinesville, Georgia",
+        "Liberty County, Georgia",
+        "Buildings in Hinesville, Georgia"
+      ],
+      "queries": [
+        "Hinesville Georgia downtown",
+        "Hinesville Georgia",
+        "Liberty County Georgia"
+      ]
+    },
+    {
+      "metroId": "cbsa:27100",
+      "city": "Jackson, Michigan",
+      "area": "Jackson, MI",
+      "wikipedia": [
+        "Jackson, Michigan",
+        "Jackson County, Michigan",
+        "Grand River (Michigan)"
+      ],
+      "categories": [
+        "Jackson, Michigan",
+        "Downtown Jackson, Michigan",
+        "Buildings in Jackson, Michigan"
+      ],
+      "queries": [
+        "Jackson Michigan downtown",
+        "Jackson Michigan skyline",
+        "Jackson Michigan cascades"
+      ]
+    },
+    {
+      "metroId": "cbsa:27860",
+      "city": "Jonesboro, Arkansas",
+      "area": "Jonesboro, AR",
+      "wikipedia": [
+        "Jonesboro, Arkansas",
+        "Craighead County, Arkansas",
+        "Arkansas State University"
+      ],
+      "categories": [
+        "Jonesboro, Arkansas",
+        "Buildings in Jonesboro, Arkansas",
+        "Craighead County, Arkansas"
+      ],
+      "queries": [
+        "Jonesboro Arkansas downtown",
+        "Jonesboro Arkansas Main Street",
+        "Jonesboro Arkansas skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:28100",
+      "city": "Kankakee, Illinois",
+      "area": "Kankakee, IL",
+      "wikipedia": [
+        "Kankakee, Illinois",
+        "Kankakee River",
+        "Kankakee County, Illinois"
+      ],
+      "categories": [
+        "Kankakee, Illinois",
+        "Kankakee River",
+        "Buildings in Kankakee, Illinois"
+      ],
+      "queries": [
+        "Kankakee Illinois downtown",
+        "Kankakee River Illinois",
+        "Kankakee Illinois skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:29020",
+      "city": "Kokomo, Indiana",
+      "area": "Kokomo, IN",
+      "wikipedia": [
+        "Kokomo, Indiana",
+        "Howard County, Indiana",
+        "Wildcat Creek (Indiana)"
+      ],
+      "categories": [
+        "Kokomo, Indiana",
+        "Downtown Kokomo, Indiana",
+        "Buildings in Kokomo, Indiana"
+      ],
+      "queries": [
+        "Kokomo Indiana downtown",
+        "Kokomo Indiana courthouse",
+        "Kokomo Indiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:30620",
+      "city": "Lima, Ohio",
+      "area": "Lima, OH",
+      "wikipedia": [
+        "Lima, Ohio",
+        "Allen County, Ohio",
+        "Ottawa River (Lima, Ohio)"
+      ],
+      "categories": [
+        "Lima, Ohio",
+        "Downtown Lima, Ohio",
+        "Buildings in Lima, Ohio"
+      ],
+      "queries": [
+        "Lima Ohio downtown",
+        "Lima Ohio skyline",
+        "Lima Ohio Town Square"
+      ]
+    },
+    {
+      "metroId": "cbsa:31020",
+      "city": "Longview, Washington",
+      "area": "Longview-Kelso, WA",
+      "wikipedia": [
+        "Longview, Washington",
+        "Kelso, Washington",
+        "Lewis and Clark Bridge"
+      ],
+      "categories": [
+        "Longview, Washington",
+        "Lewis and Clark Bridge (Columbia River)",
+        "Buildings in Longview, Washington"
+      ],
+      "queries": [
+        "Longview Washington Lake Sacajawea",
+        "Longview Washington Columbia River",
+        "Kelso Washington"
+      ]
+    },
+    {
+      "metroId": "cbsa:31900",
+      "city": "Mansfield, Ohio",
+      "area": "Mansfield, OH",
+      "wikipedia": [
+        "Mansfield, Ohio",
+        "Richland County, Ohio",
+        "Ohio State Reformatory"
+      ],
+      "categories": [
+        "Mansfield, Ohio",
+        "Ohio State Reformatory",
+        "Buildings in Mansfield, Ohio"
+      ],
+      "queries": [
+        "Mansfield Ohio downtown",
+        "Mansfield Ohio Reformatory",
+        "Mansfield Ohio carrousel"
+      ]
+    },
+    {
+      "metroId": "cbsa:33500",
+      "city": "Minot, North Dakota",
+      "area": "Minot, ND",
+      "wikipedia": [
+        "Minot, North Dakota",
+        "Souris River",
+        "Ward County, North Dakota"
+      ],
+      "categories": [
+        "Minot, North Dakota",
+        "Buildings in Minot, North Dakota",
+        "Ward County, North Dakota"
+      ],
+      "queries": [
+        "Minot North Dakota downtown",
+        "Minot North Dakota skyline",
+        "Minot Scandinavian Heritage Park"
+      ]
+    },
+    {
+      "metroId": "cbsa:33780",
+      "city": "Monroe, Michigan",
+      "area": "Monroe, MI",
+      "wikipedia": [
+        "Monroe, Michigan",
+        "River Raisin",
+        "Monroe County, Michigan"
+      ],
+      "categories": [
+        "Monroe, Michigan",
+        "River Raisin",
+        "Buildings in Monroe, Michigan"
+      ],
+      "queries": [
+        "Monroe Michigan downtown",
+        "Monroe Michigan River Raisin",
+        "Monroe Michigan courthouse"
+      ]
+    },
+    {
+      "metroId": "cbsa:34100",
+      "city": "Morristown, Tennessee",
+      "area": "Morristown, TN",
+      "wikipedia": [
+        "Morristown, Tennessee",
+        "Hamblen County, Tennessee",
+        "Cherokee Lake"
+      ],
+      "categories": [
+        "Morristown, Tennessee",
+        "Buildings in Morristown, Tennessee",
+        "Hamblen County, Tennessee"
+      ],
+      "queries": [
+        "Morristown Tennessee downtown",
+        "Morristown Tennessee skywalk",
+        "Cherokee Lake Tennessee"
+      ]
+    },
+    {
+      "metroId": "cbsa:35660",
+      "city": "Niles, Michigan",
+      "area": "Niles, MI",
+      "wikipedia": [
+        "Niles, Michigan",
+        "St. Joseph River (Lake Michigan)",
+        "Berrien County, Michigan"
+      ],
+      "categories": [
+        "Niles, Michigan",
+        "Berrien County, Michigan",
+        "St. Joseph, Michigan"
+      ],
+      "queries": [
+        "Niles Michigan downtown",
+        "St. Joseph Michigan lighthouse",
+        "Berrien County Michigan Lake Michigan"
+      ]
     }
   ]
 }
