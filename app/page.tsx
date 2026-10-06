@@ -295,7 +295,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Are my documents private?",
-    a: "Yes. Documents are stored in private storage with isolation enforced at the database level, and your deals are visible only to you — or to your teammates if you join a team. To run a screen, a document is read by Anthropic's Claude API, which does not train on it; the security page lists every outside service and what it receives. Nothing you upload is ever sold.",
+    a: "Yes. Documents are stored in private storage with isolation enforced at the database level, and your deals are visible only to you and your team — and to whoever holds a share link you send, which shows the screen, never your documents. To run a screen, a document is read by Anthropic's Claude API, which does not train on it; the security page lists every outside service and what it receives. Nothing you upload is ever sold.",
   },
   {
     q: "Is this investment advice?",
