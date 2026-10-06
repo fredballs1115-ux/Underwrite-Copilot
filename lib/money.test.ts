@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compactUsd, fmtUsd, parseUsd, readFigure, scaledText, statesRange } from "./money";
+import { renovationCostPerDoor } from "./deal-strategy";
+import { statedIncomeOf } from "./stated-period";
 
 describe("readFigure", () => {
   it("reads the shorthand an analyst types into a price field", () => {
@@ -279,6 +281,22 @@ describe("statesRange — the one test of a range behind every reader that refus
     for (const raw of ["$15k-20k", "40-42M", "$40-$42M", "1,950-$2,050", "18-24 months", "600-700", "Units 1-48 at $650 – $700"]) {
       expect(statesRange(raw), raw).toBe(true);
     }
+  });
+
+  it("reads a bare pair that leads the line, before its first dollar figure, as a range (audit C6, MED-6)", () => {
+    // Each had read its low end: $12,000 a door, $1,800 a year, $1,850.
+    for (const raw of ["12,000-15,000 per door ($2.4M total)", "150-200/mo ($175 avg)", "1,850 - 2,050 per unit (approximately $1.9k)"]) {
+      expect(statesRange(raw), raw).toBe(true);
+    }
+    expect(renovationCostPerDoor("12,000-15,000 per door ($2.4M total)")).toBeNull();
+    expect(renovationCostPerDoor("1,850 - 2,050 per unit (approximately $1.9k)")).toBeNull();
+    expect(statedIncomeOf("150-200/mo ($175 avg)")).toBeNull();
+    expect(statedIncomeOf("1,850 - 2,050 per unit (approximately $1.9k)")).toBeNull();
+    // A pair in the words after the figure is still words, and a cap range
+    // after a price is the price's words.
+    expect(statesRange("$40M, 6-7% cap")).toBe(false);
+    expect(parseUsd("$40M, 6-7% cap")).toBe(40_000_000);
+    expect(renovationCostPerDoor("$15,000 per door (units 1-48)")).toBe(15_000);
   });
 });
 

@@ -115,14 +115,19 @@ export function statesRange(text: string): boolean {
   // (audit C5, MED-4): "$450,000 (years 1-10 of the PILOT)", "$1,100,000/yr,
   // 2-3% bumps", "$650 per unit per month (1-2 BR)", "$15,000 per unit
   // (units 1-48)" are the figures they state. A line of bare figures ("18-24
-  // months", "600-700") is read as before.
+  // months", "600-700") is read as before. Only the pairs AFTER the line's
+  // first marked figure are its words, though: a bare pair that leads the
+  // line is the figure the line states, and a range ("12,000-15,000 per door
+  // ($2.4M total)", "150-200/mo ($175 avg)" — audit C6, MED-6: each had read
+  // its low end).
   const marked = (written: string, scale: string | undefined) => written.includes("$") || !!scale;
-  const lineMarksDollars = figures.some(([written, , scale]) => marked(written, scale));
+  const firstMarked = figures.find(([written, , scale]) => marked(written, scale));
+  const wordsFrom = firstMarked ? firstMarked.index + firstMarked[0].length : Infinity;
   for (const m of figures) {
     const [written, digits, scale] = m;
     if (isYear(written, digits, scale)) continue;
     const after = text.slice(m.index + written.length);
-    if (lineMarksDollars && !marked(written, scale)) {
+    if (m.index >= wordsFrom && !marked(written, scale)) {
       const other = OTHER_END.exec(after);
       if (!other || !marked(other[3], other[5])) continue;
     }
