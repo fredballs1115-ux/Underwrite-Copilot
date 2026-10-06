@@ -45,6 +45,18 @@ describe("readAll", () => {
     expect(t.asked.map(([from]) => from)).toEqual([0, 6, 12, 18, 24]);
   });
 
+  it("reads a server that answers one row a page whole (audit C6, LOW-8)", async () => {
+    // The second page was the overlap row alone, so the read had ended on
+    // the first row of five.
+    const t = table(5, 1);
+    expect((await readAll(t.page))?.map((r) => r.id)).toEqual([0, 1, 2, 3, 4]);
+    // One row in all costs the read no more requests than before.
+    const one = table(1, 1);
+    expect((await readAll(one.page))?.length).toBe(1);
+    expect(one.asked.length).toBe(2);
+    expect((await readAll(table(0, 1).page))?.length).toBe(0);
+  });
+
   it("is null on a failed page, and says why", async () => {
     const said: unknown[] = [];
     let calls = 0;

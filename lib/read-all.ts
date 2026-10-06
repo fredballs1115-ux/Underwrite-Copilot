@@ -22,7 +22,9 @@
 
 /** Rows a read asks for per page. A server set to answer fewer is read
  *  correctly too: the next page starts at the last row that came back, and
- *  the read ends where a page brings no new row. */
+ *  the read ends where a page brings no new row — and one set to answer a
+ *  single row a page, whose every later page would be that overlap row
+ *  alone, is read a row at a time with no overlap (audit C6, LOW-8). */
 export const READ_PAGE = 1000;
 
 /** Ids an `in` filter carries per request. A UUID takes 39 characters of the
@@ -53,13 +55,20 @@ async function readPass<T>(
 ): Promise<{ rows: T[] } | { moved: true } | { error: unknown }> {
   const rows: T[] = [];
   const seen = new Set<string>();
+  // The most rows any page has brought: where it is one, the server may be
+  // answering a single row a page, and a page that asks from the overlap
+  // row would bring that row alone and end the read on the first (audit C6,
+  // LOW-8). Those pages ask past the last row instead; a row read twice is
+  // still caught by its id.
+  let widest = 0;
   for (let from = 0; ; ) {
     // Every page after the first asks from the row before it, so the page
     // says whether the rows ahead of it moved since the page before.
-    const overlap = from > 0 ? 1 : 0;
+    const overlap = from > 0 && widest > 1 ? 1 : 0;
     const { data, error } = await page(from - overlap, from - overlap + READ_PAGE - 1);
     if (error) return { error };
     const got = data ?? [];
+    widest = Math.max(widest, got.length);
     if (overlap) {
       // An empty page here means even the row the read ended on has gone.
       if (got.length === 0 || keyOf(got[0]) !== keyOf(rows[rows.length - 1])) return { moved: true };
