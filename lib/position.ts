@@ -180,7 +180,7 @@ const partPct = (text: string, part: RegExp): number | null => {
  *  "8% paid currently", "8% paid monthly" (the batch audit: "12% (8%
  *  current, 4% accrued)" had read no current pay). */
 const PAID_ON = String.raw`(?:paid|payable|distributed)\s+(?:current(?:ly)?|monthly|quarterly|annually|semi[\s-]*annually|in\s+arrears|each\s+(?:month|quarter))`;
-const CURRENT_PART = new RegExp(String.raw`${PAID_ON}|(?:paid\s+)?current(?:ly)?(?:[\s-]*pay)?`);
+const CURRENT_PART = new RegExp(String.raw`(?:(?:is|are|to\s+be|will\s+be)\s+)?${PAID_ON}|(?:paid\s+)?current(?:ly)?(?:[\s-]*pay)?`);
 /** A return said to be paid in cash on a schedule, with no part named:
  *  "12%, paid monthly", "12% per annum, payable quarterly in arrears" — the
  *  current pay in all (audit C3a: each had read as no current pay). */
@@ -198,6 +198,22 @@ const IN_CLAUSE = String.raw`(?:[^,.;()]|(?<=\d)[.,](?=\d))*`;
  *  shortfall's clause beside it — the clause had run back over the whole
  *  value and read no split at all (audit C5, MED-5). */
 const SHORTFALL_CLAUSE = new RegExp(`${IN_CLAUSE}${SHORTFALL_WORD}${IN_CLAUSE}`, "gi");
+/** A shortfall's own lead-in inside a clause that names a part before it:
+ *  "with 8% paid currently and any shortfall accruing" is the 8% and the
+ *  shortfall's words after "and any" (audit C6, MED-2: the whole clause had
+ *  been struck, the 8% with it). */
+const SHORTFALL_LEAD_IN = /\b(?:and|but|plus|with)\s+(?:(?:any|all|the|its|such)\s+)?/gi;
+/** A clause's shortfall words alone: from the shortfall's own lead-in where
+ *  a percentage is named before it, else the clause whole. */
+const shortfallWordsOf = (clause: string): string => {
+  const at = clause.search(new RegExp(SHORTFALL_WORD, "i"));
+  if (at <= 0) return clause;
+  const before = clause.slice(0, at);
+  const leads = [...before.matchAll(SHORTFALL_LEAD_IN)];
+  const last = leads[leads.length - 1];
+  if (!last || last.index == null || !/%|percent/i.test(before.slice(0, last.index))) return clause;
+  return clause.slice(last.index);
+};
 /** From a shortfall's words to the end of its sentence, where its accrual is
  *  said ("any shortfall, if not paid, accrues"). */
 const SHORTFALL_SENTENCE = new RegExp(String.raw`${SHORTFALL_WORD}(?:[^.;()]|(?<=\d)\.(?=\d))*`, "gi");
@@ -259,7 +275,11 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
   const shortfallAccrues = [returnRow?.value, currentRow?.value, accrualRow?.value].some(
     (v) => v != null && [...v.matchAll(SHORTFALL_SENTENCE)].some((m) => /accru/i.test(m[0])),
   );
-  const ownWords = (text: string) => text.replace(SHORTFALL_CLAUSE, " ");
+  const ownWords = (text: string) =>
+    text.replace(SHORTFALL_CLAUSE, (clause) => {
+      const words = shortfallWordsOf(clause);
+      return `${clause.slice(0, clause.length - words.length)} `;
+    });
   const statedZero = (text: string) => (ZERO_CURRENT.test(ownWords(text)) ? 0 : null);
   let currentPayPct = currentRow
     ? (onePct(currentRow.value) ?? statedZero(currentRow.value))
@@ -271,8 +291,17 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
   // total is one figure and the part stated is not above it.
   const total = returnRow ? totalOf(ownWords(returnText)) : null;
   // A return said to be paid on a schedule, no accrual named but a
-  // shortfall's, is the current pay in all.
-  if (currentPayPct == null && accrualPct == null && total != null && PAID_IN_CASH.test(ownWords(returnText))) currentPayPct = total;
+  // shortfall's, is the current pay in all — only where its words state the
+  // one percentage: "12% preferred return, of which 8% is paid currently"
+  // names a part, never 12% in cash (audit C6, MED-2).
+  if (
+    currentPayPct == null &&
+    accrualPct == null &&
+    total != null &&
+    PAID_IN_CASH.test(ownWords(returnText)) &&
+    onePct(ownWords(returnText)) === total
+  )
+    currentPayPct = total;
   if (accrualPct == null && total != null && currentPayPct != null && total > currentPayPct) {
     accrualPct = Math.round((total - currentPayPct) * 1e6) / 1e6;
     accrualDerived = true;
@@ -289,7 +318,11 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
     totalPct: total,
     currentPayPct,
     currentPayDerived,
-    shortfallAccrues,
+    // A shortfall beside a part paid in cash below the stated return is the
+    // rest of it, said as the accrual derived ("of which 8% is paid
+    // currently, any shortfall accruing": 4% accruing, the preferred return
+    // less the current pay), never a second shortfall in the cash.
+    shortfallAccrues: shortfallAccrues && !accrualDerived,
     accrualPct,
     accrualDerived,
     compounds: accrualPct != null ? compoundingOf(compoundWords) : null,

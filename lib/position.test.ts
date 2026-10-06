@@ -305,6 +305,24 @@ describe("a current pay the memorandum does not state", () => {
     expect(parts.terms).toMatchObject({ totalPct: 12, currentPayPct: 8, accrualPct: 4, shortfallAccrues: false, compounds: true });
     expect(parts.sentences.join(" ")).not.toContain("any shortfall");
   });
+
+  it("reads a part paid currently beside a shortfall as that part, the rest accruing (audit C6, MED-2)", () => {
+    // The first had read 12% current pay ("$1.80M a year is paid in cash"),
+    // the second "does not split its preferred return".
+    for (const words of [
+      "12% preferred return, of which 8% is paid currently, any shortfall accruing",
+      "12% preferred return, with 8% paid currently and any shortfall accruing",
+    ]) {
+      const r = readPosition(position(metric("Preferred return", words)), 10_000_000, ON)!;
+      expect(r.terms, words).toMatchObject({ totalPct: 12, currentPayPct: 8, currentPayDerived: false, accrualPct: 4, accrualDerived: true });
+      expect(r.currentPayYear, words).toBe(800_000);
+      const said = [r.headline, ...r.sentences].join(" ");
+      expect(said, words).toContain("8.00% current pay and 4.00% accruing (the preferred return less the current pay)");
+      expect(said, words).toContain("$800k a year is paid in cash");
+      expect(said, words).not.toContain("does not split");
+      expect(said, words).not.toContain("$1.20M a year is paid in cash");
+    }
+  });
 });
 
 // The second pre-merge audit's items on a position (MED-1, LOW-1 to LOW-5,
