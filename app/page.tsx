@@ -1482,7 +1482,9 @@ async function FooterTrustLine() {
   const latest = latestChange();
   // Render exposes the deployed commit at build time — the footer names it,
   // so "is the site actually on the latest code" is answerable by comparing
-  // this stamp to the repo's main tip. Absent locally; omitted then.
+  // this stamp to the repo's main tip. Absent locally; omitted then. Plain
+  // text, never a link to the repository (research pass 43): live-verify
+  // reads the same id off the <meta name="uc-build"> the layout prints.
   const buildSha = (process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7);
   // The year is the render's, never typed: a typed one goes stale on Jan 1.
   const rendered = new Date();
@@ -1492,14 +1494,7 @@ async function FooterTrustLine() {
       {buildSha && (
         <>
           {" · build "}
-          <a
-            href={`https://github.com/fredballs1115-ux/Underwrite-Copilot/commit/${buildSha}`}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono underline decoration-dotted underline-offset-2 hover:text-ink"
-          >
-            {buildSha}
-          </a>
+          <span className="font-mono">{buildSha}</span>
         </>
       )}
       {latest && (
