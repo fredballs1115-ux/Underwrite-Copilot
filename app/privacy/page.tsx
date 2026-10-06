@@ -16,7 +16,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "What we collect",
     body: [
-      "Your account email and password (the password is stored only as a hash by our auth provider). The deal documents you upload and the analyses generated from them. Subscription status from Stripe if you upgrade — card numbers go straight to Stripe and never touch our servers. Standard operational logs (timestamps, request metadata) needed to run and debug the service.",
+      "Your account email and password (the password is stored only as a hash by our auth provider). The deal documents you upload, the analyses generated from them, and what you type or add in the app: your buy box (and a 1031 exchange's dates, if you enter one), notes, tasks, the questions you ask about a deal, photographs you add, and your team's name and invitations. Subscription status from Stripe if you upgrade — card numbers go straight to Stripe and never touch our servers. Standard operational logs (timestamps, request metadata, and the IP addresses our host and sign-in provider log) needed to run and debug the service.",
     ],
   },
   {
@@ -29,13 +29,13 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "What we never do",
     body: [
-      "We don't sell your data. We don't share your documents or analyses with anyone outside your account — or outside your team, if you join one. We don't run ads or hand your information to ad networks. We don't use your deal documents to build datasets or benchmarks.",
+      "We don't sell your data. We don't share your documents or analyses with anyone outside your account — or outside your team, if you join one — except a screen you send as a share link, which shows it to whoever holds the link, never the documents. We don't run ads or hand your information to ad networks. We don't use your deal documents to build datasets or benchmarks.",
     ],
   },
   {
     h: "Retention and deletion",
     body: [
-      "Deleting a deal deletes its documents and analyses. You can delete your whole account and everything in it instantly, yourself, from the Account page — it cancels any live subscription and removes your files. A team's owner cannot, since the team would go with them: write to us instead. Prefer email? Write to underwritecopilot.support@gmail.com from your account address and we'll remove it within 30 days. Either way, everything is deleted except two things: the deals you added to a team's pipeline, which stay with the team, handed to its owner along with your work on the team's deals; and what the law requires us to keep (for example, billing records).",
+      "Deleting a deal deletes its documents and analyses. You can delete your whole account and everything in it instantly, yourself, from the Account page — it cancels any live subscription and removes your files. A team's owner cannot, since the team would go with them: write to us instead. Prefer email? Write to underwritecopilot.support@gmail.com from your account address and we'll remove it within 30 days. Either way, everything is deleted except the deals you added to a team's pipeline, which stay with the team, handed to its owner along with your work on the team's deals; what the law requires us to keep (for example, billing records); and copies in our providers' backups and logs, which expire on their own schedules.",
     ],
   },
   {
