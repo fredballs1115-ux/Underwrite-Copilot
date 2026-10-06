@@ -49,7 +49,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "Deletion",
     body: [
-      "Deleting a deal removes its documents and analyses. Deleting your account — self-serve, from the Account page — cancels any live subscription, removes your files from storage, and cascades through the database. No export ransom, no retention surprise beyond what law requires (for example, billing records).",
+      "Deleting a deal removes its documents and analyses. Deleting your account — self-serve, from the Account page — cancels any live subscription, removes your files from storage, and cascades through the database. No export ransom, and nothing kept beyond what law requires (for example, billing records) and the copies in our providers' backups and logs, which expire on their own schedules.",
     ],
   },
   {
