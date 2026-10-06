@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     url: APP_URL,
     siteName: "Underwrite Copilot",
     title: "Stop underwriting like a coin flip.",
-    description: `Same deal, same afternoon, ${SPREAD_BPS} bps apart — that's a coin flip with a spreadsheet attached. Underwrite Copilot gives every deal the same rigor: sourced ranges, the three deal-killers first, a verdict that shows its work.`,
+    description: `An illustration: same deal, same afternoon, ${SPREAD_BPS} bps apart — that's a coin flip with a spreadsheet attached. Underwrite Copilot gives every deal the same rigor: sourced ranges, the three deal-killers first, a verdict that shows its work.`,
   },
   twitter: {
     card: "summary_large_image",

@@ -737,6 +737,13 @@ export default function Home() {
             <SectionHead eyebrow="The problem" title={`Same deal, same data room, ${SPREAD_BPS} bps apart.`} />
             <Reveal>
               <div className="shadow-card mt-8 rounded-2xl border border-line bg-surface p-6">
+                {/* The two IRRs are a stated illustration, not a measured
+                    benchmark (lib/marketing-constants), so the card says so. */}
+                <p className="mb-4">
+                  <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    Illustration
+                  </span>
+                </p>
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
@@ -773,7 +780,7 @@ export default function Home() {
                   />
                 </div>
                 <p className="mt-3 text-center text-xs text-muted">
-                  Same deal. Same afternoon. Same data room. One method fixes that.
+                  Same deal. Same afternoon. Same data room. One method narrows it.
                 </p>
               </div>
             </Reveal>
