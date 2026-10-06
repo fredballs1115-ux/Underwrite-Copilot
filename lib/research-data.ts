@@ -32,11 +32,14 @@ export function seedRules(): RegulatoryRule[] {
  *  source — a rule filed without one (New Jersey's municipal rent control,
  *  a patchwork of local ordinances the file points at rather than cites) is
  *  counted, never called source-linked. */
-export function ruleCounts(): { all: number; sourced: number } {
+export function ruleCounts(): { all: number; sourced: number; statewideStates: number } {
   const rules = seedRules();
   return {
     all: rules.length,
     sourced: rules.filter((r) => typeof r.source === "string" && r.source.trim() !== "").length,
+    // The states a statewide rule is on file for: the FAQ says the screen
+    // checks those outside the covered markets, and no others.
+    statewideStates: new Set(rules.filter((r) => !r.jurisdiction_local).map((r) => r.jurisdiction_state)).size,
   };
 }
 

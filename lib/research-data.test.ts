@@ -452,6 +452,12 @@ describe("ruleCounts — the homepage's claim about the rules on file", () => {
     const unsourced = seedRules().filter((r) => !r.source || r.source.trim() === "").length;
     expect(all - sourced).toBe(unsourced);
   });
+
+  it("counts the states a statewide rule is on file for, as the free plan's card does", () => {
+    const states = new Set(seedRules().filter((r) => !r.jurisdiction_local).map((r) => r.jurisdiction_state));
+    expect(ruleCounts().statewideStates).toBe(states.size);
+    expect(ruleCounts().statewideStates).toBeGreaterThan(0);
+  });
 });
 
 describe("ruleName — a rule named for a reader, never by its raw id", () => {
