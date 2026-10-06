@@ -41,7 +41,7 @@ export const CAP_WITHHELD: Record<CapWithheldKind, { na: string; title: string }
   share: {
     na: "n/a — share",
     title:
-      "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
+      "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, and a share of no stated percentage grosses up to nothing: neither is the building's price, and a cap stated against it is on a basis the memorandum never says, so no cap is shown.",
   },
   under_water: {
     na: "n/a — under water",

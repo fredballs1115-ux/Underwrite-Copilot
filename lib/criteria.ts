@@ -846,6 +846,14 @@ export function capWithheldDetail(
   // All the interests (a stated 100%): nothing is grossed up, as the deal's
   // own lead says (audit C5, LOW-7).
   if (ex?.shareRead?.all) return `${head}, but ${besideTheLoan(ex)}: a cap stated against that price is on a basis the memorandum never says.`;
+  // A share of no stated percentage grosses up to nothing, whatever loan is
+  // stated beside it, as the report and the workbook say (lib/underwrite/
+  // inputs `basisWithheldOf`; audit C6, MED-4).
+  if (ex?.shareRead && !ex.shareRead.pctStated) {
+    return ex.holding === "tic"
+      ? `${head}, but this interest's price, which no stated percentage grosses up, sits beside ${ex.loanWords ?? "the loan the memorandum states on the property"}: it is no building's price, and a cap stated against it is on a basis the memorandum never says.`
+      : `${head}, but this share's price, which no stated percentage grosses up, sits beside the loan its entity carries: it is no building's price, and a cap stated against it is on a basis the memorandum never says.`;
+  }
   if (ex?.holding === "tic") {
     return `${head}, but beside ${ex.loanWords ?? "the loan the memorandum states on the property"}, this interest's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
   }
@@ -876,22 +884,38 @@ export type ReturnWithheldKind = CapWithheldKind | "leased_fee" | "gp_stake" | "
 export function returnWithheldOf(ex: ExtractionLike | null | undefined): ReturnWithheldKind | null {
   if (!ex) return null;
   if (ex.shareRead?.gpStake) return "gp_stake";
+  // A share of no stated percentage, beside its entity's loan or not: its
+  // price grosses up to nothing, never to the equity's whole (audit C6,
+  // MED-4).
+  if (ex.interest?.kind === "partial_interest" && ex.shareRead && !ex.shareRead.pctStated) return "share_unstated";
   const cap = capWithheldOf(ex);
   if (cap) return cap;
-  if (ex.interest?.kind === "leased_fee") return "leased_fee";
-  return ex.interest?.kind === "partial_interest" && ex.shareRead && !ex.shareRead.pctStated ? "share_unstated" : null;
+  return ex.interest?.kind === "leased_fee" ? "leased_fee" : null;
 }
 
 /** The target-return check's words where the IRR is withheld, by the same
  *  reasons — the buy box's check and the mandate's dimension say the same
  *  sentence. */
-export function returnWithheldDetail(targetPct: number, why: ReturnWithheldKind, ex?: Pick<ExtractionLike, "shareRead"> | null): string {
+export function returnWithheldDetail(
+  targetPct: number,
+  why: ReturnWithheldKind,
+  ex?: Pick<ExtractionLike, "shareRead" | "capWithheld" | "holding" | "loanWords"> | null,
+): string {
   const head = `Mandate targets ≥${targetPct}% IRR`;
   if (why === "gp_stake") {
     return `${head}, but this is a share of the general partner's interest: a share of a share, whose price no figure grosses up to the building's, so an IRR the memorandum states is not read as this stake's return.`;
   }
   if (why === "share_unstated") {
-    return `${head}, but this share states no percentage of the owning entity: its price grosses up to no building's, so an IRR the memorandum states is not read as this share's return.`;
+    // The loan stated beside it is said beside the reason, never folded into
+    // an equity's whole (audit C6, MED-4).
+    const loan = ex?.capWithheld === "share";
+    if (ex?.holding === "tic" || ex?.shareRead?.tic) {
+      const beside = loan ? `, ${ex?.loanWords ?? "the loan the memorandum states on the property"} beside it` : "";
+      return `${head}, but this undivided interest states no percentage of the property: its price grosses up to no building's${beside}, so an IRR the memorandum states is not read as this interest's return.`;
+    }
+    return `${head}, but this share states no percentage of the owning entity: its price grosses up to no building's${
+      loan ? ", the loan its entity carries stated beside it" : ""
+    }, so an IRR the memorandum states is not read as this share's return.`;
   }
   if (why === "note" || why === "under_water") {
     return `${head}, but this is a note: its price is a loan's, and an IRR the memorandum states is not read as the note's return — the collateral's is not a return the note's buyer earns.`;

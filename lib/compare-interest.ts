@@ -222,6 +222,13 @@ export function modelReturnsRead(
               "A share of the general partner's interest is a share of a share: this model ran the whole building's cash flows at its price, so its cap and returns are withheld."
             : ci.cap != null
               ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
+              : interestOf(ex).entityLoan != null && interestOf(ex).sharePct == null
+                ? // No stated percentage: its price grosses up to nothing,
+                  // the loan said beside it, as the report and the workbook
+                  // say (audit C6, MED-4).
+                  isTenancyInCommon(ex)
+                  ? "An undivided interest's price is for the interest, and the memorandum states no percentage to gross it up by; beside the loan on the property it is no building's price: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                  : "A share's price is for the share, and the memorandum states no percentage to gross it up by; beside the loan its entity carries it is no building's price: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
               : interestOf(ex).entityLoan != null
                 ? isWholeShare(interestOf(ex).sharePct)
                   ? // All of the entity's interests (a stated 100%, research
@@ -283,7 +290,7 @@ export function capSlotReason(withheld: CapWithheld | null, own: { underWater?: 
 export const SHARE_CAP_WORDS = {
   na: "n/a — share",
   title:
-    "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
+    "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, and a share of no stated percentage grosses up to nothing: neither is the building's price, and a cap stated against it is on a basis the memorandum never says, so no cap is shown.",
 } as const;
 
 /**

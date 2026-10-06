@@ -33,6 +33,7 @@ import { FOLD_WORD, fitCellText, fitScoreLabel } from "./fit-label";
 import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox } from "./criteria";
 import { evalDealbreakers } from "./mandate";
 import { inferStrategy } from "./deal-strategy";
+import { capSlotWithheld, goingInCapFigure, modelReturnsRead, statedCapRead } from "./compare-interest";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 
 const DEAL = "3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b";
@@ -489,6 +490,47 @@ describe("the box holds a deal only to the figures its price buys", () => {
     expect(checkOf(r, "Basis / unit")?.detail).toContain("a share of the owning entity");
     expect(redLines(ex)).toMatchObject({ tripped: [], unknown: ["cap rate", "basis / unit"] });
     expect(r.chip.label).not.toContain("Pursue");
+  });
+
+  it("a share of no stated percentage beside its entity's loan is said to gross up to nothing, as the report and the workbook say (audit C6, MED-4)", () => {
+    const IRR: [string, string][] = [["Levered IRR", "14.0%"]];
+    const box: BuyBox = { ...BOX, minIrrPct: 15 };
+    const readBox = (ex: ExtractionResult) => buyBoxRead("multifamily", dealCheckSource(ex, null, null), box);
+    const lp = deal(
+      "partial_interest",
+      [["Asking price", "$20,000,000"], ["Entity loan balance", "$30,000,000"], ...BUILDING, ...IRR],
+      "A limited partnership interest in the owning entity",
+    );
+    const r = readBox(lp);
+    expect(checkOf(r, "Going-in cap")?.status).toBe("unknown");
+    expect(checkOf(r, "Going-in cap")?.detail).toBe(
+      "Mandate wants ≥6% going-in, but this share's price, which no stated percentage grosses up, sits beside the loan its entity carries: it is no building's price, and a cap stated against it is on a basis the memorandum never says.",
+    );
+    expect(checkOf(r, "Target return")?.detail).toBe(
+      "Mandate targets ≥15% IRR, but this share states no percentage of the owning entity: its price grosses up to no building's, the loan its entity carries stated beside it, so an IRR the memorandum states is not read as this share's return.",
+    );
+    // A tenancy in common of no stated percentage, the same way.
+    const tic = deal(
+      "partial_interest",
+      [["Asking price", "$6,000,000"], ["Entity loan balance", "$14,000,000"], ...BUILDING, ...IRR],
+      "An undivided tenant-in-common interest",
+    );
+    const t = readBox(tic);
+    expect(checkOf(t, "Going-in cap")?.detail).toBe(
+      "Mandate wants ≥6% going-in, but this interest's price, which no stated percentage grosses up, sits beside the stated $14.0M loan on the property: it is no building's price, and a cap stated against it is on a basis the memorandum never says.",
+    );
+    expect(checkOf(t, "Target return")?.detail).toBe(
+      "Mandate targets ≥15% IRR, but this undivided interest states no percentage of the property: its price grosses up to no building's, the stated $14.0M loan on the property beside it, so an IRR the memorandum states is not read as this interest's return.",
+    );
+    for (const ex of [lp, tic]) {
+      const rr = readBox(ex);
+      for (const label of ["Going-in cap", "Target return"]) expect(checkOf(rr, label)?.detail, label).not.toContain("grossed up");
+      expect(dimOf(rr, "irr")?.detail).toBe(checkOf(rr, "Target return")?.detail);
+      // The model-returns line (the deal page's tiles, the compare table).
+      const line = modelReturnsRead(ex, { purchasePrice: 20_000_000, year1Noi: 1_300_000, goingInCapPct: 6.5 }).line!;
+      expect(line).toContain("states no percentage to gross it up by");
+      expect(line).not.toContain("grossed up beside");
+    }
   });
 
   it("a tenancy in common and a GP stake are said as what they are, never a share of the owning entity (audit C3b MED-4)", () => {
