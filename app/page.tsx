@@ -204,7 +204,7 @@ const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Comps from county records",
+    label: "Comps from public property records",
     href: "/market",
     icon: (
       <Icon>
@@ -287,7 +287,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Which markets does it cover?",
-    a: `${MARKET_COUNT} markets with research briefs, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. ${DATA_METROS.length} more metro areas are read without a brief — their published rents, vacancy, jobs and, where FRED carries them, permits, each dated, with no local rules or notes on file: ${DATA_METROS.map((m) => m.name).join(", ")}. Outside all of them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}.`,
+    a: `${MARKET_COUNT} markets with research briefs, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. ${DATA_METROS.length} more metro areas are read without a brief — their published rents, vacancy, jobs and, where FRED carries them, permits, each dated, with no local rules or notes on file: ${DATA_METROS.map((m) => m.name).join(", ")}. Outside all of them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via public property-record APIs in ${COMPS_JURISDICTIONS}.`,
   },
   {
     q: "Why not just ask ChatGPT?",
