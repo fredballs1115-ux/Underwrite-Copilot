@@ -596,12 +596,18 @@ describe("a coupon priced off a Treasury, a supplemental on offer, a bare prime 
 describe("a second loan on offer or in place, by its own words, and a coupon that resets", () => {
   const terms = (rows: ReturnType<typeof row>[]) => readAssumableTerms(sample([row("Assumable loan balance", "$32,000,000"), row("Assumable loan rate", "3.85%"), ...rows]))!;
 
-  it("counts a supplemental's own rows as a second loan only where its balance row states a balance, never on offer", () => {
-    // Its rate and maturity rows alone state no loan in place.
-    expect(terms([row("Assumable supplemental loan rate", "5.95%"), row("Assumable supplemental loan maturity", "August 1, 2029")]).supplemental).toBeUndefined();
+  it("counts a supplemental's own rows as a second loan, never on offer, its balance said where it is not stated (audit C6, MED-7)", () => {
+    // Its rate and maturity rows with no balance row state a supplemental
+    // whose balance is not stated: nothing is priced on the first alone.
+    for (const rows of [
+      [row("Assumable supplemental loan rate", "5.95%"), row("Assumable supplemental loan maturity", "August 1, 2029")],
+      [row("Assumable supplemental loan balance", "Not stated"), row("Assumable supplemental loan rate", "5.95%")],
+    ]) {
+      expect(terms(rows).supplemental).toMatchObject({ balance: null, ratePct: 5.95, balanceNotStated: true });
+    }
     // A balance row that puts the loan on offer is an offer, as in the
     // first loan's own row.
-    for (const words of ["Up to $3,000,000 available", "$3,000,000 available to a qualified buyer", "May be offered to a qualified buyer", "Not stated"]) {
+    for (const words of ["Up to $3,000,000 available", "$3,000,000 available to a qualified buyer", "May be offered to a qualified buyer"]) {
       expect(terms([row("Assumable supplemental loan balance", words), row("Assumable supplemental loan rate", "5.95%")]).supplemental, words).toBeUndefined();
     }
     // A stated balance is a loan in place.
@@ -610,6 +616,25 @@ describe("a second loan on offer or in place, by its own words, and a coupon tha
       ratePct: 5.95,
     });
     expect(terms([row("Assumable supplemental loan balance", "$4,500,000 (originated May 2019)")]).supplemental?.balance).toBe(4_500_000);
+  });
+
+  it("prices nothing on the first loan where a supplemental is stated by its rate and maturity alone (audit C6, MED-7)", () => {
+    const e = sample([
+      ...LOAN,
+      row("Assumable supplemental loan rate", "5.95%"),
+      row("Assumable supplemental loan maturity", "March 31, 2031"),
+    ]);
+    const a = readAssumable(e, inputs, AS_OF)!;
+    // It had been priced: "Assuming it is worth $93k of price ...".
+    expect(a.read).toBeNull();
+    expect(assumableSentence(a)).toBe(
+      "A supplemental loan is stated with it, its balance not: the two are assumed together, so the first is not priced against a new loan alone.",
+    );
+    expect(assumableTag(e)).toBe("Assumable 3.45% + supplemental");
+    expect(assumableTermsLine(a)).toContain("; with it, a supplemental loan at 5.95% to Mar 2031, its balance not stated");
+    // "Available with the first" is the loan in place, not an offer.
+    const withFirst = terms([row("Assumable supplemental loan balance", "$4,500,000, assumable with lender approval, available with the first")]);
+    expect(withFirst.supplemental?.balance).toBe(4_500_000);
   });
 
   it("never reads a month as an offer, nor a clause that states its own loan and what may be done with it", () => {

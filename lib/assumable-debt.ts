@@ -129,6 +129,9 @@ export interface AssumableSecondLoan {
   floating?: FloatingRate;
   /** its maturity as an ISO date, a month alone on its first day */
   maturity: string | null;
+  /** its own rows state its rate or maturity and no balance: a
+   *  supplemental the memorandum states, its balance not (audit C6, MED-7) */
+  balanceNotStated?: boolean;
   /** the first loan's balance row's words, where they state the second
    *  loan beside it ("32,000,000 first mortgage plus a 4,500,000
    *  supplemental loan") — no balance is read off them as either loan's */
@@ -314,9 +317,10 @@ const NO_RESET =
  *  the offer itself ("may be offered", "may be available") — never the
  *  month ("originated May 2019") nor what may be done with a loan in place
  *  ("which may be prepaid at par"); "available" never as "available for
- *  assumption", which is the loan in place (audit C5, MED-2). */
+ *  assumption", which is the loan in place (audit C5, MED-2), nor "available
+ *  with the first", which is the loan beside it (audit C6, MED-7). */
 const ON_OFFER =
-  /\bavailable\b(?!\s+(?:for|to\s+be)\s+assum)|\bup\s+to\b|\beligib\w*|\boptional\b|\bcould\s+be\b|\bpotential\b|\bmay\s+(?:also\s+)?(?:be\s+)?(?:offered|available|obtain\w*|taken|drawn|added|arranged|provided|requested|sought)\b/i;
+  /\bavailable\b(?!\s+(?:for|to\s+be)\s+assum)(?!\s+(?:with|alongside|together\s+with)\b)|\bup\s+to\b|\beligib\w*|\boptional\b|\bcould\s+be\b|\bpotential\b|\bmay\s+(?:also\s+)?(?:be\s+)?(?:offered|available|obtain\w*|taken|drawn|added|arranged|provided|requested|sought)\b/i;
 /** A fee's percentage, which is never a loan's rate: "1% fee", "a fee of 1%". */
 const FEE_PCT = /\d+(?:\.\d+)?\s*%\s*(?:\w+\s+)?fee\b|\bfee\s*(?:of|:)?\s*\d+(?:\.\d+)?\s*%/gi;
 /** Prepayment terms that say the loan stays: a lockout, or a sale subject to
@@ -453,13 +457,17 @@ export function readAssumableTerms(ex: MetricRows): AssumableTerms | null {
   const prepayment = prepaymentText ? { stated: prepaymentText, locksIn: LOCKS_IN.test(prepaymentText) } : null;
 
   // A second loan offered with it, from its own rows or the first's words.
-  // Its own rows state a loan in place only where its balance row states a
-  // balance, and words that put it on offer there are an offer, as in the
-  // first loan's own row (the lead's item 17): a rate or a maturity alone,
-  // or "up to $3,000,000 available", is no second loan assumed with this one.
-  const secondBalance =
-    says(rows.secondBalanceRow) && !ON_OFFER.test(rows.secondBalanceRow.value) ? money(rows.secondBalanceRow.value) : null;
-  const second = secondBalance != null ? [rows.secondBalanceRow, rows.secondRateRow, rows.secondMaturityRow].filter(says) : [];
+  // Words that put it on offer are an offer, as in the first loan's own row
+  // (the lead's item 17): "up to $3,000,000 available" is no second loan
+  // assumed with this one. Its rate or maturity rows with no balance stated
+  // are a supplemental the memorandum states, its balance not — never
+  // passed over to price the first loan alone (audit C6, MED-7).
+  const secondOffered = [rows.secondBalanceRow, rows.secondRateRow, rows.secondMaturityRow].some(
+    (r) => says(r) && ON_OFFER.test(r.value),
+  );
+  const secondBalance = says(rows.secondBalanceRow) && !secondOffered ? money(rows.secondBalanceRow.value) : null;
+  const second = secondOffered ? [] : [rows.secondBalanceRow, rows.secondRateRow, rows.secondMaturityRow].filter(says);
+  const balanceNotStated = second.length > 0 && secondBalance == null && !twoInBalance;
   const secondRateText = says(rows.secondRateRow) ? rows.secondRateRow.value : "";
   const secondFloating = floatingRateOf(secondRateText);
   const secondMaturity = says(rows.secondMaturityRow) ? readStatedDate(rows.secondMaturityRow.value, 1990, 2100, "first") : null;
@@ -470,6 +478,7 @@ export function readAssumableTerms(ex: MetricRows): AssumableTerms | null {
           ratePct: secondRateText && !secondFloating ? couponOf(secondRateText) : null,
           ...(secondFloating ? { floating: secondFloating } : {}),
           maturity: secondMaturity?.iso ?? null,
+          ...(balanceNotStated ? { balanceNotStated: true } : {}),
           ...(twoInBalance ? { balanceStated: balanceRow.value.trim() } : {}),
           ...(twoInRate ? { ratesStated: rateText.trim() } : {}),
         }
@@ -700,7 +709,7 @@ const quoted = (text: string) => `"${text.trim().replace(/[.;,]+$/, "")}"`;
 function secondLoanWords(s: AssumableSecondLoan): string | null {
   if (s.balance == null && s.ratePct == null && !s.floating && s.maturity == null) return null;
   const what = `${s.balance != null ? `${assumableMoney(s.balance)} ` : ""}supplemental loan`;
-  return `${withArticle(what)}${rateWords(s.ratePct, s.floating)}${s.maturity ? ` to ${monthYear(s.maturity)}` : ""}`;
+  return `${withArticle(what)}${rateWords(s.ratePct, s.floating)}${s.maturity ? ` to ${monthYear(s.maturity)}` : ""}${s.balanceNotStated ? ", its balance not stated" : ""}`;
 }
 
 /** The loan as the memorandum states it, in one line: "$24.5M at 3.45% to
@@ -790,7 +799,12 @@ export function assumableSentence(a: AssumableRead, withheld: string | null = nu
   }
   if (t.supplemental || t.floating) {
     const said: string[] = [];
-    if (t.supplemental) said.push("A second loan is offered with it: the two are assumed together, so the first is not priced against a new loan alone.");
+    if (t.supplemental)
+      said.push(
+        t.supplemental.balanceNotStated
+          ? "A supplemental loan is stated with it, its balance not: the two are assumed together, so the first is not priced against a new loan alone."
+          : "A second loan is offered with it: the two are assumed together, so the first is not priced against a new loan alone.",
+      );
     if (t.floating) {
       const w = floatingWords(t.floating);
       const who = t.supplemental ? "It" : "The loan";
