@@ -486,7 +486,12 @@ export function basisWithheldOf(extraction: ExtractionResult | null): { word: st
           word: "share",
           why:
             entityLoan != null && sharePct != null
-              ? "the interest's price grossed up is the equity's whole, with the loan on the property on top of it, not the building's price"
+              ? isWholeShare(sharePct)
+                ? // All the tenant-in-common interests: the whole, nothing
+                  // grossed up, as the cover, the lead and the buy box say
+                  // (audit C6, LOW-3).
+                  "the price for all the tenant-in-common interests is the equity's whole, nothing grossed up, with the loan on the property on top of it, not the building's price"
+                : "the interest's price grossed up is the equity's whole, with the loan on the property on top of it, not the building's price"
               : `the price buys an undivided interest the memorandum states no percentage for, which cannot be grossed up to the building's price${
                   entityLoan != null ? ", the loan on the property stated beside it" : ""
                 }`,

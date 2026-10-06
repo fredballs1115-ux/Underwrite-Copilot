@@ -10,7 +10,7 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assessPlausibility, askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestShortLine, readInterest } from "@/lib/interest";
 import { modelReturnsRead } from "@/lib/compare-interest";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { basisWithheldOf, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 
 const row = (label: string, value: string, basis: ExtractionResult["metrics"][number]["basis"] = "na") => ({ label, value, flagged: false, page: "p. 3", basis });
 const tic = (metrics: ExtractionResult["metrics"], loan = true): ExtractionResult =>
@@ -48,6 +48,14 @@ describe("all the tenant-in-common interests are said as that, never an entity's
     expect(line).toBe(
       "This price buys all the tenant-in-common interests, and beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld.",
     );
+  });
+
+  it("the workbook's per-unit rows note: nothing grossed up (audit C6, LOW-3)", () => {
+    const ex = tic([row("NOI (in-place)", "$300,000", "in_place")]);
+    expect(basisWithheldOf(ex)).toEqual({
+      word: "share",
+      why: "the price for all the tenant-in-common interests is the equity's whole, nothing grossed up, with the loan on the property on top of it, not the building's price",
+    });
   });
 
   it("the short line", () => {
