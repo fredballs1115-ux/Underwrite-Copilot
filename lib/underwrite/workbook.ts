@@ -207,6 +207,10 @@ export async function buildUnderwriteWorkbook(
    *  leasehold whose lease ends inside the hold has its returns marked
    *  withheld, as the page and the report withhold them (audit C4, M3) */
   interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null,
+  /** the moment the file is made, set as its created and modified time
+   *  where the caller dates the cover on another day (the reader's: the
+   *  route passes noon on it, which is no moment anyone exported the file) */
+  exportedAt: Date = builtAt,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
@@ -219,8 +223,8 @@ export async function buildUnderwriteWorkbook(
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
-  wb.created = builtAt;
-  wb.modified = builtAt;
+  wb.created = exportedAt;
+  wb.modified = exportedAt;
 
   const wsCover = wb.addWorksheet("Cover", { views: [{ showGridLines: false }] });
   const wsSummary = wb.addWorksheet("Deal Summary", { views: [{ showGridLines: false }] });

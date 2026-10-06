@@ -1699,6 +1699,22 @@ describe("the workbook says the day it was built, which its \"from today\" lines
     await now.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
     expect(now.created!.getUTCFullYear()).toBeGreaterThanOrEqual(2026);
   });
+
+  it("dates the cover on the reader's day and the file at the moment it is made, where the route passes both", async () => {
+    // The route builds on noon of the reader's day (audit C6, LOW-2), which
+    // is no moment anyone exported the file: the file's own time is the
+    // export's.
+    const readerNoon = new Date(Date.UTC(2026, 9, 5, 12));
+    const exportedAt = new Date(Date.UTC(2026, 9, 6, 3, 41));
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(
+      (await buildUnderwriteWorkbook(model, null, null, null, readerNoon, null, null, exportedAt)) as unknown as ArrayBuffer,
+    );
+    const cover = wb.getWorksheet("Cover")!;
+    expect(cover.getCell(findRow(cover, 2, "Prepared"), 3).value).toBe("Oct 5, 2026");
+    expect(wb.created?.toISOString()).toBe(exportedAt.toISOString());
+    expect(wb.modified?.toISOString()).toBe(exportedAt.toISOString());
+  });
 });
 
 // ── What is being sold, on the cover (#414) ────────────────────────────────

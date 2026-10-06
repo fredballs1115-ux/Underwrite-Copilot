@@ -194,8 +194,9 @@ export async function GET(
     const interest = modelReturnsRead(extraction, screeningCompareModel(model.inputs), asOf);
     // Built on the reader's day: the cover's "Prepared" date is the day its
     // "from today" lines count from (audit C6, LOW-2: it had printed the
-    // server's UTC day, a Los Angeles reader at 8 pm reading tomorrow's).
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest);
+    // server's UTC day, a Los Angeles reader at 8 pm reading tomorrow's);
+    // the file's own created time is the moment it is made.
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date());
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";

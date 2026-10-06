@@ -217,7 +217,7 @@ describe("the signed-in pages count from the reader's day", () => {
     expect(workbook).not.toContain("toISOString().slice(0, 10)");
     // Its cover's "Prepared" day is the reader's day the "from today" lines
     // count from, never the server's UTC day (audit C6, LOW-2).
-    expect(workbook).toMatch(/buildUnderwriteWorkbook\(model, branding, marketRead, readPortfolio\(extraction\), asOf, findings, interest\)/);
+    expect(workbook).toMatch(/buildUnderwriteWorkbook\(model, branding, marketRead, readPortfolio\(extraction\), asOf, findings, interest,/);
   });
 
   // The documents' own date, read once per request from the cookie the
