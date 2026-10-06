@@ -293,13 +293,35 @@ export function noBidRead(inputs: UnderwriteInputs, floors: BidFloors, levers: P
  * is nothing to name beyond the floors themselves — every floor fails even
  * alone — and the caller's sentence stands.
  */
-export function noBidSentence(floors: BidFloors, nb: NoBidRead | null): string | null {
+export function noBidSentence(
+  floors: BidFloors,
+  nb: NoBidRead | null,
+  opts: {
+    /** the price the bid was solved against, in words: "the modelled
+     *  price", or "the price entered" where the model's is a placeholder and
+     *  the playground solves on the reader's own (audit C6, LOW-6) */
+    vs?: string;
+    /** a partial interest's stated share, where the model runs the whole
+     *  its price grosses up to: a floor-alone price is the whole's, and the
+     *  share's is said beside it, as the max-bid card says it */
+    share?: { pct: number; noun: "share" | "interest" } | null;
+  } = {},
+): string | null {
   if (!nb || nb.alone.length === 0) return null;
   const words = (k: keyof BidFloors) => floorWords(k, floors);
+  const vs = opts.vs ?? "the modelled price";
+  const share = opts.share;
+  const shareOf = (whole: number, atLeast: boolean) =>
+    share
+      ? ` (the whole's price, the ${share.noun} grossed up; the ${Number(share.pct.toFixed(2))}% ${share.noun}'s is ${atLeast ? "at least " : ""}${fmtBid(whole * (share.pct / 100))})`
+      : "";
   const never = nb.alone.filter((a) => a.price == null);
   const alone = nb.alone.filter((a) => a.price != null);
   const clearsAlone = alone.map(
-    (a, i) => `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${a.unbounded ? `at every price searched, up to ${timesWords(MAX_BID_SEARCH_X)} the modelled price` : `up to ${fmtBid(a.price!)}`}`,
+    (a, i) =>
+      `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${
+        a.unbounded ? `at every price searched, up to ${timesWords(MAX_BID_SEARCH_X)} ${vs}` : `up to ${fmtBid(a.price!)}`
+      }${shareOf(a.price!, a.unbounded)}`,
   );
   const aloneLine = clearsAlone.length > 0 ? `${clearsAlone.join(", and ").replace(/^y/, "Y")}.` : "";
   if (never.length === 0) {

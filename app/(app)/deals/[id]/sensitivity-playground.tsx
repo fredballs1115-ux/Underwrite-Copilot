@@ -336,8 +336,18 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     // Where no price clears the floors together, the report's own sentence:
     // which floor never clears and how far the others clear alone (audit
     // C3a, MED-7) — one deal, one reason.
-    return { ...solved, noBid: solved.price == null ? noBidSentence(floors, noBidRead(solveOn, floors, levers)) : null };
-  }, [box, withheld, bidAgainst, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx]);
+    // Said against the price it was solved on — the one the reader typed,
+    // where the model's is a placeholder — and, on a share, with the
+    // share's own bid beside the whole's (audit C6, LOW-6).
+    const share = data.sharePct != null ? { pct: data.sharePct, noun: data.shareNoun ?? "share" } : null;
+    return {
+      ...solved,
+      noBid:
+        solved.price == null
+          ? noBidSentence(floors, noBidRead(solveOn, floors, levers), { vs: bidAgainst != null ? "the price entered" : "the modelled price", share })
+          : null,
+    };
+  }, [box, withheld, bidAgainst, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx, data.sharePct, data.shareNoun]);
 
   const reset = () => {
     setCapIdx(caps.baseIdx);
