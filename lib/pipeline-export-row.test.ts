@@ -11,6 +11,7 @@ import { pickSlots } from "./pipeline-slots";
 import { pipelineExportRow, type ExportDeal, type ExportRowContext } from "./pipeline-export-row";
 import { yieldOnCostText } from "./plan-facts";
 import { noteCapSlot, ownYieldText } from "./compare-interest";
+import { buildManualExtraction } from "./manual-deal";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
 
@@ -399,5 +400,25 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     // the same cell is no longer a green Fits (the audit of 2026-10-05).
     const withCoc = pipelineExportRow(deal({ extraction: building }), { ...ctx, box: { ...box, minCoCPct: 6 } });
     expect(withCoc.fitCoverage).toEqual({ checked: 4, total: 5, unchecked: ["Cash-on-cash"], priceUnchecked: true });
+  });
+
+  it("marks a deal typed by hand, which the summary then says (audit C6, LOW-7)", () => {
+    const typed = buildManualExtraction({
+      name: "Typed deal",
+      assetClass: "multifamily",
+      market: "Baltimore, MD",
+      address: "",
+      price: 10_000_000,
+      capPct: 6,
+      noiAnnual: null,
+      units: 40,
+      sf: null,
+      occupancyPct: null,
+      yearBuilt: null,
+      avgRentMo: null,
+      notes: "",
+    });
+    expect(pipelineExportRow(deal({ extraction: typed }), ctx).typedByHand).toBe(true);
+    expect(pipelineExportRow(deal(), ctx).typedByHand).toBeUndefined();
   });
 });

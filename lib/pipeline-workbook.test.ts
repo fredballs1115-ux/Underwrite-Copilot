@@ -321,4 +321,12 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     });
     expect(count).toBe(1);
   });
+
+  it("says a deal typed by hand is among them where one is (audit C6, LOW-7)", async () => {
+    const line = async (rows: PipelineExportRow[]) => String((await load(rows)).getWorksheet("Summary")!.getCell("B3").value);
+    expect(await line([STABILIZED])).toBe("Exported 2026-09-08 — figures as extracted from each OM.");
+    expect(await line([STABILIZED, { ...STABILIZED, name: "Typed deal", typedByHand: true }])).toBe(
+      "Exported 2026-09-08 — figures as extracted from each OM, or as entered by hand.",
+    );
+  });
 });

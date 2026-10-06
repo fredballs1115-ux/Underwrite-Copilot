@@ -175,6 +175,10 @@ export interface PipelineExportRow {
   offersDue: string | null; // YYYY-MM-DD
   createdAt: string; // ISO
   addedBy: string | null;
+  /** the deal was typed by hand, its figures extracted from no OM
+   *  (lib/manual-deal `typedByHand`): the summary says so where any is
+   *  among the rows (audit C6, LOW-7) */
+  typedByHand?: boolean;
 }
 
 /** A fit's colour by its tone (lib/fit-label `fitTone`): the fold's own —
@@ -555,7 +559,11 @@ export async function buildPipelineWorkbook(
   ts.value = "Pipeline summary";
   ts.font = { bold: true, size: 16, color: { argb: INK } };
   const tss = sum.getCell("B3");
-  tss.value = `Exported ${exportedAt.toISOString().slice(0, 10)} — figures as extracted from each OM.`;
+  // A deal typed by hand was extracted from no OM: where any is among the
+  // rows the line says so, as the analytics and the comps do (audit C6,
+  // LOW-7).
+  const typed = rows.some((d) => d.typedByHand);
+  tss.value = `Exported ${exportedAt.toISOString().slice(0, 10)} — figures as extracted from each OM${typed ? ", or as entered by hand" : ""}.`;
   tss.font = { size: 10, color: { argb: MUTED }, italic: true };
 
   const header = (cell: string, text: string) => {

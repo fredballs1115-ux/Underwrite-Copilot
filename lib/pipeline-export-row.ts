@@ -28,6 +28,7 @@ import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
 import { goingConcernTag } from "@/lib/going-concern";
 import { condoTag } from "@/lib/condo";
+import { typedByHand } from "@/lib/manual-deal";
 import { sandwichTag } from "@/lib/sandwich-lease";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { screenedDay, verdictBehind, type JobLike } from "@/lib/screen-run";
@@ -197,6 +198,9 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
       : null,
     verdictBehind: verdictBehind(ctx.job, ctx.now),
     offersDue: ctx.offersDue,
+    // Typed by hand, extracted from no OM: the summary says so (audit C6,
+    // LOW-7).
+    ...(typedByHand(extraction) ? { typedByHand: true } : {}),
     createdAt: d.created_at,
     addedBy: ctx.addedBy,
   };
