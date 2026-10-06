@@ -192,7 +192,10 @@ export async function GET(
     // marked withheld, as the page and the report withhold them (audit C4,
     // M3).
     const interest = modelReturnsRead(extraction, screeningCompareModel(model.inputs), asOf);
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), new Date(), findings, interest);
+    // Built on the reader's day: the cover's "Prepared" date is the day its
+    // "from today" lines count from (audit C6, LOW-2: it had printed the
+    // server's UTC day, a Los Angeles reader at 8 pm reading tomorrow's).
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";
