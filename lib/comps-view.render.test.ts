@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CompsResultView } from "../app/(app)/comps/result-view";
 import type { RecordComp, RecordCompsResult } from "./public-comps/core";
 import { compStats } from "./public-comps/core";
-import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 const sale = (i: number, over: Partial<RecordComp> = {}): RecordComp => ({
   address: `${100 + i} Walnut St`,
@@ -46,6 +46,7 @@ describe("the comps readout as pictures", () => {
   it("draws a dot a sale, the middle and the subject, and passes the lint", () => {
     const comps = Array.from({ length: 6 }, (_, i) => sale(i));
     const html = draw(result(comps), 500_000);
+    dumpView("comps-readout", `<section class="rounded-xl border border-line bg-surface p-4">${html}</section>`);
     expect(count(html, "comps-sale")).toBe(6);
     expect(count(html, "comps-median")).toBe(1);
     expect(count(html, "comps-subject")).toBe(1);
