@@ -349,16 +349,24 @@ function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; su
           </figcaption>
           <div className="mt-3 flex h-16 items-end gap-1" data-bar="comps-quarters">
             {quarters.map((q) => (
-              <div key={q.label} className="flex h-full min-w-0 flex-1 flex-col justify-end" title={`${q.label}: ${q.count}`}>
+              <div
+                key={q.label}
+                className="flex h-full min-w-0 max-w-10 flex-1 flex-col items-center justify-end"
+                title={`${q.label}: ${q.count}`}
+              >
+                <span className="font-mono text-[10px] tabular-nums text-muted">{q.count || ""}</span>
                 <div
                   className={`w-full rounded-t ${q.count ? "bg-brand/60" : "bg-faint"}`}
-                  style={{ height: `${q.count ? Math.max(8, (q.count / peak) * 100) : 4}%` }}
+                  style={{ height: `${q.count ? Math.max(8, (q.count / peak) * 80) : 4}%` }}
                   data-bar="comps-quarter"
                 />
               </div>
             ))}
           </div>
-          <div className="mt-1 flex justify-between text-[11px] text-muted">
+          <div
+            className="mt-1 flex justify-between text-[11px] text-muted"
+            style={{ maxWidth: `${quarters.length * 2.75}rem` }}
+          >
             <span>{quarters[0].label}</span>
             <span>{quarters[quarters.length - 1].label}</span>
           </div>
