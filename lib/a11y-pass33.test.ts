@@ -119,6 +119,7 @@ describe("a copy that says so (research pass 33, items 9 and 25)", () => {
     }
     expect(found.sort()).toEqual(
       [
+        "app/(app)/comps/record-sales-map.tsx",
         "app/(app)/deals/[id]/bridge/bridge-view.tsx",
         "app/(app)/deals/[id]/share-control.tsx",
         "app/(app)/deals/[id]/valuations/valuations-view.tsx",
