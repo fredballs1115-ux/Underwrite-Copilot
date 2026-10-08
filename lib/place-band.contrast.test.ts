@@ -6,8 +6,12 @@ import {
   HERO_SIDE_SCRIM,
   MARKET_BAND_CREDIT,
   MARKET_BAND_CREDIT_ROW,
+  MARKET_BAND_BOXES,
   MARKET_BAND_PICTURE,
+  MARKET_BAND_WORDS_TOP,
+  PLACE_BAND_BOXES,
 } from "@/app/place-band";
+import type { BandBox } from "@/lib/skyline";
 
 /**
  * The scrim over a market photograph, held to the contrast floor.
@@ -259,9 +263,14 @@ describe("the caption scrim, for a market's own band on /market", () => {
   // what renders, not a restatement of it.
   const stops = [...CAPTION_SCRIM].sort((a, b) => a.px - b.px);
   const alphaAt = (px: number) => rampAt(px, stops.map((s) => [s.px, s.alpha] as [number, number]));
+  // The market band's scrim is a branch of PhotoScrim of its own: the strip's
+  // fade below sm, and the veil and the caption scrim from sm.
+  const branch = /if \(scrim === "caption"\) \{[\s\S]*?\n {2}\}/.exec(SOURCE)?.[0] ?? "";
+  const captionVeil = Number(/"absolute inset-0 hidden bg-sidebar\/(\d+) sm:block"/.exec(branch)?.[1]) / 100;
+  const overWhite = (alpha: number): RGB => over(SIDEBAR, alpha, over(SIDEBAR, captionVeil, WHITE));
   const shownAt = (px: number) => {
     const a = alphaAt(px);
-    return 1 - (a + (1 - a) * veilAlpha());
+    return 1 - (a + (1 - a) * captionVeil);
   };
   const ACCENT = (() => {
     const hex = /--color-accent:\s*#([0-9a-f]{6})/i.exec(CSS)?.[1] ?? "";
@@ -270,15 +279,19 @@ describe("the caption scrim, for a market's own band on /market", () => {
   })();
   const band = /export function MarketBand[\s\S]*?^}$/m.exec(SOURCE)?.[0] ?? "";
 
-  // How far up the band its words can reach, in px, worked from the classes
-  // MarketBand sets: on a phone, pb-6 (24px) under a name wrapped to TWO
-  // lines of text-2xl (2 × 32px), mt-1 (4px) and the 11px eyebrow at the
-  // body's 1.5 line height. From sm up the name is one line of text-3xl
-  // under pb-7, which is lower (84.5px), so the phone is the reach.
-  const REACH_PX = 24 + 2 * 32 + 4 + 11 * 1.5;
+  // How far up the band its words can reach where they sit over the picture,
+  // from sm, worked from the classes MarketBand sets: pb-7 (28px) under a
+  // name wrapped to TWO lines of text-3xl (2 × 36px) — line-clamp-2 allows
+  // two, and a submarket's name is whatever its owner typed — mt-1 (4px) and
+  // the 11px eyebrow at the body's 1.5 line height. Below sm the words are
+  // under the picture, on the band's own colour (the strip, below).
+  const REACH_PX = 28 + 2 * 36 + 4 + 11 * 1.5;
 
   it("is the gradient the band paints, and the market band uses it", () => {
     expect(SOURCE).toMatch(/CAPTION_SCRIM\.map\(/);
+    expect(branch, "PhotoScrim's caption branch").not.toBe("");
+    expect(branch).toContain("backgroundImage: captionGradient");
+    expect(captionVeil, "the caption's veil from sm").toBeGreaterThan(0);
     expect(band, "MarketBand").not.toBe("");
     expect(band).toContain('scrim="caption"');
     // line-clamp-2 is what makes "two lines" the reach whatever name is
@@ -286,14 +299,63 @@ describe("the caption scrim, for a market's own band on /market", () => {
     for (const cls of ["pb-6", "text-2xl", "mt-1", "text-[11px]", "sm:pb-7", "sm:text-3xl", "line-clamp-2"]) {
       expect(band, cls).toContain(cls);
     }
-    expect(REACH_PX).toBeLessThanOrEqual(110);
+    expect(REACH_PX).toBeLessThanOrEqual(125);
   });
 
   it("holds white to AAA and the accent eyebrow to AA everywhere the words reach", () => {
     for (let px = 0; px <= Math.ceil(REACH_PX); px += 5) {
-      const bg = scrimOverWhite(alphaAt(px));
+      const bg = overWhite(alphaAt(px));
       expect(contrast(WHITE, bg), `white ${px}px up`).toBeGreaterThanOrEqual(7);
       expect(contrast(ACCENT, bg), `accent ${px}px up`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("draws the picture across a phone's band as a strip, its words starting at the strip's foot on the band's own colour", () => {
+    // Under the caption scrim a 240px phone band had been a teal wash: no
+    // pixel of the photograph showed untouched (measured in Chromium on a
+    // white frame, 2026-10-05). Now the photograph is a strip and the words
+    // are under it, as on the homepage's hero.
+    const strip = Number(/(?:^| )h-\[(\d+)rem\]/.exec(MARKET_BAND_PICTURE)?.[1]);
+    const top = Number(/(?:^| )pt-\[(\d+)rem\]/.exec(MARKET_BAND_WORDS_TOP)?.[1]);
+    expect(strip).toBeGreaterThan(0);
+    expect(top, "the words start at the strip's foot").toBe(strip);
+    expect(band).toContain("${MARKET_BAND_WORDS_TOP}");
+    // From sm the picture fills the words' row again, and the words sit at
+    // its foot under the scrim.
+    expect(MARKET_BAND_PICTURE).toMatch(/(?:^| )top-0(?: |$)/);
+    expect(MARKET_BAND_PICTURE).toMatch(/\bsm:inset-0\b/);
+    expect(MARKET_BAND_PICTURE).toMatch(/\bsm:h-auto\b/);
+    expect(MARKET_BAND_WORDS_TOP).toMatch(/\bsm:pt-\d+\b/);
+    // Below sm, nothing lies over the photograph but the strip's fade into
+    // the band at its foot: the veil, the scrim and the foot's band are all
+    // drawn from sm only.
+    const layers = [...branch.matchAll(/<div className="([^"]*)"/g)].map((m) => m[1]);
+    expect(layers.length).toBeGreaterThanOrEqual(3);
+    for (const l of layers) {
+      if (/\bsm:hidden\b/.test(l)) continue;
+      expect(l, l).toMatch(/(?:^| )hidden(?: |$)/);
+      expect(l, l).toMatch(/\bsm:block\b/);
+    }
+    const fade = /bg-gradient-to-b from-sidebar\/0 from-(\d+)% to-sidebar to-100% sm:hidden/.exec(branch);
+    expect(fade, "the strip's fade below sm").not.toBeNull();
+    expect(layers.filter((l) => /\bsm:hidden\b/.test(l))).toHaveLength(1);
+    // The words begin where the fade has reached the band's own colour.
+    expect(contrast(WHITE, SIDEBAR)).toBeGreaterThanOrEqual(7);
+    expect(contrast(ACCENT, SIDEBAR)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("leaves more than half a phone's band to the photograph, with nothing over it", () => {
+    // Worked from the classes: the strip's part above its fade, over the
+    // strip and the words under it (the eyebrow, mt-1, a name of text-2xl
+    // on one line or two, pb-6). Measured in Chromium at 390px on a white
+    // frame (2026-10-05): 56–59% of the band with a one-line name, 53–54%
+    // with two, against none before.
+    const strip = Number(/(?:^| )h-\[(\d+)rem\]/.exec(MARKET_BAND_PICTURE)?.[1]) * 16;
+    const from = Number(/from-sidebar\/0 from-(\d+)% to-sidebar to-100% sm:hidden/.exec(branch)?.[1]) / 100;
+    expect(from).toBeGreaterThanOrEqual(0.6);
+    for (const lines of [1, 2]) {
+      const words = 11 * 1.5 + 4 + lines * 32 + 24;
+      expect((strip * from) / (strip + words), `a name of ${lines} line(s)`).toBeGreaterThanOrEqual(0.5);
     }
   });
 
@@ -313,7 +375,7 @@ describe("the caption scrim, for a market's own band on /market", () => {
     expect(MARKET_BAND_PICTURE).toMatch(/\brow-end-2\b/);
     expect(MARKET_BAND_CREDIT_ROW).toMatch(/\brow-start-2\b/);
     // The words are in the picture's row, and the credit is not placed over it.
-    expect(band).toMatch(/className="on-photo band-words relative col-start-1 row-start-1 /);
+    expect(band).toMatch(/className=\{`on-photo band-words relative col-start-1 row-start-1 /);
     expect(MARKET_BAND_CREDIT).not.toMatch(/\b(absolute|bottom-\d|top-\d)\b/);
     // On the band's own colour, with no photograph under it: its tier is
     // measured against the solid band.
@@ -322,20 +384,46 @@ describe("the caption scrim, for a market's own band on /market", () => {
     expect(contrast(over(WHITE, tier, SIDEBAR), SIDEBAR)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("leaves the band above the words to the photograph", () => {
+  it("leaves the band above the words to the photograph from sm", () => {
     // The whole point of anchoring in px: the band's height goes to the
     // picture, not to a proportional veil.
-    const phone = Number(/min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16;
     const desk = Number(/sm:min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16;
     const clear = stops[stops.length - 1].px;
     expect(stops[stops.length - 1].alpha).toBe(0);
-    expect(phone, "the phone band clears the scrim with room to spare").toBeGreaterThanOrEqual(clear + 32);
     expect(desk).toBeGreaterThanOrEqual(300); // a photograph, not a texture
-    expect(shownAt(phone)).toBeGreaterThan(0.7);
-    // From the middle of the desktop band up, at least half the picture.
+    expect(desk, "the band clears the scrim with room to spare").toBeGreaterThanOrEqual(clear + 32);
+    expect(shownAt(desk)).toBeGreaterThan(0.7);
+    // From the middle of the band up, at least half the picture.
     expect(shownAt(desk / 2)).toBeGreaterThanOrEqual(0.5);
     // …and the words' own zone is still mostly scrim.
     expect(shownAt(0)).toBeLessThan(0.05);
+  });
+});
+
+describe("the heights a band's picture is asked for by (research pass 29)", () => {
+  // A band's `sizes` is worked out from its picture box (lib/skyline
+  // `bandSizes`): a panorama covers the band by its height, so a height
+  // that drifted from the band's classes would ask for the wrong width.
+  const heightAt = (boxes: readonly BandBox[], w: number) =>
+    [...boxes].sort((a, b) => b.min - a.min).find((b) => w >= b.min)?.height;
+  const fn = (name: string) => new RegExp(`export function ${name}[\\s\\S]*?^}$`, "m").exec(SOURCE)?.[0] ?? "";
+
+  it("asks for the market band's picture by its strip on a phone and its row from sm", () => {
+    const band = fn("MarketBand");
+    expect(band).toContain("boxes={MARKET_BAND_BOXES}");
+    const strip = Number(/(?:^| )h-\[(\d+)rem\]/.exec(MARKET_BAND_PICTURE)?.[1]) * 16;
+    const row = Number(/sm:min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16;
+    expect(strip).toBeGreaterThan(0);
+    expect(heightAt(MARKET_BAND_BOXES, 390)).toBe(strip);
+    expect(heightAt(MARKET_BAND_BOXES, 820)).toBe(row);
+    expect(heightAt(MARKET_BAND_BOXES, 1280)).toBe(row);
+  });
+
+  it("asks for a page's opening band's picture by its heights", () => {
+    const band = fn("PlaceBand");
+    expect(band).toContain("boxes={PLACE_BAND_BOXES}");
+    expect(heightAt(PLACE_BAND_BOXES, 390)).toBe(Number(/ min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16);
+    expect(heightAt(PLACE_BAND_BOXES, 820)).toBe(Number(/sm:min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16);
   });
 });
 

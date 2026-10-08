@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MarketNavEntry } from "@/lib/market-match";
-import { asksServer, uniqueById } from "@/lib/palette-search";
+import { asksServer, paletteCall, paletteMoreLine, uniqueById, type PaletteRun } from "@/lib/palette-search";
 import { DealAvatar } from "./deal-avatar";
 
 /** How long typing rests before the server is asked for every deal whose
@@ -17,6 +17,8 @@ type PaletteDeal = {
   address: string;
   docs: string;
   call: string | null;
+  /** the latest run, as the pipeline reads it (lib/screen-run) */
+  run?: PaletteRun;
   stage: string;
 };
 
@@ -221,12 +223,6 @@ const ACTIONS: Item[] = [
   },
 ];
 
-const CALL_DOT: Record<string, string> = {
-  pass: "bg-pass",
-  caution: "bg-caution",
-  pass_on: "bg-kill",
-};
-
 /**
  * ⌘K / Ctrl+K jump-anywhere. Deals are fetched lazily on first open (and
  * refreshed on each open) from /api/palette — RLS keeps it to the caller's own.
@@ -251,7 +247,9 @@ export function CommandPalette({
   // What typed queries found beyond the recent list this time the palette
   // is open, and the last query the server answered (or failed to).
   const [found, setFound] = useState<PaletteDeal[]>([]);
-  const [answered, setAnswered] = useState<{ q: string; ok: boolean } | null>(null);
+  // A search's answer also says how many deals matched in all, where it
+  // lists fewer (the route's `total`).
+  const [answered, setAnswered] = useState<{ q: string; ok: boolean; shown?: number; total?: number | null } | null>(null);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -315,9 +313,9 @@ export function CommandPalette({
           if (!r.ok) throw new Error(String(r.status));
           return r.json();
         })
-        .then((d: { deals: PaletteDeal[] }) => {
+        .then((d: { deals: PaletteDeal[]; total?: number }) => {
           setFound((prev) => uniqueById(prev, d.deals));
-          setAnswered({ q: typed, ok: true });
+          setAnswered({ q: typed, ok: true, shown: d.deals.length, total: d.total ?? null });
         })
         .catch(() => {
           // Dropped for the next keystroke: nothing to say. Unreachable: the
@@ -331,22 +329,32 @@ export function CommandPalette({
     };
   }, [ask, typed]);
   const searching = ask && answered?.q !== typed;
+  // More deals matched than the search lists: said under the results, never
+  // left to read as every match (research pass 42).
+  const moreLine = ask && answered?.q === typed && answered.ok ? paletteMoreLine(answered.shown ?? 0, answered.total) : null;
 
   const items = useMemo<Item[]>(() => {
     const q = query.trim().toLowerCase();
     // An empty query lists the recent deals alone; a typed one filters them
     // with what the server found beyond them.
     const pool = q ? uniqueById(deals ?? [], found) : (deals ?? []);
-    const dealItems: Item[] = pool.map((d) => ({
-      key: d.id,
-      label: d.name,
-      hint: d.market || d.address || d.stage,
-      href: `/deals/${d.id}`,
-      // The building's picture with the call's dot on its corner (#435).
-      icon: <DealAvatar dealId={d.id} dot={d.call ? (CALL_DOT[d.call] ?? "bg-line") : "bg-line"} />,
-      group: "deals" as const,
-      search: `${d.name} ${d.market} ${d.address} ${d.docs}`,
-    }));
+    const dealItems: Item[] = pool.map((d) => {
+      // The call as the pipeline card draws it (lib/palette-search
+      // `paletteCall`): a failed, stalled or running screen outranks the
+      // call on file, its dot the run's and its word before the place.
+      const call = paletteCall(d.call, d.run);
+      const place = d.market || d.address || d.stage;
+      return {
+        key: d.id,
+        label: d.name,
+        hint: call.word ? `${call.word} · ${place}` : place,
+        href: `/deals/${d.id}`,
+        // The building's picture with the call's dot on its corner (#435).
+        icon: <DealAvatar dealId={d.id} dot={call.dot} />,
+        group: "deals" as const,
+        search: `${d.name} ${d.market} ${d.address} ${d.docs}`,
+      };
+    });
     // Market briefs come LAST so core actions stay above the fold on an
     // empty query; their alias search text makes "brooklyn" or "fort worth"
     // land on the right brief.
@@ -394,6 +402,11 @@ export function CommandPalette({
       e.preventDefault();
       const item = items[activeIdx];
       if (item) go(item);
+    } else if (e.key === "Tab") {
+      // The dialog is modal and the search field is its one stop — the
+      // arrows move through the results — so Tab stays here rather than
+      // walking out into the page under the scrim (research pass 33).
+      e.preventDefault();
     }
   }
 
@@ -430,6 +443,7 @@ export function CommandPalette({
     >
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Close command palette"
         className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
         onClick={() => onOpenChange(false)}
@@ -505,6 +519,7 @@ export function CommandPalette({
                   >
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => go(item)}
                       onMouseMove={() => setActive(index)}
                       className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
@@ -529,6 +544,12 @@ export function CommandPalette({
             </li>
           ))}
         </ul>
+
+        {moreLine && (
+          <p role="status" data-qa="palette-more" className="border-t border-line px-4 py-2 text-xs text-muted">
+            {moreLine}
+          </p>
+        )}
 
         <div className="flex items-center gap-3 border-t border-line bg-faint/60 px-4 py-2 text-[10px] text-muted">
           <span>

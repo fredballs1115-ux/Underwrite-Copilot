@@ -3,7 +3,7 @@
 // compile time — so this test renders the real sample memo to real PDF
 // bytes, exactly the way the public /api/demo/memo route does. If the memo
 // design breaks, this fails in CI instead of at a user's download click.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, onTestFinished, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { MemoDocument, basePosition, buildMemoData, clampWords } from "./memo-document";
@@ -88,6 +88,53 @@ describe("MemoDocument (redesigned)", () => {
     expect(plain.interestLine).toBe("");
   }, 30000);
 
+  it("says a preferred equity position under the title, its key terms led by its own rows and no cap on the building (lib/position)", async () => {
+    // The day its yield to redemption is read on.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 6", basis: "na" });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$14,000,000" } : m)),
+        row("Preferred equity amount", "$15,000,000"),
+        row("Preferred return", "12% preferred return, 8% current pay"),
+        row("Current pay rate", "8.0%"),
+        row("Mandatory redemption date", "June 2029"),
+        row("Senior loan balance", "$52,000,000"),
+        row("Whole-asset value", "$80,000,000"),
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", []);
+    expect(data.interestLine).toBe("A preferred equity position in the owning entity, not the property, 14.3% to its Jun 2029 redemption at the $14.0M price");
+    // The position's own terms lead after the price, as a note's do — cut at
+    // the memo's four beside the screen block — and no cap on the
+    // building's income prints beside its price, nor a basis under it.
+    expect(data.keyTerms.map((t) => t.label)).toEqual(["Asking price", "Preferred equity amount", "Preferred return", "Current pay rate"]);
+    expect(data.keyTerms.map((t) => t.label).filter((l) => /\bcap\b/i.test(l))).toEqual([]);
+    expect(data.keyTerms.some((t) => t.sub)).toBe(false);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("A preferred equity position in the owning entity, not the property, 14.3% to its Jun 2029 redemption");
+    // The memo prints its key terms' labels in capitals.
+    expect(text).toContain("KEY TERMS ASKING PRICE $14,000,000 PREFERRED EQUITY AMOUNT $15,000,000 PREFERRED RETURN");
+  }, 30000);
+
   it("prints the day the verdict was written, so a memo printed later never passes an old call off as the day's", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,
@@ -128,7 +175,7 @@ describe("MemoDocument (redesigned)", () => {
       "September 25, 2026",
       [],
     );
-    expect(data.floodLine).toBe("Flood zone AE: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)");
+    expect(data.floodLine).toBe("Flood zone AE: a Special Flood Hazard Area, where federal law requires flood insurance on a loan from a regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees (FEMA)");
     const buf = await renderToBuffer(
       React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
@@ -476,6 +523,241 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).storageLine).toBe("");
   }, 30000);
 
+  it("says a forward purchase under the title, on the day it is given (lib/forward-purchase), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "", basis: "na" },
+        { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "", basis: "na" },
+        { label: "Deposit", value: "$2,400,000 at signing", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: "Ridgeline Distribution",
+      asset_class: "industrial",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.forwardLine).toBe("Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's; 6.00% at delivery; deposit $2.40M");
+    // The plan's line under the type is the NOI at delivery over the price.
+    expect(data.strategyLine).toMatch(/^Development · NOI at delivery \$2\.9M on \$48\.0M total cost \(6\.00% yield on cost/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's");
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").forwardLine).toBe("");
+  }, 30000);
+
+  it("says a mixed-use building's two incomes under the title (lib/mixed-use), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Residential income", value: "$1,520,000", flagged: false, page: "", basis: "in_place" },
+        { label: "Commercial income", value: "$610,000", flagged: false, page: "", basis: "in_place" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "mixed_use",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.mixedUseLine).toBe("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").mixedUseLine).toBe("");
+  }, 30000);
+
+  it("says an operating business under the title (lib/going-concern), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Asking price", value: "$3,200,000", flagged: false, page: "", basis: "na" },
+        { label: "NOI (in-place)", value: "$256,000", flagged: false, page: "", basis: "in_place" },
+        { label: "EBITDA (T-12)", value: "$410,000", flagged: false, page: "", basis: "in_place" },
+      ],
+    };
+    const deal = {
+      name: "Route 9 Fuel & Market",
+      asset_class: "auto",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.goingConcernLine).toBe("Fuel station and its store: sold with the business; EBITDA (T-12) $410k");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Fuel station and its store: sold with the business; EBITDA (T-12) $410k");
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").goingConcernLine).toBe("");
+  }, 30000);
+
+  it("says condominium units under the title (lib/condo), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      metrics: [
+        { label: "Asking price", value: "$16,800,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Units", value: "42", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Units in building", value: "120", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const deal = {
+      name: "Harbor View",
+      asset_class: "auto",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.condoLine).toBe("Condominium units: 42 of 120 units; dues $328k a year");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Condominium units: 42 of 120 units; dues $328k a year");
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").condoLine).toBe("");
+  }, 30000);
+
+  it("says a sandwich position under the title, on the day it is given (lib/sandwich-lease), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Founders Plaza",
+      assetClass: "Office",
+      interest: {
+        kind: "leasehold" as const,
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+      metrics: [
+        { label: "Asking price", value: "$6,500,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Master lease rent", value: "$1,100,000 a year", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Sublease income", value: "$1,820,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Master lease expiration", value: "December 31, 2041", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const deal = {
+      name: "Founders Plaza",
+      asset_class: "auto",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.sandwichLine).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2041");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2041");
+    // Past its end the master lease's date is not said as the position's end.
+    expect(buildMemoData(deal, "October 5, 2042", [], null, null, null, "2042-10-05").sandwichLine).toBe(
+      "Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×)",
+    );
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").sandwichLine).toBe("");
+  }, 30000);
+
+  it("says the reader's 1031 exchange under the title, on the reader's day, only where the memo route passes it (lib/exchange-deal)", async () => {
+    const deal = { ...SAMPLE_DEAL, offers_due: "2026-11-02" } as unknown as DealRow;
+    const exchange = { block: { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const }, readerDay: "2026-10-05" };
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05", exchange);
+    const line =
+      "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; offers are due Nov 2, 2026, after your identification deadline, Oct 30, 2026: to keep it in your exchange it must be identified by Oct 30, 2026, before it is bid on";
+    expect(data.exchangeLine).toBe(line);
+    expect(data.exchangeCaution).toBe(true);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain(line);
+    // Offers due before the deadline: the clock alone, in the brand's tone.
+    const early = buildMemoData({ ...deal, offers_due: "2026-10-20" } as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05", exchange);
+    expect(early.exchangeLine).toBe("1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027");
+    expect(early.exchangeCaution).toBe(false);
+    // No exchange passed — the report's first page, the demo — or one whose
+    // period is over: nothing.
+    expect(buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05").exchangeLine).toBe("");
+    expect(buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05", { ...exchange, readerDay: "2027-06-01" }).exchangeLine).toBe("");
+  }, 30000);
+
+  it("says the rent rules that reach the building under the title, on the day it is given (lib/rent-regulation), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Year built", value: "1931", flagged: false, page: "", basis: "na" },
+        { label: "Rent-regulated units", value: "180", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      address: { label: "100 Walk-up St, Brooklyn, NY 11215", street: "100 Walk-up St", city: "Brooklyn", state: "NY", zip: "11215", county: "Kings County", submarket: "" },
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.regulationLine).toBe(
+      "Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%); 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027",
+    );
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%)");
+    // Past the period's end the allowance is no longer said as in force.
+    expect(buildMemoData(deal, "November 15, 2027", [], null, null, null, "2027-11-15").regulationLine).toBe(
+      "Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%)",
+    );
+    // The sample, in Philadelphia, sits under no regime the site holds.
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").regulationLine).toBe("");
+  }, 30000);
+
   it("says what the third-party reports found under the title (#465), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,
@@ -612,6 +894,15 @@ describe("MemoDocument (redesigned)", () => {
     expect(text).toContain("Sold at auction: bidding opens at $2.5M");
     expect((buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).saleLine).toBe("");
+    // The bids' deadline is read on the memo's own day (the reader's,
+    // lib/reader-day), never the server's: on the day before it the line
+    // says when bids are due, and on the day after it says nothing of them.
+    const withDeadline = {
+      ...deal,
+      extraction: { ...extraction, metrics: [...extraction.metrics, { label: "Bid deadline", value: "October 6, 2026", flagged: false, page: "p. 3", basis: "na" }] },
+    } as unknown as DealRow;
+    expect(buildMemoData(withDeadline, "October 5, 2026", [], undefined, null, null, "2026-10-05").saleLine).toContain("bids due Oct 6, 2026");
+    expect(buildMemoData(withDeadline, "October 7, 2026", [], undefined, null, null, "2026-10-07").saleLine).not.toContain("bids due");
   }, 30000);
 
   it("the cover aerial prints on page one, and the memo is still one page", async () => {
@@ -647,6 +938,53 @@ describe("MemoDocument (redesigned)", () => {
     const pdf = buf.toString("latin1");
     expect((pdf.match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
     expect(pdf).toMatch(/\/Subtype\s*\/Image/);
+  }, 30000);
+
+  it("keeps a typical memo to one page: the screen's date, the cover, a flood zone and what is being sold under the title (research pass 35)", async () => {
+    // The day the leasehold's term is read on.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: {
+        ...SAMPLE_DEAL.extraction,
+        interest: { kind: "leasehold", summary: "The leasehold interest in the building", share: "", groundLease: "Ground lease through December 31, 2071; unsubordinated.", loan: "", page: "p. 12" },
+        metrics: [
+          ...SAMPLE_DEAL.extraction.metrics,
+          { label: "Ground lease expiration", value: "December 31, 2071", flagged: false, page: "p. 12", basis: "na" },
+          { label: "Ground lease extension options", value: "Four 10-year options", flagged: false, page: "p. 12", basis: "na" },
+        ],
+      },
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: { ...SAMPLE_DEAL.verdict, generatedAt: "2026-09-28T14:00:00.000Z" },
+      prior_screen: null,
+      site_flags: { status: "ok", tractGeoid: null, opportunityZone: null, flood: { zone: "AE", subtype: null, isHighRisk: true }, retrievedAt: "2026-09-25T00:00:00Z", note: "" },
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", checks, null, null, { dataUri: TINY_PNG_DATA_URI, credit: "From the offering memorandum" });
+    // Each of the lines the pass measured turning the risks onto page two.
+    expect(data.screened).toBe("Screened Sep 28, 2026");
+    expect(data.floodLine).toMatch(/^Flood zone AE: a Special Flood Hazard Area/);
+    expect(data.interestLine).toBe("A leasehold — the building and a lease on the land, not the land; the lease ends Dec 2071, 45.2 years from today");
+    const pages = pdfPageTextsOf(
+      await renderToBuffer(React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    ).map((t) => t.replace(/\s+/g, " "));
+    expect(pages).toHaveLength(1);
+    // The two dates share one line, and the risks and next steps are on the
+    // page the call is.
+    expect(pages[0]).toContain("October 5, 2026 · Screened Sep 28, 2026");
+    expect(pages[0]).toContain("TOP RISKS");
+    expect(pages[0]).toContain("NEXT STEPS");
+    for (const r of SAMPLE_DEAL.verdict.topRisks.slice(0, 2)) expect(pages[0]).toContain(r);
   }, 30000);
 
   it("draws where the base sits in each range as a track and a dot, and the calls as dots", async () => {
@@ -734,16 +1072,24 @@ describe("MemoDocument (redesigned)", () => {
     expect(sample).toHaveLength(1);
     expect(sample[0]).not.toContain("continued");
 
-    // The sample with an analyst's override: the override's section moves
-    // whole to page two, which says whose memo it is.
-    const overridden = await render(base, ["Rent growth check dismissed: the renovated comps support 4% for two years (analyst)"]);
+    // The sample with an analyst's override: it travels on page one now the
+    // lines under the title run the page's width (research pass 35).
+    const RENT = "Rent growth check dismissed: the renovated comps support 4% for two years (analyst)";
+    const SUPPLY = "Supply check dismissed: the pipeline counts a project that broke ground in 2019 and delivered last spring (analyst)";
+    const overriddenOnce = await render(base, [RENT]);
+    expect(overriddenOnce).toHaveLength(1);
+    expect(overriddenOnce[0]).toContain(RENT);
+    // Two overrides: the section moves whole to page two, which says whose
+    // memo it is.
+    const overridden = await render(base, [RENT, SUPPLY]);
     expect(overridden).toHaveLength(2);
     expect(overridden[0]).not.toContain("screening memo, continued");
     expect(overridden[1]).toMatch(/^Sample — The Maddox at Brewerytown — screening memo, continued /);
-    expect(onePage(overridden, "SUBMARKET CHECKS OVERRIDDEN", "Rent growth check dismissed")).toBe(true);
+    expect(onePage(overridden, "SUBMARKET CHECKS OVERRIDDEN", RENT, SUPPLY)).toBe(true);
 
     // Lines under the title push the break down into the screen's cards:
-    // two fixtures, measured so that without the guards the first cuts the
+    // two fixtures, measured (research pass 35, once those lines ran the
+    // page's full width) so that without the guards the first cuts the
     // call's flips from their label and the second cuts each deal-killer
     // card from its "breaks if".
     const screen = SAMPLE_DEAL.verdict.screen!;
@@ -752,7 +1098,11 @@ describe("MemoDocument (redesigned)", () => {
       { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
       { ...SAMPLE_DEMO_BOX, markets: "Philadelphia, Pittsburgh", priceMaxM: 60, maxPerUnitK: 250, sfMin: 150000 } as typeof SAMPLE_DEMO_BOX,
     );
-    const crowd = (name: string, hotel: boolean) => ({
+    // A memorandum that states a rent regime and, on the second fixture, a
+    // student building's pre-leasing: one more line under the title each.
+    const REGULATED = [row("Rent regulation", "Rent stabilization"), row("Rent-regulated units", "41")];
+    const PRELEASED = [row("Pre-leased", "87% for fall 2026"), row("Beds", "612")];
+    const crowd = (name: string, hotel: boolean, extra: ReturnType<typeof row>[] = []) => ({
       ...base,
       name,
       verdict: {
@@ -783,13 +1133,14 @@ describe("MemoDocument (redesigned)", () => {
           row("Tax abatement expiration", "2031"),
           row("Abated real estate taxes", "$70,000"),
           row("Unabated real estate taxes", "$520,000"),
+          ...extra,
         ],
       },
       site_flags: { status: "ok", tractGeoid: null, opportunityZone: null, flood: { zone: "AE", subtype: null, isHighRisk: true }, retrievedAt: "2026-09-25T00:00:00Z", note: "" },
     });
-    const flipsAtBreak = await render(crowd("Riverside Gardens Apartments (Receivership Sale)", false), null, { checks: wideBox, cover: true });
+    const flipsAtBreak = await render(crowd("Riverside Gardens Apartments (Receivership Sale)", true, REGULATED), null, { checks: wideBox, cover: true });
     const killersAtBreak = await render(
-      crowd("Riverside Gardens Apartments and Townhomes at the Brewerytown Riverfront (Receivership Sale)", true),
+      crowd("Riverside Gardens Apartments and Townhomes at the Brewerytown Riverfront (Receivership Sale)", true, [...REGULATED, ...PRELEASED]),
       null,
       { checks: wideBox, cover: true },
     );
@@ -880,6 +1231,39 @@ describe("MemoDocument (redesigned)", () => {
       [],
     );
     expect(note.keyTerms.some((t) => t.sub)).toBe(false);
+
+    // A 49% share: the basis under the share's own price is the whole
+    // building's — the $68.0M the $33.32M grosses up to, over 248 units —
+    // and says so (research pass 35).
+    const share = buildMemoData(
+      {
+        ...base,
+        extraction: {
+          ...SAMPLE_DEAL.extraction,
+          interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
+          metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
+        },
+      } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(share.keyTerms[0]).toEqual({ label: "Asking price", value: "$33,320,000", flagged: false, sub: "$274k/unit, the whole" });
+    const shareText = pdfTextOf(await renderToBuffer(React.createElement(MemoDocument, { data: share }) as unknown as Parameters<typeof renderToBuffer>[0])).replace(/\s+/g, " ");
+    expect(shareText).toContain("ASKING PRICE $33,320,000 $274k/unit, the whole");
+    // All of the entity's interests (a stated 100%) is no share: its price
+    // is the whole's, and its basis says nothing more.
+    const all = buildMemoData(
+      {
+        ...base,
+        extraction: {
+          ...SAMPLE_DEAL.extraction,
+          interest: { kind: "partial_interest", summary: "", share: "100% of the beneficial interests", groundLease: "", loan: "", page: "" },
+        },
+      } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(all.keyTerms[0].sub).toBe("$274k/unit");
   }, 45000);
 
   it("says the deal-killers' and the flips' IRR moves are the screen's estimates, never the model's", async () => {
@@ -956,4 +1340,108 @@ describe("MemoDocument (redesigned)", () => {
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("a rule of thumb, not a live comps feed");
   }, 30000);
+});
+
+// Research pass 35, F18: the memo's smaller wording.
+describe("the memo's wording (research pass 35)", () => {
+  const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const dealOf = (extraction: unknown, asset_class: string, prior_screen: unknown = null) =>
+    ({
+      name: (extraction as { dealName?: string }).dealName ?? SAMPLE_DEAL.name,
+      asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen,
+    }) as unknown as DealRow;
+
+  it("dates the since-last line with its year", async () => {
+    const prior = {
+      at: "2026-08-02T15:00:00.000Z",
+      extraction: {
+        metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$70,000,000" } : m)),
+      },
+      verdict: { verdict: "pass" },
+    };
+    const data = buildMemoData(dealOf(SAMPLE_DEAL.extraction, SAMPLE_DEAL.asset_class, prior), "October 5, 2026");
+    // It read "Since last screen (Aug 2): …", which says nothing of which
+    // August once a re-screen crosses a new year.
+    expect(data.sinceLast).toBe("Since last screen (Aug 2, 2026): Go › Caution  ·  Asking price -$2.0M (-2.9%)");
+    const text = (await pdfTextOf(
+      await renderToBuffer(React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    )).replace(/\s+/g, " ");
+    expect(text).toContain("Since last screen (Aug 2, 2026):");
+  }, 30000);
+
+  it("keys the buy-box chips' marks after them, only the marks the row uses", async () => {
+    const textOf = async (checks: { label: string; status: "pass" | "near" | "miss" | "unknown"; detail: string }[]) =>
+      (await pdfTextOf(
+        await renderToBuffer(
+          React.createElement(MemoDocument, { data: buildMemoData(dealOf(SAMPLE_DEAL.extraction, SAMPLE_DEAL.asset_class), "October 5, 2026", checks) }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      )).replace(/\s+/g, " ");
+    // The sample's own mandate: inside, outside and not read yet; no near miss.
+    const sample = await textOf(
+      evaluateBuyBox(SAMPLE_DEAL.asset_class, { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics }, SAMPLE_DEMO_BOX),
+    );
+    expect(sample).toContain("— Target return + inside · × outside · — not read yet");
+    expect(sample).not.toContain("near miss");
+    const near = await textOf([
+      { label: "Price", status: "near", detail: "" },
+      { label: "Units", status: "pass", detail: "" },
+    ]);
+    expect(near).toContain("+ Units + inside · ± near miss");
+    expect(near).not.toContain("outside");
+    // No mandate, no row and no key.
+    expect(await textOf([])).not.toContain("not read yet");
+  }, 30000);
+
+  it("costs a value-add per unit, not per planned unit, and a development per planned unit in the memorandum's own noun", () => {
+    // 240 apartments that stand today, renovated: none is planned.
+    const valueAdd = {
+      dealName: "Riverside Commons — Value-Add",
+      assetClass: "multifamily",
+      market: "Richmond, VA",
+      totalPages: 40,
+      strategy: { kind: "value_add", summary: "Renovate 192 of 240 classic units over 30 months.", capitalBudget: "$4,800,000", timeline: "30 months" },
+      metrics: [
+        row("Asking price", "$42,000,000"),
+        row("Units", "240"),
+        { label: "NOI (in-place)", value: "$2,310,000", flagged: false, page: "p. 8", basis: "in_place" },
+        { label: "NOI (stabilized, pro forma)", value: "$2,950,000", flagged: true, page: "p. 9", basis: "pro_forma" },
+        row("Renovation budget", "$4,800,000", "p. 10"),
+      ],
+    };
+    // It read "…; $195,000 per planned unit all-in)".
+    expect(buildMemoData(dealOf(valueAdd, "multifamily"), "October 5, 2026").strategyLine).toBe(
+      "Value-add · stabilized NOI $3.0M on $46.8M total cost (6.30% yield on cost; $195,000 per unit all-in)",
+    );
+    // A hotel still to be built: planned, and in the count's own noun.
+    const hotel = (countLabel: string) => ({
+      dealName: "Harbor Point Hotel — Ground-up Select Service",
+      assetClass: "hospitality_str",
+      market: "Norfolk, VA",
+      strategy: {
+        kind: "development",
+        summary: "Build a 160-room select-service hotel on the waterfront site.",
+        capitalBudget: "$42M hard and soft costs",
+        timeline: "20 months of construction, 18 months of ramp",
+      },
+      metrics: [
+        row("Land cost", "$6,000,000"),
+        row("NOI (stabilized, pro forma)", "$4,200,000", "p. 12"),
+        row("Total project cost", "$48,000,000", "p. 14"),
+        row(countLabel, "160", "p. 4"),
+      ],
+    });
+    expect(buildMemoData(dealOf(hotel("Rooms (proposed)"), "hospitality_str"), "October 5, 2026").strategyLine).toBe(
+      "Development · stabilized NOI $4.2M on $48.0M total cost (8.75% yield on cost; $300,000 per planned room all-in)",
+    );
+    expect(buildMemoData(dealOf(hotel("Keys (proposed)"), "hospitality_str"), "October 5, 2026").strategyLine).toMatch(
+      /; \$300,000 per planned key all-in\)$/,
+    );
+  });
 });

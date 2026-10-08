@@ -3,9 +3,10 @@
 import { useActionState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
-import type { AskEntry } from "@/lib/deals";
+import { askAnsweredLine, type AskEntry } from "@/lib/deals";
 import { parsePageNumber } from "@/lib/facts";
 import { askDeal, type AskState } from "./ask-actions";
+import { askCountLine } from "@/lib/ask-cap";
 
 // UTC-pinned so server and client render identical strings (hydration).
 const WHEN_FMT = new Intl.DateTimeFormat("en-US", {
@@ -21,14 +22,26 @@ const safeWhen = (at: string) => {
 
 function AskButton() {
   const { pending } = useFormStatus();
+  // While it reads, the button stays focusable (aria-disabled, a second press
+  // refused) and says so once: a focused button that disables itself sent
+  // focus to the page, and "Reading the OM…" was never heard (research
+  // pass 33).
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="shrink-0 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:opacity-60"
-    >
-      {pending ? "Reading the OM…" : "Ask"}
-    </button>
+    <>
+      <button
+        type="submit"
+        aria-disabled={pending || undefined}
+        onClick={pending ? (e) => e.preventDefault() : undefined}
+        className={`shrink-0 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong ${
+          pending ? "cursor-progress opacity-60" : ""
+        }`}
+      >
+        {pending ? "Reading the OM…" : "Ask"}
+      </button>
+      <span role="status" className="sr-only">
+        {pending ? "Reading the OM…" : ""}
+      </span>
+    </>
   );
 }
 
@@ -68,6 +81,12 @@ export function AskPanel({
   useEffect(() => {
     if (state?.ok) formRef.current?.reset();
   }, [state]);
+  // The answer lands in the thread with no word to a screen reader; one
+  // polite line says it has (research pass 33), keyed to the answer by its
+  // place in the thread so a second answer is said too (lib/deals
+  // `askAnsweredLine`). The thread itself is not a live region, which would
+  // read every answer again.
+  const answered = state?.ok ? askAnsweredLine(qa.length) : "";
 
   const askable = hasOm && !isSample;
   // Who asked, on a team deal, after the date: the reader as "you", a
@@ -152,8 +171,13 @@ export function AskPanel({
 
       {!askable ? (
         <p className="mt-3 text-sm text-muted">
+          {/* Said with the plan it needs: "ask away" had told a free reader
+              they could, where Ask is Pro on their own deal (research pass
+              32). */}
           {isSample
-            ? "The sample deal has no OM behind it — upload a real deal and ask away."
+            ? isPro
+              ? "The sample deal has no OM behind it — upload a real deal and ask away."
+              : "The sample deal has no OM behind it. On Pro, you can put questions to a real deal's memorandum."
             : "Upload the OM first — answers come from the document itself."}
         </p>
       ) : !isPro ? (
@@ -183,15 +207,23 @@ export function AskPanel({
               key={state?.error ? `err-${state.question}` : "fresh"}
               defaultValue={state?.error ? (state.question ?? "") : ""}
               placeholder="e.g. What does the OM say about the tax abatement schedule?"
-              className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30"
+              className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
             />
             <AskButton />
           </div>
+          {/* The cap, said before it refuses a question (lib/ask-cap): the
+              questions asked of the memorandum the deal holds now. */}
+          <p data-qa="ask-count" className="mt-1.5 text-[11px] text-muted">
+            {askCountLine(qa.filter((e) => !e.earlier).length)}
+          </p>
           {state?.error && (
             <p className="mt-2 text-sm text-kill" role="alert">
               {state.error}
             </p>
           )}
+          <p role="status" className="sr-only">
+            {answered}
+          </p>
         </form>
       )}
     </section>

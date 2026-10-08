@@ -21,6 +21,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { STALE_MS } from "./screen-run";
+import { NEAREST_PARCEL, RECORDED_SALES, RECORDED_SALES_MAX_RADIUS_M } from "./public-record-asks";
 
 const DIR = join(__dirname, "..", "supabase", "migrations");
 
@@ -523,5 +525,70 @@ describe("the guards 0036 put on writes a user's session could otherwise shape",
 
   it("Ask's thread only grows", () => {
     expect(on("deals", "deal_qa_append_only")).toMatchObject({ timing: "before", events: "update of qa" });
+  });
+});
+
+describe("the guard 0037 puts on a deal's live job rows (research pass 39)", () => {
+  // The app keeps one job row a deal and claims it for each run (lib/jobs
+  // claimJob), so a second live row is never the app's: a user's write that
+  // would leave a deal with two queued or running rows is refused.
+  it("runs before an insert and every update that could make a row live or move it", () => {
+    expect(finalTriggers().get("analysis_jobs/analysis_jobs_one_live_run")).toMatchObject({
+      timing: "before",
+      events: "insert or update of status, deal_id, payload, updated_at",
+      fn: "analysis_jobs_one_live_run",
+    });
+  });
+
+  it("trusts the service role, dates a user's live row by the database, takes the deal's lock, and reads live by the app's stall rule", () => {
+    const body = finalFunctionBodies().get("analysis_jobs_one_live_run")!;
+    expect(body).toContain("if auth.uid() is null then return new; end if;");
+    expect(body).toContain("if new.status is distinct from 'queued' and new.status is distinct from 'running' then return new; end if;");
+    expect(body).toContain("new.updated_at := now();");
+    expect(body).toContain("perform pg_advisory_xact_lock(hashtextextended('analysis_jobs one live run ' || new.deal_id::text, 0));");
+    expect(body).toContain("j.deal_id = new.deal_id and j.id <> new.id and j.status in ('queued', 'running')");
+    // The window is lib/screen-run's: a row silent this long is a dead run.
+    expect(body).toContain(`j.updated_at > now() - interval '${STALE_MS / 60_000} minutes'`);
+    expect(body).toContain("raise exception 'analysis_job_already_live'");
+  });
+});
+
+describe("the public-record lookups 0037 holds to the app's own asks (research pass 39)", () => {
+  // Each definer function took any radius it was handed. 0037 caps the
+  // radius and the rows at the most the app's callers ever ask
+  // (lib/public-record-asks), so no caller of the app sees a change.
+  const bodies = finalFunctionBodies();
+  /** How many times a body names the radius, and how many through the cap. */
+  const radiusUses = (body: string, cap: number) => [
+    body.split("in_radius_m").length - 1,
+    body.split(`least(in_radius_m, ${cap})`).length - 1,
+  ];
+
+  it("nearest_property answers inside the card's radius, one parcel", () => {
+    const body = bodies.get("nearest_property")!;
+    const [uses, capped] = radiusUses(body, NEAREST_PARCEL.radiusM);
+    expect(uses).toBe(4);
+    expect(capped).toBe(uses);
+    expect(body).toContain(`limit least(in_limit, ${NEAREST_PARCEL.limit});`);
+  });
+
+  it("nearby_sales answers inside the comps pull's widest radius, its row count", () => {
+    const body = bodies.get("nearby_sales")!;
+    const [uses, capped] = radiusUses(body, RECORDED_SALES_MAX_RADIUS_M);
+    expect(uses).toBe(1);
+    expect(capped).toBe(uses);
+    expect(body).toContain(`limit least(in_limit, ${RECORDED_SALES.limit});`);
+    expect(RECORDED_SALES.radiusKm).toBeLessThanOrEqual(RECORDED_SALES.wideRadiusKm);
+  });
+
+  it("the two callers ask through the one module, so an ask and its cap cannot drift apart", () => {
+    const card = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "public-record-card.tsx"), "utf8");
+    expect(card).toContain("in_radius_m: NEAREST_PARCEL.radiusM,");
+    expect(card).toContain("in_limit: NEAREST_PARCEL.limit,");
+    const pull = readFileSync(join(__dirname, "public-comps", "run.ts"), "utf8");
+    expect(pull).toContain("in_radius_m: Math.round(radiusKm * 1000),");
+    expect(pull).toContain("in_limit: RECORDED_SALES.limit,");
+    expect(pull).toContain("const RADIUS_KM = RECORDED_SALES.radiusKm;");
+    expect(pull).toContain("const WIDE_RADIUS_KM = RECORDED_SALES.wideRadiusKm;");
   });
 });

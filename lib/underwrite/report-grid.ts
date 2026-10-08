@@ -5,11 +5,14 @@
 // the on-screen sliders can never disagree.
 
 import { withArticle } from "@/lib/article";
+import type { CompareModel, ModelReturnsRead } from "@/lib/compare-interest";
+import { findingWithholdsReturns, type PlausibilityFinding } from "@/lib/deal-strategy";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
-import { costAssumptionsLine } from "./cost-note";
+import { costAssumptionsLine, yearOneCapitalLine } from "./cost-note";
 import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
-import { floorWords, floorsWords, fmtBid, solveMaxBid, type BidFloors, type BidMetrics } from "./solver";
+import { NO_IRR_SHORT, NO_IRR_WHY, noIrrWhy, type NoIrrWhy } from "./no-irr";
+import { floorWords, floorsWords, fmtBid, noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type BidMetrics, type NoBidRead } from "./solver";
 
 /** Where each of the model's inputs came from (lib/underwrite/inputs). */
 export type ModelSources = DerivedModel["sources"];
@@ -17,6 +20,9 @@ export type ModelSources = DerivedModel["sources"];
 export interface HeatCell {
   irrPct: number | null; // decimal
   em: number | null;
+  /** where no IRR solved, why (lib/underwrite/no-irr): the cell reads "no
+   *  IRR" and the grid says why under it; absent where it solved */
+  noIrr?: NoIrrWhy | null;
 }
 
 export interface CapGrowthGrid {
@@ -49,7 +55,7 @@ export function buildCapGrowthGrid(inputs: UnderwriteInputs): CapGrowthGrid {
   const cells = capRows.map((cap) =>
     growthCols.map((g) => {
       const m = runScenario(inputs, { exitCapPct: cap, rentGrowthPct: g });
-      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple };
+      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple, ...(m.noIrr ? { noIrr: m.noIrr } : {}) };
     }),
   );
   return {
@@ -64,10 +70,10 @@ export function buildCapGrowthGrid(inputs: UnderwriteInputs): CapGrowthGrid {
 }
 
 /** The retrade grid: purchase price (rows, ±10% in 5% steps around the
- *  modeled price) × exit cap (columns, the same stops as the cap/growth
+ *  modelled price) × exit cap (columns, the same stops as the cap/growth
  *  grid). This is the page's second question — "what does paying less do?" */
 export interface PriceCapGrid {
-  /** dollar price per row + its % delta vs the modeled base */
+  /** dollar price per row + its % delta vs the modelled base */
   priceRows: { price: number; deltaPct: number }[];
   capCols: number[];
   cells: HeatCell[][];
@@ -87,7 +93,7 @@ export function buildPriceCapGrid(inputs: UnderwriteInputs): PriceCapGrid {
   const cells = priceRows.map((p) =>
     capCols.map((cap) => {
       const m = runScenario(inputs, { purchasePrice: p.price, exitCapPct: cap });
-      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple };
+      return { irrPct: m.leveredIrrPct, em: m.leveredEquityMultiple, ...(m.noIrr ? { noIrr: m.noIrr } : {}) };
     }),
   );
   return {
@@ -168,26 +174,39 @@ export function heatLegend(
 
 // ---- Cell text -------------------------------------------------------------
 
-/** "15.2%" — the cell's headline line ("—" when no IRR exists). */
+/** "15.2%" — the cell's headline line: "no IRR" where none solved and the
+ *  run says why (the grid's note under it, `gridNoIrrNote`), else "—". */
 export function heatCellIrr(cell: HeatCell): string {
-  if (cell.irrPct == null || !Number.isFinite(cell.irrPct)) return "—";
+  if (cell.irrPct == null || !Number.isFinite(cell.irrPct)) return cell.noIrr ? NO_IRR_SHORT : "—";
   const pct = (cell.irrPct * 100).toFixed(1);
   // toFixed keeps the sign of a tiny negative ("-0.0") — print it as zero.
   return `${pct === "-0.0" ? "0.0" : pct}%`;
 }
 
-/** "1.9x" — the cell's secondary line. An equity multiple is distributions
+/** "1.94x" — the cell's secondary line. An equity multiple is distributions
  *  over equity, so a figure at or below zero is not a multiple of anything:
- *  the cell shows a dash rather than stating "-17.9x" as a fact. */
+ *  the cell shows a dash rather than stating "-17.9x" as a fact. Two places,
+ *  as the base case above the grid, the deal page and the workbook print one
+ *  (research pass 40, L5: the grid's base cell read "1.5x" beside the base
+ *  case's "1.53x"). */
 export function heatCellEm(cell: HeatCell): string {
   return cell.em == null || !Number.isFinite(cell.em) || cell.em <= 0
     ? "—"
-    : `${cell.em.toFixed(1)}x`;
+    : `${cell.em.toFixed(2)}x`;
 }
 
 /** Legacy compact form, kept for anything still printing one line. */
 export function heatCellText(cell: HeatCell): string {
   return `${heatCellIrr(cell)} / ${heatCellEm(cell)}`;
+}
+
+/** Under a grid any of whose cells has no IRR: why, once — "Where a cell
+ *  reads no IRR, the sale does not repay the loan." (research pass 38, item
+ *  15). Null where every cell solved. */
+export function gridNoIrrNote(cells: HeatCell[][]): string | null {
+  const whys = [...new Set(cells.flat().map((c) => c.noIrr).filter((w): w is NoIrrWhy => w != null))];
+  if (whys.length === 0) return null;
+  return `Where a cell reads ${NO_IRR_SHORT}, ${whys.map((w) => NO_IRR_WHY[w]).join(", or ")}.`;
 }
 
 // ---- Takeaways -------------------------------------------------------------
@@ -200,17 +219,27 @@ const clears = (cell: HeatCell, hurdlePct: number): boolean =>
   Number((cell.irrPct * 100).toFixed(1)) >= hurdlePct;
 
 /**
- * One plain-English line an IC can lift verbatim: along the BASE cap row,
- * how little growth still clears the hurdle; along the BASE growth column,
- * how much exit-cap expansion the deal survives.
+ * One plain-English line an IC can lift verbatim: along the BASE growth
+ * column, how much exit-cap expansion the deal survives; along the BASE cap
+ * row, how little growth still clears the hurdle. Two full clauses, each
+ * with its own subject: "The deal no tested exit cap clears 13% at base
+ * growth" printed wherever the base missed the hurdle at every tested cap
+ * or cleared it at every one (research pass 35).
+ *
+ * `subject` names what the grids are of where the price did not buy the
+ * building — a note's collateral, a position's building, an equity's whole
+ * (the report's `gridSubjectOf`) — and leads the line, so it is never
+ * called "the deal"; null for the deal itself.
  */
 export function gridTakeaway(
   grid: CapGrowthGrid,
   hurdlePct: number,
   /** what the growth axis grows: a hotel's is its RevPAR, not a rent */
   growth = "rent growth",
+  subject: string | null = null,
 ): string {
   const p = (n: number) => `${Number(n.toFixed(1))}%`;
+  const hurdle = p(hurdlePct);
   const baseRow = grid.cells[grid.baseRow];
   const growthsClearing = grid.growthCols.filter((_, c) =>
     clears(baseRow[c], hurdlePct),
@@ -218,23 +247,39 @@ export function gridTakeaway(
   const capsClearing = grid.capRows.filter((_, r) =>
     clears(grid.cells[r][grid.baseCol], hurdlePct),
   );
+  // Named once: the deal in the first clause that needs a subject, or the
+  // subject that leads the line; "it" after that.
+  const named = subject ? "it" : "the deal";
 
   // WinAnsi-safe wording (no "≥" — it isn't printable in the PDF's Helvetica).
+  const capSome = capsClearing.length > 0 && capsClearing.length < grid.capRows.length;
+  // Where the hurdle clears only at exit caps under the base, the deal clears
+  // it on cap compression, never "up to" a cap as if it held there with room
+  // to spare (research pass 40, M10: the sample "holds 13%+ up to a 4.95%
+  // exit cap" beside a base exit of 5.45%, where it reads 9.28%).
+  const topClearing = capsClearing.length > 0 ? Math.max(...capsClearing) : null;
+  const baseCap = grid.capRows[grid.baseRow];
+  const underBase = topClearing != null && baseCap != null ? Math.round((baseCap - topClearing) * 10_000) : 0;
   const capPart =
     capsClearing.length === 0
-      ? `no tested exit cap clears ${p(hurdlePct)} at base growth`
-      : capsClearing.length === grid.capRows.length
-        ? `every tested exit cap clears ${p(hurdlePct)} at base growth`
-        : `holds ${p(hurdlePct)}+ up to ${withArticle(fmtPctPt(Math.max(...capsClearing), 2))} exit cap at base growth`;
-
+      ? `no tested exit cap clears ${hurdle}`
+      : !capSome
+        ? `every tested exit cap clears ${hurdle}`
+        : underBase > 0
+          ? `${named} holds ${hurdle}+ only at ${withArticle(fmtPctPt(topClearing!, 2))} exit cap or tighter, ${underBase} bps under the base ${fmtPctPt(baseCap, 2)}`
+          : `${named} holds ${hurdle}+ up to ${withArticle(fmtPctPt(topClearing!, 2))} exit cap`;
+  // After a clause with a subject, the hurdle is said again rather than as
+  // an "it" that could be the deal.
+  const target = capSome ? hurdle : "it";
   const growthPart =
     growthsClearing.length === 0
-      ? `no tested ${growth} clears it at the base exit cap`
+      ? `no tested ${growth} clears ${target}`
       : growthsClearing.length === grid.growthCols.length
-        ? `every tested growth rate clears it at the base exit cap`
-        : `needs at least ${fmtPctPt(Math.min(...growthsClearing))} ${growth} at the base exit cap`;
+        ? `every tested growth rate clears ${target}`
+        : `${capSome || subject ? "it" : "the deal"} needs at least ${fmtPctPt(Math.min(...growthsClearing))} ${growth}`;
 
-  return `The deal ${capPart}, and ${growthPart}.`;
+  const line = `at base growth, ${capPart}; at the base exit cap, ${growthPart}.`;
+  return subject ? `${subject[0].toUpperCase()}${subject.slice(1)}: ${line}` : `${line[0].toUpperCase()}${line.slice(1)}`;
 }
 
 // ---- The page's data bundle ------------------------------------------------
@@ -248,6 +293,11 @@ export interface MaxBidLine {
   binding?: keyof BidFloors | null;
   /** the model's IRR, year-1 cash-on-cash and going-in cap at that price */
   at?: BidMetrics | null;
+  /** on a leasehold, the levered IRR at that price on the lease's term
+   *  (`SensitivityOptions.termRead`, decimal; null where the sale there does
+   *  not repay the loan) — the bid itself is solved on the model's
+   *  capitalised exit; absent where no term was read */
+  onTerm?: { irr: number | null } | null;
 }
 
 /** The floors a max bid was solved on, and whose they are: the buy box's
@@ -258,10 +308,18 @@ export interface MaxBidFloors {
   from: "buybox" | "screening";
 }
 
+// Where no price clears the box's floors together, which floor never clears
+// and which clear on their own: lib/underwrite/solver's `noBidRead` and
+// `noBidSentence`, beside the solve, so the deal page's max-bid card and the
+// report say one sentence for one deal (audit C3a, MED-7).
+export { noBidRead, type NoBidRead } from "./solver";
+
 /**
  * The levers the deal page's max bid is solved under at rest: each
  * slider's base stop — the base clamped into the lever's range, which for
- * a route-derived model is the base itself — so the report's bid is the
+ * a route-derived model is the base itself (the vacancy lever reaches the
+ * model's own 99%, research pass 38: at a 95% stop the report solved its
+ * bid at a vacancy its grids did not run) — so the report's bid is the
  * page's own call on the same inputs.
  */
 export function pageBaseLevers(inputs: UnderwriteInputs): Partial<PlaygroundLevers> {
@@ -285,10 +343,26 @@ export interface SensitivityData {
   /** what the max bid was solved on; absent on a bundle built before it
    *  was recorded, which solved the hurdle's IRR alone */
   maxBidFloors?: MaxBidFloors;
+  /** where the buy box's floors clear at no price together, each floor's
+   *  own solve (`noBidRead`); null where a bid solved or the box set none */
+  noBid?: NoBidRead | null;
+  /** why no max bid is solved, said in its place (`nearlyVacantReason`: a
+   *  building the model runs at 90% vacancy or more); null or absent where
+   *  one is */
+  maxBidWithheld?: string | null;
   /** why the report leaves the model's returns out, or null where it may
-   *  print them (`placeholderReturnsLine`); null where no sources were given */
+   *  print them (`placeholderReturnsLine`, else `leaseReturnsLine`, else
+   *  `nearlyVacantReturnsLine`, else `misreadReturnsLine`); null where no
+   *  sources, interest read, occupancy or findings were given and the model
+   *  runs the building under `NEARLY_VACANT` */
   withheld?: string | null;
-  /** what the modeled price is — the ask, a share grossed up to the whole,
+  /** `withheld` is a building run nearly vacant or a finding against the
+   *  returns (`nearlyVacantReturnsLine`, `misreadReturnsLine`): the grids,
+   *  the base case and the max bid are left out, while the model's reads of
+   *  the memorandum's terms print, as the deal page prints them beside its
+   *  withheld tiles; absent where `withheld` leaves those out too */
+  readsStand?: boolean;
+  /** what the modelled price is — the ask, a share grossed up to the whole,
    *  an auction's floor, NOI over the going-in cap — as the derived model
    *  marks it; null where no sources were given */
   priceSource?: ModelSources["purchasePrice"] | null;
@@ -325,7 +399,22 @@ export interface BaseCase {
   amortYears: number;
   /** months of interest-only; 999 is the whole term */
   ioMonths: number;
+  /** the exit cap, decimal, with its source — the grids' bold row, and on a
+   *  deal whose memorandum states no cap the model's default (research
+   *  pass 35: the base case named neither) */
+  exitCap: number;
+  exitCapSource: InputSource | null;
+  /** what every year's cash flow carries below the NOI, each with its
+   *  source: the asset-management fee (decimal of equity a year) and the
+   *  capital reserves ($ a square foot a year, grown with expenses) */
+  amFee: number;
+  amFeeSource: InputSource | null;
+  reservesPsf: number;
+  reservesSource: InputSource | null;
   leveredIrr: number | null;
+  /** where no levered IRR solved, why (lib/underwrite/no-irr) — the tile
+   *  says it in the dash's place; null where it solved */
+  noIrr: NoIrrWhy | null;
   equityMultiple: number | null;
   cocY1: number | null;
   dscrY1: number | null;
@@ -336,6 +425,10 @@ export interface BaseCase {
   totalUses: number;
   /** what the returns carry for buying and selling (lib/underwrite/cost-note) */
   costLine: string;
+  /** what the multiple and the year-1 cash-on-cash are net of, where the
+   *  model spends capital in year 1 (lib/underwrite/cost-note
+   *  `yearOneCapitalLine`); null where it spends none */
+  capitalLine: string | null;
 }
 
 export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): BaseCase {
@@ -357,7 +450,14 @@ export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): 
     rateSource: sources.allInRatePct ?? null,
     amortYears: inputs.amortMonths / 12,
     ioMonths: inputs.ioMonths,
+    exitCap: inputs.exitCapPct,
+    exitCapSource: sources.exitCapPct ?? null,
+    amFee: inputs.amFeePctEquity,
+    amFeeSource: sources.amFeePctEquity ?? null,
+    reservesPsf: inputs.reservesPsf,
+    reservesSource: sources.reservesPsf ?? null,
     leveredIrr: uw.returns.leveredIrrPct,
+    noIrr: noIrrWhy(uw.returns.leveredIrrPct, uw.residual.netSaleProceeds, uw.leveredVector.slice(1).reduce((a, b) => a + b, 0)),
     equityMultiple: uw.returns.leveredEquityMultiple,
     cocY1: y1 && su.equity > 0 ? y1.leveredCashFlow / su.equity : null,
     dscrY1: y1?.dscrNoi ?? null,
@@ -367,6 +467,7 @@ export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): 
     financingCosts: su.financingCosts,
     totalUses: su.totalUses,
     costLine: costAssumptionsLine(inputs),
+    capitalLine: yearOneCapitalLine(inputs.capitalImprovementsYr1),
   };
 }
 
@@ -380,9 +481,57 @@ export interface SensitivityOptions {
    *  max bid is solved on every one set, the deal page's own call; none set
    *  solves the screening hurdle's IRR alone */
   floors?: BidFloors | null;
+  /** a leasehold's exit on its term — the caller's lib/leasehold-exit
+   *  `readLeaseholdExit` at the inputs given, its levered IRR as a decimal,
+   *  or null where the lease leaves no term to price at the sale. The max
+   *  bid is solved on the model's capitalised exit, a perpetuity's, so the
+   *  report says what the bid returns on the term too (research pass 35),
+   *  by the term block's own arithmetic, never a second formula. */
+  termRead?: ((inputs: UnderwriteInputs) => { irr: number | null } | null) | null;
+  /** the occupancy the model read, decimal (the derived model's
+   *  `meta.occupancyPct`): where the model runs the building 90% vacant or
+   *  more, the grids, the base case and the max bid are left out, as the
+   *  deal page withholds its tiles, and the sentence names the occupancy
+   *  stated (`nearlyVacantReturnsLine`) — the vacancy is the model's own,
+   *  so it is read whether or not this is given */
+  occupancyPct?: number | null;
+  /** what the price buys, read on this model by the compare table's rule
+   *  (lib/compare-interest `modelReturnsRead` over `screeningCompareModel`):
+   *  where a leasehold's lease ends inside the hold, the grids and the max
+   *  bid are left out with the leasehold card's own sentence, as the deal
+   *  page's playground withholds its tiles (research pass 38) */
+  interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null;
+  /** the plausibility check's findings (lib/deal-strategy
+   *  `assessPlausibility`, the deal page's own read): where one stands
+   *  against the returns (`findingWithholdsReturns`), the grids and the max
+   *  bid are left out under the playground's own reason (research pass 38) */
+  findings?: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null;
 }
 
-const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+/**
+ * The screening model as lib/compare-interest reads a model: its price,
+ * year-1 NOI, going-in cap and hold, from one run of the engine. The deal
+ * page's playground and the report route hand this same read to
+ * `modelReturnsRead`, so the page and the report withhold the same returns
+ * for the same reason (research pass 38).
+ */
+export function screeningCompareModel(inputs: UnderwriteInputs): CompareModel {
+  const run = computeUnderwrite(inputs);
+  const year1Noi = run.cashFlow[0]?.noi ?? 0;
+  return {
+    purchasePrice: inputs.purchasePrice,
+    year1Noi,
+    goingInCapPct: inputs.purchasePrice > 0 ? (year1Noi / inputs.purchasePrice) * 100 : null,
+    holdYears: run.holdYears,
+  };
+}
+
+// Whole dollars, a loss's minus outside the dollar: "−$310,000" (research
+// pass 38) — a memorandum's NOI of less than nothing is named as not run.
+const usd0 = (n: number) => {
+  const whole = Math.round(n);
+  return `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}`;
+};
 
 /**
  * Why the report leaves the model's returns out, or null where it may print
@@ -392,23 +541,366 @@ const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
  * IRR and every bid solved on it the placeholder's — printed beside a real
  * deal's grids, "$10M (ask)" read as the ask. Said from the sources alone:
  * an assumed price means no price was read from the memorandum, which is all
- * this line claims.
+ * this line claims. A figure the memorandum states that the model does not
+ * run (`InputSource.notRun`: a leased fee's ground rent, its income, or an
+ * NOI of zero or less beside which it runs the price × the stated cap) is
+ * named, never said to be unread.
  */
 export function placeholderReturnsLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
+  const reason = placeholderReason(inputs, sources);
+  return reason ? `The IRR grids and the max bid are left out: ${reason}` : null;
+}
+
+/**
+ * Why the report leaves the model's returns out where a leasehold's lease
+ * ends inside the hold (lib/compare-interest's rule, research pass 38): the
+ * grids and the bid would price a sale of a building that has reverted, so
+ * they are left out over the leasehold card's own sentence. Null otherwise.
+ */
+export function leaseReturnsLine(interest: Pick<ModelReturnsRead, "withheld" | "line"> | null | undefined): string | null {
+  return interest?.withheld === "lease" && interest.line ? `The IRR grids and the max bid are left out. ${interest.line}` : null;
+}
+
+/**
+ * Why the model's returns are a placeholder's, in the words after a
+ * surface's own opening — the one rule the report, the deal page's
+ * sensitivity playground and the workbook's Deal Summary each say it by:
+ * "no price was read from the memorandum, so the model runs on a
+ * $10,000,000 placeholder and its returns would be the placeholder's."
+ * `printed`: the workbook prints the returns (live, so the reader can enter
+ * the figure), so they "are" the placeholder's; the report and the page
+ * withhold them, so they "would be". `priceEntered`: the reader typed a
+ * price over the placeholder (the playground), which lifts the price's half
+ * — an assumed NOI stays the assumption's whatever price is typed. Null
+ * where the model assumed neither.
+ */
+export function placeholderReason(
+  inputs: UnderwriteInputs,
+  sources: ModelSources | null | undefined,
+  opts: { priceEntered?: boolean; printed?: boolean } = {},
+): string | null {
   if (!sources) return null;
-  const price = sources.purchasePrice?.provenance === "assumption";
+  const price = !opts.priceEntered && sources.purchasePrice?.provenance === "assumption";
   const noi = sources.inPlaceRentAnnual?.provenance === "assumption";
-  const out = "The IRR grids and the max bid are left out:";
+  const notRun = sources.inPlaceRentAnnual?.notRun ?? null;
+  const be = opts.printed ? "are" : "would be";
+  // No price stated, and an NOI of zero or less over the stated cap backed
+  // one out (lib/underwrite/inputs `noPrice`, research pass 38): the
+  // quotient is no price, and the year-1 NOI the model runs is that NOI
+  // whatever price is typed — said without the figure, which no surface
+  // shows.
+  const noPrice = sources.purchasePrice?.noPrice ?? null;
+  if (noPrice) {
+    const its = `${usd0(noPrice.value)} ${noPrice.label}`;
+    const describe = opts.printed ? "describe" : "would describe";
+    return opts.priceEntered
+      ? `the memorandum's ${its} is not a year's income to price on, and the model runs it as its year-1 NOI whatever price is typed, so the returns run on it ${describe} no deal.`
+      : `no price was read from the memorandum, and its ${its} is not a year's income to price on, so that NOI over the stated going-in cap is no price and the returns run on it ${describe} no deal.`;
+  }
+  // A stated NOI with no stated price to be set against (`notRun.unpriced`)
+  // is named as stated, never said to be unread (research pass 38: "nor a
+  // year-1 NOI the model could run on" beside the memorandum's $4,000,000).
+  const unpriced = notRun?.unpriced ? notRun : null;
   if (price && noi) {
-    return `${out} no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`;
+    if (unpriced) {
+      return `no price was read from the memorandum, so its ${usd0(unpriced.value)} ${unpriced.label} has no price to be set against, and the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI; its returns ${be} a placeholder's.`;
+    }
+    return notRun
+      ? `no price was read from the memorandum, and the model does not run its ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns ${be} a placeholder's.`
+      : `no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns ${be} a placeholder's.`;
   }
   if (price) {
-    return `${out} no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns would be the placeholder's.`;
+    return `no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns ${be} the placeholder's.`;
   }
   if (noi) {
-    return `${out} no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.`;
+    // A price typed over the placeholder: the stated NOI was judged against
+    // the placeholder, and the year-1 NOI struck on it stays.
+    if (unpriced) {
+      return `the model set the memorandum's ${usd0(unpriced.value)} ${unpriced.label} against its ${usd0(inputs.purchasePrice)} placeholder price and does not run it, so it runs on an assumed NOI and its returns ${be} the assumption's.`;
+    }
+    return notRun
+      ? `the model does not run the memorandum's ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so it runs on an assumed NOI and its returns ${be} the assumption's.`
+      : `no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns ${be} the assumption's.`;
   }
   return null;
+}
+
+/**
+ * The model's price where no memorandum stated one, as a surface that prints
+ * the model's price as an input or a column says it (research pass 40, item
+ * 15: the Assumption Bridge's scenario form, the valuations page's "Our UW"
+ * column and the rent-roll workbook's price cell printed the site's
+ * $10,000,000 placeholder, or a figure backed out of an NOI of zero or less,
+ * as if a memorandum had stated it). `kind`: "placeholder", the site's
+ * figure on an unpriced deal; "none", a quotient that is no price, which no
+ * surface shows (lib/underwrite/inputs `noPrice`). `chip` goes beside the
+ * figure, `line` is the report's own reason (`placeholderReason`), and
+ * `cell` the note an input cell carries. Null where the price is the
+ * memorandum's or worked from its figures.
+ */
+export interface UnstatedPrice {
+  kind: "placeholder" | "none";
+  chip: string;
+  line: string;
+  cell: string;
+}
+
+export function unstatedPrice(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): UnstatedPrice | null {
+  const noPrice = sources?.purchasePrice?.noPrice ?? null;
+  const placeholder = sources?.purchasePrice?.provenance === "assumption";
+  if (!noPrice && !placeholder) return null;
+  const reason = placeholderReason(inputs, sources);
+  if (!reason) return null;
+  const line = `${reason[0].toUpperCase()}${reason.slice(1)}`;
+  return noPrice
+    ? {
+        kind: "none",
+        chip: "no price",
+        line,
+        cell: `No price was read from the memorandum, and its ${usd0(noPrice.value)} ${noPrice.label} is not a year's income to price on, so no price is struck on it — enter the price you would pay.`,
+      }
+    : {
+        kind: "placeholder",
+        chip: "placeholder",
+        line,
+        cell: `No price was read from the memorandum: ${usd0(inputs.purchasePrice)} is the site's placeholder, not a price — enter the price you would pay.`,
+      };
+}
+
+/**
+ * Why the model's own reads are left out — the assumable loan's and the
+ * seller's note's pricing, the leasehold's exit, the sale's ceiling bid,
+ * every panel's model line — or null where they print. The full report's
+ * gate (lib/memo/report-document `buildReportData`: on a placeholder price or
+ * an assumed year-1 NOI "nothing else it computed prints either"), which the
+ * deal page and the workbook's cover keep too, so only the memorandum's terms
+ * print where the report prints only them (research pass 38: an auction with
+ * no NOI read "the model does not bid at all" on the page and the cover, a
+ * verdict made of the placeholder). A plan deal's report keeps its reads, and
+ * so do they.
+ */
+export function modelReadsWithheld(
+  inputs: UnderwriteInputs,
+  sources: ModelSources | null | undefined,
+  planDeal: boolean,
+): string | null {
+  return planDeal ? null : placeholderReason(inputs, sources);
+}
+
+/**
+ * The deal page's sensitivity playground, over its tiles: the returns it
+ * withholds and why, the report's own reason — and, while the price is the
+ * placeholder's, how to lift it, since the price field is right there. The
+ * max bid is named only where a buy box floor would have solved one. Null
+ * where the returns stand.
+ */
+export function placeholderPageLine(
+  inputs: UnderwriteInputs,
+  sources: ModelSources | null | undefined,
+  o: { priceEntered: boolean; maxBid: boolean },
+): string | null {
+  const reason = placeholderReason(inputs, sources, { priceEntered: o.priceEntered });
+  if (!reason) return null;
+  // No price at all — the placeholder, or a price backed out of an NOI of
+  // zero or less (`noPrice`) — with none typed yet.
+  const noPrice = sources?.purchasePrice?.noPrice != null;
+  const typeIt = !o.priceEntered && (sources?.purchasePrice?.provenance === "assumption" || noPrice);
+  // A price typed reprices the model, never a year-1 NOI struck on the
+  // placeholder: where both were assumed, the returns stay withheld whatever
+  // is typed, and the line says so rather than promise them (the second
+  // audit, MED-2) — nor the memorandum's NOI of zero or less, which the
+  // model runs as its year-1 NOI.
+  const noiAssumed = sources?.inPlaceRentAnnual?.provenance === "assumption";
+  const tail = !typeIt
+    ? ""
+    : noPrice
+      ? " A price typed above reprices the model, but not its year-1 NOI, which stays the memorandum's — so the returns stay withheld."
+      : noiAssumed
+        ? " A price typed above reprices the model, but not its year-1 NOI, which was struck on the placeholder — so the returns stay withheld."
+        : " Type the price you would pay above to run the model on it.";
+  return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${reason}${tail}`;
+}
+
+/**
+ * The workbook's Deal Summary, under its headline tiles: the same reason,
+ * said of returns it prints — and, where the price is the placeholder, the
+ * input to replace it in. Null where the model assumed neither.
+ */
+export function placeholderWorkbookLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
+  const reason = placeholderReason(inputs, sources, { printed: true });
+  if (!reason) return null;
+  // A price backed out of an NOI of zero or less is no price either: the
+  // line asks for the price as it does over the placeholder.
+  const noPrice = sources?.purchasePrice?.noPrice != null;
+  const price = sources?.purchasePrice?.provenance === "assumption" || noPrice;
+  // The year-1 NOI is the rent line's, an input of its own: a price entered
+  // over the placeholder leaves an NOI struck on it where it was (the second
+  // audit, MED-2), so the line names the NOI too wherever it was assumed —
+  // and beside no price, the memorandum's own NOI, which the model runs.
+  const noi = sources?.inPlaceRentAnnual?.provenance === "assumption";
+  const enter = price
+    ? noi
+      ? ` Enter the price you would pay as the Purchase Price on the Assumptions tab, and the Potential Gross Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves ${noPrice ? "the memorandum's NOI as the year-1 NOI" : "the NOI struck on the placeholder"}.`
+      : " Enter the price you would pay as the Purchase Price on the Assumptions tab."
+    : noi
+      ? " Enter the Potential Gross Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab."
+      : "";
+  return `${reason[0].toUpperCase()}${reason.slice(1)}${enter}`;
+}
+
+/**
+ * The vacancy at and past which the model's returns are not set beside a
+ * vacancy lever, and no bid is solved on them (research pass 38). The model
+ * reads a stated occupancy as its vacancy and grosses its year-1 revenue up
+ * through it into the rent line (lib/underwrite/inputs), so a building 3%
+ * occupied carries that space's revenue times thirty-three, and its expense
+ * line, a share of the revenue, stands still while a step of the lever
+ * moves the revenue by a multiple: from 97% to 95% vacancy the NOI of a
+ * deal the report read at 13.3% put the page's tiles at 55%.
+ */
+export const NEARLY_VACANT = 0.9;
+
+/** A share as a sentence says it: "3%", "0.5%", "97%". */
+const shareWords = (dec: number) => `${Number((dec * 100).toFixed(1))}%`;
+
+/** What a withheld tile and the cap field say after "n/a — " where the
+ *  model runs the building nearly vacant: "97% vacant". Null under
+ *  `NEARLY_VACANT`. */
+export function nearlyVacantWord(inputs: Pick<UnderwriteInputs, "vacancyPct">): string | null {
+  return inputs.vacancyPct >= NEARLY_VACANT ? `${shareWords(inputs.vacancyPct)} vacant` : null;
+}
+
+/**
+ * Why a nearly vacant building's returns and bids are withheld, in the words
+ * after a surface's own opening — the deal page's playground and the
+ * report's max bid say it alike: "stated 3% occupied, the model's rent line
+ * is that space's revenue grossed up through 97% vacancy, so a step of
+ * vacancy moves the NOI by a multiple — run a lease-up." `occupancy` is the
+ * occupancy the model read (decimal), named where it is given. Null under
+ * `NEARLY_VACANT`.
+ */
+export function nearlyVacantReason(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy?: number | null,
+): string | null {
+  if (!(inputs.vacancyPct >= NEARLY_VACANT)) return null;
+  const through = `${shareWords(inputs.vacancyPct)} vacancy`;
+  const occ = occupancy != null && Number.isFinite(occupancy) && occupancy >= 0 ? occupancy : null;
+  const lead = occ != null ? `stated ${shareWords(occ)} occupied` : `run at ${through}`;
+  // A building stated empty has no occupied space whose revenue it is: the
+  // model's floor is its own 1%.
+  const what = occ != null && occ > 0 ? "that space's revenue" : "its year-1 revenue";
+  return `${lead}, the model's rent line is ${what} grossed up through ${through}, so a step of vacancy moves the NOI by a multiple — run a lease-up.`;
+}
+
+/**
+ * The deal page's playground, over its tiles, where the model runs the
+ * building nearly vacant: what it withholds — the returns, the cap on year-1
+ * NOI and, where a buy box floor would solve one, the max bid — and why.
+ * Null under `NEARLY_VACANT`.
+ */
+export function nearlyVacantPageLine(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy: number | null | undefined,
+  o: { maxBid: boolean },
+): string | null {
+  const reason = nearlyVacantReason(inputs, occupancy);
+  if (!reason) return null;
+  const what = o.maxBid ? "The returns, the cap on year-1 NOI and the max bid" : "The returns and the cap on year-1 NOI";
+  return `${what} are withheld: ${reason}`;
+}
+
+/** What a withheld tile says after "n/a — " while a finding stands against
+ *  the returns (`misreadPageLine`). */
+export const MISREAD_WORD = "figures don't tie";
+
+/**
+ * The deal page's playground, over its tiles, while the plausibility check
+ * finds the figures the returns run on do not tie (lib/deal-strategy
+ * `findingWithholdsReturns`: a high finding, or an implied cap under the
+ * floor — an NOI stated a month at a time had printed "Equity multiple
+ * −1.53x" and "DSCR 0.16x" bare, research pass 38): the returns, and the max
+ * bid where a buy box floor would solve one, withheld with the finding's own
+ * claim, as a placeholder's are. Null where no such finding stands.
+ */
+export function misreadPageLine(
+  findings: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null | undefined,
+  o: { maxBid: boolean },
+): string | null {
+  const f = (findings ?? []).find(findingWithholdsReturns);
+  if (!f) return null;
+  return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${f.title}, and returns built on figures that do not tie would be a misread's.`;
+}
+
+/**
+ * The report's own words for the playground's rule (`misreadPageLine`):
+ * while a finding stands against the returns, the IRR grids and the max bid
+ * are left out with the finding's claim — the page withheld its tiles beside
+ * grids the report still printed (research pass 38). Null where none stands.
+ */
+export function misreadReturnsLine(
+  findings: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null | undefined,
+): string | null {
+  const f = (findings ?? []).find(findingWithholdsReturns);
+  return f ? `The IRR grids and the max bid are left out: ${f.title}, and returns built on figures that do not tie would be a misread's.` : null;
+}
+
+/**
+ * The report's own words for a building the model runs nearly vacant
+ * (`nearlyVacantReason`): the IRR grids, the base case and the max bid are
+ * left out with the page's reason, as the deal page withholds its tiles —
+ * the report had withheld its max bid alone and printed both grids and the
+ * base case beside the page's withheld tiles (research pass 40, H1(c)).
+ * Null under `NEARLY_VACANT`.
+ */
+export function nearlyVacantReturnsLine(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy?: number | null,
+): string | null {
+  const reason = nearlyVacantReason(inputs, occupancy);
+  return reason ? `The IRR grids and the max bid are left out: ${reason}` : null;
+}
+
+/** What a workbook cell the deal page withholds shows over its live
+ *  formula: one word, short enough for the narrowest return cell. */
+export const WORKBOOK_WITHHELD_WORD = "withheld";
+
+/**
+ * The workbook's Deal Summary where the deal page withholds the returns and
+ * the full report leaves its grids out (research pass 40, H1): a building
+ * the model runs nearly vacant, else a finding against the returns — the
+ * page's own order and its own reason. Said of cells that keep their live
+ * formulas under the word (`WORKBOOK_WITHHELD_WORD`), so the reader who
+ * enters the figures they would run can read them. `cap`: the cap on year-1
+ * NOI goes with the returns, as the page's cap field withholds a nearly
+ * vacant building's. Null where the returns stand.
+ */
+export function withheldWorkbookRead(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy: number | null | undefined,
+  findings: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null | undefined,
+  /** the deal page's read of what the price buys (lib/compare-interest
+   *  `modelReturnsRead` over `screeningCompareModel`): a leasehold whose
+   *  lease ends inside the hold withholds the returns first, over the
+   *  leasehold card's own sentence, as the report's `leaseReturnsLine` does
+   *  (audit C4, M3); its cap on year-1 NOI stands, as the page's does */
+  interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null,
+): { line: string; cap: boolean } | null {
+  if (interest?.withheld === "lease" && interest.line) {
+    return {
+      line: `The returns are withheld on the deal page, and the full report leaves its grids and max bid out. ${interest.line} The cells marked “${WORKBOOK_WITHHELD_WORD}” keep their live formulas: give one a number format to read it.`,
+      cap: false,
+    };
+  }
+  const vacant = nearlyVacantReason(inputs, occupancy);
+  const f = vacant ? null : (findings ?? []).find(findingWithholdsReturns);
+  if (!vacant && !f) return null;
+  const what = vacant ? "The returns and the cap on year-1 NOI are" : "The returns are";
+  const reason = vacant ?? `${f!.title}, and returns built on figures that do not tie would be a misread's.`;
+  return {
+    line: `${what} withheld on the deal page, and the full report leaves its grids and max bid out: ${reason} The cells marked “${WORKBOOK_WITHHELD_WORD}” keep their live formulas: give one a number format to read it.`,
+    cap: vacant != null,
+  };
 }
 
 /** Everything the report's sensitivity page renders, in one pure build. */
@@ -430,7 +922,17 @@ export function buildSensitivityData(
   // falls back to the screening hurdle's IRR the grids are graded on.
   const box = opts.floors && (opts.floors.minIrr != null || opts.floors.minCoc != null || opts.floors.minCap != null) ? opts.floors : null;
   const maxBidFloors: MaxBidFloors = box ? { floors: box, from: "buybox" } : { floors: { minIrr: hurdle / 100 }, from: "screening" };
-  const solved = solveMaxBid(inputs, maxBidFloors.floors, pageBaseLevers(inputs));
+  const levers = pageBaseLevers(inputs);
+  // A building the model runs nearly vacant has no bid worth solving: the
+  // deal page withholds its own, and the report says why in its place.
+  const vacant = nearlyVacantReason(inputs, opts.occupancyPct);
+  const solved = vacant ? null : solveMaxBid(inputs, maxBidFloors.floors, levers);
+  const firstReason = placeholderReturnsLine(inputs, opts.sources) ?? leaseReturnsLine(opts.interest);
+  // Then the deal page's own order over its tiles: a building the model runs
+  // nearly vacant, then a finding against the returns. Each leaves the grids,
+  // the base case and the max bid out and the model's reads of the terms in,
+  // as the page prints them beside its withheld tiles (research pass 40, H1).
+  const standing = nearlyVacantReturnsLine(inputs, opts.occupancyPct) ?? misreadReturnsLine(opts.findings);
   return {
     grid,
     priceGrid,
@@ -438,11 +940,31 @@ export function buildSensitivityData(
     hurdleSource: hurdlePct != null && Number.isFinite(hurdlePct) && hurdlePct > 0 ? "buybox" : "default",
     takeaway: gridTakeaway(grid, hurdle),
     maxBid:
-      solved.price != null && solved.deltaPct != null
-        ? { price: solved.price, deltaPct: solved.deltaPct, unbounded: solved.unbounded, binding: solved.binding, at: solved.at }
+      solved && solved.price != null && solved.deltaPct != null
+        ? {
+            price: solved.price,
+            deltaPct: solved.deltaPct,
+            unbounded: solved.unbounded,
+            binding: solved.binding,
+            at: solved.at,
+            // The bid's own price under the bid's own levers, on the term.
+            ...(opts.termRead
+              ? { onTerm: opts.termRead({ ...inputs, expenseLines: inputs.expenseLines.map((l) => ({ ...l })), ...levers, purchasePrice: solved.price }) }
+              : {}),
+          }
         : null,
     maxBidFloors,
-    withheld: placeholderReturnsLine(inputs, opts.sources),
+    // No price clears the box's floors together: which one never clears,
+    // and which clear on their own, so the sentence names them.
+    noBid: box && solved && solved.price == null ? noBidRead(inputs, box, levers) : null,
+    maxBidWithheld: vacant,
+    // A placeholder's reason first; else a leasehold whose lease ends inside
+    // the hold, said in the leasehold card's own sentence; else a building
+    // run nearly vacant, else a finding against the returns, the deal page's
+    // own rules — the grids had printed beside the page's withheld tiles
+    // (research passes 38 and 40).
+    withheld: firstReason ?? standing,
+    ...(firstReason == null && standing != null ? { readsStand: true } : {}),
     priceSource: opts.sources?.purchasePrice ?? null,
     baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
   };
@@ -453,12 +975,17 @@ const pct1 = (d: number | null | undefined, dp = 1) => (d == null || !Number.isF
 /**
  * The max bid in the deal page's words (the playground's max-bid card): the
  * floors it clears and whose they are, the bid as the page prints it
- * (rounded down, `fmtBid`), its distance from the modeled price, the floor
+ * (rounded down, `fmtBid`), its distance from the modelled price, the floor
  * that binds, and the model's IRR, year-1 cash-on-cash and going-in cap at
  * that price. A bundle with no recorded floors reads as the screening
  * hurdle's IRR, which is what it was solved on.
  */
-export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource">): string {
+export function maxBidSentence(
+  s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource" | "noBid" | "maxBidWithheld">,
+): string {
+  // Withheld rather than solved (a building the model runs nearly vacant):
+  // the deal page's own reason, in the bid's place.
+  if (s.maxBidWithheld) return `No max bid: ${s.maxBidWithheld}`;
   const f = s.maxBidFloors ?? { floors: { minIrr: s.hurdlePct / 100 }, from: "screening" as const };
   const box = f.from === "buybox";
   const hurdle = `${Number(s.hurdlePct.toFixed(1))}%`;
@@ -469,16 +996,19 @@ export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors
       : `the ${hurdle} screening hurdle`;
   const bid = s.maxBid;
   if (!bid) {
-    return box
-      ? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`
-      : `No price inside the tested range holds ${what} under these assumptions.`;
+    if (!box) return `No price inside the tested range holds ${what} under these assumptions.`;
+    return noBidSentence(f.floors, s.noBid ?? null) ?? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`;
   }
+  // Every floor still clearing at the top of the range searched: the bid is
+  // at least that top, and the range is said — the window doubles from twice
+  // the modelled price while the floors clear (research pass 40, H2).
   if (bid.unbounded) {
+    const times = `${timesWords(1 + bid.deltaPct)} the modelled price`;
     return box
-      ? `Max bid: ${what} hold even at twice the modeled price, so the box is not the constraint on this deal.`
-      : `Max bid holding ${what}: clears at every tested price — the constraint never binds inside the search range.`;
+      ? `Max bid: ${what} hold even at ${times} (${fmtBid(bid.price)}), the top of the range searched, so the box is not the constraint on this deal.`
+      : `Max bid holding ${what}: at least ${fmtBid(bid.price)}, ${times} and the top of the range searched — the model's own ceiling lies above it.`;
   }
-  const delta = `${bid.deltaPct > 0 ? "+" : ""}${(bid.deltaPct * 100).toFixed(1)}% vs the modeled price`;
+  const delta = `${bid.deltaPct > 0 ? "+" : ""}${(bid.deltaPct * 100).toFixed(1)}% vs the modelled price`;
   const binds = box && bid.binding ? `; your ${floorWords(bid.binding, f.floors)} floor binds` : "";
   const at = bid.at
     ? ` At that price: IRR ${pct1(bid.at.irr)}, year-1 cash-on-cash ${pct1(bid.at.coc)}, going-in cap ${pct1(bid.at.cap, 2)}.`

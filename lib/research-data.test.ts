@@ -10,6 +10,7 @@ import {
   mergeBenchmarks,
   mergeRules,
   metroFmr,
+  redfinSourceHref,
   ruleCounts,
   ruleName,
   seedBenchmarks,
@@ -147,14 +148,14 @@ describe("sector snapshot benchmark rows", () => {
     expect(miamiRent.source).toBe("");
     expect(miamiRent.cite).toBe("Colliers, Miami-Dade, Q2 2026; average asking");
     // Chicago's cap is Essex Realty's April 2026 average — the block's first
-    // link is JPMorgan's, the vacancy's source.
+    // link is Cushman & Wakefield's, the vacancy's source.
     const chicagoCap = snapRows.find((b) => b.metro === "Chicago" && b.metric === "multifamily_cap_rate_pct")!;
     expect(chicagoCap.source).toBe("https://essexrealtygroup.com/chicago-multifamily-report-april-2026/");
     expect(chicagoCap.cite).toBe(
       "Essex Realty, Chicago, April 2026; a transaction average of 175 sales, not a quoted band; for the small-building stock, mostly the Class B/C neighborhood buildings that drive Chicago volume",
     );
     const chicagoVacancy = snapRows.find((b) => b.metro === "Chicago" && b.metric === "multifamily_vacancy_pct")!;
-    expect(chicagoVacancy.source).toBe("https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook");
+    expect(chicagoVacancy.source).toBe("https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/multifamily");
     // Prince George's County's office figure is Suburban Maryland's, both counties together.
     const pgOffice = snapRows.find((b) => b.metro === "Prince George's County MD" && b.metric === "office_vacancy_pct")!;
     expect(pgOffice.cite).toBe("Colliers, Suburban Maryland (Montgomery and Prince George's together, not a county split), Q1 2026");
@@ -328,7 +329,14 @@ describe("HUD's fair market rents — the year in the data, the newest year only
 describe("twoToFourMedian — a sale median with its month, from the research file", () => {
   it("Philadelphia's May 2026 median and change, the month the file's own period states", () => {
     const m = twoToFourMedian("philadelphia_pa");
-    expect(m).toEqual({ price: 363_500, yoy: "+6.9%", asOf: "2026-05-31" });
+    // With the Redfin page the file cites for it, read out of the file's
+    // own source (research pass 31, C4), never an address typed.
+    expect(m).toEqual({
+      price: 363_500,
+      yoy: "+6.9%",
+      asOf: "2026-05-31",
+      sourceHref: "https://www.redfin.com/news/data-center/downloads/",
+    });
     expect(monthOf(m!.asOf)).toBe("May 2026");
     // The benchmark rows the deal pages read carry the same month.
     const row = seeds.find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit");
@@ -344,6 +352,27 @@ describe("twoToFourMedian — a sale median with its month, from the research fi
     expect(demo).toContain('twoToFourMedian("philadelphia_pa")');
     expect(demo).not.toContain("$363,500");
     expect(demo).not.toContain("+6.9% YoY");
+  });
+
+  it("Redfin's page is read out of the file's own source, and only a redfin.com address is Redfin's", () => {
+    const source = multifamilySeed.supply_demand.on_market_depth_may_2026.sources[0];
+    expect(source).toMatch(/^https:\/\/www\.redfin\.com\/news\/data-center\/downloads\/ — /);
+    expect(redfinSourceHref(source)).toBe("https://www.redfin.com/news/data-center/downloads/");
+    expect(redfinSourceHref("https://www.zillow.com/research/data/ — a note")).toBeNull();
+    expect(redfinSourceHref("https://redfin.com.example.org/x")).toBeNull();
+    expect(redfinSourceHref("Redfin public dataset")).toBeNull();
+    expect(redfinSourceHref(null)).toBeNull();
+    // The benchmark rows /market's table reads carry the same source.
+    const row = seeds.find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit");
+    expect(redfinSourceHref(row?.source)).toBe("https://www.redfin.com/news/data-center/downloads/");
+  });
+
+  it("/demo and /market credit Redfin in words and link the page the file cites (research pass 31, C4)", () => {
+    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
+    expect(demo).toMatch(/href=\{phillyMedian\.sourceHref\}[^<]{0,400}>\s*Redfin public dataset\s*<\/a>/);
+    const market = readFileSync(join(process.cwd(), "app/market/page.tsx"), "utf8");
+    expect(market).toContain("redfinSourceHref(priceRows[0].price!.source)");
+    expect(market).toMatch(/href=\{redfinHref\}[^<]{0,400}>\s*Redfin public dataset\s*<\/a>/);
   });
 });
 

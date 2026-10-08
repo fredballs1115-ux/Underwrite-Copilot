@@ -1,0 +1,111 @@
+{
+  "$note": "The rent regimes the site's rules hold, and each regime's published allowance for a dated period. A regime here is a rule in regulatory_rules.json that regulates rent; a rule that states a state preempts or bans rent control is listed under noRegime. An allowance is filed only as a primary source printed it — from the GitHub runner (zori.yml probe_url) or as the rule's own verification already records it — with the period it covers, never carried past its end and never estimated. lib/rent-regulation reads this file; lib/rent-regulation.test.ts holds every rent rule to one of the two lists.",
+  "regimes": {
+    "ny-nyc-rent-stabilization-coverage": { "name": "NYC rent stabilization", "short": "Rent-stabilized" },
+    "dc-rent-stab-coverage": { "name": "DC rent stabilization", "short": "DC rent control" },
+    "ca-la-rso-coverage": { "name": "the Los Angeles RSO", "short": "LA RSO" },
+    "ca-sf-rent-ordinance": { "name": "the San Francisco Rent Ordinance", "short": "SF rent ordinance" },
+    "ca-ab1482-rent-cap": { "name": "California's AB 1482 cap", "short": "AB 1482 cap" },
+    "wa-rent-cap-hb1217": { "name": "Washington's HB 1217 cap", "short": "WA rent cap" },
+    "md-moco-rent-stabilization": { "name": "Montgomery County rent stabilization", "short": "MoCo rent cap" },
+    "md-takoma-park-rent-stabilization": { "name": "Takoma Park rent stabilization", "short": "Takoma Park rent cap" },
+    "md-pg-prsa-cap": { "name": "Prince George's County's PRSA cap", "short": "PG rent cap" },
+    "nj-newark-rent-control": { "name": "Newark rent control", "short": "Newark rent control" },
+    "nj-jersey-city-rent-control": { "name": "Jersey City rent control", "short": "Jersey City rent control" },
+    "nj-municipal-rent-control": { "name": "a New Jersey municipal rent ordinance", "short": "NJ rent ordinance" }
+  },
+  "noRegime": [
+    "il-rent-control-preemption",
+    "ma-rent-control-ban",
+    "tx-rent-control-preemption",
+    "ga-rent-control-preemption",
+    "fl-rent-control-preemption",
+    "de-no-rent-control",
+    "va-no-local-rent-control"
+  ],
+  "allowances": [
+    {
+      "rule_id": "ny-nyc-rent-stabilization-coverage",
+      "order": "the Rent Guidelines Board's Apartment/Loft Order #58",
+      "applies_to": "leases commencing",
+      "period_start": "2026-10-01",
+      "period_end": "2027-09-30",
+      "figures": [
+        { "label": "a one-year lease", "pct": 0 },
+        { "label": "a two-year lease", "pct": 0 }
+      ],
+      "source": "https://rentguidelinesboard.cityofnewyork.us/2026-27-apartment-loft-order-58/",
+      "as_of": "2026-10-05",
+      "read": "printed from the Board's page by zori probe run 37256434220: 'For a one -year lease commencing on or after October 1, 2026 and on or before September 30, 2027 : 0%' and the same for a two-year lease"
+    },
+    {
+      "rule_id": "dc-rent-stab-coverage",
+      "order": "the Rental Housing Commission's caps for Rent Control Year 2026",
+      "applies_to": "increases taking effect",
+      "period_start": "2026-05-01",
+      "period_end": "2027-04-30",
+      "figures": [
+        { "label": "a rent-controlled unit", "pct": 4.1 },
+        { "label": "a unit with a registered elderly or disabled tenant", "pct": 2.1 }
+      ],
+      "source": "https://ota.dc.gov/release/rhc-publishes-new-rent-increase-caps-21-elderlydisability-tenants-41-other-rent-controlled",
+      "as_of": "2026-10-05",
+      "read": "printed from the Office of the Tenant Advocate's release by zori probe runs 37256434220 and 37256565109: 'Rent Control Year 2026 (starting May 1, 2026, & ending April 30, 2027)', a 4.1% cap (CPI-W + 2%) for all other rent-controlled units and 2.1% for a registered elderly or disabled tenant"
+    },
+    {
+      "rule_id": "ca-la-rso-coverage",
+      "order": "LAHD's allowable RSO increase",
+      "applies_to": "increases taking effect",
+      "period_start": "2026-07-01",
+      "period_end": "2027-06-30",
+      "figures": [{ "label": "an RSO unit", "pct": 3 }],
+      "source": "https://housing.lacity.gov/wp-content/uploads/2023/06/LA-RENTER-Protections-Notification.pdf",
+      "as_of": "2026-09-30",
+      "read": "the rule's own verification: LAHD's City of Los Angeles Renter Protections Notice (updated 07.01.2026), page 1, allowable RSO increases 3% for 7/1/2026 - 6/30/2027"
+    },
+    {
+      "rule_id": "wa-rent-cap-hb1217",
+      "order": "the Department of Commerce's HB 1217 cap",
+      "applies_to": "increases taking effect",
+      "period_start": "2026-01-01",
+      "period_end": "2026-12-31",
+      "figures": [{ "label": "a covered unit", "pct": 9.683 }],
+      "source": "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/",
+      "as_of": "2026-10-04",
+      "read": "the rule's own verification: Commerce's page read from the runner by zori probe run 37240367657, 'Maximum annual rent increase percent through 12/31/2026: 9.683%'"
+    },
+    {
+      "rule_id": "wa-rent-cap-hb1217",
+      "order": "the Department of Commerce's HB 1217 cap",
+      "applies_to": "increases taking effect",
+      "period_start": "2027-01-01",
+      "period_end": "2027-12-31",
+      "figures": [{ "label": "a covered unit", "pct": 10 }],
+      "source": "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/",
+      "as_of": "2026-10-04",
+      "read": "the rule's own verification: Commerce's page read from the runner by zori probe run 37240367657, 'between 1/1/2027 and 12/31/2027 is 10%.'"
+    },
+    {
+      "rule_id": "md-moco-rent-stabilization",
+      "order": "Montgomery County's maximum allowable rent increase",
+      "applies_to": "increases taking effect",
+      "period_start": "2026-07-01",
+      "period_end": "2027-06-30",
+      "figures": [{ "label": "a covered unit", "pct": 5.2 }],
+      "source": "https://www.montgomerycountymd.gov/department-housing-community-affairs/rent-stabilization",
+      "as_of": "2026-10-05",
+      "read": "printed from DHCA's rent stabilization page by zori probe run 37258453291: 'The current CPI-U is 2.2%, and the maximum allowable rent increase is 5.2%. These rates will be in effect from July 1, 2026, through June 30, 2027.'"
+    },
+    {
+      "rule_id": "md-takoma-park-rent-stabilization",
+      "order": "Takoma Park's published allowance",
+      "applies_to": "increases taking effect",
+      "period_start": "2026-07-01",
+      "period_end": "2027-06-30",
+      "figures": [{ "label": "a covered unit", "pct": 3 }],
+      "source": "https://takomaparkmd.gov/m/newsflash/home/detail/381",
+      "as_of": "2026-10-04",
+      "read": "the rule's own text, 'July 1, 2026 - June 30, 2027 allowance published at 3.0% (corrected from an initially published 3.3%)', and Montgomery County's market note as the runner read the pages (zori probe run 37240367657)"
+    }
+  ]
+}

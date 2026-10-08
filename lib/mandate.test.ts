@@ -180,6 +180,34 @@ describe("scoreMandateFit — unknowns never fake a pass or a fail", () => {
     expect(r.verdict).toBe("PURSUE");
   });
 
+  it("a red line clear beside one that could not be checked never scores the dimension a pass at full weight (the audit of 2026-10-05)", () => {
+    // "No red line crossed" is a claim about every red line: one unchecked
+    // may be the one the deal crosses.
+    const box: BuyBox = {
+      assetClasses: ["multifamily"],
+      minCapPct: 5.0,
+      dealbreakers: { requireAssetClass: true, minCapPct: 6.0 },
+    };
+    const extraction = ex([["Asking price", "$12,000,000"]], { assetClass: "multifamily" });
+    const r = scoreMandateFit("multifamily", extraction, box);
+    const red = dim(r, "dealbreakers")!;
+    expect(red.status).toBe("unknown");
+    expect(red.earned).toBe(0);
+    expect(red.detail).toBe("No dealbreaker tripped of the 1 checked, but 1 couldn't be checked against the screen yet — verify.");
+    expect(r.unresolvedDealbreakers).toBe(1);
+    // Each red line, as the fit's coverage counts it.
+    expect(r.dealbreakerCriteria).toEqual([
+      { label: "Asset-class dealbreaker", checked: true, onPrice: false },
+      { label: "Cap-rate dealbreaker", checked: false, onPrice: true },
+    ]);
+    // With the cap stated, both are checked and the dimension passes whole.
+    const stated = scoreMandateFit("multifamily", ex([["Going-in cap rate", "6.50%"]], { assetClass: "multifamily" }), box);
+    expect(dim(stated, "dealbreakers")).toMatchObject({ status: "pass", earned: WEIGHTS.dealbreakers });
+    expect(stated.dealbreakerCriteria?.every((c) => c.checked)).toBe(true);
+    // A box with no red lines has none to count.
+    expect(scoreMandateFit("multifamily", extraction, { assetClasses: ["multifamily"] }).dealbreakerCriteria).toEqual([]);
+  });
+
   it("a criterion with no parseable figure is dropped from the denominator", () => {
     const box: BuyBox = { minCapPct: 5.0, minCoCPct: 6.0 };
     const extraction = ex([["Going-in cap rate", "5.50%"]]); // no CoC in the OM

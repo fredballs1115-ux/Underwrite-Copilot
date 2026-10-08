@@ -14,7 +14,7 @@ import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { rankLabel } from "@/lib/rank";
 import { sectorStandings } from "@/lib/sector-leaderboard";
-import { blockCitations, snapshotAge } from "@/lib/tracker-read";
+import { blockCitations, houseShort, snapshotAge } from "@/lib/tracker-read";
 import { researchAge, staleMark } from "@/lib/research-age";
 import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
@@ -30,6 +30,8 @@ import { liveMetroRates } from "@/lib/live-rates-read";
 import { metroDemand, type MetroDemand } from "@/lib/metro-demand";
 import { metroForAddress } from "@/lib/market-match";
 import { PlaceBand } from "@/app/place-band";
+import { DataNotices } from "@/app/data-notices";
+import { linkOk } from "@/lib/link-audit";
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
@@ -124,6 +126,8 @@ export default async function DemoPage() {
       dealAssetClass: SAMPLE_DEAL.asset_class,
       checkSource,
       box: SAMPLE_DEMO_BOX,
+      // The deal page's own read of where each input came from.
+      sources: derived.sources,
     },
     underwrite: derived.inputs,
   };
@@ -208,9 +212,16 @@ export default async function DemoPage() {
   const phillyTrackerStale = staleMark(phillyTrackerAge);
   const credit = (sector: string, label: "Vacancy" | "Rent") => {
     const fig = blockCitations(phillySnapshot?.[sector]).find((f) => f.label === label);
-    // The narrower stock a figure covers rides with its period ("Class A
-    // space, Q2 2026"), so a Class A rent never reads as the market's.
-    return { period: [fig?.read.slice, fig?.read.period ?? "undated"].filter(Boolean).join(", "), title: fig?.words };
+    // Who published the figure comes first, in words a phone shows (research
+    // pass 31, C5: the house had been in the title alone), then the narrower
+    // stock it covers ("Class A space, Q2 2026"), so a Class A rent never
+    // reads as the market's, then its period.
+    return {
+      cited: [houseShort(fig?.read ?? { house: null }), fig?.read.slice, fig?.read.period ?? "undated"]
+        .filter(Boolean)
+        .join(", "),
+      title: fig?.words,
+    };
   };
   const phillySectors = {
     office: band("office_vacancy_pct"),
@@ -296,7 +307,7 @@ export default async function DemoPage() {
               <h2 className="text-xl font-semibold tracking-tight">
                 The Maddox at Brewerytown
               </h2>
-              <span className="rounded-full bg-caution/15 px-2.5 py-1 text-[11px] font-medium text-caution">
+              <span className="rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-medium text-caution">
                 Caution
               </span>
               {/* The deal's kind, read from the sample's own extraction the way
@@ -353,7 +364,7 @@ export default async function DemoPage() {
                 Take the deliverables with you
               </h2>
               <p className="mt-1 max-w-md text-sm text-muted">
-                The same files a signed-in analyst exports from this screen.
+                The same files a Pro analyst exports from this screen, free here for the sample.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -489,6 +500,25 @@ export default async function DemoPage() {
                     <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
                       {`$${phillyMedian.price.toLocaleString("en-US")}`}
                     </dd>
+                    {/* Redfin's figure, credited to Redfin and linked to the
+                        page the research file cites for it (research pass
+                        31, C4: it had printed with no source at all). */}
+                    {phillyMedian.sourceHref && (
+                      <dd className="mt-0.5 text-[10px] leading-snug text-muted" data-qa="redfin-credit">
+                        {linkOk(phillyMedian.sourceHref) !== false ? (
+                          <a
+                            href={phillyMedian.sourceHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                          >
+                            Redfin public dataset
+                          </a>
+                        ) : (
+                          "Redfin public dataset"
+                        )}
+                      </dd>
+                    )}
                   </div>
                 )}
               </dl>
@@ -510,7 +540,7 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("office", "Vacancy").title}>
                         {phillySectors.office}
                       </span>
-                      {` (${[credit("office", "Vacancy").period, phillyRanks.office].filter(Boolean).join(", ")})`}
+                      {` (${[credit("office", "Vacancy").cited, phillyRanks.office].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.industrial && (
@@ -519,14 +549,14 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Vacancy").title}>
                         {phillySectors.industrial}
                       </span>
-                      {` (${[credit("industrial", "Vacancy").period, phillyRanks.industrial].filter(Boolean).join(", ")})`}
+                      {` (${[credit("industrial", "Vacancy").cited, phillyRanks.industrial].filter(Boolean).join(", ")})`}
                       {typeof phillySectors.industrialRent === "number" && (
                         <>
                           {" at "}
                           <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Rent").title}>
                             ${phillySectors.industrialRent.toFixed(2)}/SF
                           </span>
-                          {` (${credit("industrial", "Rent").period})`}
+                          {` (${credit("industrial", "Rent").cited})`}
                         </>
                       )}
                     </>
@@ -537,7 +567,7 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("multifamily", "Vacancy").title}>
                         {phillySectors.multifamily}
                       </span>
-                      {` (${[credit("multifamily", "Vacancy").period, phillyRanks.multifamily].filter(Boolean).join(", ")})`}
+                      {` (${[credit("multifamily", "Vacancy").cited, phillyRanks.multifamily].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.retail && (
@@ -546,7 +576,7 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("retail", "Vacancy").title}>
                         {phillySectors.retail}
                       </span>
-                      {` (${[credit("retail", "Vacancy").period, phillyRanks.retail].filter(Boolean).join(", ")})`}
+                      {` (${[credit("retail", "Vacancy").cited, phillyRanks.retail].filter(Boolean).join(", ")})`}
                     </>
                   )}{" "}
                   — ranges are tracker spreads, never averaged; ranks run
@@ -586,6 +616,10 @@ export default async function DemoPage() {
               Home
             </Link>
           </span>
+          {/* The demo draws FRED's figures (the leverage and demand cards)
+              outside either shell, so its own footer carries the data
+              providers' notices too (app/data-notices). */}
+          <DataNotices className="basis-full" />
         </div>
       </footer>
     </div>

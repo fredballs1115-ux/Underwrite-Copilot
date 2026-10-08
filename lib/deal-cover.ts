@@ -68,15 +68,28 @@ function hashOf(seed: string): number {
   return h >>> 0;
 }
 
-/** A deal's sky, as its number in `COVER_TONES`: the same deal always
- *  wears the same one (the one its gradient had before the drawing). */
+/** The skies a deal could wear before research pass 29 added four. */
+const FIRST_SKIES = 8;
+
+/**
+ * A deal's sky, as its number in `COVER_TONES`: the same deal always wears
+ * the same one. Of the twelve, a deal wears the one it wore among the first
+ * eight (its hash's own eighth, the one its gradient had before the drawing)
+ * two times in three, and one of the four added the third time — two of the
+ * old eight to each — so each of the twelve is worn as often, and most of a
+ * pipeline keeps the sky it had.
+ */
 export function coverToneFor(seed: string): number {
-  return hashOf(seed) % COVER_TONES.length;
+  const h = hashOf(seed);
+  const old = h % FIRST_SKIES;
+  const added = COVER_TONES.length - FIRST_SKIES;
+  return added > 0 && (h >>> 3) % 3 === 0 ? FIRST_SKIES + (old % added) : old;
 }
 
-/** A deal's own draw of its cover's details — where the sun sits, which
- *  windows are lit — mixed from the same hash so it varies apart from the
- *  sky: two deals under one sky still differ. */
+/** A deal's own draw of its cover (lib/deal-cover-art `coverDraw`): its hour
+ *  and its light's side, where the building stands and what stands beside
+ *  it, where the sun sits, which windows are lit — mixed from the same hash
+ *  so it varies apart from the sky: two deals under one sky still differ. */
 export function coverVariantFor(seed: string): number {
   let h = hashOf(seed);
   h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { renameDeal, deleteDeal } from "../actions";
+import { DEAL_NAME_MAX } from "@/lib/deal-name";
 
 const itemCls =
   "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors";
@@ -45,13 +46,16 @@ export function DealActions({
   // Nothing to offer is no menu, never an empty one.
   if (!canRename && !canDelete) return null;
 
+  // On a phone the button sits in the deal header's scrolling row of
+  // controls, so the menu's containing block is that row (DealHero's
+  // ToolRow), outside the scroller: it opens at the row's right edge rather
+  // than inside the scroll, which would cut it off (research pass 36).
   return (
-    <div className="relative">
+    <div className="sm:relative">
       <button
         ref={triggerRef}
         type="button"
         aria-label="Deal actions"
-        aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => {
           setOpen((o) => !o);
@@ -108,7 +112,7 @@ export function DealActions({
                   defaultValue={dealName}
                   required
                   autoFocus
-                  maxLength={120}
+                  maxLength={DEAL_NAME_MAX}
                   className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
                 />
                 <div className="flex gap-2">
@@ -129,9 +133,12 @@ export function DealActions({
               </form>
             )}
 
+            {/* The question is the group's name, and focus lands on Cancel —
+                the button pressed is gone, and focus had dropped to the page
+                (research pass 33). */}
             {mode === "delete" && (
-              <div className="space-y-2.5 p-1.5">
-                <p className="text-sm leading-relaxed">
+              <div role="group" aria-labelledby={`${dealId}-delete-q`} className="space-y-2.5 p-1.5">
+                <p id={`${dealId}-delete-q`} className="text-sm leading-relaxed">
                   Delete this deal permanently? Its documents and analysis are
                   removed and this can&apos;t be undone.
                 </p>
@@ -148,6 +155,7 @@ export function DealActions({
                   <button
                     type="button"
                     onClick={close}
+                    autoFocus
                     className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint"
                   >
                     Cancel

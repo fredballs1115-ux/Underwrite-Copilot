@@ -1,4 +1,5 @@
 import "server-only";
+import { compactUsd } from "@/lib/money";
 import {
   Document,
   Font,
@@ -17,8 +18,8 @@ import type { DealRow } from "@/lib/deals";
 Font.registerHyphenationCallback((word) =>
   word.length <= 24 ? [word] : (word.match(/.{1,12}/g) ?? [word]),
 );
-import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
-import { pdfSafe } from "./pdf-text";
+import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { nameBreaks, pdfSafe, printableName } from "./pdf-text";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { screenedOn } from "@/lib/screen-run";
@@ -30,9 +31,9 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
-import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, planWithBasisChecked, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
-import { yieldOnCostText } from "@/lib/plan-facts";
+import { YOC_WITHHELD, planNoiText, yieldOnCostText } from "@/lib/plan-facts";
 import { dealTypeLabel, interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -47,6 +48,14 @@ import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
+import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
+import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
+import { condoShortLine, readCondo } from "@/lib/condo";
+import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
+import { exchangeForDeal } from "@/lib/exchange-deal";
+import type { ExchangeBlock } from "@/lib/exchange-window";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -103,6 +112,17 @@ export const STATUS_CHIP: Record<
   unknown: { color: C.muted, bg: C.faint, mark: "—" },
 };
 
+/** The chips' key under the row's "Buy box": each mark in a word or two,
+ *  as the deal page's buy-box card has it (inside the mandate, a near
+ *  miss, outside it, not determinable yet). */
+const STATUS_ORDER = ["pass", "near", "miss", "unknown"] as const;
+export const STATUS_WORD: Record<(typeof STATUS_ORDER)[number], string> = {
+  pass: "inside",
+  near: "near miss",
+  miss: "outside",
+  unknown: "not read yet",
+};
+
 /**
  * The deal type for the memo's subtitle — and, on a plan deal, the plan's
  * headline in one clause: the stabilized NOI over the total cost it takes to
@@ -111,21 +131,36 @@ export const STATUS_CHIP: Record<
  * The strategy is the deal page's own read (the extraction and the first
  * signal).
  */
-function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStrategy): string {
+function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStrategy, cls: string): string {
   if (strategy.kind === "unknown" || strategy.kind === "stabilized") return "";
-  const plan = planSummary(extraction, strategy);
+  const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   // Whose strategy it is on a note or a leased fee, as the deal header says
   // it (lib/interest `dealTypeLabel`): the collateral's, or the building
   // someone else owns on the land.
   const kind = dealTypeLabel(strategy.label, extraction);
-  const m = (n: number) =>
-    n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+  const m = (n: number) => compactUsd(n, { thousandsFrom: Infinity });
+  // A forward purchase's NOI is the one stated at delivery (lib/deal-strategy
+  // `forwardDeliveryNoi`), over the price the buyer pays then.
+  const noiWord = plan?.forward ? "NOI at delivery" : "stabilized NOI";
+  // The basis in the counting row's own noun — a hotel's rooms or keys, a
+  // park's pads — as the report's plan page says it, and "planned" only
+  // where the building is still to be delivered: a value-add's units stand
+  // (research pass 35: "$195,000 per planned unit all-in" on 240 existing
+  // units).
+  // On a conversion or a development, the proposed row the basis divides by.
+  const noun = countNounOf(extraction?.metrics ?? [], cls, strategy.kind).one;
+  const per = `per ${notYetDelivered(strategy.kind) ? "planned " : ""}${noun}`;
   if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
-    return `${kind} · stabilized NOI ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
-      plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} per planned unit all-in` : ""
+    return `${kind} · ${noiWord} ${planNoiText(plan.stabilizedNoi, m)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
+      plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} ${per} all-in` : ""
     })`;
   }
-  if (plan?.stabilizedNoi) return `${kind} · stabilized NOI ${m(plan.stabilizedNoi.value)}`;
+  // A yield on cost the plan refuses is said as the plan's facts say it, with
+  // the plan's own sentence why (research pass 38): the line had dropped it
+  // and read as if no total cost were stated. So is a total cost the plan
+  // strikes on no equity's whole, in its own sentence.
+  const refused = plan?.yieldWithheld ? `; yield on cost ${YOC_WITHHELD}. ${plan.yieldWithheld}` : plan?.costWithheld ? `. ${plan.costWithheld}` : "";
+  if (plan?.stabilizedNoi) return `${kind} · ${noiWord} ${planNoiText(plan.stabilizedNoi, m)}${refused}`;
   return kind;
 }
 
@@ -139,10 +174,15 @@ function portfolioLineFor(extraction: ExtractionResult | null): string {
   return p ? [`A portfolio of ${p.assets.length} properties across ${marketsPhrase(p)}.`, ...portfolioFacts(p)].join(" ") : "";
 }
 
+/** The memo's day as the instant the dated readers read it on: noon UTC
+ *  of the reader's own day (lib/reader-day), so a lease's end, a bid's
+ *  deadline or a Phase I's age is judged on the day the memo is dated. */
+const noonOf = (today: string): Date => new Date(`${today}T12:00:00Z`);
+
 /** What is being sold, in one line for the memo's header (lib/interest):
  *  "" for a plain fee simple, whose memo reads as it always did. */
-function interestLineFor(extraction: ExtractionResult | null): string {
-  const r = readInterest(extraction, askingPriceOf(extraction));
+function interestLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readInterest(extraction, askingPriceOf(extraction), noonOf(today));
   return r ? interestShortLine(r) : "";
 }
 
@@ -150,24 +190,24 @@ function interestLineFor(extraction: ExtractionResult | null): string {
  *  the memo's header (lib/assumable-debt, #419): the terms as stated — the
  *  pricing against today's rate is the deal page's and the report's, which
  *  carry the model. "" where none is offered. */
-function assumableLineFor(extraction: ExtractionResult | null): string {
-  const a = readAssumable(extraction, null);
+function assumableLineFor(extraction: ExtractionResult | null, today: string): string {
+  const a = readAssumable(extraction, null, noonOf(today));
   return a ? assumableLine(a) : "";
 }
 
 /** A covenant or a contract that sets the rents (lib/affordable, #453), in
  *  one line for the memo's header: how much is restricted, under what,
  *  until when. "" on a market-rate deal. */
-function affordableLineFor(extraction: ExtractionResult | null): string {
-  const r = readAffordable(extraction);
+function affordableLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readAffordable(extraction, noonOf(today));
   return r ? affordableShortLine(r) : "";
 }
 
 /** The one lease a single-tenant property is (lib/single-tenant, #454), in
  *  one line for the memo's header: the tenant, its guarantor, when the
  *  lease ends and how its rent grows. "" on anything else. */
-function singleTenantLineFor(extraction: ExtractionResult | null): string {
-  const r = readSingleTenant(extraction);
+function singleTenantLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSingleTenant(extraction, noonOf(today));
   return r ? singleTenantShortLine(r) : "";
 }
 
@@ -175,8 +215,8 @@ function singleTenantLineFor(extraction: ExtractionResult | null): string {
  *  one line for the memo's header: how much of the building the list
  *  covers, how much of its rent rolls before the model's sale, the anchors
  *  in and out of the sale. "" where fewer than two are listed. */
-function rosterLineFor(extraction: ExtractionResult | null): string {
-  const r = readRoster(extraction);
+function rosterLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readRoster(extraction, noonOf(today));
   return r ? rosterShortLine(r) : "";
 }
 
@@ -201,8 +241,8 @@ function sellerNoteLineFor(extraction: ExtractionResult | null): string {
  *  memorandum states none. */
 /** What the third-party reports found (lib/site-reports, #465), in one
  *  line for the memo's header. "" where the memorandum cites none. */
-function siteReportsLineFor(extraction: ExtractionResult | null): string {
-  const r = readSiteReports(extraction);
+function siteReportsLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSiteReports(extraction, noonOf(today));
   return r ? siteReportsShortLine(r) : "";
 }
 
@@ -229,24 +269,106 @@ function storageLineFor(extraction: ExtractionResult | null): string {
   return r ? storageShortLine(r) : "";
 }
 
-function taxAbatementLineFor(extraction: ExtractionResult | null): string {
-  const r = readTaxAbatement(extraction);
+/** The rent rules that reach the building (lib/rent-regulation), in one
+ *  line for the memo's header: the regime, the regulated share as stated
+ *  and the allowance in force on `today`. Read through the one call every
+ *  surface makes, at the address the deal page reads the deal at, with the
+ *  site flags stored for it. "" where no rule reaches the building and the
+ *  memorandum names no regime. */
+function regulationLineFor(deal: DealRow, extraction: ExtractionResult | null, today: string): string {
+  const address =
+    ((deal as { is_sample?: boolean }).is_sample ? null : addressUpgrade(deal.address, extraction)) ??
+    ((deal.address as StructuredAddress | null | undefined) ?? null);
+  const r = regulationForDeal(
+    {
+      extraction,
+      address,
+      siteFlags: (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null,
+      assetClass: typeof deal.asset_class === "string" ? deal.asset_class : null,
+    },
+    today,
+  );
+  return r ? regulationShortLine(r) : "";
+}
+
+/** A forward purchase or a build-to-suit bought at delivery
+ *  (lib/forward-purchase), in one line for the memo's header: the price paid
+ *  at delivery, the works the developer's, the yield at delivery, the outside
+ *  date and the deposit, read on `today` with the kind the memo reads. ""
+ *  where the buyer is not paying for a building at its completion. */
+function forwardLineFor(extraction: ExtractionResult | null, strategy: DealStrategy, today: string): string {
+  const r = readForwardPurchase(extraction, noonOf(today), strategy);
+  return r ? forwardShortLine(r) : "";
+}
+
+/** A mixed-use building (lib/mixed-use) in one line for the memo's header:
+ *  its two incomes as stated, the commercial share and the commercial
+ *  space. "" on anything else. */
+function mixedUseLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readMixedUse(extraction, noonOf(today));
+  return r ? mixedUseShortLine(r) : "";
+}
+
+/** An operating business on its real estate (lib/going-concern) in one
+ *  line for the memo's header: what is sold, the operator's earnings and
+ *  the rent's coverage. "" on anything else. */
+function goingConcernLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readGoingConcern(extraction, noonOf(today));
+  return r ? goingConcernShortLine(r) : "";
+}
+
+/** Condominium units bought in bulk (lib/condo) in one line for the memo's
+ *  header: the units offered of the condominium's, a year of their dues and
+ *  a special assessment. "" on anything else. */
+function condoLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readCondo(extraction, noonOf(today));
+  return r ? condoShortLine(r) : "";
+}
+
+/** A sandwich position (lib/sandwich-lease) in one line for the memo's
+ *  header: the sublease income against the master rent and its cover, and
+ *  when the master lease ends. "" on anything but a master lease of the
+ *  building. */
+function sandwichLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSandwichLease(extraction, noonOf(today));
+  return r ? sandwichShortLine(r) : "";
+}
+
+/** The reader's buy box's 1031 exchange and the reader's own day
+ *  (lib/reader-day), as the memo route reads them. */
+export interface MemoExchange {
+  block: ExchangeBlock | null | undefined;
+  readerDay: string;
+}
+
+/** The reader's 1031 exchange against the deal (lib/exchange-deal), on the
+ *  reader's own day: the clock and its first flag in one line, and whether a
+ *  date keeps the deal out of the exchange. Null where the caller passes no
+ *  exchange, or its period is over. */
+function exchangeFor(deal: DealRow, extraction: ExtractionResult | null, exchange: MemoExchange | null | undefined) {
+  if (!exchange?.block) return null;
+  const due = (deal as { offers_due?: string | null }).offers_due ?? null;
+  return exchangeForDeal(exchange.block, extraction, due, noonOf(exchange.readerDay));
+}
+
+function taxAbatementLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readTaxAbatement(extraction, noonOf(today));
   return r ? taxAbatementShortLine(r) : "";
 }
 
 /** How the property is sold (lib/sale-terms, #456), in one line for the
  *  memo's header: the auction's bid, premium, reserve and deadline, or who
  *  is selling. "" on a negotiated sale. */
-function saleLineFor(extraction: ExtractionResult | null): string {
-  const r = readSale(extraction);
+function saleLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSale(extraction, noonOf(today));
   return r ? saleShortLine(r) : "";
 }
 
 /** What a hotel is sold with (lib/hotel-deal, #455), in one line for the
  *  memo's header: the flag, the encumbrance, the PIP, the franchise's end.
  *  "" on anything but a hotel. */
-function hotelLineFor(extraction: ExtractionResult | null): string {
-  const r = readHotelDeal(extraction);
+function hotelLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readHotelDeal(extraction, noonOf(today));
   return r ? hotelShortLine(r) : "";
 }
 
@@ -256,6 +378,16 @@ function hotelLineFor(extraction: ExtractionResult | null): string {
  *  for an address the deal has since changed from. The address is the one
  *  the deal page reads the deal at: a blank one the memorandum's, a typed
  *  line its own fields (`addressUpgrade`), the sample's as stored. */
+/** The address the deal page reads the deal at, for the name's fallback: a
+ *  blank one the memorandum's, a typed line its own fields, the sample's as
+ *  stored. */
+function nameAddressOf(deal: DealRow, extraction: ExtractionResult | null): StructuredAddress | null {
+  return (
+    ((deal as { is_sample?: boolean }).is_sample ? null : addressUpgrade(deal.address, extraction)) ??
+    ((deal.address as StructuredAddress | null | undefined) ?? null)
+  );
+}
+
 function floodLineFor(deal: DealRow, extraction: ExtractionResult | null): string {
   const flags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
   const address =
@@ -316,6 +448,37 @@ export type MemoData = {
   /** a self-storage facility's occupancies, rates and platform
    *  (lib/self-storage, #471), in one line; "" on anything else */
   storageLine?: string;
+  /** the rent rules that reach the building — the regime, the regulated
+   *  share as stated and the allowance in force (lib/rent-regulation), in
+   *  one line; "" where none reaches it and the memorandum names none */
+  regulationLine?: string;
+  /** a forward purchase or a build-to-suit bought at delivery — the price
+   *  at delivery, the works the developer's, the yield at delivery, the
+   *  outside date and the deposit (lib/forward-purchase), in one line; "" on
+   *  anything else */
+  forwardLine?: string;
+  /** a mixed-use building's two incomes, the commercial share and the
+   *  commercial space (lib/mixed-use), in one line; "" on anything else */
+  mixedUseLine?: string;
+  /** an operating business on its real estate — what is sold, the
+   *  operator's earnings and the rent's coverage (lib/going-concern), in one
+   *  line; "" on anything else */
+  goingConcernLine?: string;
+  /** condominium units bought in bulk — the units offered of the
+   *  condominium's, a year of their dues and a special assessment
+   *  (lib/condo), in one line; "" on anything else */
+  condoLine?: string;
+  /** a sandwich position — the sublease income against the master rent,
+   *  its cover and the master lease's end (lib/sandwich-lease), in one
+   *  line; "" on anything but a master lease of the building */
+  sandwichLine?: string;
+  /** the reader's 1031 exchange against the deal — its deadlines and the
+   *  first thing the deal and the exchange say together (lib/exchange-deal
+   *  `line`); "" where the reader's buy box holds none, and on every
+   *  document but the reader's own memo */
+  exchangeLine?: string;
+  /** the exchange's line is a date that keeps the deal out of it */
+  exchangeCaution?: boolean;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -350,7 +513,9 @@ export type MemoData = {
   sensitivity: { scenario: string; call: string; note: string }[];
   nextSteps: string[];
   // The buyer's standing criteria, checked deterministically (empty = no box set).
-  buyBox: { label: string; status: "pass" | "near" | "miss" | "unknown" }[];
+  // `note`: what the full report adds beside a chip — the model's own IRR
+  // and its page, where the screen read none (research pass 35).
+  buyBox: { label: string; status: "pass" | "near" | "miss" | "unknown"; note?: string }[];
   // One-line retrade summary ("Caution → Go · Price −$1.8M (−2.5%) · …"), or null.
   sinceLast: string | null;
   /**
@@ -457,8 +622,19 @@ export function buildMemoData(
   branding?: MemoData["branding"],
   overrides?: string[] | null,
   cover?: MemoCover | null,
+  /** the day the memo is read on, an ISO day — the reader's own day
+   *  (lib/reader-day), which the memo and report routes date the document
+   *  and name its file for; it decides the rent allowance in force and the
+   *  other dated lines that take a day. The clock's UTC day where a caller
+   *  passes none. */
+  today: string = new Date().toISOString().slice(0, 10),
+  /** the reader's 1031 exchange (the buy box's) and the reader's own day,
+   *  from the memo route; absent elsewhere — the report's first page and the
+   *  demo carry none */
+  exchange?: MemoExchange | null,
 ): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
+  const dealExchange = exchangeFor(deal, extraction ?? null, exchange);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -494,8 +670,13 @@ export function buildMemoData(
   // memorandum, as every surface reads it.
   const screenYear = screenYearOf(extraction);
   const priceRow = findPriceMetric(metrics ?? [], strategy.kind, screenYear);
+  // A share's basis is the whole building's — its price grossed up over the
+  // building's count — and the basis tag says so under the share's own
+  // price, here as on the pipeline's card, list and CSV (research pass 35: a
+  // reader who divided $33.3M by 248 units found $134k, not $274k).
+  const sold = interestOf(extraction ?? null);
   const priceBasis = extraction && priceRow ? basisTag(extraction, strategy.kind, str(deal.asset_class)) : null;
-  const keyTerms = keyTermRows(metrics, strategy.kind, screenYear, 8, interestOf(extraction ?? null).kind).map((m) => ({
+  const keyTerms = keyTermRows(metrics, strategy.kind, screenYear, 8, sold.kind).map((m) => ({
     label: str(m.label),
     value: str(m.value),
     flagged: !!m.flagged,
@@ -595,9 +776,12 @@ export function buildMemoData(
         for (const r of diff.rows.filter((x) => x.direction !== "flat").slice(0, 3)) {
           parts.push(`${r.label} ${r.delta}`);
         }
+        // With its year: a re-screen across a new year read "(Aug 2)"
+        // with nothing to say which August (research pass 35).
         const when = new Date(diff.at).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
+          year: "numeric",
           timeZone: "UTC",
         });
         sinceLast = pdfSafe(
@@ -610,23 +794,35 @@ export function buildMemoData(
   }
 
   return {
-    name: str(deal.name) || "Deal",
+    // The name as the font can print it — where it cannot without losing a
+    // letter, said so with the address or the market, never the "2" a name
+    // in Japanese had printed as (lib/memo/pdf-text `printableName`). The
+    // report's title, header and metadata read this one.
+    name: printableName(deal.name, [nameAddressOf(deal, extraction ?? null)?.label, extraction?.market]),
     market: str(extraction?.market),
     // On a deal filed "Auto-detect", what the deck turned out to be.
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
-    strategyLine: pdfSafe(strategyLineFor(extraction ?? null, strategy)),
+    strategyLine: pdfSafe(strategyLineFor(extraction ?? null, strategy, shownAssetClass(str(deal.asset_class), extraction ?? null))),
     portfolioLine: pdfSafe(portfolioLineFor(extraction ?? null)),
-    interestLine: pdfSafe(interestLineFor(extraction ?? null)),
-    assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
-    affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
-    singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
-    hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
-    saleLine: pdfSafe(saleLineFor(extraction ?? null)),
-    rosterLine: pdfSafe(rosterLineFor(extraction ?? null)),
+    interestLine: pdfSafe(interestLineFor(extraction ?? null, today)),
+    assumableLine: pdfSafe(assumableLineFor(extraction ?? null, today)),
+    affordableLine: pdfSafe(affordableLineFor(extraction ?? null, today)),
+    regulationLine: pdfSafe(regulationLineFor(deal, extraction ?? null, today)),
+    forwardLine: pdfSafe(forwardLineFor(extraction ?? null, strategy, today)),
+    mixedUseLine: pdfSafe(mixedUseLineFor(extraction ?? null, today)),
+    goingConcernLine: pdfSafe(goingConcernLineFor(extraction ?? null, today)),
+    condoLine: pdfSafe(condoLineFor(extraction ?? null, today)),
+    sandwichLine: pdfSafe(sandwichLineFor(extraction ?? null, today)),
+    exchangeLine: pdfSafe(dealExchange?.line ?? ""),
+    exchangeCaution: dealExchange?.tone === "caution",
+    singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null, today)),
+    hotelLine: pdfSafe(hotelLineFor(extraction ?? null, today)),
+    saleLine: pdfSafe(saleLineFor(extraction ?? null, today)),
+    rosterLine: pdfSafe(rosterLineFor(extraction ?? null, today)),
     valueAddLine: pdfSafe(valueAddLineFor(extraction ?? null)),
-    taxAbatementLine: pdfSafe(taxAbatementLineFor(extraction ?? null)),
+    taxAbatementLine: pdfSafe(taxAbatementLineFor(extraction ?? null, today)),
     sellerNoteLine: pdfSafe(sellerNoteLineFor(extraction ?? null)),
-    siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null)),
+    siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null, today)),
     studentLine: pdfSafe(studentLineFor(extraction ?? null)),
     mhLine: pdfSafe(mhLineFor(extraction ?? null)),
     storageLine: pdfSafe(storageLineFor(extraction ?? null)),
@@ -680,8 +876,15 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Helvetica",
     color: C.ink,
-    lineHeight: 1.32,
   },
+  // The memo's line height, on its content rather than its page: react-pdf
+  // 4.x re-resolves the styles of a page whose fixed nodes need the page
+  // count and re-multiplies a numeric line height each pass, so the full
+  // report's numbered footer ("1 / 10") was drawn far above its own page
+  // under a page-wide 1.32 (the report's other pages set none). The font
+  // size is the page's, which the 1.32 is resolved against here, as it
+  // was on the page: 13.2pt for every line inside, as before.
+  body: { fontSize: 10, lineHeight: 1.32 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -707,7 +910,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: C.brand,
     marginTop: 8,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   titleRow: {
     flexDirection: "row",
@@ -803,14 +1006,17 @@ const s = StyleSheet.create({
   },
   buyBoxMark: { fontSize: 8, fontFamily: "Helvetica-Bold", marginRight: 3 },
   buyBoxLabel: { fontSize: 8, color: C.ink },
+  buyBoxKey: { fontSize: 6.5, color: C.muted, marginBottom: 3, marginLeft: 2 },
 
-  section: { marginTop: 11 },
-  twoCol: { flexDirection: "row", marginTop: 11, gap: 14 },
+  // The sections sit 9pt apart (research pass 35: 11 left the risks and
+  // the next steps a few points short of page one under a wrapped title).
+  section: { marginTop: 9 },
+  twoCol: { flexDirection: "row", marginTop: 9, gap: 14 },
   col: { flex: 1 },
   sectionTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 7,
+    marginBottom: 6,
   },
   sectionTick: {
     width: 3,
@@ -1040,8 +1246,11 @@ export function MemoDocument({ data }: { data: MemoData }) {
   );
 }
 
-/** The memo's single page, exported so the full report can lead with it. */
-export function MemoPage({ data }: { data: MemoData }) {
+/** The memo's single page, exported so the full report can lead with it.
+ *  `pageNumbers`: the full report numbers its memo pages as it numbers
+ *  every other ("1 / 10", research pass 35); the standalone memo keeps its
+ *  own footer, the firm's name where the number would be. */
+export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNumbers?: boolean }) {
   // The class as the label map says it — a stored "self_storage" reads
   // "Self-storage" on paper, never "Self_storage".
   const subParts = [data.market, assetClassLabel(data.assetClass), data.strategyLine ?? ""].filter(Boolean);
@@ -1056,12 +1265,14 @@ export function MemoPage({ data }: { data: MemoData }) {
         <Text
           fixed
           style={s.continued}
+          hyphenationCallback={nameBreaks}
           render={({ pageNumber }) => (pageNumber > 1 ? `${data.name} — screening memo, continued` : "")}
         />
+        <View style={s.body}>
         {/* The masthead: brand and date, the rule, the title and its chip —
-            and, when there is one, the cover aerial at the far right spanning
-            all three rows. It borrows the height the masthead already spends,
-            so a memo that fit one page without it still does. */}
+            and, when there is one, the cover at the far right spanning all
+            three rows. It borrows the height the masthead already spends, so
+            a memo that fit one page without it still does. */}
         <View style={s.masthead}>
           <View style={{ flex: 1 }}>
         <View style={s.header}>
@@ -1082,16 +1293,45 @@ export function MemoPage({ data }: { data: MemoData }) {
           </View>
           <View>
             <Text style={s.metaRight}>Deal Screening Memo</Text>
-            <Text style={s.metaRight}>{data.dateStr}</Text>
-            {data.screened ? <Text style={s.metaRight}>{data.screened}</Text> : null}
+            {/* The export date and the day the call was written share one
+                line (research pass 35): a third line here narrowed the
+                title's column for its whole height. */}
+            <Text style={s.metaRight}>{data.screened ? `${data.dateStr} · ${data.screened}` : data.dateStr}</Text>
           </View>
         </View>
 
         <View style={s.divider} />
 
         <View style={s.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.title}>{data.name}</Text>
+          {/* A name breaks where it can break with nothing drawn — after a
+              URL's slashes — never with a hyphen inside it (`nameBreaks`). */}
+          <Text style={[s.title, { flex: 1 }]} hyphenationCallback={nameBreaks}>
+            {data.name}
+          </Text>
+          {data.verdictWord ? (
+            <View
+              style={[s.titleChipBox, { backgroundColor: data.verdictColor }]}
+            >
+              <Text style={s.titleChipText}>{data.verdictWord}</Text>
+            </View>
+          ) : null}
+        </View>
+          </View>
+          {data.cover ? (
+            <View style={s.coverBox}>
+              {/* react-pdf's Image has no alt concept (print canvas, not DOM) */}
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={data.cover.dataUri} style={s.cover} />
+              <Text style={s.coverCredit}>{pdfSafe(data.cover.credit)}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* The lines under the title run the page's full width, below the
+            masthead and the cover beside it (research pass 35): in the
+            title's column beside the cover every one of them wrapped, and
+            one wrapped line was enough to turn the risks onto a second page. */}
+        <View>
             {subParts.length > 0 && (
               <Text style={s.sub}>{subParts.join("  ·  ")}</Text>
             )}
@@ -1103,9 +1343,18 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.interestLine && (
               <Text style={[s.sub, { color: "#114e54", fontFamily: "Helvetica-Bold" }]}>{data.interestLine}</Text>
             )}
+            {/* A sandwich position (lib/sandwich-lease): the subleases
+                against the master rent, and when the master lease ends. */}
+            {data.sandwichLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.sandwichLine}</Text>}
             {/* How it is sold (#456): an auction's starting bid is where the
                 price starts, and a court's or a lender's sale is as-is. */}
             {data.saleLine && <Text style={[s.sub, { color: "#8a5a00", fontFamily: "Helvetica-Bold" }]}>{data.saleLine}</Text>}
+            {/* A forward purchase (lib/forward-purchase): the price is paid at
+                delivery and the developer funds the works. */}
+            {data.forwardLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.forwardLine}</Text>}
+            {/* An operating business (lib/going-concern): whose earnings
+                these are, and the rent's coverage. */}
+            {data.goingConcernLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.goingConcernLine}</Text>}
             {/* The seller's loan offered for assumption (#419), as stated. */}
             {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
             {/* A note the seller offers to carry (#462), as stated. */}
@@ -1113,6 +1362,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A covenant or a contract that sets the rents (#453): the
                 restricted units' rents move with the limits, not the market. */}
             {data.affordableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.affordableLine}</Text>}
+            {/* The rent rules that reach the building: a regulated unit's
+                rent rises at the regime's allowance, not the market's. */}
+            {data.regulationLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.regulationLine}</Text>}
             {/* The one lease a single-tenant property is (#454): the
                 tenant, its guarantor, the term and the increases. */}
             {data.singleTenantLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.singleTenantLine}</Text>}
@@ -1137,30 +1389,26 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A self-storage facility (#471): the two occupancies and the
                 in-place rent against the street rate. */}
             {data.storageLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.storageLine}</Text>}
+            {/* A mixed-use building (lib/mixed-use): the residential and
+                commercial incomes and the commercial share. */}
+            {data.mixedUseLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.mixedUseLine}</Text>}
+            {/* Condominium units bought in bulk (lib/condo): the buyer's
+                share of the association and a year of its dues. */}
+            {data.condoLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.condoLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}
             {/* FEMA's flood zone at the building (#426): a Special Flood
                 Hazard Area is a cost and a lender's condition. */}
             {data.floodLine && <Text style={[s.sub, { color: "#9b1c1c" }]}>{data.floodLine}</Text>}
-          </View>
-          {data.verdictWord ? (
-            <View
-              style={[s.titleChipBox, { backgroundColor: data.verdictColor }]}
-            >
-              <Text style={s.titleChipText}>{data.verdictWord}</Text>
-            </View>
-          ) : null}
-        </View>
-          </View>
-          {data.cover ? (
-            <View style={s.coverBox}>
-              {/* react-pdf's Image has no alt concept (print canvas, not DOM) */}
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
-              <Image src={data.cover.dataUri} style={s.cover} />
-              <Text style={s.coverCredit}>{pdfSafe(data.cover.credit)}</Text>
-            </View>
-          ) : null}
+            {/* The reader's 1031 exchange against the deal
+                (lib/exchange-deal): a date that keeps the deal out of it in
+                the warning tone. */}
+            {data.exchangeLine && (
+              <Text style={[s.sub, data.exchangeCaution ? { color: "#8a5a00", fontFamily: "Helvetica-Bold" } : { color: "#114e54" }]}>
+                {data.exchangeLine}
+              </Text>
+            )}
         </View>
 
         {data.verdictWord && (
@@ -1207,9 +1455,19 @@ export function MemoPage({ data }: { data: MemoData }) {
                     {chip.mark}
                   </Text>
                   <Text style={s.buyBoxLabel}>{c.label}</Text>
+                  {/* A margin, not a space: a text box's leading space is
+                      trimmed where it meets the label's. */}
+                  {c.note ? <Text style={[s.buyBoxLabel, { color: C.muted, marginLeft: 3 }]}>{`· ${c.note}`}</Text> : null}
                 </View>
               );
             })}
+            {/* The marks' key, the ones the row uses (research pass 35:
+                the chips printed "+, × and — with no legend"). */}
+            <Text style={s.buyBoxKey}>
+              {STATUS_ORDER.filter((st) => data.buyBox.some((c) => c.status === st))
+                .map((st) => `${STATUS_CHIP[st].mark} ${STATUS_WORD[st]}`)
+                .join("  ·  ")}
+            </Text>
           </View>
         )}
 
@@ -1335,8 +1593,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.topRisks.length > 0 && (
               <View style={s.col}>
                 <Text style={s.sectionTitle}>Top risks</Text>
-                {data.topRisks.map((r, i) => (
-                  <View key={i} style={s.row}>
+                {/* The last item ends the page's block: no margin under it. */}
+                {data.topRisks.map((r, i, all) => (
+                  <View key={i} style={i === all.length - 1 ? [s.row, { marginBottom: 0 }] : s.row}>
                     <Text style={s.bullet}>•</Text>
                     <Text style={s.itemText}>{r}</Text>
                   </View>
@@ -1346,8 +1605,8 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.nextSteps.length > 0 && (
               <View style={s.col}>
                 <Text style={s.sectionTitle}>Next steps</Text>
-                {data.nextSteps.map((n, i) => (
-                  <View key={i} style={s.row}>
+                {data.nextSteps.map((n, i, all) => (
+                  <View key={i} style={i === all.length - 1 ? [s.row, { marginBottom: 0 }] : s.row}>
                     <Text style={s.bullet}>{i + 1}.</Text>
                     <Text style={s.itemText}>{n}</Text>
                   </View>
@@ -1399,6 +1658,7 @@ export function MemoPage({ data }: { data: MemoData }) {
             ))}
           </Section>
         )}
+        </View>
 
         <View style={s.footer} fixed>
           <View style={s.footerLeft}>
@@ -1410,9 +1670,13 @@ export function MemoPage({ data }: { data: MemoData }) {
               against source documents.
             </Text>
           </View>
-          <Text style={s.footerText}>
-            {b?.firmName ? pdfSafe(b.firmName) : "Underwrite Copilot"}
-          </Text>
+          {pageNumbers ? (
+            <Text style={s.footerText} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
+          ) : (
+            <Text style={s.footerText}>
+              {b?.firmName ? pdfSafe(b.firmName) : "Underwrite Copilot"}
+            </Text>
+          )}
         </View>
         {branded ? (
           <Text style={s.poweredBy} fixed>

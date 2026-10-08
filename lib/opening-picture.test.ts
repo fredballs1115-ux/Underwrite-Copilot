@@ -7,7 +7,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MarketBand, PAGE_COLUMN_SIZES, PlaceBackdrop, PlaceBand } from "@/app/place-band";
+import { MARKET_BAND_BOXES, MarketBand, PlaceBackdrop, PlaceBand, WINDOW_BOXES, pageColumnBoxes } from "@/app/place-band";
+import { SKYLINES, bandSizes } from "@/lib/skyline";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8");
 const imgOf = (html: string) => /<img\b[^>]*>/.exec(html)?.[0] ?? "";
@@ -51,21 +52,37 @@ describe("a page's opening picture is fetched first", () => {
     }
   });
 
-  it("asks /tools' picture for the width of its column, not the screen's", () => {
-    expect(read("app/tools/page.tsx")).toMatch(/<PlaceBackdrop metro="chicago"[^>]*sizes=\{PAGE_COLUMN_SIZES\}/);
-    const html = renderToStaticMarkup(React.createElement(PlaceBackdrop, { metro: "chicago", sizes: PAGE_COLUMN_SIZES }));
-    expect(imgOf(html)).toContain(`sizes="${PAGE_COLUMN_SIZES}"`);
-    // The same measure the market bands, in the same column, ask for.
+  it("asks /tools' picture for the width it is drawn in its column, not the screen's", () => {
+    // The band's own heights, held to its classes: 15rem, 18rem from sm.
+    const tools = read("app/tools/page.tsx");
+    expect(tools).toMatch(/<PlaceBackdrop metro="chicago"[^>]*boxes=\{pageColumnBoxes\(240, 288\)\}/);
+    expect(tools).toMatch(/<section className="[^"]*\bmin-h-\[15rem\][^"]*\bsm:min-h-\[18rem\]/);
+    const boxes = pageColumnBoxes(240, 288);
+    const html = renderToStaticMarkup(React.createElement(PlaceBackdrop, { metro: "chicago", boxes }));
+    // Chicago's 2.4:1 frame is drawn wider than a phone's 240px band.
+    expect(imgOf(html)).toContain(`sizes="${bandSizes(SKYLINES.chicago, boxes)}"`);
+    expect(bandSizes(SKYLINES.chicago, boxes)).toMatch(/(?:^|, )576px$/);
+    // The market bands, in the same column, ask by their own heights.
     const band = renderToStaticMarkup(React.createElement(MarketBand, { metro: "chicago", eyebrow: "x", name: "y" }));
-    expect(imgOf(band)).toContain(`sizes="${PAGE_COLUMN_SIZES}"`);
+    expect(imgOf(band)).toContain(`sizes="${bandSizes(SKYLINES.chicago, MARKET_BAND_BOXES)}"`);
+    // The sign-in page's band is the window, so its panorama is asked for
+    // by the window's height wherever the window is the narrower shape.
+    expect(read("app/login/page.tsx")).toMatch(/<PlaceBackdrop metro="baltimore"[^>]*boxes=\{WINDOW_BOXES\}/);
+    const login = renderToStaticMarkup(React.createElement(PlaceBackdrop, { metro: "baltimore", scrim: "center", boxes: WINDOW_BOXES }));
+    expect(imgOf(login)).toContain('sizes="(max-aspect-ratio: 7988/3495) calc(100vh * 2.286), 100vw"');
+    // A band that says nothing of its box (the homepage's hero) keeps the
+    // window's width.
+    expect(imgOf(renderToStaticMarkup(React.createElement(PlaceBackdrop, { metro: "chicago" })))).toContain('sizes="100vw"');
   });
 
   it("keeps the fallback to the overhead when the photograph fails before hydration", () => {
     // Asked for first, the picture can fail before any listener is
-    // attached; the component checks on mount as DealBanner does.
-    const src = read("app/city-photo.tsx");
+    // attached; the component checks on mount as DealBanner does. The
+    // check lives in CityPhoto's client half (app/city-photo-view), which
+    // is handed both pictures resolved on the server.
+    const src = read("app/city-photo-view.tsx");
     expect(src).toMatch(/img\?\.complete \|\| img\.naturalWidth > 0\) return;/);
-    expect(src).toContain('m === "skyline" && view ? "aerial" : "none"');
-    expect(src).toContain('onError={() => setMode(skyline && view ? "aerial" : "none")}');
+    expect(src).toContain('m === "skyline" && hasAerial ? "aerial" : "none"');
+    expect(src).toContain('onError={() => setMode(mode === "skyline" && hasAerial ? "aerial" : "none")}');
   });
 });

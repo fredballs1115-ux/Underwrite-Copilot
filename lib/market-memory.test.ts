@@ -452,8 +452,8 @@ describe("implausible extracted figures don't pollute the ranges", () => {
 
 describe("range formatting", () => {
   it("cap range collapses when the ends coincide", () => {
-    expect(fmtCapRange({ min: 5.0, median: 5.2, max: 5.4 })).toBe("5.0–5.4%");
-    expect(fmtCapRange({ min: 5.2, median: 5.2, max: 5.2 })).toBe("5.2%");
+    expect(fmtCapRange({ min: 5.0, median: 5.2, max: 5.4 })).toBe("5.00–5.40%");
+    expect(fmtCapRange({ min: 5.2, median: 5.2, max: 5.2 })).toBe("5.20%");
   });
   it("basis range shares the unit suffix", () => {
     expect(fmtBasisRange({ min: 250_000, median: 275_000, max: 300_000, basis: "unit" })).toBe("$250–300k/unit");

@@ -33,8 +33,9 @@ export const ACCOUNT_EXISTS =
 const COPY = {
   wrongPassword: "Wrong email or password. If you're new, switch to Create account.",
   confirmFirst: "Confirm your email first — check your inbox for the link.",
-  weakPassword:
-    "That password is too weak — use at least 8 characters with a mix of letters, numbers and symbols.",
+  // Said only where the service gives no reasons: never a rule the
+  // project's own settings may not hold (`weakPasswordCopy`).
+  weakPassword: "That password is too weak — choose a longer, less common one.",
   longPassword: "That password is too long — keep it under 72 characters.",
   badEmail: "That doesn't look like a valid email address — check it and try again.",
   signupsClosed: `New sign-ups are closed right now — email ${SUPPORT} and we'll set you up.`,
@@ -63,6 +64,15 @@ const GENERIC: Record<AuthIntent, string> = {
   resend: "Something went wrong sending the confirmation link — please try again.",
   password: "Something went wrong saving your new password — please try again.",
 };
+
+/** What the page says once an account is created and waits for its
+ *  confirmation link: the address it went to, so a mistyped one is seen
+ *  (the form keeps it, to correct and send again), and that the link
+ *  signs the person in only in this browser — the sign-up's code verifier
+ *  lives in its cookies (research pass 32). */
+export function accountCreatedNotice(email: string): string {
+  return `Account created. We sent a confirmation link to ${email} — open it in this browser to confirm your email and sign in. Not your address? Correct it and create the account again.`;
+}
 
 /** What the page says once a fresh confirmation link is asked for. The auth
  *  service answers alike for an address waiting to be confirmed, one already
@@ -98,8 +108,79 @@ function emailLimitCopy(message: string): string {
  * and its message second (older responses carry no code), with a fallback
  * that names what the person was trying to do.
  */
+/** The character classes a weak-password message lists, as a person says
+ *  them. The service's `characters` reason names the classes the project
+ *  requires, as the characters themselves. */
+const CHARACTER_CLASSES: [RegExp, string][] = [
+  [/abcdefghijklmnopqrstuvwxyz/, "a lower-case letter"],
+  [/ABCDEFGHIJKLMNOPQRSTUVWXYZ/, "an upper-case letter"],
+  [/0123456789/, "a number"],
+  [/[!@#$%^&*][!@#$%^&*()_+\-=[\]{};':"|<>?,./`~]{3,}/, "a symbol"],
+];
+
+/** One required set of the service's list, said as the characters it lets
+ *  through: a set holding both alphabets is "a letter", never a demand for
+ *  both cases (its "Letters and digits" setting is one set of both, beside
+ *  the digits), and a set mixing kinds is any one of them. Null where the set
+ *  is none the copy can name. */
+function requiredSetWords(set: string): string | null {
+  const lower = set.includes("abcdefghijklmnopqrstuvwxyz");
+  const upper = set.includes("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+  const words: string[] = [];
+  if (lower && upper) words.push("a letter");
+  else if (lower) words.push("a lower-case letter");
+  else if (upper) words.push("an upper-case letter");
+  if (set.includes("0123456789")) words.push("a number");
+  if (/[!@#$%^&*]/.test(set)) words.push("a symbol");
+  return words.length > 0 ? words.join(" or ") : null;
+}
+
+/** The kinds of characters the message's list asks for, a set at a time
+ *  ("…at least one character of each: <set>, <set>"); null where the message
+ *  carries no list, or a set the copy cannot name. A symbol set holds a comma
+ *  but never a comma before a space, so the list splits on ", ". */
+function requiredKinds(message: string): string[] | null {
+  const at = /\beach:\s*/i.exec(message);
+  if (!at) return null;
+  const sets = message.slice(at.index + at[0].length).trim().split(", ").filter((x) => x.length > 0);
+  if (sets.length === 0) return null;
+  const words = sets.map(requiredSetWords);
+  return words.every((w): w is string => w != null) ? words : null;
+}
+
+/**
+ * A weak password, said by the reasons the auth service gives
+ * (`AuthWeakPasswordError.reasons`: length, characters, pwned) and the
+ * figures its own message states — never a rule the project's settings may
+ * not hold. The sentence had promised "at least 8 characters with a mix of
+ * letters, numbers and symbols" to every weak password alike, a rule the
+ * project's policy may not ask for (research pass 32).
+ */
+export function weakPasswordCopy(err: { message?: string | null; reasons?: readonly string[] | null }): string {
+  const message = err.message ?? "";
+  const reasons = err.reasons ?? [];
+  const parts: string[] = [];
+  if (reasons.includes("length")) {
+    const n = /at least (\d+) characters/i.exec(message)?.[1];
+    parts.push(n ? `use at least ${n} characters` : "make it longer");
+  }
+  if (reasons.includes("characters")) {
+    const kinds =
+      requiredKinds(message) ?? CHARACTER_CLASSES.filter(([re]) => re.test(message)).map(([, words]) => words);
+    parts.push(
+      kinds.length === 0
+        ? "include the kinds of characters the sign-in service asks for"
+        : `include at least ${kinds.length === 1 ? kinds[0] : `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}`}`,
+    );
+  }
+  if (reasons.includes("pwned")) parts.push("choose one that hasn't appeared in a known data breach");
+  if (parts.length === 0) return COPY.weakPassword;
+  const said = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+  return `That password is too weak — ${said}.`;
+}
+
 export function authErrorCopy(
-  err: { message?: string | null; code?: string | null },
+  err: { message?: string | null; code?: string | null; reasons?: readonly string[] | null },
   intent: AuthIntent,
 ): string {
   const code = err.code ?? "";
@@ -114,7 +195,7 @@ export function authErrorCopy(
     case "email_exists":
       return ACCOUNT_EXISTS;
     case "weak_password":
-      return COPY.weakPassword;
+      return weakPasswordCopy(err);
     case "email_address_invalid":
       return COPY.badEmail;
     case "email_address_not_authorized":
@@ -147,7 +228,7 @@ export function authErrorCopy(
       return COPY.linkExpired;
     case "validation_failed":
       if (m.includes("72 characters")) return COPY.longPassword;
-      if (m.includes("password")) return COPY.weakPassword;
+      if (m.includes("password")) return weakPasswordCopy(err);
       if (m.includes("email")) return COPY.badEmail;
       return GENERIC[intent];
   }
@@ -163,7 +244,7 @@ export function authErrorCopy(
   if (m.includes("should be different from the old password")) return COPY.samePassword;
   if (m.includes("requires reauthentication")) return COPY.reauthenticate;
   if (m.includes("password should") || m.includes("password is too weak") || m.includes("weak password"))
-    return COPY.weakPassword;
+    return weakPasswordCopy(err);
   if (m.includes("signups not allowed") || m.includes("signup is disabled")) return COPY.signupsClosed;
   if (m.includes("invalid format") || m.includes("unable to validate email") || m.includes("is invalid"))
     return COPY.badEmail;
@@ -289,6 +370,112 @@ export function landingAfterFailedExchange(next: string | null, hadCode: boolean
   return "/login?link=expired";
 }
 
+/**
+ * The email links a click-through page verifies by their token hash
+ * (supabase-js's `EmailOtpType`): `/auth/confirm` shows one button and
+ * verifies only when it is pressed. A link a corporate scanner fetches to
+ * check it (Outlook's Safe Links and its kind) then uses nothing up, and a
+ * reset asked for on a laptop opens on a phone, since the hash needs no code
+ * verifier in the browser that asked (research pass 32; the email templates
+ * pointing here are the owner's to set).
+ *
+ * Only the kinds the app sends (research pass 39): a sign-up's confirmation
+ * (app/login/actions `signUp` and `resend`, its template's `type=signup`, or
+ * `email` as the auth service's own guide writes it) and a password reset
+ * (`resetPasswordForEmail`, `recovery`). The app sends no invite (a team's
+ * invite is a link of its own, `/team/join/<token>`, minted on the Team
+ * page), no magic link and no email change, so a link of those kinds is
+ * none of ours and is refused before the auth service is asked.
+ */
+export const EMAIL_LINK_TYPES = ["signup", "email", "recovery"] as const;
+export type EmailLinkType = (typeof EMAIL_LINK_TYPES)[number];
+
+/** A link's `type`, or null for one the page does not verify. */
+export function emailLinkTypeOf(raw: string | null | undefined): EmailLinkType | null {
+  return (EMAIL_LINK_TYPES as readonly string[]).includes(raw ?? "") ? (raw as EmailLinkType) : null;
+}
+
+/** A token hash as a link carries it: letters, digits, `-` and `_`, of a
+ *  sane length — anything else is refused before the auth service is asked. */
+export function isTokenHash(raw: string | null | undefined): raw is string {
+  return typeof raw === "string" && /^[A-Za-z0-9_-]{16,512}$/.test(raw);
+}
+
+/** What `/auth/confirm` says, and its one button, by the link's kind. */
+export function confirmPageCopy(type: EmailLinkType): { heading: string; body: string; button: string } {
+  if (type === "recovery") {
+    return {
+      heading: "Set a new password",
+      body: "Continue to sign in and choose a new password on your Account page.",
+      button: "Continue",
+    };
+  }
+  return { heading: "Confirm your email", body: "Confirm your email address to finish setting up your account.", button: "Confirm my email" };
+}
+
+/** Where `/auth/confirm` sends the person: on a verified link, where a
+ *  code's exchange would (`landingAfterExchange`); on a refused one, to the
+ *  sign-in page's banner for that kind of link, the page it carried riding
+ *  along. */
+export function landingAfterConfirm(type: EmailLinkType, next: string | null, ok: boolean): string {
+  if (ok) return landingAfterExchange(next, type === "recovery" ? "recovery" : null);
+  if (type === "recovery") return "/login?link=expired";
+  const onward = onwardPath(next);
+  return `/login?confirmed=1&link=expired${onward ? `&next=${encodeURIComponent(onward)}` : ""}`;
+}
+
+/**
+ * The same link, asking first (research pass 39): pressed in a browser that
+ * is already signed in, `/auth/confirm` verifies nothing and signs nobody
+ * out — it shows who is signed in and asks, and only a second press signs
+ * that account out of this browser and verifies the link. A token hash needs
+ * no code verifier from the browser that asked for it, so a link made for
+ * one account can be opened in another account's browser.
+ */
+export function confirmSwitchPath(type: EmailLinkType, tokenHash: string, next: string | null): string {
+  const q = new URLSearchParams({ token_hash: tokenHash, type, switch: "1" });
+  const safe = safeNextPath(next);
+  if (safe) q.set("next", safe);
+  return `/auth/confirm?${q.toString()}`;
+}
+
+/** What `/auth/confirm` asks before a link replaces the account `email`
+ *  signed in to this browser — or, where the session could not be read to
+ *  name it, whatever account is signed in here. */
+export function confirmSwitchCopy(
+  type: EmailLinkType,
+  email: string | null,
+): { heading: string; body: string; button: string; stay: string } {
+  const does =
+    type === "recovery"
+      ? // It signs in; the new password is set on the page it lands on (the
+        // audit C3b LOW-3: it had said the link itself sets one).
+        "This link signs this browser in to the account it was sent to, and takes you on to set its new password."
+      : "This link confirms the account it was sent to, and signs this browser in to that account.";
+  // The second press signs out whoever is signed in here, the same account
+  // included (app/auth/confirm/actions.ts), so the words name no condition.
+  if (!email) {
+    return {
+      heading: "This browser may be signed in already",
+      body: `${does} Continuing signs out whoever is signed in here first.`,
+      button: "Sign out and continue",
+      stay: "Keep the account signed in here",
+    };
+  }
+  return {
+    heading: `You’re signed in as ${email}`,
+    body: `${does} Continuing signs ${email} out of this browser first.`,
+    button: "Sign out and continue",
+    stay: `Stay signed in as ${email}`,
+  };
+}
+
+/** Where a verified link lands: `/auth/confirm` naming the account now
+ *  signed in, with "not you?" beside it and the way on to `landing`. */
+export function confirmedPath(landing: string): string {
+  return `/auth/confirm?signed_in=1&next=${encodeURIComponent(safeNextPath(landing) ?? "/deals")}`;
+}
+
 export type LinkBanner = { tone: "ok" | "warn"; text: string };
 
 export const CONFIRM_LINK_FAILED =
@@ -327,10 +514,16 @@ export function initialLoginMode(params: {
   mode?: string | null;
   link?: string | null;
   confirmed?: string | null;
+  next?: string | null;
 }): LoginMode {
   if (params.mode === "signup") return "signup";
   if (params.mode === "reset") return "reset";
+  if (params.mode === "signin") return "signin";
   // A refused reset link opens straight on "email me a new one".
   if (params.link === "expired" && !params.confirmed) return "reset";
+  // A signed-out invitee is sent here on the way to the invite: most are new
+  // to the site, so the page opens on Create account, a tab away from Sign
+  // in (research pass 32).
+  if (safeNextPath(params.next ?? null)?.startsWith("/team/join/")) return "signup";
   return "signin";
 }

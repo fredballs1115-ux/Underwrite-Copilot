@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { UPLOAD_MAX_BYTES, sizeAgainstLimit, tooLargeMessage, wrongTypeMessage } from "./upload-limit";
+import { TOO_LARGE_REMEDY, UPLOAD_MAX_BYTES, sizeAgainstLimit, tooLargeMessage, wrongTypeMessage } from "./upload-limit";
 
 const MB = 1024 * 1024;
 
@@ -41,6 +41,22 @@ describe("a file over the limit never reads as equal to it", () => {
     const odd = sizeAgainstLimit(1_000_001, 1_000_000);
     expect(odd.size).toBeNull();
     expect(tooLargeMessage("a.pdf", 1_000_001, 1_000_000)).toContain("is just over the 1 MB limit");
+  });
+});
+
+describe("what to do with a file too large is said by what the file is (research pass 32)", () => {
+  it("never tells a memorandum to be split, which would screen part of it", () => {
+    const om = tooLargeMessage("deck.pdf", Math.round(40 * MB), UPLOAD_MAX_BYTES, "memorandum");
+    expect(om).toBe(`"deck.pdf" is 40 MB — over the 32 MB limit. ${TOO_LARGE_REMEDY.memorandum}`);
+    expect(om).not.toMatch(/splitting/);
+    expect(tooLargeMessage("p.jpg", Math.round(13 * MB), 12 * MB, "picture")).toMatch(/Try a smaller copy\.$/);
+  });
+
+  it("the memorandum's pickers ask for it", () => {
+    const src = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
+    expect(src("app/(app)/deals/pipeline.tsx")).toMatch(/name="om"[\s\S]{0,200}tooLarge="memorandum"/);
+    expect(src("app/(app)/deals/[id]/replace-om.tsx")).toContain('"memorandum")');
+    expect(src("app/(app)/deals/[id]/replace-picture.tsx")).toContain('"picture")');
   });
 });
 

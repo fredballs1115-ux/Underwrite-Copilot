@@ -9,14 +9,16 @@ import {
   floodSwatchBorder,
   type FloodClassKey,
 } from "@/lib/flood-style";
-import { photographerParts } from "@/lib/credit-parts";
+import { photographerParts, type CreditPart } from "@/lib/credit-parts";
+import { OSM_LOCATION_PARTS } from "@/lib/basemaps";
 import { CreditPartsText } from "@/app/credit-parts";
 import { MarketCaption } from "../market-caption";
 import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 import { previewStyle } from "@/lib/photo-preview";
-import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER } from "@/lib/image-frames";
+import { mosaicRepeats, photoControlOn } from "@/lib/property-views";
+import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER, FLOOD_STRIP, FLOOD_VIEW, FLOOD_VIEW_2X, FLOOD_VIEWER } from "@/lib/image-frames";
 import {
   headerPhotoSizes,
   mosaicTileSizes,
@@ -63,7 +65,9 @@ import {
  *
  * It is the deal header's picture (#433, `DealHero`): no card of its own,
  * beside the name and the figures where the header is wide and above them
- * where it is not, with the reader's Replace photo on the picture itself.
+ * where it is not, with the reader's Replace photo on the photograph itself
+ * — never over an overhead, the flood map, the market's photograph or the
+ * map (lib/property-views `photoControlOn`).
  *
  * The Flood tab (#425) is the deal's flood frame (#472, lib/flood-map): the
  * USGS aerial at a wider frame, calmed, with FEMA's flood zones drawn over it
@@ -120,9 +124,10 @@ type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "
  *  22), so this page and its route cannot drift apart. */
 const AERIAL = DEAL_AERIAL_VIEW;
 const VIEWER = DEAL_AERIAL_VIEWER;
-/** The Flood view's crop of the deal's flood frame (#472): the view's own
- *  16:9, so nothing the key describes is cut away by the box. */
-const FLOOD_VIEW = { w: 1280, h: 720 };
+// The Flood view's crops of the deal's flood frame (#472) — the view's own
+// 16:9 at 1x and 2x, the filmstrip's and the viewer's whole frame — are
+// lib/image-frames' own, the only sizes the flood route cuts (research pass
+// 39), so this page and its route cannot drift apart.
 
 /** Every view's frame, read against the deal header it sits in (#433): 16:9
  *  on a phone, a wider band where the header stacks at a tablet's width (so
@@ -138,11 +143,15 @@ const MOSAIC =
 /** The cover inside the mosaic: the frame's own shape on a phone, the
  *  mosaic's full height beside the tiles. */
 const MOSAIC_COVER = "aspect-[16/9] @2xl:aspect-auto @2xl:h-full";
+/** A link inside a credit drawn over a picture. */
+const OSM_LINK = "underline decoration-dotted underline-offset-2 hover:text-white";
 
 export function PropertyVisual({
   dealId,
   label,
   hasStreetAddress,
+  pointIsBuilding = hasStreetAddress,
+  osmPlaced = false,
   googleEnabled,
   hasAddress = true,
   picture = null,
@@ -156,6 +165,17 @@ export function PropertyVisual({
   label: string;
   /** street-level imagery is only honest for a street-level address */
   hasStreetAddress: boolean;
+  /** the aerial's centre is the building: a street address the geocoder
+   *  placed at the house (lib/deal-location `pointIsBuilding`). Only then is
+   *  it ringed — a street's centreline or a town's centre is never the
+   *  building (the batch-2 audit). */
+  pointIsBuilding?: boolean;
+  /** Photon — a geocoder on OpenStreetMap's data — placed the deal's point,
+   *  the Census geocoder having found nothing (lib/deal-location
+   *  `placedByOpenStreetMap`): the aerial and the flood view, each framed on
+   *  that point, credit OpenStreetMap beside their own credit (the batch-2
+   *  audit, LOW-8) */
+  osmPlaced?: boolean;
   /** GOOGLE_MAPS_API_KEY is set (checked server-side) — unlocks the Street
    *  photo AND the sharp satellite frame, which are separate Google APIs */
   googleEnabled: boolean;
@@ -321,14 +341,14 @@ export function PropertyVisual({
   // filmstrip's, and the viewer's whole frame — each retry a new URL.
   const floodR = floodTry ? `&r=${floodTry}` : "";
   const floodView = flood ? `${flood.src}&w=${FLOOD_VIEW.w}&h=${FLOOD_VIEW.h}${floodR}` : "";
-  const floodView2x = flood ? `${flood.src}&w=${FLOOD_VIEW.w * 2}&h=${FLOOD_VIEW.h * 2}${floodR}` : "";
+  const floodView2x = flood ? `${flood.src}&w=${FLOOD_VIEW_2X.w}&h=${FLOOD_VIEW_2X.h}${floodR}` : "";
   const thumbs: Record<string, { src: string | null; fail: () => void }> = {
     photo: { src: `/api/deals/${dealId}/picture?size=hero`, fail: () => setPhotoGone(true) },
     street: { src: `/api/deals/${dealId}/photo`, fail: () => setStreetGone(true) },
     market: { src: market?.src ?? null, fail: () => setMarketGone(true) },
     satellite: { src: `/api/deals/${dealId}/aerial?src=satellite&w=${AERIAL.w}&h=${AERIAL.h}`, fail: () => setSatelliteGone(true) },
     aerial: { src: aerialSrc, fail: () => setAerialGone(true) },
-    flood: { src: flood && floodState !== "failed" ? `${flood.src}&w=192&h=108${floodR}` : null, fail: onFloodError },
+    flood: { src: flood && floodState !== "failed" ? `${flood.src}&w=${FLOOD_STRIP.w}&h=${FLOOD_STRIP.h}${floodR}` : null, fail: onFloodError },
     map: { src: null, fail: () => {} },
     // A gallery photograph's place in the filmstrip is its stored 240px
     // crop: its full-size picture waits for its view to be opened.
@@ -345,6 +365,12 @@ export function PropertyVisual({
   const coverSrcSet = photoSrcSet((size) => `/api/deals/${dealId}/picture?size=${size}`, picture);
   const gallerySrcSet = (g: StoredPhotoSizes & { i: number }) =>
     photoSrcSet((size) => `/api/deals/${dealId}/picture?size=${size}&g=${g.i}`, g);
+
+  // A picture framed on a point Photon placed names OpenStreetMap after its
+  // own credit (lib/basemaps `OSM_LOCATION_PARTS`); nothing otherwise.
+  const osmCredit: readonly CreditPart[] = osmPlaced ? [" · ", ...OSM_LOCATION_PARTS] : [];
+  // Where the flood zone is read: the building only where the point is its own.
+  const floodWhere = pointIsBuilding ? "at the building" : "at the frame's centre";
 
   // The full-screen viewer's pictures (#445): the views the page has, the
   // map apart, each credited exactly as its own view is.
@@ -414,11 +440,14 @@ export function PropertyVisual({
             label: v.label,
             src: viewerAerial,
             alt: `Aerial photograph of ${label}`,
-            credit: hasStreetAddress
-              ? "Imagery: USGS The National Map"
-              : "Imagery: USGS The National Map · neighborhood placement, no street address on this deal",
+            credit: [
+              hasStreetAddress
+                ? "Imagery: USGS The National Map"
+                : "Imagery: USGS The National Map · neighborhood placement, no street address on this deal",
+              ...osmCredit,
+            ],
             thumb,
-            ring: hasStreetAddress,
+            ring: pointIsBuilding,
           },
         ];
       case "flood":
@@ -428,11 +457,13 @@ export function PropertyVisual({
                 id: v.id,
                 label: v.label,
                 // The whole frame, at the pixels it is drawn at.
-                src: `${flood.src}&w=${VIEWER.w * 2}&h=${VIEWER.h * 2}${floodR}`,
+                src: `${flood.src}&w=${FLOOD_VIEWER.w}&h=${FLOOD_VIEWER.h}${floodR}`,
                 alt: `Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones drawn over it`,
-                credit: "FEMA flood zones · USGS imagery",
+                credit: ["FEMA flood zones · USGS imagery", ...osmCredit],
                 thumb,
-                ring: true,
+                // The frame is drawn around the deal's point, which is the
+                // building only where the geocoder placed it at the house.
+                ring: pointIsBuilding,
               },
             ]
           : [];
@@ -448,6 +479,15 @@ export function PropertyVisual({
   const tiles = photoPossible ? galleryLive.slice(0, 2) : [];
   const mosaic = tiles.length === 2;
   const moreCount = photoIds.length - 3;
+  // The filmstrip leaves out what the mosaic shows, from the header's @2xl
+  // (the mosaic's own breakpoint, on the same @container) and only while the
+  // mosaic is on screen (lib/property-views); a strip left with nothing to
+  // add there goes too.
+  const repeats = mosaicRepeats(
+    views.map((v) => v.id),
+    { mosaic: mosaic ? ["photo", ...tiles.map((g) => g.id)] : [], active },
+  );
+  const stripAt2xl = views.length - repeats.size;
   // The Flood view's key (#472): the zones the view's crop actually shows,
   // read off the frame when it was drawn, the building's own first.
   const floodKeyList: { key: FloodClassKey; here: boolean }[] | null = floodClasses
@@ -524,7 +564,7 @@ export function PropertyVisual({
                         }
                         title={g.credit}
                         data-mosaic-tile={g.i}
-                        className="group/tile relative min-h-0 cursor-zoom-in overflow-hidden bg-faint focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
+                        className="group/tile relative min-h-0 cursor-zoom-in overflow-hidden bg-faint"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- proxied, auth-scoped route serving the stored derivative */}
                         <img
@@ -649,12 +689,13 @@ export function PropertyVisual({
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
               Imagery: USGS The National Map
+              <CreditPartsText parts={osmCredit} linkClassName={OSM_LINK} />
             </span>
             {/* The overhead is drawn at the photograph's own grain (#429), a
                 block or two across, so a street address's building is ringed
                 at the frame's centre — never a neighbourhood placement's,
                 whose centre is a district's. */}
-            {hasStreetAddress && (
+            {pointIsBuilding && (
               <span
                 aria-hidden
                 data-picture="aerial-pin"
@@ -699,7 +740,7 @@ export function PropertyVisual({
                     key={floodTry}
                     ref={floodImg}
                     src={floodView}
-                    srcSet={`${floodView} ${FLOOD_VIEW.w}w, ${floodView2x} ${FLOOD_VIEW.w * 2}w`}
+                    srcSet={`${floodView} ${FLOOD_VIEW.w}w, ${floodView2x} ${FLOOD_VIEW_2X.w}w`}
                     sizes="(min-width: 64rem) 50vw, 100vw"
                     alt={`Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones drawn over it`}
                     width={FLOOD_VIEW.w}
@@ -722,20 +763,23 @@ export function PropertyVisual({
                   )}
                   {floodState === "ready" && (
                     <>
-                      {/* The frame is drawn around the building's location. */}
-                      <span
-                        aria-hidden
-                        data-picture="flood-pin"
-                        className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.45),0_1px_6px_rgba(0,0,0,0.5)]"
-                      >
-                        <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
-                      </span>
+                      {/* The frame is drawn around the deal's point, ringed
+                          only where that point is the building's own. */}
+                      {pointIsBuilding && (
+                        <span
+                          aria-hidden
+                          data-picture="flood-pin"
+                          className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.45),0_1px_6px_rgba(0,0,0,0.5)]"
+                        >
+                          <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+                        </span>
+                      )}
                       {flood.zone ? (
                         <span
                           data-picture="flood-zone"
                           className="absolute bottom-0 left-0 rounded-tr bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white"
                         >
-                          {`${flood.zone} at the building`}
+                          {`${flood.zone} ${floodWhere}`}
                         </span>
                       ) : null}
                     </>
@@ -744,6 +788,7 @@ export function PropertyVisual({
               )}
               <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
                 FEMA flood zones · USGS imagery
+                <CreditPartsText parts={osmCredit} linkClassName={OSM_LINK} />
               </span>
             </div>
             <div className="border-t border-line px-4 py-3">
@@ -760,7 +805,7 @@ export function PropertyVisual({
                             className="h-3.5 w-3.5 shrink-0 rounded-sm border-[1.5px]"
                             style={{ background: floodSwatchBackground(style), borderColor: floodSwatchBorder(style) }}
                           />
-                          <span>{k.here ? `${FLOOD_CLASS_LABEL[k.key]} — at the building` : FLOOD_CLASS_LABEL[k.key]}</span>
+                          <span>{k.here ? `${FLOOD_CLASS_LABEL[k.key]} — ${floodWhere}` : FLOOD_CLASS_LABEL[k.key]}</span>
                         </li>
                       );
                     })}
@@ -806,7 +851,7 @@ export function PropertyVisual({
             aria-label={`See the pictures of ${label} full screen`}
             title="Full screen"
             data-picture="expand"
-            className="absolute left-2 top-2 z-[5] flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className="absolute left-2 top-2 z-[5] flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-on-photo"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
               <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
@@ -827,7 +872,7 @@ export function PropertyVisual({
                 : `See the ${photoIds.length} photographs of ${label}`
             }
             data-picture="photo-count"
-            className="absolute left-12 top-2 z-[5] flex h-8 items-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className="absolute left-12 top-2 z-[5] flex h-8 items-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-on-photo"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-3.5 w-3.5">
               <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
@@ -837,21 +882,28 @@ export function PropertyVisual({
           </button>
         )}
 
-        {/* "That's not the building": on the picture itself, where a cover
-            photograph's own control sits — never over the map, whose corner
-            belongs to its controls. */}
-        {canReplace && active !== "map" && !(mosaic && active === "photo") && (
+        {/* "That's not the building": on the photograph itself, where a
+            cover photograph's own control sits — never over the aerial,
+            FEMA's flood map, the market's photograph or the map
+            (lib/property-views). A deal with no photograph of its own on
+            screen is offered "Add photo" on the picture that leads. */}
+        {canReplace && photoControlOn(active, { photos: photoIds, ownPhoto: photoPossible, mosaic }) && (
           <div className="absolute right-2 top-2 z-[5]">
-            <ReplacePicture dealId={dealId} hasPicture={!!picture} tone="overlay" />
+            <ReplacePicture dealId={dealId} hasPicture={photoPossible} tone="overlay" />
           </div>
         )}
       </div>
 
       {/* The views as a filmstrip (#432), the way a listing shows its
           photographs: each one's own picture under its name, the one on
-          screen ringed. */}
+          screen ringed — and, beside the mosaic, only the views the mosaic
+          does not already show (research pass 29). */}
       {views.length > 1 && (
-        <div role="group" aria-label="Views of the property" className="flex gap-2 overflow-x-auto border-t border-line bg-faint/60 px-3 py-2.5">
+        <div
+          role="group"
+          aria-label="Views of the property"
+          className={`flex gap-2 overflow-x-auto border-t border-line bg-faint/60 px-3 py-2.5${stripAt2xl === 0 ? " @2xl:hidden" : ""}`}
+        >
           {views.map((v) => {
             const t = thumbs[v.id];
             const on = active === v.id;
@@ -864,7 +916,7 @@ export function PropertyVisual({
                 data-view-thumb={v.id}
                 className={`group relative h-14 w-24 shrink-0 overflow-hidden rounded-lg border bg-surface text-left transition ${
                   on ? "border-brand ring-2 ring-brand" : "border-line opacity-80 hover:opacity-100"
-                }`}
+                }${repeats.has(v.id) ? " @2xl:hidden" : ""}`}
               >
                 {t.src ? (
                   // eslint-disable-next-line @next/next/no-img-element -- the view's own URL, cached by the browser once for both

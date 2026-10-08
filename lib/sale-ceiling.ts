@@ -25,7 +25,9 @@ export interface SaleCeiling {
   /** the most the model pays all-in, and the hammer that allows it */
   maxAllIn: number | null;
   hammer: number | null;
-  /** the model still clears the hurdle at the solver's own ceiling */
+  /** the model still clears the hurdle at the top of the range the solver
+   *  searched (`MAX_BID_SEARCH_X` times the modelled price): `maxAllIn` is
+   *  then a floor of what it pays, its own ceiling above the range */
   unbounded: boolean;
   hurdlePct: number;
 }
@@ -36,13 +38,16 @@ export function saleCeiling(
   extraction: ExtractionResult | null | undefined,
   inputs: UnderwriteInputs,
   hurdlePct: number = SALE_HURDLE_PCT,
+  /** the day the sale is read on (a bid deadline's countdown): the
+   *  caller's, as the page's sale panel reads it; absent, the clock's */
+  asOf: Date = new Date(),
 ): SaleCeiling | null {
-  const sale = readSale(extraction);
+  const sale = readSale(extraction, asOf);
   if (!sale) return null;
   const solved = solveMaxBid(inputs, { minIrr: hurdlePct / 100 });
   const maxAllIn = solved.price != null && solved.price > 0 ? solved.price : null;
   return {
-    line: ceilingBidLine(sale, maxAllIn, hurdlePct, solved.unbounded),
+    line: ceilingBidLine(sale, maxAllIn, hurdlePct, solved.unbounded, inputs.purchasePrice),
     maxAllIn,
     hammer: maxAllIn != null ? hammerFor(maxAllIn, sale.premium) : null,
     unbounded: solved.unbounded,
@@ -55,6 +60,7 @@ export function saleCeilingRead(
   extraction: ExtractionResult | null | undefined,
   inputs: UnderwriteInputs,
   hurdlePct: number = SALE_HURDLE_PCT,
+  asOf: Date = new Date(),
 ): string {
-  return saleCeiling(extraction, inputs, hurdlePct)?.line ?? "";
+  return saleCeiling(extraction, inputs, hurdlePct, asOf)?.line ?? "";
 }

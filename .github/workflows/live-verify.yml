@@ -59,7 +59,10 @@ jobs:
           grep -c "irr-gauge" body.html && echo "IRR GAUGE: present" || echo "IRR GAUGE: missing"
           grep -c "stamp-in" body.html && echo "VERDICT STAMP: present" || echo "VERDICT STAMP: missing"
           grep -c "scroll-progress" body.html && echo "SCROLL PROGRESS: present" || echo "SCROLL PROGRESS: missing"
-          grep -c "Aerial view of" body.html && echo "MARKETS GALLERY (aerials): present" || echo "MARKETS GALLERY: missing"
+          # The gallery's tiles (each carries its fact, data-qa="fact") and its
+          # one credit line. It had grepped "Aerial view of", the tiles' alt when
+          # every tile was an overhead; a tile's alt now says what it shows.
+          grep -c 'data-qa="fact"' body.html && grep -q "Photographs by" body.html && echo "MARKETS GALLERY: present" || echo "MARKETS GALLERY: missing"
           grep -c "The ground layer" body.html && echo "GROUND LAYER TEXT: STILL PRESENT (pre-#240 build)" || echo "GROUND LAYER TEXT: gone (correct after #240)"
           grep -c "pulse-tile" body.html && echo "MARKET PULSE BOARD: STILL PRESENT (pre-#240 build)" || echo "MARKET PULSE BOARD: gone (correct after #240)"
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
@@ -179,6 +182,26 @@ jobs:
           [ "$(head -c 5 report.pdf 2>/dev/null)" = "%PDF-" ] \
             && echo "/api/demo/report: serves a real PDF ($(wc -c < report.pdf) bytes)" \
             || echo "/api/demo/report: not serving PDF bytes (pre-#126 build, or report render failing)"
+      - name: What a visitor downloads, and how soon it starts (diagnostic, non-gating)
+        # Research pass 25 (2026-10-05) measured the pages from a local
+        # build, never from Render: the sandbox cannot reach onrender.com.
+        # This prints each page's encoding, its bytes on the wire and
+        # unpacked, and the time to its first byte and to its last, from the
+        # runner — the first production timings for the two pages that
+        # render on every visit (/tools and /market), and which encoding
+        # Render answers curl's offer with (Node itself sends only gzip).
+        # Read the lines; nothing here gates.
+        run: |
+          for path in "/" "/tools" "/market?metro=dc" "/market?metro=nyc" "/demo"; do
+            url="https://underwrite-copilot.onrender.com${path}"
+            rm -f page.bin headers.txt
+            line=$(curl -sS -o page.bin -D headers.txt --compressed --max-time 60 \
+              -w "%{http_code} %{size_download} %{time_starttransfer} %{time_total}" "$url" 2>/dev/null || echo "FAILED 0 0 0")
+            enc=$(grep -i '^content-encoding:' headers.txt | tail -1 | tr -d '\r' | awk '{print $2}')
+            cache=$(grep -i '^cache-control:' headers.txt | tail -1 | tr -d '\r' | cut -d' ' -f2-)
+            set -- $line
+            echo "PAGE WEIGHT: ${path} HTTP $1 · ${enc:-identity} · $2 B on the wire · $(wc -c < page.bin) B unpacked · first byte $3 s · done $4 s · cache: ${cache:-none}"
+          done || true
       - name: News feeds from the deployment's own network (diagnostic, non-gating)
         # The News page's live layer fetches the publishers' feeds from
         # Render, not from a browser — so only Render can say which ones
@@ -501,6 +524,12 @@ jobs:
           }
           both() { grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html; }
           copies() { [ "$(grep -o "Copy as table" p_tools2.html | wc -l)" -ge 2 ]; }
+          # The homepage's gallery credit as it reads since 2026-10-01: each
+          # photographer's licence follows them, linked to its text, and the
+          # line ends on where the photographs came from and that they are
+          # cropped (lib/credit-parts). It had ended "via Wikimedia Commons,
+          # CC BY …", the licences listed once at its end.
+          gallerycredit() { grep -q "via Wikimedia Commons, cropped to fit" body.html && grep -q "creativecommons.org/licenses/" body.html; }
           bidtwice() { [ "$(grep -o "What you can pay" p_tools2.html | wc -l)" -ge 2 ]; }
           # The strip renders (its money market heading is there) and carries no
           # series its publisher licenses to FRED alone (#482). grep -c, not
@@ -510,7 +539,7 @@ jobs:
           echo "ROUND MARKERS — what the live site is actually serving:"
           mark "#302 photo treatment (on-photo + band-words on /why)" both
           mark "#302 deal math reads the shorthand (seeded \$20M on /tools)" grep -q 'value="\$20M"' p_tools2.html
-          mark "#302 gallery credit names the licence" grep -q "via Wikimedia Commons, CC BY" body.html
+          mark "#302 gallery credit names the licence" gallerycredit
           mark "#304 the cash-flow strip is on /tools" grep -q "Paste a cash flow" p_tools2.html
           mark "#305 the work leaves the page (Copy link)" grep -q "Copy link to this sizing" p_tools2.html
           mark "#306 net effective rent, both ways" grep -q "The face rent is" p_tools2.html
@@ -1188,6 +1217,35 @@ jobs:
           mark "#494 mixed-use, labs and short sales, read as what they are" grep -q "Mixed-use, labs and short sales, read as what they are" p_whats-new.html
           mark "#496 defaults said as defaults" grep -q "Defaults said as defaults" p_whats-new.html
           mark "#495 counts that hold from one day to the next" grep -q "Counts that hold from one day to the next" p_whats-new.html
+          mark "#497 rent rules that reach the building" grep -q "Rent rules that reach the building, in every screen" p_whats-new.html
+          mark "#498 forward purchases, read at delivery" grep -q "Forward purchases and build-to-suits, read at delivery" p_whats-new.html
+          mark "#499 mixed-use buildings, two incomes" grep -q "Mixed-use buildings, read as two incomes" p_whats-new.html
+          mark "#500 operating businesses, read as the operator's" grep -q "Gas stations, car washes and other operating businesses" p_whats-new.html
+          mark "#501 condominium units bought in bulk" grep -q "Condominium units bought in bulk" p_whats-new.html
+          mark "#502 when a screen stops, it says so" grep -q "When a screen stops, it says so" p_whats-new.html
+          mark "#503 data sources credited beside their figures" grep -q "Data sources credited beside their figures" p_whats-new.html
+          mark "#504 sharper card photos and a scene for every deal" grep -q "Sharper card photos, and a scene of its own for every deal" p_whats-new.html
+          mark "#505 the market page, quicker" grep -q "The market page, quicker" p_whats-new.html
+          mark "#506 flood insurance, as the law reaches it" grep -q "Flood insurance, as the law reaches it" p_whats-new.html
+          mark "#507 a first hour without surprises" grep -q "A first hour without surprises" p_whats-new.html
+          mark "#508 every page, by keyboard and screen reader" grep -q "Every page, by keyboard and screen reader" p_whats-new.html
+          mark "#509 sandwich positions, read as the spread" grep -q "Sandwich positions, read as the spread" p_whats-new.html
+          mark "#510 your 1031 clock, beside every deal" grep -q "Your 1031 clock, beside every deal" p_whats-new.html
+          mark "#511 credits that follow the data" grep -q "Credits that follow the data, and messages that hold up" p_whats-new.html
+          mark "#512 preferred equity, read as a position" grep -q "Preferred equity, read as a position" p_whats-new.html
+          mark "#513 twenty-two more cities, pictured" grep -q "Twenty-two more cities, pictured" p_whats-new.html
+          mark "#514 thirteen more cities, pictured" grep -q "Thirteen more cities, pictured" p_whats-new.html
+          mark "#515 no figure a building could not earn" grep -q "No figure a building could not earn" p_whats-new.html
+          mark "#516 sign-in links that ask first" grep -q "Sign-in links that ask first, and screens that wait their turn" p_whats-new.html
+          mark "#517 co-owners and empty buildings" grep -q "Co-owners and empty buildings, read as what they are" p_whats-new.html
+          mark "#518 loans and deliveries, read as offered" grep -q "Loans and deliveries, read as offered" p_whats-new.html
+          mark "#519 the deal page, made for a phone" grep -q "The deal page, made for a phone" p_whats-new.html
+          mark "#520 a report that says what it ran on" grep -q "A report that says what it ran on" p_whats-new.html
+          mark "#521 a fit that says what it was judged on" grep -q "A fit that says what it was judged on" p_whats-new.html
+          mark "#522 one deal, one set of figures" grep -q "One deal, one set of figures" p_whats-new.html
+          mark "#523 seven more cities, pictured" grep -q "Seven more cities, pictured" p_whats-new.html
+          mark "#524 nine more cities, pictured" grep -q "Nine more cities, pictured" p_whats-new.html
+          mark "#525 ten more cities, pictured" grep -q "Ten more cities, pictured" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"

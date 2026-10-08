@@ -48,8 +48,46 @@
   font-variant-numeric: tabular-nums;
 }
 
-html {
-  scroll-behavior: smooth;
+/* Smooth in-page jumps, only for a reader who has not asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* A control the keyboard reaches is scrolled clear of a bar that stays on
+   screen (WCAG 2.4.11, research pass 33): the homepage's sticky header, on a
+   phone the app's top bar and the deal's bar at the foot, which covered
+   whole controls on Shift+Tab and Tab, and from md the deal's bar at the
+   top. The homepage's sections take their
+   anchor offset from here too, so a jump lands under the header as before. */
+html:has([data-home-bar]) {
+  scroll-padding-top: 4rem;
+}
+@media (max-width: 47.99rem) {
+  html:has([data-app-topbar]) {
+    scroll-padding-top: 7.5rem;
+  }
+  html:has([data-deal-sticky]:not([inert])) {
+    scroll-padding-bottom: 4.5rem;
+  }
+}
+/* From md the deal's bar is fixed at the top of the content column, so a
+   control reached by Shift+Tab is scrolled clear of it there (the pre-merge
+   audit of 2026-10-05: the phone had the rule, the desktop did not). */
+@media (min-width: 48rem) {
+  html:has([data-deal-sticky]:not([inert])) {
+    scroll-padding-top: 4rem;
+  }
+}
+
+/* A placeholder reads at the muted text's contrast (5.6:1 on white), not
+   Tailwind's half-strength default (3.2:1). In the base layer, so an input
+   that sets its own placeholder colour keeps it. */
+@layer base {
+  ::placeholder {
+    color: var(--color-muted);
+  }
 }
 
 body {
@@ -61,9 +99,15 @@ body {
   background: color-mix(in oklab, var(--color-brand) 16%, transparent);
 }
 
-/* Keyboard-visible focus everywhere. Elements that opt into Tailwind ring
-   utilities set `outline-none`, so this is the baseline, not a double ring.
-   The sidebar is deep teal, so its focus ring flips to white. */
+/* Keyboard-visible focus everywhere. This rule is UNLAYERED, so it beats
+   every Tailwind utility, `outline-none` and the `focus-visible:outline-*`
+   ones included: an element that adds a ring utility draws the ring and
+   this outline both, and a colour or offset a utility asks for never
+   applies. A context that needs another ring says so below, unlayered too.
+   Never move this into @layer base: some sixty controls set `outline-none`
+   and would lose the only ring they have.
+   The sidebar and the dark bands are deep teal, so the ring flips to white;
+   a white card inside a dark band (the sign-in card) takes the teal back. */
 :focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
@@ -71,6 +115,57 @@ body {
 .bg-sidebar :focus-visible,
 .band-dark :focus-visible {
   outline-color: rgba(255, 255, 255, 0.85);
+}
+.band-dark .bg-surface :focus-visible {
+  outline-color: var(--color-brand);
+}
+/* A control that sits on a photograph, and everything in the full-screen
+   viewer: a white ring with a dark halo inside and out, which reads over any
+   picture, a night sky or a snowfield. */
+.focus-on-photo:focus-visible,
+[data-photo-viewer] :focus-visible {
+  outline-color: #fff;
+  box-shadow: 0 0 0 6px rgb(0 0 0 / 0.6);
+}
+/* A pipeline card clips whatever is drawn outside it (its picture's round
+   corners), so its link's ring — or, choosing deals to compare, its
+   button's — is drawn on the card itself (research pass 33: a focused card
+   showed no ring at all). */
+[data-deal-tile]:has(> a:focus-visible),
+[data-deal-tile]:has(> button[aria-pressed]:focus-visible) {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+/* A mosaic tile clips whatever is drawn outside it, so its ring is drawn
+   inside, over the photograph. */
+[data-mosaic-tile]:focus-visible {
+  outline: none;
+}
+[data-mosaic-tile]:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 3px #fff,
+    inset 0 0 0 6px rgb(0 0 0 / 0.6);
+}
+
+/* Windows High Contrast and other forced-colour settings repaint every
+   background to the system's colour, and every chart here is a background:
+   the bars keep their own colours, and a selected tab, toggle or page is
+   outlined, since its fill alone no longer tells it apart. */
+@media (forced-colors: active) {
+  [data-bar] {
+    forced-color-adjust: none;
+  }
+  [aria-selected="true"],
+  [aria-pressed="true"],
+  [aria-current="page"] {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 
 /* Elevation — soft, layered shadows so cards sit *on* the canvas. */
@@ -380,26 +475,54 @@ body {
   0%, 100% { transform: translate(-50%, -50%) translateX(0); }
   50% { transform: translate(-50%, -50%) translateX(6px); }
 }
+/* The stage ring and the call to action's breath move the OPACITY of a
+   glow drawn on a layer of their own (the ::after rules below), never a
+   box-shadow: a moving shadow repaints its element on every frame, and
+   research pass 25 measured the homepage painting 844 ms in five seconds on
+   a phone, forever (1,531 ms of main-thread work with these two off against
+   3,219 ms with them on). An opacity change is the compositor's alone. */
 @keyframes uc-stage-glow {
-  0%, 12%, 100% { box-shadow: 0 0 0 0 rgba(127, 214, 204, 0); }
-  6% { box-shadow: 0 0 0 3px rgba(127, 214, 204, 0.35), 0 8px 24px -8px rgba(127, 214, 204, 0.35); }
+  0%, 12%, 100% { opacity: 0; }
+  6% { opacity: 1; }
 }
 @keyframes uc-beacon {
   0% { transform: scale(1); opacity: 0.7; }
   70%, 100% { transform: scale(2.4); opacity: 0; }
 }
 @keyframes uc-cta-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(127, 214, 204, 0.0); }
-  50% { box-shadow: 0 0 24px 2px rgba(127, 214, 204, 0.45); }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .glow-drift { animation: uc-glow-drift 26s ease-in-out infinite; }
   .glow-drift-2 { animation: uc-glow-drift-2 34s ease-in-out infinite; }
   .spread-dot-l { animation: uc-spread-l 4.5s ease-in-out infinite; }
   .spread-dot-r { animation: uc-spread-r 4.5s ease-in-out infinite; }
-  /* one soft ring travels down the six stages, forever — the pipeline runs */
-  .stage-cycle { animation: uc-stage-glow 12s ease-in-out infinite; animation-delay: calc(var(--i, 0) * 2s); }
-  .cta-breathe { animation: uc-cta-breathe 3.6s ease-in-out infinite; }
+  /* one soft ring travels down the six stages, forever — the pipeline runs.
+     The card is positioned (`relative`) and bordered (1px), so its glow
+     covers the border box. */
+  .stage-cycle::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: 0 0 0 3px rgba(127, 214, 204, 0.35), 0 8px 24px -8px rgba(127, 214, 204, 0.35);
+    opacity: 0;
+    animation: uc-stage-glow 12s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * 2s);
+  }
+  .cta-breathe { position: relative; }
+  .cta-breathe::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: 0 0 24px 2px rgba(127, 214, 204, 0.45);
+    opacity: 0;
+    animation: uc-cta-breathe 3.6s ease-in-out infinite;
+  }
 }
 /* live-data beacon: solid dot + expanding ring (ring only animates when
    motion is allowed; the dot alone still reads as a status light) */
@@ -435,8 +558,12 @@ body {
   from { transform: translateX(-50%); }
   to { transform: translateX(0); }
 }
+/* 90s, not 70s, since each figure carries its house beside it (research
+   pass 31, C5): the row grew about 28% (13,900px against 10,850px at the
+   band's 13px mono), and a fixed duration over a longer row is a faster
+   band — 90s holds the speed it read at, about 155px a second. */
 .ticker-track-reverse {
-  animation: ticker-slide-reverse 70s linear infinite;
+  animation: ticker-slide-reverse 90s linear infinite;
 }
 .ticker-track-reverse:hover,
 .ticker-track-reverse:focus-within,

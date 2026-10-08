@@ -319,7 +319,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   #422 carries it wherever the deal is summarized:
   - the pipeline row's tag and its CSV, the deal header and the internal
     comps (`interestTag(ex, asOf)`): "Leasehold, 45 yrs left", whole years
-    down, and "Leased fee, reverts in 45 yrs";
+    down, and "Leased fee, reverts in 45 yrs" — "up to 45 yrs left" and
+    "reverts within 45 yrs" where the term is a count of years counted from
+    today, whose memorandum is dated earlier, or already counts its options
+    (a single tenant's tag and a master lease's alike);
   - the memo's header and the workbook cover's "What is being sold"
     (`interestShortLine`'s clause): "…; the lease ends Dec 2071, 45.3
     years from today";
@@ -869,6 +872,310 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   basis is the all-in cost. `TileStat`'s `sub` draws it under the price
   (`data-qa="tile-sub"`); the list row's price tooltip and the CSV's
   "Basis" column carry it too.
+- **One figure, one reader** (research pass 34, 2026-10-05): a deal's
+  figure reads the same on every surface that summarizes it — the deal
+  header, the pipeline card, list and CSV, the meeting workbook, the
+  compare table, the analytics, the market memory and the internal comps —
+  because each goes through one writer. `lib/one-reader.test.ts` reads
+  deals of each shape through the reader every surface calls.
+  - **A short dollar is `compactUsd`** (lib/money): "$5.6M", "$850k",
+    "$9,350", rounded half up on its last shown place in whole numbers
+    (`scaledText`: a float's `toFixed` wrote $5,550,000 "$5.5M" on a card
+    and "$5.6M" on its memo); a thousands figure that rounds to a thousand
+    thousands is a million; a negative's U+2212 minus outside the dollar,
+    and none on a figure that rounds to nothing. Each surface's shape is an option (`millions` 1, 2
+    or "auto", `trim`, `wholeMillionsFrom`, `thousandsFrom`,
+    `thousandsPlaces`), never arithmetic of its own; the test fails on any
+    file outside lib/money that writes a compact dollar by hand.
+  - **A cap, a yield on cost and a cap range at two decimals** (`pctText`
+    in lib/plan-facts), the header's own: the card had read 6.3% beside
+    the header's 6.27%.
+  - **The cap slot where no cap of the deal's own stands** is decided by
+    `capSlotWithheld` (lib/compare-interest: a note, a preferred equity
+    position, a share beside the loan its entity carries) and said in
+    `lib/cap-slot.ts` (no imports, for the pipeline's client module; a
+    test holds its words to lib/compare-interest's): a note's yield to
+    maturity or a position's to redemption with what it runs to
+    (`OWN_YIELD`), "n/a — share" (`CAP_WITHHELD`), and on a plan deal
+    "n/a — plan" (`PLAN_CAP_NA`, the CSV's `capCellText` and the meeting
+    workbook alike), its yield on cost in a column of its own. A plan
+    deal is said to be judged on its yield on total cost, never to have
+    no cap. A cap the header withholds is pooled nowhere (the analytics,
+    the market memory, the internal comps) and set against nothing (the
+    model's exit read, `dealGoingInCap`).
+  - **A deal's kind and going-in cap read its first signal** beside the
+    extraction (`inferStrategy(ex, firstSignal)`): the memorandum's cap,
+    else the first signal's, on the header, the card, the CSV, the
+    workbook and the compare table; and the analytics, the market memory,
+    the internal comps and the deal page's comps select `first_signal` to
+    read a value-add as one.
+  - **"Outside box" wherever a deal misses its buy box outright**
+    (`fitScoreLabel` in lib/fit-label), whatever the score's call: the
+    header had printed "Fit 18 · Pass" beside the card's "Fit 18 · Outside
+    box" for one deal.
+  - **The rent rules test the building's stated unit count**
+    (`rulesSizeText` in lib/rent-regulation: "N units" from the count row
+    through `unitCountFromMetrics`, none on homes or a portfolio), never the
+    header's Size slot, which shows the area where a memorandum states
+    both and left an apartment building's unit questions open.
+- **A fit says what it was judged on** (research pass 35, 2026-10-05).
+  The score rescales over the criteria the screen could read, so a note
+  whose cap and return the box cannot judge read "Fit 100 · Pursue" on two
+  of four. `buyBoxCoverage` (lib/criteria) counts them beside the fold
+  (`BuyBoxCheck.onPrice` marks the criteria the price decides: the price
+  band, the basis, the going-in cap, the target return) and lib/fit-label
+  (no runtime imports) says it ONE way: `fitScoreLabel` puts the count in
+  the call's place ("Fit 100 · 2 of 4 checked" — a call over part of the
+  box is no call), a miss outright keeping its words ("Fit 63 · Outside
+  box · 3 of 4 checked"); `fitTone` is never green while a criterion the
+  price decides is unchecked (muted: nothing about the price was judged);
+  `fitCellText` writes an export cell ("Fits (2 of 4)", "Near (2 of 4,
+  first read)"); `checkedSentence` is the tooltip, the cell's note and the
+  verdict's brief ("Judged on 3 of the buy box's 4 criteria; target
+  return could not be checked."). Every fit reads it: the deal header's
+  chip and the screen-complete email (lib/buy-box-chip), the pipeline's
+  card, list and CSV, the meeting workbook, the compare table and the
+  batch upload's chip. A fully checked deal's words are as before.
+- **The deal-type panels draw from one set of parts** (research pass 36,
+  2026-10-05). `app/panel-parts.tsx` (pure) holds them:
+  - `PanelHead`: the eyebrow is the panel's `h2`, so a screen reader moving
+    by headings meets each panel;
+  - `PanelRead` and `PanelFold`: the read, with one "Read the rest (N more)"
+    control, 36px tall on a touch screen, and the whole text in the HTML;
+  - `PanelNote`;
+  - `Key` and `KeyItem`: one swatch, tick or dashed mark, set to the middle
+    of its label's first line;
+  - `Tick`: centred on its value and kept inside its track, 4px past each
+    edge of a primary track and 2px past a secondary one;
+  - `BarRows` and `BarRow`: label, bar and figure columns of one width, so
+    bars on one scale start at one x on tracks of one length, stacked under
+    the label until the group is 24rem wide;
+  - `tileSpan`: a tile of words spans both columns below `sm`;
+  - `MEASURE`: 68 characters.
+
+  Every deal-type panel, the lease-term bar and the portfolio card draw
+  with them. `lib/panel-parts.render.test.ts` holds the parts to their
+  rules and every panel's source to drawing with them. A panel's drawn
+  money goes through `compactUsd`, one option set a panel. Exact dollars
+  stay only where the figure is a term the memorandum states and a reader
+  checks it against, each marked so in a comment: a tier's rent and limit,
+  a lot rent, a rent a bed, ADR and RevPAR to the cent, a base rent, and
+  the PCA's immediate repairs.
+- **A phone's deal page** (research pass 36):
+  - **The kept-in-view bar** watches the header's facts block
+    (`data-deal-hero-facts`), not the whole header, whose panels can run
+    screens long. While the bar shows, the page pads its scroll by it
+    (`app/globals.css`: the phone's foot, and the top from `md`), so a
+    focused control never scrolls under it (WCAG 2.4.11).
+  - **The header's tools and controls**: below `sm` the tools are one
+    sideways row and the controls another (`ToolRow`,
+    `app/(app)/deals/[id]/tool-row.tsx`). Each row scrolls under a drawn
+    edge fade, never a mask, since a mask would clip the share panel and
+    the deal's menu that open out of them (both `sm:relative`). A
+    keyboard's focus is scrolled clear of the fade. From `sm` the rows are
+    `display: contents`, box for box the old toolbar.
+  - **Order**: the plausibility panel sits right after the plan and the
+    interest panel, and a test holds the order.
+  - **Light only**: the root layout's viewport says `colorScheme: "only
+    light"`. A phone that darkens websites had inverted every black
+    reference tick (`lib/color-scheme.test.ts`).
+  - **The compare page** decides cards or table by its own column, a
+    container query: the table from `@xl` for two or three deals, from
+    `@2xl` for four.
+  - **The shared screen** says the call beside its title, with the day it
+    was written. It is dashed and reads "From the previous screen" where
+    `verdictBehind` says so (`previousCallNote`).
+  - **The offering card** keeps a deadline's time on one line with its
+    zone (`ListingTeam`).
+- **The documents, page by page** (research pass 35, 2026-10-05):
+  - **The page a grid lands on is measured.** The full report renders
+    through `renderReportPdf` (lib/memo/report-document), which names the
+    page the sensitivity grids land on. Where the memo or the call runs to
+    a second page, it draws again naming that page. The target-return
+    chip's "model 9.3%, p. 3" is the page as laid out, never assumed.
+  - **Page numbers.** The report numbers the memo's pages as its own ("1 /
+    10"). The memo's 1.32 line height sits on a wrapper inside its page,
+    never on the page itself. react-pdf 4.x re-resolves a page whose fixed
+    nodes need the page count, and multiplies a numeric line height on
+    each pass: the first cut drew page 1's footer at y 5,590 on a 792-point
+    page. `pdfPageRunsOf` holds every "N / M" to its page's foot.
+  - **The one-page memo stays on one page** with a cover, the screened date
+    and a wrapped line under the title, measured by a test.
+  - **The grid's takeaway** is two full clauses. Where the price buys no
+    building, it leads with what the grids are of (`basisWithheldOf`,
+    exported from lib/underwrite/inputs): "The collateral, run at the
+    note's price: …".
+  - **The max-bid line** names the floor no price clears, and how far each
+    other floor clears alone (`noBidRead`). On a leasehold it gives the
+    bid's IRR on the lease's term (`termReadFor`, lib/leasehold-exit's own
+    arithmetic).
+  - **The retrade grid** prints its prices at one precision down the column
+    (`retradePrices`, through `compactUsd` and `scaledText`).
+  - **The assumptions are named.** The base case names the exit cap and the
+    rent's source. The line under the grids names the asset-management fee
+    and the reserves, each from the model's inputs with its provenance. A
+    stored day is written in prose wherever a source note is printed
+    (`proseDays`).
+  - **Spelling** follows the site: modelled, colour, centre, while the -ize
+    words stay.
+  - **The demo's fictional memorandum** has 48 pages and cites p. 14 for
+    its sale comps.
+- **What `parseUsd` refuses** (research pass 37, 2026-10-05). It refuses
+  only what is not one positive figure:
+  - a minus before the figure in any form (the hyphen-minus, the minus
+    sign, the en dash), on either side of the dollar sign;
+  - accounting brackets around the figure alone;
+  - a range whose first end is the figure ("$40M - $42M", "40-42M", "$40M
+    to $42M"). "To" or "through" makes a range only where the other figure
+    is at least half the first, so "$900,000 through 2031" is the figure.
+
+  A hyphen in the words after the figure is read past ("$24,500,000
+  (Freddie Mac, non-recourse)", "$650,000 (T-12)"). It had refused any
+  value with a hyphen anywhere, so figures the memorandum stated read as
+  none. Stored deals re-read on their next view. **`parseMoney` reads a
+  scale only where it ends its word** (the scale words and their values
+  are lib/money's, `SCALE_WORDS` and `scaleOf`): it had read the next
+  word's first letter as one, so "$450,000 more or less" was $450 billion
+  and "$600,000 base rent" $600 billion.
+- **Assumable debt that is not one fixed loan** (research pass 37):
+  - **A floating rate**, one naming an index or saying it floats, is
+    carried as its index and spread with no coupon. The card prices
+    nothing and says why ("Assumable SOFR + 3.25%").
+  - **A supplemental loan** ("Assumable supplemental loan balance / rate /
+    maturity", or a figure of its own in the first loan's row) is never
+    read as the first's, and nothing is priced on the first alone.
+  - **A stated mortgage insurance premium** is added to the note rate the
+    card prices.
+  - **A "Prepayment" row's lockout**, or a sale subject to the loan, is
+    said.
+
+  The tag's tooltip and the meeting workbook's note say the page prices
+  only a fixed coupon (`debtTagMeaning` in lib/pipeline-tags). The finder
+  refuses a row naming C-PACE, PACE, a CDD, MUD, PID or CFD, Mello-Roos or
+  a special assessment, and every term filed beside the levy's balance
+  goes with it. A levy sits beside a mortgage on the tax bill; it replaces
+  none.
+- **A phased forward purchase** (research pass 37). A delivery row naming
+  several dates is read at the latest, the side that does not flatter.
+  Where its words name phases, tranches, takedowns or numbered buildings,
+  every place the delivery is said lists them: "phased: 3 takedowns, the
+  last Q2 2028" in the read, the tag "Forward, 3 takedowns to Q2 2028",
+  and a lighter tick on the panel for each takedown
+  (`data-bar="fwd-phase"`). The model still runs one closing and says so.
+- **Figures no building could have** (research pass 38, 2026-10-05). A
+  figure no building could earn is refused, or said as what it is, never
+  printed as a return. The model's arithmetic is unchanged throughout;
+  what each figure should be is the owner's (WILL_TODO).
+  - **A price row whose value is no price** (`priceRefusal` in
+    lib/criteria, read by the one price reader, so by every reader of an
+    ask): a percentage, a share of a loan's balance ("75% of UPB"), a
+    multiple, or a figure per unit, foot, acre or year is refused. The deal
+    reads as unpriced and the row stays in the key terms as written; a
+    dollar price with its cap or share in words after it reads as before.
+  - **An unpriced deal** runs on the $10,000,000 placeholder, and the
+    memorandum's NOI is never judged against it ("cannot be set against
+    the $10,000,000 placeholder price, which no memorandum stated — enter
+    the price"). Where only a cap is stated, the placeholder × the cap is
+    an assumption, so a typed price never shows returns on it; the workbook
+    leaves its per-unit, per-SF and all-in rows out on a placeholder.
+  - **One gate on the model's reads** (`modelReadsWithheld` in
+    lib/underwrite/report-grid): on a placeholder price or an assumed
+    year-1 NOI, the report, the deal page (the assumable loan, the seller's
+    note, the leasehold exit, the sale panel's ceiling, every panel's model
+    line) and the workbook's cover print the memorandum's terms and none of
+    the model's reads. A finding against the returns (an implied going-in
+    cap under 2% on a deal read as stabilized, a building run 90% vacant or
+    more, any high finding) withholds the playground's tiles and max bid
+    and the report's grids and max bid under one sentence, while the
+    model's reads of the terms stand (`readsStand`).
+  - **The playground rests on the model's own vacancy** (its lever reaches
+    99%), and an assumed NOI's cap reads "n/a — assumed NOI".
+  - **A yield on cost at or past 25%** is struck nowhere (`yieldWithheld`,
+    "n/a — figures don't tie"), the first-draft model's included; a plan
+    basis outside the band any market delivers at is struck nowhere
+    (`planWithBasisChecked`, `basisWithheld`); a works budget under about
+    $1,000 a unit, or 1% of the price, is a finding.
+  - **A note under water** (its balance over the collateral's stated
+    value, or with a stated senior loan the two together: `noteUnderWater`
+    in lib/note-yield) reads "n/a — under water" in every cap slot, and its
+    sentence says the contract yield assumes a repayment the collateral
+    does not cover.
+  - **A seller's loan or note at or over the price** prices nothing ("check
+    the balance"), and a gap that does not solve is said as none, never
+    "0 points".
+  - **A levered IRR that does not solve says why** (lib/underwrite/no-irr:
+    the sale does not repay the loan, the equity gets none of its cash
+    back, or no rate solves), on the tiles, the report and, live, the
+    workbook.
+  - **The default exit beside the model's own entry**
+    (`defaultExitGap`, lib/underwrite/cost-note): where the memorandum
+    states no cap, the exit's note and a line under the playground name the
+    model's year-1 NOI over its price and the compression or expansion
+    riding in the returns. A cap stated as a range runs at its low end, and
+    every note says so.
+  - **Words:** a duplex, triplex or fourplex files as multifamily; a
+    student building counted in units says 350 SF is a bed's typical size;
+    the class's expense ratio on a mostly empty building says its taxes and
+    insurance do not fall with occupancy; the workbook's breakeven
+    occupancy past 100% reads "not reached at full occupancy" and is left
+    out at 90% vacancy; a development's land price a unit is "Land cost /
+    Unit"; a bulk condominium's price divides by the units offered
+    (lib/condo-units); a leased fee's NOI read off its row and equal to its
+    ground rent says so, and its cap prints in the workbook as on the page,
+    "on the Land's Price"; /tools' sized loan past the price says why.
+- **A tenancy in common, a DST and a share of a share** (research pass
+  37). A TIC is title to the property: its own label, lead, caveat and
+  short line, TIC traps (a)–(e) in place of the partial interest's, the
+  1031 flag `tic`, the tag "TIC 30%" and a letter of intent refused in its
+  own words. "Co-tenancy" is a TIC only in an owner's words, never a retail
+  lease's clause. A TIC's stated loan is the property's, so it is named so
+  beside the equity's whole (`entityLoanWords`) on the plan, the
+  plausibility note, the verdict and the model tab, and the cap slot's
+  tooltip names "the loan the memorandum states". A DST asks DST traps
+  (a)–(d) beside the share list. **A share of the general partner's
+  interest** (`isGpStake`) is a share of a share that no figure grosses up
+  to the building's price: no building price, basis, comps tick, price
+  finding or implied cap; the model runs at the stated price with its cap
+  and returns withheld ("n/a — share"); GP-STAKE TRAPS (a)–(e); the tag "GP
+  stake 50%"; no letter of intent. The extraction files "Entity
+  construction loan", which `entityLoanOf` reads.
+- **A building with no income today** (research pass 37): a deal of no
+  stated strategy with no NOI of any kind beside 0% occupancy, or a vacant
+  or owner-user building's words, is a lease-up wherever the deal's kind is
+  read (`noIncomeToday`). One that states a pro forma NOI stays as it was
+  read, since the model would run that figure as year 1 one way and not
+  the other, and a stated 0% occupancy on a deal read as stabilized is a
+  plausibility finding. A lease-up's plan paragraph (`leaseUpPlanText`)
+  speaks of a stabilized NOI or a budget only where the memorandum states
+  it, and calls the NOI "not a misread" only where the plan's figures tie.
+- **Audit C2's fixes** (2026-10-05):
+  - The buy box and the mandate hold a preferred equity position, or a
+    share beside its entity's loan, to no building cap or basis; each
+    check reads unknown with the cap slot's own reason. Every page, route
+    and document builds its check source through `dealCheckSource`.
+  - `buyBoxCoverage` counts the mandate's cash-on-cash floor and every red
+    line that could not be checked.
+  - The first signal's cap counts where the memorandum states none and the
+    deal is no plan deal: the buy box judges it, and the internal comps,
+    the market memory and the analytics pool it through `statedCapRead`.
+  - A fit with no score reads "Fits (1 of 2)" on the header chip, the
+    pipeline cell's words.
+  - Puerto Rico sits in lib/market-county's own tables only: a deal there
+    gets its metro area's photograph and reads no market figures.
+  - The deal page's interest read, cap figure and model-returns read run
+    on the reader's day (`readerNoon`), and so do the memo's and report's
+    filenames and the report's rent-regulation read.
+  - A conversion's or a development's all-in basis divides by a count the
+    memorandum labels proposed or planned (`planCountRow`); with none, no
+    basis is struck and the plan says why (`costPerUnitWithheld`).
+  - The rent-roll workbook's "Loan balance at exit" and "Gross sale
+    proceeds" handle a 0% rate and a 0% exit cap as the mirror does, still
+    live formulas.
+- **A mixed-use income read off a month** is said as the month the
+  memorandum states and the year it makes ("$92k a month of residential
+  income ($1.10M a year)"; `residentialFromMonth`, `commercialFromMonth`),
+  never as a stated year, and the panel's tile says "twelve times the month
+  stated".
 - A manufactured-housing park (#470): the extraction labels a park's
   figures as rows of their own, each only as stated — "Pads" (never with
   the RV sites in it), "Occupied pads", "Lot rent" (the average monthly
@@ -956,6 +1263,183 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   its title (`storageShortLine`), the workbook's cover ("The facility",
   `meta.storage`), the report's caveat (`buildReportData`'s
   twenty-fourth argument) and the compare table's row.
+- Rent regulation (research pass 28, round 1). The rules panel had long
+  said which rent regimes reach a building (`evaluateRules`), but nothing
+  the screen hands a reader did: a rent-stabilized Brooklyn walk-up read
+  as market-rate everywhere else. `lib/rent-regulation.ts` (pure) reads the
+  site's own rules for the deal, each regime's published allowance for a
+  dated period, and what the memorandum states. `data/research/
+  rent_allowances.json` holds `regimes` (each rent rule's name and short
+  word), `noRegime` (the rules that preempt or ban rent control) and
+  `allowances`, each filed ONLY as a primary source printed it from the
+  runner, with its period and the run in `read`: NYC's Order #58 (0% on one-
+  and two-year leases commencing Oct 1, 2026 to Sep 30, 2027), DC's Rent
+  Control Year 2026 (4.1%, 2.1% for a registered elderly or disabled
+  tenant), the LA RSO's 3%, Montgomery County's 5.2% (Jul 1, 2026 to Jun
+  30, 2027), Washington's 9.683% (2026) and 10% (2027), and Takoma Park's
+  3%; `lib/rent-regulation.test.ts` holds every rent rule to one of the two
+  lists. San Francisco's and Prince George's pages refuse the runner and
+  Jersey City's states no figure, so none is filed for them; AB 1482's cap
+  is regional (the LA area's 8.7% is in the rule's text, not the table).
+  Six rules: **the rule is the file's** (a regime is said only where a rule
+  applies or possibly applies, a "possibly" naming its open questions; a
+  regime only the memorandum names is said as its claim); **the allowance
+  is dated** (`allowanceOn`: read only inside its period; past its end said
+  to have ended, never carried forward; a period not yet begun said as
+  next); **the memorandum's count is the share** ("Rent-regulated units"
+  over the unit count; no count, no share, never derived from the
+  building's age); **loss to lease on a regulated unit is not upside**;
+  **the model's one growth rate is the market's** (set beside the
+  allowance, never changed — growing regulated units at the allowance is
+  the owner's model-math call); **a blank is null** (a regime row stating
+  "None", "No rent control", "Exempt", "Market rate" or a dash names no
+  regime, `STATES_NONE`). The extraction labels "Rent regulation", "Rent-
+  regulated units", "Legal regulated rent" and "Preferential rent", each
+  only as stated (a test holds the prompt's labels to the reader's
+  patterns). Every surface reads through ONE call, `regulationForDeal`
+  (the row's extraction, address, stored site flags and class, on the
+  reader's own day on a signed-in page and the UTC day in a route, a
+  document or a Claude step): the deal context (`regulationContextLine`,
+  every step after the site flags); the challenger (`regulationNote`,
+  REGULATION TRAPS by name, read from the address alone since it runs
+  before the flags, so a city regime it cannot place reads "possibly");
+  `app/regulation-panel.tsx` (`RegulationPanel`, pure: the regimes with
+  their outcome and source, `data-bar="reg-units"` the regulated share,
+  `reg-allowance` each figure in force against `reg-model-growth` the
+  model's rate on one scale — the shared screen, which has no model, draws
+  the allowance alone — `reg-period` with `reg-today`) on the deal page and
+  the shared screen; the key terms (`regulationTermRows` after the count);
+  the pipeline card, row, CSV "Rent regulation" column and the meeting
+  workbook's price note (`regulationTag`: "Rent-stabilized, 41 of 48", "LA
+  RSO, 3% cap", a regime that applies or the memorandum's claim in the
+  warning tone, "Rent rules: check" muted; `pickSlots`' fourth argument);
+  the memo under its title, the workbook cover ("The rent rules",
+  `meta.regulation`), the report's caveat (`buildReportData`'s last
+  argument) and the compare table's row (a dash, never "none"). **The
+  model's rent-growth check names a current allowance first**
+  (lib/model-vs-market), as the regime's for the units it regulates, shown
+  among the published figures and never folded into the market's range or
+  the tone: a NYC stabilized building at the model's 3% reads the 0%
+  allowance before the market figures it sits inside. An open "any of"
+  exemption is asked as the questions its open branches ask (MoCo's, AB
+  1482's and Washington's read "Open: any of" before), and every condition
+  key the rules file uses has an `OPEN_QUESTION_LABELS` entry, held by a
+  test that walks the file.
+- Research pass 28's deal types, rounds 2, 3, 7 and 8 (wired 2026-10-05).
+  Each reader is pure, reads only rows the extraction labels as stated, and
+  rides every surface the earlier rounds use: the deal context and the
+  challenger's notes (its traps by name), a panel on the deal page and the
+  shared screen, the key terms, the pipeline row, card and CSV and the
+  meeting workbook's price note (its tag), the memo under its title, the
+  workbook's cover, the report's caveat and the compare table's row.
+  - **A forward purchase or a build-to-suit** (`lib/forward-purchase.ts`,
+    `isForwardPurchase` in lib/deal-strategy): the developer funds the
+    works and the buyer pays the price at delivery, so the plan's total
+    cost is the price and a stated budget is the developer's
+    (`planSummary`'s `forward`, `developerBudget`); the yield is struck at
+    delivery (a "Delivery cap rate" row is never read as going-in); a
+    delivery stated as a quarter, month or year alone is read on its LAST
+    day; before delivery the buyer's exposure is the deposit. It builds
+    nothing (`buildsSomething`), so its market check reads no construction
+    cost index. Panel `app/forward-panel.tsx` (`fwd-clock`, `fwd-delivery`,
+    `fwd-outside`, `fwd-deposit`, `fwd-yield`, `fwd-exit`); tag "Forward,
+    6.00% at delivery" / "Build-to-suit, delivers Q3 2027".
+  - **A mixed-use building's two incomes** (`lib/mixed-use.ts`): rows
+    "Residential income", "Commercial income", "Commercial SF",
+    "Commercial occupancy"; a share is said only where both halves are
+    stated, and the model's read says one exit cap capitalises both
+    (separate caps are the owner's change). No lender limit is drawn until a
+    primary source's words are on file. Panel `app/mixed-use-panel.tsx`
+    (`mu-income`, `mu-area`); tag "Commercial 29% of income".
+  - **An operating business on its real estate** (`lib/going-concern.ts`):
+    a going concern (the business sold with the real estate) or an
+    operator's lease (the real estate leased to the operator); EBITDA is
+    never NOI, the split between real estate, fixtures and business only as
+    stated, a coverage as stated or EBITDAR over the stated rent. Panel
+    `app/going-concern-panel.tsx` (`gc-split`, `gc-coverage`, `gc-line`);
+    tag "Going concern" / "Operator lease, 1.85x coverage".
+  - **Condominium units bought in bulk** (`lib/condo.ts`): units offered of
+    the units in the condominium, the dues a unit a month (a period stated
+    or no figure), assessments, reserves and the declaration's terms as
+    stated; the agencies' single-entity limit from
+    `data/research/agency_rules.json` (Fannie Mae's Selling Guide
+    B4-2.1-03, printed by zori run 37260966320: 20% in a project of 21 or
+    more units, 49% under the section's exceptions), aged by the research
+    rule and said as the lender's rule, never a verdict. The panel imports
+    only types (the agency file stays out of the browser). Panel
+    `app/condo-panel.tsx` (`condo-share`, `condo-limit`); tag "Bulk 42 of
+    120 (35%)".
+  - **A sandwich position** (`lib/sandwich-lease.ts`): the buyer is the
+    tenant under a master lease and the landlord of the subleases, so its
+    income is the spread, said with its coverage; the master lease's term is
+    read by `readMasterLeaseTerm` (lib/ground-lease-term) and a master
+    leasehold's exit runs on it (lib/leasehold-exit, "the master lease's
+    term"). The two rents are read from their months where stated a month
+    at a time; a spread of zero is said as none. Panel
+    `app/sandwich-panel.tsx`; it rides the surfaces above.
+  - **A buyer's 1031 clock** (`lib/exchange-window.ts`): the buy box's
+    exchange (the relinquished property's transfer day, the filer, an
+    extension) against a deal's offers-due date — the 45 days, the 180
+    days cut by the filer's calendar-year due date (26 U.S.C. 1031 and the
+    IRS's instructions, printed from the runner), and whether what the
+    price buys is a question for exchange counsel (a note, an entity share,
+    a leasehold under 30 years). `lib/exchange-deal.ts` hands it each
+    deal's own facts: the deal header's chip (`exchange-chip.tsx`), the
+    pipeline's tag and the memo's line. **Never the shared screen, and
+    never a Claude step** — the verdict's words reach the shared screen,
+    and a counterparty who learns the buyer's deadline holds the price
+    (`buyBoxLines(box, { exchange: false })` in the pipeline).
+  - **A preferred equity position** (`lib/position.ts`, round 5): capital
+    behind the mortgage and ahead of the common equity, for a fixed
+    preferred return and a redemption date. Its own interest kind
+    (`preferred_equity`; a share filed before the kind was asked whose rows
+    say a position — a "Preferred equity amount" beside a rate — reads as
+    one, never a fee simple's rows). The extraction files its terms as rows
+    by the reader's own labels ("Preferred equity amount", "Preferred
+    return", "Current pay rate", "Accrual rate", "Mandatory redemption
+    date", "Senior loan balance", "Senior loan maturity", "Whole-asset
+    value", "Extension options", "Remedies"; a test holds the prompt's
+    labels to the reader's). Six rules: a position, not a share (its yield
+    to redemption is solved on its own payments at its price with the
+    engine's `irr`); the last dollar is the risk (first and last dollar over
+    the stated value); current pay is cash, accrual a promise (said apart,
+    the yield read simple and the stack compounding where the words say
+    neither); the redemption is a refinancing (against the senior loan's
+    maturity; a date gone by is a default, not a yield); remedies as
+    stated; a blank is null. `lib/interest.ts` carries it as `position` on
+    the read, its lead and model caveat, `POSITION_TRAPS` and the shared two
+    read for it, the tag ("Pref equity, 12% to Jun 2029"), the short line
+    and "(the entity's property)" as the deal type. Its price is no
+    building's: `buildingPriceOf` and `subjectBasis` answer none, the
+    plausibility check makes no price finding, the plan withholds the
+    price as a position's, and the model's price note says it runs the
+    whole building at that price, which is not the position's return. In
+    a cap slot its yield to redemption stands where a note's yield to
+    maturity does (`noteCapSlot`'s `of`, `OWN_YIELD_WORDS` in
+    lib/compare-interest: "n/a — position" where none can be stated), and
+    its model returns are withheld.
+- The data providers' notices (2026-10-05, research pass 31), each in the
+  provider's own printed words in `lib/data-notices.ts` (no imports):
+  FRED's notice ("This product uses the FRED® API but is not endorsed or
+  certified by the Federal Reserve Bank of St. Louis.") and the BLS's
+  sentence in every footer (`app/data-notices.tsx`, the public and
+  signed-in shells and /demo's own footer) and under the rates strip; the
+  BLS sentence again under a metro tile read from the BLS's own API; the
+  New York Fed's notice, filled for "SOFR data" and "Underwrite Copilot",
+  and the DTCC sentence once under the strip's money market where a SOFR
+  tile is drawn and under the construction panel's SOFR seed. A tile
+  credits the publisher via its channel ("New York Fed via FRED", "U.S.
+  Treasury via FRED", "Freddie Mac via FRED"; the leverage check's survey
+  "Freddie Mac's Primary Mortgage Market Survey® via FRED"); a tracker
+  figure names its house in words a phone shows; Redfin's 2–4 unit medians
+  are credited and linked to the page the research file cites; the address
+  search says "Address search © OpenStreetMap contributors" with the
+  copyright link, and the comps map's attribution names OpenStreetMap; a
+  public-web comp's source is linked only where the web search returned
+  it (`lib/anthropic/search-sources.ts`, otherwise "unverified, not a page
+  the search returned"); a market's link-preview card names its licence's
+  address and "cropped, words added". Whether a card is offered under
+  BY-SA, and the BLS retrieval date, are the owner's (WILL_TODO).
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
@@ -1025,6 +1509,42 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   whose target id is missing. Never crawl a local `next start` while a
   build runs, and never leave one running across a rebuild: an ISR page it
   re-renders overwrites the fresh build's prerender with its stale code.
+- What a visitor waits for and downloads (research pass 25, 2026-10-05,
+  measured from a local build in Chromium on a 4x-throttled phone and a
+  laptop; the scripts are the pass's, and live-verify's PAGE WEIGHT lines
+  print each page's encoding, bytes and first byte from the live site).
+  Five rules, each measured:
+  - **A page shows before its slowest read.** A route's `loading.tsx` is
+    one Suspense boundary around the whole body, so an async section with
+    no boundary of its own holds the page behind the skeleton until it
+    answers: /market waited 7.1–7.4 s for a retried read although its bytes
+    arrived in 60 ms. Each live section below the explorer streams in its
+    own `<Suspense fallback={null}>` (largest paint 7,368 → 1,416 ms on the
+    phone).
+  - **A table every signed-in reader reads alike is read once an hour for
+    all of them** (`lib/research-read`: `benchmarks`, `regulatory_rules`
+    and the property database's counts, each granted to authenticated
+    readers `using (true)`), and only for a reader who is signed in — a
+    visitor with no account reads the checked-in files, as before. A card
+    built on a table a visitor cannot read is drawn only for a signed-in
+    reader (the weekday intel card told every visitor "Nothing notable").
+  - **No data table reaches a browser** (`lib/client-bundle-tables.test.ts`,
+    above under the rates).
+  - **An animation moves opacity or a transform, never a shadow.** A moving
+    box-shadow repaints its element on every frame: the homepage's two
+    glows painted 872 ms in five seconds on the phone, forever; drawn once
+    on an `::after` layer whose opacity moves, 63 ms.
+  - **A stored picture's URL names its version** (`pictureVersion` in
+    lib/deal-banner: the stamp its files carry, which every stored picture
+    gets anew), and the picture route answers a URL naming the current
+    version `private, max-age=31536000, immutable`; anything else is
+    revalidated as before. Every pipeline card had asked its picture again
+    on every view, each answer behind a sign-in check and a read of the
+    deal.
+  The sign-in page does not prefetch /demo (141 KB of its scripts a phone
+  fetched on every visit). A market band keeps its slots when its picture
+  fails (`CityPhotoView`), so the hero no longer jumps (CLS 0.37 → 0.0002
+  at 1280).
 - The page on paper: `app/globals.css` ends with one `@media print` rule
   setting `print-color-adjust: exact` page-wide, because **every picture on
   this site is a background colour** and browsers drop those when printing
@@ -1067,9 +1587,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   ledger is open on the async context, `runAnalysis` writes the summary to
   `analysis_jobs.usage` (migration 0035) and one log line, Ask logs its
   own; the list prices live in `lib/anthropic/models.ts` (`PRICES`, by id
-  prefix) beside the model levers, whose comment says the one thing to
-  know: the prompt cache is per model, so the OM-reading steps move
-  together or not at all. The operator's picture is the pure
+  prefix) beside the model levers, whose comment says what is and is not
+  known: the cache is per model, and whether one step reads another's
+  cache of the OM is not established (each step sends its own
+  structured-output format, which the API turns into a system prompt of
+  its own), so a screen's cost is read off its ledger, never assumed
+  (research pass 41). The operator's picture is the pure
   `app/(app)/data-health/cost-card.tsx`, rendered on fixtures in
   `lib/cost-card.render.test.ts`. **Beside it, what each feed last
   wrote** (#383): `lib/feed-health.ts` (pure) judges every pull on ITS
@@ -1257,9 +1780,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photograph is the name linked to it, several are the name and then each
   place linked to its own page ("Bruce Emmerling (Downtown Richmond;
   Downtown Norfolk from the Elizabeth River)"), under "Photographs by".
-  The parts are `lib/credit-parts.ts` (no imports) and
-  `app/credit-parts.tsx`, so a client component draws a linked credit
-  without loading the table; the deal page's Market view links it and says
+  The parts are `lib/credit-parts.ts` (no imports; the grid's line is
+  built there too, `galleryCreditLineOf`, from each photograph's credit as
+  data) and `app/credit-parts.tsx`, so a client component draws a linked
+  credit without loading the table: `CityPhoto` is a server component that
+  looks the market up and hands its client half (`CityPhotoView`, which
+  holds the fallback) the two pictures and their credits as data, and the
+  pipeline's cards carry each market photograph's credit
+  (`BannerSource.marketCredit`), drawn under them by
+  `GalleryCreditPartsText` (research pass 25: the 211-row table had been in
+  the JavaScript of ten public pages and the pipeline); the deal page's
+  Market view links it and says
   "cropped to fit", and the full-screen viewer, which shows the photograph
   whole, links it without. **A band's credit comes after its words in the
   markup** (`PlaceBackdrop` takes the words as children, `CityPhoto` draws
@@ -1281,8 +1812,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   that is why the fallback is in the component and not the route, because
   naming the wrong photographer is a licence breach. An overhead stays only
   where the subject is one building (deal header, pipeline thumbnail, memo
-  cover, shared screen); there `lib/imagery.ts` already prefers a Street
-  View photograph when `GOOGLE_MAPS_API_KEY` is set. A market with no
+  cover, shared screen); `lib/imagery.ts` can put a Street View photograph
+  ahead of it when `GOOGLE_MAPS_API_KEY` is set, but the deal page and the
+  compare columns never ask for one whatever the key (a544615: each draws
+  a non-Google map or overhead beside its pictures, which Google's terms
+  forbid beside Street View), so only the image route's callers that sit
+  beside no other map can. A market with no
   verified file keeps its overhead, so the table grows one photograph at a
   time. **Never write a filename, author or licence into that table from
   memory**: the sandbox cannot reach Commons (403 through its egress
@@ -1353,7 +1888,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  One hundred and sixty-seven are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Two hundred and twenty-eight are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1432,7 +1967,85 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   37236836751 — Rapid City and Bismarck — run 37236951448 — and Dover
   (West Loockerman Street, its credit the name inside "Tim Kiser (
   w:User:Malepheasant )", zori run 37240141265), Morgantown, Pittsfield
-  and Winchester — run 37237349944), each judged
+  and Winchester — run 37237349944; then round 12: Lake Havasu
+  City-Kingman (London Bridge from the water, wreaths on its piers), Hot
+  Springs, Carson City (the Capitol's cupola) and Casper (the city across
+  the plain from Casper Mountain, the round's weakest) — run 37277388755 —
+  Bangor, Glens Falls (Lake George, named for the metro area), Amherst
+  Town-Northampton (UMass Amherst in autumn), Dubuque and La Crosse (a
+  4.78:1 frame, the table's widest, which a 3x phone's card draws about
+  1.3x) — run 37278011774 — and Brunswick-St. Simons (the Sidney Lanier
+  Bridge), Fairbanks-College and Eau Claire — run 37278486927 — with
+  Gettysburg (cannons on Seminary Ridge), Jefferson City (the Capitol from
+  the air, its credit "KTrimble at English Wikipedia" as printed) and
+  Great Falls (the falls on the Missouri) from a one-market run each
+  (37279345706, 37279496897 and 37279768946); then round 13: Aguadilla
+  (the town on its bay) — run 37287443715 — Racine-Mount Pleasant (Wind
+  Point Lighthouse from a drone), Saginaw (downtown across the river) and
+  Kenosha (the red North Pier lighthouse, its credit "Wrongdave at English
+  Wikipedia" as printed) — run 37287680216 — with Ponce (its port under the
+  mountains, from the search door), Mayagüez (Los Morrillos lighthouse at
+  Cabo Rojo, named for the metro area) and Lexington Park (Calvert Cliffs,
+  named for the metro area: the 2023 delineation puts Calvert County in
+  it) from a one-market run each (37288646346, 37288750601 and
+  37288974243); Ponce's and Aguadilla's are U.S. Army Corps of Engineers
+  film scans about 1500px wide, served at their own width as Erie's is;
+  then round 14: Beckley (the New River Gorge Bridge, named for the
+  metro area), Twin Falls (Shoshone Falls, named for the metro area),
+  Altoona (the city from a hill), Wheeling (downtown across the Ohio,
+  "Wheeling, WV") and Sandusky (Cedar Point from the air) — run
+  37313470791 — Mount Vernon-Anacortes (the Skagit Valley's tulip fields),
+  Wenatchee-East Wenatchee (Lake Chelan in winter, named for the metro
+  area as Glens Falls' Lake George is) and Farmington (Shiprock, its
+  credit the name inside the "Dave Bunnell redirect" the runner printed,
+  which is the file page's Author field whole, an account with no user
+  page: zori probe_url run 37329561789) — run 37313645151 — Michigan
+  City-La Porte (the pierhead lighthouse at dusk), Muskegon-Norton Shores
+  (downtown across Muskegon Lake) and Johnstown (the city from the
+  Inclined Plane) — run 37314140256 — with Lawton (the Wichitas at a
+  winter sunrise, from the Wildlife Refuge's category) and Homosassa
+  Springs (Three Sisters Springs) from a one-market run each (37321853635
+  and 37321374937); then round 15: San Angelo (the Concho River) — run
+  37330183778 — Greenville (North Carolina; the city from a rooftop at
+  sunset, its credit the photographer and the agency as printed) and
+  Blacksburg-Christiansburg-Radford (Burruss Hall across the Drillfield,
+  the title kept whole) — run 37330328150 — Waterloo-Cedar Falls
+  (downtown across the frozen river), Wausau (downtown at dusk from a
+  drone, a 2.89:1 frame served at 2400) and Sheboygan (its riverfront) —
+  run 37330877189, Wausau's credit the account whose user page its file
+  page's Author field links and Sheboygan's an account whose user page was
+  never created, each as printed (zori probe_url run 37343970376) — with
+  Pueblo (the Historic Arkansas Riverwalk, from its category) from a
+  one-market run (37340733360); then round 16: Bloomington (Illinois; its
+  domed stone building), Janesville-Beloit (downtown Beloit, the title kept
+  whole) and Mankato (the Union Depot) — run 37349000346 — Owensboro (the
+  Natcher Bridge from the air) and Sherman-Denison (Denison's Main Street,
+  the title kept whole) — run 37349135113 — Parkersburg-Vienna (the
+  Blennerhassett Mansion) — run 37349271496 — Midland (Michigan; the
+  Tridge at dusk, from its category) from a one-market run (37381601175),
+  and, from one-market runs for round 15's markets, Florence-Muscle Shoals
+  (the O'Neal Bridge; 37382918468) and Valdosta (the courthouse, its
+  finial rod cut at 21:9; 37382707897); four credits are account names as
+  printed (WVhybrid, Renelibrary, Visit Beloit and Noahmcdonald1, the
+  last though the file's name says Noah McDonald), each its file page's
+  Author field with no other attribution asked, as zori probe_url runs
+  37382024313 and 37383378486 printed them; then round 17: Albany
+  (Oregon; a green truss bridge from a pier, an Oregon State Archives
+  photograph), Anniston-Oxford (a downtown Anniston street, the title
+  kept whole), Bay City (the riverfront across the Saginaw) and
+  Burlington (North Carolina; its tallest building from the air) — run
+  37387656865 — Dothan (its tower and radar dome), Elizabethtown (the
+  LaRue County Courthouse, named for the metro area), Elmira (the city on
+  the Chemung) and Gadsden (Noccalula Falls, in a strong blue cast) — run
+  37388036901 — Cape Girardeau (the Bill Emerson Memorial Bridge, "Cape
+  Girardeau, MO", from a one-market run, 37388585938) and, from a
+  one-market run for round 16's markets, Lewiston-Auburn (the
+  Lewiston-Auburn Railroad Bridge; 37389070836); six credits are account
+  names or carry one as printed (Rivers Langley's "SaveRivers",
+  WeaponizingArchitecture, Ak1047, Prussian_Fool, Antony-22 and DSKEO),
+  each its file page's Author field with no other attribution asked, as
+  zori probe_url runs 37389642101 and 37389764574 printed them),
+  each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
   `cbsa:` row never draws; Hagerstown, Burlington (Vermont), Kalamazoo,
@@ -1465,8 +2078,61 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   reads as a map), Cheyenne (the file's own edge cuts the dome), Idaho
   Falls, Logan (the 21:9 cuts the summit), Redding (the Sundial Bridge's
   pylon lost at 21:9), Salisbury and Harrisonburg, so each keeps the
-  drawn cover too. A one-state title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); 35 of the 152
+  drawn cover too. Round 12 left Helena (its Capitol portraits lose the
+  dome's statue at 21:9, and its one view of the city is soft over a
+  hillside of new houses, one-market run 37279647195), Fort Smith (streets
+  under wires and signs, a flood plate and a postcard) and Corvallis (buses
+  under wires, an archive aerial that reads as a map, and the courthouse,
+  whose clock and cupola the 21:9 cuts) on the drawn cover. Round 13 left
+  Houma-Bayou Cane-Thibodaux (its one usable frame a hazy film-scan aerial
+  of Larose, run 37287680216), Monroe (its one frame a PNG), Gainesville
+  (Georgia; a cupola the 21:9 cuts and streets of parked cars),
+  Jacksonville (North Carolina), Yuma, Elkhart-Goshen (the courthouse's
+  author printed "unknown", its lantern trimmed at 21:9), Springfield
+  (Illinois; every Capitol frame behind cars and wires or cut at 21:9,
+  one-market run 37289191720), St. Cloud, Joplin (its sheet the 2011
+  tornado's cleanup), Warner Robins and Florence (South Carolina; a
+  big-box centre's parking) on the drawn cover. Round 14 left Columbus
+  (Indiana; the Miller House and two postcards, its architecture
+  categories never reached), Grand Island (a crane sunrise that names no
+  place on the river), Walla Walla, Sioux City (its skyline under the
+  words, one-market run 37321660533) and Lewiston (the confluence a film
+  scan with a scanner's line down it) on the drawn cover. Round 15 left
+  Abilene (its skyline a silhouette under power lines), Wichita Falls (its
+  blocks a low row under the words), Odessa, Valdosta, Albany (Georgia),
+  Florence-Muscle Shoals, Paducah, Terre Haute (the courthouse's dome cut
+  at 21:9; one-market run 37332047933), Ames (a garden courtyard;
+  one-market run 37341240059), Manhattan (Kansas; the town soft and small
+  from a hill; one-market run 37341627920) and Grand Forks (an aerial that
+  reads as a map) on the drawn cover, and a one-market run each for round
+  14's Columbus (Indiana; 37343088880), Grand Island (the courthouse's
+  cupola cut at 21:9, and cranes on a Platte that names no place;
+  37343351814) and Walla Walla (the Blue Mountains a soft thin line over a
+  field; 37343538606) found nothing better. Round 16 left Oshkosh-Neenah, Muncie, Jackson
+  (Tennessee; one-market run 37381511168, two aerials that read as maps),
+  Texarkana, St. Joseph (two soft panoramas), Rome (Georgia; a monument's
+  finial cut at 21:9, one-market run 37381706466), Williamsport (the city
+  under wires and a washed-out valley, one-market run 37381804176),
+  Lewiston-Auburn (drone frames that read as maps), Lebanon
+  (Pennsylvania), Pocatello and Pinehurst-Southern Pines (a golf hole that
+  names no place) on the drawn cover, and a one-market run each for round
+  15's Abilene (37382378067), Wichita Falls (37382472733), Odessa
+  (37382579601), Paducah (37383040068), Grand Forks (37383135473) and
+  Albany (Georgia; 37383227834) found nothing better. Round 17 left Alexandria
+  (Louisiana), Battle Creek, Chambersburg (its courthouse's cupola cut in
+  both crops), Cleveland (Tennessee; its one strong frame, Craigmiles Hall
+  from a drone, carries a studio's watermark that the full-screen viewer
+  would show), Dalton (a plain modern courthouse), Decatur (Alabama;
+  one-market run 37388724728, cranes and a low riverfront), Decatur
+  (Illinois; its downtown behind a signal head, one-market run
+  37388651151), El Centro (field patchworks that read as maps) and Fond
+  du Lac (one-market run 37388499210, a hazy main street) on the drawn
+  cover, and a one-market run each for round 16's Muncie (37388875891),
+  St. Joseph (37388961347), Lebanon (Pennsylvania; 37389183232),
+  Pocatello (the city small from Howard Mountain; 37389259456) and
+  Pinehurst-Southern Pines (37389358864) found nothing better. A one-state
+  title is mostly kept whole (the card
+  truncates a long one and the deal page shows it in full); 36 of the 211
   are cut, most to their first city, three to the city the place is known
   by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
   name (Boise, Honolulu). A two-state title is cut to
@@ -1698,7 +2364,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   shape of the curve, and the two rules) with `lib/live-rates-read.ts`
   (the `server-only` read) and `app/rates-strip.tsx` (the pure strip — at
   the app root beside `place-band.tsx` because `/tools` and `/market` both
-  draw it). **The series list is `data/fred-series.json` and nowhere
+  draw it). **A browser never loads the table** (research pass 25,
+  2026-10-05): lib/live-rates parses it at its top, so everything that
+  needs no list of series — the shapes, ages and moves, the year-over-year
+  change, a year of permits, how a figure is said and dated, the curve, the
+  seeds, `treasuryForTerm`, `monthOf` (re-exported by lib/zori) and a row's
+  link (`seriesUrlOf`) — is `lib/live-rates-core.ts`, which lib/live-rates
+  re-exports, and every module a client component reaches imports the core
+  (/tools' cards, lib/metro-supply, lib/debt-index). The table had been in
+  the JavaScript of /tools, /demo and every deal page, 313 KB raw.
+  `lib/client-bundle-tables.test.ts` walks every client module's value
+  imports, through to the end and stopping at a "use server" module, and
+  fails on a path to any `data/*.json` or to lib/skyline's table.
+  **The series list is `data/fred-series.json` and nowhere
   else**: the cron script and the module both import it, so the two cannot
   disagree about what a series is, and `readSeriesTable` REFUSES a
   malformed entry rather than skipping it (a skipped entry is a series the
@@ -3536,10 +4214,51 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     and the workbook read it too.
   - The location cache is kept with the address it was resolved for
     (`geoFor`, `geoKey`: the line and whether it named a street;
-    `GEO_VERSION` 3), and a Street View verdict with the point it was
-    reached for (`checkedFor`). Before, an edited address kept the old
-    one's point, so the aerial, the pin and the flood zone showed the old
-    place for up to a month.
+    `GEO_VERSION` 3). Before, an edited address kept the old one's point,
+    so the aerial, the pin and the flood zone showed the old place for up
+    to a month.
+  - **Nothing Google answers is kept** (2026-10-05). Its Street View
+    policies, as the runner printed them (zori probe run 37258453291):
+    "Content pre-fetching, indexing, storing, or caching is generally
+    prohibited, except for place IDs and panorama IDs"; and a metadata
+    request comes "without consuming quota" (run 37258539449). So
+    `fetchStreetViewImage` asks the metadata on every request, reads the
+    panorama's position for that request's camera heading and drops it;
+    the deal's cache had kept the verdict and the panorama's coordinates
+    for 30 days, and `writeCache` now drops them from an older row
+    (`withoutGoogleContent`). Every route that can answer with a Google
+    image (the photo, image and aerial routes) sends `GOOGLE_NO_STORE`
+    (`private, no-store`, no validator) where they had told browsers to
+    keep it a day; `lib/google-imagery-terms.test.ts` scans for it. The
+    same page asks a web app showing the imagery for public Terms of Use
+    and a Privacy Policy linked in its footer, so every signed-in page
+    ends on Terms, Privacy and Security (`app/(app)/app-shell.tsx`).
+  - **Google's terms, before the key is set** (zori probe run
+    37262665824). The terms page states Google Maps' End User Additional
+    Terms of Service and the Google Privacy Policy, each linked, in the
+    words Google's terms ask for — but only while `googleConfigured()`, so
+    the page never claims a service it does not use. And a customer "will
+    not … display Street View imagery and non-Google Maps on the same
+    screen": `imagePlan`'s `google: false` drops Street View and the
+    satellite frame whatever the key says, the image route reads `?google=0`
+    into it (under a validator of its own), and the pipeline map's hover
+    card and every `DealAvatar` ask for it, since each sits over or beside a
+    Leaflet map of other tiles; and the deal page's picture
+    (`googleEnabled={false}`) and the compare columns are held off Google
+    whatever the key (a544615), since each draws USGS's aerial, FEMA's
+    flood map or an OpenStreetMap view beside its pictures. Nothing changes
+    until the key is set.
+  - **OpenStreetMap's credit follows its geocoder** (the batch-2 audit,
+    LOW-8): where the Census geocoder finds nothing, Photon (a geocoder on
+    OpenStreetMap's data) places the deal, and the location carries which
+    one did (`DealLocation.source`, `placedByOpenStreetMap`). Every picture
+    and map framed on such a point names OpenStreetMap after its own credit
+    (`OSM_LOCATION_PARTS` linked, `OSM_LOCATION_WORDS` where no link fits):
+    the deal page's aerial, flood view and map, the pipeline map, the
+    compare columns, the shared screen, the memo's cover and the report's
+    site page. The flood view's ring, and the report's, follow the aerial's:
+    no ring on a point placed on the street, its zone read "at the frame's
+    centre".
 - Where a deal is, by its county (#447). The markets' keyword lists name
   principal cities and a few counties, so a deal in Frisco, Irvine, Fort
   Lauderdale or Cranberry Township read its STATE's figures.
@@ -3705,6 +4424,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `todaysRatesLine` in the pipeline) and appends the line to the
     challenger's notes, after the document so the cache never moves; the
     first-draft model's reconciliation gets it through `liveDebtSeeds`.
+    Where SOFR is handed over the line ends on `SOFR_LEVEL_RULE`: a step
+    judges a floating loan against it but never writes its level, since
+    the New York Fed licenses its rates with a notice beside each figure
+    and a step's words reach the deal page and the shared screen with
+    none under them (the batch-2 audit, LOW-6).
   - **The Opportunity Zone answer names its round, as it stands on the day
     the page is read** (`opportunityZoneRead(flags, today)` in
     lib/site-flags/core, its dates held by a test to
@@ -3808,7 +4532,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photograph through the token-scoped `/api/share/[token]/picture` (only
   what is stored — a share never reads the memorandum — revalidated
   against the stored path, so a revoked link's picture stops with the
-  link), then the aerial, the credit following whichever loaded; the
+  link), then the aerial, the credit following whichever loaded — the
+  aerial of a street address ringing the building at its centre, as the
+  deal page does (`ring`, research pass 29; a neighbourhood placement's
+  centre is a district's and gets none); the
   memo's cover and so the report's first page take the photograph cut to
   the cover's pixels (`coverPictureFor`, `fitCover`), credited as the
   memorandum's or the reader's, the aerial behind it. Google's frames
@@ -3827,12 +4554,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   on desktop, and each card on a phone, opens on the deal's picture. The
   list of sources is `bannerSources` in `lib/deal-banner.ts` (pure, in
   `imagePlan`'s order): the deal's own cached photograph, then Street
-  View where the key and a street address allow, then the USGS aerial —
-  no Google satellite at card size. Each source is PINNED to one route, so
+  View where the key and a street address allow (the compare page passes
+  `googleEnabled: false` since a544615, so never there), then the USGS
+  aerial — no Google satellite at card size. Each source is PINNED to one route, so
   the corner credit is exactly the picture on screen. `DealBanner` (client)
   advances to the next source when one fails, and the credit follows it.
-  Nothing loads, or there is no address and no photograph: a blank plate
-  with the building mark holds the slot. A picture that failed before
+  Nothing loads, or there is no address and no photograph: the deal's
+  drawn cover holds the slot, as on its pipeline card, with its stored
+  photograph's blur-up while it loads (research pass 29; the compare
+  page had passed neither, so its columns showed a dashed plate). The
+  compare columns keep the aerial, where two columns' overheads tell two
+  buildings apart. A picture that failed before
   hydration fired its `error` with no listener, so the banner also checks
   on mount (`complete` with no `naturalWidth` is a failure). The
   pipeline's `DealThumb` makes the same check, and since #420 it shows
@@ -3845,7 +4577,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   column: beside the picture, the column left the name "The Maddox /
   at…". **The pipeline opens as cards** (#428, `DealTile` in
   `app/(app)/deals/pipeline.tsx`, the Dealpath / listing-site pattern): a
-  card a deal in a grid (one column on a phone, up to four wide), led by
+  card a deal in a grid (one column on a phone, up to four wide — as many
+  columns as hold a card of 17.5rem, counted from the grid's own width,
+  `PIPELINE_CARD_GRID` in lib/pipeline-view, research pass 29: it had gone
+  two-up at `sm` while the sidebar arrives at `md`, so from 768 to 1023 a
+  card was 222–250px and its market caption collapsed), led by
   the building's picture through `DealBanner` at `CARD` (720×450, 16:10)
   with the call on it as a solid chip, the flood / interest / assumable
   tags on it, then the name, the class and place, and price, cap (or yield
@@ -3865,10 +4601,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photograph of its own borrowing its metro's through `metroAliasOf`),
   handed to `bannerSources` as `market` by the pipeline page only (two
   compare columns in one market would show one skyline twice). The card
-  names it on its face — "Market photo" over the market's name on a shade
-  at the foot (`data-picture="market"`), the photographer and licence
-  beside it (`photographerLine`), the place in its alt text with "No
-  photograph of the building yet" — and `lib/market-picture.test.ts`
+  names it on its face — "Market photo" over the market's name, two lines
+  at most across the caption's whole width, the photographer and licence
+  under it (`photographerLine`), on a black scrim at the foot
+  (`data-picture="market"`, `MARKET_CAPTION_SCRIM`: 80% at the foot, 62%
+  at the words' top, eased to nothing across the padding above them, its
+  stops the caption's own box so a longer wrap cannot outrun them) — the
+  place in its alt text with "No photograph of the building yet". The 9px
+  eyebrow over a light gradient had fallen under 4.5:1 on 94 of 209 served
+  photographs on a phone's card (research pass 29);
+  `lib/market-caption.contrast.test.ts` holds every line's white to AA
+  over a pure white frame at every point it can reach, for one and two name
+  lines and one to four credit lines, at both sizes. `lib/market-picture.test.ts`
   holds every market the site covers to having a photograph for its
   cards, its own or its metro's. The compare pick sits beside the call,
   clear of the caption. **No overhead on the pipeline at all** (#442):
@@ -3878,17 +4622,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `app/(app)/deals/deal-cover.tsx`): an evening illustration of its kind
   of building (`coverKindFor` through `assetClassKey`: an apartment block,
   homes, an office tower, a warehouse, a storefront, a hotel, storage
-  doors, a staked parcel, a plain building — lit from a low sun, some
-  windows glowing, a distant city or hills behind) under one of eight
-  skies picked by hashing the deal's id (`coverToneFor`, the old
-  gradients' index, so a deal keeps its hue), with the deal's own draw
-  (`coverVariantFor`) of the sun, the lit windows and the building's form,
-  so two deals of one kind are two buildings; and at a card's foot "No
+  doors, a staked parcel with a survey flag, a plain building — a distant
+  city or hills behind) under one of twelve skies picked by hashing the
+  deal's id (`coverToneFor`; the four added skies of research pass 29's
+  second round moved a third of deals to a new hue, once), with the deal's
+  own draw (`coverVariantFor`) of its hour (an evening half the time, a
+  night with a moon and stars, or a misted morning), the side the light
+  comes from (the scene mirrored), where the building stands, a lower
+  street beside it and up to two trees, so two deals of one kind are two
+  scenes (`COVER_EDITION` 3); and at a card's foot "No
   photo yet" over its place (`coverPlace`: the address's city and state,
   else the market's name, else the memorandum's words) — the market
   caption's type, and its accessible name saying there is no photograph of
   the deal yet. A wide frame's horizon sits at 72%, so the words sit on the
-  ground on the smallest card (224×140), and `lib/deal-cover.test.ts` holds
+  ground on a card of 140px (the grid now draws none under 17.5rem where one
+  fits; the test keeps 140 as its floor), and `lib/deal-cover.test.ts` holds
   the place to AAA and the eyebrow to AA over the worst pixel under each
   line, before the shade, across every kind and sky. The list row's thumbnail had asked the image route for
   "the best picture", which fell to the USGS aerial for every deal
@@ -3925,7 +4673,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (a picture that fails to load hands the lead to it), the aerial, the
   flood map and the map one step along the filmstrip, "Add photo" on it.
   Both surfaces draw ONE caption, `MarketCaption`
-  (`app/(app)/deals/market-caption.tsx`, pure). The List view is one
+  (`app/(app)/deals/market-caption.tsx`, pure). On a phone the filters
+  fold behind one row (research pass 29): the search and a summary saying
+  how many are set ("Filters · 2 set", `filtersFoldLabel`), open by itself
+  when any is; from 640px up the selects sit in the row as before. Four
+  selects stacked two by two had pushed a phone's first photograph to
+  y=884 of an 844px screen; folded, it starts at 758. The selects follow
+  the `<details>` rather than sit in it, since a closed details hides its
+  contents at every width. The List view is one
   `ViewToggle` away; the choice of cards or list is a cookie the page
   reads, so the server draws the view the reader left without a flash of
   the other, and the map is opened for a visit and never landed on
@@ -3959,8 +4714,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   that fails takes its view away as the view failing would. **Every view
   opens full screen** (#445, `app/(app)/deals/[id]/photo-viewer.tsx`): a
   click on the picture, or the expand control at its top left (the top
-  right is Replace photo; never over the map), opens `PhotoViewer`, a
-  dialog over the page with the views one at a time at the largest size
+  right is Replace photo, on the deal's own photographs only where it has
+  one — never over the flood map, the aerial or the map, where it read as
+  "replace this map"; "Add photo" on whatever leads where it has none:
+  `photoControlOn` in lib/property-views), opens `PhotoViewer`, a solid
+  black dialog over the page with the views one at a time at the largest size
   the site holds them (the overheads at 1280 × 960 rather than the
   header's band), each with its own view's credit, the building ringed on
   an overhead of a street address, the arrows, the arrow keys and a swipe
@@ -3998,9 +4756,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     (Washington's 1600px frame was 616 KB) and real photographs from the
     contact sheets came out at 53–57% of their bytes — which makes a 2400px
     width affordable, so `SKYLINE_SRCSET` is 480 / 960 / 1600 / 2400 and
-    `PlaceBackdrop` offers it (`sizes`: the full width for a page's band,
-    the 72rem column for `MarketBand`): a phone takes 1600 and a dense
-    laptop 2400 where one 1400px file had been stretched twice over. The
+    `PlaceBackdrop` offers it: a phone takes 1600 and a dense
+    laptop 2400 where one 1400px file had been stretched twice over. A
+    band's `sizes` is worked out from its picture box at each window width
+    and the photograph's recorded shape (`bandSizes` in lib/skyline, from
+    `boxes`: `PLACE_BAND_BOXES`, `MARKET_BAND_BOXES` through
+    `pageColumnBoxes`, `WINDOW_BOXES` for the sign-in page), because a
+    band's height is set in pixels and a panorama covers it by its height,
+    wider than the band — Portland's 3.75:1 panorama had been asked for at a
+    phone's width and drawn 1.69× its file, the sign-in page's Baltimore
+    3.6× (research pass 29). `coverWidth` is the one copy of that
+    arithmetic, which `marketPhotoWidth` reads too. And a band crops each
+    photograph at its own focus where the table records one
+    (`SkylineShot.bandFocusY`, `object-position: 50% <y>%`, through
+    `CityPhoto`'s `bandFocus`, bands only — never a card or a tile): the
+    laptop band's 42% cut the crowns of Atlanta's, Houston's, Tampa's,
+    Jacksonville's, Cleveland's, Indianapolis's, Miami's and Orlando's
+    towers and the top of PG County's wheel, and sank Chicago's skyline
+    under the words, each judged by eye through the bands' own crops. The
     PHOTOGRAPHS step's byte counts are what a visitor downloads.
   - **A small photograph enlarged by us, not the browser.** A memorandum
     exported for email carries its cover at 600–900px; `derivePicture`
@@ -4015,10 +4788,29 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     way)
     and fade the picture in on `load` — never its progressive scans, never
     an empty frame; the mount check catches a load that finished before
-    hydration. The first four cards are `loading="eager"` and
+    hydration. **And nothing on the picture speaks for it until it has
+    loaded** (research pass 29, `BannerFace` in deal-banner.tsx): the
+    credit, the market's caption, the photograph count, the ring on an
+    overhead and the flip arrows and dots wait for the picture they
+    describe and fade in with it, and the count says "2 / 5" only once the
+    flipped-to photograph is whole — a card had worn "From the offering
+    memorandum", or a photographer's name and licence, over the drawn cover
+    for as long as a phone took to fetch the photograph. The first four cards are `loading="eager"` and
     `fetchPriority="high"` (React also emits a preload link for them), the
     rest lazy, and a card's picture zooms a little on hover
     (`motion-safe:`).
+  - **A card's own size** (research pass 29, second round): every stored
+    photograph keeps an 800px copy beside its hero (`size=card`, under the
+    hero's stamp, made from the photograph and never enlarged), and a
+    pipeline card offers the two in a `srcset` sized by the grid's
+    `PIPELINE_CARD_SIZES` — twelve cards on a 2x laptop downloaded 1,039 KB
+    where they had downloaded 3,240 KB, measured on 32 photographs. A
+    photograph stored before has its copy made from the hero on its first
+    ask and stored after the response onto the photograph still stored then
+    (`backfillCard`); the deletion sweep reaches a copy by its path even
+    where a later write lost its record (`picturePaths`). The shared screen
+    draws the stored photograph 16:9 below `sm` (the aerial keeps its one
+    frame), and a card's corner words are never under 10px.
   - **Its own colours first** (#463, the blur-up): every stored photograph
     carries a `preview` (`DealPicture.preview`) — the hero `PREVIEW_PX`
     (24) px on its long side as a WebP data URI, a few hundred characters,
@@ -4173,7 +4965,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   since a button inside an anchor is invalid), hidden at rest and shown on
   hover or focus, and always on a touch screen (`pointer-coarse:`); a
   horizontal swipe across the picture flips too, and a dot a photograph
-  (five at most, a window round the one on screen) says where you are.
+  (five at most, a window round the one on screen, on a dark pill so it
+  reads over any sky, and only with two photographs or more) says where
+  you are.
   `DealBanner` lays the one asked for (`slide`) over the lead photograph,
   fades it in once whole and moves the credit and the count ("2 / 5") to
   it only then; one that fails is dropped from the card's set
@@ -4194,8 +4988,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   picture), each credited with its page ("Memorandum, p. 7", the full
   credit as its title), each opening the viewer at itself, the last
   saying "+N more". The reader's Replace photo moves onto the cover tile,
-  and a tile that fails drops the mosaic back to the one picture. Checked
-  in Chromium at 390, 820 and 1280. **The full report prints them too**
+  and a tile that fails drops the mosaic back to the one picture. While
+  the mosaic is on screen the filmstrip leaves out the photographs it
+  shows (`mosaicRepeats` in lib/property-views — it had shown Photo 1–3
+  again under them); with another view open it keeps them all, the way
+  back included. Checked in Chromium at 390, 820 and 1280. **The full report prints them too**
   (#459): `galleryPhotosFor` (lib/memo/cover-aerial) reads up to
   `PHOTO_PAGE_MAX` (4) stored gallery heroes, cuts each to
   `PHOTO_PAGE_SIZE` (512 × 340, twice the 256 × 170 pt frame) by
@@ -4330,10 +5127,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   legend entry — FEMA maps it and leaves it undrawn**. A vector drawing is
   possible (`frameQuery` answers in 0.1–3 s) but New Orleans' polygons are
   228,000 vertices, 5 MB a frame, so the export stays the source.
-  **The sentence** (`floodZoneLine`) says the zone, FEMA's name for it and
-  what it means for a loan — a Special Flood Hazard Area needs flood
-  insurance on a federally backed loan, and the premium belongs in the
-  expense line — with FEMA's base flood elevation where it states one
+  **The sentence** (`floodZoneLine`) says the zone at the building's POINT
+  (FEMA's map at the geocoded point, never a determination for the
+  building), FEMA's name for it and what it means for a loan — in a
+  Special Flood Hazard Area of a community in the National Flood Insurance
+  Program, federal law (42 U.S.C. 4012a, runner-printed in zori probe run
+  37262925199) requires flood insurance on a loan from a federally
+  regulated or federal agency lender, or one Fannie Mae or Freddie Mac
+  buys; the lender's own flood determination decides; the premium belongs
+  in the expense line (`SFHA_INSURANCE`; "a federally backed loan", the
+  first wording, left a bank's borrower thinking the rule was not theirs,
+  research pass 31); outside one, federal law does not require it, though
+  a lender may still ask — with FEMA's base flood elevation where it states one
   (STATIC_BFE with its unit and datum; FEMA writes -9999 for none) or an
   AO zone's depth; the regulatory floodway (new building and fill
   restricted) and a V zone (storm waves add to the flood) say so; open
@@ -4371,7 +5176,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   - the deal context the Claude steps read (`floodContextLine`, passed to
     `dealContextFor` by the pipeline where the lookup has answered by the
     time the step runs): in an SFHA the expense line needs a flood premium
-    the seller's figures may not carry.
+    the seller's figures may not carry. The lookup records whether its
+    point was the building's (`SiteFlagsResult.pointIsBuilding`: a street
+    address placed at the house), and the line says "the building's point"
+    only then, else "the point the address was placed at", as the flood
+    view does; open water, an area the map leaves out and a bare Zone X are
+    said as that view says them.
 
   **The full report prints the map** (#427) on a page of its own, "The
   site", before the portfolio and the terms: `floodMapFor` takes the deal's
@@ -4433,12 +5243,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   a brief) under a third shape, `"caption"`: the proportional "band"
   scrim is 85% opaque at 55% of the height because a page's opening
   words can reach 60% up, and on a 256px card band that veiled the lower
-  half of every photograph. `CAPTION_SCRIM` is anchored in PIXELS to the
-  tallest words the band holds (an eyebrow over a name wrapped to two
-  lines on a phone, 110px), clear by 208px, and the band is 15rem / 21rem
-  so everything above that is picture; the contrast test imports the
-  stops and holds white to AAA and the accent eyebrow to AA at every
-  point the words reach, against the same pure-white frame. **A
+  half of every photograph. From `sm`, `CAPTION_SCRIM` is anchored in
+  PIXELS to the tallest words the band holds (an eyebrow over a name
+  wrapped to two lines, 121px), clear by 208px, and the band is 21rem so
+  everything above that is picture; the contrast test imports the stops
+  and holds white to AAA and the accent eyebrow to AA at every point the
+  words reach, against the same pure-white frame. **Below `sm` the
+  picture is a 14rem strip across the top with the words under it on the
+  band's own colour** (`MARKET_BAND_PICTURE`, `MARKET_BAND_WORDS_TOP`,
+  research pass 29 — the hero's answer): under the scrim a 240px phone band
+  had been a teal wash with no pixel of the photograph untouched, and
+  night frames went black; the strip has nothing over it but the fade
+  into the band at its foot, and the test holds it to more than half the
+  band whether the name takes one line or two. **A
   submarket opens on its metro's photograph** (#424): the submarket's
   metro is whatever its owner typed, so `metroForName`
   (`lib/market-match.ts`, pure) reads it only where the text says which
@@ -4626,7 +5443,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   check reads (`sectorJobsFor`), a stale sector kept and named with its
   date — as PLAIN DATA, because `deal-view.tsx` and `deal-sections.tsx`
   are client components and handing them the rows rather than the series
-  keeps the series table out of the browser bundle. `MetroDemandCard`
+  keeps the series table out of the browser bundle (held by
+  `lib/client-bundle-tables.test.ts`). `MetroDemandCard`
   (deal-sections.tsx, `data-bar="demand"`) draws it under the folded
   brief: the building's own sector full, the others faded, rental
   housing singling nothing out, each figure linked; the page threads it
@@ -4641,7 +5459,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   is an apartment building, so nothing is singled out. The bars are
   `app/demand-bars.tsx` (`DemandBars`), the ONE picture the deal page's
   client card and the demo's server card both draw, so it takes plain
-  rows and imports nothing but a type. **`metroDemand` takes the deal's
+  rows and imports nothing that holds a table: its supply sentence is
+  lib/metro-supply's, which reads lib/live-rates-core. **`metroDemand` takes the deal's
   CLASS, not a sector, and writes the sentence under the heading itself**
   (`intro`), because the sentence is the class's: rental housing runs on
   all payrolls; a class that reads no sector — storage, land, a net
@@ -4915,6 +5734,47 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   before any model call. `lib/anthropic/pipeline.test.ts` drives the real
   pipeline against a recording fake database — reproduce a failure there
   before fixing it.
+- When a screen stops (research pass 30, 2026-10-05). **One stall rule**:
+  `isStalled` (lib/screen-run) — a live run that has written no progress in
+  `STALE_MS` — feeds the pipeline's `listJobStatus`, the header's shimmer and
+  `verdictBehind`, which answers "stalled" beside "failed" and "running", so
+  no surface says a dead run is running: the memo and report routes refuse
+  with `memostalled` / `reportstalled`, the compare table and the meeting
+  workbook say "Stalled" / "Screen stalled", and on the deal page a stalled
+  run draws no rail, skeletons or pulsing tabs and Replace OM works. A job's
+  age is measured on the SERVER's clock (`JobLike.ageMs`, `jobAgeMs`: the
+  page's own read and the status route hand it over), never the browser's.
+  **A document's failure offers another document**:
+  `lib/anthropic/document-failures.ts` (no imports, so the client page and
+  the stopped-screen email read it) lists the failures a retry reads the
+  same way — no figures, past the page cap, a 413, the OM gone from storage,
+  no OM — and the banner offers Replace OM (or Attach OM) in place of "Try
+  again"; the provider's 400 offers both, until its own wording is printed
+  from the runner. **A deck is refused for length on pdfjs's count only**:
+  the byte counter over-counts an incrementally saved file (a 350-page deck
+  annotated in Acrobat read 700), so a count past the cap only asks
+  `checkPdfOpens`, and a file pdfjs cannot open goes on to the service.
+  **A result that did not save fails the run** (`writeResult` in the
+  pipeline): a write's error had been dropped, leaving the previous call
+  under a job marked done; the verdict is never synthesized over a failed
+  read of the deal's results. Storage and database failures name our
+  storage and our database (lib/anthropic/failure), a start that failed
+  says so (`startfail`, `reconcilestartfail`) and "already running" is said
+  only when a run is. A worker run's last failure names only the
+  interruptions it recorded (`lib/worker-interruptions.ts`: restart,
+  timeout, crash) and says a retry resumes from the last finished step. A
+  market check in a covered market that read none of its figures says so
+  (`MarketResult.liveReadFailed`, `lib/market-read-failed.ts`) on the deal
+  page, the shared screen and the report. The batch upload never offers a
+  retry the plan's limit will refuse (`lib/batch-run.ts`). Two warnings,
+  never refusals: the first signal names the document's kind
+  (`lib/document-kind.ts`: a lease, a rent roll or a T-12 uploaded as the
+  OM is said, with Replace OM), and the same file already on an earlier
+  deal is linked from the newer one (`lib/same-memorandum.ts`, by
+  `omFingerprint`). Past twice the reader's own median screen time — never
+  without a measured median — the progress bar says this one is taking
+  longer than usual, and the support link (`lib/support-link.ts`) carries
+  the deal, its id, the step and the page's sentence.
 - Dates, read on the day they are read (#490, research pass 20's time
   bombs, 2026-10-01: the whole suite was run at twelve future dates).
   - **Every Claude step is told today's date** (`lib/anthropic/today.ts`,
@@ -5099,7 +5959,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   The code verifier lives in the requesting browser's cookies — a link opened
   elsewhere fails, and the page says so. Tests drive the route and the proxy
   with a fake auth client (`lib/auth-callback.test.ts`,
-  `lib/supabase/proxy-session.test.ts`).
+  `lib/supabase/proxy-session.test.ts`). At the door (research pass 32):
+  every answer of the sign-in action carries the address it was sent with
+  and the field opens on it again (React empties a form once its action
+  runs); the sign-up notice names the address and says to open the link in
+  this browser (`accountCreatedNotice`); a weak password is said by the
+  service's own reasons and figures (`weakPasswordCopy`), never a rule the
+  project's settings may not hold; and a signed-out invitee on the way to
+  `/team/join/…` opens on Create account (`initialLoginMode`'s `next`).
 - The private bucket: `lib/storage-paths.ts` is the one definition of where
   objects live (`<userId>/<dealId>.pdf`, `…/<dealId>.model-tmp`,
   `documents/<dealId>/…`, `supplements/<dealId>/…`,
@@ -5168,7 +6035,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 - Claude PDF facts to design around: the 1M-context models (Opus 4.8, Sonnet 4.6)
   read PDFs up to ~600 pages / 32MB in one request; enable Citations for
   page-level "verify against source"; cache the OM across the pipeline steps to
-  keep cost down. These models use adaptive thinking (no `budget_tokens`).
+  keep cost down. Thinking is off as the screen's calls are made (none
+  sends a `thinking` field), and `MAX_TOKENS` is sized for the answers
+  alone; a newer model that thinks by default needs its caps reviewed
+  first (`lib/anthropic/models.ts`).
 - The broker-comp scrutiny step reads comps OUT of the OM itself — no external
   comps data source (deliberate: avoids data-licensing constraints). The
   SEPARATE public-records pull (`lib/public-comps/`, `/comps`) has its own
@@ -5199,7 +6069,14 @@ and token its minter chose, the free-deal cap can be dodged by an update, a
 user can put their own run back at the head of the worker's queue, and any
 signed-in account can write the alert banner's shared dismissal columns; the
 app's own writes pass it unchanged, and `CHECK_MIGRATIONS.sql` checks it
-(the first draft of part 4 reads ❌ there).
+(the first draft of part 4 reads ❌ there). **0037 (2026-10-05) runs after
+it**: a deal holds one live job row whoever writes it, and the two
+public-record lookups are held to the sizes the app asks for
+(`lib/public-record-asks.ts`, the one file both callers read). The worker
+holds to the same rules in code (`lib/worker-queue.ts`, pure): one run a
+deal at a time, its other queued rows closed as superseded, and one
+account's runs past `OWNER_QUEUE_SHARE` (the batch upload's four) waiting
+behind another account's.
 What remains is seeding and the operator's own accounts, not schema.
 
 ## Agents

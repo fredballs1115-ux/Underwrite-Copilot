@@ -29,9 +29,12 @@
 // show one skyline twice, where their overheads tell the buildings apart.
 
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
+import { withOsmLocation } from "@/lib/basemaps";
 import { DEAL_BANNER, DEAL_CARD, DEAL_THUMB } from "@/lib/image-frames";
 import { isPreview } from "@/lib/photo-preview";
+import { cardSrcSet, coverSlotSizes, type StoredPhotoSizes } from "@/lib/photo-srcset";
 import type { MarketPicture } from "@/lib/market-picture";
+import type { PhotoCredit } from "@/lib/credit-parts";
 
 export interface BannerSource {
   src: string;
@@ -47,6 +50,10 @@ export interface BannerSource {
   /** a market photograph's table id (lib/skyline), for the page's one
    *  credit line with the photographer's and the licence's links */
   marketId?: string;
+  /** a market photograph's credit as data — what it shows, its photographer
+   *  and its licence, each linked — so the page's one credit line is drawn
+   *  in the browser without lib/skyline's table (research pass 25) */
+  marketCredit?: PhotoCredit;
   /** a market photograph's alt text: what it shows, and whose it is */
   alt?: string;
   /** the deal's own photograph, not yet looked for in its memorandum
@@ -56,6 +63,48 @@ export interface BannerSource {
   /** the photograph's blur-up preview (#463, lib/photo-preview): drawn
    *  blurred in the frame until the photograph has loaded whole */
   preview?: string;
+  /** a stored photograph's card copy and its hero, each at its width
+   *  (lib/photo-srcset `cardSrcSet`, research pass 29): the browser takes
+   *  the copy wherever the card's slot allows. `src` stays the hero, the
+   *  source's identity */
+  srcSet?: string;
+  /** the photograph's shape, width over height, so a panorama's `sizes` says
+   *  the width it is drawn at to cover the card (lib/photo-srcset
+   *  `coverSlotSizes`) */
+  aspect?: number;
+}
+
+/**
+ * A stored photograph's card copy as a source carries it: the srcset of its
+ * card copy and its hero, and its shape — for the deal's own photograph and
+ * each gallery photograph a card flips to (`g`, from 1). Nothing where the
+ * hero is no longer than a card copy, or its sizes are not known.
+ */
+export function cardPictureSet(
+  dealId: string,
+  sizes: StoredPhotoSizes | null | undefined,
+  version?: string | null,
+  g?: number,
+): Pick<BannerSource, "srcSet" | "aspect"> {
+  const id = encodeURIComponent(dealId);
+  const at = g ? `&g=${g}` : "";
+  const srcSet = cardSrcSet((size) => `/api/deals/${id}/picture?size=${size}${at}${versionQuery(version)}`, sizes);
+  if (!srcSet) return {};
+  const w = sizes?.width ?? 0;
+  const h = sizes?.height ?? 0;
+  return { srcSet, aspect: Math.round((w / h) * 1000) / 1000 };
+}
+
+/**
+ * The `sizes` a source's picture is asked with: the slot's, where it offers
+ * one width; and where it offers a srcset, the width it is drawn at to cover
+ * a frame of `frameAspect` — wider than the slot for a panorama, so the
+ * browser never takes the card copy and stretches it. One rule for the
+ * card's picture and for the card's asking ahead for the next photograph.
+ */
+export function bannerSizes(source: BannerSource, slot: string | undefined, frameAspect: number): string | undefined {
+  if (!slot || !source.srcSet || !source.aspect) return slot;
+  return coverSlotSizes(slot, source.aspect, frameAspect);
 }
 
 export interface BannerFacts {
@@ -65,6 +114,13 @@ export interface BannerFacts {
   pictureCredit: string | null;
   /** its blur-up preview, where the photo cache holds one (#463) */
   picturePreview?: string | null;
+  /** the stored photograph's version (`pictureVersion`): carried in its
+   *  URL, so the browser keeps the picture until it is replaced */
+  pictureVersion?: string | null;
+  /** the stored photograph's sizes, where the surface offers its card copy
+   *  beside the hero (the pipeline's cards, research pass 29): its hero's
+   *  width and height and its card copy's width */
+  pictureSizes?: StoredPhotoSizes | null;
   /** no picture is cached but the deal's memorandum may hold one nobody has
    *  looked for (lib/deal-picture `pictureMayBeInMemorandum`): the picture
    *  route lifts the cover on this first ask, or answers 404 and the next
@@ -77,6 +133,14 @@ export interface BannerFacts {
   /** the address reaches a street — Street View at a district centroid
    *  photographs some arbitrary block */
   hasStreetAddress: boolean;
+  /** the aerial's centre is the building's own point (lib/deal-location
+   *  `pointIsBuilding`): only then is it ringed. Absent, the street address
+   *  decides, as it did before the point's precision was read. */
+  pointIsBuilding?: boolean;
+  /** Photon — a geocoder on OpenStreetMap's data — placed the point the
+   *  aerial is framed on (lib/deal-location `placedByOpenStreetMap`): its
+   *  credit names OpenStreetMap too (the batch-2 audit, LOW-8) */
+  osmPlaced?: boolean;
   /** the deal has an address at all — without one there is no overhead */
   hasAddress: boolean;
   /** the photograph of the deal's market, tried before the aerial — the
@@ -134,6 +198,45 @@ export function shownMarketIds(
   return out;
 }
 
+/** The credits of the market photographs on screen (`shownMarketIds`), in
+ *  the same order: each read off a card's own market source, so the line is
+ *  built from what the cards carry and never from the table. */
+export function shownMarketCredits(
+  cards: { id: string; pictures?: BannerSource[] }[],
+  reported: ReadonlyMap<string, string | null>,
+): PhotoCredit[] {
+  const byId = new Map<string, PhotoCredit>();
+  for (const c of cards) {
+    for (const p of c.pictures ?? []) {
+      if (p.kind === "market" && p.marketId && p.marketCredit && !byId.has(p.marketId)) byId.set(p.marketId, p.marketCredit);
+    }
+  }
+  return shownMarketIds(cards, reported)
+    .map((id) => byId.get(id))
+    .filter((c): c is PhotoCredit => c !== undefined);
+}
+
+/**
+ * A stored photograph's version: the stamp its files are stored under
+ * (`photos/<dealId>/<stamp>-<size>.jpg`, lib/storage-paths). Every picture
+ * the site stores — a memorandum's cover, a gallery photograph, an upload, a
+ * derivation under new rules — is written under a stamp of its own, so the
+ * stamp is the picture's identity. Carried in the picture's URL (`v`), it
+ * lets the route answer a matching request as never changing: research
+ * pass 25 found every card on the pipeline asking its picture again on
+ * every view, each answer a revalidation behind a sign-in check and a read
+ * of the deal. Null for a path not of that shape.
+ */
+export function pictureVersion(path: string | null | undefined): string | null {
+  const m = /\/([A-Za-z0-9]+)-(?:hero|thumb|full|card)\.jpg$/.exec(path ?? "");
+  return m ? m[1] : null;
+}
+
+/** `&v=<version>`, or nothing where the picture has none. */
+function versionQuery(version: string | null | undefined): string {
+  return version ? `&v=${encodeURIComponent(version)}` : "";
+}
+
 export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): BannerSource[] {
   const id = encodeURIComponent(f.dealId);
   const out: BannerSource[] = [];
@@ -142,9 +245,12 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
   if (f.pictureCredit) {
     out.push({
       kind: "photo",
-      src: `/api/deals/${id}/picture?size=${size}`,
+      src: `/api/deals/${id}/picture?size=${size}${versionQuery(f.pictureVersion)}`,
       credit: f.pictureCredit,
       ...(isPreview(f.picturePreview) ? { preview: f.picturePreview } : {}),
+      // The card copy beside the hero, where the surface handed the sizes
+      // over (research pass 29); a row's thumbnail is its own crop.
+      ...(size === "hero" ? cardPictureSet(f.dealId, f.pictureSizes, f.pictureVersion) : {}),
     });
   }
   else if (f.memorandumUnread) {
@@ -160,6 +266,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       credit: f.market.credit,
       market: f.market.name,
       marketId: f.market.id,
+      marketCredit: { place: f.market.place, author: f.market.author, license: f.market.license },
       alt: `${f.market.place}: the market this deal is in, ${f.market.name}. No photograph of the building yet.`,
     });
   }
@@ -168,8 +275,8 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
     out.push({
       kind: "aerial",
       src: `/api/deals/${id}/aerial?src=usgs&w=${frame.w}&h=${frame.h}${z}`,
-      credit: IMAGE_CREDIT.aerial,
-      ...(f.hasStreetAddress ? { marker: true } : {}),
+      credit: withOsmLocation(IMAGE_CREDIT.aerial, f.osmPlaced === true),
+      ...((f.pointIsBuilding ?? f.hasStreetAddress) ? { marker: true } : {}),
     });
   }
   return out;

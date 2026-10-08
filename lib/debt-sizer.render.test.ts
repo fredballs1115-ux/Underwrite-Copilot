@@ -11,6 +11,7 @@ import { DebtSizer } from "@/app/(app)/deals/[id]/debt-sizer";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { FLAT_SIZER_RATE_PCT, sizerStartingRate } from "@/lib/sizer-terms";
+import { inferStrategy } from "@/lib/deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const OM: ExtractionResult = {
@@ -160,6 +161,64 @@ describe("the debt sizer's opening sentence names where its starting figures com
       "Price, NOI and amortization from the first-draft model; the lender tests are screening defaults — replace them with a lender&#x27;s terms.",
     );
     expect(visibleText(html)).toContain("Rate starts from the screening model's 6.00% placeholder");
+  });
+
+  // Research pass 34: with a T-12 uploaded and no first-draft model, the
+  // sizer said "Price and NOI from the OM" and seeded the OM's in-place NOI
+  // while the playground's coverage ran the T-12's; an OM stating only a
+  // pro forma NOI seeded none ("needs an NOI") while the model ran it.
+  it("starts from the screening model's year-1 NOI — the playground's, the T-12's where uploaded — and says so", () => {
+    const t12 = {
+      summary: { collectedRent: null, vacancyLoss: null, otherIncome: null, egi: 4_400_000, opex: [], totalOpex: 1_800_000, noi: 2_600_000, noiDerived: false },
+      periodEnd: "2026-06-30",
+    };
+    const derived = deriveUnderwriteInputs(OM, "Harbor Point Apartments", { t12 });
+    const html = render({ model: null, extraction: OM, underwrite: derived.inputs, underwriteSources: derived.sources, rateSeeds: null });
+    clean(html);
+    expect(inputValue(html, "Year-1 NOI")).toBe("$2,600,000");
+    expect(opening(html)).toBe(
+      "Price from the OM, NOI from the screening model the playground and the workbook run; the amortization and lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+    // A stabilized OM that states only a pro forma NOI: the model runs it,
+    // and so does the sizer now.
+    const proForma: ExtractionResult = {
+      ...OM,
+      metrics: OM.metrics.map((m) => (/NOI/.test(m.label) ? { ...m, label: "NOI (pro forma)" } : m)),
+    };
+    const pf = deriveUnderwriteInputs(proForma, "Harbor Point Apartments");
+    expect(render({ model: null, extraction: proForma, underwrite: pf.inputs, rateSeeds: null })).not.toContain('value="$2,400,000"');
+    const seeded = render({ model: null, extraction: proForma, underwrite: pf.inputs, underwriteSources: pf.sources, rateSeeds: null });
+    expect(inputValue(seeded, "Year-1 NOI")).toBe("$2,400,000");
+    // An NOI the model had to assume is no NOI to start a loan from.
+    const unread: ExtractionResult = { ...OM, metrics: OM.metrics.filter((m) => !/NOI/.test(m.label)) };
+    const assumed = deriveUnderwriteInputs(unread, "Harbor Point Apartments");
+    expect(assumed.sources.inPlaceRentAnnual?.provenance).toBe("assumption");
+    const none = render({ model: null, extraction: unread, underwrite: assumed.inputs, underwriteSources: assumed.sources, rateSeeds: null });
+    expect(inputValue(none, "Year-1 NOI")).toBe("");
+    expect(opening(none)).toMatch(/^Price from the OM; /);
+  });
+
+  it("reads the deal's kind the page reads, the first signal included: a value-add the header names gets its plan block", () => {
+    const ex: ExtractionResult = {
+      ...OM,
+      metrics: [
+        { label: "Asking price", value: "$18,500,000", flagged: false, page: "p. 3" },
+        { label: "NOI (in-place)", value: "$1,100,000", flagged: false, page: "p. 8" },
+        { label: "NOI (stabilized)", value: "$1,337,800", flagged: false, page: "p. 9" },
+        { label: "Capital budget", value: "$2,850,000", flagged: false, page: "p. 10" },
+        { label: "Units", value: "100", flagged: false, page: "p. 3" },
+      ],
+    };
+    // Nothing in the rows names the plan; the first signal does.
+    expect(inferStrategy(ex).kind).toBe("stabilized");
+    const page = inferStrategy(ex, { take: "A value-add play: the renovation program carries the return — check the premium." });
+    expect(page.kind).toBe("value_add");
+    const d = deriveUnderwriteInputs(ex, "x");
+    const block = "Construction &amp; take-out — the plan&#x27;s debt";
+    expect(render({ model: null, extraction: ex, underwrite: d.inputs, rateSeeds: null })).not.toContain(block);
+    const html = render({ model: null, extraction: ex, underwrite: d.inputs, underwriteSources: d.sources, rateSeeds: null, strategy: page });
+    expect(html).toContain(block);
+    clean(html);
   });
 
   it("with nothing to start from, asks for the deal's figures and still names the defaults", () => {

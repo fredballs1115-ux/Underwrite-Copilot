@@ -1,6 +1,8 @@
 "use client";
 
+import { compactUsd } from "@/lib/money";
 import { useState } from "react";
+import { ScrollRegion } from "@/app/scroll-region";
 import { tallySentence, type ValuationBridge, type AggressivenessTally } from "@/lib/valuation/reconcile";
 import { FIELD_LABELS, VALUATION_FIELDS, type ValuationField } from "@/lib/valuation/types";
 
@@ -31,13 +33,7 @@ export interface ColumnData {
   };
 }
 
-const usd = (n: number): string => {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "−" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(abs >= 100_000_000 ? 0 : 1)}M`;
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs)}`;
-};
+const usd = (n: number): string => compactUsd(n, { wholeMillionsFrom: 1e8 });
 
 const FORMAT: Record<ValuationField, (n: number) => string> = {
   headlineValue: usd,
@@ -75,6 +71,7 @@ function CopyLine({ text }: { text: string }) {
           }
         }}
         className="shrink-0 rounded-md border border-brand px-3 py-1.5 text-sm font-medium text-brand transition hover:bg-brand hover:text-white"
+        aria-live="polite"
       >
         {copied ? "Copied" : "Copy"}
       </button>
@@ -208,7 +205,7 @@ export function ValuationsView({
   return (
     <div className="flex flex-col gap-6">
       {/* ── Comparison table ──────────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+      <ScrollRegion label="Valuations compared" className="rounded-lg border border-line bg-surface">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-line text-left">
@@ -248,7 +245,7 @@ export function ValuationsView({
                       ) : null}
                       {derived ? (
                         <span
-                          className="ml-1 rounded bg-caution/15 px-1 text-[10px] font-sans font-medium text-caution"
+                          className="ml-1 rounded bg-caution/10 px-1 text-[10px] font-sans font-medium text-caution"
                           title="Computed from a stated value and NOI — not stated on the page"
                         >
                           der
@@ -319,7 +316,7 @@ export function ValuationsView({
             </tr>
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
 
       <p className="text-xs leading-relaxed text-muted">
         Superscripts are page references — hover for the quote, click to open.{" "}
@@ -337,6 +334,20 @@ export function ValuationsView({
             {" "}
             <span className="font-medium">edited</span>
             {" = a figure you entered over the document’s, so it carries no page reference."}
+          </>
+        ) : null}
+        {columns.some((c) => c.notes?.headlineValue?.chip === "placeholder") ? (
+          <>
+            {" "}
+            <span className="font-medium">placeholder</span>
+            {" = no price was read from the memorandum, so your model runs on the site’s placeholder; its IRR is withheld."}
+          </>
+        ) : null}
+        {columns.some((c) => c.notes?.headlineValue?.chip === "no price") ? (
+          <>
+            {" "}
+            <span className="font-medium">no price</span>
+            {" = no price was read from the memorandum, and the figure the model backs out of its NOI is none; its IRR is withheld."}
           </>
         ) : null}{" "}
         A dash = the source is silent. The IRR row runs each price through your model; its
@@ -356,7 +367,7 @@ export function ValuationsView({
           <div className="rounded-lg border border-line bg-surface p-4">
             <ValueWaterfall bridge={bridge} />
           </div>
-          <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+          <ScrollRegion label="Value gap by driver" className="rounded-lg border border-line bg-surface">
             <table className="w-full min-w-[440px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
@@ -382,7 +393,7 @@ export function ValuationsView({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         </>
       ) : null}
 

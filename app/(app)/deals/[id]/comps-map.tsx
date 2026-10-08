@@ -8,6 +8,7 @@ import {
   BASEMAPS,
   BASEMAP_ORDER,
   DEFAULT_BASEMAP,
+  OSM_ATTRIBUTION,
   type BasemapId,
 } from "@/lib/basemaps";
 import { safeHttpUrl } from "@/lib/safe-url";
@@ -219,6 +220,12 @@ export function CompsMap({
         maxNativeZoom: base.maxNativeZoom,
         attribution: base.attribution,
       }).addTo(map);
+      // Every pin here was placed by Photon, a geocoder on OpenStreetMap's
+      // data, so the map credits OpenStreetMap over whichever basemap is
+      // drawn (lib/basemaps `OSM_ATTRIBUTION`, the guideline's own form).
+      // The street tiles' credit is the same string, and the control keeps
+      // one of each, so on the street map it reads once.
+      map.attributionControl?.addAttribution(OSM_ATTRIBUTION);
       L.control.scale({ imperial: true, metric: false }).addTo(map);
 
       if (subjectPos) {
@@ -449,7 +456,9 @@ export function CompsMap({
                     {c.n}
                   </span>
                 </td>
-                <td className="max-w-52 truncate py-2 pr-3 font-medium">{c.name}</td>
+                <td className="py-2 pr-3 font-medium">
+                  <CompName name={c.name} placed={!!c.pos} onShow={() => zoomTo(c)} />
+                </td>
                 <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs tabular-nums">
                   {c.distanceKm != null ? (
                     fmtMiles(c.distanceKm)
@@ -497,9 +506,33 @@ export function CompsMap({
   );
 }
 
+/** The Comp cell: the comp's name, and for a comp with a pin, a button that
+ *  flies the map to it, so what the row's click does is reachable from the
+ *  keyboard too. The name is cut here rather than on the cell, so the cell
+ *  never clips the button's focus ring. */
+export function CompName({ name, placed, onShow }: { name: string; placed: boolean; onShow: () => void }) {
+  return placed ? (
+    <button
+      type="button"
+      title="Show on the map"
+      onClick={(e) => {
+        e.stopPropagation();
+        onShow();
+      }}
+      className="block max-w-52 cursor-pointer truncate text-left"
+    >
+      {name}
+    </button>
+  ) : (
+    <span className="block max-w-52 truncate">{name}</span>
+  );
+}
+
+/** A sortable header. Every sort here runs ascending (A to Z, nearest
+ *  first), so the sorted header says so and the others say nothing. */
 function Th({ label, onClick, active }: { label: string; onClick: () => void; active: boolean }) {
   return (
-    <th className="py-1.5 pr-3 font-medium">
+    <th className="py-1.5 pr-3 font-medium" aria-sort={active ? "ascending" : undefined}>
       <button
         type="button"
         onClick={onClick}

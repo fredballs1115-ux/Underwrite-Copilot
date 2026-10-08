@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { coverSizes, headerPhotoSizes, mosaicTileSizes, photoAspect, photoSrcSet, viewerSizes } from "./photo-srcset";
+import {
+  CARD_PX,
+  cardSrcSet,
+  cardWidthOf,
+  coverSizes,
+  coverSlotSizes,
+  headerPhotoSizes,
+  mosaicTileSizes,
+  photoAspect,
+  photoSrcSet,
+  viewerSizes,
+} from "./photo-srcset";
+import { PIPELINE_CARD_SIZES } from "./pipeline-view";
 
 const url = (size: "hero" | "full") => `/api/deals/d1/picture?size=${size}`;
 
@@ -56,5 +68,49 @@ describe("the width a stored photograph is drawn at", () => {
       "(min-aspect-ratio: 1600/1067) calc((100vh - 11rem) * 1.5), (min-width: 640px) calc(100vw - 8rem), calc(100vw - 1rem)",
     );
     expect(viewerSizes(null)).toBe("(min-width: 640px) calc(100vw - 8rem), calc(100vw - 1rem)");
+  });
+});
+
+describe("a pipeline card's copy of a stored photograph (research pass 29)", () => {
+  const url = (size: "card" | "hero") => `/api/deals/d1/picture?size=${size}&v=lk2x9a`;
+
+  it("is 800px on its long side: stored, or the size a copy made from the hero will have", () => {
+    expect(CARD_PX).toBe(800);
+    expect(cardWidthOf({ width: 1600, height: 1067, cardWidth: 800 })).toBe(800);
+    // Stored before card copies: the copy the route will make from the hero.
+    expect(cardWidthOf({ width: 1600, height: 1067 })).toBe(800);
+    expect(cardWidthOf({ width: 1067, height: 1600 })).toBe(534);
+    // A hero no longer than a copy is its own card; no sizes, no copy.
+    expect(cardWidthOf({ width: 800, height: 533 })).toBeNull();
+    expect(cardWidthOf({ width: 1600 })).toBeNull();
+    expect(cardWidthOf(null)).toBeNull();
+  });
+
+  it("is offered beside the hero, each at its width, only where it is the smaller", () => {
+    expect(cardSrcSet(url, { width: 1600, height: 1067, cardWidth: 800 })).toBe(
+      "/api/deals/d1/picture?size=card&v=lk2x9a 800w, /api/deals/d1/picture?size=hero&v=lk2x9a 1600w",
+    );
+    // A small cover's copy is its own pixels, under its enlarged hero.
+    expect(cardSrcSet(url, { width: 1200, height: 750, cardWidth: 700 })).toContain("size=card&v=lk2x9a 700w");
+    expect(cardSrcSet(url, { width: 800, height: 533 })).toBeUndefined();
+    expect(cardSrcSet(url, { width: 1600, height: 1067, cardWidth: 1600 })).toBeUndefined();
+    expect(cardSrcSet(url, undefined)).toBeUndefined();
+  });
+
+  it("is asked for at the card's own width, wider for a panorama that covers the card by its height", () => {
+    // No wider than the card's 16:10: the card's sizes, as the grid writes them.
+    expect(coverSlotSizes(PIPELINE_CARD_SIZES, 1.5, 1.6)).toBe(PIPELINE_CARD_SIZES);
+    expect(coverSlotSizes(PIPELINE_CARD_SIZES, 0.75, 1.6)).toBe(PIPELINE_CARD_SIZES);
+    // 2.4:1 in a 16:10 card is drawn 1.5 times the card's width: every
+    // width the grid writes, scaled, and the media conditions untouched.
+    const wide = coverSlotSizes(PIPELINE_CARD_SIZES, 2.4, 1.6);
+    expect(wide.split(", ")).toHaveLength(PIPELINE_CARD_SIZES.split(", ").length);
+    expect(wide).toContain("(min-width: 1520px) calc(292px * 1.5)");
+    expect(wide).toContain("(min-width: 1472px) calc((25vw - 88px) * 1.5)");
+    expect(wide.endsWith(", calc((100vw - 40px) * 1.5)")).toBe(true);
+    // A length with nested parentheses keeps them whole.
+    expect(coverSlotSizes("(min-width: 600px) min(50vw, calc(100vw - 20px)), 90vw", 3.2, 1.6)).toBe(
+      "(min-width: 600px) calc(min(50vw, calc(100vw - 20px)) * 2), calc(90vw * 2)",
+    );
   });
 });

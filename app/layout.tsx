@@ -17,8 +17,16 @@ const APP_URL =
 // This `metadata` export is how Next.js sets the <title> and <meta> tags —
 // it's what shows in the browser tab, in Google results, and in link previews.
 // Colors the browser chrome (mobile address bar) to match the brand.
+//
+// The site is one light design (no dark theme, no prefers-color-scheme), and
+// says so: `<meta name="color-scheme" content="only light">`. A phone that
+// darkens websites — Chrome Android's "Darken websites", Samsung Internet's
+// dark mode — inverted a page that declared nothing, and every black tick a
+// panel draws its comparison against (a model's sale, RevPAR's 100, a PML's
+// 20%) went dark on dark (research pass 36). "only light" opts out.
 export const viewport: Viewport = {
   themeColor: "#0c3338",
+  colorScheme: "only light",
 };
 
 export const metadata: Metadata = {

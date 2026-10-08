@@ -142,6 +142,17 @@ describe("the reports a memorandum cites, read (#465)", () => {
     expect(readSiteReports(null, ASOF)).toBeNull();
   });
 
+  it("reads a repairs total with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no total.
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$630,000 (short-term and life-safety items)")]), ASOF)!.pca!.immediate).toBe(630_000);
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$400,000-$600,000")]), ASOF)!.pca!.immediate).toBeNull();
+    // A year after a dash, or a span of years beside the total, is words
+    // after it (audit C3a), never a range.
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$630,000 – 2025 PCA")]), ASOF)!.pca!.immediate).toBe(630_000);
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$630,000 (2025–26 report)")]), ASOF)!.pca!.immediate).toBe(630_000);
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$400,000 to $600,000")]), ASOF)!.pca!.immediate).toBeNull();
+  });
+
   it("reads a row that states nothing as no row, never as a clean report", () => {
     // "N/A" is not "None": a Phase I whose finding nobody states was not found clean.
     expect(readSiteReports(deal([row("Phase I ESA findings", "N/A")]), ASOF)).toBeNull();

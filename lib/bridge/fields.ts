@@ -10,6 +10,8 @@
  * Pure, typed, no I/O.
  */
 
+import { compactUsd } from "@/lib/money";
+
 /** A leaf value inside an assumption object. Arrays appear here only when the
  *  two sides being compared have DIFFERENT lengths — the array is then treated
  *  as one atomic driver ("Expense lines") rather than a set of index paths that
@@ -221,13 +223,7 @@ export function fieldFormat(path: FieldPath): FieldFormat {
   return "number";
 }
 
-const usd = (n: number): string => {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2)}M`;
-  if (abs >= 10_000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs).toLocaleString("en-US")}`;
-};
+const usd = (n: number): string => compactUsd(n, { millions: "auto", thousandsFrom: 1e4 });
 
 /** Render a leaf value for the bridge table / sentence. */
 export function formatFieldValue(value: LeafValue, format: FieldFormat): string {

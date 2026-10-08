@@ -8,6 +8,7 @@ import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassLabel } from "./asset-class";
 import { pickSlots, readingTerms, shownAssetClass } from "./pipeline-slots";
 import { noteCapSlot } from "./compare-interest";
+import { yieldOnCostText } from "./plan-facts";
 
 describe("shownAssetClass — a row never says \"Auto\"", () => {
   it("shows the stored class, the extraction's read for an auto-detect deal, and nothing before any read", () => {
@@ -49,7 +50,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
+    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, plan: false, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -144,6 +145,101 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).mh).toBeNull();
   });
 
+  it("says the rent rules that reach the building where the caller hands its place and day (lib/rent-regulation), and nothing where none reach it", () => {
+    const walkUp = ex([m("Asking price", "$14,000,000"), m("Units", "48"), m("Year built", "1931"), m("Rent-regulated units", "41")]);
+    const brooklyn = { address: { state: "NY", city: "Brooklyn", county: "Kings County", label: "100 Walk-up St, Brooklyn, NY 11215" }, siteFlags: null, today: "2026-10-05" };
+    expect(pickSlots(walkUp, null, "multifamily", brooklyn).regulation).toBe("Rent-stabilized, 41 of 48");
+    // A year the memorandum does not state leaves the rules' question open.
+    const noYear = ex([m("Asking price", "$14,000,000"), m("Units", "48")]);
+    expect(pickSlots(noYear, null, "multifamily", brooklyn).regulation).toBe("Rent rules: check");
+    // Filed as an office: no rent rules read, and the memorandum names none.
+    expect(pickSlots(noYear, null, "office", brooklyn).regulation).toBeNull();
+    // Outside every regime the site's rules hold, and with no place handed in.
+    expect(pickSlots(noYear, null, "multifamily", { address: { state: "TX", city: "Austin" }, siteFlags: null, today: "2026-10-05" }).regulation).toBeNull();
+    expect(pickSlots(walkUp, null, "multifamily").regulation).toBeNull();
+  });
+
+  it("says a forward purchase's yield at delivery, or the delivery it counts down to, on the day handed in (lib/forward-purchase)", () => {
+    const strategy = { kind: "development" as const, summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" };
+    const rows = [m("Purchase price", "$48,000,000"), m("Delivery date", "Q3 2027")];
+    const on = (today: string) => ({ address: null, siteFlags: null, today });
+    expect(pickSlots(ex(rows, { strategy }), null, "industrial", on("2026-10-05")).forward).toBe("Build-to-suit, delivers Q3 2027");
+    // Past the delivery the tag stops counting down.
+    expect(pickSlots(ex(rows, { strategy }), null, "industrial", on("2027-11-01")).forward).toBe("Build-to-suit purchase");
+    // A cap at delivery is said, and never read as the going-in cap.
+    const capped = pickSlots(ex([...rows, m("Delivery cap rate", "6.00%"), m("NOI (Year 1)", "$2,880,000")], { strategy }), null, "industrial", on("2026-10-05"));
+    expect(capped.forward).toBe("Build-to-suit, 6.00% at delivery");
+    expect(capped.cap).toBeNull();
+    // The developer funds the works: the yield slot is the NOI at delivery
+    // over the price, to the two decimals the tag beside it says ("6.0%"
+    // had stood beside "6.00% at delivery" on one card).
+    expect(capped.yoc).toBe("6.00%");
+    expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).forward).toBeNull();
+  });
+
+  it("says a mixed-use building's commercial share of the income, else of the area (lib/mixed-use), and nothing on anything else", () => {
+    const rows = [m("Asking price", "$25,000,000"), m("Residential income", "$1,520,000"), m("Commercial income", "$610,000")];
+    expect(pickSlots(ex(rows, { assetClass: "Retail / Multifamily" }), null).mixedUse).toBe("Commercial 29% of income");
+    const area = [m("Asking price", "$25,000,000"), m("Commercial SF", "9,500 SF"), m("Total SF", "62,000 SF")];
+    expect(pickSlots(ex(area, { assetClass: "Mixed-Use" }), null).mixedUse).toBe("Commercial 15% of area");
+    expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).mixedUse).toBeNull();
+  });
+
+  it("says an operating business sold with its real estate, or leased to its operator with the coverage (lib/going-concern), and nothing on anything else", () => {
+    const station = ex([m("Asking price", "$3,200,000"), m("NOI (in-place)", "$256,000"), m("EBITDA (T-12)", "$410,000")], {
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+    });
+    expect(pickSlots(station, null).goingConcern).toBe("Going concern");
+    const wash = ex([m("Asking price", "$4,600,000"), m("Annual base rent", "$276,000"), m("EBITDAR (T-12)", "$720,000")], {
+      assetClass: "Car wash",
+      singleTenant: { tenant: "Tidal Wave Auto Spa", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+    });
+    expect(pickSlots(wash, null).goingConcern).toBe("Operator lease, 2.61x coverage");
+    expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).goingConcern).toBeNull();
+  });
+
+  it("says condominium units bought in bulk as the units offered of the condominium's (lib/condo), and nothing on anything else", () => {
+    const bulk = ex([m("Asking price", "$16,800,000"), m("Units", "42"), m("HOA dues", "$650 per unit per month"), m("Units in building", "120")], {
+      assetClass: "Condominium Units (bulk sale)",
+    });
+    expect(pickSlots(bulk, null).condo).toBe("Bulk 42 of 120 (35%)");
+    const whole = ex([m("Units offered", "120"), m("Units in condominium", "120")], { assetClass: "Condominium (entire building)" });
+    expect(pickSlots(whole, null).condo).toBe("Condo units");
+    expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).condo).toBeNull();
+  });
+
+  it("says a sandwich position's spread and its cover (lib/sandwich-lease), and nothing on a plain leasehold", () => {
+    const interest = {
+      kind: "leasehold" as const,
+      summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+      share: "",
+      groundLease: "Master lease of the building from its owner",
+      loan: "",
+      page: "",
+    };
+    const position = ex([m("Asking price", "$6,500,000"), m("Master lease rent", "$1,100,000"), m("Sublease income", "$1,820,000")], { interest });
+    expect(pickSlots(position, null).sandwich).toBe("Spread $720k, 1.65× cover");
+    const under = ex([m("Master lease rent", "$1,100,000"), m("Sublease income", "$950,000")], { interest });
+    expect(pickSlots(under, null).sandwich).toBe("Subleases under the master rent");
+    // One rent alone is no spread, and a plain leasehold is no position.
+    expect(pickSlots(ex([m("Master lease rent", "$1,100,000")], { interest }), null).sandwich).toBeNull();
+    const plain = { ...interest, summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" };
+    expect(pickSlots(ex([m("Master lease rent", "$1,100,000"), m("Sublease income", "$1,820,000")], { interest: plain }), null).sandwich).toBeNull();
+  });
+
+  it("says the reader's 1031 exchange against the deal only where the caller passes it (lib/exchange-deal), on the slots' day", () => {
+    const rows = ex([m("Asking price", "$20,000,000"), m("Units", "240")]);
+    const place = { address: null, siteFlags: null, today: "2026-10-05" };
+    const block = { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const };
+    expect(pickSlots(rows, null, "auto", place, { block, offersDue: "2026-10-20" }).exchange).toBe("1031: identify by Oct 30");
+    expect(pickSlots(rows, null, "auto", place, { block, offersDue: "2026-11-02" }).exchange).toBe("1031: offers due after ID");
+    // No exchange passed, none in the box, or its period over: no slot.
+    expect(pickSlots(rows, null, "auto", place).exchange).toBeNull();
+    expect(pickSlots(rows, null, "auto", place, { block: undefined, offersDue: "2026-11-02" }).exchange).toBeNull();
+    expect(pickSlots(rows, null, "auto", { ...place, today: "2027-06-01" }, { block, offersDue: null }).exchange).toBeNull();
+  });
+
   it("says a storage facility's lease-up or premium over street (#471), and nothing on anything else", () => {
     const rows = [m("Asking price", "$9,800,000"), m("Occupancy", "72%"), m("In-place rent", "$1.20/SF/mo"), m("Street rate", "$1.00/SF/mo")];
     expect(pickSlots({ ...ex(rows), assetClass: "self_storage" }, null).storage).toBe("Lease-up, 72% occupied, In-place 20% over street");
@@ -226,7 +322,13 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     );
     expect(s.cap).toBeNull();
     expect(s.price).toBe("$42,000,000");
-    expect(s.yoc).toBe(`${((3_400_000 / 50_600_000) * 100).toFixed(1)}%`);
+    // To two decimals, as the deal header prints it (lib/plan-facts
+    // `yieldOnCostText`): the card's "6.7%" stood beside the header's "6.72%".
+    expect(s.yoc).toBe("6.72%");
+    expect(s.yoc).toBe(yieldOnCostText(3_400_000 / 50_600_000));
+    // A plan deal, so the CSV's cap cell says the .xlsx's "n/a — plan" too
+    // (lib/cap-slot `capCellText`, research pass 35).
+    expect(s.plan).toBe(true);
   });
 
   it("a development priced at its land: the land cost is the price, the yield on cost is over land + budget", () => {
@@ -236,7 +338,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
+    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.00%", plan: true, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, mixedUse: null, goingConcern: null, condo: null, sandwich: null, exchange: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {
@@ -245,13 +347,17 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(bare, { askPrice: "Call for offers", goingInCap: "", perUnit: "", assetClass: "", market: "", take: "", dealName: "" } as never).price).toBeNull();
   });
 
-  it("with no extraction at all — a first screen's first minute — the first signal's ask is the price and nothing else is read yet", () => {
+  it("with no extraction at all — a first screen's first minute — the first signal's ask is the price, its cap the cap, and nothing else is read yet", () => {
     const signal = { askPrice: "$20,000,000", goingInCap: "5.2%", perUnit: "$83k/unit", assetClass: "multifamily", market: "Dallas, TX", take: "", dealName: "X", size: "240 units" };
     // The deal page's summary bar prints the same ask before the extraction
-    // lands; the card printed "Price —" because the page never asked.
-    expect(pickSlots(null, signal)).toEqual({ cap: null, price: "$20,000,000", yoc: null });
+    // lands; the card printed "Price —" because the page never asked. It
+    // prints the signal's cap too (research pass 34): the card's cap had
+    // been a dash beside the header's "5.2%".
+    expect(pickSlots(null, signal)).toEqual({ cap: "5.2%", price: "$20,000,000", yoc: null });
     expect(pickSlots(null, { ...signal, askPrice: "Unpriced" }).price).toBeNull();
     expect(pickSlots(null, { ...signal, askPrice: "" }).price).toBeNull();
+    // A "cap" no price could carry is no cap, on the header or the card.
+    expect(pickSlots(null, { ...signal, goingInCap: "105%" }).cap).toBeNull();
     // No signal yet either: nothing to show.
     expect(pickSlots(null, null)).toEqual({ cap: null, price: null, yoc: null });
   });

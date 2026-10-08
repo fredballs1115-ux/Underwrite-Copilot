@@ -16,6 +16,7 @@
  *
  * Pure: no I/O, no LLM.
  */
+import { compactUsd } from "@/lib/money";
 import {
   FIELD_LABELS,
   VALUATION_FIELDS,
@@ -287,13 +288,7 @@ export function tallySentence(tally: AggressivenessTally, aLabel: string, bLabel
 // The copy-able one-liner
 // ---------------------------------------------------------------------------
 
-const usd = (n: number): string => {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs)}`;
-};
+const usd = (n: number): string => compactUsd(n);
 
 /**
  * "The $6.5M gap is 71% cap rate, 24% Year-1 NOI, 5% capex treatment."

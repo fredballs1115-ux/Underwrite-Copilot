@@ -3,6 +3,7 @@
 // Seeded into the user's pipeline by the "Try a sample deal" action.
 
 import { computeModel, type ModelInputs } from "@/lib/model/compute";
+import { compactUsd } from "@/lib/money";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -74,6 +75,12 @@ const bpsFrom = (v: number | null): string => {
 const OM_CASE = { exitCapPct: 5.25, rentGrowthPct: 4, vacancyPct: 6 } as const;
 /** The OM's stated NOI less the T-12's, the gap the reconciliation names. */
 const NOI_GAP = 3_880_000 - 3_706_500;
+/** The model's exit against its own going-in cap, read off the model and
+ *  said as a figure, never as "flat": the exit is 5.50% and the going-in
+ *  5.45%, 5 bps of expansion (research pass 40, L8: "Held flat to
+ *  going-in"). The going-in figure itself stays on the tab's own tile, where
+ *  a price that buys no building withholds it. */
+const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.exitCapPct - returns.goingInCapPct) * 100)} bps over the going-in cap`;
 
 const modelMetrics: ReconciledMetric[] = [
   {
@@ -122,7 +129,7 @@ const modelMetrics: ReconciledMetric[] = [
     unit: "%",
     sources: [{ doc: "Market", value: "5.5%", locator: "", basis: "market norm" }],
     authority: "Market",
-    rationale: "Held flat to going-in — no compression thesis.",
+    rationale: `${EXIT_OVER_ENTRY} — no compression thesis.`,
     confidence: "medium",
     isConflict: false,
   },
@@ -255,7 +262,7 @@ const model: UnderwritingModel = {
   cashFlow,
   returns,
   summary:
-    "Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit holds flat to going-in with no compression assumed.",
+    `Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit is ${EXIT_OVER_ENTRY}, with no compression assumed.`,
   caveats: [
     "Single-tranche debt and straight-line growth — a screening model, not a full build.",
     "Capital reserve is a flat annual figure; confirm against a real engineering budget.",
@@ -285,6 +292,11 @@ const extraction: ExtractionResult = {
     { label: "Vacancy (pro forma)", value: "6.0%", flagged: true, page: "p. 8", basis: "pro_forma" },
     { label: "Loan-to-value", value: "60%", flagged: false, page: "p. 44", basis: "na" },
   ],
+  // The fictional memorandum's length, at or past its last cited page
+  // (p. 44): a citation prints only inside the page count (lib/facts), and
+  // without one the demo report's page column was dashes on every row
+  // beside the "(p. 14)" its own memo page cites (research pass 35).
+  totalPages: 48,
 };
 
 const challenges: ChallengerResult = {
@@ -293,7 +305,7 @@ const challenges: ChallengerResult = {
       assumption: "Exit cap compression to 5.25%",
       severity: "high",
       challenge:
-        "The model exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
+        "The OM's pro forma exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
       question:
         "What thesis supports buying at a 5.45% cap and selling five years later at 5.25%?",
     },
@@ -317,9 +329,11 @@ const challenges: ChallengerResult = {
   // $3.1M is not the T-12's $3,085,000, so the sentence names the model's
   // figure, and its exit is said as a figure, not as "flat" against the
   // 5.45% going-in cap (the pre-merge audit of 2026-09-30).
-  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same $${(inputs.year1Opex / 1e6).toFixed(1)}M of year-one expenses.`,
+  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same ${compactUsd(inputs.year1Opex)} of year-one expenses.`,
 };
 
+// The memorandum's three sale comps sit on its p. 14, the page the
+// verdict's basis range cites for the $252k and $261k trades.
 const comps: BrokerCompsResult = {
   saleComps: [
     {
@@ -327,18 +341,21 @@ const comps: BrokerCompsResult = {
       detail: "$252k/unit · 5.6% cap · Q3'25",
       support: "supports",
       note: "Comparable vintage and submarket; supports a sub-$260k basis.",
+      page: "p. 14",
     },
     {
       name: "Vue at Girard — 4.0 mi",
       detail: "$298k/unit · 4.9% cap · Q1'25",
       support: "stretched",
       note: "Newer, amenitized asset in a stronger submarket — not a clean comp.",
+      page: "p. 14",
     },
     {
       name: "Parkside — 1.4 mi",
       detail: "$261k/unit · 5.4% cap · Q4'25",
       support: "favorable",
       note: "Closest comp; lands near the subject's implied basis.",
+      page: "p. 14",
     },
   ],
   leaseComps: [
@@ -477,7 +494,13 @@ const verdict: VerdictResult = {
       },
       {
         lever: "debt",
-        read: "60% LTV at 6.0% with one year of IO.",
+        // What the documents' model runs (lib/sample-derive): it amortizes
+        // over 30 years from the first month, so no interest-only year
+        // (research pass 35: the read said "with one year of IO"). And it
+        // sizes the loan at 60% of cost, its default, never 60% of value:
+        // the demo report's base case says "Loan … · 60% of cost" beside
+        // this line (audit C3a, LOW-13), and a test holds both to the model.
+        read: "60% of cost, the model's default, at 6.0%, amortizing over 30 years.",
         risk: "A soft refi window or higher rate pressures the takeout.",
       },
     ],

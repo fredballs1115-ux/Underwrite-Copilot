@@ -1,9 +1,10 @@
 import "server-only";
 import sharp from "sharp";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
+import { updateCache, writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
 import { RunGate } from "@/lib/anthropic/run-gate";
 import { PREVIEW_PX, isPreview } from "@/lib/photo-preview";
+import { CARD_PX, cardWidthOf } from "@/lib/photo-srcset";
 import { MAX_OM_PAGES } from "@/lib/pdf";
 import { EARLY_SHARE, findOmImages, scanShaped, type OmImage } from "@/lib/om-photo";
 import {
@@ -39,16 +40,18 @@ import {
  * re-searched a month later at most, and the sample deal is never searched
  * at all, because its memorandum is not ours to republish a page of.
  *
- * STORED TWICE, AND A THIRD TIME WHERE IT IS WORTH IT. The broker's JPEG
+ * STORED TWICE, AND MORE WHERE IT IS WORTH IT. The broker's JPEG
  * can be 6,000 pixels and several megabytes, and a list row wants 36 of
  * them. So sharp — already in the tree as Next's own image dependency —
  * writes derivatives into the private bucket under the deal: a hero no
  * wider than 1,600px for the deal page, a 240px square crop for a row, and,
  * where the source is larger than the hero, a full-size copy up to 2,560px
  * (`FULL_MAX_PX`) that a dense screen and the full-screen viewer ask for
- * through a srcset, where the hero alone was drawn stretched. The reader's
- * own upload goes through the same sizes, so a picture is never served as
- * the bytes somebody uploaded.
+ * through a srcset, where the hero alone was drawn stretched. A pipeline
+ * card's srcset offers a card copy beside the hero, 800px on its long side
+ * (`CARD_PX`, research pass 29): every card had downloaded the hero for a
+ * slot of about 350px. The reader's own upload goes through the same sizes,
+ * so a picture is never served as the bytes somebody uploaded.
  *
  * MADE AGAIN, QUIETLY. A memorandum's photograph derived under older rules
  * (`DERIVED_VERSION`: before the full-size copy) is made again from the
@@ -225,6 +228,13 @@ export interface RawPicture {
 /** A picture's bytes as a file (a JPEG, a phone's upload), or as pixels. */
 export type PictureInput = Buffer | RawPicture;
 
+/** A derivative's bytes and its pixel size. */
+export interface DerivedCopy {
+  bytes: Buffer;
+  width: number;
+  height: number;
+}
+
 /** What sharp writes from a picture, before any of it is stored. */
 export interface DerivedPicture {
   hero: Buffer;
@@ -233,10 +243,17 @@ export interface DerivedPicture {
   width: number;
   height: number;
   /** the full-size copy, where the source is larger than the hero */
-  full: { bytes: Buffer; width: number; height: number } | null;
+  full: DerivedCopy | null;
+  /** the card copy (research pass 29), where the hero is longer than one */
+  card: DerivedCopy | null;
   /** the blur-up preview (#463), null where it could not be made */
   preview: string | null;
 }
+
+/** The card copy's encoding: the hero's, so a card's picture is the hero's
+ *  photograph at fewer pixels and nothing else. */
+const CARD_RESIZE = { width: CARD_PX, height: CARD_PX, fit: "inside", withoutEnlargement: true } as const;
+const CARD_JPEG = { quality: 82, mozjpeg: true } as const;
 
 /** The derivatives sharp writes from any picture it can read. */
 export async function derivePicture(input: PictureInput): Promise<DerivedPicture> {
@@ -280,14 +297,120 @@ export async function derivePicture(input: PictureInput): Promise<DerivedPicture
           .jpeg({ quality: 82, mozjpeg: true })
           .toBuffer({ resolveWithObject: true })
       : null;
+  // The card copy (research pass 29), wherever the hero is longer than one:
+  // from the photograph itself, never enlarged, so a small photograph's copy
+  // is its own pixels — where its hero was enlarged for the deal page.
+  const card =
+    Math.max(hero.info.width, hero.info.height) > CARD_PX
+      ? await base.clone().resize(CARD_RESIZE).jpeg(CARD_JPEG).toBuffer({ resolveWithObject: true })
+      : null;
   return {
     hero: hero.data,
     thumb,
     width: hero.info.width,
     height: hero.info.height,
     full: full ? { bytes: full.data, width: full.info.width, height: full.info.height } : null,
+    card: card ? { bytes: card.data, width: card.info.width, height: card.info.height } : null,
     preview: await previewOf(hero.data),
   };
+}
+
+/**
+ * A card copy made from a stored hero's bytes (research pass 29): what the
+ * picture route serves a photograph stored before card copies on its first
+ * ask, and stores after its response (`backfillCard`). Never enlarged; null
+ * where the hero is no longer than a card copy, or could not be read.
+ */
+export async function cardOf(heroBytes: Buffer): Promise<DerivedCopy | null> {
+  try {
+    const meta = await sharp(heroBytes, { failOn: "none" }).metadata();
+    if (!(Math.max(meta.width ?? 0, meta.height ?? 0) > CARD_PX)) return null;
+    const { data, info } = await sharp(heroBytes, { failOn: "none" })
+      .resize(CARD_RESIZE)
+      .jpeg(CARD_JPEG)
+      .toBuffer({ resolveWithObject: true });
+    return { bytes: data, width: info.width, height: info.height };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The path a photograph's card copy is stored at: beside its hero, under the
+ * hero's own stamp, so the URL that names the picture's version names the
+ * copy too (lib/deal-banner `pictureVersion`). Null for a hero not of that
+ * shape.
+ */
+export function cardPathOf(picture: DealPicture): string | null {
+  const m = /^(photos\/[^/]+\/[a-z0-9]+)-hero\.jpg$/.exec(picture.hero ?? "");
+  return m ? `${m[1]}-card.jpg` : null;
+}
+
+/**
+ * Whether a stored photograph should have a card copy it does not have yet:
+ * one stored before card copies, whose hero is longer than a copy
+ * (lib/photo-srcset `cardWidthOf`). The picture route makes it from the hero
+ * on the first ask.
+ */
+export function cardCopyDue(picture: DealPicture): boolean {
+  return !picture.card && cardWidthOf({ width: picture.width, height: picture.height }) !== null && cardPathOf(picture) !== null;
+}
+
+/**
+ * Store the card copy the picture route made for a photograph stored before
+ * card copies, after its response (research pass 29) — as `backfillPreview`
+ * stores a preview: the row is read again before the copy is put and again
+ * just before the write, and the path goes only onto the photograph still
+ * stored then, at its place (the cover, or the gallery's `gallery`th, from
+ * 1), and only where it has no copy yet. A photograph replaced while the
+ * copy was put has its copy taken away again: it is nobody's. Never throws.
+ */
+export async function backfillCard(
+  supabase: SupabaseClient,
+  dealId: string,
+  picture: DealPicture,
+  made: DerivedCopy,
+  gallery?: number,
+): Promise<void> {
+  const path = picture.card ? null : cardPathOf(picture);
+  if (!path) return;
+  const read = async (): Promise<DealVisualCache | null> => {
+    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
+    return (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
+  };
+  const placed = (photo: DealVisualCache | null): DealPicture | null =>
+    (gallery ? photo?.gallery?.[gallery - 1] : photo?.picture) ?? null;
+  let put = false;
+  try {
+    const before = placed(await read());
+    if (!before || before.hero !== picture.hero || before.card) return;
+    await uploadDealPhoto(path, made.bytes, photoScope(dealId));
+    put = true;
+    // Written only while the database still holds this photograph at its
+    // place, and only onto the record read (lib/deal-location `updateCache`,
+    // research pass 39): a replacement, a gallery or a flood frame landing
+    // between the read and the write is never undone, and a write that
+    // matched nothing stored nothing (the batch-2 audit).
+    let inPlace = false;
+    const done = await updateCache(supabase, dealId, null, (current) => {
+      const still = placed(current);
+      if (!current || !still || still.hero !== picture.hero) return null;
+      // Another ask stored the same copy meanwhile: it is in place.
+      if (still.card) {
+        inPlace = true;
+        return null;
+      }
+      const next: DealPicture = { ...still, card: path, cardWidth: made.width, cardHeight: made.height };
+      return gallery
+        ? { gallery: (current.gallery ?? []).map((g, i) => (i === gallery - 1 ? next : g)) }
+        : { picture: next };
+    });
+    if (done.wrote || inPlace) return;
+  } catch {
+    // A card copy is a saving, never a reason a request fails.
+  }
+  // Put, and not recorded on the photograph: nobody's file.
+  if (put) await removeStorageFiles([path], photoScope(dealId)).catch(() => {});
 }
 
 /**
@@ -316,8 +439,10 @@ export async function previewOf(bytes: Buffer): Promise<string | null> {
  * hero bytes a request already holds (#463) — the picture route's, so no
  * photograph is ever fetched for its preview alone. The row is read again
  * just before the write and the preview goes onto the picture stored THEN,
- * only where it is still the one the bytes are of: a photograph replaced
- * while the request ran is never put back. Never throws.
+ * only where it is still the one the bytes are of, and is written onto that
+ * record only (lib/deal-location `updateCache`): a photograph replaced while
+ * the request ran, or between the read and the write, is never put back
+ * (research pass 39). Never throws.
  */
 export async function backfillPreview(
   supabase: SupabaseClient,
@@ -328,17 +453,13 @@ export async function backfillPreview(
   if (picture.preview) return;
   const preview = await previewOf(heroBytes);
   if (!preview) return;
-  try {
-    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
-    const current = (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
-    if (!current?.picture || current.picture.hero !== picture.hero || current.picture.preview) return;
-    await supabase
-      .from("deals")
-      .update({ photo: { ...current, picture: { ...current.picture, preview } } })
-      .eq("id", dealId);
-  } catch {
-    // A preview is a nicety: never fail a request over one.
-  }
+  // A preview is a nicety: updateCache never throws, and a write that does
+  // not land is made again on a later ask.
+  await updateCache(supabase, dealId, null, (current) =>
+    current?.picture && current.picture.hero === picture.hero && !current.picture.preview
+      ? { picture: { ...current.picture, preview } }
+      : null,
+  );
 }
 
 /** The scope every photo path is read and written under. */
@@ -346,9 +467,17 @@ function photoScope(dealId: string) {
   return { kind: "deal", dealId, only: ["photo"] } as const;
 }
 
-/** Every stored file of one picture: its hero, its thumbnail, its full-size copy. */
+/** Every stored file of one picture: its hero, its thumbnail, its card copy
+ *  and its full-size copy. A card copy is swept by the path it is stored at
+ *  even where it is not recorded: one stored after a response
+ *  (`backfillCard`) can lose its record to another write to the photo cache
+ *  made from an earlier read, and the copy's path is the hero's own with its
+ *  size changed. Removing a path that holds nothing is a no-op. Every sweep
+ *  goes through here — a replaced picture's as much as a deleted deal's —
+ *  so no copy outlives its picture (the batch-2 audit). */
 function pathsOf(picture: DealPicture): string[] {
-  return [picture.hero, picture.thumb, ...(picture.full ? [picture.full] : [])];
+  const card = picture.card ?? cardPathOf(picture);
+  return [picture.hero, picture.thumb, ...(card ? [card] : []), ...(picture.full ? [picture.full] : [])];
 }
 
 /**
@@ -366,6 +495,12 @@ async function putDerived(
   const thumb = dealPhotoPath(dealId, stamp, "thumb");
   await uploadDealPhoto(hero, derived.hero, photoScope(dealId));
   await uploadDealPhoto(thumb, derived.thumb, photoScope(dealId));
+  let card: Pick<DealPicture, "card" | "cardWidth" | "cardHeight"> = {};
+  if (derived.card) {
+    const path = dealPhotoPath(dealId, stamp, "card");
+    await uploadDealPhoto(path, derived.card.bytes, photoScope(dealId));
+    card = { card: path, cardWidth: derived.card.width, cardHeight: derived.card.height };
+  }
   let full: Pick<DealPicture, "full" | "fullWidth" | "fullHeight"> = {};
   if (derived.full) {
     const path = dealPhotoPath(dealId, stamp, "full");
@@ -377,6 +512,7 @@ async function putDerived(
     thumb,
     width: derived.width,
     height: derived.height,
+    ...card,
     ...full,
     source,
     at,
@@ -425,10 +561,13 @@ export async function storePicture(
 }
 
 /**
- * Merge a patch touching the picture into the cache, read at the write:
- * where `expectHero` is given (null for "no picture"), only while the
- * picture stored is still that one. Answers whether it wrote, the picture
- * it replaced and the one stored after.
+ * Merge a patch touching the picture into the cache, read at the write and
+ * written onto the record read (lib/deal-location `updateCache`): where
+ * `expectHero` is given (null for "no picture"), only while the picture
+ * stored is still that one. A write that lands on nothing is read and
+ * decided again, so the picture it replaces is the one stored when it
+ * wrote. Answers whether it wrote, the picture it replaced and the one
+ * stored after.
  */
 async function swapPicture(
   supabase: SupabaseClient,
@@ -437,65 +576,48 @@ async function swapPicture(
   patch: Partial<DealVisualCache>,
   expectHero?: string | null,
 ): Promise<{ stored: boolean; replaced: DealPicture | null; current: DealPicture | null }> {
-  let row: DealVisualCache = fallback ?? {};
-  try {
-    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
-    row = ((data as { photo?: DealVisualCache | null } | null)?.photo ?? fallback ?? {}) as DealVisualCache;
-  } catch {
-    // Read failed: the caller's copy stands in, as writeCache's does.
-  }
-  const was = row.picture ?? null;
-  if (expectHero !== undefined && (was?.hero ?? null) !== expectHero) {
-    return { stored: false, replaced: null, current: was };
-  }
-  try {
-    await supabase.from("deals").update({ photo: { ...row, ...patch } }).eq("id", dealId);
-  } catch {
-    // Pre-0027 schema has no `photo` column — never fail over a cache write.
-  }
+  const done = await updateCache(supabase, dealId, fallback, (row) =>
+    expectHero !== undefined && (row?.picture?.hero ?? null) !== expectHero ? null : patch,
+  );
+  const was = done.read?.picture ?? null;
+  if (!done.wrote) return { stored: false, replaced: null, current: was };
   return { stored: true, replaced: was, current: "picture" in patch ? (patch.picture ?? null) : was };
 }
 
 /**
  * Forget a picture that came from the memorandum — the memorandum was
  * replaced, so its cover may have been too. A picture the reader put there
- * is theirs and stays.
+ * is theirs and stays. Decided on the record as it stands when written
+ * (lib/deal-location `updateCache`), never on the caller's copy: a reader's
+ * photograph stored meanwhile is theirs, and the files removed are those of
+ * the record the write replaced (research pass 39).
  */
 export async function clearOmPicture(
   supabase: SupabaseClient,
   dealId: string,
   cache: DealVisualCache | null,
 ): Promise<void> {
-  const pic = cache?.picture;
-  // The memorandum's other photographs were the old file's too (#448).
-  const galleryFiles = galleryPaths(cache);
-  const galleryPatch =
-    cache?.galleryV !== undefined || cache?.galleryRetry !== undefined || galleryFiles.length > 0
-      ? { gallery: undefined, galleryV: undefined, galleryRetry: undefined }
-      : {};
-  if (!pic || pic.source !== "om") {
-    // No memorandum picture to drop, but a "nothing in there" verdict — and
-    // a count of reads the time cut short — is stale the moment the file
-    // changes.
-    if (cache?.pictureCheckedAt || cache?.pictureRetry || "galleryV" in galleryPatch) {
-      await writeCache(supabase, dealId, cache, {
-        pictureCheckedAt: undefined,
-        pictureSearchV: undefined,
-        pictureRetry: undefined,
-        ...galleryPatch,
-      });
+  let gone: string[] = [];
+  const done = await updateCache(supabase, dealId, cache, (read) => {
+    const pic = read?.picture;
+    // The memorandum's other photographs were the old file's too (#448).
+    const galleryFiles = galleryPaths(read);
+    const galleryPatch =
+      read?.galleryV !== undefined || read?.galleryRetry !== undefined || galleryFiles.length > 0
+        ? { gallery: undefined, galleryV: undefined, galleryRetry: undefined }
+        : {};
+    const verdicts = { pictureCheckedAt: undefined, pictureSearchV: undefined, pictureRetry: undefined };
+    if (!pic || pic.source !== "om") {
+      // No memorandum picture to drop, but a "nothing in there" verdict — and
+      // a count of reads the time cut short — is stale the moment the file
+      // changes.
+      gone = galleryFiles;
+      return read?.pictureCheckedAt || read?.pictureRetry || "galleryV" in galleryPatch ? { ...verdicts, ...galleryPatch } : null;
     }
-    if (galleryFiles.length > 0) await removeStorageFiles(galleryFiles, photoScope(dealId)).catch(() => {});
-    return;
-  }
-  await writeCache(supabase, dealId, cache, {
-    picture: undefined,
-    pictureCheckedAt: undefined,
-    pictureSearchV: undefined,
-    pictureRetry: undefined,
-    ...galleryPatch,
+    gone = [...pathsOf(pic), ...galleryFiles];
+    return { picture: undefined, ...verdicts, ...galleryPatch };
   });
-  await removeStorageFiles([...pathsOf(pic), ...galleryFiles], photoScope(dealId)).catch(() => {});
+  if (done.wrote && gone.length > 0) await removeStorageFiles(gone, photoScope(dealId)).catch(() => {});
 }
 
 /** Every storage path the gallery occupies. */
@@ -503,10 +625,12 @@ function galleryPaths(cache: DealVisualCache | null | undefined): string[] {
   return (cache?.gallery ?? []).flatMap(pathsOf);
 }
 
-/** Every storage path a deal's pictures occupy — for the deletion sweeps. */
+/** Every storage path a deal's pictures occupy — for the deletion sweeps,
+ *  each picture's files as `pathsOf` lists them (an unrecorded card copy
+ *  included). */
 export function picturePaths(cache: DealVisualCache | null | undefined): string[] {
   const pic = cache?.picture;
-  return [...(pic ? pathsOf(pic) : []), ...galleryPaths(cache)];
+  return [...(pic ? pathsOf(pic) : []), ...(cache?.gallery ?? []).flatMap(pathsOf)];
 }
 
 const searches = new RunGate(() => MAX_IN_FLIGHT);
@@ -816,8 +940,9 @@ export function derivedOutdated(picture: DealPicture | null | undefined): boolea
 
 /**
  * Put `next` in the place of the stored picture `was`, read again just
- * before the write: only while `was` is still the one stored, so a picture
- * the reader put there meanwhile, or a new memorandum's, is never replaced.
+ * before the write and written onto that record only (lib/deal-location
+ * `updateCache`): only while `was` is still the one stored, so a picture the
+ * reader put there meanwhile, or a new memorandum's, is never replaced.
  */
 async function replaceStoredPicture(
   supabase: SupabaseClient,
@@ -825,18 +950,10 @@ async function replaceStoredPicture(
   was: DealPicture,
   next: DealPicture,
 ): Promise<boolean> {
-  try {
-    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
-    const current = (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
-    if (!current?.picture || current.picture.hero !== was.hero) return false;
-    const { error } = await supabase
-      .from("deals")
-      .update({ photo: { ...current, picture: next } })
-      .eq("id", dealId);
-    return !error;
-  } catch {
-    return false;
-  }
+  const done = await updateCache(supabase, dealId, null, (current) =>
+    current?.picture && current.picture.hero === was.hero ? { picture: next } : null,
+  );
+  return done.wrote;
 }
 
 /**
@@ -1115,15 +1232,18 @@ export function pictureSizeFor(size: { width: number; height: number }): "hero" 
   return size.width <= THUMB_PX && size.height <= THUMB_PX ? "thumb" : "hero";
 }
 
-/** A stored size of a picture: the hero, the square thumbnail, or the
- *  full-size copy. */
-export type PictureSize = "hero" | "thumb" | "full";
+/** A stored size of a picture: the hero, the square thumbnail, the
+ *  full-size copy, or the card copy (research pass 29). */
+export type PictureSize = "hero" | "thumb" | "full" | "card";
 
 /** The stored file a size is served from: the full-size copy is the hero
- *  where the source was no larger than the hero, or the picture predates it. */
+ *  where the source was no larger than the hero, or the picture predates it,
+ *  and so is the card copy where none is stored — the picture route makes
+ *  one stored before from the hero (`cardCopyDue`). */
 export function picturePathFor(picture: DealPicture, size: PictureSize): string {
   if (size === "thumb") return picture.thumb;
   if (size === "full") return picture.full ?? picture.hero;
+  if (size === "card") return picture.card ?? picture.hero;
   return picture.hero;
 }
 

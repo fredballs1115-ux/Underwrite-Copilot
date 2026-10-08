@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import {
   DEFAULT_LEASE_UP_MONTHS,
   type RentRollAnalytics,
@@ -6,6 +7,7 @@ import {
   type LeaseUpCurve,
 } from "@/lib/rentroll/analytics";
 import type { ValidationIssue } from "@/lib/rentroll/validate";
+import { ScrollRegion } from "@/app/scroll-region";
 
 /**
  * The rent roll dashboard. Server-rendered — every figure is deterministic and
@@ -13,13 +15,7 @@ import type { ValidationIssue } from "@/lib/rentroll/validate";
  * charting dependency.
  */
 
-const usd = (n: number): string => {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "−" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs)}`;
-};
+const usd = (n: number): string => compactUsd(n, { millions: 2 });
 const sf = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
 const pct1 = (n: number | null) => (n == null ? "—" : `${(n * 100).toFixed(1)}%`);
 const psf = (n: number | null) => (n == null ? "—" : `$${n.toFixed(2)}`);
@@ -289,7 +285,7 @@ export function RentRollDashboard({
         <div className="mt-3">
           <RolloverChart analytics={analytics} cost={cost} />
         </div>
-        <div className="mt-3 overflow-x-auto">
+        <ScrollRegion label="Rollover schedule" className="mt-3">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
@@ -317,7 +313,7 @@ export function RentRollDashboard({
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
         {analytics.rollover.undatedSf > 0 ? (
           <p className="mt-2 text-xs text-muted">
             {sf(analytics.rollover.undatedSf)} of occupied space carries no expiry date and is not

@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { chunks, readAll, readByIds } from "@/lib/read-all";
 
 export type TeamRole = "owner" | "member";
 
@@ -105,30 +106,64 @@ export async function getTeam(
  * — the ones they lose access to by leaving. Their own deals stay theirs, so
  * links on those stay live. Run BEFORE the membership row is deleted: the
  * share policy follows deal access, and the leaver's own client loses it the
- * moment the row is gone. Best-effort; the shared page also re-checks the
- * creator's access on every render, so a missed sweep still dies there.
+ * moment the row is gone.
+ *
+ * It reads the leaver's live links first, every one a page at a time, then
+ * keeps those on the team's other deals, a hundred ids a request, and revokes
+ * them by id (lib/read-all). The first version read the team's other deals
+ * and put every id in one URL: past one response's rows, or past what a
+ * request line carries, links were missed or none revoked, and a failed read
+ * was read as no deals (research pass 42).
+ *
+ * True where every link it should revoke is revoked; false where a read or a
+ * write failed, which the caller says and keeps the membership until it can:
+ * the shared page re-checks the creator's access on every render, so a link
+ * the sweep missed still dies there, but the deal page would go on listing it
+ * as a live link.
  */
 export async function revokeSharesOfDepartingMember(
   supabase: SupabaseClient,
   teamId: string,
   memberId: string,
-): Promise<void> {
+): Promise<boolean> {
+  const failed = (what: string) => (err: unknown) =>
+    console.error(`[teams] ${what} for ${memberId}'s share links on team ${teamId} failed:`, err);
   try {
-    const { data: deals } = await supabase
-      .from("deals")
-      .select("id")
-      .eq("team_id", teamId)
-      .neq("user_id", memberId);
-    const ids = ((deals ?? []) as { id: string }[]).map((d) => d.id);
-    if (ids.length === 0) return;
-    await supabase
-      .from("deal_shares")
-      .update({ revoked: true })
-      .eq("created_by", memberId)
-      .eq("revoked", false)
-      .in("deal_id", ids);
+    const links = await readAll<{ id: string; deal_id: string }>(
+      (from, to) =>
+        supabase
+          .from("deal_shares")
+          .select("id, deal_id")
+          .eq("created_by", memberId)
+          .eq("revoked", false)
+          .order("id")
+          .range(from, to),
+      failed("reading"),
+    );
+    if (!links) return false;
+    if (links.length === 0) return true;
+    const others = await readByIds<{ id: string }>(
+      [...new Set(links.map((l) => l.deal_id))],
+      (chunk) => supabase.from("deals").select("id").eq("team_id", teamId).neq("user_id", memberId).in("id", chunk),
+      failed("reading the team's deals"),
+    );
+    if (!others) return false;
+    const onOthers = new Set(others.map((d) => d.id));
+    for (const run of chunks(links.filter((l) => onOthers.has(l.deal_id)).map((l) => l.id))) {
+      const { error } = await supabase
+        .from("deal_shares")
+        .update({ revoked: true })
+        .eq("created_by", memberId)
+        .in("id", run);
+      if (error) {
+        failed("revoking")(error);
+        return false;
+      }
+    }
+    return true;
   } catch (err) {
-    console.error(`[teams] revoking ${memberId}'s share links on team ${teamId} failed:`, err);
+    failed("revoking")(err);
+    return false;
   }
 }
 

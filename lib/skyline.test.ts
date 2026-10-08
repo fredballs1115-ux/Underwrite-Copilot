@@ -4,7 +4,9 @@ import {
   SKYLINE_SRCSET,
   SKYLINE_WIDTH,
   SKYLINE_WIDTHS,
+  bandSizes,
   commonsPage,
+  coverWidth,
   commonsUrl,
   creditLine,
   galleryCreditParts,
@@ -68,6 +70,25 @@ describe("the market photograph table", () => {
       expect(shot.licenseUrl, `${id} claims ${shot.license} with no licence link`).toMatch(
         /^https?:\/\//,
       );
+    }
+  });
+
+  it("crops a band at a photograph's own focus only inside the photograph, and only where one was judged (research pass 29)", () => {
+    // `bandFocusY` is an object-position's vertical percent, judged by eye
+    // through the bands' crops: 0 is the photograph's top edge at the
+    // band's top, 100 its bottom edge at the band's bottom. Anything outside
+    // that is no crop of the photograph at all.
+    const focused = Object.entries(SKYLINES).filter(([, shot]) => shot.bandFocusY !== undefined);
+    expect(focused.length, "the photographs a band's 42% cut wrong").toBeGreaterThanOrEqual(10);
+    for (const [id, shot] of focused) {
+      const y = shot.bandFocusY!;
+      expect(Number.isFinite(y), id).toBe(true);
+      expect(y, id).toBeGreaterThanOrEqual(0);
+      expect(y, id).toBeLessThanOrEqual(100);
+      // A judged value is a whole percent; 42 is the band's own and is
+      // left unset rather than restated.
+      expect(Number.isInteger(y), id).toBe(true);
+      expect(y, id).not.toBe(42);
     }
   });
 
@@ -156,6 +177,40 @@ describe("the Commons URLs", () => {
     // However many widths a caller types, the route serves the handful.
     const served = new Set(Array.from({ length: 5_000 }, (_, i) => skylineWidth(i)));
     expect([...served].sort((a, b) => a - b)).toEqual([...SKYLINE_WIDTHS]);
+  });
+
+  it("asks for a band's picture at the width it is drawn: a panorama by the band's height, a 1.5:1 frame by its width (research pass 29)", () => {
+    // MarketBand's boxes: the phone's 224px strip, the 336px band from sm,
+    // in the page's 1104px column from 1200px.
+    const band = [
+      { min: 0, width: "100vw" as const, height: 224 },
+      { min: 640, width: "100vw" as const, height: 336 },
+      { min: 1200, width: 1104, height: 336 },
+    ];
+    // Portland's 3.75:1 panorama covers every band by its height, wider
+    // than the band: 840px on a phone (it was asked for at a phone's width
+    // and drawn 1.69× its file), 1260px from sm.
+    expect(SKYLINES.portland.size).toEqual([22500, 6000]);
+    expect(coverWidth(SKYLINES.portland, 224)).toBe(840);
+    expect(bandSizes(SKYLINES.portland, band)).toBe("(min-width: 640px) 1260px, 840px");
+    // A 1.5:1 frame is drawn at the band's width wherever the window is at
+    // least as wide as the height covers, and at that width below it.
+    expect(bandSizes({ size: [3000, 2000] }, band)).toBe("(min-width: 1200px) 1104px, (min-width: 336px) 100vw, 336px");
+    // A window-high band: the window's height decides wherever the window
+    // is narrower than the photograph (the sign-in page's Baltimore).
+    expect(bandSizes({ size: [7988, 3495] }, [{ min: 0, width: "100vw", height: "100vh" }])).toBe(
+      "(max-aspect-ratio: 7988/3495) calc(100vh * 2.286), 100vw",
+    );
+    // No recorded size: the band's width alone, as before.
+    expect(bandSizes({}, band)).toBe("(min-width: 1200px) 1104px, 100vw");
+    expect(bandSizes(null, band)).toBe("(min-width: 1200px) 1104px, 100vw");
+    expect(coverWidth({}, 224)).toBeNull();
+    // Every entry is a length a browser's sizes reads: px, vw or calc().
+    for (const shot of Object.values(SKYLINES)) {
+      for (const entry of bandSizes(shot, band).split(", ")) {
+        expect(entry, shot.file).toMatch(/^(?:\((?:min-width: \d+px|max-aspect-ratio: \d+\/\d+)\) )?(?:\d+px|100vw|calc\(100vh \* [\d.]+\))$/);
+      }
+    }
   });
 
   it("escapes a name on the way into the file's own page", () => {

@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { HOLD_MONTHS, deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
@@ -17,6 +19,10 @@ import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { readPortfolio } from "@/lib/portfolio";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
+import { regulationForDeal } from "@/lib/rent-regulation";
+import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
+import { modelReturnsRead } from "@/lib/compare-interest";
+import { screeningCompareModel } from "@/lib/underwrite/report-grid";
 
 export const runtime = "nodejs";
 
@@ -117,7 +123,27 @@ export async function GET(
     // cell and its Sources note match the page the download came from —
     // and, as there, none for the sample (lib/model-market).
     const debt = await liveDebtSeeds(HOLD_MONTHS);
-    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt));
+    // Where the deal is, as the page and the report read it: a blank address
+    // the memorandum's, a typed line its own fields (#441).
+    const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
+    const siteFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+    // The rent rules that reach the building (lib/rent-regulation), through
+    // the one call every surface makes, on the reader's own day (lib/reader-
+    // day), as the deal page and the report read them: the cover's "The rent
+    // rules" and the Market Read's rent-growth row read the same regulation.
+    const readerDay = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+    const regulation = regulationForDeal(
+      { extraction, address, siteFlags, assetClass: deal.asset_class as string | null },
+      readerDay,
+    );
+    // The model's dated readers read the same day, at its noon, as the page
+    // and the report read theirs: on the UTC day a Los Angeles reader at 8 pm
+    // saw a lease ending today read "ended" on the cover (audit C4, L8).
+    const asOf = new Date(`${readerDay}T12:00:00Z`);
+    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt), {
+      regulation,
+      asOf,
+    });
     // An auction's ceiling bid (#456) is said at the buyer's own hurdle, the
     // buy box's IRR floor, as the deal page and the report say it; the
     // model's own read is at the screening default. Asked only of a deal
@@ -126,7 +152,7 @@ export async function GET(
       try {
         const ownership = deal as unknown as { user_id: string; team_id: string | null };
         const hurdle = (await getBuyBoxForDeal(ownership.user_id, ownership.team_id))?.minIrrPct ?? null;
-        if (hurdle != null) model.meta.sale = { ...model.meta.sale, read: saleCeilingRead(extraction, model.inputs, hurdle) };
+        if (hurdle != null) model.meta.sale = { ...model.meta.sale, read: saleCeilingRead(extraction, model.inputs, hurdle, asOf) };
       } catch (err) {
         console.warn(`workbook buy box read failed for ${id}:`, err instanceof Error ? err.message : err);
       }
@@ -139,11 +165,7 @@ export async function GET(
     try {
       // The covered metro, the metro area its county sits in (#447), or the
       // state's own series — the same market the page and the report read.
-      const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
-      const metro = placeDeal(
-        address,
-        countyOf(address, (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
-      ).live;
+      const metro = placeDeal(address, countyOf(address, siteFlags)).live;
       marketRead = modelVsMarketFor({
         derived: model,
         extraction,
@@ -153,13 +175,28 @@ export async function GET(
         storedAssetClass: deal.asset_class as string | null,
         metro,
         reads: await todayReads(metro),
+        regulation,
       });
     } catch (err) {
       console.warn(`workbook market read failed for ${id}:`, err instanceof Error ? err.message : err);
     }
     // A portfolio memorandum's properties (#411), the same reader as the
-    // deal page's card and the report's portfolio page.
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction));
+    // deal page's card and the report's portfolio page. And the plausibility
+    // check's findings on the deal page's own read (its kind with the first
+    // signal): where one stands against the returns, the Deal Summary marks
+    // them withheld over their live formulas, as the page withholds its
+    // tiles and the report its grids (research pass 40, H1).
+    const findings = assessPlausibility(extraction, inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null));
+    // And what the price buys, on the deal page's own read of the same
+    // model: a leasehold whose lease ends inside the hold has its returns
+    // marked withheld, as the page and the report withhold them (audit C4,
+    // M3).
+    const interest = modelReturnsRead(extraction, screeningCompareModel(model.inputs), asOf);
+    // Built on the reader's day: the cover's "Prepared" date is the day its
+    // "from today" lines count from (audit C6, LOW-2: it had printed the
+    // server's UTC day, a Los Angeles reader at 8 pm reading tomorrow's);
+    // the file's own created time is the moment it is made.
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date());
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";

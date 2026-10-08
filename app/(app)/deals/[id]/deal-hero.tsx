@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { priceRange, priceRangeShort } from "@/lib/criteria";
+import { ToolRow } from "./tool-row";
 
 /**
  * The deal's header, laid out the way a listing opens (#433): the
@@ -45,6 +46,11 @@ export function priceFigureOf(label: string, stated: string | null): HeroFigure 
     ? { label, value: priceRangeShort(range), title: `As stated: ${stated.trim()}`, figure: true }
     : { label, value: stated, figure: true };
 }
+
+/** The deal's name: wraps anywhere it must (`overflow-wrap: anywhere`, which
+ *  also lets the flex row shrink it) and stops at three lines, the whole name
+ *  in its title. */
+export const HERO_TITLE = "line-clamp-3 min-w-0 text-xl font-semibold tracking-tight [overflow-wrap:anywhere] @3xl:text-2xl";
 
 // One column by default: the picture, the facts, the tools, the panels.
 // Split at the header's own 48rem, and only while a picture is there.
@@ -92,10 +98,20 @@ export function DealHero({
     // is the card's last row.
     <header data-deal-hero className="@container shadow-card rounded-2xl border border-line bg-surface">
       <div className={GRID}>
-        <div className="@container/facts flex min-w-0 flex-col justify-center gap-4 px-6 py-5 [grid-area:facts]">
+        {/* The name, the call and the figures: the block the bar that keeps
+            the deal in view watches (`DealStickyBar`), never the whole
+            header, whose deal-kind panels run on for screens below it. */}
+        <div data-deal-hero-facts className="@container/facts flex min-w-0 flex-col justify-center gap-4 px-6 py-5 [grid-area:facts]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight @3xl:text-2xl">{title}</h1>
+              {/* Focusable from script only: "Back to the top" lands here,
+                  out of the sticky bar that hides as it goes. A name wraps
+                  anywhere it must — a URL pasted as the name had widened a
+                  phone's page to 711px — and a long one stops at three
+                  lines, the whole name in its title (research pass 42). */}
+              <h1 id="deal-title" tabIndex={-1} title={title} className={HERO_TITLE}>
+                {title}
+              </h1>
               {chips}
             </div>
             <p className="mt-1 line-clamp-2 text-sm text-muted">{subtitle}</p>
@@ -140,14 +156,19 @@ export function DealHero({
 
         {picture ? <div className="min-w-0 [grid-area:pic]">{picture}</div> : null}
 
+        {/* The tools, then the deal's state: on a phone a row each that
+            scrolls sideways (ToolRow), from `sm` one wrapping row. */}
         {actions || controls ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-line bg-faint/50 px-4 py-3 [grid-area:actions] [&:has(+_div:empty)]:rounded-b-[15px]">
-            {actions}
-            {controls ? <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">{controls}</div> : null}
+          <div className="flex flex-col gap-2 border-t border-line bg-faint/50 px-4 py-3 [grid-area:actions] sm:flex-row sm:flex-wrap sm:items-center [&:has(+_div:empty)]:rounded-b-[15px]">
+            {actions ? <ToolRow row="tools">{actions}</ToolRow> : null}
+            {controls ? <ToolRow row="controls">{controls}</ToolRow> : null}
           </div>
         ) : null}
 
-        <div className="px-6 pb-5 [grid-area:panels] empty:hidden">{children}</div>
+        {/* The panels' well: 12px inside the card on a phone, where 24px of
+            it, the card's border and each panel's own edge and padding left
+            a 263px column of text on a 390px screen (research pass 36). */}
+        <div className="px-3 pb-5 sm:px-6 [grid-area:panels] empty:hidden">{children}</div>
       </div>
     </header>
   );

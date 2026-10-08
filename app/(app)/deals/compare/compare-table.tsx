@@ -1,28 +1,44 @@
 import Link from "next/link";
 import { assetClassLabel } from "@/lib/asset-class";
 import type { BannerSource } from "@/lib/deal-banner";
+import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
+import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, UNDER_WATER_WORDS, type CapWithheld } from "@/lib/compare-interest";
+import { PLAN_CAP_NA } from "@/lib/cap-slot";
+import { pctText, YOC_WITHHELD } from "@/lib/plan-facts";
+import type { BuyBoxCoverage } from "@/lib/criteria";
+import { fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
-  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/10 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/10 text-caution" },
   pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 };
 
 export const usd = (n: number | null | undefined) =>
   n == null ? null : "$" + Math.round(n).toLocaleString();
+/** A return — an IRR, a cash-on-cash, a note's yield — to one decimal. */
 export const pct = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(1) + "%";
+/** A going-in cap or a yield on cost to two decimals, as the deal header,
+ *  the pipeline card and the meeting workbook print it (lib/plan-facts):
+ *  this table had printed the card's "5.45%" as "5.5%" and a plan's
+ *  "6.27%" as "6.3%". */
+const pct2 = (n: number | null | undefined) => (n == null || !isFinite(n) ? null : pctText(n));
 export const mult = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(2) + "x";
 
 /** What the return rows are, said once over the table (the audit of
  *  2026-09-30): the first-draft model's figures (lib/model, which carries
- *  no date), not the memorandum's that each deal's header prints. */
+ *  no date), not the memorandum's that each deal's header prints — and not
+ *  the screening model's (lib/underwrite/engine), whose returns the deal
+ *  page's playground, the Excel workbook and the full report print, so the
+ *  two can differ for one deal (research pass 40, M9: the sample reads
+ *  8.72% here and 9.28% on its page). */
 export const MODEL_ROWS_NOTE =
-  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced), not the memorandum’s figures on its header; a figure marked (OM) comes from the memorandum’s figures, stated or worked from them (a yield on cost, a note’s yield, a spread), where the model has none.";
+  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced) — not the screening model whose returns the deal page’s playground, the Excel workbook and the full report print, which can differ, nor the memorandum’s figures on its header; a figure marked (OM) comes from the memorandum’s figures, stated or worked from them (a yield on cost, a note’s yield, a spread), where the model has none.";
 
 /** A row a model figure fills says so beside its name. */
 const MODEL_ROW = " · model";
@@ -54,16 +70,28 @@ export type Col = {
   /** where the county alone placed it: "Collin County, TX" */
   readCounty?: string | null;
   verdict: string | null;
+  /** the day the call on file was written ("Sep 12, 2026",
+   *  lib/screen-run `screenedOn`); null with no call, never the day the
+   *  deal was added */
+  screened?: string | null;
   reason: string | null;
   /** why the call on file is the previous screen's, if it is: a re-screen
-   *  still running toward its verdict, or one that failed before reaching
-   *  it (lib/screen-run `verdictBehind`). Such a call is shown as the run,
-   *  the way the pipeline card shows it, and never crowned "best". */
-  behind?: "running" | "failed" | null;
+   *  still running toward its verdict, one that failed before reaching it,
+   *  or one that stopped making progress on the way (lib/screen-run
+   *  `verdictBehind`). Such a call is shown as the run, the way the
+   *  pipeline card shows it, and never crowned "best". */
+  behind?: "running" | "failed" | "stalled" | null;
+  /** whether a memorandum is on file (a typed-in deal has none) */
+  hasOm?: boolean;
   hasModel: boolean;
-  /** deterministic mandate fit + a one-line why (misses / near-misses) */
+  /** deterministic mandate fit + a one-line why (misses / near-misses, and
+   *  which criteria could not be checked) */
   fit: "fits" | "near" | "outside" | null;
   fitNote: string | null;
+  /** how many of the box's criteria the fit stands on (lib/criteria
+   *  `buyBoxCoverage`): "Fits (2 of 4)" where not every one could be
+   *  checked, and never green while one the price decides is among them */
+  fitCoverage?: BuyBoxCoverage | null;
   /** the deal's strategy label (Stabilized / Value-add / Conversion …), null when unknown */
   strategy: string | null;
   /** a deal with a plan (value-add, lease-up, conversion, development): its
@@ -77,11 +105,19 @@ export type Col = {
   /** where the cap came from: the first-draft model, or the memorandum's
    *  own going-in cap where the model has none (lib/compare-figures) */
   capFrom?: FigureSource | null;
+  /** why the cap slot is withheld on every surface the deal is summarized
+   *  on (lib/compare-interest `capSlotWithheld`): a note's and a position's
+   *  yield stands in its place, and a share beside the loan its entity
+   *  carries says "n/a — share" */
+  capWithheld?: CapWithheld | null;
   /** stabilized NOI ÷ total cost, % — the yardstick for a deal with a plan:
    *  the model's, else the one the deal's header prints; null for a
    *  stabilized asset */
   yoc: number | null;
   yocFrom?: FigureSource | null;
+  /** why no yield on cost is shown where one was struck at or past the
+   *  ceiling, a yield no project earns (lib/compare-figures) */
+  yocWithheld?: string | null;
   /** cap vs the freshest 30-yr fixed — same arithmetic as the deal page */
   leverage: LeverageRead | null;
   /** cap over today's 10-year Treasury (lib/leverage `capSpreadRead`) —
@@ -99,11 +135,19 @@ export type Col = {
   /** a note's yield to maturity at its price, percent, where it pays or
    *  may — its answer where a building shows a going-in cap (#423) */
   noteYtm?: number | null;
+  /** a note whose balance is over the collateral's stated value: its slot
+   *  reads "n/a — under water" (lib/compare-interest, research pass 38) */
+  noteUnderWater?: boolean;
   /** the model's returns withheld: a note's are the collateral's, bought
    *  outright; a share's, run at the share's price, set the whole
    *  building's cash flows against a fraction of its cost
-   *  (lib/compare-interest, #423) */
-  withheld?: "note" | "share" | null;
+   *  (lib/compare-interest, #423); a leasehold's whose lease ends inside
+   *  the model's hold sell a building that has reverted (research pass 38) */
+  withheld?: "note" | "share" | "position" | "lease" | null;
+  /** what a withheld return says after "n/a — " (lib/compare-interest
+   *  `withheldWord`): "note", "share", "position", "lease ends in year 3";
+   *  absent, the reason's own word */
+  withheldWord?: string | null;
   /** FEMA's flood zone at the building as a cell ("AE (SFHA)", "X
    *  (minimal)", "no FEMA digital map" — lib/site-flags `floodCell`, #426);
    *  blank before the lookup has answered */
@@ -150,6 +194,27 @@ export type Col = {
    *  3rd-party managed" — lib/self-storage `selfStorageTag`, #471); absent
    *  otherwise */
   storage?: string | null;
+  /** the rent rules that reach the building ("Rent-stabilized, 41 of 48",
+   *  "Rent rules: check" — lib/rent-regulation `regulationTag`); absent
+   *  where none reaches it and the memorandum names no regime */
+  regulation?: string | null;
+  /** a forward purchase or a build-to-suit bought at delivery ("Forward,
+   *  delivers Q2 2028", "Build-to-suit, 6.00% at delivery" —
+   *  lib/forward-purchase `forwardTag`); absent otherwise */
+  forward?: string | null;
+  /** a mixed-use building's commercial share ("Commercial 29% of income" —
+   *  lib/mixed-use `mixedUseTag`); absent otherwise */
+  mixedUse?: string | null;
+  /** an operating business on its real estate ("Going concern", "Operator
+   *  lease, 2.61x coverage" — lib/going-concern `goingConcernTag`); absent
+   *  otherwise */
+  goingConcern?: string | null;
+  /** condominium units bought in bulk ("Bulk 42 of 120 (35%)", "Condo
+   *  units" — lib/condo `condoTag`); absent otherwise */
+  condo?: string | null;
+  /** a sandwich position's spread ("Spread $720k, 1.65× cover" —
+   *  lib/sandwich-lease `sandwichTag`); absent otherwise */
+  sandwich?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -159,13 +224,34 @@ export type Col = {
   /** the building's pictures to try, best first, each with its own credit
    *  (lib/deal-banner, #418) — absent where the caller draws none */
   pictures?: BannerSource[];
+  /** the deal's cover (lib/deal-cover, #442), as its pipeline card wears it:
+   *  what holds the frame while a picture loads, and the frame where none
+   *  answers — absent, the blank plate */
+  cover?: DealCoverFacts | null;
 };
 
-const FIT_LABEL: Record<NonNullable<Col["fit"]>, { text: string; cls: string }> = {
-  fits: { text: "Fits", cls: "text-pass" },
-  near: { text: "Near miss", cls: "text-caution" },
-  outside: { text: "Outside", cls: "text-kill" },
+const FIT_LABEL: Record<NonNullable<Col["fit"]>, string> = {
+  fits: "Fits",
+  near: "Near miss",
+  outside: "Outside",
 };
+
+/** The fit's colour by its tone (lib/fit-label `fitTone`): the fold's
+ *  own, and muted — never green — while a criterion the price decides could
+ *  not be checked, as the deal header's chip and the pipeline card are. */
+const FIT_TONE_CLS: Record<FitTone, string> = {
+  pass: "text-pass",
+  caution: "text-caution",
+  kill: "text-kill",
+  muted: "text-muted",
+};
+
+/** The fit in words and colour: "Fits", or "Fits (2 of 4)" where the box
+ *  could not be judged whole (lib/fit-label `fitCellText`). */
+function fitShown(c: Col): { text: string; cls: string } | null {
+  if (!c.fit) return null;
+  return { text: fitCellText(FIT_LABEL[c.fit], c.fitCoverage), cls: FIT_TONE_CLS[fitTone(null, c.fit, c.fitCoverage)] };
+}
 
 /** The row's spread as a bar — the pipeline's fit bar, scaled to the row's
  *  largest figure. Muted on a rejected deal (drawn, so the proportions stay
@@ -233,7 +319,24 @@ function CallPill({ c, className = "" }: { c: Col; className?: string }) {
         title={p ? `Re-screening — the previous call was ${p.label}` : undefined}
       >
         <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        {p ? "Re-screening…" : "Screening…"}
+        {p ? "Re-screening…" : c.hasOm === false ? "Screening the facts…" : "Reading the OM…"}
+      </span>
+    );
+  }
+  // A run that stopped making progress is no re-screen in progress: said
+  // as the pipeline card says it (lib/screen-run `isStalled`).
+  if (c.behind === "stalled") {
+    return (
+      <span
+        data-qa="call-behind"
+        className={`rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-medium text-caution ${className}`}
+        title={
+          p
+            ? `The latest screen stopped making progress before its verdict — the previous call was ${p.label}. Open the deal to start it again.`
+            : "The screen stopped making progress — open the deal to start it again"
+        }
+      >
+        Stalled
       </span>
     );
   }
@@ -277,6 +380,13 @@ const BEST_PILL = (
   </>
 );
 
+/** A row's name in the table's sticky first column: wrapped at 9rem while
+ *  the column is narrow, so the width goes to the deals (on one line it took
+ *  202px of a tablet's 516, beside deal columns of 115px), and on one line
+ *  once the page's column is wide. */
+const LABEL_CELL =
+  "sticky left-0 z-10 w-36 bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted @4xl:w-auto @4xl:whitespace-nowrap";
+
 export function CompareTable({ cols }: { cols: Col[] }) {
   // Never crown a hero number on a deal the screen rejected — that's the
   // exact pro-forma trap the product exists to counter — nor on one whose
@@ -304,6 +414,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
      *  and a memorandum's figure in it is marked (the audit of 2026-09-30) */
     src?: (c: Col) => FigureSource | null | undefined;
   }[] = [
+    // The day each call was written, first under the calls: two calls a
+    // year apart read alike otherwise (research pass 42).
+    { label: "Screened", get: (c) => c.screened ?? "—" },
     { label: "Market", get: (c) => c.market },
     {
       label: "Market read",
@@ -311,9 +424,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
         c.coveredMarket ??
         (c.readMarket ? (c.readCounty ? `${c.readMarket} (by its county, ${c.readCounty})` : `${c.readMarket} (read, not briefed)`) : "—"),
     },
-    // FEMA's zone at the building (#426): a Special Flood Hazard Area means
-    // flood insurance on federally backed debt, a cost and a lender's
-    // condition, set side by side with the others.
+    // FEMA's zone at the building's point (#426): a Special Flood Hazard
+    // Area means flood insurance on the loans federal law reaches there
+    // (lib/site-flags), a cost and a lender's condition, set side by side.
     {
       label: "Flood zone",
       get: (c) => c.flood || "—",
@@ -329,6 +442,16 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A dash, never "market-rate": a screen saved before the restriction
     // was read did not look.
     { label: "Affordability", get: (c) => c.affordable || "—" },
+    // The rent rules that reach the building (lib/rent-regulation): a dash,
+    // never "none", for a deal with no read — the site's rules not reaching
+    // a regime here is not a finding that the building has none.
+    { label: "Rent regulation", get: (c) => c.regulation || "—" },
+    // A forward purchase (lib/forward-purchase): the price is paid at
+    // delivery and the developer funds the works — a dash, never "none".
+    { label: "Forward purchase", get: (c) => c.forward || "—" },
+    // An operating business on its real estate (lib/going-concern): whose
+    // earnings the income is, a dash beside a deal with no read.
+    { label: "Operating business", get: (c) => c.goingConcern || "—" },
     { label: "Tenancy", get: (c) => c.tenancy || "—" },
     // A shadow anchor is not bought, and a roll before the sale is income
     // the model counts and the buyer may not keep (#457).
@@ -353,15 +476,25 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Manufactured housing", get: (c) => c.mh || "—" },
     // A self-storage facility's occupancy and rates (#471).
     { label: "Self-storage", get: (c) => c.storage || "—" },
+    // A mixed-use building's commercial share (lib/mixed-use): a dash,
+    // never "none", beside a deal with no read.
+    { label: "Mixed-use", get: (c) => c.mixedUse || "—" },
+    // Condominium units bought in bulk (lib/condo): the buyer's share of the
+    // association, a dash beside a deal with no read.
+    { label: "Condominium", get: (c) => c.condo || "—" },
+    // A sandwich position (lib/sandwich-lease): the subleases less the
+    // master rent and its cover, a dash beside a deal with no read.
+    { label: "Sandwich position", get: (c) => c.sandwich || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },
-    // A note's or a share's model returns are not the deal's (#423): said
+    // A note's or a share's model returns are not the deal's (#423), nor a
+    // leasehold's whose lease ends inside the hold (research pass 38): said
     // as withheld, with the reason, rather than left a bare dash.
     // The returns are the first-draft model's alone.
     {
       label: "Levered IRR",
-      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.irr)),
+      get: (c) => (c.withheld ? `n/a — ${c.withheldWord ?? c.withheld}` : pct(c.irr)),
       best: (c) => crownable(c) && c.irr != null && c.irr === bestIrr,
       mono: true,
       num: (c) => c.irr,
@@ -369,7 +502,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     },
     {
       label: "Equity multiple",
-      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : mult(c.em)),
+      get: (c) => (c.withheld ? `n/a — ${c.withheldWord ?? c.withheld}` : mult(c.em)),
       best: (c) => crownable(c) && c.em != null && c.em === bestEm,
       mono: true,
       num: (c) => c.em,
@@ -377,7 +510,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     },
     {
       label: "Cash-on-cash (Yr 1)",
-      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.coc)),
+      get: (c) => (c.withheld ? `n/a — ${c.withheldWord ?? c.withheld}` : pct(c.coc)),
       mono: true,
       num: (c) => c.coc,
       src: (c) => (c.withheld || c.coc == null ? null : "model"),
@@ -390,18 +523,33 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       label: "Going-in cap",
       get: (c) =>
         c.planDeal
-          ? "n/a — plan"
-          : c.withheld === "note"
+          ? PLAN_CAP_NA
+          : c.withheld === "note" || c.withheld === "position"
             ? c.noteYtm != null
-              ? `${pct(c.noteYtm)} to maturity`
-              : "n/a — note"
-            : pct(c.cap),
+              ? `${pct(c.noteYtm)} ${OWN_YIELD_WORDS[c.withheld].to}`
+              : c.noteUnderWater
+                ? UNDER_WATER_WORDS.na
+                : OWN_YIELD_WORDS[c.withheld].na
+            : // A share beside the loan its entity carries: the cap is
+              // withheld here as on its header and its card, never a dash
+              // that reads as "not stated".
+              c.capWithheld === "share"
+              ? SHARE_CAP_WORDS.na
+              : pct2(c.cap),
       mono: true,
       num: (c) => (c.planDeal ? null : c.cap),
       // The model's cap, else the memorandum's (lib/compare-figures); a
       // note's yield is read off the memorandum's own terms.
       src: (c) =>
-        c.planDeal ? null : c.withheld === "note" ? (c.noteYtm != null ? "om" : null) : c.cap != null ? c.capFrom : null,
+        c.planDeal
+          ? null
+          : c.withheld === "note" || c.withheld === "position"
+            ? c.noteYtm != null
+              ? "om"
+              : null
+            : c.cap != null
+              ? c.capFrom
+              : null,
     },
     // The plan's yardstick: stabilized NOI over everything it cost to get
     // there. Blank for a stabilized asset — its going-in cap is the answer.
@@ -411,7 +559,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       // cost"), so the row stays while one is compared: the model's figure,
       // else the one the deal's header prints; "not stated" where neither
       // has one, rather than a dash.
-      get: (c) => pct(c.yoc) ?? (c.planDeal ? "not stated" : null),
+      // A yield no project earns is refused in the plan facts' own words,
+      // never "not stated" (research pass 38).
+      get: (c) => pct2(c.yoc) ?? (c.yocWithheld ? YOC_WITHHELD : c.planDeal ? "not stated" : null),
       mono: true,
       num: (c) => c.yoc,
       src: (c) => (c.yoc != null ? c.yocFrom : null),
@@ -422,11 +572,13 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) =>
         c.planDeal
           ? "judged on yield on cost"
-          : c.withheld === "note"
-            ? "n/a — note"
-            : c.leverage
-              ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
-              : null,
+          : c.withheld === "note" || c.withheld === "position"
+            ? OWN_YIELD_WORDS[c.withheld].na
+            : c.capWithheld === "share"
+              ? SHARE_CAP_WORDS.na
+              : c.leverage
+                ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
+                : null,
       cls: (c) =>
         c.leverage?.tone === "negative"
           ? "text-kill"
@@ -441,7 +593,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       num: (c) => (c.planDeal || !c.leverage ? null : c.leverage.spreadBps),
       signed: true,
       // Struck on the cap one row up, so from where that cap came.
-      src: (c) => (c.planDeal || c.withheld === "note" || !c.leverage ? null : c.capFrom),
+      src: (c) => (c.planDeal || c.withheld === "note" || c.withheld === "position" || !c.leverage ? null : c.capFrom),
     },
     // The cap over today's 10-year — the spread a cap is quoted against, a
     // fact with no verdict, so the cell carries no tone; signed, like the
@@ -451,15 +603,17 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) =>
         c.planDeal
           ? "judged on yield on cost"
-          : c.withheld === "note"
-            ? "n/a — note"
-            : c.capOverTenYear
-              ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
-              : null,
+          : c.withheld === "note" || c.withheld === "position"
+            ? OWN_YIELD_WORDS[c.withheld].na
+            : c.capWithheld === "share"
+              ? SHARE_CAP_WORDS.na
+              : c.capOverTenYear
+                ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
+                : null,
       mono: true,
       num: (c) => (c.planDeal || !c.capOverTenYear ? null : c.capOverTenYear.spreadBps),
       signed: true,
-      src: (c) => (c.planDeal || c.withheld === "note" || !c.capOverTenYear ? null : c.capFrom),
+      src: (c) => (c.planDeal || c.withheld === "note" || c.withheld === "position" || !c.capOverTenYear ? null : c.capFrom),
     },
     // What the price buys, beside it, where it is not the building
     // outright (#423) — the pipeline row's own tag.
@@ -515,17 +669,30 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     );
   };
 
+  // Cards or the table, by the width of the page's own column — a container
+  // query, as the pipeline's grid counts its columns from its own width —
+  // never the window's: the window's `sm` turned the table on from 640px,
+  // but beside the 240px sidebar an 820px tablet has a 516px column, and
+  // four deals showed two and a half with nothing saying the rest scrolled
+  // (research pass 36).
+  // The table from the width that holds its columns — a 9rem label column
+  // and some 8rem a deal, never under its own 36rem — and the cards below.
+  const layout =
+    cols.length > 3
+      ? { cards: "@2xl:hidden", table: "@2xl:block" }
+      : { cards: "@xl:hidden", table: "@xl:block" };
+
   return (
-    <>
-      {/* Phone: one card per deal with the table's rows stacked, so a phone
-          reads a whole deal instead of one column and a sliver of the next.
-          From `sm` up the table takes over. */}
-      <ul className="grid gap-3 sm:hidden" aria-label="Deals compared">
+    <div className="@container">
+      {/* One card per deal with the table's rows stacked, so a narrow
+          column reads a whole deal instead of one column and a sliver of
+          the next. Where the column holds the table, the table. */}
+      <ul className={`grid gap-3 ${layout.cards}`} aria-label="Deals compared">
         {cols.map((c, ci) => {
           const reason = reasonLine(c);
           return (
             <li key={c.id} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-              {c.pictures && <DealBanner sources={c.pictures} label={c.name} className="mb-3" />}
+              {c.pictures && <DealBanner sources={c.pictures} cover={c.cover ?? null} label={c.name} className="mb-3" />}
               <div className="flex items-start justify-between gap-3">
                 <Link href={`/deals/${c.id}`} className="font-medium text-ink hover:text-brand">
                   {c.name}
@@ -535,7 +702,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
               {reason && <p className="mt-1 text-xs leading-relaxed text-muted">{reason}</p>}
               {c.fit && (
                 <p className="mt-2 text-xs">
-                  <span className={`font-semibold ${FIT_LABEL[c.fit].cls}`}>{FIT_LABEL[c.fit].text}</span>
+                  <span className={`font-semibold ${fitShown(c)!.cls}`}>{fitShown(c)!.text}</span>
                   {c.fitNote && <span className="text-muted"> · {c.fitNote}</span>}
                 </p>
               )}
@@ -573,103 +740,108 @@ export function CompareTable({ cols }: { cols: Col[] }) {
         })}
       </ul>
 
-      <div className="hidden overflow-x-auto rounded-2xl border border-line bg-surface shadow-card sm:block">
-        <table className="w-full min-w-[36rem] border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 bg-surface" />
-              {cols.map((c) => {
-                const reason = reasonLine(c);
-                return (
-                  <th
-                    key={c.id}
-                    className="border-b border-l border-line p-4 text-left align-top"
-                  >
-                    {c.pictures && (
-                      <DealBanner sources={c.pictures} label={c.name} className="mb-3 w-full max-w-[16rem]" />
-                    )}
-                    <Link
-                      href={`/deals/${c.id}`}
-                      className="font-medium text-ink hover:text-brand"
-                    >
-                      {c.name}
-                    </Link>
-                    <div className="mt-2">
-                      <CallPill c={c} />
-                    </div>
-                    {reason && (
-                      <p className="mt-2 max-w-[16rem] text-xs font-normal leading-relaxed text-muted">
-                        {reason}
-                      </p>
-                    )}
-                    {!c.hasModel && (
-                      <Link
-                        href={`/deals/${c.id}?tab=model`}
-                        className="mt-2 inline-block text-[11px] font-medium text-brand hover:text-brand-strong"
-                      >
-                        No model yet — generate →
-                      </Link>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Mandate fit leads — an analyst checks the box before the returns.
-                Hidden entirely until a buy box exists to check against. */}
-            {cols.some((c) => c.fit) && (
-              <tr className="border-b border-line">
-                <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  Buy box
-                </td>
-                {cols.map((c) => (
-                  <td key={c.id} className="border-l border-line px-4 py-3 align-top">
-                    {c.fit ? (
-                      <>
-                        <span className={`font-semibold ${FIT_LABEL[c.fit].cls}`}>
-                          {FIT_LABEL[c.fit].text}
-                        </span>
-                        {c.fitNote && (
-                          <p className="mt-0.5 max-w-[16rem] text-xs leading-relaxed text-muted">
-                            {c.fitNote}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                ))}
-              </tr>
-            )}
-            {rows.map((mr, ri) => (
-              <tr key={mr.label} className="border-b border-line last:border-0">
-                <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  {labelOf[ri]}
-                </td>
-                {cols.map((c, ci) => {
-                  const val = mr.get(c);
-                  const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
+      {/* Where it still runs past its column, a soft shadow at the edge that
+          has more says so and leaves once there is nothing left to scroll —
+          the site's own affordance for a wide table (scroll-shadows-x). */}
+      <div className={`hidden rounded-2xl border border-line bg-surface shadow-card ${layout.table}`}>
+        <div className="scroll-shadows-x overflow-x-auto rounded-[15px]">
+          <table className="w-full min-w-[36rem] border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 bg-surface" />
+                {cols.map((c) => {
+                  const reason = reasonLine(c);
                   return (
-                    <td
+                    <th
                       key={c.id}
-                      className={`border-l border-line px-4 py-3 ${
-                        mr.mono ? "font-mono tabular-nums" : ""
-                      } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
+                      className="border-b border-l border-line p-4 text-left align-top"
                     >
-                      {val ?? <span className="text-muted">—</span>}
-                      {omMark(mr, c, val)}
-                      {isBest && BEST_PILL}
-                      {barFor(mr, c, ri, ci, isBest)}
-                    </td>
+                      {c.pictures && (
+                        <DealBanner sources={c.pictures} cover={c.cover ?? null} label={c.name} className="mb-3 w-full max-w-[16rem]" />
+                      )}
+                      <Link
+                        href={`/deals/${c.id}`}
+                        className="font-medium text-ink hover:text-brand"
+                      >
+                        {c.name}
+                      </Link>
+                      <div className="mt-2">
+                        <CallPill c={c} />
+                      </div>
+                      {reason && (
+                        <p className="mt-2 max-w-[16rem] text-xs font-normal leading-relaxed text-muted">
+                          {reason}
+                        </p>
+                      )}
+                      {!c.hasModel && (
+                        <Link
+                          href={`/deals/${c.id}?tab=model`}
+                          className="mt-2 inline-block text-[11px] font-medium text-brand hover:text-brand-strong"
+                        >
+                          No model yet — generate →
+                        </Link>
+                      )}
+                    </th>
                   );
                 })}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {/* Mandate fit leads — an analyst checks the box before the returns.
+                  Hidden entirely until a buy box exists to check against. */}
+              {cols.some((c) => c.fit) && (
+                <tr className="border-b border-line">
+                  <td className={LABEL_CELL}>
+                    Buy box
+                  </td>
+                  {cols.map((c) => (
+                    <td key={c.id} className="border-l border-line px-4 py-3 align-top">
+                      {c.fit ? (
+                        <>
+                          <span className={`font-semibold ${fitShown(c)!.cls}`}>
+                            {fitShown(c)!.text}
+                          </span>
+                          {c.fitNote && (
+                            <p className="mt-0.5 max-w-[16rem] text-xs leading-relaxed text-muted">
+                              {c.fitNote}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              )}
+              {rows.map((mr, ri) => (
+                <tr key={mr.label} className="border-b border-line last:border-0">
+                  <td className={LABEL_CELL}>
+                    {labelOf[ri]}
+                  </td>
+                  {cols.map((c, ci) => {
+                    const val = mr.get(c);
+                    const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
+                    return (
+                      <td
+                        key={c.id}
+                        className={`border-l border-line px-4 py-3 ${
+                          mr.mono ? "font-mono tabular-nums" : ""
+                        } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
+                      >
+                        {val ?? <span className="text-muted">—</span>}
+                        {omMark(mr, c, val)}
+                        {isBest && BEST_PILL}
+                        {barFor(mr, c, ri, ci, isBest)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

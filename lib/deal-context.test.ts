@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { dealContextFor } from "./deal-context";
+import { regulationForDeal } from "./rent-regulation";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
 
@@ -51,6 +52,35 @@ describe("dealContextFor — what the screen established, for every step that re
     expect(ctx).toContain("Total cost is $400k per planned unit (300 units)");
     expect(ctx).toContain("never the land price");
     expect(ctx).not.toContain("Timeline as stated");
+  });
+
+  // Audit C4, L5: a value-add's units stand today, so its basis is never
+  // "per planned unit" (lib/deal-strategy `notYetDelivered`, the memo's
+  // rule).
+  it("a value-add's basis is per unit, never per planned unit", () => {
+    const ctx = dealContextFor({
+      ...CONVERSION,
+      dealName: "Maddox Apartments",
+      strategy: { kind: "value_add", summary: "Renovate the interiors", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$17,000,000"), m("Stabilized NOI", "$1,320,000"), m("Renovation budget", "$2,000,000"), m("Units", "100")],
+    })!;
+    expect(ctx).toContain("Total cost is $190k per unit (100 units)");
+    expect(ctx).not.toContain("planned");
+    expect(ctx).toContain("never the price alone");
+  });
+
+  // Audit C4, L6: a forward purchase's price is the finished building's, the
+  // buyer's whole cost at delivery; the memorandum states no land price.
+  it("a forward purchase's basis is its price, the buyer's whole cost at delivery, never the land price", () => {
+    const ctx = dealContextFor({
+      ...CONVERSION,
+      dealName: "Riverside Forward",
+      strategy: { kind: "development", summary: "Forward purchase of a 300-unit building at completion", capitalBudget: "", timeline: "" },
+      metrics: [m("Purchase price", "$90,000,000"), m("Stabilized NOI", "$5,400,000"), m("Units (proposed)", "300")],
+    })!;
+    expect(ctx).toContain("Total cost is $300k per planned unit (300 units)");
+    expect(ctx).toContain("the price, the buyer's whole cost at delivery");
+    expect(ctx).not.toContain("land price");
   });
 
   it("says nothing about units or timing the OM does not state", () => {
@@ -143,6 +173,18 @@ describe("dealContextFor — a portfolio OM says what it offers", () => {
     expect(unknown.startsWith("Portfolio: 2 properties")).toBe(true);
     // One property is not a portfolio, and an unknown single asset says nothing.
     expect(dealContextFor({ ...PORTFOLIO, strategy: undefined, metrics: [], properties: [PORTFOLIO.properties![0]] })).toBeNull();
+  });
+
+  // Research pass 41 (L11): "FEMA's flood map puts the building's point in
+  // Zone AE" beside "Portfolio: 2 properties across 2 markets".
+  it("names the point the address was placed at on a portfolio, never the building's", () => {
+    const site = { flood: { zone: "AE", subtype: null, isHighRisk: true }, pointIsBuilding: true };
+    const ctx = dealContextFor(PORTFOLIO, site)!;
+    expect(ctx).toContain("FEMA's flood map puts the point the address was placed at in Zone AE");
+    expect(ctx).not.toContain("the building's point");
+    // One building placed at its house keeps the building's point.
+    const one = { ...PORTFOLIO, properties: [] };
+    expect(dealContextFor(one, site)).toContain("FEMA's flood map puts the building's point in Zone AE");
   });
 });
 
@@ -334,6 +376,180 @@ describe("dealContextFor — a self-storage facility (#471)", () => {
     const ctx = dealContextFor(storage)!;
     expect(ctx).toContain("Self-storage: It is 91% occupied by units, 84% economically: the 7 points between the units let and the rent collected");
     expect(ctx).toContain("21.1% over it, the premium years of rate increases built");
+  });
+});
+
+describe("dealContextFor — a forward purchase (lib/forward-purchase)", () => {
+  const bts: ExtractionResult = {
+    dealName: "Ridgeline Distribution",
+    assetClass: "industrial",
+    strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+    metrics: [
+      m("Purchase price", "$48,000,000"),
+      m("NOI (Year 1)", "$2,880,000"),
+      m("Delivery cap rate", "6.00%"),
+      m("Delivery date", "Q3 2027"),
+      m("Outside date", "March 31, 2028"),
+      m("Deposit", "$2,400,000 at signing"),
+      m("Developer", "Ridgeline Logistics Partners"),
+    ],
+  };
+
+  it("says the price is paid at delivery and the developer funds the works, then the yield at delivery over the price", () => {
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      const ctx = dealContextFor(bts)!;
+      expect(ctx).toContain(
+        "Forward purchase: A build-to-suit bought at delivery: the buyer pays $48.0M at delivery, Q3 2027 (read as Sep 30, 2027), and the developer funds the works",
+      );
+      expect(ctx).toContain("It is struck at a 6.00% cap at delivery, as stated.");
+      expect(ctx).toContain("Developer as stated: Ridgeline Logistics Partners.");
+      // The plan's own figures, said as the NOI at delivery over the price.
+      expect(ctx).toContain(
+        "The OM's NOI at delivery (NOI (Year 1)) of $2.9M is the delivered building's figure — over the $48.0M price, the buyer's whole cost, it is a 6.00% yield on cost, not today's income.",
+      );
+      expect(ctx).not.toContain("finished project's figure");
+      // Said with what the price buys, before the deal's type.
+      expect(ctx.indexOf("Forward purchase:")).toBeLessThan(ctx.indexOf("Deal type:"));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says nothing of a forward purchase on a development the buyer builds", () => {
+    const own = { ...bts, strategy: { ...bts.strategy!, summary: "Ground-up distribution center" } };
+    expect(dealContextFor(own)).not.toContain("Forward purchase");
+  });
+});
+
+describe("dealContextFor — a mixed-use building's two incomes (lib/mixed-use)", () => {
+  it("says the residential and commercial incomes and the commercial share, each as stated", () => {
+    const mixed: ExtractionResult = {
+      dealName: "Main Street Lofts",
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        m("Asking price", "$25,000,000"),
+        m("Units", "48"),
+        m("NOI (in-place)", "$1,400,000"),
+        m("Residential income", "$1,520,000"),
+        m("Commercial income", "$610,000"),
+      ],
+    };
+    const ctx = dealContextFor(mixed)!;
+    expect(ctx).toContain(
+      "Mixed-use income: The memorandum states $1.52M of residential income and $610k of commercial: 28.6% of the income is the commercial space's",
+    );
+    // One half alone reads no share, and an ordinary building says nothing.
+    expect(dealContextFor({ ...mixed, assetClass: "multifamily", metrics: mixed.metrics.filter((r) => r.label !== "Commercial income") })).not.toContain("Mixed-use");
+  });
+});
+
+describe("dealContextFor — an operating business on its real estate (lib/going-concern)", () => {
+  it("says whose earnings the income is, and the contracts as stated, with what the price buys", () => {
+    const station: ExtractionResult = {
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [
+        m("Asking price", "$3,200,000"),
+        m("NOI (in-place)", "$256,000"),
+        m("EBITDA (T-12)", "$410,000"),
+        m("Fuel supply agreement", "Shell branded supply through 2029"),
+        m("Tank system", "Three double-walled fiberglass USTs, installed 2004"),
+      ],
+    };
+    const ctx = dealContextFor(station)!;
+    expect(ctx).toContain(
+      "Operating business: The memorandum sells a fuel station and its store with its real estate: its earnings are the operation's, and a real estate cap struck on them prices the business as if it were rent.",
+    );
+    expect(ctx).toContain("It states EBITDA (T-12) of $410k: the operator's earnings, before a management fee and a reserve for the fixtures, never the real estate's NOI.");
+    expect(ctx).toContain("Fuel supply agreement, as stated: Shell branded supply through 2029.");
+    expect(ctx.indexOf("Operating business:")).toBeLessThan(ctx.indexOf("Deal type:"));
+    expect(dealContextFor({ ...station, dealName: "Route 9", assetClass: "Retail", strategy: undefined, metrics: station.metrics.filter((r) => !/EBITDA/.test(r.label)) })).not.toContain("Operating business");
+  });
+});
+
+describe("dealContextFor — condominium units bought in bulk (lib/condo)", () => {
+  it("says the buyer's share of the association and a year of its dues, as stated", () => {
+    const bulk: ExtractionResult = {
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      metrics: [
+        m("Asking price", "$16,800,000"),
+        m("Units", "42"),
+        m("NOI (in-place)", "$840,000"),
+        m("HOA dues", "$650 per unit per month"),
+        m("Units in building", "120"),
+      ],
+    };
+    const ctx = dealContextFor(bulk)!;
+    expect(ctx).toContain(
+      "Condominium units: The memorandum offers 42 of the condominium's 120 units, 35%: the buyer becomes one owner in an association whose declaration governs the building",
+    );
+    expect(ctx).toContain("At $650 a unit a month, the dues on 42 units are $328k a year");
+    expect(dealContextFor({ ...bulk, dealName: "Harbor View Apartments", assetClass: "Multifamily" }) ?? "").not.toContain("Condominium units");
+  });
+});
+
+describe("dealContextFor — a sandwich position (lib/sandwich-lease)", () => {
+  const SANDWICH = {
+    dealName: "Founders Plaza",
+    assetClass: "Office",
+    totalPages: 40,
+    interest: {
+      kind: "leasehold",
+      summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+      share: "",
+      groundLease: "Master lease of the building from its owner; master rent $1,100,000 a year",
+      loan: "",
+      page: "p. 4",
+    },
+    metrics: [
+      m("Asking price", "$6,500,000"),
+      m("Master lease rent", "$1,100,000 a year, increasing 2% annually"),
+      m("Sublease income", "$1,820,000"),
+      m("NOI (T-12)", "$720,000"),
+      m("Master lease expiration", "December 31, 2041"),
+    ],
+  } as unknown as ExtractionResult;
+
+  it("says the spread, its cover and the master lease's end right after what is being sold, and nothing on a plain leasehold", () => {
+    const ctx = dealContextFor(SANDWICH)!;
+    expect(ctx).toContain(
+      "Sandwich position (a master lease of the building, sublet): The subleases bring in $1.82M a year against the $1.10M master rent: a spread of $720k, the position's income before its own costs, the sublease income covering the master rent 1.65×.",
+    );
+    expect(ctx).toContain("When it ends the position ends with it: no building and no land come to the buyer.");
+    expect(ctx.indexOf("What is being sold")).toBeGreaterThan(-1);
+    expect(ctx.indexOf("What is being sold")).toBeLessThan(ctx.indexOf("Sandwich position"));
+    const plain = { ...SANDWICH, interest: { ...SANDWICH.interest!, summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" } };
+    expect(dealContextFor(plain) ?? "").not.toContain("Sandwich position");
+  });
+});
+
+describe("dealContextFor — the rent rules that reach the building (lib/rent-regulation)", () => {
+  const walkUp: ExtractionResult = {
+    dealName: "The Walk-up",
+    assetClass: "multifamily",
+    metrics: [m("Asking price", "$14,000,000"), m("Units", "48"), m("Year built", "1931"), m("Rent-regulated units", "41")],
+  };
+  const address = { state: "NY", city: "Brooklyn", county: "Kings County", label: "100 Walk-up St, Brooklyn, NY 11215" };
+
+  it("says the regime, the regulated share as stated and the allowance in force, beside a covenant on the rents", () => {
+    const regulation = regulationForDeal({ extraction: walkUp, address, siteFlags: null, assetClass: "multifamily" }, "2026-10-05");
+    const ctx = dealContextFor(walkUp, null, null, regulation)!;
+    expect(ctx).toContain("Rent regulation: NYC rent stabilization applies by the site's rules.");
+    expect(ctx).toContain("The memorandum states 41 of the 48 units are rent-regulated (85%).");
+    expect(ctx).toContain("the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease");
+    // Said before the deal's type, beside what sets the rents.
+    expect(ctx.indexOf("Rent regulation:")).toBeLessThan(ctx.indexOf("Deal type:"));
+  });
+
+  it("says nothing of rent rules where the caller read none, or none reached the building and the memorandum names none", () => {
+    expect(dealContextFor(walkUp)).toBe("Deal type: Stabilized.");
+    const unstated = { ...walkUp, metrics: walkUp.metrics.filter((r) => r.label !== "Rent-regulated units") };
+    const austin = regulationForDeal({ extraction: unstated, address: { state: "TX", city: "Austin" }, siteFlags: null, assetClass: "multifamily" }, "2026-10-05");
+    expect(austin).toBeNull();
+    expect(dealContextFor(unstated, null, null, austin)).toBe("Deal type: Stabilized.");
   });
 });
 

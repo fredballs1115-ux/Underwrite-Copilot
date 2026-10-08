@@ -1,19 +1,19 @@
+import { compactUsd } from "@/lib/money";
 import type { RentRollSummary, T12Summary, NoiComparison } from "@/lib/actuals/types";
 import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
 
 const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
-  in_line: { label: "In line", cls: "bg-pass/10 text-pass" },
-  material: { label: "Material", cls: "bg-caution/10 text-caution" },
+  // A 5% tint, since the chip sits on the faint comparison box: at 10%
+  // the 10px label read 4.37:1 (pass) and 4.39:1 (caution), at 5% 4.67:1
+  // and 4.69:1. Kill reads 4.85:1 at 10% and keeps it.
+  in_line: { label: "In line", cls: "bg-pass/5 text-pass" },
+  material: { label: "Material", cls: "bg-caution/5 text-caution" },
   red_flag: { label: "Red flag", cls: "bg-kill/10 text-kill" },
 };
 
 const usd = (n: number | null | undefined): string => {
   if (n == null || !Number.isFinite(n)) return "—";
-  const sign = n < 0 ? "−" : "";
-  const a = Math.abs(n);
-  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `${sign}$${Math.round(a / 1e3)}k`;
-  return `${sign}$${Math.round(a)}`;
+  return compactUsd(n, { millions: 2 });
 };
 const pct = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;
@@ -60,6 +60,13 @@ export interface ActualsData {
   assetClass?: string | null;
 }
 
+/** Where the card's figures come from: the deal's own documents, named by
+ *  which of the two it holds. */
+export function actualsSourceLine(hasRentRoll: boolean, hasT12: boolean): string {
+  if (hasRentRoll && hasT12) return "From the deal's rent roll and T-12";
+  return hasRentRoll ? "From the deal's rent roll" : "From the deal's T-12";
+}
+
 /** The OM figure's name on the card, by what it is. */
 const OM_LABEL: Record<NonNullable<NoiComparison["omBasis"]>, string> = {
   in_place: "OM in-place NOI",
@@ -102,7 +109,11 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">Property actuals</h2>
-        <p className="text-xs text-muted">From the rent roll and T-12 you uploaded</p>
+        {/* The deal's documents, named by what is here: never "you
+            uploaded", which is untrue on the sample deal and on a teammate's
+            documents, nor both documents where one was given (research pass
+            32). */}
+        <p className="text-xs text-muted">{actualsSourceLine(!!rentRoll, !!t12)}</p>
       </div>
 
       {/* Headline: OM assumed NOI vs T-12 actual. */}

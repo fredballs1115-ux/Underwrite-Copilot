@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import type { LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -15,15 +16,8 @@ import type { LeaseholdExitView } from "@/lib/leasehold-exit";
  * valued on the years left, on one track. Then the model's own returns at
  * that exit, and the one sentence.
  */
-// Rounded on the tenths, never a float's toFixed.
-const money = (n: number) =>
-  Math.abs(n) >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : Math.abs(n) >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : Math.abs(n) >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+const money = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const pct2 = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}%`;
 const pct1 = (n: number) => {
   const v = Math.round(n * 10) / 10;
@@ -61,8 +55,10 @@ export function LeaseholdExitCard({ view }: { view: LeaseholdExitView | null }) 
     >
       <div className="border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          {/* The lease the position runs out with: the land's, or a sandwich
+              position's master lease of the building (research pass 28). */}
           <h2 id="leasehold-exit-heading" className="text-sm font-semibold tracking-tight">
-            The exit, on the ground lease&rsquo;s term
+            {`The exit, on the ${v.lease ?? "ground lease"}\u2019s term`}
           </h2>
           {v.page && <span className="font-mono text-[10px] text-muted">{v.page}</span>}
         </div>
@@ -118,7 +114,7 @@ export function LeaseholdExitCard({ view }: { view: LeaseholdExitView | null }) 
         )}
         <p className="text-xs">
           <Link href="/tools#ground-lease" prefetch={false} className="font-medium text-brand underline-offset-2 hover:underline">
-            Value the leasehold with its ground rent and resets
+            {v.lease === "master lease" ? "Value the position with its master rent and resets" : "Value the leasehold with its ground rent and resets"}
           </Link>
         </p>
       </div>

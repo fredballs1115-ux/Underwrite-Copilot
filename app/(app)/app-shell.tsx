@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
 import { LogoMark } from "@/app/logo";
+import { DataNotices } from "@/app/data-notices";
 import { ToastProvider } from "./toaster";
 import { CommandPalette } from "./command-palette";
 import type { MarketNavEntry } from "@/lib/market-match";
@@ -129,6 +130,9 @@ export function AppShell({
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
+  // A deal's own page keeps its bar at a phone's foot once the header
+  // scrolls away (#437), so the footer below the page clears it too.
+  const onDealPage = /^\/deals\/[^/]+$/.test(pathname) && pathname !== "/deals/compare";
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   return (
@@ -172,7 +176,11 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="mt-1 flex-1 space-y-1 overflow-y-auto px-3">
+        {/* The app's primary navigation, named as its own landmark: the
+            aside around it also holds the logo, the palette and the
+            account, so a screen reader's list of landmarks had shown only an
+            unnamed navigation inside a "complementary" region. */}
+        <nav aria-label="Primary" className="mt-1 flex-1 space-y-1 overflow-y-auto px-3">
           {(
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],
@@ -243,7 +251,7 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — mobile */}
-        <header className="sticky top-0 z-10 bg-sidebar text-white md:hidden">
+        <header data-app-topbar className="sticky top-0 z-10 bg-sidebar text-white md:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <Link href="/deals" className="flex items-center gap-2">
               <LogoMark className="h-7 w-7" />
@@ -282,8 +290,9 @@ export function AppShell({
               </form>
             </div>
           </div>
-          {/* Mobile nav — the sidebar is desktop-only, so these live here. */}
-          <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2">
+          {/* Mobile nav — the sidebar is desktop-only, so these live here,
+              under the same name; only one of the two is ever displayed. */}
+          <nav aria-label="Primary" className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2">
             {[
               { href: "/deals", label: "Pipeline", active: inPipeline },
               { href: "/criteria", label: "Buy box", active: inCriteria },
@@ -319,6 +328,28 @@ export function AppShell({
             {children}
           </div>
         </main>
+        {/* The terms, the privacy policy and the security page on every
+            signed-in page: what a customer may need to read, and the footer
+            links Google's Street View policies ask of a web app that shows
+            its imagery ("web apps should include these links in their
+            footer", as the runner printed the policies on Oct 5, 2026). */}
+        <footer className={`border-t border-line px-5 py-4 sm:px-8 print:hidden ${onDealPage ? "max-md:pb-20" : ""}`}>
+          <nav aria-label="Terms and policies" className="mx-auto flex max-w-7xl gap-4 text-xs text-muted">
+            <Link href="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+            <Link href="/security" className="hover:text-ink">
+              Security
+            </Link>
+          </nav>
+          {/* The data providers' notices on every signed-in page, in the
+              footer's type: the deal pages, the market pages and the
+              calculators all draw FRED's figures (app/data-notices). */}
+          <DataNotices className="mx-auto mt-2 max-w-7xl text-xs text-muted" />
+        </footer>
       </div>
     </div>
     </ToastProvider>

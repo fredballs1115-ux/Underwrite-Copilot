@@ -11,6 +11,9 @@ import { parseDealQa } from "@/lib/deals";
 import { locatedPage } from "@/lib/facts";
 import { omFingerprint } from "@/lib/om-fingerprint";
 import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { regulationForDeal } from "@/lib/rent-regulation";
+import { ASK_QUESTION_CAP } from "@/lib/ask-cap";
 
 export type AskState =
   | { error?: string; ok?: boolean; question?: string }
@@ -19,8 +22,9 @@ export type AskState =
 // Each answer is a full OM read — cap the questions asked of each memorandum
 // so one deal can't become an unbounded Claude bill. A reissued deck is a new
 // document with its own pages, so its questions start again; the same bytes
-// uploaded again are the same memorandum, and keep their count.
-const MAX_QUESTIONS = 25;
+// uploaded again are the same memorandum, and keep their count. The cap is
+// lib/ask-cap's, which the box under the thread says too.
+const MAX_QUESTIONS = ASK_QUESTION_CAP;
 
 /**
  * Ask-the-deal: one question, answered from the stored OM with page cites,
@@ -69,7 +73,7 @@ export async function askDeal(
 
   const { data: deal, error: readErr } = await supabase
     .from("deals")
-    .select("id, om_storage_path, is_sample, qa, extraction, first_signal, site_flags, address")
+    .select("id, om_storage_path, is_sample, qa, extraction, first_signal, site_flags, address, asset_class")
     .eq("id", dealId)
     .maybeSingle();
   if (readErr) {
@@ -118,8 +122,20 @@ export async function askDeal(
     );
     const context = dealContextFor(
       extraction,
-      flags ? { flood: flags.flood } : null,
+      flags ? { flood: flags.flood, pointIsBuilding: flags.pointIsBuilding } : null,
       (deal.first_signal as FirstSignal | null | undefined) ?? null,
+      // The rent rules that reach the building, read as the screen's steps
+      // read them (lib/rent-regulation `regulationForDeal`), on the UTC day
+      // every Claude step is told it is (lib/anthropic/today).
+      regulationForDeal(
+        {
+          extraction,
+          address: addressUpgrade(deal.address, extraction) ?? ((deal.address as StructuredAddress | null) ?? null),
+          siteFlags: (deal.site_flags as SiteFlagsResult | null) ?? null,
+          assetClass: (deal.asset_class as string | null) ?? null,
+        },
+        new Date().toISOString().slice(0, 10),
+      ),
     );
     const result = await askDealQuestion(pdf, question, context, {
       dealId,

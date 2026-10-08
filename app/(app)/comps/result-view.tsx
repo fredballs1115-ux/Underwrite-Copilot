@@ -5,19 +5,23 @@
 // per-row source links, then provenance. Every failure mode is a sentence,
 // not a blank.
 
-import { fmtMiles, kmToMiles } from "@/lib/geo";
+import { compactUsd } from "@/lib/money";
+import { fmtMiles } from "@/lib/geo";
 import {
   COVERAGE_DISCOVERY,
   COVERAGE_SUMMARY,
   compEvidence,
+  compsCutNote,
+  compsScope,
   evidenceNote,
   medianLabel,
   salesPhrase,
   type RecordCompsResult,
 } from "@/lib/public-comps/core";
+import { compsTableText, perSqftOf, priceTrack, salesByQuarter } from "@/lib/public-comps/picture";
+import { CopySalesButton, RecordSalesMap, type MapSale } from "./record-sales-map";
 
-const fmtMoney = (n: number) =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n).toLocaleString()}`;
+const fmtMoney = (n: number) => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
 
 const fmtDate = (iso: string) => {
   const d = new Date(iso + "T00:00:00Z");
@@ -31,10 +35,13 @@ const fmtDate = (iso: string) => {
 export function CompsResultView({
   result,
   subjectPrice,
+  showMap = false,
 }: {
   result: RecordCompsResult;
   /** parsed asking/purchase price of the subject, when known */
   subjectPrice: number | null;
+  /** draw the sales on a map (the comps page; the deal page has its own) */
+  showMap?: boolean;
 }) {
   if (result.status === "no_provider") {
     return (
@@ -63,10 +70,11 @@ export function CompsResultView({
     );
   }
 
-  const miles = result.params ? kmToMiles(result.params.radiusKm) : null;
-  const scope = result.params
-    ? `within ${miles && miles < 1.1 ? "1 mi" : `${Math.round(miles ?? 0)} mi`} · last ${result.params.monthsBack} months · ${result.params.classFilter}`
-    : "";
+  // What the sales cover — less than the search asked where the source
+  // stopped at its limit (lib/public-comps/core `compsScope`) — and what the
+  // result left out, said under the readout (`compsCutNote`).
+  const scope = compsScope(result);
+  const cutNote = compsCutNote(result);
 
   if (result.status === "no_sales" || !result.stats) {
     return (
@@ -138,53 +146,51 @@ export function CompsResultView({
         )}
       </p>
 
+      {cutNote && (
+        <p className="mt-1.5 text-xs leading-relaxed text-caution" data-qa="comps-cut">
+          {cutNote}
+        </p>
+      )}
+
       {note && (
         <p className="mt-1.5 text-xs leading-relaxed text-caution">{note}</p>
       )}
 
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[560px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
-              <th className="py-1.5 pr-3 font-medium">Sold</th>
-              <th className="py-1.5 pr-3 font-medium">Address</th>
-              <th className="py-1.5 pr-3 font-medium">Price</th>
-              <th className="py-1.5 pr-3 font-medium">$/SF</th>
-              <th className="py-1.5 pr-3 font-medium">Type</th>
-              <th className="py-1.5 font-medium">Dist.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.comps.slice(0, 12).map((c) => (
-              <tr key={`${c.address}|${c.saleDate}`} className="border-b border-line/60">
-                <td className="py-1.5 pr-3 whitespace-nowrap text-muted">{fmtDate(c.saleDate)}</td>
-                <td className="py-1.5 pr-3">
-                  <a
-                    href={c.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-dotted underline-offset-2 hover:text-brand"
-                  >
-                    {c.address}
-                  </a>
-                </td>
-                <td className="py-1.5 pr-3 font-mono tabular-nums">{fmtMoney(c.price)}</td>
-                <td className="py-1.5 pr-3 font-mono tabular-nums">
-                  {c.sqft && c.sqft > 200 ? `$${Math.round(c.price / c.sqft)}` : "—"}
-                </td>
-                <td className="py-1.5 pr-3 text-xs text-muted">{c.propertyType.toLowerCase()}</td>
-                <td className="py-1.5 font-mono text-xs tabular-nums text-muted">
-                  {fmtMiles(c.distanceKm)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <CompsPictures result={result} subjectPrice={subjectPrice} />
+
+      {showMap && result.subject && (
+        <RecordSalesMap
+          subject={result.subject}
+          radiusKm={result.params?.radiusKm ?? null}
+          sales={result.comps.map(
+            (c, i): MapSale => ({
+              n: i + 1,
+              lat: c.lat,
+              lng: c.lng,
+              address: c.address,
+              priceText: fmtMoney(c.price),
+              soldText: fmtDate(c.saleDate),
+              distanceKm: c.distanceKm,
+              sourceUrl: c.sourceUrl,
+            }),
+          )}
+        />
+      )}
+
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+          {result.comps.length > SHOWN ? `The ${SHOWN} nearest` : "The sales, nearest first"}
+        </h3>
+        <CopySalesButton text={compsTableText(result)} />
       </div>
-      {result.comps.length > 12 && (
-        <p className="mt-1.5 text-[11px] text-muted">
-          Showing the 12 nearest of {result.comps.length}.
-        </p>
+      <SalesTable comps={result.comps.slice(0, SHOWN)} start={1} />
+      {result.comps.length > SHOWN && (
+        <details className="group mt-1.5">
+          <summary className="cursor-pointer text-xs font-medium text-brand hover:text-brand-strong">
+            Show all {result.comps.length}
+          </summary>
+          <SalesTable comps={result.comps.slice(SHOWN)} start={SHOWN + 1} />
+        </details>
       )}
 
       <p className="mt-3 border-t border-line pt-2 text-[11px] leading-relaxed text-muted">
@@ -208,5 +214,164 @@ export function CompsResultView({
         {result.note}
       </p>
     </>
+  );
+}
+
+/** The table shows this many nearest sales; the rest fold behind "Show all". */
+const SHOWN = 12;
+
+function SalesTable({ comps, start }: { comps: RecordCompsResult["comps"]; start: number }) {
+  return (
+    <div className="mt-1.5 overflow-x-auto">
+      <table className="w-full min-w-[600px] text-left text-sm">
+        <thead>
+          <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
+            <th className="w-8 py-1.5 pr-2 font-medium">
+              <span className="sr-only">Pin</span>
+            </th>
+            <th className="py-1.5 pr-3 font-medium">Sold</th>
+            <th className="py-1.5 pr-3 font-medium">Address</th>
+            <th className="py-1.5 pr-3 text-right font-medium">Price</th>
+            <th className="py-1.5 pr-3 text-right font-medium">$/SF</th>
+            <th className="py-1.5 pr-3 font-medium">Type</th>
+            <th className="py-1.5 text-right font-medium">Dist.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {comps.map((c, i) => {
+            const psf = perSqftOf(c);
+            return (
+              <tr key={`${c.address}|${c.saleDate}`} className="border-b border-line/60">
+                <td className="py-1.5 pr-2">
+                  <span
+                    aria-hidden
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white"
+                  >
+                    {start + i}
+                  </span>
+                </td>
+                <td className="whitespace-nowrap py-1.5 pr-3 text-muted">{fmtDate(c.saleDate)}</td>
+                <td className="py-1.5 pr-3">
+                  <a
+                    href={c.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline decoration-dotted underline-offset-2 hover:text-brand"
+                  >
+                    {c.address}
+                  </a>
+                </td>
+                <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{fmtMoney(c.price)}</td>
+                <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{psf ? `$${psf}` : "—"}</td>
+                <td className="py-1.5 pr-3 text-xs text-muted">{c.propertyType.toLowerCase()}</td>
+                <td className="py-1.5 text-right font-mono text-xs tabular-nums text-muted">{fmtMiles(c.distanceKm)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * The set as two pictures: every sale on one price track (the middle and the
+ * subject ticked where the readout would name them), and the sales by
+ * quarter across the window. Each is left out where it has nothing to draw.
+ */
+function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; subjectPrice: number | null }) {
+  const track = priceTrack(result.comps, result.stats?.medianPrice ?? null, subjectPrice);
+  const quarters = salesByQuarter(result.comps);
+  if (!track && quarters.length === 0) return null;
+  const peak = Math.max(1, ...quarters.map((q) => q.count));
+  return (
+    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+      {track && (
+        <figure className="min-w-0">
+          <figcaption className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+            Each sale&apos;s price{track.log ? " · log scale" : ""}
+          </figcaption>
+          <div className="relative mt-3 h-8" data-bar="comps-price">
+            <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-faint" />
+            {track.dots.map((d) => (
+              <span
+                key={d.n}
+                title={`${d.n}. ${fmtMoney(d.price)}`}
+                className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-brand/70"
+                style={{ left: `${d.pct}%` }}
+                data-bar="comps-sale"
+              />
+            ))}
+            {track.medianPct !== null && (
+              <span
+                className="absolute top-0 h-8 w-0.5 -translate-x-1/2 rounded bg-ink"
+                style={{ left: `${track.medianPct}%` }}
+                data-bar="comps-median"
+                title={`${medianLabel(result.stats?.count ?? 0)} ${fmtMoney(result.stats?.medianPrice ?? 0)}`}
+              />
+            )}
+            {track.subjectPct !== null && (
+              <span
+                className="absolute -top-1 h-10 w-0.5 -translate-x-1/2 rounded bg-caution"
+                style={{ left: `${track.subjectPct}%` }}
+                data-bar="comps-subject"
+                title="This deal's price"
+              />
+            )}
+          </div>
+          <div className="mt-1 flex justify-between font-mono text-[11px] tabular-nums text-muted">
+            <span>{track.lowLabel}</span>
+            <span>{track.highLabel}</span>
+          </div>
+          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
+            <span className="inline-flex items-center gap-1">
+              <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-brand/70" />a sale
+            </span>
+            {track.medianPct !== null && (
+              <span className="inline-flex items-center gap-1">
+                <span aria-hidden className="h-3 w-0.5 rounded bg-ink" />
+                {medianLabel(result.stats?.count ?? 0)}
+              </span>
+            )}
+            {track.subjectPct !== null && (
+              <span className="inline-flex items-center gap-1">
+                <span aria-hidden className="h-3 w-0.5 rounded bg-caution" />
+                this deal
+              </span>
+            )}
+          </p>
+        </figure>
+      )}
+      {quarters.length > 0 && (
+        <figure className="min-w-0">
+          <figcaption className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+            Sales by quarter
+          </figcaption>
+          <div className="mt-3 flex h-16 items-end gap-1" data-bar="comps-quarters">
+            {quarters.map((q) => (
+              <div
+                key={q.label}
+                className="flex h-full min-w-0 max-w-10 flex-1 flex-col items-center justify-end"
+                title={`${q.label}: ${q.count}`}
+              >
+                <span className="font-mono text-[10px] tabular-nums text-muted">{q.count || ""}</span>
+                <div
+                  className={`w-full rounded-t ${q.count ? "bg-brand/60" : "bg-faint"}`}
+                  style={{ height: `${q.count ? Math.max(8, (q.count / peak) * 80) : 4}%` }}
+                  data-bar="comps-quarter"
+                />
+              </div>
+            ))}
+          </div>
+          <div
+            className="mt-1 flex justify-between text-[11px] text-muted"
+            style={{ maxWidth: `${quarters.length * 2.75}rem` }}
+          >
+            <span>{quarters[0].label}</span>
+            <span>{quarters[quarters.length - 1].label}</span>
+          </div>
+        </figure>
+      )}
+    </div>
   );
 }

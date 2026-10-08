@@ -74,6 +74,26 @@ describe("readSale — how the property is sold", () => {
     expect(r.page).toBe("p. 3");
   });
 
+  it("reads the bid, the reserve and the stalking horse with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no figure.
+    const r = readSale(
+      ex(
+        [
+          row("Starting bid", "$2,500,000 (non-binding opening bid)"),
+          row("Reserve price", "$3,000,000 (court-approved)"),
+          row("Stalking horse bid", "$3,100,000 (break-up fee 3%)"),
+        ],
+        { method: "auction" },
+      ),
+      TODAY,
+    )!;
+    expect(r.startingBid).toBe(2_500_000);
+    expect(r.reserve).toEqual({ kind: "amount", amount: 3_000_000, stated: "$3,000,000 (court-approved)" });
+    expect(r.stalkingHorse).toBe(3_100_000);
+    // A bid stated as a range is still no one bid.
+    expect(readSale(ex([row("Starting bid", "$2.5M - $3M")], { method: "auction" }), TODAY)!.startingBid).toBeNull();
+  });
+
   it("a deadline stated as a month alone is no day: never counted down, never printed as the month's last (the audit of 2026-10-04)", () => {
     for (const stated of ["October 2026", "10/2026"]) {
       const r = readSale(
@@ -131,7 +151,7 @@ describe("readSale — how the property is sold", () => {
     expect(saleShortLine(r)).toContain("an 8% buyer's premium");
     expect(saleShortLine(r)).toContain("an $80M stalking-horse bid");
     expect(ceilingBidLine(r, 3_000_000, 18)).toMatch(/^At an 18% levered IRR/);
-    expect(ceilingBidLine(r, 6_000_000, 18, true)).toContain("still clears an 18% levered IRR");
+    expect(ceilingBidLine(r, 6_000_000, 18, true)).toMatch(/^At an 18% levered IRR the model pays at least/);
     expect(gluedWords(`${r.headline} ${saleShortLine(r)}`)).toEqual([]);
   });
 
@@ -187,9 +207,13 @@ describe("the sale on every summary", () => {
     );
     expect(ceilingBidLine(r, 2_100_000, 15)).toContain("under the $2.5M starting bid, so the model does not bid at all");
     expect(ceilingBidLine(r, null, 15)).toBe("");
-    expect(ceilingBidLine(r, 5_250_000, 15, true)).toBe(
-      "The model still clears a 15% levered IRR at $5.25M all-in, twice the opening floor — at this hurdle the bidding, not the model, sets the ceiling.",
+    // Past the range searched the bid is at least its top, said with the
+    // multiple of the price the model ran at — never a model that sets no
+    // ceiling (research pass 40, H2).
+    expect(ceilingBidLine(r, 168_000_000, 15, true, 2_625_000)).toBe(
+      "At a 15% levered IRR the model pays at least $168M all-in, 64 times the opening floor: its own ceiling lies above the range searched.",
     );
+    expect(ceilingBidLine(r, 5_250_000, 15, true)).not.toContain("the bidding, not the model, sets the ceiling");
   });
 
   it("the tag, the short line, the context and the traps", () => {

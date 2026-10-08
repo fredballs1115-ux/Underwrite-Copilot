@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { parseStructuredAddress } from "@/lib/address";
 import { coveredState, metroForAddress } from "@/lib/market-match";
-import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
+import { COVERAGE_DISCOVERY, COVERAGE_LIVE } from "@/lib/public-comps/core";
 import { computeRecordComps } from "@/lib/public-comps/run";
 import { AddressAutocomplete } from "../address-autocomplete";
 import { CompsResultView } from "./result-view";
@@ -53,11 +53,10 @@ export default async function PullCompsPage({
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Pull comps</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Recorded sales around any address, straight from the public record —
-          the same engine that sanity-checks every deal you screen. Coverage
-          today: {COVERAGE_SUMMARY}, plus every market loaded into the
-          property database.
+          Recorded sales around an address, from the public record — the same
+          read every screened deal gets.
         </p>
+        <CoverageChips />
       </header>
 
       <form method="get" className="flex flex-wrap items-end gap-2">
@@ -140,14 +139,62 @@ export default async function PullCompsPage({
               </Link>
             </p>
           ) : null}
-          <CompsResultView result={result} subjectPrice={null} />
+          <CompsResultView result={result} subjectPrice={null} showMap />
         </section>
       ) : (
         <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-          Type an address above and pick it from the suggestions — the pick
-          tells the engine the county. Every result carries its source.
+          <ol className="grid gap-3 sm:grid-cols-3">
+            {[
+              ["Pick an address", "from the suggestions, so the search knows its county"],
+              ["See the sales", "on a map, with each price on one track"],
+              ["Screen it", "as a deal in one click, or copy the table"],
+            ].map(([head, tail], i) => (
+              <li key={head} className="flex items-start gap-2">
+                <span
+                  aria-hidden
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand"
+                >
+                  {i + 1}
+                </span>
+                <span>
+                  <span className="font-medium text-ink">{head}</span> {tail}
+                </span>
+              </li>
+            ))}
+          </ol>
         </section>
       )}
     </div>
+  );
+}
+
+/** Where the records reach, as chips: each live source's region, then the
+ *  property database's markets, then the sources still being wired (muted). */
+function CoverageChips() {
+  return (
+    <ul className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]" aria-label="Where recorded sales are read">
+      {COVERAGE_LIVE.map((p) => (
+        <li
+          key={p.id}
+          className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 font-medium text-brand"
+        >
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+          {p.regionLabel}
+        </li>
+      ))}
+      <li className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 font-medium text-brand">
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+        Markets in the property database
+      </li>
+      {COVERAGE_DISCOVERY.map((p) => (
+        <li
+          key={p.id}
+          className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 text-muted"
+          title="Being wired: not read yet"
+        >
+          {p.regionLabel} · being wired
+        </li>
+      ))}
+    </ul>
   );
 }

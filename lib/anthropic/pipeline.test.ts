@@ -14,7 +14,7 @@ import type {
   MarketResult,
   VerdictResult,
 } from "./types";
-import { staleAfterFailure, type JobLike } from "@/lib/screen-run";
+import { previousScreenResults, staleAfterFailure, verdictBehind, type JobLike } from "@/lib/screen-run";
 
 type Row = Record<string, unknown>;
 interface State {
@@ -27,6 +27,19 @@ interface State {
   rates?: Row[];
   /** the `benchmarks` table, likewise */
   benchmarks?: Row[];
+  /** a deals update whose patch writes this column answers with an error,
+   *  as a statement timeout does */
+  failUpdateOf?: string;
+  /** the next N reads of a deal answer with an error, as a network blip does */
+  failDealReads?: number;
+  /** every read of `rates` and `benchmarks` answers with an error */
+  failFigureReads?: boolean;
+  /** reads of every series but these, and of `benchmarks`, answer with an
+   *  error: the market's own figures fail while the nation's answer */
+  onlySeries?: string[];
+  /** with `onlySeries`, the `benchmarks` read still answers (empty, as a
+   *  state's does: it has no Zillow or Realtor.com rows) */
+  benchmarksAnswer?: boolean;
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -107,12 +120,19 @@ class FakeQuery {
       const id = String(this.where("id"));
       const row = state.deals[id];
       if (this.op === "select") {
+        if (state.failDealReads && state.failDealReads > 0) {
+          state.failDealReads--;
+          return { data: null, error: { message: "TypeError: fetch failed" } };
+        }
         if (!row) {
           return this.wantsSingle
             ? { data: null, error: { message: "Row not found" } }
             : { data: null, error: null };
         }
         return { data: row, error: null };
+      }
+      if (this.op === "update" && state.failUpdateOf && state.failUpdateOf in this.patch) {
+        return { data: null, error: { message: "canceling statement due to statement timeout" } };
       }
       if (this.op === "update" && row && this.nulls.every((c) => row[c] == null)) Object.assign(row, this.patch);
       return { data: this.wantsRows ? (row ? [row] : []) : null, error: null };
@@ -132,6 +152,15 @@ class FakeQuery {
     }
     // The two public-figure tables the market check reads, filtered the one
     // way the read filters them: a series by its id, a metro by its name.
+    if ((table === "rates" || table === "benchmarks") && state.failFigureReads) {
+      return { data: null, error: { message: "TypeError: fetch failed" } };
+    }
+    if (
+      state.onlySeries &&
+      ((table === "benchmarks" && !state.benchmarksAnswer) || (table === "rates" && !state.onlySeries.includes(String(this.where("series_id")))))
+    ) {
+      return { data: null, error: { message: "TypeError: fetch failed" } };
+    }
     if (table === "rates") {
       const id = this.where("series_id");
       return { data: (state.rates ?? []).filter((r) => r.series_id === id), error: null };
@@ -196,6 +225,10 @@ import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { omSourceFor, releaseOmSource } from "./om-source";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
+import { MAX_OM_PAGES, countPdfPages } from "@/lib/pdf";
+import { incrementalRevision, testMemorandum } from "@/lib/test-memorandum";
+import { pageCapFailure } from "./document-failures";
+import { READER_ROUND } from "@/lib/reader-round";
 
 const EXTRACTION = {
   dealName: "Oakwood Flats",
@@ -219,6 +252,8 @@ const EXTRACTION = {
 const STORED_EXTRACTION = {
   ...EXTRACTION,
   omFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+  // the round of readers this run read under (lib/reader-round)
+  readerRound: READER_ROUND,
 };
 const SIGNAL = { dealName: "Oakwood Flats", assetClass: "multifamily", market: "Dallas, TX" } as unknown as FirstSignal;
 const CHALLENGES = { challenges: [], summary: "" } as unknown as ChallengerResult;
@@ -485,6 +520,7 @@ describe("runAnalysis — the happy path", () => {
       omRead: "pdf",
       screenedOn: "2026-12-31",
       omFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+      readerRound: READER_ROUND,
     });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual(COMPS);
@@ -571,6 +607,27 @@ describe("runAnalysis — the happy path", () => {
     expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("office");
   });
 
+  // Research pass 41 (L1): the market check was handed the filed "Auto"
+  // after the deck's class was read, so it was told to detect the class and
+  // given every sector's norms.
+  it("hands the market check the class the deck turned out to be, as the challenger is", async () => {
+    state.deals.d1.asset_class = "auto";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Hospitality" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(checkMarket).mock.calls[0][1]).toBe("hospitality_str");
+
+    vi.mocked(checkMarket).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Specialty asset" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(checkMarket).mock.calls[0][1]).toBe("auto");
+
+    vi.mocked(checkMarket).mockClear();
+    state.deals.d1.asset_class = "office";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Multifamily" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(checkMarket).mock.calls[0][1]).toBe("office");
+  });
+
   it("hands the challenger the trap lists the memorandum's own words call for, and none on an ordinary deal (research pass 23)", async () => {
     await runAnalysis("d1");
     expect(vi.mocked(challengeAssumptions).mock.calls[0][3]).toEqual([]);
@@ -638,6 +695,61 @@ describe("runAnalysis — the happy path", () => {
       ["sloos_multifamily", -5.7],
     ]);
     expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a covered market whose figures could not be read says so on the check, never reads like a market outside the covered ones (research pass 30)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.failFigureReads = true;
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    // The screen goes on: a check without figures, never a failed screen.
+    expect(job().status).toBe("done");
+    expect(vi.mocked(checkMarket).mock.calls[0][3]).toBeNull();
+    const stored = state.deals.d1.market as MarketResult;
+    expect(stored.liveBrief).toBeNull();
+    expect(stored.liveReadFailed).toEqual({ market: "Washington DC", grain: "metro" });
+    // A deal in no market the site reads — no address, and none in its
+    // memorandum — stores no such mark: nothing failed.
+    state = freshState();
+    state.failFigureReads = true;
+    vi.mocked(extractTerms).mockResolvedValueOnce({ ...EXTRACTION, address: "", market: "" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect((state.deals.d1.market as MarketResult).liveReadFailed).toBeUndefined();
+    // Nor does a covered market whose figures were read.
+    state = freshState();
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [{ series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 }];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect((state.deals.d1.market as MarketResult).liveBrief?.metro).toBe("Washington DC");
+    expect((state.deals.d1.market as MarketResult).liveReadFailed).toBeUndefined();
+    // Every read of the market's own figures failed while the nation's
+    // answered: a failed read, never a brief of national lines under a
+    // header saying the metro's figures were read (the batch-2 audit).
+    state = freshState();
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [{ series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 }];
+    state.onlySeries = ["DGS10"];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    expect((state.deals.d1.market as MarketResult).liveBrief).toBeNull();
+    expect((state.deals.d1.market as MarketResult).liveReadFailed).toEqual({ market: "Washington DC", grain: "metro" });
+    warn.mockRestore();
   });
 
   it("an office in a covered metro is handed the metro's jobs and no housing figure; an apartment building the same day still is (research pass 18)", async () => {
@@ -764,7 +876,10 @@ describe("runAnalysis — the happy path", () => {
     expect(input.firstSignal).toEqual(signal);
     const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
     const brief = buildBrief(input);
-    expect(brief).toContain("DEAL STRATEGY: Conversion");
+    // The deal context says the kind and its reading; the plausibility
+    // section, beside it, says them no more (research pass 41).
+    expect(brief).toContain("Deal type: Conversion — A change of use with construction and downtime first");
+    expect(brief.split("A change of use with construction and downtime first").length - 1).toBe(1);
     expect(brief).not.toContain("Stabilized");
   });
 
@@ -786,8 +901,15 @@ describe("runAnalysis — the happy path", () => {
       label: "Price",
       status: "miss",
       detail: "Mandate is $15.0M max — the ask is $20.0M. Beyond the mandate.",
+      // A criterion the price decides (lib/criteria `buyBoxCoverage`).
+      onPrice: true,
     });
     expect(input.buyBoxChecks?.tripped).toEqual(["price $20.0M over the $18.0M ceiling"]);
+    // And the score beside them, whose red lines the brief's coverage counts
+    // as the chip's does.
+    const { scoreMandateFit } = await import("@/lib/mandate");
+    expect(input.buyBoxChecks?.mandate).toEqual(scoreMandateFit("multifamily", dealCheckSource(EXTRACTION, signal, null), box));
+    expect(input.buyBoxChecks?.mandate?.dealbreakerCriteria).toEqual([{ label: "Price dealbreaker", checked: true, onPrice: true }]);
 
     // A read of the checks that fails (here, a first signal stored without
     // its going-in cap) leaves the criteria in the brief, as before.
@@ -798,6 +920,29 @@ describe("runAnalysis — the happy path", () => {
     const again = vi.mocked(synthesizeVerdict).mock.calls[0][0];
     expect(again.buyBox).toEqual(input.buyBox);
     expect(again.buyBoxChecks).toBeNull();
+  });
+
+  it("the verdict is never handed the buyer's 1031 exchange: its words reach a shared screen (lib/criteria)", async () => {
+    // A counterparty who learns from a shared link that the buyer must close
+    // by a date holds the price; the deadlines stay on the reader's own
+    // surfaces (the deal header's chip, the pipeline's tag, the memo).
+    const { getBuyBoxForDeal } = await import("@/lib/criteria-server");
+    const box = { minCapPct: 5, exchange: { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const } };
+    (state.deals.d1 as Record<string, unknown>).offers_due = "2026-11-02";
+    vi.mocked(getBuyBoxForDeal).mockResolvedValueOnce(box);
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.buyBox).toContain("Min going-in cap: 5%");
+    expect((input.buyBox ?? []).join(" ")).not.toMatch(/1031|relinquished/);
+    expect(JSON.stringify(input)).not.toMatch(/1031 exchange|relinquished/);
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    expect(buildBrief(input)).not.toMatch(/1031|relinquished/);
   });
 
   it("the verdict is handed the deal context the comps and the market check read, built once — on a resumed run too (research pass 18)", async () => {
@@ -914,6 +1059,82 @@ describe("runAnalysis — the happy path", () => {
     expect(handed).toContain("Published figures for the Dallas-Fort Worth market the deal sits in — placed there by its county: Collin County, TX");
     // The flood zone the fresh lookup found reaches the deal context too.
     expect(vi.mocked(checkMarket).mock.calls[0][2]).toMatch(/Zone AE/);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  // Research pass 41 (M3): the comps, the market check, the verdict and Ask
+  // read which end of a price range every figure is struck at and the flood
+  // zone; the challenger, whose BASIS test and insurance trap read both,
+  // was told neither.
+  it("hands the challenger the price range's end, and the flood zone where the lookup has already answered — never waiting for one", async () => {
+    const label = "5000 Main St, Frisco, TX 75034";
+    state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };
+    // The deal page's lookup has answered: the building sits in Zone AE.
+    state.deals.d1.site_flags = {
+      status: "ok",
+      subject: { lat: 33.15, lng: -96.82, label },
+      tractGeoid: "48085030100",
+      opportunityZone: null,
+      flood: { zone: "AE", subtype: null, isHighRisk: true },
+      pointIsBuilding: true,
+      retrievedAt: "2026-09-23T11:00:00Z",
+      note: "",
+    };
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      metrics: [{ ...EXTRACTION.metrics[0], value: "$40,000,000 – $42,000,000" }, EXTRACTION.metrics[1]],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("The asking price is stated as a range, $40–42M: every figure here is struck at its top, $42.0M, the end that does not flatter a return.");
+    expect(note).toContain("FEMA's flood map puts the building's point in Zone AE, a Special Flood Hazard Area");
+    // The comps are told the same two sentences, as before.
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("The asking price is stated as a range, $40–42M");
+    expect(context).toContain("in Zone AE, a Special Flood Hazard Area");
+    expect(vi.mocked(claimSiteFlags)).not.toHaveBeenCalled();
+
+    // On a portfolio the address is no one building's: the challenger and
+    // the comps both read the point the address was placed at (research
+    // pass 41, L11).
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    const prop = (name: string, address: string) => ({ name, address, count: "100", area: "", noi: "", occupancy: "", yearBuilt: "", allocatedPrice: "", page: "" });
+    vi.mocked(extractTerms).mockResolvedValueOnce({
+      ...EXTRACTION,
+      properties: [prop("Frisco Flats", label), prop("Plano Commons", "2100 Legacy Dr, Plano, TX 75024")],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    for (const text of [vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "", vi.mocked(scrutinizeComps).mock.calls[0][1] ?? ""]) {
+      expect(text).toContain("FEMA's flood map puts the point the address was placed at in Zone AE");
+      expect(text).not.toContain("the building's point");
+    }
+
+    // A lookup that has not answered by the challenger's turn: no flood line
+    // there and no wait for one — the lookup runs before the comps, as it did.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    state.deals.d1.site_flags = { status: "pending", retrievedAt: "2026-09-23T11:59:00Z", note: "" };
+    vi.mocked(runSiteFlags).mockImplementationOnce(async () => {
+      state.deals.d1.site_flags = {
+        status: "ok",
+        subject: { lat: 33.15, lng: -96.82, label },
+        tractGeoid: "48085030100",
+        opportunityZone: null,
+        flood: { zone: "AE", subtype: null, isHighRisk: true },
+        pointIsBuilding: true,
+        retrievedAt: "2026-09-23T12:00:00Z",
+        note: "",
+      };
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const later = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(later).toContain("The asking price is stated as a range, $40–42M");
+    expect(later).not.toContain("Zone AE");
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "").toContain("in Zone AE, a Special Flood Hazard Area");
     expect(errSpy).not.toHaveBeenCalled();
   });
 
@@ -1272,6 +1493,257 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a forward purchase: the challenger reads the purchase's facts and traps in place of the construction paragraph, and the deal context says it (lib/forward-purchase)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "", basis: "na" },
+        { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Construction budget", value: "$31,000,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "", basis: "na" },
+        { label: "Outside date", value: "March 31, 2028", flagged: false, page: "", basis: "na" },
+        { label: "Deposit", value: "$2,400,000 at signing", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const call = vi.mocked(challengeAssumptions).mock.calls[0];
+    // The instruction's plan paragraph is the purchase's.
+    expect(call[4]).toBe(true);
+    const note = call[2] ?? "";
+    expect(note).toContain("Forward purchase: A build-to-suit bought at delivery: the buyer pays $48.0M at delivery, Q3 2027 (read as Sep 30, 2027)");
+    expect(note).toContain("FORWARD-PURCHASE TRAPS, checked by name");
+    expect(note).toContain("(b) THE OUTSIDE DATE AND THE DEPOSIT");
+    // The plan's text is the purchase's too: the budget is the developer's,
+    // and nothing asks the buyer about construction debt.
+    expect(note).toContain("A FORWARD PURCHASE: the buyer pays the price at delivery and the developer funds the works");
+    expect(note).toContain("the $31.0M budget (Construction budget) is the developer's");
+    expect(note).not.toContain("against the cost of construction debt");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Forward purchase: A build-to-suit bought at delivery");
+    expect(context).not.toContain("FORWARD-PURCHASE TRAPS");
+    // The comps and the market check read the purchase's paragraph in the
+    // plan's place too (research pass 41).
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][2]).toBe(true);
+    expect(vi.mocked(checkMarket).mock.calls[0][4]).toBe(true);
+    expect(errSpy).not.toHaveBeenCalled();
+
+    // An ordinary deal's challenger keeps the plan paragraph.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    vi.mocked(checkMarket).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][4]).toBe(false);
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("Forward purchase");
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][2]).toBe(false);
+    expect(vi.mocked(checkMarket).mock.calls[0][4]).toBe(false);
+  });
+
+  it("a forward purchase reads its own loan's lending standards, never the construction lenders' (research pass 41)", async () => {
+    state.deals.d1.asset_class = "industrial";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      { series_id: "SUBLPDRCSN", obs_date: "2026-07-01", value: 3.1 },
+      { series_id: "SUBLPDRCSC", obs_date: "2026-07-01", value: 8.2 },
+    ];
+    const forward = {
+      ...EXTRACTION,
+      assetClass: "industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "", basis: "na" },
+        { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult;
+    vi.mocked(extractTerms).mockResolvedValue(forward);
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+    expect(handed).toContain("banks tightening standards for nonfarm nonresidential loans");
+    expect(handed).not.toContain("construction and land development loans");
+
+    // The same deal built by the buyer reads the construction lenders' too.
+    vi.mocked(checkMarket).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...forward,
+      strategy: { kind: "development", summary: "Ground-up distribution center", capitalBudget: "", timeline: "" },
+    } as unknown as ExtractionResult);
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(vi.mocked(checkMarket).mock.calls[0][3] ?? "").toContain("construction and land development loans");
+  });
+
+  it("a mixed-use building: the challenger reads the two incomes and the traps they add after the class's own, and the deal context says them (lib/mixed-use)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Residential income", value: "$1,520,000", flagged: false, page: "", basis: "in_place" },
+        { label: "Commercial income", value: "$610,000", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("MIXED-USE INCOME AS STATED: The memorandum states $1.52M of residential income and $610k of commercial");
+    expect(note).toContain("(d) THE AGENCY LIMIT");
+    expect(note).toContain("(f) THE ZONING");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Mixed-use income: The memorandum states $1.52M of residential income");
+    expect(context).not.toContain("(d) THE AGENCY LIMIT");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("an operating business: the challenger reads whose earnings these are and the operating-business traps, and the deal context says it (lib/going-concern)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Car wash",
+      dealName: "Express Wash NNN",
+      singleTenant: { tenant: "Tidal Wave Auto Spa", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+      metrics: [
+        { label: "Asking price", value: "$4,600,000", flagged: false, page: "", basis: "na" },
+        { label: "Annual base rent", value: "$276,000", flagged: false, page: "", basis: "in_place" },
+        { label: "EBITDAR (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("OPERATING BUSINESS AS STATED: The memorandum sells the real estate under a car wash, leased to its operator");
+    expect(note).toContain("Its EBITDAR covers the $276k rent 2.61x.");
+    expect(note).toContain("OPERATING-BUSINESS TRAPS, checked by name");
+    expect(note).not.toContain("CARE-OPERATION TRAPS");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Operating business: The memorandum sells the real estate under a car wash");
+    expect(context).not.toContain("OPERATING-BUSINESS TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("condominium units: the challenger reads the buyer's share of the association, its dues and the condo traps, and the deal context says them (lib/condo)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Condominium Units (bulk sale)",
+      dealName: "Harbor View",
+      metrics: [
+        { label: "Asking price", value: "$16,800,000", flagged: false, page: "", basis: "na" },
+        { label: "Units offered", value: "42", flagged: false, page: "", basis: "na" },
+        { label: "Units in condominium", value: "120", flagged: false, page: "", basis: "na" },
+        { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "", basis: "in_place" },
+        { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("CONDOMINIUM UNITS AS STATED: The memorandum offers 42 of the condominium's 120 units, 35%");
+    expect(note).toContain("At $650 a unit a month, the dues on 42 units are $328k a year");
+    expect(note).toContain("CONDO TRAPS, checked by name");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Condominium units: The memorandum offers 42 of the condominium's 120 units");
+    expect(context).not.toContain("CONDO TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a sandwich position: the challenger reads the spread, its cover and the sandwich-lease traps, and the deal context says them (lib/sandwich-lease)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Office",
+      dealName: "Founders Plaza",
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner; master rent $1,100,000 a year",
+        loan: "",
+        page: "",
+      },
+      metrics: [
+        { label: "Asking price", value: "$6,500,000", flagged: false, page: "", basis: "na" },
+        { label: "Master lease rent", value: "$1,100,000 a year, increasing 2% annually", flagged: false, page: "", basis: "in_place" },
+        { label: "Sublease income", value: "$1,820,000", flagged: false, page: "", basis: "in_place" },
+        { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" },
+        { label: "Master lease expiration", value: "December 31, 2041", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain(
+      "SANDWICH POSITION AS STATED: The subleases bring in $1.82M a year against the $1.10M master rent: a spread of $720k, the position's income before its own costs, the sublease income covering the master rent 1.65×.",
+    );
+    // The master lease's traps, once: the interest note leads with them
+    // and the sandwich note carries the facts alone (the batch-2 audit).
+    expect(note.match(/MASTER-LEASE TRAPS, checked by name/g)?.length).toBe(1);
+    expect(note).not.toContain("SANDWICH-LEASE TRAPS");
+    for (const trap of ["(a) THE TERM AND THE OPTIONS", "(c) THE FEE OWNER'S LENDER", "(d) CONSENT TO ASSIGN AND SUBLET"]) expect(note.split(trap).length - 1, trap).toBe(1);
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Sandwich position (a master lease of the building, sublet): The subleases bring in $1.82M a year");
+    expect(context).not.toMatch(/LEASE TRAPS/);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a rent-regulated building: the challenger and the deal context read the rules that reach it, the allowance in force and the regulation traps (lib/rent-regulation)", async () => {
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Units", value: "24", flagged: false, page: "", basis: "na" },
+        { label: "Year built", value: "1962", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    // The challenger, from the address alone (it runs before the site flags).
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("Rent regulation: DC rent stabilization applies by the site's rules.");
+    expect(note).toContain("REGULATION TRAPS, checked by name");
+    expect(note).toContain("(c) THE ALLOWANCE");
+    // The deal context the comps, the market check and the verdict are told,
+    // with the allowance in force on the screen's day.
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Rent regulation: DC rent stabilization applies by the site's rules.");
+    expect(context).toContain(
+      "the allowance for increases taking effect May 1, 2026 to Apr 30, 2027 is 4.1% on a rent-controlled unit and 2.1% on a unit with a registered elderly or disabled tenant",
+    );
+    expect(context).not.toContain("REGULATION TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+
+    // Outside every regime the site's rules hold, neither says a word of it.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    state.deals.d1.address = { city: "Dallas", state: "TX" };
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("Rent regulation");
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "").not.toContain("Rent regulation");
+  });
+
   it("the third-party reports: the challenger reads what they found and the site-report traps (#465)", async () => {
     vi.mocked(extractTerms).mockResolvedValue({
       ...EXTRACTION,
@@ -1396,6 +1868,61 @@ describe("runAnalysis — the happy path", () => {
     expect(stored.liveBrief?.metro).toBe("Pennsylvania");
     expect(stored.liveBrief?.grain).toBe("state");
     expect(stored.liveBrief?.lines).toHaveLength(3);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  // The pre-merge audit (C1, M3): a state has no Zillow or Realtor.com rows,
+  // so its benchmarks read "succeeded" empty while every series read failed,
+  // and the check was handed the nation's lines under "so these are the
+  // state's own figures".
+  it("a state whose every series read failed while its empty benchmarks answered stores a failed read, never a brief of the nation's lines", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    state.deals.d1.address = { city: "Harrisburg", state: "PA" };
+    state.rates = [
+      { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    state.benchmarks = [];
+    state.onlySeries = ["DGS10"];
+    state.benchmarksAnswer = true;
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    expect(vi.mocked(checkMarket).mock.calls[0][3]).toBeNull();
+    const stored = state.deals.d1.market as MarketResult;
+    expect(stored.liveBrief).toBeNull();
+    expect(stored.liveReadFailed).toEqual({ market: "Pennsylvania", grain: "state" });
+    warn.mockRestore();
+  });
+
+  it("a state none of whose own figures is current is handed the nation's lines under a header that says so, and no failed read", async () => {
+    state.deals.d1.address = { city: "Harrisburg", state: "PA" };
+    state.rates = [
+      { series_id: "PAUR", obs_date: "2025-01-01", value: 3.7 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    state.benchmarks = [];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain(
+      "Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks — read on 2026-09-23 from FRED. No figure of the state's own was current; the one line below is the nation's figure, dated and said as such, and never this state's.",
+    );
+    expect(handed).not.toContain("own figures");
+    expect(handed).not.toContain("each is the state's");
+    const stored = state.deals.d1.market as MarketResult;
+    expect(stored.liveBrief?.national).toBe(1);
+    expect(stored.liveBrief?.lines).toHaveLength(1);
+    expect(stored.liveReadFailed).toBeUndefined();
     expect(errSpy).not.toHaveBeenCalled();
   });
 });
@@ -1559,6 +2086,9 @@ describe("runAnalysis — a re-screen of the same memorandum keeps the day it wa
       vi.useRealTimers();
     }
     expect(state.deals.d1.extraction).toMatchObject({ screenedOn: "2026-11-20", omFingerprint: same });
+    // …while the readers it was read under are this run's (lib/reader-round,
+    // research pass 42): the day is the memorandum's, the round the screen's.
+    expect((state.deals.d1.extraction as { readerRound?: number }).readerRound).toBe(READER_ROUND);
 
     // The extraction on file was read from other bytes: a new reading.
     state.deals.d1.extraction = { ...EXTRACTION, screenedOn: "2026-11-20", omFingerprint: "0000000000000000" };
@@ -1827,16 +2357,108 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(state.jobs.map((j) => j.status).sort()).toEqual(["done", "error"]);
   });
 
-  it("an OM past the provider's page cap stops before any model call, with the count in the message", async () => {
+  it("a result whose write fails fails the run at its step — never 'done' over the previous screen's result (research pass 30)", async () => {
+    // The verdict's write times out: the previous call stays on the deal,
+    // and the job says the run failed at the verdict, so every surface marks
+    // that call as the previous screen's (lib/screen-run).
+    state.failUpdateOf = "verdict";
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().step).toBe("verdict");
+    expect(job().error).toBe("We couldn't save the verdict to the deal — our database didn't take the write. Try again in a minute.");
+    expect(state.deals.d1.verdict).toEqual({ old: true });
+    expect(verdictBehind(job())).toBe("failed");
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("statement timeout"));
+
+    // The terms' write fails: nothing after it reads the previous terms.
+    state = freshState();
+    state.failUpdateOf = "extraction";
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(synthesizeVerdict).mockClear();
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().step).toBe("extract");
+    expect(job().error).toMatch(/^We couldn't save the terms to the deal/);
+    expect(challengeAssumptions).not.toHaveBeenCalled();
+    expect(synthesizeVerdict).not.toHaveBeenCalled();
+    expect(previousScreenResults(job()).has("extraction")).toBe(true);
+
+    // The challenger's, the comps' and the market check's alike.
+    for (const [column, step] of [["challenges", "challenge"], ["comps", "comps"], ["market", "market"]] as const) {
+      state = freshState();
+      state.failUpdateOf = column;
+      await runAnalysis("d1");
+      expect(job().status, column).toBe("error");
+      expect(job().step, column).toBe(step);
+      expect(state.deals.d1[column], column).toEqual({ old: true });
+    }
+  });
+
+  it("one failed read of the deal is our database's, never a deal 'no longer available' (research pass 30)", async () => {
+    state.failDealReads = 1;
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().error).toBe("We couldn't read this deal from our database just now — try again in a minute.");
+    expect(readFirstSignal).not.toHaveBeenCalled();
+    // A deal that is really gone still says so.
+    state = freshState();
+    delete state.deals.d1;
+    state.jobs = [];
+    await expect(runAnalysis("d1")).resolves.toBeUndefined();
+  });
+
+  it("a verdict is never synthesized over a read of the deal's results that failed", async () => {
+    // Every read up to the verdict answers; the verdict's own read blips.
+    const reads = vi.fn();
+    vi.mocked(synthesizeVerdict).mockImplementation(async () => {
+      reads();
+      return VERDICT;
+    });
+    vi.mocked(checkMarket).mockImplementation(async () => {
+      state.failDealReads = 1;
+      return MARKET;
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().step).toBe("verdict");
+    expect(reads).not.toHaveBeenCalled();
+    expect(state.deals.d1.verdict).toEqual({ old: true });
+  });
+
+  it("an OM past the provider's page cap by pdfjs's own count stops before any model call, with the count in the message", async () => {
+    const { downloadOmPdf } = await import("@/lib/storage");
+    const pages = Array.from({ length: MAX_OM_PAGES + 1 }, (_, i) => ({ text: `Page ${i + 1}` }));
+    vi.mocked(downloadOmPdf).mockResolvedValueOnce(Buffer.from(await testMemorandum(pages)));
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().error).toBe(pageCapFailure(MAX_OM_PAGES + 1));
+    expect(readFirstSignal).not.toHaveBeenCalled();
+    expect(extractTerms).not.toHaveBeenCalled();
+  }, 60_000);
+
+  it("an incrementally saved deck the byte counter reads double is screened on pdfjs's count (research pass 30)", async () => {
+    // A 350-page deck with every page revised once — annotated and saved in
+    // Acrobat: the byte counter reads 700, pdfjs reads the page tree's 350,
+    // and the upload's check passed it on that count.
+    const { downloadOmPdf } = await import("@/lib/storage");
+    const pages = Array.from({ length: 350 }, (_, i) => ({ text: `Page ${i + 1}` }));
+    const revised = incrementalRevision(await testMemorandum(pages));
+    expect(countPdfPages(revised)).toBe(700);
+    vi.mocked(downloadOmPdf).mockResolvedValueOnce(revised);
+    await runAnalysis("d1");
+    expect(job().error).toBeNull();
+    expect(job().status).toBe("done");
+    expect(extractTerms).toHaveBeenCalledTimes(1);
+  }, 60_000);
+
+  it("the byte counter alone never refuses a deck: where pdfjs cannot open it, the screen goes on and the service decides", async () => {
     const { downloadOmPdf } = await import("@/lib/storage");
     vi.mocked(downloadOmPdf).mockResolvedValueOnce(
       Buffer.from("%PDF-1.4\n" + "<< /Type /Page >>\n".repeat(700)),
     );
     await runAnalysis("d1");
-    expect(job().status).toBe("error");
-    expect(job().error).toMatch(/runs 700 pages/);
-    expect(readFirstSignal).not.toHaveBeenCalled();
-    expect(extractTerms).not.toHaveBeenCalled();
+    expect(job().status).toBe("done");
+    expect(readFirstSignal).toHaveBeenCalledTimes(1);
   });
 
   it("a resumed run whose checkpoint read fails still writes checkpoints that carry the job's kind", async () => {

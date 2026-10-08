@@ -8,6 +8,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   uploadOmPdf,
   removeStorageFiles,
+  listDealPictureFiles,
   uploadSupplement,
   modelTmpPath,
   omStoragePath,
@@ -42,8 +43,11 @@ import {
   buildManualExtraction,
   firstSignalFromExtraction,
 } from "@/lib/manual-deal";
+import { dealNameOf } from "@/lib/deal-name";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { checkPdfOpens } from "@/lib/pdf-open";
+import { capRefusalOf } from "@/lib/deal-allowance";
+import { deadlineDay } from "@/lib/deadline-day";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -62,6 +66,7 @@ export type CreateDealError =
   | "limit"
   | "teamlimit"
   | "file"
+  | "empty"
   | "pdf"
   | "size"
   | "locked"
@@ -83,7 +88,9 @@ export type CreateDealResult =
  * can surface failures its own way.
  */
 async function createDealCore(formData: FormData): Promise<CreateDealResult> {
-  const name = String(formData.get("name") ?? "").trim();
+  // The one cap every name is stored under (lib/deal-name): the upload had
+  // stored a name of any length (research pass 42).
+  const name = dealNameOf(formData.get("name"));
   const assetClass = String(formData.get("assetClass") ?? "auto");
   const file = formData.get("om");
 
@@ -102,9 +109,13 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     return { ok: false, error: billing.team ? "teamlimit" : "limit" };
   }
 
-  if (!(file instanceof File) || file.size === 0) {
+  // No file chosen arrives as an empty File with no name; a file that is
+  // chosen and empty (0 bytes) has its name, and is said as empty — not
+  // "choose a PDF", and not a retry of the same empty file.
+  if (!(file instanceof File) || (file.size === 0 && !file.name)) {
     return { ok: false, error: "file" };
   }
+  if (file.size === 0) return { ok: false, error: "empty" };
   // Accept when the browser says PDF, says nothing (some drag sources report an
   // empty type for a real PDF), or the name ends in .pdf — then let the magic
   // bytes below be the real gate.
@@ -157,20 +168,17 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
-  const personal = !!billing.team && !teamAllowed;
-  const { data: deal, error: insertErr } = await supabase
-    .from("deals")
-    .insert({
-      name,
-      asset_class: assetClass,
-      user_id: user.id,
-      team_id: teamAllowed ? billing.team!.id : null,
-    })
-    .select("id")
-    .single();
-  if (insertErr || !deal) return { ok: false, error: "save" };
+  const filed = await fileDeal(
+    supabase,
+    { name, asset_class: assetClass, user_id: user.id },
+    teamAllowed ? billing.team!.id : null,
+  );
+  // The database's own cap refusal is the plan's limit, said as one — a
+  // double-submit or a second tab the read above let through.
+  if (!("id" in filed)) return { ok: false, error: filed.refusal ?? "save" };
+  const personal = !!billing.team && !filed.teamFiled;
 
-  const dealId = deal.id as string;
+  const dealId = filed.id;
   const path = omStoragePath(user.id, dealId);
 
   // Optional property address from the autocomplete: the structured pick
@@ -265,6 +273,38 @@ export async function createDealFromBatch(
  *  user typed is ever lost. */
 export type ManualDealState = { error: string } | null;
 
+/** The typed-facts form's words for a plan's limit — the app's own check
+ *  and the database's refusal alike. */
+const MANUAL_LIMIT = "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.";
+/**
+ * Insert a new deal: on the reader's team while its plan or trial allows
+ * (`teamId`), else as the reader's own. Where the database refuses the
+ * team's insert for its trial — another insert took the last slot between
+ * the allowance read and this write — the deal is filed again as the
+ * reader's own, which the personal cap then decides; refused there too, both
+ * pools are in use, and the refusal is the team's limit. So "your personal
+ * free deals are all in use" is said only where they are (the batch-2
+ * audit: a raced team insert had said it with the reader's own slots free).
+ */
+async function fileDeal(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  row: Record<string, unknown>,
+  teamId: string | null,
+): Promise<{ id: string; teamFiled: boolean } | { refusal: "limit" | "teamlimit" | null }> {
+  const insert = (team_id: string | null) => supabase.from("deals").insert({ ...row, team_id }).select("id").single();
+  const first = await insert(teamId);
+  if (first.data && !first.error) return { id: first.data.id as string, teamFiled: teamId !== null };
+  const refusal = capRefusalOf(first.error);
+  if (teamId === null || refusal !== "teamlimit") return { refusal };
+  const again = await insert(null);
+  if (again.data && !again.error) return { id: again.data.id as string, teamFiled: false };
+  const second = capRefusalOf(again.error);
+  return { refusal: second === "limit" ? "teamlimit" : second };
+}
+
+const MANUAL_TEAM_LIMIT =
+  "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro.";
+
 /**
  * Create a deal from TYPED facts — no OM. The facts become a normal
  * ExtractionResult (plus an instant first signal), so the buy box, mandate
@@ -291,11 +331,7 @@ export async function createManualDeal(
 
   const billing = await getBilling(supabase, user.id);
   if (!billing.canCreateDeal) {
-    return {
-      error: billing.team
-        ? "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro."
-        : "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.",
-    };
+    return { error: billing.team ? MANUAL_TEAM_LIMIT : MANUAL_LIMIT };
   }
 
   // Same 15s idempotency window as the upload path — a double-click can't
@@ -326,23 +362,20 @@ export async function createManualDeal(
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
-  const personal = !!billing.team && !teamAllowed;
-  const { data: deal, error: insertErr } = await supabase
-    .from("deals")
-    .insert({
-      name: facts.name,
-      asset_class: facts.assetClass,
-      user_id: user.id,
-      team_id: teamAllowed ? billing.team!.id : null,
-      extraction,
-      first_signal: firstSignal,
-    })
-    .select("id")
-    .single();
-  if (insertErr || !deal) {
-    return { error: "Couldn’t save the deal. Please try again." };
+  const filed = await fileDeal(
+    supabase,
+    { name: facts.name, asset_class: facts.assetClass, user_id: user.id, extraction, first_signal: firstSignal },
+    teamAllowed ? billing.team!.id : null,
+  );
+  if (!("id" in filed)) {
+    // The database's own cap refusal is the plan's limit, never "try again".
+    const cap = filed.refusal;
+    return {
+      error: cap === "teamlimit" ? MANUAL_TEAM_LIMIT : cap === "limit" ? MANUAL_LIMIT : "Couldn’t save the deal. Please try again.",
+    };
   }
-  const dealId = deal.id as string;
+  const personal = !!billing.team && !filed.teamFiled;
+  const dealId = filed.id;
 
   // Best-effort separate update so a pre-0011 schema can't sink the create.
   if (address) {
@@ -425,6 +458,9 @@ export async function updateManualFacts(
   );
   if (claim.outcome === "busy") {
     return { error: "A screen is already running on this deal — give it a minute to finish." };
+  }
+  if (claim.outcome === "error") {
+    return { error: "Couldn’t start the re-screen just now — nothing changed. Try again in a moment." };
   }
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
@@ -715,9 +751,10 @@ export async function setOffersDue(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const raw = String(formData.get("offersDue") ?? "").trim();
   if (!dealId) redirect("/deals");
-  // Empty clears the deadline; otherwise require a plain ISO date.
-  const offersDue =
-    raw === "" ? null : /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
+  // Empty clears the deadline; otherwise a real day between 2000 and 2100
+  // (lib/deadline-day) — a date field reports 0002 on the way to 2027, and
+  // this had stored it.
+  const offersDue = raw === "" ? null : (deadlineDay(raw) ?? undefined);
   if (offersDue === undefined) redirect(`/deals/${dealId}?error=deadline`);
 
   const supabase = await createSupabaseServerClient();
@@ -742,7 +779,7 @@ export async function setOffersDue(formData: FormData) {
  *  offers it no Rename; this refuses one sent anyway. */
 export async function renameDeal(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
+  const name = dealNameOf(formData.get("name"));
   if (!dealId || !name) redirect(`/deals/${dealId}`);
 
   const supabase = await createSupabaseServerClient();
@@ -760,7 +797,7 @@ export async function renameDeal(formData: FormData) {
 
   await supabase
     .from("deals")
-    .update({ name: name.slice(0, 120), updated_at: new Date().toISOString() })
+    .update({ name, updated_at: new Date().toISOString() })
     .eq("id", dealId);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
@@ -830,7 +867,11 @@ export async function deleteDeal(formData: FormData) {
     .select("id");
   if (delErr) redirect(`/deals/${dealId}?error=delete`);
   if (!gone || gone.length === 0) redirect(`/deals/${dealId}?error=deletepermission`);
-  await removeStorageFiles(paths, scope);
+  // The deal's picture folders are listed too, not only the files its photo
+  // cache names: a picture whose record another write lost is still the
+  // deal's (lib/storage `listDealPictureFiles`, research pass 39).
+  const listed = await listDealPictureFiles(dealId).catch(() => [] as string[]);
+  await removeStorageFiles([...new Set([...paths, ...listed])], scope);
 
   revalidatePath("/deals");
   redirect("/deals?deleted=1");
@@ -879,6 +920,9 @@ export async function rerunAnalysis(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  // A claim the database did not take, or a row it would not insert, is a
+  // start that failed — never "a screen is already running" (research pass 30).
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=startfail`);
   if (claim.outcome === "none") {
     // No prior job row means no completed prior generation to diff against.
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
@@ -888,7 +932,7 @@ export async function rerunAnalysis(formData: FormData) {
         workerMode ? { workerPayload: { kind: "screen", requestedBy: user.id } } : undefined,
       ),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=startfail`);
   }
 
   // Snapshot for the retrade diff only when the stored results are a
@@ -943,9 +987,10 @@ export async function replaceOm(formData: FormData) {
   }
 
   const file = formData.get("om");
-  if (!(file instanceof File) || file.size === 0) {
+  if (!(file instanceof File) || (file.size === 0 && !file.name)) {
     redirect(`/deals/${dealId}?error=omfile`);
   }
+  if (file.size === 0) redirect(`/deals/${dealId}?error=omempty`);
   const looksPdf =
     file.type === "application/pdf" ||
     file.type === "" ||
@@ -987,6 +1032,8 @@ export async function replaceOm(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  // Before the upload: the stored OM is untouched (research pass 30).
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=startfail`);
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
       newJobRow(
@@ -997,7 +1044,7 @@ export async function replaceOm(formData: FormData) {
           : undefined,
       ),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=startfail`);
   }
 
   // Keep the same storage path (upsert) so every reference — signed URLs,
@@ -1171,6 +1218,7 @@ export async function reconcileWithModel(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=reconcilestartfail`);
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
       workerMode && tmpPath
@@ -1180,7 +1228,7 @@ export async function reconcileWithModel(formData: FormData) {
           })
         : newJobRow(dealId, "reconcile", { status: "running", progress: 10 }),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=reconcilestartfail`);
   } else if (!workerMode) {
     // We own the row now — surface the reconcile step immediately.
     await supabase

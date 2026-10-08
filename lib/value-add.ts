@@ -39,6 +39,7 @@
 // A BLANK IS NULL. A turnover, a period or an achieved premium the
 // memorandum does not state is not assumed.
 
+import { compactUsd, statesRange } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parseCount } from "@/lib/criteria";
@@ -83,13 +84,14 @@ export function valueAddTermRows<M extends { label: string; value: string }>(met
 // ── Reading one figure ─────────────────────────────────────────────────
 
 const clean = (s: string | null | undefined) => (s ?? "").trim();
-const RANGE = /\d\s*[-–—]\s*\$?\d|\d\s+to\s+\$?\d/i;
 
 /** A monthly rent or premium to the cent: "$250", "$250/mo", "$3,000/yr"
- *  read as a month's. A range is two figures and reads as none. */
+ *  read as a month's. A range is two figures and reads as none (lib/money
+ *  `statesRange`, so "$250/mo – 20% on cost" is the premium it states). */
 export function monthlyOf(value: string | null | undefined): number | null {
+  if (statesRange(clean(value))) return null;
   const v = clean(value).replace(/,/g, "");
-  if (!v || RANGE.test(v)) return null;
+  if (!v) return null;
   const m = v.match(/\$?\s*(\d+(?:\.\d+)?)/);
   if (!m) return null;
   const n = Number(m[1]);
@@ -108,7 +110,7 @@ function pctOf(value: string | null | undefined): number | null {
 /** A period in months: "24 months", "2 years", "18-24 months" is none. */
 function monthsOf(value: string | null | undefined): number | null {
   const v = clean(value);
-  if (!v || RANGE.test(v)) return null;
+  if (!v || statesRange(v)) return null;
   const mo = v.match(/(\d+(?:\.\d+)?)\s*(?:months?|mos?)\b/i);
   if (mo) return Number(mo[1]) > 0 ? Number(mo[1]) : null;
   const yr = v.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b/i);
@@ -156,10 +158,7 @@ export interface ValueAddRead {
   headline: string;
 }
 
-const money = (n: number) =>
-  n >= 1e6
-    ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const dollars = (n: number) => (Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
 const pct = (n: number) => `${Math.round(n)}%`;
 const years1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)} years`;
@@ -230,9 +229,20 @@ export function readValueAdd(ex: ExtractionResult | null | undefined): ValueAddR
   return { ...read, sentences, headline: sentences.join(" ") };
 }
 
+/** The doors the program has left, said as the doors still to do where some
+ *  are already done — so the sentence and the panel's bar, whose whole is
+ *  the doors done and the doors to go, name one program, not a 192-door one
+ *  beside a 248-door one (research pass 36). The arithmetic is the doors
+ *  left times a door's cost either way. */
+function doorsLeftText(r: Pick<ValueAddRead, "doors" | "renovated">): string | null {
+  if (r.doors == null) return null;
+  const doors = `${r.doors.toLocaleString("en-US")} ${r.doors === 1 ? "door" : "doors"}`;
+  return r.renovated != null && r.renovated > 0 ? `the ${doors} still to do` : doors;
+}
+
 function sentencesOf(r: Omit<ValueAddRead, "headline" | "sentences">): string[] {
   const parts: string[] = [];
-  const doorsText = r.doors != null ? `${r.doors.toLocaleString("en-US")} ${r.doors === 1 ? "door" : "doors"}` : "the classic units";
+  const doorsText = doorsLeftText(r) ?? "the classic units";
   if (r.costPerDoor != null && r.premium != null) {
     parts.push(
       `The program renovates ${doorsText} at ${money(r.costPerDoor)} each for ${dollars(Math.round(r.premium * 100) / 100)} a month more rent: ${pct(r.returnOnCostPct!)} a year on the cost of every door once it is done${
@@ -295,10 +305,13 @@ export function valueAddModelLine(r: ValueAddRead, m: ValueAddModel): string {
   const cap = m.exitCapPct;
   const breakEven = (r.costPerDoor * cap) / 12;
   const perDoor = (r.premium * 12) / cap - r.costPerDoor;
+  // Across the doors the program has left: where some are done, said as
+  // the doors still to do, as the read says them.
+  const across = (r.renovated ?? 0) > 0 ? (doorsLeftText(r) ?? "the program") : "the program";
   const value =
     r.doors != null
       ? `At the model's ${(cap * 100).toFixed(2)}% exit cap a door's premium is worth ${money((r.premium * 12) / cap)} against its ${money(r.costPerDoor)} cost — ${
-          perDoor >= 0 ? `${money(perDoor)} a door, ${money(perDoor * r.doors)} across the program,` : `${money(-perDoor)} a door lost,`
+          perDoor >= 0 ? `${money(perDoor)} a door, ${money(perDoor * r.doors)} across ${across},` : `${money(-perDoor)} a door lost,`
         } and the premium breaks even at ${dollars(Math.round(breakEven * 100) / 100)} a month.`
       : `At the model's ${(cap * 100).toFixed(2)}% exit cap the premium breaks even at ${dollars(Math.round(breakEven * 100) / 100)} a month.`;
   const model =

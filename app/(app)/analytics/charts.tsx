@@ -36,6 +36,26 @@ const MONTH_FMT = new Intl.DateTimeFormat("en-US", {
   year: "2-digit",
   timeZone: "UTC",
 });
+/** A month in a chart's spoken name: the year in full, since the axis's
+ *  "Jan 26" would be heard as a day. */
+const SPOKEN_MONTH_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** The scatter's name for a screen reader: how many deals, over which
+ *  months, the median, and the lowest and highest — each said only where
+ *  the points give it (one month is no span; one value is no range). */
+export function timelineName(points: { at: string; value: number }[], format: (v: number) => string): string {
+  const times = points.map((p) => new Date(p.at).getTime());
+  const values = points.map((p) => p.value);
+  const [first, last] = [SPOKEN_MONTH_FMT.format(Math.min(...times)), SPOKEN_MONTH_FMT.format(Math.max(...times))];
+  const span = first === last ? `in ${first}` : `from ${first} to ${last}`;
+  const [lo, hi] = [Math.min(...values), Math.max(...values)];
+  const range = lo === hi ? "" : `, lowest ${format(lo)}, highest ${format(hi)}`;
+  return `${points.length} deals over time, ${span}; median ${format(median(values)!)}${range}`;
+}
 
 function niceBounds(lo: number, hi: number): [number, number] {
   if (lo === hi) {
@@ -78,7 +98,7 @@ export function DotTimeline({
       viewBox={`0 0 ${W} ${H}`}
       width="100%"
       role="img"
-      aria-label={`${points.length} deals over time; median ${format(med)}`}
+      aria-label={timelineName(points, format)}
     >
       {ticks.map((tv, i) => (
         <g key={i}>
@@ -219,8 +239,12 @@ export function StageFunnel({
           <span className="w-36 shrink-0 truncate text-xs text-muted">
             {r.label}
           </span>
+          {/* The bar repeats the label and count beside it, both read as
+              text, so it stays out of the accessibility tree (it had been
+              an unnamed image between them); its title still shows on
+              hover. */}
           <div className="h-4 min-w-0 flex-1">
-            <svg viewBox="0 0 100 8" preserveAspectRatio="none" width="100%" height="100%">
+            <svg viewBox="0 0 100 8" preserveAspectRatio="none" width="100%" height="100%" aria-hidden>
               <rect
                 x={0}
                 y={0}

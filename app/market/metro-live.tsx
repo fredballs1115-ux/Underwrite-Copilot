@@ -15,6 +15,7 @@ import { monthOf } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
 import { marketOwnArea, namesItsArea } from "@/lib/metro-own-area";
+import { BLS_NOTICE } from "@/lib/data-notices";
 
 /**
  * A covered metro's own figures, live from FRED — the four things a metro
@@ -205,8 +206,11 @@ export function MetroLive({
           ` Housing supply is the Census Bureau's building permits for the metro area, twelve months against the twelve before, because a month of permits is the season: the units in buildings of two or more are the total less the single-family series, since ${NO_MULTI_UNIT_SERIES}, and they are the pipeline an apartment underwrite competes with.`}
         {hasRentIndex &&
           " The rent index is what sitting tenants pay across the area's leases; the asking rent above is Zillow's smoothed index of what landlords ask."}
+        {/* A figure read from the BLS's own API carries the sentence its
+            terms ask for (lib/data-notices), here under the tiles that
+            draw one — once, however many such tiles there are. */}
         {fromBls &&
-          " Where FRED does not carry the area, the rent index comes from the BLS directly."}
+          ` Where FRED does not carry the area, the rent index comes from the BLS directly, through its own API. ${BLS_NOTICE}`}
         {borrowed.length > 0 &&
           ` Where FRED publishes nothing for ${metroName} itself, the figure is the metro area's, named on the tile.`}
         {narrower.length > 0 &&

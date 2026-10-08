@@ -42,7 +42,7 @@ import { parsePct } from "@/lib/criteria";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import type { MetricRow } from "@/lib/ground-lease-term";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 import { parseStatedDate } from "@/lib/note-yield";
 
 const isRow = (m: unknown): m is MetricRow =>
@@ -240,9 +240,8 @@ export interface SiteReportsRead {
  *  retrofit. */
 export const PML_LENDER_PCT = 20;
 
-const money = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `$${Math.round(n).toLocaleString("en-US")}`;
-const compact = (n: number) => (n >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`);
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
+const compact = (n: number) => compactUsd(n, { trim: true });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -257,13 +256,13 @@ const bareNumber = (v: string) => {
   return m ? Number(m[1]) : null;
 };
 
-/** The repairs as stated: dollars, "None" as zero, never a range or a
- *  figure per unit or per foot. */
+/** The repairs as stated: dollars, "None" as zero, never a range (lib/money
+ *  `statesRange`) or a figure per unit or per foot. */
 function repairsOf(value: string): number | null {
   const v = value.trim();
   if (NONE.test(v) || /^\$?0(?:\.0+)?$/.test(v) || /^no\s+(?:immediate\s+|critical\s+)?(?:repairs?|needs|items)\b/i.test(v)) return 0;
   if (/\/\s*(?:unit|door|key|sf|sq)|\bper\s+(?:unit|door|key|sf|square)|\bpsf\b/i.test(v)) return null;
-  if (/\d\s*[–—-]\s*\$?\d|\d\s+to\s+\$?\d/i.test(v)) return null;
+  if (statesRange(v)) return null;
   const n = parseUsd(v, 100);
   return n != null && n > 0 ? n : null;
 }
@@ -345,7 +344,10 @@ export function readSiteReports(ex: ExtractionResult | null | undefined, asOf: D
   return { ...read, sentences, headline: sentences.join(" ") };
 }
 
-const FINDING_WORDS: Record<EsaFinding, string> = {
+/** A Phase I finding in words, for a sentence ("a recognized environmental
+ *  condition"); "" for a finding stated in the report's own words, which a
+ *  caller quotes instead. */
+export const FINDING_WORDS: Record<EsaFinding, string> = {
   none: "no recognized environmental conditions",
   rec: "a recognized environmental condition",
   crec: "a controlled recognized environmental condition",

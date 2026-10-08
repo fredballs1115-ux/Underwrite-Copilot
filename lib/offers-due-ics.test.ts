@@ -61,6 +61,33 @@ describe("the call for offers as a calendar file (#467)", () => {
     expect(body).toContain("DTSTART;VALUE=DATE:20261015");
   });
 
+  // Research pass 35, F14: the memorandum's time of day was dropped.
+  it("carries the memorandum's own words, its time and its page where the deadline is its day, still all day", async () => {
+    const extraction = {
+      metrics: [{ label: "Offers due", value: "Thursday, October 22, 2026 at 5:00 PM ET", page: "p. 2" }],
+      totalPages: 40,
+    };
+    // A long DESCRIPTION is folded at 75 octets; read the file unfolded.
+    const unfolded = async () => (await (await get()).text()).replace(/\r\n /g, "");
+    for (const offers_due of [null, "2026-10-22"]) {
+      state.deal = { id: "d1", name: "The Maddox", offers_due, extraction };
+      const body = await unfolded();
+      expect(body).toContain("DTSTART;VALUE=DATE:20261022\r\n");
+      expect(body).toContain("DTEND;VALUE=DATE:20261023\r\n");
+      expect(body).toContain("SUMMARY:Offers due 5:00 PM ET — The Maddox\r\n");
+      expect(body).toMatch(
+        /\r\nDESCRIPTION:Offers due as the memorandum states it: Thursday\\, October 22\\, 2026 at 5:00 PM ET \(OM p\. 2\)\\nhttps?:\/\/[^\r\n]*\/deals\/d1\r\n/,
+      );
+    }
+    // A day the reader set that is not the memorandum's: the link alone.
+    state.deal = { id: "d1", name: "The Maddox", offers_due: "2026-10-29", extraction };
+    const body = await unfolded();
+    expect(body).toContain("DTSTART;VALUE=DATE:20261029\r\n");
+    expect(body).toContain("SUMMARY:Offers due — The Maddox\r\n");
+    expect(body).toMatch(/\r\nDESCRIPTION:https?:\/\/[^\r\n]*\/deals\/d1\r\n/);
+    expect(body).not.toContain("as the memorandum states it");
+  });
+
   it("is a 404 with no deadline or no deal, and asks a signed-out visitor to sign in", async () => {
     state.deal = { id: "d1", name: "The Maddox", offers_due: null, extraction: { metrics: [{ label: "Offers due", value: "October 15th" }] } };
     expect((await get()).status).toBe(404);

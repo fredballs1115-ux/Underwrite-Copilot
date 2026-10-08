@@ -9,6 +9,9 @@ import type { BuyBox } from "./criteria";
 import { buildPipelineWorkbook } from "./pipeline-workbook";
 import { pickSlots } from "./pipeline-slots";
 import { pipelineExportRow, type ExportDeal, type ExportRowContext } from "./pipeline-export-row";
+import { yieldOnCostText } from "./plan-facts";
+import { noteCapSlot, ownYieldText } from "./compare-interest";
+import { buildManualExtraction } from "./manual-deal";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
 
@@ -28,7 +31,7 @@ const deal = (over: Partial<ExportDeal> = {}): ExportDeal => ({
   ...over,
 });
 
-const ctx: ExportRowContext = { box: null, job: null, offersDue: null, addedBy: null };
+const ctx: ExportRowContext = { box: null, job: null, offersDue: null, addedBy: null, today: "2026-09-08" };
 
 async function classCell(d: ExportDeal): Promise<unknown> {
   const buf = await buildPipelineWorkbook([pipelineExportRow(d, ctx)], new Date("2026-09-08T12:00:00Z"), null);
@@ -39,6 +42,136 @@ async function classCell(d: ExportDeal): Promise<unknown> {
 }
 
 describe("pipelineExportRow — the meeting workbook reads a deal as every surface does", () => {
+  it("says the rent rules that reach the building, read on the route's day, and carries them in the price cell's note (lib/rent-regulation)", async () => {
+    const walkUp = {
+      dealName: "The Walk-up",
+      assetClass: "multifamily",
+      market: "Brooklyn, NY",
+      address: "",
+      metrics: [m("Asking price", "$14,000,000"), m("Units", "48"), m("Year built", "1931"), m("Rent-regulated units", "41")],
+    } as ExtractionResult;
+    const brooklyn = { label: "100 Walk-up St, Brooklyn, NY 11215", street: "100 Walk-up St", city: "Brooklyn", state: "NY", zip: "11215", county: "Kings County", submarket: "" };
+    const row = pipelineExportRow(deal({ extraction: walkUp, address: brooklyn }), { ...ctx, today: "2026-10-05" });
+    // The pipeline card's own slot, for the same deal on the same day.
+    expect(row.regulation).toBe("Rent-stabilized, 41 of 48");
+    expect(row.regulation).toBe(pickSlots(walkUp, null, "auto", { address: brooklyn, siteFlags: null, today: "2026-10-05" }).regulation);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 7 its price.
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain(
+      "Rent-stabilized, 41 of 48: the rent rules that reach the building",
+    );
+    // A deal no rule reaches carries none.
+    expect(pipelineExportRow(deal(), ctx).regulation).toBeNull();
+  });
+
+  it("says a forward purchase on the route's day, as the pipeline card says it, and carries it in the price cell's note (lib/forward-purchase)", async () => {
+    const forward = {
+      dealName: "Ridgeline Distribution",
+      assetClass: "industrial",
+      market: "Columbus, OH",
+      address: "",
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [m("Purchase price", "$48,000,000"), m("Delivery date", "Q3 2027")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: forward, asset_class: "industrial" }), { ...ctx, today: "2026-10-05" });
+    expect(row.forward).toBe("Build-to-suit, delivers Q3 2027");
+    expect(row.forward).toBe(pickSlots(forward, null, "industrial", { address: null, siteFlags: null, today: "2026-10-05" }).forward);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 7 its price.
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain(
+      "Build-to-suit, delivers Q3 2027: the price is paid at delivery and the developer funds the works",
+    );
+    expect(pipelineExportRow(deal(), ctx).forward).toBeNull();
+  });
+
+  it("says a mixed-use building's commercial share, as the pipeline card says it, and carries it in the price cell's note (lib/mixed-use)", async () => {
+    const mixed = {
+      dealName: "Main Street Lofts",
+      assetClass: "Retail / Multifamily",
+      market: "Baltimore, MD",
+      address: "",
+      metrics: [m("Asking price", "$25,000,000"), m("Residential income", "$1,520,000"), m("Commercial income", "$610,000")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: mixed }), ctx);
+    expect(row.mixedUse).toBe("Commercial 29% of income");
+    expect(row.mixedUse).toBe(pickSlots(mixed, null, "auto").mixedUse);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain("Commercial 29% of income: a mixed-use building's commercial share");
+    expect(pipelineExportRow(deal(), ctx).mixedUse).toBeNull();
+  });
+
+  it("says an operating business, as the pipeline card says it, and carries it in the price cell's note (lib/going-concern)", async () => {
+    const station = {
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      market: "Hudson Valley, NY",
+      address: "",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$3,200,000"), m("NOI (in-place)", "$256,000"), m("EBITDA (T-12)", "$410,000")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: station }), ctx);
+    expect(row.goingConcern).toBe("Going concern");
+    expect(row.goingConcern).toBe(pickSlots(station, null, "auto").goingConcern);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain("Going concern: an operating business on its real estate");
+    expect(pipelineExportRow(deal(), ctx).goingConcern).toBeNull();
+  });
+
+  it("says condominium units, as the pipeline card says them, and carries them in the price cell's note (lib/condo)", async () => {
+    const bulk = {
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      market: "Miami, FL",
+      address: "",
+      metrics: [m("Asking price", "$16,800,000"), m("Units", "42"), m("HOA dues", "$650 per unit per month"), m("Units in building", "120")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: bulk }), ctx);
+    expect(row.condo).toBe("Bulk 42 of 120 (35%)");
+    expect(row.condo).toBe(pickSlots(bulk, null, "auto").condo);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain(
+      "Bulk 42 of 120 (35%): condominium units in an association its declaration governs",
+    );
+    expect(pipelineExportRow(deal(), ctx).condo).toBeNull();
+  });
+
+  it("says a sandwich position's spread, as the pipeline card says it, and carries it in the price cell's note (lib/sandwich-lease)", async () => {
+    const position = {
+      dealName: "Founders Plaza",
+      assetClass: "Office",
+      market: "Baltimore, MD",
+      address: "",
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+      metrics: [m("Asking price", "$6,500,000"), m("Master lease rent", "$1,100,000"), m("Sublease income", "$1,820,000"), m("Master lease expiration", "December 31, 2041")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: position }), { ...ctx, today: "2026-10-05" });
+    expect(row.sandwich).toBe("Spread $720k, 1.65× cover");
+    expect(row.sandwich).toBe(pickSlots(position, null, "auto", { address: null, siteFlags: null, today: "2026-10-05" }).sandwich);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    const note = JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note);
+    expect(note).toContain("Spread $720k, 1.65× cover: a master lease of the building, sublet — the master rent is owed whatever the subtenants pay");
+    expect(pipelineExportRow(deal(), ctx).sandwich).toBeNull();
+  });
+
   it("prints the deal's one class: the deck's on a deal filed Auto, the analyst's where they filed one", async () => {
     expect(pipelineExportRow(deal(), ctx).assetClass).toBe("multifamily");
     expect(pipelineExportRow(deal({ asset_class: "office" }), ctx).assetClass).toBe("office");
@@ -76,14 +209,27 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     take: "An office-to-residential conversion of a 1962 tower, sold vacant.",
   };
 
+  it("says a re-screen that stopped making progress is stalled, on the route's own clock, never running (research pass 30)", () => {
+    const now = Date.parse("2026-09-08T12:00:00Z");
+    const at = (msAgo: number) => new Date(now - msAgo).toISOString();
+    const row = (updated_at: string) =>
+      pipelineExportRow(deal(), { ...ctx, now, job: { status: "running", step: "challenge", updated_at } });
+    expect(row(at(11 * 60_000)).verdictBehind).toBe("stalled");
+    expect(row(at(30_000)).verdictBehind).toBe("running");
+    expect(pipelineExportRow(deal(), { ...ctx, now, job: { status: "error", step: "comps", updated_at: at(3_600_000) } }).verdictBehind).toBe("failed");
+  });
+
   it("reads the deal's kind as the pipeline card does, from the extraction and the first signal", () => {
     const row = pipelineExportRow(deal({ extraction: wexley, first_signal: SIGNAL }), ctx);
     expect(row.dealType).toBe("Conversion");
     expect(row.planDeal).toBe(true);
     expect(row.cap).toBeNull();
-    expect(row.yieldOnCost).toBe("7.0%");
+    // The plan's own fraction, which the cell's "0.00%" prints as the card's
+    // two decimals — never "7.0%" read back.
+    expect(row.yieldOnCost).toBeCloseTo(0.07, 10);
     // The card's own slots say the same.
-    expect(row.yieldOnCost).toBe(pickSlots(wexley, SIGNAL).yoc);
+    expect(yieldOnCostText(row.yieldOnCost!)).toBe(pickSlots(wexley, SIGNAL).yoc);
+    expect(pickSlots(wexley, SIGNAL).yoc).toBe("7.00%");
     expect(row.cap).toBe(pickSlots(wexley, SIGNAL).cap);
     // A row screened before the first signal existed reads as before.
     const before = pipelineExportRow(deal({ extraction: wexley }), ctx);
@@ -112,13 +258,50 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(row.cap).toBeNull();
     expect(row.capWithheld).toBe("note");
     expect(row.cap).toBe(pickSlots(note, null).cap);
-    const buf = await buildPipelineWorkbook([row], new Date("2026-09-08T12:00:00Z"), null);
+    // The note pays: its yield to maturity at its price, read on the route's
+    // day, is the figure the pipeline card shows in the slot (research pass
+    // 34 — the cell had said "n/a — note" beside the card's yield).
+    const own = noteCapSlot(note, new Date(`${ctx.today}T12:00:00Z`));
+    expect(own?.ytmPct).not.toBeNull();
+    expect(row.noteYield).toBe(ownYieldText(own!.ytmPct!));
+    const sheet = async (r: typeof row) => {
+      const buf = await buildPipelineWorkbook([r], new Date("2026-09-08T12:00:00Z"), null);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ArrayBuffer);
+      // Row 6 is the deal; column 8 the cap.
+      return wb.getWorksheet("Pipeline")!.getRow(6).getCell(8);
+    };
+    const cell = await sheet(row);
+    expect(cell.value).toBe(`${row.noteYield} to maturity`);
+    // Never the collateral's 9.50%, and why the yield stands there is said.
+    expect(String(cell.value)).not.toContain("9.50");
+    expect(JSON.stringify(cell.note)).toContain("A note has no going-in cap");
+    // A note that does not pay has no yield to state: the cap is withheld.
+    const npl = { ...note, metrics: note.metrics.map((r) => (r.label === "Payment status" ? m("Payment status", "Non-performing") : r)) };
+    const nplRow = pipelineExportRow(deal({ extraction: npl }), ctx);
+    expect(nplRow.noteYield).toBeNull();
+    expect((await sheet(nplRow)).value).toBe("n/a — note");
+    // A building's cap stands.
+    expect(pipelineExportRow(deal(), ctx)).toMatchObject({ cap: "5.90%", capWithheld: null, noteYield: null });
+  });
+
+  it("prices a first screen's row from the first signal's ask, as the card does, before the extraction lands (research pass 34)", async () => {
+    const early = pipelineExportRow(deal({ extraction: null, first_signal: SIGNAL }), ctx);
+    expect(early.price).toBe("$20,000,000");
+    expect(early.price).toBe(pickSlots(null, SIGNAL).price);
+    const buf = await buildPipelineWorkbook([early], new Date("2026-09-08T12:00:00Z"), null);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf as unknown as ArrayBuffer);
-    // Row 6 is the deal; column 8 the cap — never the collateral's 9.50%.
-    expect(wb.getWorksheet("Pipeline")!.getRow(6).getCell(8).value).toBe("n/a — note");
-    // A building's cap stands.
-    expect(pipelineExportRow(deal(), ctx)).toMatchObject({ cap: "5.90%", capWithheld: null });
+    // Row 6 is the deal; column 7 its price, a number the sheet can sum.
+    expect(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).value).toBe(20_000_000);
+    // A word where a price goes is no price, on the card or the sheet.
+    for (const askPrice of ["Call for offers", "Unpriced", ""]) {
+      const row = pipelineExportRow(deal({ extraction: null, first_signal: { ...SIGNAL, askPrice } }), ctx);
+      expect(row.price, askPrice).toBeNull();
+      expect(row.price, askPrice).toBe(pickSlots(null, { ...SIGNAL, askPrice }).price);
+    }
+    // The memorandum's price wins once it is read.
+    expect(pipelineExportRow(deal({ first_signal: { ...SIGNAL, askPrice: "$19,000,000" } }), ctx).price).toBe("$41,250,000");
   });
 
   it("says whose strategy the deal type is on a note or a leased fee, as the deal header does", async () => {
@@ -168,5 +351,74 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal({ extraction: wexley, first_signal: SIGNAL, address }), { ...ctx, box }).fitFirstRead).toBe(false);
     // No buy box, no fit: nothing to mark.
     expect(pipelineExportRow(deal({ extraction: null, first_signal: SIGNAL, address }), ctx).fitFirstRead).toBe(false);
+  });
+
+  it("says how much of the box a note's fit stands on, and draws it muted, never a green Fits (research pass 35)", async () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const note = {
+      dealName: "Harbor Point note",
+      assetClass: "multifamily",
+      market: "Baltimore, MD",
+      address: "",
+      interest: { ...blank, kind: "note" },
+      metrics: [m("Asking price", "$68,000,000"), m("Going-in cap rate", "5.45%"), m("Units", "248")],
+    } as ExtractionResult;
+    const box: BuyBox = { assetClasses: ["multifamily"], unitsMin: 100, unitsMax: 400, minCapPct: 5.75, minIrrPct: 13 };
+    const row = pipelineExportRow(deal({ extraction: note }), { ...ctx, box });
+    // The fold's "fits" on the class and the count alone…
+    expect(row.fit).toBe("fits");
+    // …and the count of what it stands on, as the pipeline card reads it.
+    expect(row.fitCoverage).toEqual({ checked: 2, total: 4, unchecked: ["Going-in cap", "Target return"], priceUnchecked: true });
+    const buf = await buildPipelineWorkbook([row], new Date("2026-09-08T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 10 its Buy box.
+    const cell = wb.getWorksheet("Pipeline")!.getRow(6).getCell(10);
+    expect(cell.value).toBe("Fits (2 of 4)");
+    // Muted, never the pass green, while the cap and the return go unjudged.
+    expect(cell.font?.color?.argb).toBe("FF5F6B69");
+    expect(cell.font?.color?.argb).not.toBe("FF1B7A5E");
+    expect(JSON.stringify(cell.note)).toContain("Judged on 2 of the buy box's 4 criteria; going-in cap and target return could not be checked.");
+    // The same deal as a building, its cap and a stated return checked: the
+    // cell reads as it always has, in green, with no note.
+    const building = {
+      ...note,
+      interest: { ...blank, kind: "fee_simple" },
+      metrics: [m("Asking price", "$68,000,000"), m("Going-in cap rate", "6.00%"), m("Units", "248"), m("Levered IRR", "14%")],
+    } as ExtractionResult;
+    const whole = pipelineExportRow(deal({ extraction: building }), { ...ctx, box });
+    expect(whole.fitCoverage).toMatchObject({ checked: 4, total: 4 });
+    const buf2 = await buildPipelineWorkbook([whole], new Date("2026-09-08T12:00:00Z"), null);
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buf2 as unknown as ArrayBuffer);
+    const cell2 = wb2.getWorksheet("Pipeline")!.getRow(6).getCell(10);
+    expect(cell2.value).toBe("Fits");
+    expect(cell2.font?.color?.argb).toBe("FF1B7A5E");
+    expect(cell2.note).toBeUndefined();
+    // The box's cash-on-cash floor, which no check lists and the score
+    // judges, is a criterion too: the building states no cash-on-cash, so
+    // the same cell is no longer a green Fits (the audit of 2026-10-05).
+    const withCoc = pipelineExportRow(deal({ extraction: building }), { ...ctx, box: { ...box, minCoCPct: 6 } });
+    expect(withCoc.fitCoverage).toEqual({ checked: 4, total: 5, unchecked: ["Cash-on-cash"], priceUnchecked: true });
+  });
+
+  it("marks a deal typed by hand, which the summary then says (audit C6, LOW-7)", () => {
+    const typed = buildManualExtraction({
+      name: "Typed deal",
+      assetClass: "multifamily",
+      market: "Baltimore, MD",
+      address: "",
+      price: 10_000_000,
+      capPct: 6,
+      noiAnnual: null,
+      units: 40,
+      sf: null,
+      occupancyPct: null,
+      yearBuilt: null,
+      avgRentMo: null,
+      notes: "",
+    });
+    expect(pipelineExportRow(deal({ extraction: typed }), ctx).typedByHand).toBe(true);
+    expect(pipelineExportRow(deal(), ctx).typedByHand).toBeUndefined();
   });
 });

@@ -2,7 +2,7 @@
  * The atomic job claim, against a recording fake: what a retry after a
  * FAILED worker run keeps, and what every other claim resets.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { claimJob, newJobRow, requesterOf } from "./jobs";
 
 type Row = Record<string, unknown>;
@@ -162,5 +162,66 @@ describe("claimJob — a retry after a failed worker run keeps the steps that fi
     expect((await claimJob(fresh.db, "d1", "signal")).outcome).toBe("busy");
     const stale = fakeDb({ id: "j1", status: "running", updated_at: HOUR_AGO });
     expect((await claimJob(stale.db, "d1", "signal")).outcome).toBe("claimed");
+  });
+});
+
+describe("claimJob — a claim the database refuses is an error, never 'busy' (research pass 30)", () => {
+  /** A fake whose read or update answers with an error, as supabase-js does
+   *  (it never throws): a dropped connection, a statement timeout. */
+  function failingDb(fail: "select" | "update") {
+    const writes: Row[] = [];
+    class Q {
+      private kind: "select" | "update" = "select";
+      select() {
+        return this;
+      }
+      update(patch: Row) {
+        this.kind = "update";
+        writes.push(patch);
+        return this;
+      }
+      eq() {
+        return this;
+      }
+      in() {
+        return this;
+      }
+      order() {
+        return this;
+      }
+      limit() {
+        return this;
+      }
+      maybeSingle() {
+        return this;
+      }
+      then<T>(resolve: (v: { data: unknown; error: { message: string } | null }) => T, reject?: (e: unknown) => T) {
+        return Promise.resolve()
+          .then(() => {
+            if (this.kind === fail) return { data: null, error: { message: "TypeError: fetch failed" } };
+            return this.kind === "select"
+              ? { data: { id: "j1", status: "error", updated_at: HOUR_AGO }, error: null }
+              : { data: [{ id: "j1" }], error: null };
+          })
+          .then(resolve, reject);
+      }
+    }
+    return { db: { from: () => new Q() } as never, writes };
+  }
+
+  it("an update that errors claimed nothing, and says so", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { db } = failingDb("update");
+    expect(await claimJob(db, "d1", "signal")).toEqual({ outcome: "error", priorStatus: "error" });
+    expect(err).toHaveBeenCalledWith(expect.stringContaining("claim update failed for deal d1"));
+    err.mockRestore();
+  });
+
+  it("a read that errors is an error — never 'none', which would insert a second row, and never 'busy'", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { db, writes } = failingDb("select");
+    expect(await claimJob(db, "d1", "signal")).toEqual({ outcome: "error", priorStatus: null });
+    expect(writes).toEqual([]);
+    err.mockRestore();
   });
 });

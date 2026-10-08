@@ -7,7 +7,10 @@
  * app only ENQUEUES a job row; this process (a separate Render worker service
  * built from the same repo) claims it and does the slow work:
  *
- *   poll `analysis_jobs` for the oldest queued job
+ *   poll `analysis_jobs` for the oldest queued job (lib/worker-queue: never
+ *   a deal that is still running, one queued run a deal — its others closed
+ *   as superseded — and no more than the batch upload's four of one
+ *   account's runs ahead of another account's run that is waiting)
  *     → claim it atomically (status → running, attempts + 1)
  *     → run the pipeline: signal → extract → challenge → comps → market → verdict
  *       (or a reconcile, when the payload says so)
@@ -38,6 +41,21 @@ import { downloadDealFile, removeSupplementFile, type StorageScope } from "@/lib
 import { runWeeklyDigests } from "@/lib/digest";
 import { notifyAnalysisFailed } from "@/lib/email";
 import { requesterOf } from "@/lib/jobs";
+import {
+  MAX_COLLAPSE_PER_POLL,
+  claimQueuedRow,
+  collapseDeal,
+  newestQueued,
+  readQueueHead,
+  supersedeOthers,
+} from "@/lib/worker-claim";
+import { OWNER_QUEUE_SHARE, noteClaim, type ClaimLog } from "@/lib/worker-queue";
+import {
+  interruptedMessage,
+  interruptionKinds,
+  interruptionOf,
+  type InterruptionKind,
+} from "@/lib/worker-interruptions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Tunables — env-overridable so the test rig can run the real binary fast.
@@ -62,11 +80,8 @@ const DIGEST_DOW = int0(process.env.WORKER_DIGEST_DOW, 1);
 const DIGEST_HOUR_UTC = int0(process.env.WORKER_DIGEST_HOUR_UTC, 13);
 const DIGEST_CHECK_MS = int(process.env.WORKER_DIGEST_CHECK_MS, 15 * 60_000);
 
-// Said to the analyst on the deal page and in the stopped-screen email, so
-// in plain words: what happened, and the deal page's own button.
-const INTERRUPTED_MSG =
-  `The screen was interrupted ${MAX_ATTEMPTS} time${MAX_ATTEMPTS === 1 ? "" : "s"} while our servers restarted, ` +
-  "so it stopped trying on its own. Choose “Try again” on the deal page to run it fresh.";
+// The job timeout as the stopped-screen sentence says it, in minutes.
+const TIMEOUT_MINUTES = Math.round(JOB_TIMEOUT_MS / 60_000);
 
 function int(v: string | undefined, fallback: number): number {
   const n = Number(v);
@@ -94,12 +109,20 @@ interface ClaimedJob {
     /** who asked for the run (lib/jobs `WorkerPayload`), read through
      *  `requesterOf`: the screen's emails go to them */
     requestedBy?: unknown;
+    /** why each earlier attempt was put back in line — a restart, the job
+     *  timeout, a crash (lib/worker-interruptions), as `requeueCurrent`
+     *  records them */
+    interruptions?: unknown;
   };
 }
 
 let admin: SupabaseClient;
 let shuttingDown = false;
 let current: ClaimedJob | null = null;
+/** When this process took each account's last runs (lib/worker-queue): an
+ *  account that has had its share since another's run was asked for waits
+ *  behind it. */
+const claimLog: ClaimLog = new Map();
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -198,38 +221,54 @@ async function failJob(
 }
 
 /**
- * Claim the oldest queued job: a conditional UPDATE (status AND attempts must
- * still be what we read), so two workers can never both win the same row.
- * Also enforces the attempts cap here, where the retry count is in hand.
+ * Claim the next queued job, whose deal lib/worker-queue picks: the oldest in
+ * line, past any deal still running, and never an account's run once it has
+ * had its share since another account's run was asked for. The row run is
+ * the deal's newest queued one, and its others are closed as superseded, so
+ * a deal never runs twice. The claim is a conditional UPDATE (status AND
+ * attempts must still be what we read), so two workers can never both win
+ * the same row. Also enforces the attempts cap here, where the retry count
+ * is in hand.
  */
 async function claimNext(): Promise<ClaimedJob | null> {
   // ONLY rows carrying a worker payload are this service's to run — that is
   // the handoff marker the web writes in worker mode. Payload-less queued
   // rows are in-process runs mid-startup (or a flag-off web service); a
   // worker that grabbed those would double-run the same screen.
-  const { data: next, error: nextErr } = await admin
-    .from("analysis_jobs")
-    .select("id, deal_id, payload, attempts")
-    .eq("status", "queued")
-    .not("payload", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (nextErr && nextErr.code !== "PGRST116") {
-    log(`queue poll failed: ${nextErr.message}`);
+  const head = await readQueueHead(admin, claimLog);
+  // A second queued row of any deal met is put back to one, so no deal
+  // holds more than its one place in line (a few a poll; the rest next).
+  for (const dealId of head.collapse.filter((d) => d !== head.pick?.dealId).slice(0, MAX_COLLAPSE_PER_POLL)) {
+    const closed = await collapseDeal(admin, dealId);
+    if (closed > 0) log(`deal ${dealId}: ${closed} queued row${closed === 1 ? "" : "s"} closed as superseded`);
   }
-  if (!next) return null;
+  if (!head.pick) return null;
+  const dealId = head.pick.dealId;
+  const next = await newestQueued(admin, dealId);
+  if (!next) return null; // claimed or closed meanwhile — re-poll
 
   const attempts = (next.attempts as number) ?? 0;
   const payload = (next.payload as ClaimedJob["payload"]) ?? {};
+  const closeOthers = async () => {
+    const closed = await supersedeOthers(admin, dealId, next.id);
+    if (closed > 0) log(`deal ${dealId}: ${closed} other queued row${closed === 1 ? "" : "s"} closed as superseded`);
+  };
 
   if (attempts >= MAX_ATTEMPTS) {
-    const killed = await failJob(next.id as string, INTERRUPTED_MSG, {
+    // Said to the analyst on the deal page and in the stopped-screen email,
+    // in plain words: what happened — by the interruptions the payload
+    // recorded, never a restart that was a timeout or a crash — and the deal
+    // page's own button, which picks up from the last finished step.
+    const message = interruptedMessage(interruptionKinds(payload.interruptions), attempts, TIMEOUT_MINUTES);
+    const killed = await failJob(next.id as string, message, {
       status: "queued",
       attempts,
     });
     if (killed) {
       log(`job ${next.id} exceeded ${MAX_ATTEMPTS} attempts — marked error`);
+      // The deal's run has stopped; its older queued rows were never its
+      // run, and are closed rather than left to run after it.
+      await closeOthers();
       if (payload.model?.path) {
         await removeSupplementFile(payload.model.path, parkedModelScope(next.deal_id as string));
       }
@@ -237,7 +276,7 @@ async function claimNext(): Promise<ClaimedJob | null> {
       // verdict; the pipeline sends it on its own failures, and these are
       // the worker's — to whoever asked for the run.
       if (payload.kind === "screen") {
-        await notifyAnalysisFailed(admin, next.deal_id as string, INTERRUPTED_MSG, {
+        await notifyAnalysisFailed(admin, next.deal_id as string, message, {
           requestedBy: requesterOf(payload.requestedBy),
         });
       }
@@ -245,19 +284,10 @@ async function claimNext(): Promise<ClaimedJob | null> {
     return null;
   }
 
-  const { data: claimed, error: claimErr } = await admin
-    .from("analysis_jobs")
-    .update({
-      status: "running",
-      attempts: attempts + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", next.id)
-    .eq("status", "queued")
-    .eq("attempts", attempts)
-    .select("id");
-  if (claimErr) log(`claim failed for job ${next.id}: ${claimErr.message}`);
-  if (!claimed || claimed.length === 0) return null; // raced — re-poll
+  if (!(await claimQueuedRow(admin, next))) return null; // raced — re-poll
+  noteClaim(claimLog, head.pick.account, Date.now());
+  await closeOthers();
+  if (head.pick.behind) log(`deal ${dealId}: waited behind other accounts' runs, its account having had ${OWNER_QUEUE_SHARE} runs taken since they were asked for`);
 
   return {
     id: next.id as string,
@@ -267,17 +297,33 @@ async function claimNext(): Promise<ClaimedJob | null> {
   };
 }
 
-/** Put the in-flight job back in line (deploy/shutdown/timeout). The payload
- *  keeps its per-step checkpoints, so the next attempt resumes, not restarts. */
+/** Put the in-flight job back in line (deploy/shutdown/timeout/crash). The
+ *  payload keeps its per-step checkpoints, so the next attempt resumes, not
+ *  restarts, and it records why this attempt was interrupted
+ *  (lib/worker-interruptions), so the run's last failure says what really
+ *  happened. */
 async function requeueCurrent(reason: string): Promise<void> {
   if (!current) return;
+  const job = current;
+  const kind = interruptionOf(reason);
+  let recorded: InterruptionKind[] | null = null;
   try {
-    const requeue = () =>
-      admin
+    // The payload is read afresh each pass, so the steps the pipeline
+    // checkpointed meanwhile are kept; the kind is appended once.
+    const requeue = async () => {
+      const { data } = await admin.from("analysis_jobs").select("payload").eq("id", job.id).maybeSingle();
+      const payload = ((data?.payload as Record<string, unknown> | null) ?? job.payload) as Record<string, unknown>;
+      recorded ??= [...interruptionKinds(payload.interruptions), kind];
+      await admin
         .from("analysis_jobs")
-        .update({ status: "queued", updated_at: new Date().toISOString() })
-        .eq("id", current!.id)
+        .update({
+          status: "queued",
+          updated_at: new Date().toISOString(),
+          payload: { ...payload, interruptions: recorded },
+        })
+        .eq("id", job.id)
         .eq("status", "running");
+    };
     // Twice, a beat apart: the pipeline's own patchJob writes are keyed by
     // deal_id with no fence, so one already in flight at shutdown can land
     // AFTER the first requeue and flip the row back to "running" — which the
@@ -286,7 +332,7 @@ async function requeueCurrent(reason: string): Promise<void> {
     await requeue();
     await sleep(250);
     await requeue();
-    log(`job ${current.id} re-queued (${reason})`);
+    log(`job ${job.id} re-queued (${reason})`);
   } catch {
     // If this write is lost the row goes stale and the existing stall
     // recovery reclaims it — slower, but nothing is stranded.

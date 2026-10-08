@@ -77,6 +77,15 @@ export interface WorkbookNotes {
   vacancy?: string;
   /** expense recovery: what this export assumes */
   reimbursement?: string;
+  /** the purchase price where no memorandum stated one: the site's
+   *  placeholder, or a figure backed out of an NOI of zero or less, said as
+   *  that beside the cell and above the IRR (lib/underwrite/report-grid
+   *  `unstatedPrice`, research pass 40) */
+  price?: string;
+  /** the price is no price (`noPrice`): the cell keeps the model's figure,
+   *  which no surface shows, and reads "no price: enter one" until the
+   *  reader types a price — the underwrite workbook's own format */
+  priceIsNone?: boolean;
 }
 
 /** Everything read off the rent roll, resolved once so the workbook writes the
@@ -177,6 +186,11 @@ export interface WorkbookCashFlow {
   leveredVector: number[];
   leveredIrr: number | null;
   unleveredIrr: number | null;
+  /** what the workbook's IRR cell says where its rate is null — the
+   *  formula's own fallback sentence (`noRateText`); null where a rate
+   *  stands */
+  leveredIrrNote: string | null;
+  unleveredIrrNote: string | null;
   equityMultiple: number | null;
   /** blended rollover cost per expiring SF, the Assumptions-tab lever */
   rolloverCostPsf: number;
@@ -184,6 +198,20 @@ export interface WorkbookCashFlow {
 
 const grow = (base: number, pct: number, yearsElapsed: number) =>
   base * Math.pow(1 + pct, yearsElapsed);
+
+/**
+ * What the workbook's IRR and XIRR cells say where no rate solves their
+ * flows (research pass 35): each is IFERROR-wrapped, so a deal whose flows
+ * never earn the equity back reads a sentence, never #NUM! (Excel) or
+ * Err:523 (LibreOffice). Only what is true of the flows: "never turn
+ * positive" where none of them does — the formula tests MAX(flows) <= 0 —
+ * and otherwise that the search found no rate, which is all an error from
+ * the function says. The workbook writes these strings into its formulas,
+ * and the mirror below says the same where its rate is null.
+ */
+export function noRateText(measure: "IRR" | "XIRR", flows: "levered" | "unlevered", neverPositive: boolean): string {
+  return neverPositive ? `no ${measure}: the ${flows} flows never turn positive` : `no ${measure}: the search found no rate for these flows`;
+}
 
 /** Level monthly payment; mirrors Excel's PMT with the sign flipped positive. */
 export function pmt(loan: number, ratePct: number, amortMonths: number): number {
@@ -322,6 +350,8 @@ export function buildRentRollCashFlow(
 
   const distributions =
     years.reduce((s, y) => s + y.leveredCashFlow, 0) + netSaleProceedsLevered;
+  const leveredIrr = irr(leveredVector);
+  const unleveredIrr = irr(unleveredVector);
 
   return {
     basis,
@@ -337,8 +367,10 @@ export function buildRentRollCashFlow(
     equity,
     unleveredVector,
     leveredVector,
-    leveredIrr: irr(leveredVector),
-    unleveredIrr: irr(unleveredVector),
+    leveredIrr,
+    unleveredIrr,
+    leveredIrrNote: leveredIrr == null ? noRateText("IRR", "levered", Math.max(...leveredVector) <= 0) : null,
+    unleveredIrrNote: unleveredIrr == null ? noRateText("IRR", "unlevered", Math.max(...unleveredVector) <= 0) : null,
     equityMultiple: equity > 0 ? distributions / equity : null,
     rolloverCostPsf: blendedPsf,
   };

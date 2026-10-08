@@ -1,0 +1,17 @@
+{
+  "$note": "Agency lenders' rules a deal's financing turns on, each filed only as the primary source printed it from the GitHub runner (zori.yml probe_url), with the version the source states and the day it was read. A rule here is said as the lender's rule, never as a verdict on a building, and it ages by lib/research-age's rule. lib/condo reads the single-entity limit.",
+  "rules": [
+    {
+      "id": "fannie-single-entity-ownership",
+      "lender": "Fannie Mae",
+      "section": "Selling Guide B4-2.1-03, Ineligible Projects",
+      "version": "2026-08-05",
+      "min_units": 21,
+      "max_share_pct": 20,
+      "exception_max_share_pct": 49,
+      "source": "https://selling-guide.fanniemae.com/sel/b4-2.1-03/ineligible-projects",
+      "as_of": "2026-10-05",
+      "read": "printed by zori probe run 37260966320 from the section dated (08/05/2026): 'Projects in which a single entity (the same individual, investor group, partnership, project sponsor, or corporation) owns more than the following total number of units in the project:' … 'projects with 21 or more units – 20%'; the same section lists conditions under which 'units owned by the single entity represent no more than 49% of the units', among them that 'the single entity is marketing units for sale to further reduce single-entity ownership, with the goal of reducing the concentration to 20% or less of the project units' and 'is current on all HOA assessments'"
+    }
+  ]
+}

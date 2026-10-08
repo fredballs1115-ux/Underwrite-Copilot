@@ -21,6 +21,8 @@
  * A term stated with its options counted in (`ceiling`) is the lease's
  * ceiling, not the lease: the legend says "up to", with the options.
  */
+import { Key, KeyItem } from "@/app/panel-parts";
+
 // On the tenths, and a whole number without its ".0": "40 years", "40.3 years".
 const years = (n: number) => {
   const v = Math.round(n * 10) / 10;
@@ -83,7 +85,7 @@ export function LeaseTermBar({
 
   return (
     <div data-qa="lease-term">
-      <div className="relative h-2.5 overflow-hidden rounded-full bg-faint" aria-hidden>
+      <div className="relative h-3 overflow-hidden rounded-full bg-faint" aria-hidden>
         {hold == null ? (
           <div className="absolute inset-y-0 left-0 bg-brand/60" data-bar="lease-term" style={{ width: pctOf(yearsLeft, whole) }} />
         ) : (
@@ -113,14 +115,13 @@ export function LeaseTermBar({
           />
         )}
       </div>
-      <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
+      <Key>
         {legend.map((l) => (
-          <li key={l.text} className="flex items-center gap-1.5">
-            <span aria-hidden className={`inline-block h-2 w-3 shrink-0 rounded-sm ${l.tone}`} />
+          <KeyItem key={l.text} mark="swatch" tone={l.tone}>
             {l.text}
-          </li>
+          </KeyItem>
         ))}
-      </ul>
+      </Key>
     </div>
   );
 }

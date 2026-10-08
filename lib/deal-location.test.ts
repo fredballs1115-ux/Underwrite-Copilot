@@ -5,6 +5,8 @@ import {
   GEO_VERSION,
   cacheFresh,
   geoKey,
+  placedByOpenStreetMap,
+  pointIsBuilding,
   resolveDealLocation,
   type DealVisualCache,
 } from "./deal-location";
@@ -67,13 +69,65 @@ describe("cacheFresh", () => {
   });
 });
 
+describe("pointIsBuilding (the batch-2 audit)", () => {
+  const placed = (precision: "street" | "block" | "area"): DealVisualCache => ({
+    geoAt: new Date(NOW - 1000).toISOString(),
+    geoV: GEO_VERSION,
+    geoFor: geoKey(ADDR),
+    lat: 38.94,
+    lng: -76.96,
+    geoPrecision: precision,
+    geoSource: precision === "street" ? "census" : "photon",
+  });
+
+  it("rings a street address the geocoder placed at the house", () => {
+    expect(pointIsBuilding(placed("street"), ADDR, NOW)).toBe(true);
+  });
+
+  it("never rings a street's centreline, a town's centre, or a point not placed for this address", () => {
+    expect(pointIsBuilding(placed("block"), ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding(placed("area"), ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding(null, ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding({ ...placed("street"), geoFor: "another address" }, ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding({ ...placed("street"), geoAt: new Date(NOW - 31 * 86_400_000).toISOString() }, ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding({ ...placed("street"), geoMiss: true, lat: undefined, lng: undefined }, ADDR, NOW)).toBe(false);
+    // An address with no street names no building, wherever its point is.
+    const noStreet: StructuredAddress = { ...ADDR, street: "" };
+    expect(pointIsBuilding({ ...placed("street"), geoFor: geoKey(noStreet) }, noStreet, NOW)).toBe(false);
+  });
+});
+
+describe("placedByOpenStreetMap (the batch-2 audit, LOW-8)", () => {
+  const placed = (source: "census" | "photon"): DealVisualCache => ({
+    geoAt: new Date(NOW - 1000).toISOString(),
+    geoV: GEO_VERSION,
+    geoFor: geoKey(ADDR),
+    lat: 38.94,
+    lng: -76.96,
+    geoPrecision: "street",
+    geoSource: source,
+  });
+
+  it("is true where Photon placed the point for this address, and only then", () => {
+    expect(placedByOpenStreetMap(placed("photon"), ADDR, NOW)).toBe(true);
+    expect(placedByOpenStreetMap(placed("census"), ADDR, NOW)).toBe(false);
+    // A point not placed for this address, an old one or a miss says nothing.
+    expect(placedByOpenStreetMap({ ...placed("photon"), geoFor: "another address" }, ADDR, NOW)).toBe(false);
+    expect(placedByOpenStreetMap({ ...placed("photon"), geoAt: new Date(NOW - 31 * 86_400_000).toISOString() }, ADDR, NOW)).toBe(false);
+    expect(placedByOpenStreetMap({ ...placed("photon"), geoMiss: true, lat: undefined, lng: undefined }, ADDR, NOW)).toBe(false);
+    expect(placedByOpenStreetMap(null, ADDR, NOW)).toBe(false);
+  });
+});
+
 describe("resolveDealLocation", () => {
   it("records the precision the geocoder ANSWERED with, not the one the address implied", async () => {
     const { client, writes } = fakeSupabase(null);
     // A street address the geocoder could only place to the block.
     const blockHit: Geocoded = { ...CENSUS, precision: "block", source: "photon" };
     const loc = await resolveDealLocation(client, "d1", ADDR, null, deps(async () => blockHit));
-    expect(loc).toMatchObject({ precision: "block" });
+    // Which geocoder placed it rides with the point, so a map framed on it
+    // credits OpenStreetMap where Photon placed it (the batch-2 audit, LOW-8).
+    expect(loc).toMatchObject({ precision: "block", source: "photon" });
     expect(writes.at(-1)).toMatchObject({
       geoPrecision: "block",
       geoSource: "photon",
@@ -115,7 +169,7 @@ describe("resolveDealLocation", () => {
     const loc = await resolveDealLocation(client, "d1", ADDR, current, deps(async () => { asked++; return CENSUS; }));
     expect(asked).toBe(0);
     expect(writes).toHaveLength(0);
-    expect(loc).toMatchObject({ precision: "street" });
+    expect(loc).toMatchObject({ precision: "street", source: "census" });
   });
 
   it("re-resolves a location cached for another address, and keeps the new one with its address (#441)", async () => {
@@ -164,21 +218,32 @@ describe("resolveDealLocation", () => {
 
   it("merges over the ROW's current cache, not the caller's copy", async () => {
     // The clobber this guards: the geocoder wrote a fresh point, then a
-    // Street View verdict was written by a caller still holding the OLD
-    // cache. Before, the fresh point was lost. Now the row is read first.
-    const staleCopy: DealVisualCache = { status: "none", checkedAt: "2026-01-01T00:00:00Z" };
+    // second writer arrived still holding the OLD cache. Before, the fresh
+    // point was lost. Now the row is read first.
+    const staleCopy: DealVisualCache = { pictureCheckedAt: "2026-01-01T00:00:00Z" };
     const { client, row, writes } = fakeSupabase(staleCopy);
     await resolveDealLocation(client, "d1", ADDR, staleCopy, deps(async () => CENSUS));
-    // Now a second writer arrives with the stale copy and a verdict patch.
+    // Now a second writer arrives with the stale copy and a patch.
     const { writeCache } = await import("./deal-location");
-    await writeCache(client, "d1", staleCopy, { status: "ok", checkedAt: "2026-09-07T12:00:00Z" });
+    await writeCache(client, "d1", staleCopy, { pictureCheckedAt: "2026-09-07T12:00:00Z" });
     expect(row.photo).toMatchObject({
-      lat: CENSUS.lat,      // survived
-      lng: CENSUS.lng,      // survived
-      status: "ok",         // applied
-      geoV: GEO_VERSION,    // survived
+      lat: CENSUS.lat,                          // survived
+      lng: CENSUS.lng,                          // survived
+      pictureCheckedAt: "2026-09-07T12:00:00Z", // applied
+      geoV: GEO_VERSION,                        // survived
     });
     expect(writes).toHaveLength(2);
+  });
+
+  it("drops Google's Street View answer from every write, an older row's included", async () => {
+    // Google's policies prohibit storing its content but for place and
+    // panorama IDs (lib/imagery `fetchStreetViewImage`): an earlier cut
+    // kept the metadata's verdict and the panorama's coordinates.
+    const older: DealVisualCache = { status: "ok", checkedAt: "2026-09-01T00:00:00Z", checkedFor: "38.9,-76.9", panoLat: 38.9001, panoLng: -76.9002 };
+    const { client, row } = fakeSupabase(older);
+    const { writeCache } = await import("./deal-location");
+    await writeCache(client, "d1", older, { status: "ok", pictureCheckedAt: "2026-10-05T00:00:00Z" });
+    expect(row.photo).toEqual({ pictureCheckedAt: "2026-10-05T00:00:00Z" });
   });
 
   it("returns null for a deal with no address, without touching the cache", async () => {

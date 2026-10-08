@@ -189,6 +189,50 @@ describe("readSingleTenant — the one lease the deal is", () => {
     expect(singleTenantModelLine(open, MODEL)).toContain("The tenant's right to end the lease early is already open");
   });
 
+  // Research pass 28: a government lease's firm term was never read. The
+  // tag said "Single tenant, 8 yrs left" and the model line "the lease has 3
+  // years left" at its sale, on a lease the government may leave on notice
+  // once its firm term ends — inside the hold.
+  it("a firm term's end is when the tenant may leave, never the lease's end", () => {
+    const gsa = (firm: Row[]) =>
+      ex([row("Lease expiration", "Sep 30, 2034", "p. 3"), ...firm], {
+        dealName: "Federal Building | Government-Leased Office (GSA)",
+        assetClass: "office",
+        singleTenant: tenant({ tenant: "United States of America (GSA)", guarantor: "", leaseType: "Modified gross" }),
+      });
+    const deal = gsa([row("Firm term expiration", "Sep 30, 2029", "p. 3")]);
+    const r = readSingleTenant(deal, TODAY)!;
+    expect(r.term?.ends).toBe("2034-09-30");
+    expect(r.early?.ends).toBe("2029-09-30");
+    expect(r.effective).toEqual({ ends: "2029-09-30", from: "date", yearsLeft: 3, early: true });
+    expect(singleTenantTag(deal, TODAY)).toBe("Single tenant, may leave in 3 yrs");
+    const line = singleTenantModelLine(r, MODEL);
+    expect(line).toBe(
+      "The lease may end Sep 2029, inside the model's 5-year hold: the model's rent after that is this tenant staying — the tenant's choice, not the buyer's — and its 2.0% vacancy is a market's allowance, not a single tenant's all-or-nothing.",
+    );
+    expect(line).not.toContain("years left");
+    expect(r.headline).toContain("The tenant may end the lease early from Sep 2029");
+    expect(gluedWords(`${r.headline} ${line}`)).toEqual([]);
+    // The firm term's end under the labels a memorandum gives it.
+    for (const label of ["Firm term end", "Firm term ends", "End of firm term", "Lease expiration (firm term)"]) {
+      expect(readSingleTenant(gsa([row(label, "Sep 30, 2029")]), TODAY)?.early?.ends, label).toBe("2029-09-30");
+    }
+    // Listed first, it is never read as the lease's own end, here or in the key terms.
+    const first = ex([row("Lease firm term expiration", "Sep 30, 2029"), row("Lease expiration", "Sep 30, 2034")]);
+    expect(readSingleTenant(first, TODAY)?.term?.ends).toBe("2034-09-30");
+    expect(readSingleTenant(first, TODAY)?.early?.ends).toBe("2029-09-30");
+    expect(singleTenantTermRows(first.metrics).map((m) => m.label)).toContain("Lease expiration");
+    expect(singleTenantTermRows(first.metrics).map((m) => m.label)).not.toContain("Lease firm term expiration");
+    // A firm term stated as a length is no date, and the lease keeps its own end.
+    const length = readSingleTenant(gsa([row("Firm term", "10 years (2019–2029)")]), TODAY)!;
+    expect(length.early).toBeNull();
+    expect(singleTenantTag(gsa([row("Firm term", "10 years")]), TODAY)).toBe("Single tenant, 8 yrs left");
+    // The extraction is asked to file a firm term's end where the reader reads it.
+    expect(extractionInstruction("office" as never)).toContain(
+      `under "Early termination date" exactly as written (a firm term's end, where the lease states one: after its firm term the tenant may leave on notice)`,
+    );
+  });
+
   it("a count of years is counted from today and said to be possibly short", () => {
     const r = readSingleTenant(ex([row("Lease term remaining", "9.5 years")]), TODAY)!;
     expect(r.term?.from).toBe("remaining");
@@ -270,8 +314,9 @@ describe("readSingleTenant — the one lease the deal is", () => {
     }
     // A conversion's new use comes with the works too.
     expect(singleTenantTag(bts("15 years", "conversion"), TODAY)).toBe("Single tenant, 15 yrs from delivery");
-    // A building that stands keeps today's count.
-    expect(singleTenantTag(bts("15 years", "stabilized"), TODAY)).toBe("Single tenant, 15 yrs left");
+    // A building that stands keeps today's count, at most that long: the
+    // memorandum's own date is earlier, so the term may be shorter.
+    expect(singleTenantTag(bts("15 years", "stabilized"), TODAY)).toBe("Single tenant, up to 15 yrs left");
     expect(singleTenantModelLine(readSingleTenant(bts("15 years", "stabilized"), TODAY)!, MODEL)).toMatch(
       /^At the model's sale in 5 years the lease has 10 years left:/,
     );
@@ -353,6 +398,19 @@ describe("readSingleTenant — the one lease the deal is", () => {
     expect(readSingleTenant(ex([row("Annual base rent", "$32,500/month")]), TODAY)?.rent).toBeNull();
     expect(readSingleTenant(ex([row("Base rent", "$20.42/SF")]), TODAY)?.rent).toBeNull();
     expect(readSingleTenant(ex([row("Annual base rent", "$245,000 ($20.42 PSF)")]), TODAY)?.rent).toBe(245_000);
+  });
+
+  it("reads a base rent with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no rent.
+    expect(readSingleTenant(ex([row("Annual base rent", "$468,000 (flat, 10-year primary term remaining)")]), TODAY)?.rent).toBe(468_000);
+    expect(readSingleTenant(ex([row("Annual base rent", "$468,000 - $490,000")]), TODAY)?.rent).toBeNull();
+  });
+
+  it("reads a base rent with its increases after a dash (audit C3a)", () => {
+    // Any dash and digit had read as a range, so the stated rent was none.
+    expect(readSingleTenant(ex([row("Annual base rent", "$540,000 – 2% annual increases")]), TODAY)?.rent).toBe(540_000);
+    expect(readSingleTenant(ex([row("Annual base rent", "$540,000 — 10% every 5 years")]), TODAY)?.rent).toBe(540_000);
+    expect(readSingleTenant(ex([row("Annual base rent", "$540,000 – $560,000")]), TODAY)?.rent).toBeNull();
   });
 
   it("a page is cited only inside the memorandum", () => {
@@ -440,5 +498,77 @@ describe("the lease on every summary", () => {
     expect(r.rating?.grade).toBe("investment");
     expect(r.early?.ends).toBe("2033-12-31");
     expect(readSingleTenant(ex([row("Lease term remaining", "7 years")]), TODAY)?.term?.from).toBe("remaining");
+  });
+});
+
+// Research pass 41 (M7): two labels of other families read as the lease's.
+describe("another family's label is never the lease's (research pass 41)", () => {
+  it("reads no star rating as the tenant's credit", () => {
+    const snf = ex(
+      [
+        row("Annual base rent", "$1,450,000", "p. 5"),
+        row("Lease expiration", "December 31, 2038", "p. 5"),
+        row("CMS star rating", "3 stars (August 2026)", "p. 7"),
+      ],
+      { assetClass: "Skilled Nursing Facility", singleTenant: tenant({ tenant: "Buckeye Care Operations, LLC", guarantor: "Buckeye Care Holdings" }) },
+    );
+    const r = readSingleTenant(snf, TODAY)!;
+    expect(r.rating).toBeNull();
+    expect(r.headline).not.toContain("3 stars");
+    // The tenant's own rating, by an agency's name or bare, still reads.
+    for (const label of ["Tenant credit rating", "Guarantor credit rating", "S&P rating", "Rating"]) {
+      expect(readSingleTenant(ex([row(label, "BBB- (S&P)")]), TODAY)!.rating?.grade, label).toBe("investment");
+    }
+  });
+
+  it("reads no preferred equity position's extension options as the tenant's renewal options", () => {
+    const position = {
+      kind: "preferred_equity" as const,
+      summary: "Preferred equity in the entity owning a Walgreens",
+      share: "",
+      groundLease: "",
+      loan: "",
+      page: "p. 4",
+    };
+    const pref = ex(
+      [
+        row("Preferred equity amount", "$2,000,000"),
+        row("Extension options", "One 12-month extension of the redemption at a 50 bp fee"),
+        row("Lease expiration", "March 31, 2034"),
+      ],
+      { interest: position },
+    );
+    const r = readSingleTenant(pref, TODAY)!;
+    expect(r.term?.ends).toBe("2034-03-31");
+    expect(r.term?.options).toBeNull();
+    expect(r.headline).not.toContain("redemption");
+    // The tenant's options under the lease's own words still read.
+    for (const label of ["Renewal options", "Lease extension options", "Renewal and extension options"]) {
+      expect(readSingleTenant(ex([row("Lease expiration", "March 31, 2034"), row(label, "Four 5-year options")]), TODAY)!.term?.options, label).toEqual({
+        years: 20,
+        how: "four of 5 years",
+      });
+    }
+  });
+});
+
+describe("a sandwich position's master lease is never its subtenant's lease (research pass 28)", () => {
+  it("reads the subtenant's own lease on a master leasehold, and a net lease's master lease as the tenant's", () => {
+    const master = {
+      kind: "leasehold" as const,
+      summary: "Leasehold interest under a master lease of the building, sublet to one tenant",
+      share: "",
+      groundLease: "Master lease of the building from its owner",
+      loan: "",
+      page: "",
+    };
+    // The master lease's end and its remaining term listed first: the
+    // subtenant's lease is read from its own row.
+    const rows = [row("Master lease expiration", "December 31, 2041"), row("Master lease term remaining", "15 years"), row("Lease expiration", "March 31, 2036")];
+    expect(readSingleTenant(ex(rows, { interest: master }), TODAY)!.term?.ends).toBe("2036-03-31");
+    // Only the master lease's end stated: nothing is read for the subtenant.
+    expect(readSingleTenant(ex([row("Master lease expiration", "December 31, 2041")], { interest: master }), TODAY)!.term).toBeNull();
+    // A net lease's master lease, on a building sold outright, is the tenant's.
+    expect(readSingleTenant(ex([row("Master lease expiration", "December 31, 2041")]), TODAY)!.term?.ends).toBe("2041-12-31");
   });
 });

@@ -40,6 +40,9 @@ describe("the pipeline's news strip", () => {
     const text = visibleText(html);
     expect(text).toContain("CRE news");
     expect(text).not.toMatch(/your markets/i);
+    // The scores are one buyer profile's, said where they are read
+    // (research pass 32), never relevance to the reader.
+    expect(text).toContain("AI-scored for a small East Coast 2–4 unit buyer, not your buy box");
     // Each story's day is UTC's, and says so (lib/utc-day, the helper
     // /market's intel prints through): a bare day read as the reader's was a
     // day late for a story a feed dated in a US evening.

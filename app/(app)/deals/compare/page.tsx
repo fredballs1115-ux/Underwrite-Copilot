@@ -5,7 +5,10 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxCheckSource, evaluateBuyBox, screenYearOf, type BuyBox } from "@/lib/criteria";
+import { buyBoxCoverage, evaluateBuyBox, screenYearOf, type BuyBox, type BuyBoxCoverage } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { scoreMandateFit } from "@/lib/mandate";
+import { checkedSentence } from "@/lib/fit-label";
 import { CompareTable, MODEL_ROWS_NOTE, usd, type Col } from "./compare-table";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
@@ -19,7 +22,9 @@ import { seedBenchmarks } from "@/lib/research-data";
 import { asOfLabel } from "@/lib/research";
 import { findPriceMetric, inferStrategy, noiFigures } from "@/lib/deal-strategy";
 import { dealTypeLabel } from "@/lib/interest";
-import { bannerSources } from "@/lib/deal-banner";
+import { bannerSources, pictureVersion } from "@/lib/deal-banner";
+import { coverFor, coverPlace } from "@/lib/deal-cover";
+import { marketPictureFor } from "@/lib/market-picture";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
@@ -34,11 +39,22 @@ import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
+import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
+import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseTag } from "@/lib/mixed-use";
+import { goingConcernTag } from "@/lib/going-concern";
+import { condoTag } from "@/lib/condo";
+import { sandwichTag } from "@/lib/sandwich-lease";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
+import { withheldWord } from "@/lib/compare-interest";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
+import { placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
-import { verdictBehind, type JobLike } from "@/lib/screen-run";
+import { screenedOn, verdictBehind, type JobLike } from "@/lib/screen-run";
+import { COMPARE_MAX } from "@/lib/link-limits";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -59,6 +75,9 @@ function toCol(
   tenYearPct: number | null,
   googleEnabled: boolean,
   job: JobLike | null,
+  /** the reader's own day (lib/reader-day), which decides the rent
+   *  allowance in force */
+  today: string,
 ): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
@@ -74,6 +93,15 @@ function toCol(
     (stored as StructuredAddress | null) ??
     null;
   const picture = ((deal as { photo?: unknown }).photo as DealVisualCache | null)?.picture ?? null;
+  // The class the deal was filed under ("auto" where the analyst left it to
+  // the deck) — never printed as it stands: the column shows the deal's one
+  // class through `shownAssetClass`.
+  const filedClass = (deal.asset_class as string | null) ?? null;
+  // The same placement the pipeline and the deal page make (lib/market-
+  // county, #447) — all three surfaces agree, a county-placed deal naming
+  // its county.
+  const storedFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+  const placed = placeDeal(address, countyOf(address, siteFlagsStale(storedFlags, address?.label) ? null : storedFlags));
 
   // A plan deal's generated model books dark years first, so its year-1 cap
   // is negative or a default — not a figure to compare on, and not one to
@@ -85,9 +113,16 @@ function toCol(
   // struck on the whole its price implies, and returns the price did not
   // buy are withheld rather than set beside buildings' (lib/compare-interest).
   // Where the first-draft model has no figure, the memorandum's own: the
-  // header's yield on cost, the pipeline card's going-in cap, each said as
+  // header's yield on cost, the pipeline card's going-in cap — the first
+  // signal's where the memorandum states none, as on both — each said as
   // the memorandum's (lib/compare-figures).
-  const figs = compareReturns(ex, r ?? null, strat);
+  // Read on the reader's own day, as the pipeline card reads them: a note's
+  // yield to its maturity and what the price buys (a leasehold's years
+  // left) had read the clock.
+  const asOf = new Date(`${today}T12:00:00Z`);
+  // The model's own hold rides with its returns: a leasehold whose lease
+  // ends inside it has its returns withheld (research pass 38).
+  const figs = compareReturns(ex, r ? { ...r, holdYears: model?.holdYears ?? null } : null, strat, asOf, signal);
   const planDeal = figs.planDeal;
   const cap = figs.cap;
   // The price and the year-1 NOI: the model's, else the memorandum's — the
@@ -100,11 +135,13 @@ function toCol(
   const statedNoi = goingInNoiText(ex);
 
   // Mandate fit — same engine, the same inputs and the same inferred kind
-  // as the pipeline and deal page, so a development's land cost is judged
-  // by the fit call printed beside it.
+  // as the pipeline and deal page (lib/buy-box-chip `dealCheckSource`), so a
+  // development's land cost is judged by the fit call printed beside it, and
+  // a cap the column withholds is held to no floor.
   let fit: Col["fit"] = null;
   let fitNote: string | null = null;
-  const checkSource = box ? buyBoxCheckSource(ex, signal, address, strat.kind) : null;
+  let fitCoverage: BuyBoxCoverage | null = null;
+  const checkSource = box ? dealCheckSource(ex, signal, address) : null;
   if (box && checkSource) {
     const checks = evaluateBuyBox(deal.asset_class, checkSource, box);
     const misses = checks.filter((c) => c.status === "miss");
@@ -118,6 +155,13 @@ function toCol(
     } else if (checks.some((c) => c.status === "pass")) {
       fit = "fits";
     }
+    // How many of the box's criteria the fit stands on, and which could not
+    // be checked, as the pipeline card and the meeting workbook say it
+    // (lib/criteria `buyBoxCoverage`, lib/fit-label) — the mandate-fit
+    // score's cash-on-cash floor and red lines counted with the checks.
+    fitCoverage = buyBoxCoverage(checks, scoreMandateFit(deal.asset_class, checkSource, box));
+    const checked = fit ? checkedSentence(fitCoverage) : null;
+    if (checked) fitNote = fitNote ? `${fitNote}. ${checked}` : checked;
   }
 
   return {
@@ -128,29 +172,24 @@ function toCol(
     // a deal the extraction has read.
     assetClass: shownAssetClass(deal.asset_class, ex),
     market: ex?.market || "—",
-    // The same placement the pipeline and the deal page make (lib/market-
-    // county, #447) — all three surfaces agree, a county-placed deal naming
-    // its county.
-    ...(() => {
-      const stored = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
-      const flags = siteFlagsStale(stored, address?.label) ? null : stored;
-      const placed = placeDeal(address, countyOf(address, flags));
-      return {
-        coveredMarket: placed.briefed?.name ?? null,
-        readMarket: placed.read?.name ?? null,
-        readCounty: placed.placedBy?.county ?? null,
-      };
-    })(),
+    coveredMarket: placed.briefed?.name ?? null,
+    readMarket: placed.read?.name ?? null,
+    readCounty: placed.placedBy?.county ?? null,
     verdict: verdict?.verdict ?? null,
+    // The day that call was written (lib/screen-run `screenedOn`), none
+    // without a call — never the day the deal was added.
+    screened: verdict?.verdict ? screenedOn(verdict.generatedAt) : null,
     reason: verdict?.reason ?? null,
     // A re-screen still running, or one that failed before its verdict,
     // leaves the call on file the previous screen's (lib/screen-run, the
     // reader the memo, the report, the shared screen and the meeting
     // workbook ask): marked as the run, never crowned "best".
     behind: verdictBehind(job),
+    hasOm: !!(deal as { om_storage_path?: string | null }).om_storage_path,
     hasModel: model != null,
     fit,
     fitNote,
+    fitCoverage,
     // Whose strategy it is on a note or a leased fee, as the deal header
     // says it (lib/interest `dealTypeLabel`).
     strategy: strat.kind === "unknown" ? null : dealTypeLabel(strat.label, ex),
@@ -160,8 +199,10 @@ function toCol(
     coc: figs.withheld ? null : (r?.cashOnCashPct ?? null),
     cap,
     capFrom: figs.capFrom,
+    capWithheld: figs.capWithheld,
     yoc: figs.yoc,
     yocFrom: figs.yocFrom,
+    yocWithheld: figs.yocWithheld,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap
     // this table shows one row above — never a differently-sourced number.
     leverage: cap != null && bench30 != null ? leverageRead(cap, bench30) : null,
@@ -170,20 +211,49 @@ function toCol(
     capOverTenYear: cap != null && tenYearPct != null ? capSpreadRead(cap, tenYearPct) : null,
     interest: figs.tag,
     affordable: affordableTag(ex),
-    tenancy: singleTenantTag(ex),
-    roster: rosterTag(ex),
+    tenancy: singleTenantTag(ex, asOf),
+    roster: rosterTag(ex, asOf),
     valueAdd: valueAddTag(ex),
-    abatement: taxAbatementTag(ex),
+    abatement: taxAbatementTag(ex, asOf),
     sellerNote: sellerFinancingTag(ex),
-    reports: siteReportsTag(ex),
+    reports: siteReportsTag(ex, asOf),
     broker: brokerageOf(ex),
     student: studentHousingTag(ex),
     mh: manufacturedHousingTag(ex, Infinity),
     storage: selfStorageTag(ex, Infinity),
-    hotel: hotelTag(ex),
-    sale: saleTag(ex),
+    // The rent rules that reach the building, read through the one call
+    // every surface makes (lib/rent-regulation `regulationForDeal`) at the
+    // address the column is placed at. It is handed the class the deal was
+    // filed under and reads the deal's one class itself (`shownAssetClass`).
+    regulation: regulationTag(
+      regulationForDeal(
+        {
+          extraction: ex,
+          address,
+          siteFlags: (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null,
+          assetClass: filedClass,
+        },
+        today,
+      ),
+    ),
+    // A forward purchase (lib/forward-purchase), read on the reader's day
+    // with the kind the column reads.
+    forward: forwardTag(readForwardPurchase(ex, asOf, strat)),
+    // A mixed-use building's commercial share (lib/mixed-use).
+    mixedUse: mixedUseTag(ex, asOf),
+    // An operating business on its real estate (lib/going-concern).
+    goingConcern: goingConcernTag(ex, asOf),
+    // Condominium units bought in bulk (lib/condo).
+    condo: condoTag(ex, asOf),
+    // A sandwich position's spread (lib/sandwich-lease).
+    sandwich: sandwichTag(ex, asOf),
+    hotel: hotelTag(ex, asOf),
+    sale: saleTag(ex, asOf),
     noteYtm: figs.noteYtmPct,
+    // A note under water has no yield to compare either (research pass 38).
+    noteUnderWater: figs.underWater === true,
     withheld: figs.withheld,
+    withheldWord: withheldWord(figs),
     // FEMA's zone at the building from the stored site-flags lookup (#426);
     // blank before it has answered, never a guess.
     flood: floodCell(
@@ -198,13 +268,30 @@ function toCol(
     noiFrom: modelNoi ? "model" : statedNoi ? "om" : null,
     // Each building pictured at the head of its column (#418): its own
     // photograph where the deal has one cached, then Street View, then the
-    // USGS aerial — each pinned, so its credit is the picture on screen.
+    // USGS aerial — each pinned, so its credit is the picture on screen. The
+    // overhead stays here, where two columns' overheads tell two buildings
+    // apart (lib/deal-banner); no market photograph.
     pictures: bannerSources({
       dealId: deal.id,
       pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+      // Its colours before its pixels (#463), as on its pipeline card.
+      picturePreview: picture?.preview ?? null,
+      pictureVersion: picture ? pictureVersion(picture.hero) : null,
       googleEnabled,
       hasStreetAddress: !!address?.street,
+      // Ringed only where the point is the building's (the batch-2 audit).
+      pointIsBuilding: pointIsBuilding((deal.photo as DealVisualCache | null) ?? null, address),
+      // Photon placed the point: the aerial's credit names OpenStreetMap.
+      osmPlaced: placedByOpenStreetMap((deal.photo as DealVisualCache | null) ?? null, address),
       hasAddress: !!address?.label,
+    }),
+    // The deal's cover (#442), built as the pipeline page builds it, so the
+    // column wears the drawing its card wears: under a picture while it
+    // loads, and in place of the blank plate where no picture answers.
+    cover: coverFor({
+      seed: deal.id,
+      assetClass: shownAssetClass(deal.asset_class, ex),
+      place: coverPlace(address, marketPictureFor(address, ex?.market ?? null, placed.briefed ?? placed.read, placed.county)?.name, ex?.market),
     }),
   };
 }
@@ -219,7 +306,7 @@ export default async function ComparePage({
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, COMPARE_MAX);
 
   const supabase = await createSupabaseServerClient();
   const { data } = ids.length
@@ -276,6 +363,9 @@ export default async function ComparePage({
     seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"),
   );
   const tenYearPct = debt.tenYear?.pct ?? null;
+  // Today on the reader's own calendar (lib/reader-day), read once per
+  // request: each column's rent rules read the allowance in force on it.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   const cols = (rows as Scoped[]).map((d) =>
     toCol(
@@ -283,8 +373,12 @@ export default async function ComparePage({
       boxByScope.get(scopeKey(d)) ?? null,
       bench30?.value ?? null,
       tenYearPct,
-      !!process.env.GOOGLE_MAPS_API_KEY,
+      // Never Google's: the columns draw USGS aerials beside each other, and
+      // Google's terms forbid Street View beside a non-Google map (zori probe
+      // run 37266021924).
+      false,
       jobByDeal.get(d.id) ?? null,
+      todayIso,
     ),
   );
 

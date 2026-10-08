@@ -43,6 +43,11 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   invite: { cls: "bg-kill/10 text-kill", text: "Couldn't create the invite — please try again." },
   remove: { cls: "bg-kill/10 text-kill", text: "Couldn't remove that member — please try again." },
   leave: { cls: "bg-kill/10 text-kill", text: "Couldn't leave the team — please try again." },
+  // The departing member's share links on the team's other deals are revoked
+  // before the seat goes (lib/teams); where that could not be done, the seat
+  // stays and the page says why.
+  removelinks: { cls: "bg-kill/10 text-kill", text: "Couldn't revoke the share links that member made for the team's deals, so they are still on the team — please try again." },
+  leavelinks: { cls: "bg-kill/10 text-kill", text: "Couldn't revoke the share links you made for your teammates' deals, so you are still on the team — please try again." },
   ownerleave: { cls: "bg-kill/10 text-kill", text: "Owners can't leave their own team. Transfer isn't supported yet — email underwritecopilot.support@gmail.com and we'll handle it." },
   config: TEAM_UNAVAILABLE,
   save: { cls: "bg-kill/10 text-kill", text: "Couldn't save the team's billing profile — please try again." },
@@ -203,7 +208,7 @@ export default async function TeamPage({
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   team.planActive
-                    ? "bg-pass/15 text-pass"
+                    ? "bg-pass/10 text-pass"
                     : "bg-faint text-muted"
                 }`}
               >

@@ -165,7 +165,7 @@ export function DealTasks({
             required
             maxLength={TASK_TITLE_MAX}
             placeholder="e.g. Request trailing-12 financials from the broker"
-            className="min-w-[200px] flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30"
+            className="min-w-[200px] flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
           />
           <select
             name="assignee"

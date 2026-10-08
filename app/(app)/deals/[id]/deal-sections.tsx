@@ -4,8 +4,11 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { placedByClause } from "@/lib/placed-by";
+import { andList, figureHolders } from "@/lib/region-line";
+import { stressTestTitle } from "@/lib/stress-test-title";
 import { currentBriefLine } from "@/lib/permit-split";
-import { screenedOn } from "@/lib/screen-run";
+import { screenedOn, type BehindWhy } from "@/lib/screen-run";
+import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { PendingButton } from "../../pending-button";
 import {
   addSupplementNote,
@@ -257,6 +260,7 @@ function RevealList({
         <button
           type="button"
           onClick={() => setOpen(!open)}
+          aria-expanded={open}
           className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand transition-colors hover:text-brand-strong"
         >
           {open ? "Show less" : `Show ${hidden} ${noun}`}
@@ -329,7 +333,10 @@ export function deriveRisks(results: Results): RiskItem[] {
       const share = incomeGapShare(r);
       risks.push({
         severity: share != null && share <= NOI_IN_LINE_BAND ? "low" : "high",
-        title: `${r.metric}: model less favorable than the OM`,
+        // "Your model": the reader's own underwriting, which the reconciler
+        // reads — never the OM's pro forma nor the site's engine, which the
+        // same page also calls a model (research pass 32).
+        title: `${r.metric}: your model less favorable than the OM`,
         detail: r.gap,
         source: "Reconciler",
         tab: "reconciler",
@@ -397,6 +404,7 @@ export function OverviewView({
   onNavigate,
   stale = [],
   staleWhy = "failed",
+  stopped = false,
 }: {
   results: Results;
   active: boolean;
@@ -408,8 +416,14 @@ export function OverviewView({
   /** results the latest screen has not rewritten — the previous screen's
    *  (lib/screen-run `previousScreenResults`) */
   stale?: ReadonlyArray<keyof Results>;
-  /** why: the latest screen failed before them, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: the latest screen failed before them, is still running, or
+   *  stopped making progress before them */
+  staleWhy?: BehindWhy;
+  /** the latest screen stopped before its end (lib/screen-run
+   *  `screenStopped`): what is missing is missing because it stopped, and
+   *  the reason is at the top of the page — never "no concerns", which
+   *  reads as a clean result */
+  stopped?: boolean;
 }) {
   const risks = deriveRisks(results);
   const counts = { high: 0, medium: 0, low: 0 };
@@ -448,7 +462,9 @@ export function OverviewView({
           <p className="mt-1 text-sm text-muted">
             {active
               ? "The verdict and risk digest will appear here as the analysis completes."
-              : "Run the analysis to see the verdict and the consolidated risk digest."}
+              : stopped
+                ? "The screen stopped before its verdict — the reason is at the top of the page."
+                : "Run the analysis to see the verdict and the consolidated risk digest."}
           </p>
         </div>
       )}
@@ -494,7 +510,9 @@ export function OverviewView({
             <p className="mt-2 text-xs leading-relaxed text-caution">
               {staleWhy === "running"
                 ? `${staleCount} of these are from the previous screen — the run in progress replaces each as it reaches it.`
-                : `${staleCount} of these are from the previous screen — the latest run failed before reaching them. Run it again to bring them up to date.`}
+                : staleWhy === "stalled"
+                  ? `${staleCount} of these are from the previous screen — the latest run stopped making progress before reaching them. Start it again to bring them up to date.`
+                  : `${staleCount} of these are from the previous screen — the latest run failed before reaching them. Run it again to bring them up to date.`}
             </p>
           )}
         </div>
@@ -525,7 +543,9 @@ export function OverviewView({
           <p className="mt-3 text-sm text-muted">
             {active
               ? "Concerns will collect here as each section completes."
-              : "No concerns surfaced yet."}
+              : stopped
+                ? "Nothing to digest yet — the screen stopped before it finished."
+                : "No concerns surfaced yet."}
           </p>
         ) : (
           <div className="mt-3">
@@ -690,11 +710,15 @@ export function ChallengerView({
   result,
   dealName,
   totalPages = null,
+  sample = false,
 }: {
   result: ChallengerResult;
   dealName?: string;
   /** the memorandum's own length: a cited page past it is never sent */
   totalPages?: number | null;
+  /** the sample deal: its stress test's figures are the first-draft
+   *  model's, and the heading says so (lib/stress-test-title) */
+  sample?: boolean;
 }) {
   const ordered = [...(result.challenges ?? [])].sort(
     (a, b) => SEV[a.severity].rank - SEV[b.severity].rank,
@@ -725,7 +749,10 @@ export function ChallengerView({
         <div className="mt-3 rounded-xl border border-line bg-paper p-4">
           <div className="flex items-center gap-2 text-brand">
             <IconActivity className="h-4 w-4" />
-            <p className="text-sm font-medium text-ink">Stress test</p>
+            {/* Whose figures they are, as the full report heads them: the
+                challenger's estimate, or the sample's first-draft model's
+                (research pass 40, M8). */}
+            <p className="text-sm font-medium text-ink" data-qa="stress-test-title">{stressTestTitle(sample)}</p>
           </div>
           <p className="mt-1.5 text-sm leading-relaxed text-muted">
             {result.stressTest}
@@ -966,8 +993,14 @@ export function BrokerComps({
               kind: "web",
               name: c.name,
               detail: [c.detail, c.date].filter(Boolean).join(" · "),
-              sourceLabel: c.sourceName || "Public source",
-              sourceHref: c.sourceUrl || null,
+              // Linked only where the source is a page the search returned
+              // (lib/anthropic/search-sources); otherwise its name alone,
+              // said unverified.
+              sourceLabel:
+                c.sourceInSearch === true
+                  ? c.sourceName || "Public source"
+                  : `${c.sourceName || "Public source"} (unverified)`,
+              sourceHref: c.sourceInSearch === true ? c.sourceUrl || null : null,
               queries: geocodeCandidates(
                 c.name,
                 c.detail ?? "",
@@ -1137,8 +1170,13 @@ function PublicWebComps({
                       {c.note}
                     </p>
                   )}
-                  {/* LLM-sourced URL — only http(s) ever becomes a link. */}
-                  {safeHttpUrl(c.sourceUrl) && (
+                  {/* A source becomes a link only where it is a page the
+                      search returned, at the search's own address, and then
+                      only an http(s) one (lib/anthropic/search-sources). A
+                      source the model named that the search did not return,
+                      or one stored before the check, is its name in words,
+                      said unverified — never a link. */}
+                  {c.sourceInSearch === true && safeHttpUrl(c.sourceUrl) ? (
                     <a
                       href={safeHttpUrl(c.sourceUrl)!}
                       target="_blank"
@@ -1147,7 +1185,15 @@ function PublicWebComps({
                     >
                       {c.sourceName || "Source"} →
                     </a>
-                  )}
+                  ) : c.sourceName ? (
+                    <p className="mt-1.5 text-xs text-muted" data-qa="source-unverified">
+                      {`${c.sourceName} · unverified, ${
+                        c.sourceInSearch === false
+                          ? "not a page the search returned"
+                          : "not checked against the search's pages"
+                      }`}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1568,6 +1614,9 @@ export function MarketCheck({
   // A portfolio across markets (#413): each other market's own figures,
   // folded under the address's the same way.
   const others = (result.otherBriefs ?? []).filter((b) => b.lines.length > 0);
+  // A covered market whose figures could not be read that day: said so,
+  // never read like a market outside the covered ones (research pass 30).
+  const readFailed = !brief ? liveReadFailedLine(result.liveReadFailed) : null;
   return (
     <section className="space-y-4">
       <SectionHeader
@@ -1577,11 +1626,20 @@ export function MarketCheck({
             {others.length > 0
               ? `rules of thumb, read beside each market's published figures`
               : brief
-                ? `rules of thumb, read beside ${brief.grain === "state" ? "the state's" : "the metro's"} published figures`
-                : "rules-of-thumb, not pulled comps"}
+                ? `rules of thumb, read beside ${
+                    brief.lines.length > 0 && (brief.national ?? 0) >= brief.lines.length ? "the nation's" : brief.grain === "state" ? "the state's" : "the metro's"
+                  } published figures`
+                : readFailed
+                  ? "rules of thumb — the published figures were not read"
+                  : "rules-of-thumb, not pulled comps"}
           </span>
         }
       />
+      {readFailed && (
+        <p className="rounded-xl border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-caution" data-qa="live-read-failed">
+          {readFailed}
+        </p>
+      )}
       {result.summary && <Callout>{result.summary}</Callout>}
       {brief && brief.lines.length > 0 && <LiveBriefRead brief={brief} />}
       {others.map((b) => (
@@ -1679,7 +1737,11 @@ function briefCount(brief: NonNullable<MarketResult["liveBrief"]>): string {
   const n = brief.lines.length;
   const nat = Math.min(Math.max(brief.national ?? 0, 0), n);
   const whose = brief.grain === "state" ? "the state’s rather than any metro’s" : "the metro’s rather than the submarket’s";
-  const split = nat > 0 ? `each dated: ${n - nat} ${whose} and ${nat} the nation’s` : `each dated, each ${whose}`;
+  // Whose each line is, counted: the market's own, a Census region's
+  // rental vacancy (the region's, said so — audit C4, L7) and the nation's.
+  const holders = figureHolders(brief.lines, nat, whose, "’");
+  // Every line the nation's: no figure of the market's own was current.
+  const split = nat >= n ? "each dated, each the nation’s" : holders.length > 1 ? `each dated: ${andList(holders)}` : `each dated, each ${whose}`;
   const tail = brief.portfolio
     ? ", and never the portfolio’s"
     : brief.grain === "state"
@@ -1697,13 +1759,20 @@ function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]
       ? ` — where ${pf.here} of the ${pf.of} properties ${pf.here === 1 ? "sits" : "sit"}`
       : ` — the address on file, where none of the ${pf.of} properties sits`
     : "";
+  // A block of the nation's lines alone: none of the market's own figures
+  // was current, and the heading says so rather than "own figures".
+  const noneOwn = (brief.national ?? 0) >= brief.lines.length;
   return (
     <details className="rounded-xl border border-line bg-paper px-4 py-3 text-sm">
       <summary className="cursor-pointer list-none text-muted [&::-webkit-details-marker]:hidden">
         <span className="font-medium text-ink">
-          {brief.grain === "state"
-            ? `Read beside the state of ${brief.metro}’s own figures${where}`
-            : `Read beside the ${brief.metro} market’s own figures${where}${placedByClause(brief.placedBy)}`}
+          {noneOwn
+            ? brief.grain === "state"
+              ? `Read beside the nation’s figures — none of the state of ${brief.metro}’s own was current${where}`
+              : `Read beside the nation’s figures — none of the ${brief.metro} market’s own was current${where}${placedByClause(brief.placedBy)}`
+            : brief.grain === "state"
+              ? `Read beside the state of ${brief.metro}’s own figures${where}`
+              : `Read beside the ${brief.metro} market’s own figures${where}${placedByClause(brief.placedBy)}`}
         </span>
         <span>{briefCount(brief)}</span>
       </summary>
@@ -1846,7 +1915,7 @@ const VERDICT = {
     word: "Go",
     sub: "Worth deeper work",
     tint: "from-pass/10",
-    iconBg: "bg-pass/15 text-pass",
+    iconBg: "bg-pass/10 text-pass",
     wordCls: "text-pass",
     rail: "border-l-pass",
     Icon: IconCheck,
@@ -1855,7 +1924,7 @@ const VERDICT = {
     word: "Caution",
     sub: "Proceed only with named conditions",
     tint: "from-caution/10",
-    iconBg: "bg-caution/15 text-caution",
+    iconBg: "bg-caution/10 text-caution",
     wordCls: "text-caution",
     rail: "border-l-caution",
     Icon: IconAlert,
@@ -1954,8 +2023,9 @@ function VerdictHero({
   /** the latest screen has not re-run the verdict — this call was written
    *  about the terms as they were before that run */
   stale?: boolean;
-  /** why: that screen failed before the verdict, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: that screen failed before the verdict, is still running, or
+   *  stopped making progress on the way */
+  staleWhy?: BehindWhy;
   onMore?: () => void;
 }) {
   const v = VERDICT[result.verdict] ?? VERDICT.caution;
@@ -1985,7 +2055,9 @@ function VerdictHero({
               title={
                 staleWhy === "running"
                   ? "A new screen of this deal is running. This call was written about the terms as they stood before it — the run replaces it when it reaches the verdict."
-                  : "The latest screen failed before it reached the verdict. This call was written about the terms as they stood before that run — run the screen again to refresh it."
+                  : staleWhy === "stalled"
+                    ? "The latest screen stopped making progress before it reached the verdict. This call was written about the terms as they stood before that run — start the screen again to refresh it."
+                    : "The latest screen failed before it reached the verdict. This call was written about the terms as they stood before that run — run the screen again to refresh it."
               }
             >
               From the previous screen
@@ -2070,8 +2142,9 @@ export function VerdictView({
   result: VerdictResult;
   /** the latest screen has not re-run the verdict */
   stale?: boolean;
-  /** why: that screen failed before the verdict, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: that screen failed before the verdict, is still running, or
+   *  stopped making progress on the way */
+  staleWhy?: BehindWhy;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -2248,6 +2321,9 @@ function RangeCard({ r: stored }: { r: ScreenRange }) {
   );
 }
 
+/** A screen range's base cell: the brand's tint on white, opaque. */
+export const BASE_CELL = "bg-[color-mix(in_oklab,var(--color-brand)_10%,var(--color-surface))]";
+
 function RangeCell({
   label,
   value,
@@ -2258,7 +2334,10 @@ function RangeCell({
   emphasized?: boolean;
 }) {
   return (
-    <div className={`px-3 py-2 ${emphasized ? "bg-brand/10" : "bg-surface"}`}>
+    // The base's tint is mixed with white rather than laid over the grid's
+    // line colour, which showed through a 10% tint and took the label to
+    // 3.7:1 (research pass 33).
+    <div className={`px-3 py-2 ${emphasized ? BASE_CELL : "bg-surface"}`}>
       <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
       <p
         className={`mt-0.5 font-mono tabular-nums ${
@@ -2452,13 +2531,29 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
   );
 }
 
-export function RetryForm({ dealId, label }: { dealId: string; label: string }) {
+export function RetryForm({
+  dealId,
+  label,
+  className = "mt-3",
+  secondary = false,
+}: {
+  dealId: string;
+  label: string;
+  /** the form's own spacing — none where it sits in a row of actions */
+  className?: string;
+  /** drawn as the second of two actions, beside a primary one */
+  secondary?: boolean;
+}) {
   return (
-    <form action={rerunAnalysis} className="mt-3">
+    <form action={rerunAnalysis} className={className}>
       <input type="hidden" name="dealId" value={dealId} />
       <PendingButton
         pendingLabel="Starting the screen…"
-        className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+        className={
+          secondary
+            ? "rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+            : "rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+        }
       >
         {label}
       </PendingButton>

@@ -124,7 +124,7 @@ export default async function AccountPage({
           <div className="flex items-center gap-3">
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                isPro ? "bg-pass/15 text-pass" : "bg-faint text-muted"
+                isPro ? "bg-pass/10 text-pass" : "bg-faint text-muted"
               }`}
             >
               {isPro ? "Pro" : "Free"}

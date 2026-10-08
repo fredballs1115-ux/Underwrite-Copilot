@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { BASEMAPS, BASEMAP_ORDER, type BasemapId } from "@/lib/basemaps";
+import { BASEMAPS, BASEMAP_ORDER, OSM_ATTRIBUTION, type BasemapId } from "@/lib/basemaps";
 import {
   MAX_TO_PLACE,
   PIN_LABEL,
@@ -12,8 +12,10 @@ import {
   pinColor,
   pinHtml,
   pinTapAction,
+  pinTitle,
   placementLine,
   partitionForMap,
+  osmPlacedAny,
   previewHtml,
   tooltipHtml,
   type MapDeal,
@@ -37,6 +39,11 @@ import {
  */
 const BASE_DEFAULT: BasemapId = "hybrid";
 const CONCURRENCY = 3;
+/** How long the hover card waits, once the pointer leaves the pin or the
+ *  card, before it closes: long enough to cross the gap between the two
+ *  (the card's arrow takes no pointer), so the card can be hovered
+ *  (WCAG 1.4.13). */
+const CARD_CLOSE_DELAY_MS = 300;
 
 export function PipelineMap({
   deals,
@@ -145,8 +152,19 @@ export function PipelineMap({
       });
       setReady(true);
     })();
+    // Escape dismisses the open card wherever the focus is, without moving
+    // the pointer or the focus (WCAG 1.4.13).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      pinsRef.current?.eachLayer((layer) => {
+        layer.closeTooltip();
+      });
+      mapRef.current?.closePopup();
+    };
+    document.addEventListener("keydown", onKey);
     return () => {
       disposed = true;
+      document.removeEventListener("keydown", onKey);
       mapRef.current?.remove();
       mapRef.current = null;
       layerRef.current = null;
@@ -184,7 +202,7 @@ export function PipelineMap({
           tooltipAnchor: [0, -size / 2 - 1],
           popupAnchor: [0, -size / 2],
         }),
-        title: deal.name,
+        title: pinTitle(deal),
         keyboard: true,
         riseOnHover: true,
       });
@@ -206,7 +224,19 @@ export function PipelineMap({
           };
         });
       } else if (!coarse) {
-        marker.bindTooltip(tooltipHtml(deal), { direction: "top", className: "uc-maptip-wrap", opacity: 1 });
+        // The card takes the pointer (`interactive`), and its pointer events
+        // reach this marker, Leaflet's parent for them. Leaflet closes the
+        // card the moment the pointer leaves the pin, before it can reach
+        // the card; that close is swapped for one that waits a moment, and
+        // entering the pin or the card again keeps the card open.
+        marker.bindTooltip(tooltipHtml(deal), { direction: "top", className: "uc-maptip-wrap", opacity: 1, interactive: true });
+        marker.off("mouseout", marker.closeTooltip);
+        let closing: ReturnType<typeof setTimeout> | undefined;
+        marker.on("mouseout", () => {
+          clearTimeout(closing);
+          closing = setTimeout(() => marker.closeTooltip(), CARD_CLOSE_DELAY_MS);
+        });
+        marker.on("mouseover", () => clearTimeout(closing));
       }
       marker.on("click", () => {
         const tap = tapRef.current?.id === deal.id ? tapRef.current : null;
@@ -256,6 +286,19 @@ export function PipelineMap({
       });
     }
   }, [ready, points, selected, compareMode]);
+
+  // A pin Photon placed is OpenStreetMap's data: the map credits it over
+  // every basemap while one is drawn (the batch-2 audit, LOW-8). The street
+  // tiles carry the same string, which the control prints once.
+  const osmPins = osmPlacedAny(points);
+  const osmCredited = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || osmPins === osmCredited.current) return;
+    if (osmPins) map.attributionControl?.addAttribution(OSM_ATTRIBUTION);
+    else map.attributionControl?.removeAttribution(OSM_ATTRIBUTION);
+    osmCredited.current = osmPins;
+  }, [ready, osmPins]);
 
   // Basemap switch: swap the tile layer in place, keeping the view and pins.
   useEffect(() => {

@@ -42,12 +42,51 @@ export interface JobLike {
   step: string | null | undefined;
   /** the row's last write — a live run keeps it fresh */
   updated_at?: string | null;
+  /** how long ago the row was last written, measured on the SERVER's clock
+   *  when it was read: the deal page's own read and its status route hand
+   *  it over, so a browser whose clock runs fast never calls a live run
+   *  stalled (research pass 30) */
+  ageMs?: number | null;
 }
 
 /** A job that hasn't written progress in this long is presumed dead: a
  *  crashed background task must never wedge the deal forever. The server's
  *  reclaim, the deal page's stall banner and the pipeline list all use it. */
 export const STALE_MS = 10 * 60 * 1000;
+
+/** Why the call on file is the previous screen's: the latest screen failed
+ *  before its verdict, is still running toward it, or stopped making
+ *  progress on the way (`verdictBehind`). */
+export type BehindWhy = "failed" | "running" | "stalled";
+
+/**
+ * How long since the job last wrote progress, in ms: the age the server
+ * measured where the job carries one (`ageMs`), else `now` less the row's
+ * last write; null where neither says — no `now` given, or no write on
+ * record. Never read off a clock the caller did not hand in, so a page can
+ * ask it during its render and the server's markup and the browser's agree.
+ */
+export function jobAgeMs(job: JobLike | null | undefined, now?: number): number | null {
+  if (typeof job?.ageMs === "number" && Number.isFinite(job.ageMs)) return job.ageMs;
+  if (now == null || !Number.isFinite(now)) return null;
+  const t = job?.updated_at ? Date.parse(job.updated_at) : NaN;
+  return Number.isFinite(t) ? now - t : null;
+}
+
+/**
+ * A live run (queued or running) that has not written progress in longer
+ * than `STALE_MS`: its process died under it — a deploy, most often — and
+ * nothing is running it. The ONE stall rule: the pipeline card, the digest,
+ * the header's call, the shared screen, the memo and the report, the
+ * compare table and the meeting workbook all read it, so no surface says
+ * "running" about a run nothing is running (research pass 30). With no age
+ * to read, no stall is claimed.
+ */
+export function isStalled(job: JobLike | null | undefined, now?: number): boolean {
+  if (!isLiveJob(job)) return false;
+  const age = jobAgeMs(job, now);
+  return age != null && age > STALE_MS;
+}
 
 /**
  * The results a FAILED screen never reached, so they still belong to the
@@ -96,15 +135,47 @@ export function previousScreenResults(job: JobLike | null | undefined): Set<Resu
 }
 
 /**
+ * `previousScreenResults`, held to the results the deal actually stores. A
+ * first screen has no previous screen: a result it never reached is simply
+ * absent, and nothing is the previous screen's. The deal page said "the
+ * results it did not reach still show below, marked as the previous
+ * screen's" over a first screen that had stored nothing at all (research
+ * pass 30).
+ */
+export function storedPreviousResults(
+  job: JobLike | null | undefined,
+  stored: Partial<Record<ResultKey, unknown>>,
+): ResultKey[] {
+  return [...previousScreenResults(job)].filter((k) => stored[k] != null);
+}
+
+/**
+ * Why the latest SCREEN stopped before its end, if it did: it failed before
+ * one of the five results, or it stalled on the way (`isStalled`). Null for
+ * a finished run, one still going, and a job that is no screen (a comp
+ * search, a model build). The deal page reads it for its empty sections,
+ * which then point at the reason at the top of the page instead of saying
+ * the screen "hasn't run" and offering a second button for the one beside
+ * the failure.
+ */
+export function screenStopped(job: JobLike | null | undefined, now?: number): "failed" | "stalled" | null {
+  if (staleAfterFailure(job).size > 0) return "failed";
+  if (staleWhileRunning(job).size > 0 && isStalled(job, now)) return "stalled";
+  return null;
+}
+
+/**
  * Why the stored verdict is the previous screen's, if it is: the latest
- * screen failed before it reached the verdict, or a screen still running
- * has not reached it yet. The memo and the report refuse to print it
+ * screen failed before it reached the verdict, a screen still running has
+ * not reached it yet, or one stopped making progress on the way — stalled,
+ * by the pipeline card's own rule (`isStalled`), so nothing calls a dead
+ * run "running" or waits on it. The memo and the report refuse to print it
  * beside terms the run has already rewritten, the shared screen marks it,
  * and the pipeline shows the run instead of the call it will replace.
  */
-export function verdictBehind(job: JobLike | null | undefined): "failed" | "running" | null {
+export function verdictBehind(job: JobLike | null | undefined, now: number = Date.now()): BehindWhy | null {
   if (staleAfterFailure(job).has("verdict")) return "failed";
-  if (staleWhileRunning(job).has("verdict")) return "running";
+  if (staleWhileRunning(job).has("verdict")) return isStalled(job, now) ? "stalled" : "running";
   return null;
 }
 
@@ -112,15 +183,31 @@ export function verdictBehind(job: JobLike | null | undefined): "failed" | "runn
  *  server's render and the browser's agree; null for a verdict saved before
  *  the pipeline stamped one, or a stamp that does not parse. */
 export function screenedOn(generatedAt: string | null | undefined): string | null {
-  if (!generatedAt) return null;
-  const t = Date.parse(generatedAt);
-  if (!Number.isFinite(t)) return null;
+  const t = generatedTime(generatedAt);
+  if (t == null) return null;
   return new Date(t).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+/** The same day as `screenedOn`, as an ISO date ("2026-09-12") — what the
+ *  pipeline's CSV and the meeting workbook write beside the call, so it
+ *  sorts and parses as a date the way their other date columns do (research
+ *  pass 42: a call nine months old had read like yesterday's wherever a
+ *  deal is summarized). Null where `screenedOn` is: no date is ever another
+ *  day's, the deal's "Added" included. */
+export function screenedDay(generatedAt: string | null | undefined): string | null {
+  const t = generatedTime(generatedAt);
+  return t == null ? null : new Date(t).toISOString().slice(0, 10);
+}
+
+function generatedTime(generatedAt: string | null | undefined): number | null {
+  if (!generatedAt) return null;
+  const t = Date.parse(generatedAt);
+  return Number.isFinite(t) ? t : null;
 }
 
 /** The results from a step onward — no step at all means the run died, or
@@ -158,8 +245,7 @@ export function listJobStatus(
   if (!job) return null;
   if (job.status === "queued" || job.status === "running") {
     if (staleWhileRunning(job).size === 0) return null;
-    const t = job.updated_at ? Date.parse(job.updated_at) : NaN;
-    return Number.isFinite(t) && now - t > STALE_MS ? "stalled" : "running";
+    return isStalled(job, now) ? "stalled" : "running";
   }
   if (job.status === "error") {
     if (!hasVerdict) return "failed";

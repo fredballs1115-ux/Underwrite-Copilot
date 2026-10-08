@@ -26,7 +26,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
-import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
+import { GOOGLE_NO_STORE, IMAGE_CREDIT, fetchBestBuildingImage, isGoogleImage } from "@/lib/imagery";
 import { coverFor } from "@/lib/deal-cover";
 import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -56,6 +56,10 @@ export async function GET(
   // nearest it, where the route had drawn any size from 48 to 1280.
   const { w: width, h: height } = nearestFrame(DEAL_IMAGE_FRAMES, q.get("w"), q.get("h"));
   const coverFallback = q.get("fallback") === "cover";
+  // `?google=0`: a surface that draws a non-Google map on the same screen
+  // (the pipeline map's hover card, a deal avatar) — Google's terms forbid
+  // Street View beside one (lib/imagery-plan `google`).
+  const google = q.get("google") !== "0";
 
   // The deal's own photograph first — found in its memorandum on the first
   // ask and stored, so the plan below can serve it.
@@ -89,7 +93,7 @@ export async function GET(
   // deals' pictures the next day rather than after a week of aerials.
   const etag = picture
     ? `W/"${picture[pictureSizeFor({ width, height })]}"`
-    : `W/"map:${geoAt}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}"`;
+    : `W/"map:${geoAt}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}${google ? "" : ":nog"}"`;
   const revalidate = { etag, "cache-control": "private, no-cache" };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: revalidate });
@@ -101,7 +105,7 @@ export async function GET(
     (deal.address as StructuredAddress | null) ?? null,
     withPicture,
     { width, height },
-    { overhead: !coverFallback },
+    { overhead: !coverFallback, google },
   );
   if (!best && coverFallback) {
     const row = deal as { asset_class?: string | null; extracted_class?: string | null };
@@ -129,7 +133,9 @@ export async function GET(
   return new NextResponse(best.response.body, {
     headers: {
       "content-type": best.response.headers.get("content-type") ?? "image/jpeg",
-      ...revalidate,
+      // A Google image is never kept, by the browser or anyone (lib/imagery
+      // GOOGLE_NO_STORE): no etag to revalidate against.
+      ...(isGoogleImage(best.source) ? { "cache-control": GOOGLE_NO_STORE } : revalidate),
       // Lets the caller render the right credit without a second request.
       "x-image-source": best.source,
       "x-image-credit": credit,

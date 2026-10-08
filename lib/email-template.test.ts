@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   PREVIEW_MAX,
+  REPLACE_OM_LINE,
   analysisReadyEmail,
   bannerAlt,
+  escapeHtml,
   previewLine,
   previousCallLine,
   screenStoppedEmail,
@@ -257,6 +259,14 @@ describe("a screen that stopped says so by email (pass 14, 2026-10-01)", () => {
     );
     // A first screen has no call to stand.
     expect(screenStoppedEmail(input).text).not.toContain("still stands");
+  });
+
+  it("a failure in the document says the way on is replacing the OM, as the deal page offers (research pass 30)", () => {
+    const doc = { ...input, message: "We couldn't read any figures out of this PDF.", replaceOm: true };
+    const { html, text } = screenStoppedEmail(doc);
+    expect(text).toContain(REPLACE_OM_LINE);
+    expect(html).toContain(escapeHtml(REPLACE_OM_LINE));
+    expect(screenStoppedEmail(input).text).not.toContain(REPLACE_OM_LINE);
   });
 
   it("names the deal, says the deal page's own sentence and links back", () => {

@@ -50,7 +50,7 @@ export function DealAvatar({ dealId, dot, size = "sm" }: { dealId: string; dot?:
         // eslint-disable-next-line @next/next/no-img-element -- the pipeline row's own proxied route, with its own cache headers
         <img
           data-deal-avatar="picture"
-          src={`/api/deals/${dealId}/image?w=${frame.w}&h=${frame.h}&fallback=cover`}
+          src={`/api/deals/${dealId}/image?w=${frame.w}&h=${frame.h}&fallback=cover&google=0`}
           alt=""
           width={px}
           height={px}

@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
-import { CONSTRUCTION_COST_IDS, BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
+import {
+  CONSTRUCTION_COST_IDS,
+  BRIEF_NATIONAL_IDS,
+  CRE_PRICE_ID,
+  DEBT_MARKET_IDS,
+  lendingStandardsFor,
+  liveMarketBrief,
+  periodLabel,
+  regionClause,
+  regionOfLine,
+  rentIndexFor,
+  sectorJobsFor,
+  sectorPayrollMetric,
+} from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 import { briefDelta } from "./brief-delta";
@@ -663,6 +676,54 @@ describe("a deal outside the covered metros reads its state's figures, said as t
     expect(dc.grain).toBe("metro");
     expect(dc.text).toContain("each is the metro area's");
   });
+
+  // Research pass 41 (L3): "each is the metro area's" had stood over a
+  // "Rental vacancy, South Census region" line.
+  it("says a Census region's line apart from the metro area's own", () => {
+    const dc = liveMarketBrief({ metro: { id: "dc", name: "Washington DC" }, assetClass: "multifamily", rates: readMetroRates("dc", DC_ROWS, NOW), zori: null, realtor: null, national: [], now: NOW })!;
+    expect(dc.lines).toContain("Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)");
+    expect(dc.text.split("\n")[0]).toContain(
+      "Each is dated, and each is the metro area's — not the submarket's and not the building's — save the rental vacancy line for the South Census region, which is the region's and says so.",
+    );
+    expect(regionOfLine("Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)")).toBe("South Census region");
+    for (const line of dc.lines.filter((l) => !l.includes("Census region"))) expect(regionOfLine(line), line).toBeNull();
+    expect(regionClause(["Unemployment 3.4% (Jul 2026, Washington MSA; FRED)"])).toBe("");
+    // An office reads no housing line, and so no region's.
+    const office = liveMarketBrief({ metro: { id: "dc", name: "Washington DC" }, assetClass: "office", rates: readMetroRates("dc", DC_ROWS, NOW), zori: null, realtor: null, national: [], now: NOW })!;
+    expect(office.text).toContain("each is the metro area's — not the submarket's and not the building's.");
+    expect(office.text).not.toContain("Census region");
+  });
+
+  // The pre-merge audit (C1, M3): a block holding the nation's lines alone
+  // opened "so these are the state's own figures … each is the state's".
+  it("says no figure of the state's or the market's own was current where every line is the nation's", () => {
+    const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+    const state = liveMarketBrief({ metro: { id: "state:PA", name: "Pennsylvania" }, assetClass: "office", rates: [], zori: null, realtor: null, national, now: NOW })!;
+    expect(state.national).toBe(state.lines.length);
+    expect(state.national).toBeGreaterThan(1);
+    const head = state.text.split("\n")[0];
+    expect(head).toBe(
+      `Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks — read on 2026-09-23 from FRED. No figure of the state's own was current; the ${state.national} lines below are the nation's figures, each dated and said as such, and never this state's.`,
+    );
+    // Stale figures of its own are no figures of its own.
+    const stale = liveMarketBrief({
+      metro: { id: "state:PA", name: "Pennsylvania" },
+      assetClass: "multifamily",
+      rates: readMetroRates("state:PA", [{ series_id: "PAUR", obs_date: "2025-01-01", value: 3.7 }], NOW),
+      zori: null,
+      realtor: null,
+      national: national.filter((r) => r.meta.id === "DGS10"),
+      now: NOW,
+    })!;
+    expect(stale.text.split("\n")[0]).toBe(
+      "Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks — read on 2026-09-23 from FRED. No figure of the state's own was current; the one line below is the nation's figure, dated and said as such, and never this state's.",
+    );
+    const dc = liveMarketBrief({ metro: { id: "dc", name: "Washington DC" }, assetClass: "multifamily", rates: [], zori: null, realtor: null, national, now: NOW })!;
+    expect(dc.text.split("\n")[0]).toBe(
+      `Published figures for the Washington DC market the deal sits in, read on 2026-09-23 from FRED. No figure of the metro area's own was current; the ${dc.national} lines below are the nation's figures, each dated and said as such, and never this market's.`,
+    );
+    for (const b of [state, stale, dc]) expect(b.text).not.toMatch(/each is the (?:state|metro area)'s|own figures/);
+  });
 });
 
 // ── A metro area the site reads without a brief ─────────────────────────────
@@ -782,8 +843,10 @@ describe("a portfolio across several markets: the header says whose figures thes
       national: undefined,
       portfolio: { properties: 5, here: 2, markets: "3 markets — Washington DC (2), Baltimore MD (2) and Virginia (1)", role: "other" },
     })!;
+    // The South Census region's rental vacancy among them is said apart
+    // (research pass 41).
     expect(other.text.split("\n")[0]).toBe(
-      "Published figures for the Washington DC market, where 2 of the portfolio's 5 properties sit, read on 2026-09-23 from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's.",
+      "Published figures for the Washington DC market, where 2 of the portfolio's 5 properties sit, read on 2026-09-23 from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's — save the rental vacancy line for the South Census region, which is the region's and says so.",
     );
     expect(other.portfolio).toEqual({ here: 2, of: 5 });
     // The same market read as the address's block, with the national rows,

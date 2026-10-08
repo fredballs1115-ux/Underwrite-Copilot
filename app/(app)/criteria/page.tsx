@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { ExchangeFields } from "./exchange-fields";
 import { getActiveBuyBox } from "@/lib/criteria-server";
 import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
 import {
@@ -52,10 +56,17 @@ export default async function CriteriaPage({
   const box = activeNamed?.box ?? {};
   const boxId = activeNamed?.id ?? "";
   const db = box.dealbreakers ?? {};
+  // The reader's own day (lib/reader-day), read once per request: the
+  // exchange's clock is said on it, as the deal header's chip says it.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   const banner = saved
     ? {
         cls: "bg-pass/10 text-pass",
+        // A saved box sends the reader back where they came from: the
+        // pipeline's checklist links here and the page had no way back
+        // (research pass 32).
+        back: saved === "1",
         text:
           saved === "box"
             ? "New mandate added — fill it in and save."
@@ -91,8 +102,16 @@ export default async function CriteriaPage({
       </div>
 
       {banner && (
-        <p className={`rounded-lg px-3 py-2 text-sm ${banner.cls}`}>
+        <p className={`rounded-lg px-3 py-2 text-sm ${banner.cls}`} role="status">
           {banner.text}
+          {"back" in banner && banner.back && (
+            <>
+              {" "}
+              <Link href="/deals" className="font-medium underline decoration-dotted underline-offset-2">
+                Back to your pipeline →
+              </Link>
+            </>
+          )}
         </p>
       )}
 
@@ -383,6 +402,11 @@ export default async function CriteriaPage({
                 </div>
               </div>
             </section>
+
+            {/* The buyer's 1031 exchange (lib/exchange-window): the day the
+                relinquished property transferred, who files the return and
+                whether it is extended — each deal's deadlines read off it. */}
+            <ExchangeFields exchange={box.exchange} today={todayIso} />
 
             <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
               <label htmlFor="notes" className="text-sm font-semibold tracking-tight">

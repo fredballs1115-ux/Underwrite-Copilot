@@ -8,10 +8,11 @@
 // verified/sourced status; unknowns render as open questions — a rule is
 // never silently dropped for missing data.
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { signedInBenchmarkRows, signedInRuleRows } from "@/lib/research-read";
 import {
   asOfLabel,
   evaluateRules,
+  OPEN_QUESTION_LABELS,
   type Benchmark,
   type RegulatoryRule,
   type RuleEvaluation,
@@ -24,9 +25,9 @@ import {
   fmtBenchValue,
   mergeBenchmarks,
   mergeRules,
-  pricePerUnit,
   seedBenchmarks,
   seedRules,
+  vsMarketHeading,
 } from "@/lib/research-data";
 import { withArticle } from "@/lib/article";
 import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
@@ -37,6 +38,7 @@ import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
 import { capSpreadRead, leverageRead, SEEDED_RATE_BENCHMARK } from "@/lib/leverage";
+import { SHARE_CAP_WORDS } from "@/lib/compare-interest";
 import {
   benchmark30,
   datedLong,
@@ -54,7 +56,7 @@ const OUTCOME_META: Record<
   { label: string; cls: string }
 > = {
   exempt: { label: "Exempt", cls: "bg-emerald-500/10 text-emerald-600" },
-  applies: { label: "Applies", cls: "bg-red-500/10 text-red-600" },
+  applies: { label: "Applies", cls: "bg-kill/10 text-kill" },
   possibly_applies: { label: "Possibly applies", cls: "bg-amber-500/10 text-amber-600" },
   not_applicable: { label: "Not applicable", cls: "bg-line/60 text-muted" },
 };
@@ -161,22 +163,6 @@ export function benchRowLabel(b: Pick<Benchmark, "metric" | "as_of">): string {
 // over a year old is not ranked.
 const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 
-/** Plain-English labels for condition keys surfaced as open questions. */
-const UNKNOWN_LABELS: Record<string, string> = {
-  building_permit_issued_on_or_before: "building permit year",
-  building_permit_issued_after: "building permit year",
-  built_before: "year built",
-  building_age_years_lt: "year built",
-  exemption_registered_with_rad: "RAD exemption registration",
-  units_gte: "unit count",
-  units_lte: "unit count",
-  municipality_adopted_etpa: "whether the municipality adopted ETPA",
-  municipality_population_gte: "municipality population",
-  occupancy: "current occupancy status",
-  owner_occupied_with_units_lte: "whether you'll owner-occupy (and unit count)",
-  owner_total_rental_units_in_state_lte: "total rental units you own in this state",
-  within_city_limits: "whether the building sits inside the city's limits",
-};
 
 /** Condition keys the Deal-facts panel can actually answer — only these earn
  *  the "answer in Deal facts" pointer (units come from the deal itself, and
@@ -256,7 +242,7 @@ export function SourceLink({
 export async function ResearchPanel({
   address,
   sizeText,
-  priceText,
+  basis = null,
   capText,
   capWithheld = null,
   yearBuilt,
@@ -278,14 +264,22 @@ export async function ResearchPanel({
    *  briefed market, a metro area whose figures are read, and how — the
    *  address matchers answer where it is not given */
   placement?: Pick<DealPlacement, "briefed" | "read" | "placedBy"> | null;
+  /** the header's size, for the rules' unit count */
   sizeText?: string | null;
-  priceText?: string | null;
+  /** the deal's price by its class's basis, as its pipeline card prints it
+   *  (lib/pipeline-slots `basisTag`: "$280k/unit", "$200k/room", "$212/SF"),
+   *  beside the benchmarks; null where the card prints none */
+  basis?: string | null;
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
   capText?: string | null;
   /** "note" where the deal's price is a loan's: the collateral's income
-   *  over it is a cap nobody earns (lib/compare-interest `noteCapSlot`), so
-   *  the leverage check does not run and says why */
-  capWithheld?: "note" | null;
+   *  over it is a cap nobody earns (lib/compare-interest `capSlotWithheld`),
+   *  so the leverage check does not run and says why; "position" where it is
+   *  a preferred equity position's, which buys a rate and a redemption, never
+   *  a slice of the building — the same rule, its own reason; "share" where
+   *  it is a share's beside the loan its entity carries, whose price grossed
+   *  up is the equity's whole and no cap is struck on it */
+  capWithheld?: "note" | "position" | "share" | null;
   /** the screening rate the model was seeded with off today's curve
    *  (lib/debt-index): the index a fact, the class spread an assumption,
    *  the note naming both — the leverage check reads the cap against it */
@@ -313,21 +307,14 @@ export async function ResearchPanel({
   // missing table (migration not yet run) degrades silently to the files.
   // A rule's words are always the file's (mergeRules: nothing else writes
   // them); a benchmark's figures may be the steward's correction.
+  // One cached read serves every signed-in reader (lib/research-read): the
+  // deal page is signed in, and the tables are granted to every signed-in
+  // reader alike; each view had read both whole tables again.
   let rules: RegulatoryRule[] = seedRules();
   let benchmarks: Benchmark[] = seedBenchmarks();
-  try {
-    const supabase = await createSupabaseServerClient();
-    const [{ data: dbRules }, { data: dbBench }] = await Promise.all([
-      supabase.from("regulatory_rules").select("*"),
-      supabase.from("benchmarks").select("*"),
-    ]);
-    if (dbRules?.length) rules = mergeRules(dbRules as unknown as RegulatoryRule[]);
-    if (dbBench?.length) {
-      benchmarks = mergeBenchmarks(dbBench as unknown as Benchmark[]);
-    }
-  } catch {
-    // seeds already loaded
-  }
+  const [dbRules, dbBench] = await Promise.all([signedInRuleRows(), signedInBenchmarkRows()]);
+  if (dbRules?.length) rules = mergeRules(dbRules);
+  if (dbBench?.length) benchmarks = mergeBenchmarks(dbBench);
 
   // What the deal IS decides which rules can reach it (lib/asset-words): an
   // office or a hotel is commercial property to the rent-control regimes;
@@ -375,7 +362,6 @@ export async function ResearchPanel({
         : 1;
     return own(a.metric) - own(b.metric);
   });
-  const ppu = pricePerUnit(priceText, sizeText);
 
   // Leverage check (deterministic code, not a model call): the going-in cap
   // against the week's 30-yr fixed — the survey off the same cached rates
@@ -482,7 +468,7 @@ export async function ResearchPanel({
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                 leverage.tone === "negative"
-                  ? "bg-red-500/10 text-red-600"
+                  ? "bg-kill/10 text-kill"
                   : leverage.tone === "thin"
                     ? "bg-amber-500/10 text-amber-600"
                     : "bg-emerald-500/10 text-emerald-600"
@@ -512,7 +498,7 @@ export async function ResearchPanel({
                 <p
                   className={`mt-1 text-xs leading-relaxed ${
                     seededLeverage.tone === "negative"
-                      ? "text-red-600"
+                      ? "text-kill"
                       : seededLeverage.tone === "thin"
                         ? "text-amber-600"
                         : "text-emerald-600"
@@ -543,9 +529,41 @@ export async function ResearchPanel({
           </p>
         </div>
       )}
+      {/* A preferred equity position: its price buys a rate and a
+          redemption in the owning entity, never a slice of the building, so
+          the building's income over it is a cap nobody earns either. */}
+      {capPct == null && capWithheld === "position" && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3" data-qa="leverage-position">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
+              n/a on a preferred equity position
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            {
+              "The price is a position's, not the building's: it buys a preferred return and a redemption in the owning entity, never a slice of the building, so the building's income over it is a cap nobody earns, and there is no cap of the buyer's to spread against debt. The position is read by its yield to redemption at its price, and by where its last dollar sits on the stated value, not by a cap rate."
+            }
+          </p>
+        </div>
+      )}
+      {/* A share beside the loan its entity carries: the share's price
+          grossed up is the equity's whole, not the building's, so no cap is
+          struck on it — the header says the same (lib/compare-interest). */}
+      {capPct == null && capWithheld === "share" && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3" data-qa="leverage-share">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
+              n/a on this share
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">{SHARE_CAP_WORDS.title}</p>
+        </div>
+      )}
       {/* A plan deal with no going-in cap: a dark building has nothing to
           spread against debt yet. Say so rather than leaving a gap. */}
-      {capPct == null && capWithheld !== "note" && planLabel && (
+      {capPct == null && !capWithheld && planLabel && (
         <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold">Leverage check</p>
@@ -554,9 +572,9 @@ export async function ResearchPanel({
             </span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            No going-in cap to spread against debt until the works are done; the
-            plan is judged on yield on total cost (the stressed grid under the
-            plan strip) and its debt is sized to cost.
+            The plan is judged on its yield on total cost, not on a cap against
+            its price (the stressed grid under the plan strip reads it), and its
+            debt is sized to cost.
           </p>
         </div>
       )}
@@ -587,7 +605,7 @@ export async function ResearchPanel({
         <ul className="mt-3 space-y-3">
           {shown.map((e) => {
             const meta = OUTCOME_META[e.outcome];
-            const open = [...new Set(e.unknowns.map((u) => UNKNOWN_LABELS[u] ?? u))];
+            const open = [...new Set(e.unknowns.map((u) => OPEN_QUESTION_LABELS[u] ?? u))];
             const answerable = e.unknowns.some((u) => ANSWERABLE_IN_DEAL_FACTS.has(u));
             return (
               <li key={e.rule.id} className="rounded-lg border border-line/70 p-3">
@@ -629,9 +647,7 @@ export async function ResearchPanel({
 
       {hasBenchmarks && (
         <div className="mt-4 border-t border-line pt-3">
-          <h3 className="text-[11px] uppercase tracking-wide text-muted">
-            vs. market{ppu ? ` — this deal ≈ $${ppu.toLocaleString()}/unit` : ""}
-          </h3>
+          <h3 className="text-[11px] uppercase tracking-wide text-muted">{vsMarketHeading(basis)}</h3>
           <ul className="mt-2 space-y-2">
             {benchItems(metroBench).map((item) => {
               if (item.kind === "fmr") {

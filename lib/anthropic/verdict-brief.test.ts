@@ -32,8 +32,61 @@ describe("the verdict's brief carries the figures the market check read", () => 
     const counted = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: { ...market.liveBrief!, national: 1 } } });
     expect(counted).toContain("The last line is the nation's figure, not the market's — it says so.");
     expect(brief).not.toContain("the nation's figure");
-    const two = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: { ...market.liveBrief!, national: 2 } } });
+    // Two of three: every line the nation's is a block of its own (below).
+    const two = buildBrief({
+      extraction: null,
+      challenges: null,
+      comps: null,
+      reconciliation: null,
+      market: {
+        ...market,
+        liveBrief: { ...market.liveBrief!, lines: [...market.liveBrief!.lines, "Debt market — CRE loan delinquency at commercial banks 1.40% (Q2 2026; FRED)"], national: 2 },
+      },
+    });
     expect(two).toContain("The last 2 lines are the nation's figures, not the market's — each says so.");
+  });
+
+  // Research pass 41 (L3): "Each is dated and is the metro's" had stood
+  // over a Census region's rental vacancy line.
+  it("says a Census region's line apart from the metro's", () => {
+    const withRegion = {
+      ...market,
+      liveBrief: {
+        ...market.liveBrief!,
+        lines: [market.liveBrief!.lines[0], "Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)", market.liveBrief!.lines[1]],
+        national: 1,
+      },
+    };
+    const brief = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: withRegion });
+    expect(brief).toContain(
+      "Each is dated and is the metro's, not the submarket's or the building's — save the rental vacancy line for the South Census region, which is the region's and says so.",
+    );
+    // A block with no region's line reads as before.
+    const plain = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market });
+    expect(plain).toContain("Each is dated and is the metro's, not the submarket's or the building's. Where a screen range");
+  });
+
+  // The pre-merge audit (C1, M3): a block of the nation's lines alone was
+  // headed as the state's figures and said "each is dated and is the state's".
+  it("heads a block of the nation's lines alone as the nation's, saying none of the market's own was current", () => {
+    const nationOnly = {
+      metro: "Pennsylvania",
+      grain: "state" as const,
+      readOn: "2026-09-23",
+      lines: ["Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED), -3 bps on the day before"],
+      figures: [],
+      national: 1,
+    };
+    const brief = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: nationOnly } });
+    expect(brief).toContain(
+      "## The nation's published figures the market check read on 2026-09-23 — none of the state of Pennsylvania's own was current, and the deal lies outside the metros the site tracks",
+    );
+    expect(brief).toContain("Each is dated and is the nation's, not the state's, any metro's, the submarket's or the building's.");
+    expect(brief).not.toContain("is the state's, not any metro's");
+    expect(brief).not.toContain("## The state of Pennsylvania's published figures");
+    const metro = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: { ...nationOnly, metro: "Washington DC", grain: "metro" as const } } });
+    expect(metro).toContain("## The nation's published figures the market check read on 2026-09-23 — none of the Washington DC market's own was current\n");
+    expect(metro).not.toContain("is the metro's, not the submarket's");
   });
 
   it("a check that read no figures adds no section, and the brief is the old one", () => {
@@ -150,6 +203,42 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(brief).toContain("- Asking price: $20,000,000 [p. 3]");
   });
 
+  // Research pass 37: "50% of the general partner interest" read as 50% of
+  // the entity, so the brief struck "$21k/unit" on a building the
+  // memorandum values at $267k a unit.
+  it("a share of the general partner's interest: a share of a share, and no building basis", () => {
+    const gp = base({
+      interest: {
+        kind: "partial_interest",
+        summary: "50% of the general partner interest in the partnership that owns the property; the GP holds a 10% capital interest and a 20% promote over an 8% preferred return",
+        share: "50% of the general partner interest",
+        groundLease: "",
+        loan: "",
+        page: "p. 2",
+      },
+      metrics: [m("Asking price", "3,200,000"), m("Units", "300"), m("NOI (in-place)", "4,400,000", "in_place"), m("Whole-asset value", "80,000,000")],
+    });
+    const est = section(briefOf(gp));
+    expect(est).toContain("What is being sold: a share of the general partner's interest.");
+    expect(est).toContain(
+      "THE BUILDING'S BASIS: none — this sells a share of the general partner's interest, a share of a share: its price buys the general partner's capital share and promote, never a slice of the building, and is never grossed up or divided over the whole building's units or area.",
+    );
+    expect(est).not.toMatch(/\/unit|share of the owning entity\. This memorandum sells a 50%/);
+  });
+
+  it("an undivided interest held as a tenant in common: its loan is the property's, never an entity's", () => {
+    const tic = base({
+      interest: { kind: "partial_interest", summary: "An undivided 30% tenant-in-common interest", share: "30% tenant-in-common interest", groundLease: "", loan: "", page: "p. 2" },
+      metrics: [m("Asking price", "$4,200,000"), m("Units", "60"), m("NOI (in-place)", "$980,000", "in_place"), m("Entity loan balance", "$9,000,000")],
+    });
+    const est = section(briefOf(tic));
+    expect(est).toContain("What is being sold: an undivided interest in the property, as a tenant in common.");
+    expect(est).toContain(
+      "THE BUILDING'S BASIS: none — the interest's price grossed up is the equity's whole, not the building's: the building's cost is that plus the stated $9.0M loan on the property, which the model does not add",
+    );
+    expect(est).not.toMatch(/entity's stated/);
+  });
+
   it("a note: the context carries the note's own read, and there is no building basis", () => {
     // Read on a pinned day: the note matures March 1, 2028, and from Feb 2
     // of that year it is due within the month, with no yield to state.
@@ -180,6 +269,40 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(est).not.toMatch(/\/unit/);
   });
 
+  it("a preferred equity position: the context carries the position's own read, and there is no building basis (lib/position)", () => {
+    // Read on a pinned day: its yield to redemption runs from today.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const position = base({
+      interest: { kind: "preferred_equity", summary: "A $15M preferred equity investment in the owning entity.", share: "", groundLease: "", loan: "", page: "p. 3" },
+      metrics: [
+        m("Asking price", "$14,000,000"),
+        m("Preferred equity amount", "$15,000,000"),
+        m("Preferred return", "12% preferred return, 8% current pay"),
+        m("Current pay rate", "8.0%"),
+        m("Mandatory redemption date", "June 2029"),
+        m("Senior loan balance", "$52,000,000"),
+        m("Whole-asset value", "$80,000,000"),
+        m("Units", "240"),
+        m("NOI (in-place)", "$4,400,000", "in_place"),
+        m("Going-in cap rate", "5.50%"),
+      ],
+    });
+    const est = section(briefOf(position));
+    expect(est).toContain("This memorandum sells a PREFERRED EQUITY position in the owning entity, not the property");
+    expect(est).toContain("A preferred equity position of $15.0M at 8.00% current pay and 4.00% accruing");
+    expect(est).toContain("14.3% to redemption at its $14.0M price");
+    expect(est).toContain(
+      "THE BUILDING'S BASIS: none — this sells a preferred equity position in the owning entity, and its price buys a preferred return and a redemption, never a slice of the building.",
+    );
+    expect(est).toContain("which are the building's, not the position's");
+    // Never the position's price over the building's units.
+    expect(est).not.toMatch(/\/unit/);
+    expect(est).not.toContain("none computed");
+  });
+
   it("an auction: the starting bid is said to be no price, and no basis is struck on it", () => {
     const auction = base({
       dealName: "Midtown Office Tower",
@@ -205,6 +328,103 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(section(briefOf(office, "office"))).toContain("THE BUILDING'S BASIS, computed in code: $267/SF — the asking price, over the building's area.");
   });
 
+  // Research pass 41 (L5): the plausibility section restated the deal
+  // context's type, summary, NOI, total cost, yield on cost and timeline on
+  // every plan deal. Each is said once, the context's; what the context does
+  // not say — the price, the budget, a figure it leaves out — stays.
+  it("says a plan deal's type, summary and figures once: the deal context's, where the brief has it", () => {
+    const count = (s: string, part: string) => s.split(part).length - 1;
+    const dev = base({
+      dealName: "Riverside — ground-up development site, fully entitled",
+      strategy: { kind: "development", summary: "Build 300 apartments on an entitled site.", capitalBudget: "", timeline: "Delivery Q4 2028" },
+      metrics: [m("Land cost", "$12,000,000"), m("NOI (stabilized, pro forma)", "$9,000,000", "pro_forma"), m("Total development cost", "$120,000,000"), m("Units (proposed)", "300")],
+    });
+    const withContext = buildBrief({ extraction: dev, dealContext: dealContextFor(dev), ...none });
+    expect(count(withContext, "Deal type: Development")).toBe(1);
+    expect(count(withContext, "Build 300 apartments on an entitled site")).toBe(1);
+    expect(withContext).not.toContain("DEAL STRATEGY: Development");
+    expect(count(withContext, "Ground-up or to-be-built; there is no in-place income")).toBe(1);
+    // The NOI, the total cost and its yield, and the timeline: the context's.
+    expect(count(withContext, "7.50%")).toBe(1);
+    expect(count(withContext, "Delivery Q4 2028")).toBe(1);
+    expect(withContext).not.toContain("stabilized NOI $9.0M");
+    expect(withContext).not.toContain("total cost $120.0M");
+    // The price and the budget, which the context does not say, stay.
+    expect(withContext).toContain("THE PLAN AS THE OM STATES IT: price $12.0M; budget $108.0M (Total development cost less the price).");
+    // The plan's own test stays.
+    expect(withContext).toContain("## Deal strategy, the plan, and figures that do not tie");
+    // With no deal context the section says every figure itself, as before.
+    const alone = buildBrief({ extraction: dev, ...none });
+    expect(alone).toContain("DEAL STRATEGY: Development — Build 300 apartments on an entitled site. Ground-up or to-be-built");
+    expect(alone).toContain("THE PLAN AS THE OM STATES IT: stabilized NOI $9.0M (NOI (stabilized, pro forma)); price $12.0M;");
+    expect(alone).toContain("timeline: Delivery Q4 2028");
+
+    // A plan whose context states no NOI says no total cost there: the plan's
+    // line keeps it, and says the NOI is not stated.
+    const reno = base({
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$20,000,000"), m("Units", "100"), m("NOI (in-place)", "$1,200,000", "in_place"), m("Renovation budget", "$2,000,000")],
+    });
+    const renoBrief = buildBrief({ extraction: reno, dealContext: dealContextFor(reno), ...none });
+    expect(count(renoBrief, "Deal type: Value-add")).toBe(1);
+    expect(renoBrief).toContain("DEAL STRATEGY: In-place income plus a renovation program");
+    expect(renoBrief).toContain("THE PLAN AS THE OM STATES IT: stabilized NOI not stated; price $20.0M; $2.0M (Renovation budget); total cost $22.0M; timeline to stabilization not stated.");
+  });
+
+  // Research pass 41 (L6): a summary with no period ran into the next
+  // sentence, the plan's own words closed twice ("as units turn.." and
+  // "2030.;"), a value-add's basis said "never the shell's price", and a
+  // tenancy in common was called a share.
+  it("closes each of the plan's own sentences once, and names what the price alone buys", () => {
+    const reno = base({
+      strategy: {
+        kind: "value_add",
+        summary: "Renovate the 200 classic units",
+        capitalBudget: "$3,000,000 interior program, stabilized in 2030.",
+        timeline: "Renovation over 36 months as units turn.",
+      },
+      metrics: [m("Asking price", "$20,000,000"), m("Units", "200"), m("NOI (in-place)", "$1,200,000", "in_place"), m("Renovation budget", "$3,000,000")],
+    });
+    const alone = buildBrief({ extraction: reno, ...none });
+    expect(alone).toContain("DEAL STRATEGY: Value-add — Renovate the 200 classic units. In-place income");
+    expect(alone).toContain("timeline: Renovation over 36 months as units turn; budget as worded: $3,000,000 interior program, stabilized in 2030.");
+    expect(alone).not.toContain("..");
+    expect(alone).not.toContain(".;");
+    const context = dealContextFor(reno)!;
+    expect(context).toContain("Deal type: Value-add — Renovate the 200 classic units. ");
+    expect(context).toContain("never the price alone.");
+    expect(context).not.toContain("shell's");
+  });
+
+  it("calls a tenancy in common's percentage an interest, never a share", () => {
+    const tic = {
+      kind: "partial_interest" as const,
+      summary: "An undivided 30% tenant-in-common interest in the fee simple of a medical office building",
+      share: "30% tenant-in-common interest",
+      groundLease: "",
+      loan: "",
+      page: "p. 2",
+    };
+    const held = base({
+      assetClass: "Medical Office",
+      interest: tic,
+      metrics: [m("Asking price", "$4,200,000"), m("Total SF", "48,000 SF"), m("NOI (in-place)", "$980,000", "in_place")],
+    });
+    const basis = section(briefOf(held));
+    expect(basis).toContain("the whole the 30% interest's price implies");
+    expect(basis).toContain("The interest's own price over the whole building is no basis.");
+    expect(basis).not.toContain("share's");
+    const works = base({
+      assetClass: "Medical Office",
+      interest: tic,
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$4,200,000"), m("Total SF", "48,000 SF"), m("NOI (in-place)", "$980,000", "in_place"), m("Renovation budget", "$500,000")],
+    });
+    const plan = buildBrief({ extraction: works, ...none });
+    expect(plan).toContain("whole price, the interest's grossed up, $14.0M");
+    expect(plan).not.toContain("the share's grossed up");
+  });
+
   it("a plan deal's basis is its total cost a planned unit, never the land's price", () => {
     const dev = base({
       dealName: "Riverside — ground-up development site, fully entitled",
@@ -214,6 +434,30 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(section(briefOf(dev))).toContain(
       "THE BUILDING'S BASIS, computed in code: on this development deal it is total cost — $120.0M over 300 planned units is $400k per planned unit, never the land's price over them.",
     );
+  });
+
+  // Research pass 41 (L4): a deal filed as an office over a deck that calls
+  // itself multifamily read "Harbor View Apartments — Multifamily" beside a
+  // basis per foot and "Asset class — fits: … this is office".
+  it("names the deal's one class: the analyst's where filed, the deck's where left to Auto", () => {
+    const deck = base({ metrics: [m("Asking price", "$80,000,000"), m("Total SF", "300,000 SF")] });
+    const dealLine = (brief: string) => brief.split("\n")[2];
+    expect(dealLine(briefOf(deck, "office"))).toBe("Harbor View Apartments — Office — Dallas, TX");
+    expect(dealLine(briefOf(deck, "auto"))).toBe("Harbor View Apartments — Multifamily — Dallas, TX");
+    expect(dealLine(briefOf(base({ assetClass: "Garden-style apartments" }), "auto"))).toBe("Harbor View Apartments — Garden-style apartments — Dallas, TX");
+  });
+
+  it("a forward purchase's basis is its price, the buyer's whole cost at delivery, never the price plus the developer's budget (research pass 41)", () => {
+    const forward = base({
+      assetClass: "Industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [m("Purchase price", "$48,000,000"), m("NOI (Year 1)", "$2,880,000", "pro_forma"), m("Construction budget", "$31,000,000"), m("Delivery date", "Q3 2027")],
+    });
+    const brief = section(briefOf(forward, "industrial"));
+    expect(brief).toContain(
+      "THE BUILDING'S BASIS: on this forward purchase it is the price, the buyer's whole cost at delivery, $48.0M all-in as computed in code; the OM states no planned count to set it per unit, and the price plus the developer's budget is never the basis.",
+    );
+    expect(brief).not.toContain("the land's price is never the basis");
   });
 
   it("a brief with no extraction and no context is the old one", () => {
@@ -248,10 +492,33 @@ describe("the verdict is handed the code's buy-box checks, not the bare criteria
     expect(box).toContain("- Asset class — fits: Mandate is multifamily — this is multifamily. In scope.");
     expect(box).toContain("- Target return — not checked: Mandate targets ≥15% IRR; no parseable IRR in the screen yet.");
     expect(box).toContain("The code's call across the checks: outside the box on at least one criterion.");
+    // How much of the box the call stands on, in the deal page's chip's words.
+    expect(box).toContain("Judged on 3 of the buy box's 4 criteria; target return could not be checked.");
     expect(box).toContain("Red lines the buyer set that this deal trips: price $20.0M over the $18.0M ceiling.");
     expect(box).toContain("The code computes no entry price: one you name is your own estimate — give its arithmetic and say it is yours.");
     // A check's call is never the verdict's own word "pass".
     expect(box).not.toMatch(/— pass\b/);
+    // A box checked in full says no count.
+    const known = checks.filter((c) => c.status !== "unknown");
+    const full = buildBrief({ ...none, buyBox: lines, buyBoxChecks: { checks: known, tripped: [] } });
+    expect(full).not.toContain("Judged on");
+  });
+
+  it("counts the score's cash-on-cash floor and the red lines it could not check, as the chip does (the audit of 2026-10-05)", () => {
+    // The score the pipeline hands beside the checks: a cash-on-cash floor
+    // the memorandum gives no figure for, and a cap-rate red line it could
+    // not check.
+    const mandate = {
+      score: 100,
+      verdict: "PURSUE" as const,
+      dimensions: [{ key: "coc" as const, label: "Cash-on-cash", weight: 15, earned: 0, status: "unknown" as const, detail: "" }],
+      dealbreakerTripped: false,
+      unresolvedDealbreakers: 1,
+      dealbreakerCriteria: [{ label: "Cap-rate dealbreaker", checked: false, onPrice: true }],
+    };
+    const known = checks.filter((c) => c.status !== "unknown");
+    const brief = buildBrief({ ...none, buyBox: lines, buyBoxChecks: { checks: known, tripped: [], mandate } });
+    expect(brief).toContain("Judged on 3 of the buy box's 5 criteria; cash-on-cash and cap-rate dealbreaker could not be checked.");
   });
 
   it("with no checks to hand, the criteria alone — and an entry price is still the verdict's own estimate", () => {

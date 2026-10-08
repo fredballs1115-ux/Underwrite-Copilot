@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { allDayEventIcs } from "@/lib/ics";
-import { offersDueUpgrade } from "@/lib/offering";
+import { offersDueEventText, offersDueUpgrade } from "@/lib/offering";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export const runtime = "nodejs";
@@ -15,7 +15,10 @@ function appUrl(): string {
  * carries — the reader's own date, else the memorandum's — read under the
  * reader's own session, so a deal nobody may open is a bare 404, as is a
  * deal with no deadline. The event's id is the deal's, so a second
- * download after the date moves updates the same event.
+ * download after the date moves updates the same event. Where the deadline
+ * is the memorandum's day, the event carries the memorandum's own words —
+ * the time of day an all-day event cannot hold — and its page
+ * (`offersDueEventText`).
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,11 +36,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const name = (row.name ?? "").trim() || "Untitled deal";
   const link = `${appUrl()}/deals/${id}`;
+  const { summary, description } = offersDueEventText(due, name, link, row.extraction ?? null);
   const ics = allDayEventIcs({
     uid: `offers-due-${id}@underwrite-copilot`,
     date: due,
-    summary: `Offers due — ${name}`,
-    description: link,
+    summary,
+    description,
     url: link,
     remindDaysBefore: 2,
     now: new Date(),

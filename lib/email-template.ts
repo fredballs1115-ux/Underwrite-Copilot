@@ -11,11 +11,13 @@ export interface AnalysisReadyEmailInput {
   /** hex for the verdict accent, e.g. "#1b7a5e" */
   verdictColor: string;
   /** the deal header's buy-box chip (lib/buy-box-chip): "Fit 82 · Pursue",
-   *  "Fit 61 · Outside box", "Fits buy box", "Near buy box", "Outside buy
-   *  box", "Buy box unverified" — or "No buy box set", or lib/email's line
-   *  for a box it could not read. Drawn after "Buy box:", as the plain-text
-   *  part has always said it: beside the call's pill, a bare "Fit 82 ·
-   *  Pursue" read as a second call ("No-go  Fit 82 · Pursue"). */
+   *  "Fit 61 · Outside box", "Fit 100 · 2 of 4 checked" where the box could
+   *  not be judged whole; without a score the pipeline cell's words, "Fits",
+   *  "Near (1 of 2)", "Outside", or "Buy box unverified" — or "No buy box
+   *  set", or lib/email's line for a box it could not read. Drawn after
+   *  "Buy box:", as the plain-text part has always said it: beside the
+   *  call's pill, a bare "Fit 82 · Pursue" read as a second call ("No-go
+   *  Fit 82 · Pursue"). */
   buyBoxLabel: string;
   /** one-line verdict reason ("" to omit) */
   reason: string;
@@ -198,7 +200,15 @@ export interface ScreenStoppedEmailInput {
    *  (lib/screen-run `verdictBehind` "failed") — and the day it was made
    *  (`screenedOn`, null for a call saved before the pipeline dated one) */
   previousCall?: { label: string; color: string; on: string | null } | null;
+  /** the failure is the document's (lib/anthropic/document-failures): a
+   *  retry reads the same file the same way, so the email says the way on
+   *  is replacing the OM on the deal page, as the page's banner offers */
+  replaceOm?: boolean;
 }
+
+/** What a document's failure asks of the reader, said once in the email. */
+export const REPLACE_OM_LINE =
+  "Trying again would read the same file the same way — replace the OM on the deal page to go on.";
 
 /** The sentence a stopped re-screen says about the call that stands. */
 export function previousCallLine(call: { label: string; on: string | null }): string {
@@ -223,6 +233,7 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
     `${input.dealName} — the screen stopped before its verdict.`,
     ``,
     input.message,
+    input.replaceOm ? REPLACE_OM_LINE : null,
     stands ? `` : null,
     stands,
     ``,
@@ -247,13 +258,14 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
   const html = emailDocument({
     title: subject,
     // Why it stopped, first; then the call that stands.
-    preheader: [input.message, stands].filter(Boolean).join(" "),
+    preheader: [input.message, input.replaceOm ? REPLACE_OM_LINE : null, stands].filter(Boolean).join(" "),
     rows: `
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#a8432f;">The screen stopped</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
             <p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.message)}</p>
+            ${input.replaceOm ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(REPLACE_OM_LINE)}</p>` : ""}
             ${standing}
             ${button(input.dealUrl, "Open the deal")}
           </td>
@@ -276,6 +288,10 @@ export interface DigestInput {
    *  soonest first; `pictureUrl` is the deal's square (#464,
    *  lib/email-picture) */
   offersDue: { name: string; due: string; url: string; pictureUrl?: string | null }[];
+  /** how many open deals' deadlines fall in the window — `offersDue` lists
+   *  the soonest few (lib/digest), and the rest are said as "and 9 more due
+   *  by Sun, Oct 11 — open the pipeline"; absent is the list's own length */
+  offersDueTotal?: number;
   /** the window's last day, as the deadlines are written ("Sun, Oct 11"):
    *  the section is headed "Offers due by" it, so it says the window it
    *  lists — a "this week" heading had listed eight days */
@@ -291,6 +307,10 @@ export interface DigestInput {
     pictureUrl?: string | null;
     note?: string | null;
   }[];
+  /** how many calls landed in the last 7 days — `verdicts` lists the newest
+   *  few, and the rest are said as "and 4 more since last week"; absent is
+   *  the list's own length */
+  verdictsTotal?: number;
   pipelineUrl: string;
   settingsUrl: string;
   /** the unsubscribe link (lib/email-unsubscribe): drawn in the footer
@@ -330,6 +350,14 @@ export function weeklyDigestEmail(input: DigestInput): {
   const dealsWord = `${open} open deal${open === 1 ? "" : "s"}`;
   const subject = `Your pipeline this week — ${dealsWord}`;
   const offersTitle = `Offers due by ${input.offersThrough}`;
+  // Each list stops at a few (lib/digest) and says how many it left out —
+  // a cut list had dropped nine of fifteen deadlines with no sign.
+  const offersTotal = Math.max(input.offersDueTotal ?? 0, input.offersDue.length);
+  const offersMore = offersTotal - input.offersDue.length;
+  const verdictsTotal = Math.max(input.verdictsTotal ?? 0, input.verdicts.length);
+  const verdictsMore = verdictsTotal - input.verdicts.length;
+  const offersMoreWords = offersMore > 0 ? `and ${offersMore} more due by ${input.offersThrough}` : null;
+  const verdictsMoreWords = verdictsMore > 0 ? `and ${verdictsMore} more since last week` : null;
 
   const text = [
     `Your pipeline this week — ${dealsWord}, by stage:`,
@@ -338,9 +366,11 @@ export function weeklyDigestEmail(input: DigestInput): {
     input.offersDue.length ? `` : null,
     input.offersDue.length ? `${offersTitle}:` : null,
     ...input.offersDue.map((o) => `  ${o.name} — ${o.due}: ${o.url}`),
+    offersMoreWords ? `  ${offersMoreWords} — open the pipeline: ${input.pipelineUrl}` : null,
     input.verdicts.length ? `` : null,
     input.verdicts.length ? `Verdicts since last week:` : null,
     ...input.verdicts.map((v) => `  ${v.label}: ${v.name}${v.note ? ` (${v.note})` : ""} — ${v.url}`),
+    verdictsMoreWords ? `  ${verdictsMoreWords}` : null,
     ``,
     `Open the pipeline: ${input.pipelineUrl}`,
     ``,
@@ -352,11 +382,16 @@ export function weeklyDigestEmail(input: DigestInput): {
     .join("\n");
 
   // The deadlines first — the one thing in a digest with a date on it — then
-  // the count and the calls.
+  // the count and the calls, each count the true one, not the list's.
+  const offersListed = input.offersDue.map((o) => `${o.name} (${o.due})`).join(", ");
   const preheader = [
-    input.offersDue.length ? `Offers due: ${input.offersDue.map((o) => `${o.name} (${o.due})`).join(", ")}.` : null,
+    input.offersDue.length
+      ? offersMore > 0
+        ? `${offersTotal} offers due by ${input.offersThrough}: ${offersListed}, and ${offersMore} more.`
+        : `Offers due: ${offersListed}.`
+      : null,
     `${dealsWord} in your pipeline.`,
-    input.verdicts.length ? `${input.verdicts.length} verdict${input.verdicts.length === 1 ? "" : "s"} since last week.` : null,
+    verdictsTotal ? `${verdictsTotal} verdict${verdictsTotal === 1 ? "" : "s"} since last week.` : null,
   ]
     .filter((l): l is string => l !== null)
     .join(" ");
@@ -403,11 +438,18 @@ export function weeklyDigestEmail(input: DigestInput): {
     )
     .join("");
 
-  const section = (title: string, rows: string) =>
+  // What a cut list left out, under it (`more`, already escaped).
+  const section = (title: string, rows: string, more: string | null = null) =>
     rows
       ? `<p style="margin:20px 0 6px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5f6b69;">${esc(title)}</p>
-         <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${rows}</table>`
+         <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${rows}</table>${
+           more ? `<p style="margin:6px 0 0;font-size:13px;color:#5f6b69;">${more}</p>` : ""
+         }`
       : "";
+  const offersMoreHtml = offersMoreWords
+    ? `${esc(offersMoreWords)} — <a href="${esc(input.pipelineUrl)}" style="color:#114e54;font-weight:600;">open the pipeline</a>`
+    : null;
+  const verdictsMoreHtml = verdictsMoreWords ? esc(verdictsMoreWords) : null;
 
   const html = emailDocument({
     title: subject,
@@ -418,8 +460,8 @@ export function weeklyDigestEmail(input: DigestInput): {
             <p style="margin:0;font-size:13px;color:#5f6b69;">Monday pipeline digest</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${dealsWord} in your pipeline</h1>
             ${section("Open deals by stage", stageRows)}
-            ${section(offersTitle, offerRows)}
-            ${section("Verdicts since last week", verdictRows)}
+            ${section(offersTitle, offerRows, offersMoreHtml)}
+            ${section("Verdicts since last week", verdictRows, verdictsMoreHtml)}
             ${button(input.pipelineUrl, "Open the pipeline")}
           </td>
         </tr>${footerRow(

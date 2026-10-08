@@ -3,8 +3,13 @@ import ExcelJS from "exceljs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 import { assetClassLabel } from "@/lib/asset-class";
-import { parsePct, parsePrice, priceRange } from "@/lib/criteria";
-import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import { parsePct, parsePrice, priceRange, type BuyBoxCoverage } from "@/lib/criteria";
+import { FIRST_READ_TITLE } from "@/lib/first-read";
+import { FOLD_WORD, checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
+import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
+import { CAP_WITHHELD, PLAN_CAP_NA } from "@/lib/cap-slot";
+import { debtTagMeaning } from "@/lib/pipeline-tags";
+import { YOC_WITHHELD } from "@/lib/plan-facts";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -25,6 +30,13 @@ const KILL = "FFB23A30";
 
 const USD = "$#,##0";
 const PCT2 = "0.00%";
+
+/** The Pipeline sheet's header row: frozen under, and repeated on every
+ *  printed page. */
+const HEAD_ROW = 4;
+/** The underwrite workbook's print margins (lib/underwrite/workbook), in
+ *  inches. */
+const PRINT_MARGINS = { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 };
 
 export interface PipelineExportRow {
   name: string;
@@ -91,34 +103,92 @@ export interface PipelineExportRow {
    *  economic occupancy (lib/self-storage `selfStorageTag`, #471); carried
    *  in the price cell's note */
   storage?: string | null;
-  /** the going-in cap on today's income — always null on a plan deal, and
-   *  on a note (`capWithheld`) */
+  /** the rent rules that reach the building — "Rent-stabilized, 41 of 48",
+   *  "Rent rules: check" (lib/rent-regulation `regulationTag`); carried in
+   *  the price cell's note */
+  regulation?: string | null;
+  /** a forward purchase or a build-to-suit bought at delivery — "Forward,
+   *  delivers Q2 2028", "Build-to-suit, 6.00% at delivery"
+   *  (lib/forward-purchase `forwardTag`); carried in the price cell's note */
+  forward?: string | null;
+  /** a mixed-use building's commercial share — "Commercial 29% of income"
+   *  (lib/mixed-use `mixedUseTag`); carried in the price cell's note */
+  mixedUse?: string | null;
+  /** an operating business on its real estate — "Going concern", "Operator
+   *  lease, 2.61x coverage" (lib/going-concern `goingConcernTag`); carried in
+   *  the price cell's note */
+  goingConcern?: string | null;
+  /** condominium units bought in bulk — "Bulk 42 of 120 (35%)", "Condo
+   *  units" (lib/condo `condoTag`); carried in the price cell's note */
+  condo?: string | null;
+  /** a sandwich position's spread — "Spread $720k, 1.65× cover", "Subleases
+   *  under the master rent" (lib/sandwich-lease `sandwichTag`); carried in
+   *  the price cell's note */
+  sandwich?: string | null;
+  /** the going-in cap on today's income — the memorandum's, else the first
+   *  signal's, as the pipeline card reads it — always null on a plan deal,
+   *  and where the slot is withheld (`capWithheld`) */
   cap: string | null;
   /** "note" where the going-in cap is withheld because the price is a
-   *  loan's: the collateral's income over it is a cap nobody earns
-   *  (lib/compare-interest `noteCapSlot`) — the cell says "n/a — note" */
-  capWithheld?: "note" | null;
-  /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
-  yieldOnCost: string | null;
+   *  loan's: the collateral's income over it is a cap nobody earns;
+   *  "position" where it is a preferred equity position's; and "share"
+   *  where it is a share's beside the loan its entity carries (lib/compare-
+   *  interest `capSlotWithheld`) — the cell says "n/a — note", "n/a —
+   *  position" or "n/a — share"; and "under_water" for a note whose
+   *  balance is over the collateral's stated value, whose yield is withheld
+   *  too — "n/a — under water" (`capSlotReason`, research pass 38) */
+  capWithheld?: "note" | "position" | "share" | "under_water" | null;
+  /** a note's yield to maturity, or a position's to redemption, at its
+   *  price — "17.0%", the pipeline card's figure (lib/compare-interest
+   *  `ownYieldText`) — written in the cap cell with what it runs to; null
+   *  where none can be stated, and the cell says the cap is withheld */
+  noteYield?: string | null;
+  /** a plan deal's stabilized NOI over total cost, as a fraction — 0.0627
+   *  — written raw into the cell, whose "0.00%" shows the "6.27%" the deal
+   *  header prints; never a rounded string read back */
+  yieldOnCost: number | null;
+  /** why no yield on cost is struck where the plan states both figures —
+   *  at or past the ceiling, a yield no project earns (lib/deal-strategy
+   *  `planSummary`'s `yieldWithheld`): the cell says `YOC_WITHHELD`, this
+   *  in its note; absent or null otherwise */
+  yieldWithheld?: string | null;
   fit: "fits" | "near" | "outside" | null;
+  /** how many of the box's criteria the fit stands on (lib/criteria
+   *  `buyBoxCoverage`) — the cell says "Fits (2 of 4)" where not every one
+   *  could be checked, names them in its note, and is never green while
+   *  one the price decides is among them */
+  fitCoverage?: BuyBoxCoverage | null;
   /** the fit is judged on the screen's first signal, the extraction not
    *  landed yet — the pipeline card's "First read" (lib/first-read); the
    *  cell says so beside the fit it shows */
   fitFirstRead?: boolean | null;
   verdict: string | null; // pass | caution | pass_on
-  /** the call on file is the previous screen's: a re-screen is running, or
-   *  the latest screen failed before its verdict (lib/screen-run
-   *  `verdictBehind`) — the cell says so beside the call it shows */
-  verdictBehind?: "running" | "failed" | null;
+  /** the ISO day the call on file was written (lib/screen-run
+   *  `screenedDay`): the column after the call — null, and "—", for a deal
+   *  with no call, never the day it was added (research pass 42) */
+  screenedAt?: string | null;
+  /** the call on file is the previous screen's: a re-screen is running,
+   *  the latest screen failed before its verdict, or it stopped making
+   *  progress on the way (lib/screen-run `verdictBehind`) — the cell says
+   *  so beside the call it shows */
+  verdictBehind?: "running" | "failed" | "stalled" | null;
   offersDue: string | null; // YYYY-MM-DD
   createdAt: string; // ISO
   addedBy: string | null;
+  /** the deal was typed by hand, its figures extracted from no OM
+   *  (lib/manual-deal `typedByHand`): the summary says so where any is
+   *  among the rows (audit C6, LOW-7) */
+  typedByHand?: boolean;
 }
 
-const FIT_LABEL: Record<string, { label: string; color: string }> = {
-  fits: { label: "Fits", color: PASS },
-  near: { label: "Near", color: CAUTION },
-  outside: { label: "Outside", color: KILL },
+/** A fit's colour by its tone (lib/fit-label `fitTone`): the fold's own —
+ *  green, amber, red — and muted, never green, while a criterion the price
+ *  decides could not be checked. */
+const FIT_COLOR: Record<FitTone, string> = {
+  pass: PASS,
+  caution: CAUTION,
+  kill: KILL,
+  muted: MUTED,
 };
 
 const VERDICT_LABEL: Record<string, { label: string; color: string }> = {
@@ -137,25 +207,44 @@ export async function buildPipelineWorkbook(
   wb.created = exportedAt;
 
   /* ------------------------------ Pipeline ------------------------------ */
+  // Frozen through the Deal column as well as under the header: frozen rows
+  // alone, scrolling right kept the figures and lost whose they were
+  // (research pass 35).
   const ws = wb.addWorksheet("Pipeline", {
-    views: [{ state: "frozen", ySplit: 4 }],
+    views: [{ state: "frozen", xSplit: 2, ySplit: HEAD_ROW }],
   });
+  // Each column as wide as its words, and no wider: the sheet prints one page
+  // wide, so every spare unit is smaller type on paper.
   ws.columns = [
     { width: 2 },
-    { width: 34 }, // Deal
-    { width: 20 }, // Stage
+    { width: 34 }, // Deal — a longer name wraps
+    { width: 16 }, // Stage — "Under contract / DD"
     { width: 13 }, // Asset
     { width: 13 }, // Deal type
-    { width: 22 }, // Market
+    { width: 25 }, // Market — "Brewerytown, Philadelphia, PA" whole (22 cut it)
     { width: 14 }, // Price
     { width: 11 }, // Cap
     { width: 13 }, // Yield on cost
-    { width: 10 }, // Buy box
-    { width: 10 }, // Verdict
+    { width: 16 }, // Buy box — "Outside (3 of 4)" on one line; a first read's longer words wrap
+    { width: 24 }, // Verdict — "Re-screening (was Caution)", "Screen stalled (was Caution)" (10 cut them)
+    { width: 12 }, // Screened — the day the call was written
     { width: 12 }, // Offers due
     { width: 12 }, // Added
-    { width: 18 }, // Added by
+    { width: 16 }, // Added by
   ];
+  // Printed as a meeting reads it: landscape, one page wide however many
+  // deals run down it, the header row on every page. With no page setup the
+  // sheet printed over five portrait pages, and pages two to four were rows
+  // of figures with no deal's name beside them.
+  ws.pageSetup = {
+    ...ws.pageSetup,
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    printTitlesRow: `${HEAD_ROW}:${HEAD_ROW}`,
+    margins: PRINT_MARGINS,
+  };
 
   const t = ws.getCell("B2");
   t.value = "Pipeline";
@@ -175,11 +264,12 @@ export async function buildPipelineWorkbook(
     "Yield on cost",
     "Buy box",
     "Verdict",
+    "Screened",
     "Offers due",
     "Added",
     "Added by",
   ];
-  const headRow = ws.getRow(4);
+  const headRow = ws.getRow(HEAD_ROW);
   HEADERS.forEach((h, i) => {
     const c = headRow.getCell(i + 2);
     c.value = h;
@@ -188,12 +278,15 @@ export async function buildPipelineWorkbook(
     c.alignment = {
       horizontal: i >= 5 && i <= 7 ? "right" : "left",
       vertical: "middle",
+      // The Buy box column sets its words off the right-aligned yield on
+      // cost beside it: printed one page wide, "—Outside" read as one word.
+      ...(h === "Buy box" ? { indent: 1 } : {}),
     };
     if (h === "Yield on cost") {
       c.note =
-        "Plan deals — value-add, lease-up, conversion, development — have no going-in cap. " +
-        "This is the OM's stabilized NOI over total cost (price plus the capital budget), " +
-        "the figure such a deal is judged on.";
+        "Plan deals — value-add, lease-up, conversion, development — are judged on yield on total cost, " +
+        "not on an in-place cap. This is the OM's stabilized NOI over total cost (price plus the " +
+        "capital budget).";
     }
   });
   headRow.height = 18;
@@ -204,7 +297,8 @@ export async function buildPipelineWorkbook(
   );
   for (const r of rows) byStage.get(normalizeStage(r.stage))!.push(r);
 
-  let rowN = 5;
+  const firstRow = HEAD_ROW + 1;
+  let rowN = firstRow;
   let lastDealRow = 0;
   const today = exportedAt.toISOString().slice(0, 10);
   for (const stage of STAGES) {
@@ -212,16 +306,19 @@ export async function buildPipelineWorkbook(
     if (!group.length) continue;
     const isDead = stage === "dead";
 
-    // Stage band.
-    ws.mergeCells(`B${rowN}:N${rowN}`);
-    const band = ws.getCell(`B${rowN}`);
-    band.value = `${STAGE_LABEL[stage]}  ·  ${group.length}`;
-    band.font = { bold: true, size: 10, color: { argb: isDead ? MUTED : BRAND } };
-    band.fill = {
+    // Stage band: its words in the Deal column, its fill across the row —
+    // never one cell merged across the frozen Deal column's edge, which
+    // would split the merged cell between the pane that stays and the pane
+    // that scrolls.
+    const bandFill: ExcelJS.Fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: isDead ? FAINT : BRAND_SOFT },
     };
+    for (let c = 2; c <= HEADERS.length + 1; c++) ws.getRow(rowN).getCell(c).fill = bandFill;
+    const band = ws.getCell(`B${rowN}`);
+    band.value = `${STAGE_LABEL[stage]}  ·  ${group.length}`;
+    band.font = { bold: true, size: 10, color: { argb: isDead ? MUTED : BRAND } };
     ws.getRow(rowN).height = 16;
     rowN++;
 
@@ -231,6 +328,10 @@ export async function buildPipelineWorkbook(
 
       row.getCell(2).value = d.name;
       row.getCell(2).font = { ...baseFont, bold: !isDead };
+      // A name longer than the frozen column wraps, so the row grows to
+      // print it whole: "Harbor Point — Performing First Mortgage" had lost
+      // its last letter on every page.
+      row.getCell(2).alignment = { wrapText: true };
       row.getCell(3).value = STAGE_LABEL[normalizeStage(d.stage)];
       row.getCell(3).font = baseFont;
       row.getCell(4).value = assetClassLabel(d.assetClass) || "—";
@@ -270,7 +371,7 @@ export async function buildPipelineWorkbook(
       const notes = [
         priceSpan ? `The memorandum states a range, ${d.price}: the cell is its top, the end that does not flatter the returns.` : null,
         d.interest ? `${d.interest}: the price does not buy the building outright — the deal page says what it buys.` : null,
-        d.debt ? `${d.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate.` : null,
+        d.debt ? `${d.debt}: ${debtTagMeaning(d.debt)}.` : null,
         d.affordable ? `${d.affordable}: a covenant or a contract sets these rents — they move with the limits, not the market; the deal page says until when.` : null,
         d.tenancy ? `${d.tenancy}: one lease is the whole income — the deal page reads its guarantor, its term and its increases.` : null,
         d.hotel ? `${d.hotel}: what the hotel is sold with — the deal page reads the flag, the manager and the PIP.` : null,
@@ -283,6 +384,12 @@ export async function buildPipelineWorkbook(
         d.student ? `${d.student}: a student building's leasing for the coming year — the deal page reads the pace, the beds and the walk to campus.` : null,
         d.mh ? `${d.mh}: a manufactured-housing park — the deal page reads the lot rent against the market's, the park-owned homes and the water and sewer.` : null,
         d.storage ? `${d.storage}: a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate.` : null,
+        d.regulation ? `${d.regulation}: the rent rules that reach the building — the deal page reads the regime, the regulated share and the allowance in force against the model's growth.` : null,
+        d.forward ? `${d.forward}: the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery.` : null,
+        d.mixedUse ? `${d.mixedUse}: a mixed-use building's commercial share — the deal page reads the two incomes, the commercial space and what one exit cap does to both.` : null,
+        d.goingConcern ? `${d.goingConcern}: an operating business on its real estate — the deal page reads whose earnings these are, the rent's coverage and the split.` : null,
+        d.condo ? `${d.condo}: condominium units in an association its declaration governs — the deal page reads the buyer's share of the votes, a year of the dues and a lender's limit on a single owner.` : null,
+        d.sandwich ? `${d.sandwich}: a master lease of the building, sublet — the master rent is owed whatever the subtenants pay; the deal page reads the spread, its cover and the master lease's term.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 
@@ -294,19 +401,36 @@ export async function buildPipelineWorkbook(
       if (capNum != null) {
         capCell.value = capNum / 100;
         capCell.numFmt = PCT2;
+      } else if (!d.planDeal && d.noteYield && (d.capWithheld === "note" || d.capWithheld === "position")) {
+        // The pipeline card's figure in the slot: a note's or a position's
+        // own yield, said with what it runs to — text, so it draws no bar
+        // among the column's caps — and why it stands where a cap would.
+        const words = OWN_YIELD_WORDS[d.capWithheld];
+        capCell.value = `${d.noteYield} ${words.to}`;
+        capCell.note =
+          d.capWithheld === "note"
+            ? "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. Its yield to maturity at its price stands in its place."
+            : "A preferred equity position has no going-in cap: its price buys a rate and a redemption, never a slice of the building. Its yield to redemption at its price stands in its place.";
       } else {
-        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : d.capWithheld === "note" ? "n/a — note" : "—");
+        // A plan deal's words are the pipeline CSV's too (lib/cap-slot), and
+        // so are a withheld slot's — a note under water's with its reason.
+        capCell.value = d.cap ?? (d.planDeal ? PLAN_CAP_NA : d.capWithheld ? CAP_WITHHELD[d.capWithheld].na : "—");
+        if (!d.cap && !d.planDeal && d.capWithheld === "under_water") capCell.note = CAP_WITHHELD.under_water.title;
       }
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };
 
-      const yocNum = d.yieldOnCost ? parsePct(d.yieldOnCost) : null;
       const yocCell = row.getCell(9);
-      if (yocNum != null) {
-        yocCell.value = yocNum / 100;
+      if (d.yieldOnCost != null && Number.isFinite(d.yieldOnCost)) {
+        yocCell.value = d.yieldOnCost;
         yocCell.numFmt = PCT2;
+      } else if (d.yieldWithheld) {
+        // A yield no project earns is refused in the plan's own words, the
+        // sentence why in the cell's note (research pass 38).
+        yocCell.value = YOC_WITHHELD;
+        yocCell.note = d.yieldWithheld;
       } else {
-        yocCell.value = d.yieldOnCost ?? "—";
+        yocCell.value = "—";
       }
       yocCell.font = baseFont;
       yocCell.alignment = { horizontal: "right" };
@@ -314,20 +438,35 @@ export async function buildPipelineWorkbook(
       // A fit judged on the first signal is the card's "First read": said on
       // the cell, in italic as a call not yet the screen's own is, and
       // explained in its note — never passed off as the full screen's fit.
-      const fit = d.fit ? FIT_LABEL[d.fit] : null;
-      const firstRead = !!fit && !!d.fitFirstRead;
-      row.getCell(10).value = fit ? markFirstRead(fit.label, firstRead) : "—";
-      row.getCell(10).font = fit
+      // A fit that stands on part of the box says on how much — "Fits (2 of
+      // 4)" — names what could not be checked in its note, and is not green
+      // while that includes a criterion the price decides: a note's cap and
+      // return, which the box cannot judge, had read a green "Fits"
+      // (research pass 35).
+      const fitWord = d.fit ? FOLD_WORD[d.fit] : null;
+      const firstRead = !!fitWord && !!d.fitFirstRead;
+      const fitColor = FIT_COLOR[fitTone(null, d.fit, d.fitCoverage)];
+      row.getCell(10).value = fitWord ? fitCellText(fitWord, d.fitCoverage, firstRead) : "—";
+      row.getCell(10).alignment = { horizontal: "left", indent: 1, wrapText: true };
+      row.getCell(10).font = fitWord
         ? firstRead
-          ? { size: 10, italic: true, color: { argb: fit.color } }
-          : { size: 10, bold: true, color: { argb: fit.color } }
+          ? { size: 10, italic: true, color: { argb: fitColor } }
+          : { size: 10, bold: true, color: { argb: fitColor } }
         : baseFont;
-      if (firstRead) row.getCell(10).note = FIRST_READ_TITLE;
+      const fitNote = fitWord ? [checkedSentence(d.fitCoverage), firstRead ? FIRST_READ_TITLE : null].filter(Boolean).join(" ") : "";
+      if (fitNote) row.getCell(10).note = fitNote;
 
       const v = d.verdict ? VERDICT_LABEL[d.verdict] : null;
       // A call the latest screen has not re-run is the previous screen's,
       // printed beside this run's terms — said, never passed off as current.
-      const behind = v && d.verdictBehind ? (d.verdictBehind === "running" ? "Re-screening" : "Screen failed") : null;
+      const behind =
+        v && d.verdictBehind
+          ? d.verdictBehind === "running"
+            ? "Re-screening"
+            : d.verdictBehind === "stalled"
+              ? "Screen stalled"
+              : "Screen failed"
+          : null;
       row.getCell(11).value = behind ? `${behind} (was ${v!.label})` : (v?.label ?? "—");
       row.getCell(11).font = v
         ? behind
@@ -335,17 +474,24 @@ export async function buildPipelineWorkbook(
           : { size: 10, bold: true, color: { argb: v.color } }
         : baseFont;
 
-      const dueCell = row.getCell(12);
+      // The day the call on file was written, beside it: a call nine months
+      // old, against other rates and older rules, had read like yesterday's
+      // in the pipeline meeting. The previous screen's day where the call is
+      // the previous screen's.
+      row.getCell(12).value = v ? (d.screenedAt ?? "—") : "—";
+      row.getCell(12).font = baseFont;
+
+      const dueCell = row.getCell(13);
       dueCell.value = d.offersDue ?? "—";
       dueCell.font =
         d.offersDue && d.offersDue < today && !isDead
           ? { size: 10, bold: true, color: { argb: KILL } }
           : baseFont;
 
-      row.getCell(13).value = d.createdAt.slice(0, 10);
-      row.getCell(13).font = baseFont;
-      row.getCell(14).value = d.addedBy ?? "";
+      row.getCell(14).value = d.createdAt.slice(0, 10);
       row.getCell(14).font = baseFont;
+      row.getCell(15).value = d.addedBy ?? "";
+      row.getCell(15).font = baseFont;
       lastDealRow = rowN;
       rowN++;
     }
@@ -355,12 +501,25 @@ export async function buildPipelineWorkbook(
   // Data bars on the three figures a meeting compares across the sheet —
   // price, cap, yield on cost. Excel draws these itself and keeps them live
   // as the numbers change: a picture with no chart library and nothing
-  // computed into a cell. Text cells (a dash, "n/a — plan", a band header)
-  // draw no bar, so a plan deal's cap column stays honestly empty.
+  // computed into a cell.
+  //
+  // Each bar runs from ZERO to the column's largest figure, as the
+  // underwrite workbook's portfolio tab draws its shares, so a bar is its
+  // figure's length: run from the column's smallest, the cheapest deal drew
+  // no bar at all and a $36M price a sliver beside $75M (a 2.1x difference
+  // drawn about 15x), and the lowest cap drew the same empty cell as "n/a —
+  // note" (research pass 35).
+  //
+  // Text cells stay in the range on purpose, and draw nothing: Excel and
+  // LibreOffice draw a data bar on a number alone, and leave a text cell out
+  // of the column's largest — a dash, "n/a — plan", a note's yield said in
+  // words, a stage band. From zero, every figure draws a bar of its own
+  // length, so an empty cap cell is always one of those words, never the
+  // column's lowest cap.
   if (lastDealRow > 0) {
     for (const col of ["G", "H", "I"]) {
       ws.addConditionalFormatting({
-        ref: `${col}5:${col}${lastDealRow}`,
+        ref: `${col}${firstRow}:${col}${lastDealRow}`,
         rules: [
           {
             type: "dataBar",
@@ -370,7 +529,7 @@ export async function buildPipelineWorkbook(
             maxLength: 100,
             showValue: true,
             border: false,
-            cfvo: [{ type: "min" }, { type: "max" }],
+            cfvo: [{ type: "num", value: 0 }, { type: "max" }],
             // The bar's colour rides the rule's model even though the typing
             // omits it (exceljs writes it as the databar's <color>).
             color: { argb: "FFB5CDC9" },
@@ -382,12 +541,29 @@ export async function buildPipelineWorkbook(
 
   /* ------------------------------ Summary ------------------------------- */
   const sum = wb.addWorksheet("Summary");
-  sum.columns = [{ width: 2 }, { width: 30 }, { width: 12 }, { width: 4 }, { width: 30 }, { width: 12 }];
+  // Column C holds the asking value in $#,##0: at 12 wide a team's pipeline
+  // past $1,000,000,000 showed "###" (research pass 35); 18 holds
+  // "$10,000,000,000".
+  sum.columns = [{ width: 2 }, { width: 30 }, { width: 18 }, { width: 4 }, { width: 30 }, { width: 12 }];
+  // One page wide, so the By verdict block prints beside By stage rather
+  // than alone on a page of its own.
+  sum.pageSetup = {
+    ...sum.pageSetup,
+    orientation: "portrait",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: PRINT_MARGINS,
+  };
   const ts = sum.getCell("B2");
   ts.value = "Pipeline summary";
   ts.font = { bold: true, size: 16, color: { argb: INK } };
   const tss = sum.getCell("B3");
-  tss.value = `Exported ${exportedAt.toISOString().slice(0, 10)} — figures as extracted from each OM.`;
+  // A deal typed by hand was extracted from no OM: where any is among the
+  // rows the line says so, as the analytics and the comps do (audit C6,
+  // LOW-7).
+  const typed = rows.some((d) => d.typedByHand);
+  tss.value = `Exported ${exportedAt.toISOString().slice(0, 10)} — figures as extracted from each OM${typed ? ", or as entered by hand" : ""}.`;
   tss.font = { size: 10, color: { argb: MUTED }, italic: true };
 
   const header = (cell: string, text: string) => {

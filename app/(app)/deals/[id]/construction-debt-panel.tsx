@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
+import { compactUsd } from "@/lib/money";
 import { useMemo, useState } from "react";
 import { withArticle } from "@/lib/article";
 import { parseMoney } from "@/lib/criteria";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import type { RateSeed } from "@/lib/debt-index";
+import { NY_FED_SOFR_NOTICES, carriesNyFedNotice } from "@/lib/data-notices";
 import {
   DEFAULT_DRAW_PROFILE,
   DEFAULT_EXIT_CAP_PCT,
@@ -14,12 +17,9 @@ import {
   sizeConstructionDebt,
   worksYearsFromTimeline,
 } from "@/lib/construction-debt";
-import { yieldOnCostText } from "@/lib/plan-facts";
+import { YOC_WITHHELD, yieldOnCostText } from "@/lib/plan-facts";
 
-const fmtUsd = (n: number) =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const fmtUsd = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const fmtInput = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const pct = (d: number, dp = 1) => `${(d * 100).toFixed(dp)}%`;
 
@@ -66,8 +66,15 @@ export function ConstructionDebtPanel({
   rateSeed?: RateSeed | null;
 }) {
   const seededYears = worksYearsFromTimeline(plan.timeline);
-  const [budgetRaw, setBudgetRaw] = useState(plan.budget ? fmtInput(plan.budget.budget) : "");
-  const [noiRaw, setNoiRaw] = useState(plan.stabilizedNoi ? fmtInput(plan.stabilizedNoi.value) : "");
+  const budgetSeed = plan.budget ? fmtInput(plan.budget.budget) : "";
+  const noiSeed = plan.stabilizedNoi ? fmtInput(plan.stabilizedNoi.value) : "";
+  const [budgetRaw, setBudgetRaw] = useState(budgetSeed);
+  const [noiRaw, setNoiRaw] = useState(noiSeed);
+  // A yield on cost the plan refuses (past the ceiling no project earns,
+  // research pass 38) is not struck here either while the two figures it
+  // would be struck on stand as the memorandum's: the panel starts from the
+  // plan's own sentence, and sizes the figures a reader enters in their place.
+  const refusedAtSeed = plan.yieldWithheld && budgetRaw === budgetSeed && noiRaw === noiSeed ? plan.yieldWithheld : null;
   const [worksYears, setWorksYears] = useState(seededYears ?? DEFAULT_WORKS_YEARS);
   // The construction rate starts from the day's index plus a spread, never
   // from a flat figure, wherever the rates table could seed one. Every
@@ -160,8 +167,20 @@ export function ConstructionDebtPanel({
           .filter((s): s is string => s !== null)
           .join(" ")}
       </p>
+      {/* A rate built on SOFR prints SOFR's figure, which the New York
+          Fed's terms ask be presented with their notice and the DTCC
+          sentence (lib/data-notices): once, small, under the note. */}
+      {rateSeed && carriesNyFedNotice(rateSeed.index) && (
+        <p className="mt-1 text-[10px] leading-snug text-muted" data-qa="nyfed-notice">
+          {NY_FED_SOFR_NOTICES}
+        </p>
+      )}
 
-      {r ? (
+      {refusedAtSeed ? (
+        <p className="mt-3 text-xs leading-relaxed text-muted" data-qa="construction-refused">
+          {`Yield on total cost with the carry inside it: ${YOC_WITHHELD}. ${refusedAtSeed} Enter the works budget and the stabilized NOI you underwrite above and the construction sizing appears here.`}
+        </p>
+      ) : r ? (
         <>
           <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(
@@ -217,7 +236,18 @@ export function ConstructionDebtPanel({
                   a real cost of the plan and the OM&apos;s figure leaves it out.
                 </>
               )}{" "}
-              The draw is assumed to average {Math.round(DEFAULT_DRAW_PROFILE * 100)}% outstanding across the works.
+              The draw is assumed to average {Math.round(DEFAULT_DRAW_PROFILE * 100)}% outstanding across the works.{" "}
+              {/* The shortcut describes a loan drawn from the first day; a
+                  lender funds the equity first, so the loan draws later and
+                  less, and the reserve here errs high (research pass 40,
+                  L11; lib/tools/construction-draw runs it by the month). The
+                  method stays the owner's. */}
+              That is a screening shortcut for a loan drawn from the first day: a lender has the equity
+              in first, so the loan draws later and the reserve here errs high —{" "}
+              <Link href="/tools#construction-draw" className="underline decoration-dotted underline-offset-2 hover:text-ink">
+                the construction draw card
+              </Link>{" "}
+              runs the draw month by month.
             </p>
           )}
         </>

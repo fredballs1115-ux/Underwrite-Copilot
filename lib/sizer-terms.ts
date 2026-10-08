@@ -60,6 +60,13 @@ export function modelLoanCoverageLine(dscrYr1: number | null, ltc: number): stri
  * (`sizerStartingRate`), so it is named here only where a loan's own paper
  * states it. It had said "its figures start from the OM's" over a 65% LTV,
  * a 1.25x DSCR, an 8% debt yield and a 30-year amortization that are not.
+ *
+ * Where there is no first-draft model, the NOI is the screening model's own
+ * year-1 NOI (`noiFromScreening`), the one the playground and the workbook
+ * run — a T-12's where one was uploaded — and said as that (research pass
+ * 34: the sizer seeded the OM's in-place NOI beside a playground running
+ * the T-12's, and no NOI at all where the OM stated only the one the model
+ * ran).
  */
 export function sizerSourceLine(o: {
   from: "model" | "extraction" | "defaults";
@@ -70,20 +77,28 @@ export function sizerSourceLine(o: {
   rate: boolean;
   /** the first-draft model's own amortization (else the 30-year default) */
   amortization: boolean;
+  /** the NOI is the screening model's year-1 NOI, not `from`'s */
+  noiFromScreening?: boolean;
 }): string {
   const fromSource = o.from !== "defaults";
+  const screening = o.noi && !!o.noiFromScreening;
   const named = [
     fromSource && o.price ? "price" : null,
-    fromSource && o.noi ? "NOI" : null,
+    fromSource && o.noi && !screening ? "NOI" : null,
     o.from === "model" && o.rate ? "rate" : null,
     o.from === "model" && o.amortization ? "amortization" : null,
   ].filter((w): w is string => w !== null);
   const amortTaken = named.includes("amortization");
   const defaults = `${amortTaken ? "the lender tests are" : "the amortization and lender tests are"} screening defaults — replace them with a lender's terms.`;
-  if (named.length === 0) return `Enter the deal's figures; ${defaults}`;
-  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
-  const whose = o.from === "model" ? "the first-draft model" : "the OM";
-  return `${list[0].toUpperCase()}${list.slice(1)} from ${whose}; ${defaults}`;
+  const parts = [
+    named.length === 0
+      ? null
+      : `${named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`} from ${o.from === "model" ? "the first-draft model" : "the OM"}`,
+    screening ? "NOI from the screening model the playground and the workbook run" : null,
+  ].filter((p): p is string => p !== null);
+  if (parts.length === 0) return `Enter the deal's figures; ${defaults}`;
+  const said = parts.join(", ");
+  return `${said[0].toUpperCase()}${said.slice(1)}; ${defaults}`;
 }
 
 export type SizerRateSource = "stated" | "seed" | "model" | "flat";

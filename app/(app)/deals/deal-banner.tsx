@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { BannerSource } from "@/lib/deal-banner";
+import { bannerSizes, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealCover } from "./deal-cover";
 import { MarketCaption } from "./market-caption";
@@ -47,6 +47,20 @@ import { previewStyle } from "@/lib/photo-preview";
  * leaves the lead photograph on screen. The card is told whether the
  * deal's own photograph is the picture on screen (`onPhoto`), so it offers
  * the others only over it.
+ *
+ * What the picture says about itself — its credit, the market's caption,
+ * the photographs counted, the ring on an overhead — waits for the picture
+ * it describes to load whole (`BannerFace`), as the picture does, and so
+ * does `onPhoto`: until then the frame is the deal's cover without its
+ * words, or the photograph's own blur, and says nothing. A card had worn
+ * "From the offering memorandum", or a photographer's name and licence,
+ * over the drawn cover for as long as a phone took to fetch the photograph.
+ *
+ * A stored photograph offers its card copy beside its hero (`srcSet`,
+ * research pass 29), asked with the card's `sizes` — wider for a panorama
+ * that covers the card by its height (`bannerSizes`) — so a laptop's card
+ * downloads a third of the bytes. Which of them the browser took is the
+ * browser's: a picture counts as loaded by its source, never by the URL.
  */
 export function DealBanner({
   sources,
@@ -108,18 +122,21 @@ export function DealBanner({
   const lift = sources[0]?.pending ? sources[0] : null;
   const rest = lift ? sources.slice(1) : sources;
   const [at, setAt] = useState(0);
-  // Which source has loaded whole: the picture fades in only then.
+  // Which source has loaded whole, by its `src`: the picture fades in only
+  // then. By the source, not by the URL the browser fetched, which a srcset
+  // leaves to the browser (research pass 29).
   const [loaded, setLoaded] = useState<string | null>(null);
   const [lifted, setLifted] = useState<"trying" | "shown" | "gone">("trying");
   const ref = useRef<HTMLImageElement>(null);
   const liftRef = useRef<HTMLImageElement>(null);
+  const baseSrc = rest[at]?.src ?? null;
   useEffect(() => {
     // A picture that settled before hydration fired its event unheard.
     const img = ref.current;
     if (!img?.complete) return;
     if (img.naturalWidth === 0) setAt((i) => i + 1);
-    else setLoaded(img.currentSrc || img.src);
-  }, [at]);
+    else setLoaded(baseSrc);
+  }, [at, baseSrc]);
   useEffect(() => {
     // A picture that settled before hydration fired its event unheard.
     const img = liftRef.current;
@@ -128,8 +145,15 @@ export function DealBanner({
   // The other photographs (#450): which has loaded whole, and which failed.
   const [slideLoaded, setSlideLoaded] = useState<string | null>(null);
   const [slideGone, setSlideGone] = useState<ReadonlySet<string>>(new Set());
-  const screen = lifted === "shown" ? lift : rest[at];
-  const photoOnScreen = screen?.kind === "photo";
+  const base = rest[at];
+  const baseLoaded = !!base && loaded === base.src;
+  const shown = !!lift && lifted === "shown";
+  const trying = !!lift && lifted === "trying";
+  const screen = shown ? lift : base;
+  // Whether the picture on screen has loaded whole: until it has, the frame
+  // is the cover or the photograph's blur, and nothing on it speaks for it.
+  const screenLoaded = shown || baseLoaded;
+  const photoOnScreen = screenLoaded && screen?.kind === "photo";
   useEffect(() => {
     onPhoto?.(photoOnScreen);
   }, [photoOnScreen, onPhoto]);
@@ -141,11 +165,9 @@ export function DealBanner({
     return () => onMarket?.(null);
   }, [marketOnScreen, onMarket]);
 
-  const base = rest[at];
-  const baseLoaded = !!base && loaded !== null && loaded.endsWith(base.src);
-  const shown = !!lift && lifted === "shown";
-  const trying = !!lift && lifted === "trying";
   const shape = aspect === "16/10" ? "aspect-[16/10]" : "aspect-[16/9]";
+  // The frame's shape, for a panorama's `sizes` (`bannerSizes`).
+  const frameAspect = aspect === "16/10" ? 16 / 10 : 16 / 9;
   const altOf = (s: BannerSource) =>
     s.alt ??
     (s.kind === "photo"
@@ -213,8 +235,9 @@ export function DealBanner({
   // lifted photograph once it has loaded, the next picture until then.
   const onScreen = shown ? lift! : base!;
   // The other photograph asked for (#450), over the deal's own photograph
-  // only; its credit once it is whole on screen.
-  const asked = !shown && onScreen.kind === "photo" && slide > 0 ? (slides[slide - 1] ?? null) : null;
+  // only, once that has loaded; its credit and its place in the count once
+  // it is whole on screen.
+  const asked = !shown && screenLoaded && onScreen.kind === "photo" && slide > 0 ? (slides[slide - 1] ?? null) : null;
   const other = asked && !slideGone.has(asked.src) ? asked : null;
   const otherLoaded = !!other && slideLoaded === other.src;
   const credit = other && otherLoaded ? other.credit : onScreen.credit;
@@ -240,15 +263,16 @@ export function DealBanner({
           key={base.src}
           ref={ref}
           src={base.src}
+          srcSet={base.srcSet}
           alt={shown ? "" : altOf(base)}
           aria-hidden={shown ? true : undefined}
           width={640}
           height={aspect === "16/10" ? 400 : 360}
-          sizes={sizes}
+          sizes={bannerSizes(base, sizes, frameAspect)}
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
-          onLoad={(e) => setLoaded(e.currentTarget.currentSrc || e.currentTarget.src)}
+          onLoad={() => setLoaded(base.src)}
           onError={() => setAt((i) => i + 1)}
           className={`relative ${shape} w-full object-cover transition-[opacity,transform] duration-500 ease-out motion-safe:group-hover:scale-[1.03] ${
             baseLoaded ? "opacity-100" : "opacity-0"
@@ -262,12 +286,13 @@ export function DealBanner({
         <img
           key={other.src}
           src={other.src}
+          srcSet={other.srcSet}
           alt={otherLoaded ? (other.alt ?? `Photograph of ${label}`) : ""}
           aria-hidden={otherLoaded ? undefined : true}
           data-slide={slide}
           width={640}
           height={aspect === "16/10" ? 400 : 360}
-          sizes={sizes}
+          sizes={bannerSizes(other, sizes, frameAspect)}
           decoding="async"
           onLoad={() => setSlideLoaded(other.src)}
           onError={() => {
@@ -283,18 +308,63 @@ export function DealBanner({
       {shade && (
         <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-black/30 to-transparent" />
       )}
-      {onScreen.marker && (
+      <BannerFace
+        source={onScreen}
+        loaded={screenLoaded}
+        photos={photos}
+        position={other && otherLoaded ? slide + 1 : null}
+        credit={credit}
+      />
+    </div>
+  );
+}
+
+/**
+ * What a card's picture says about itself — the ring on a street address's
+ * overhead, how many photographs the deal holds and which is on screen, the
+ * market's caption, or the credit — drawn only once the picture it
+ * describes has loaded whole (`loaded`), and faded in with it. Until then
+ * the frame is the deal's cover without its words, or the photograph's own
+ * blur, and says nothing. Pure, so a test draws both halves.
+ */
+export function BannerFace({
+  source,
+  loaded,
+  photos = 0,
+  position = null,
+  credit,
+}: {
+  /** the picture on screen */
+  source: BannerSource;
+  /** whether it has loaded whole */
+  loaded: boolean;
+  /** how many photographs the deal page holds, counted over its own */
+  photos?: number;
+  /** which of them is on screen, from 1, where another of the deal's
+   *  photographs has been flipped to and is whole on screen */
+  position?: number | null;
+  /** the credit of the photograph on screen: the flipped-to one's once it
+   *  is whole, else the picture's own */
+  credit: string;
+}) {
+  if (!loaded) return null;
+  return (
+    <span
+      data-picture="face"
+      className="pointer-events-none absolute inset-0 transition-opacity duration-500 ease-out starting:opacity-0"
+    >
+      {source.marker && (
         // The building, at the overhead's centre: a white ring with a dark
         // halo, legible over a roof or a road alike.
         <span
           aria-hidden
           data-picture="banner-pin"
-          className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_1px_6px_rgba(0,0,0,0.45)]"
+          className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_1px_6px_rgba(0,0,0,0.45)]"
         >
           <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
         </span>
       )}
-      {onScreen.kind === "photo" && photos > 1 ? (
+      {source.kind === "photo" && photos > 1 ? (
         <span
           data-picture="photo-count"
           className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white"
@@ -303,8 +373,8 @@ export function DealBanner({
             <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
             <circle cx="12" cy="13" r="3.5" />
           </svg>
-          {other ? (
-            <span>{`${slide + 1} / ${photos}`}</span>
+          {position ? (
+            <span>{`${position} / ${photos}`}</span>
           ) : (
             <>
               <span>{photos}</span>
@@ -313,16 +383,20 @@ export function DealBanner({
           )}
         </span>
       ) : null}
-      {onScreen.kind === "market" && onScreen.market ? (
+      {source.kind === "market" && source.market ? (
         // The market's photograph (#438) says so on its face: the market
-        // named over a shade at the foot, so a skyline never passes for the
-        // building, and its photographer and licence beside it.
-        <MarketCaption market={onScreen.market} credit={onScreen.credit} />
+        // named over a scrim at the foot, so a skyline never passes for the
+        // building, and its photographer and licence under it.
+        <MarketCaption market={source.market} credit={source.credit} />
       ) : (
-        <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[9px] leading-tight text-white">
+        // 10px on a 12px line, a pixel above and below and four a side
+        // (research pass 29: 9px was under any comfortable size on a phone):
+        // measured in Geist, a little less of the picture than the 9px chip
+        // covered for every credit a card wears.
+        <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1 py-px text-[10px] leading-[12px] text-white">
           {credit}
         </span>
       )}
-    </div>
+    </span>
   );
 }

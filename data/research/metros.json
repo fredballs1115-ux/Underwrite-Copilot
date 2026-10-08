@@ -278,7 +278,6 @@
           "rent_basis": "avg asking — Q4 2024 print, vintage declared",
           "status": "sourced",
           "sources": [
-            "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024",
             "https://klnb.com/wp-content/uploads/2025/04/NAIKLNB_MD_Industrial_Q1_2025-1.pdf"
           ],
           "note": "County-specific print from the Colliers/KLNB Maryland industrial series, Q4 2024 VINTAGE (declared — the newest MoCo-specific level to clear the bar): asking $6.94/SF, up $0.09 QoQ; +15,360 SF Q4 absorption (2024 total −12,839 SF); NO projects under construction, so new supply pressure is nil and absorption works straight against vacancy. A vacancy RATE for the county has not cleared the bar: Colliers’ Q1 2026 “Maryland 10.1%” runs on a Baltimore/I-95-corridor-shaped base (its own narrative ties the print to that corridor) and is rejected as a MoCo read; Transwestern’s 6.9% suburban-MD figure is Q2 2025 vintage on the two-county base. Both stay recorded, neither is a county vacancy.",
@@ -286,9 +285,7 @@
             "house": "the Colliers/KLNB Maryland industrial series",
             "area": "Montgomery County",
             "period": "Q4 2024",
-            "links": [
-              "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024"
-            ],
+            "links": [],
             "construct": "average asking"
           }
         },
@@ -1370,22 +1367,24 @@
           }
         },
         "multifamily": {
-          "vacancy_pct_low": 3.7,
-          "vacancy_pct_high": 4.6,
+          "vacancy_pct_low": 5.1,
+          "vacancy_pct_high": 5.1,
           "cap_rate_low_pct": 8.3,
           "cap_rate_high_pct": 8.3,
           "status": "sourced",
           "sources": [
-            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook",
-            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/multifamily",
             "https://essexrealtygroup.com/chicago-multifamily-report-april-2026/"
           ],
-          "note": "Band spans stabilized-asset occupancy 96.3% (=3.7% vacancy, JPMorgan) to 4.6% market vacancy (projected 5.1% by Q3 2026); rent growth ~3.8% YoY — supply discipline doing the work. Cap rate: no two-source band captured; null. Cook County landlord rules already on file for this metro. Cap filled Aug 25 with the basis named: Essex Realty (local multifamily brokerage) April 2026 rolling data — 175 transactions, $587.8M, average cap 8.3%. That average is dominated by the Class B/C neighborhood buildings that drive Chicago volume (Northmarq: B/C sales fuel the market); institutional Class A trades price far tighter (gateway core ~4-5% nationally). A transaction average for the small-building stock, not a metro-wide quoted band.",
+          "note": "Cushman & Wakefield's Q2 2026 MarketBeat puts Chicago's apartment occupancy at 94.9% (5.1% vacant), above its 10-year average of 93.8%, with effective rents up 3.2% year over year to $1,972 a unit. Cook County landlord rules already on file for this metro. Cap filled Aug 25 with the basis named: Essex Realty (local multifamily brokerage) April 2026 rolling data — 175 transactions, $587.8M, average cap 8.3%. That average is dominated by the Class B/C neighborhood buildings that drive Chicago volume (Northmarq: B/C sales fuel the market); institutional Class A trades price far tighter (gateway core ~4-5% nationally). A transaction average for the small-building stock, not a metro-wide quoted band.",
           "vacancy_read": {
-            "house": "JPMorgan (3.7%, stabilized assets) and a market read (4.6%)",
+            "house": "Cushman & Wakefield",
+            "area": "Chicago",
+            "period": "Q2 2026",
             "links": [
-              "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook"
-            ]
+              "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/multifamily"
+            ],
+            "construct": "the complement of its 94.9% occupancy rate"
           },
           "cap_read": {
             "house": "Essex Realty",

@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import metrosSeed from "@/data/research/metros.json";
 import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
+import { NEAREST_PARCEL } from "@/lib/public-record-asks";
 
 interface PropertyRow {
   market: string;
@@ -51,8 +52,8 @@ export async function PublicRecordCard({
       const { data } = await supabase.rpc("nearest_property", {
         in_lat: subject.lat,
         in_lng: subject.lng,
-        in_radius_m: 120,
-        in_limit: 1,
+        in_radius_m: NEAREST_PARCEL.radiusM,
+        in_limit: NEAREST_PARCEL.limit,
       });
       if (Array.isArray(data) && data.length > 0) row = data[0] as PropertyRow;
     }

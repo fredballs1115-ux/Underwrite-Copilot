@@ -1,11 +1,13 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { abbrevState, type StructuredAddress } from "@/lib/address";
+import { RECORDED_SALES } from "@/lib/public-record-asks";
 import {
   compStats,
   finalizeComps,
   HONESTY_NOTE,
   providerFor,
+  STORED_COMPS,
   type RecordComp,
   type RecordCompsResult,
 } from "./core";
@@ -17,10 +19,12 @@ import {
 // every failure mode lands as a stored status the panel renders honestly —
 // never a silent absence.
 
-const RADIUS_KM = 1.6; // 1 mile
-const WIDE_RADIUS_KM = 4.8; // 3 miles
-const MONTHS_BACK = 24;
-const WIDE_MONTHS_BACK = 36;
+// The asks, one place (lib/public-record-asks): migration 0037 caps the
+// nearby_sales lookup at the widest of them.
+const RADIUS_KM = RECORDED_SALES.radiusKm; // 1 mile
+const WIDE_RADIUS_KM = RECORDED_SALES.wideRadiusKm; // 3 miles
+const MONTHS_BACK = RECORDED_SALES.monthsBack;
+const WIDE_MONTHS_BACK = RECORDED_SALES.wideMonthsBack;
 const MIN_COMPS_BEFORE_WIDENING = 5;
 const PENDING_STALE_MS = 10 * 60 * 1000;
 
@@ -124,7 +128,7 @@ async function tryDbComps(
       in_radius_m: Math.round(radiusKm * 1000),
       in_asset_class: assetClass.includes("multifamily") ? "multifamily" : null,
       in_months: monthsBack,
-      in_limit: 80,
+      in_limit: RECORDED_SALES.limit,
     });
     if (error || !Array.isArray(data) || data.length === 0) return null;
     return (data as Record<string, unknown>[]).map((r) => ({
@@ -175,7 +179,7 @@ export async function computeRecordComps(input: {
   }
   if (db && db.length > 0) {
     const comps = finalizeComps(db, subject, radiusKm);
-    const stored = comps.slice(0, 40);
+    const stored = comps.slice(0, STORED_COMPS);
     return {
       ...base,
       status: stored.length ? "ok" : "no_sales",
@@ -190,6 +194,11 @@ export async function computeRecordComps(input: {
       },
       comps: stored,
       stats: compStats(stored),
+      // The lookup answers its nearest sales, at most RECORDED_SALES.limit:
+      // a full answer is a set that stops short of the radius asked.
+      capped: db.length >= RECORDED_SALES.limit,
+      sourceOrder: "nearest",
+      found: comps.length,
     };
   }
 
@@ -220,23 +229,27 @@ export async function computeRecordComps(input: {
     if (!res.ok) {
       throw new Error(`${provider.id}: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`);
     }
-    return finalizeComps(provider.parse(await res.json()), subject, rKm);
+    const json = await res.json();
+    // How many rows came back, parsed or not: a full answer is a source that
+    // stopped at its limit, with more sales inside the radius and the window.
+    return { comps: finalizeComps(provider.parse(json), subject, rKm), returned: provider.rowCount(json) };
   };
   try {
     let rKm = RADIUS_KM;
     let mBack = MONTHS_BACK;
-    let comps = await attempt(rKm, mBack);
+    let { comps, returned } = await attempt(rKm, mBack);
     if (comps.length < MIN_COMPS_BEFORE_WIDENING) {
       try {
         const widened = await attempt(WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
         rKm = WIDE_RADIUS_KM;
         mBack = WIDE_MONTHS_BACK;
-        comps = widened;
+        comps = widened.comps;
+        returned = widened.returned;
       } catch {
         if (comps.length === 0) throw new Error(`${provider.id}: widened query failed`);
       }
     }
-    const stored = comps.slice(0, 40);
+    const stored = comps.slice(0, STORED_COMPS);
     return {
       ...base,
       status: stored.length ? "ok" : "no_sales",
@@ -251,6 +264,9 @@ export async function computeRecordComps(input: {
       },
       comps: stored,
       stats: compStats(stored),
+      capped: returned >= RECORDED_SALES.limit,
+      sourceOrder: provider.order,
+      found: comps.length,
     };
   } catch (err) {
     return { ...base, status: "provider_error", error: String(err).slice(0, 500) };

@@ -1,9 +1,14 @@
 // The tags a pipeline deal carries beside its figures — a flood zone, how
-// it is sold, what the price buys, the seller's loan, a covenant on the
-// rents, the one lease, the listed tenants, a renovation program, a tax
-// abatement, a hotel's contracts, the third-party reports, and the reads of
-// a student building, a park and a storage facility — in ONE order, each
-// with its tone and its tooltip, so the list row and the card draw one list
+// it is sold, what the price buys and a sandwich position's spread, a
+// purchase at delivery, an operating business, the seller's loan, a
+// covenant on the rents, the rent rules, the one lease, the listed
+// tenants, a renovation program, a tax abatement, a hotel's contracts, the
+// third-party reports, and the reads of a student building, a park, a
+// storage facility, a mixed-use building and condominium units, and last
+// the reader's own 1031 exchange against the deal (no tag reads a
+// module's tables here: the pipeline's client draws these, so each tone is
+// read off the slot's own words) — in ONE order, each with its tone and
+// its tooltip, so the list row and the card draw one list
 // (lib/pipeline-slots reads each slot). And the card's rule for which of
 // them its picture carries: a chip there is never cut, so one that cannot
 // fit whole on a picture as wide as its card's waits on the card's own
@@ -24,6 +29,21 @@ export type TagTone = "brand" | "caution" | "kill" | "muted";
  */
 export const PERSONAL_TAG: DealTag = { key: "personal", text: PERSONAL_CHIP, tone: "muted", title: PERSONAL_TITLE };
 
+/** The chip a deal screened before a reader its figures turn on wears
+ *  (lib/older-screen, research pass 42). */
+export const OLDER_SCREEN_CHIP = "Older screen";
+
+/**
+ * A screen stored before a reader its figures turn on — what is being sold —
+ * said on the card's line and the row's tag line, at every width, never on
+ * the picture: the chip says it briefly and its title says the server's
+ * sentence ("Screened before the site read what is being sold — re-screen to
+ * read it"). Null where the deal has none to say.
+ */
+export function olderScreenTag(line: string | null | undefined): DealTag | null {
+  return line ? { key: "older", text: OLDER_SCREEN_CHIP, tone: "caution", title: line } : null;
+}
+
 export interface DealTag {
   /** the slot it comes from, stable for a React key */
   key: string;
@@ -31,6 +51,20 @@ export interface DealTag {
   tone: TagTone;
   /** what it means and where the deal page reads it */
   title: string;
+}
+
+/**
+ * What the seller's-loan tag means (lib/assumable-debt `assumableTag`), read
+ * off its own words: a fixed coupon — "Assumable 3.45%", "Assumable 2.65% +
+ * MIP" — the deal page prices against today's rate; a floating rate, a
+ * second loan assumed with it or a loan with no stated rate it reads as
+ * stated and says why it prices nothing (research pass 37). The meeting
+ * workbook's price note says the same.
+ */
+export function debtTagMeaning(tag: string): string {
+  return /^Assumable \d+(?:\.\d+)?%(?: \+ MIP)?$/.test(tag)
+    ? "the seller's loan is offered for assumption — the deal page prices it against today's rate"
+    : "the seller's loan is offered for assumption — the deal page reads its terms as stated and says what it cannot price";
 }
 
 /**
@@ -44,18 +78,52 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
     text ? { key, text, tone, title: `${text}: ${why}` } : null;
   return [
     // A Special Flood Hazard Area (#426): a cost and a lender's condition.
-    tag("flood", flood?.tag, "kill", "FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance; the deal page draws the map"),
+    tag("flood", flood?.tag, "kill", "FEMA's Special Flood Hazard Area at the building's point — federal law requires flood insurance there on a regulated or agency lender's loan, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees; the deal page draws the map"),
     // An auction's figure is where the bidding opens; a court's or a
     // lender's sale is as-is (#456).
     tag("sale", slots.sale, "caution", "the figure is where the bidding opens or the seller is not an owner — the deal page reads the sale"),
     // A share's price, a note's, the land's under a ground lease (#415).
     tag("interest", slots.interest, "brand", "the price does not buy the building outright — the deal page says what it buys"),
+    // A sandwich position (lib/sandwich-lease): the spread between the
+    // subleases and the master rent; subleases that bring in less than the
+    // master rent, or exactly it — no spread at all — warn, as the panel
+    // does (the pre-merge audit).
+    tag(
+      "sandwich",
+      slots.sandwich,
+      slots.sandwich && /^Subleases (?:under|equal)\b/.test(slots.sandwich) ? "caution" : "brand",
+      "a master lease of the building, sublet — the master rent is owed whatever the subtenants pay; the deal page reads the spread, its cover and the master lease's term",
+    ),
+    // A forward purchase (lib/forward-purchase): the price is paid when the
+    // building is delivered, and the developer funds the works.
+    tag("forward", slots.forward, "brand", "the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery"),
+    // An operating business (lib/going-concern): a business sold with its
+    // real estate, or one the memorandum does not settle, warns; so does a
+    // lease its operator's earnings do not cover ("0.xx coverage").
+    tag(
+      "goingConcern",
+      slots.goingConcern,
+      slots.goingConcern && (/^(?:Going concern|Operating business)/.test(slots.goingConcern) || /, 0\.\d+x coverage$/.test(slots.goingConcern)) ? "caution" : "brand",
+      "an operating business on its real estate — the deal page reads whose earnings these are, the rent's coverage and the split",
+    ),
     // The seller's loan, offered for assumption (#419).
-    tag("debt", slots.debt, "brand", "the seller's loan is offered for assumption — the deal page prices it against today's rate"),
+    tag("debt", slots.debt, "brand", slots.debt ? debtTagMeaning(slots.debt) : ""),
     // A note the seller will carry (#462).
     tag("sellerNote", slots.sellerNote, "brand", "the seller offers to carry financing — the deal page prices the note against today's rate"),
     // A covenant or a contract that sets the rents (#453).
     tag("affordable", slots.affordable, "brand", "a covenant or a contract sets these rents — the deal page says until when"),
+    // The rent rules that reach the building (lib/rent-regulation): a regime
+    // that applies, or the memorandum's claim of one, warns; one the rules
+    // say possibly applies ("Rent rules: check") is a question to answer,
+    // and rules that apply to a building the memorandum says has none of
+    // its units regulated ("Rent rules apply; 0 of 48 regulated (OM)") a
+    // fact to check, each in the muted tone.
+    tag(
+      "regulation",
+      slots.regulation,
+      slots.regulation && /^Rent rules\b/.test(slots.regulation) ? "muted" : "caution",
+      "the rent rules that reach the building — the deal page reads the regime, the regulated share and the allowance in force against the model's growth",
+    ),
     // One tenant leases the whole property (#454).
     tag("tenancy", slots.tenancy, "brand", "one lease is the whole income — the deal page reads its guarantor, its term and its increases"),
     // An anchor not in the sale, a roll before the model's sale (#457).
@@ -88,6 +156,35 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
       slots.storage,
       slots.storage && /Lease-up/.test(slots.storage) ? "caution" : "brand",
       "a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate",
+    ),
+    // A mixed-use building's commercial share (lib/mixed-use).
+    tag(
+      "mixedUse",
+      slots.mixedUse,
+      "brand",
+      "a mixed-use building's commercial share — the deal page reads the two incomes, the commercial space and what one exit cap does to both",
+    ),
+    // Condominium units bought in bulk (lib/condo): a share of an
+    // association someone else's declaration governs.
+    tag(
+      "condo",
+      slots.condo,
+      "brand",
+      "condominium units in an association its declaration governs — the deal page reads the buyer's share of the votes, a year of the dues and a lender's limit on a single owner",
+    ),
+    // The reader's 1031 exchange against the deal (lib/exchange-deal): a
+    // date that keeps the deal out of it (offers due after a deadline, the
+    // identification period over) warns; what the price buys, a question
+    // for exchange counsel, is muted; the clock alone is the brand's.
+    tag(
+      "exchange",
+      slots.exchange,
+      slots.exchange && /^1031: (?:offers due after|ID period over)/.test(slots.exchange)
+        ? "caution"
+        : slots.exchange && /ask counsel|lease under 30/.test(slots.exchange)
+          ? "muted"
+          : "brand",
+      "your 1031 exchange's deadlines against this deal's offers-due date and what its price buys — the deal header says them; your buy box holds the exchange",
     ),
   ].filter((t): t is DealTag => t !== null);
 }
@@ -131,14 +228,16 @@ export function chipWidth(text: string): number {
  * a card's picture is at least the first, and each tier holds from its
  * width up to the next's. The card component asks the same widths of its
  * own picture (container queries, `@min-[278px]/card`, `@min-[348px]/card`).
- *  - 222: the narrowest the grid draws — two columns beside the 240px
- *    sidebar at 768px wide (768 − 240 − 2 × 32 of page padding leaves 464,
- *    less the 16px gap, over two is a 224px card), less the card's 1px
- *    border a side;
- *  - 278: a phone's card from 320px wide, two columns from 640 (beside the
- *    sidebar from 880), three from 1280 and four from 1536;
- *  - 348: a phone's card from 390px wide, two columns beside the sidebar
- *    from 1020, three from 1386.
+ *  - 222: a phone narrower than 320px, where a card is the whole column,
+ *    less the card's 1px border a side. It was the narrowest card on any
+ *    screen until research pass 29 — two columns beside the 240px sidebar
+ *    at 768px wide — and the grid (lib/pipeline-view `PIPELINE_CARD_GRID`)
+ *    now draws none narrower than 17.5rem where one fits;
+ *  - 278: 17.5rem less the border, the narrowest card wherever one fits: a
+ *    phone's from 320px wide, two columns from 616 (beside the sidebar from
+ *    880), three from 1176 and four from 1472;
+ *  - 348: a phone's card from 390px wide, one column beside the sidebar
+ *    from 768, two from 1020, three from 1386.
  */
 export const PICTURE_TIERS = [222, 278, 348] as const;
 

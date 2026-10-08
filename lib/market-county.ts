@@ -61,11 +61,46 @@ const TABLE = countyTable as unknown as {
   counties: Record<string, CountyEntry>;
 };
 
-/** "48" → "TX", from the table itself: every state has a metropolitan county. */
+/**
+ * The territory the delineation files beside the states, under the code its
+ * own titles write ("Ponce, PR"): read HERE only. lib/address's table — the
+ * one every market reader shares — names the states and the District alone,
+ * so no market, no state's series and no brief is ever read for a deal in
+ * Puerto Rico, which the site reads no figures for. Read here, its county is
+ * known, and with it the photograph chosen for its metro area (lib/market-
+ * picture): Ponce's port, Mayagüez's and Aguadilla's coasts, San Juan — rows
+ * of the skyline table no deal could reach (the audit of 2026-10-05).
+ */
+const TERRITORY_ABBREV: Readonly<Record<string, string>> = { "puerto rico": "PR" };
+
+/** A state's or the territory's code by the name the delineation gives it. */
+const codeOfName = (name: string): string | undefined =>
+  US_STATE_ABBREV[name.toLowerCase()] ?? TERRITORY_ABBREV[name.toLowerCase()];
+
+/** "48" → "TX", from the table itself: every state has a metropolitan county,
+ *  and so does Puerto Rico. */
 const STATE_BY_FIPS = new Map<string, string>();
 for (const [fips, c] of Object.entries(TABLE.counties)) {
-  const code = US_STATE_ABBREV[c.state.toLowerCase()];
+  const code = codeOfName(c.state);
   if (code) STATE_BY_FIPS.set(fips.slice(0, 2), code);
+}
+
+/**
+ * The two-letter code of the state an address names, as countyOf compares it
+ * with its tract's: a state's by lib/address, the territory's by its code or
+ * its name — from the address's own state field, else (where lib/address,
+ * which reads the states alone, read none off a line) the line's last part:
+ * "…, Ponce, PR 00716", "…, Puerto Rico".
+ */
+function addressStateCode(addr: AddressLike): string {
+  const field = (addr.state ?? "").trim();
+  if (field) return (TERRITORY_ABBREV[field.toLowerCase()] ?? abbrevState(field)).trim().toUpperCase();
+  const last = (addr.label ?? "").split(",").at(-1)?.replace(/\b\d{5}(?:-\d{4})?\b/, "").trim() ?? "";
+  const code = /(?:^|\s)([A-Z]{2})$/.exec(last)?.[1];
+  const territory = Object.values(TERRITORY_ABBREV);
+  if (code && territory.includes(code)) return code;
+  const named = Object.entries(TERRITORY_ABBREV).find(([name]) => last.toLowerCase().endsWith(name));
+  return named ? named[1] : "";
 }
 
 /** A county's name the way names compare: "St. Louis city" and "Saint Louis
@@ -84,10 +119,10 @@ function countyKey(name: string): string {
     .trim();
 }
 
-/** Each state's metropolitan counties by their name's key. */
+/** Each state's (and Puerto Rico's) metropolitan counties by their name's key. */
 const BY_STATE_NAME = new Map<string, Map<string, string>>();
 for (const [fips, c] of Object.entries(TABLE.counties)) {
-  const code = US_STATE_ABBREV[c.state.toLowerCase()];
+  const code = codeOfName(c.state);
   if (!code) continue;
   const names = BY_STATE_NAME.get(code) ?? new Map<string, string>();
   names.set(countyKey(c.county), fips);
@@ -141,7 +176,7 @@ export function countyOf(
   flags?: Pick<SiteFlagsResult, "subject"> & { status?: string | null; tractGeoid?: string | null } | null,
 ): DealCounty | null {
   const addr = readableAddress(address ?? {});
-  const state = abbrevState((addr.state ?? "").trim()).trim().toUpperCase();
+  const state = addressStateCode(addr);
   // A tract looked up for the address the deal had before an edit is the old
   // building's, and is not read.
   const tract =

@@ -1,9 +1,7 @@
-"use client";
-
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { metroView } from "@/lib/metro-imagery";
-import { skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
-import { SkylineCreditText } from "./photo-credit";
+import { skylineCreditParts, skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
+import { CityPhotoView } from "./city-photo-view";
 
 /**
  * The picture of a covered market, and the honest sentence under it.
@@ -50,7 +48,14 @@ import { SkylineCreditText } from "./photo-credit";
  * heading. So the band hands its words in as `children`: the picture (and
  * its scrim) fill the layer's box, the words follow, and the credit comes
  * last in a box of the same shape, which keeps it where it was on screen.
- * The state that decides which credit that is stays here, with the picture.
+ * The state that decides which credit that is stays with the picture.
+ *
+ * A SERVER component: it looks the market up in lib/skyline's table and in
+ * lib/metro-imagery's, and hands `CityPhotoView` (the client half, which
+ * holds the fallback) only the two pictures it may show, as data. The
+ * component had been a client one, which sent both tables to the browser on
+ * every page with a photo band (research pass 25: 58 KB of photograph table
+ * on ten public pages and the pipeline).
  */
 export function CityPhoto({
   metro,
@@ -65,6 +70,7 @@ export function CityPhoto({
   eager = false,
   showCredit = true,
   sizes,
+  bandFocus = false,
   layer,
   creditLayer,
   overlay,
@@ -89,6 +95,11 @@ export function CityPhoto({
   /** how wide the slot draws, for the browser to pick a file by; unset,
    *  the one file at `width`, as before */
   sizes?: string;
+  /** a band's picture (`PlaceBackdrop`): the photograph is cropped at its
+   *  own `bandFocusY` where the table records one (lib/skyline), judged
+   *  through a band's crops — never a card's or a tile's, whose frames are
+   *  other shapes */
+  bandFocus?: boolean;
   /** a band's picture layer: the box the picture fills behind the band's
    *  words ("absolute inset-0", or the hero's strip), and the shape of the
    *  box its credit is drawn in after them. Unset, the picture and its
@@ -107,97 +118,51 @@ export function CityPhoto({
 }) {
   const shot = skylineFor(metro);
   const view = metroView(metro);
-  const [mode, setMode] = useState<"skyline" | "aerial" | "none">(
-    shot ? "skyline" : view ? "aerial" : "none",
-  );
-  const ref = useRef<HTMLImageElement>(null);
-  useEffect(() => {
-    // A picture that settled before hydration fired its event unheard.
-    const img = ref.current;
-    if (!img?.complete || img.naturalWidth > 0) return;
-    setMode((m) => (m === "skyline" && view ? "aerial" : "none"));
-  }, [mode, view]);
-
-  if (mode === "none") {
-    // Neither picture: the band's own colour carries on under its scrim,
-    // and its words with it.
-    return layer ? (
-      <>
-        <div className={`pointer-events-none ${layer}`}>{overlay}</div>
-        {children}
-      </>
-    ) : (
-      <>{children}</>
-    );
-  }
-
-  const skyline = mode === "skyline" && shot;
   // `v` is a cache buster, not a parameter the route reads: the bytes are
   // served immutable for a year, and without a token that moves when the
   // table names a different file, a returning visitor would hold last
   // year's photograph forever.
-  const src = skyline
-    ? `/api/imagery/skyline/${metro}?w=${width}&v=${skylineTag(metro)}`
-    : `/api/imagery/metro/${metro}?w=${width}&h=${height}`;
-  // The photographer linked to the file's page and the licence to its
-  // text, and "cropped to fit": what a Creative Commons credit carries.
-  const credit = skyline ? (
-    <SkylineCreditText shot={shot} linkClassName="underline decoration-dotted underline-offset-2 hover:text-white" />
-  ) : view ? (
-    `${view.place} from above · USGS`
-  ) : null;
+  const skyline = shot
+    ? {
+        src: `/api/imagery/skyline/${metro}?w=${width}&v=${skylineTag(metro)}`,
+        srcSet: sizes ? skylineSrcSet(metro) : undefined,
+        alt: shot.place,
+        // The photographer linked to the file's page and the licence to its
+        // text, and "cropped to fit": what a Creative Commons credit carries.
+        credit: skylineCreditParts(shot),
+        ...(bandFocus && shot.bandFocusY !== undefined ? { position: `50% ${shot.bandFocusY}%` } : {}),
+      }
+    : null;
   // The overhead is drawn at the size asked for, so twice the size is the
   // same frame at twice the grain, inside the route's 1600px ceiling.
+  const aerialSrc = `/api/imagery/metro/${metro}?w=${width}&h=${height}`;
   const double = width * 2 <= 1600 && height * 2 <= 1600;
-  const srcSet = !sizes
-    ? undefined
-    : skyline
-      ? skylineSrcSet(metro)
-      : double
-        ? `${src} 1x, /api/imagery/metro/${metro}?w=${width * 2}&h=${height * 2} 2x`
-        : undefined;
-
-  const picture = (
-    /* eslint-disable-next-line @next/next/no-img-element -- a proxied route
-       that sets its own immutable cache headers; next/image would add a
-       second cache layer over it and cannot express the fallback chain */
-    <img
-      ref={ref}
-      src={src}
-      srcSet={srcSet}
-      sizes={srcSet ? sizes : undefined}
-      alt={describe ? (skyline ? shot.place : view ? `${view.place} from above` : "") : (alt ?? "")}
+  const aerial = view
+    ? {
+        src: aerialSrc,
+        srcSet: sizes && double ? `${aerialSrc} 1x, /api/imagery/metro/${metro}?w=${width * 2}&h=${height * 2} 2x` : undefined,
+        alt: `${view.place} from above`,
+        credit: `${view.place} from above · USGS`,
+      }
+    : null;
+  return (
+    <CityPhotoView
+      skyline={skyline}
+      aerial={aerial}
       width={width}
       height={height}
-      loading={eager ? "eager" : "lazy"}
-      fetchPriority={eager ? "high" : undefined}
-      decoding="async"
-      onError={() => setMode(skyline && view ? "aerial" : "none")}
       className={className}
-    />
-  );
-  const caption = showCredit && credit ? <p className={creditClassName}>{credit}</p> : null;
-
-  if (!layer) {
-    return (
-      <>
-        {picture}
-        {children}
-        {caption}
-      </>
-    );
-  }
-  return (
-    <>
-      <div className={`pointer-events-none ${layer}`}>
-        {picture}
-        {overlay}
-      </div>
+      creditClassName={creditClassName}
+      alt={alt}
+      describe={describe}
+      eager={eager}
+      showCredit={showCredit}
+      sizes={sizes}
+      layer={layer}
+      creditLayer={creditLayer}
+      overlay={overlay}
+    >
       {children}
-      {/* After the words, in a box of the picture's own shape, so it is
-          drawn where it always was: at the foot of the picture — or in the
-          box the band names for it (`creditLayer`). */}
-      {caption ? <div className={`pointer-events-none ${creditLayer ?? layer}`}>{caption}</div> : null}
-    </>
+    </CityPhotoView>
   );
 }

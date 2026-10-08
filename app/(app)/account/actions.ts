@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   removeStorageFiles,
+  listDealPictureFiles,
   modelTmpPath,
   omStoragePath,
   brandingLogoPath,
@@ -358,7 +359,10 @@ export async function deleteAccount(formData: FormData) {
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
   if (delErr) redirect(deletionStopHref("delete", done));
   for (const [dealId, paths] of byDeal) {
-    await removeStorageFiles(paths, { kind: "deal", dealId });
+    // Each deal's picture folders listed too, not only what its photo cache
+    // names (lib/storage `listDealPictureFiles`, research pass 39).
+    const listed = await listDealPictureFiles(dealId).catch(() => [] as string[]);
+    await removeStorageFiles([...new Set([...paths, ...listed])], { kind: "deal", dealId });
   }
   if (logoPath) {
     await removeStorageFiles([logoPath], { kind: "branding", userId: user.id, teamId: null });

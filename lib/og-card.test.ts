@@ -19,19 +19,44 @@ import { SKYLINE_WIDTHS, skylineFor } from "./skyline";
 import { marketPages } from "./public-pages";
 
 describe("the card's credit line", () => {
-  it("prints the author, the licence and the crop, which a CC licence asks to be said", () => {
-    expect(cardPhotoCredit({ credit: "EEJCC", license: "CC BY-SA 4.0" })).toBe(
-      "Photo: EEJCC, CC BY-SA 4.0, cropped (Wikimedia Commons)",
+  it("prints the author, the licence by name and address, and what the card changed", () => {
+    expect(
+      cardPhotoCredit({ credit: "EEJCC", license: "CC BY-SA 4.0", licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0" }),
+    ).toBe("Photo: EEJCC via Wikimedia Commons · CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0 · cropped, words added");
+    expect(
+      cardPhotoCredit({ credit: "Clément Bardot", license: "CC BY-SA 4.0", licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0" }),
+    ).toContain("Clément Bardot");
+    expect(
+      cardPhotoCredit({ credit: "unknown", license: "CC0", licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en" }),
+    ).toBe("Photo: Wikimedia Commons · CC0, http://creativecommons.org/publicdomain/zero/1.0/deed.en · cropped, words added");
+    // Public domain has no licence address, and the line names none.
+    expect(cardPhotoCredit({ credit: "Daderot", license: "Public domain", licenseUrl: "" })).toBe(
+      "Photo: Daderot via Wikimedia Commons · Public domain · cropped, words added",
     );
-    expect(cardPhotoCredit({ credit: "Clément Bardot", license: "CC BY-SA 4.0" })).toContain("Clément Bardot");
-    expect(cardPhotoCredit({ credit: "unknown", license: "CC0" })).toBe(
-      "Photo: Wikimedia Commons, CC0, cropped (Wikimedia Commons)",
-    );
+  });
+
+  it("names each served photograph's licence address as the table holds it, a 2.x or 3.0 licence's too (research pass 31)", () => {
+    let older = 0;
+    for (const p of marketPages()) {
+      const shot = skylineFor(p.id);
+      const credit = shot ? cardPhotoCredit(shot) : null;
+      if (!shot || !credit) continue;
+      expect(credit, p.id).toContain("cropped, words added");
+      if (shot.licenseUrl) expect(credit, p.id).toContain(`${shot.license}, ${shot.licenseUrl} ·`);
+      if (/CC BY(-SA)? [23]\.\d/.test(shot.license)) {
+        older++;
+        expect(credit, p.id).toMatch(/creativecommons\.org\/licenses\/by(-sa)?\/[23]\.\d/);
+      }
+    }
+    // The markets' cards include photographs under the older licences.
+    expect(older).toBeGreaterThan(0);
   });
 
   it("keeps a photograph off the card where the card cannot draw its author's name", () => {
     expect(cardCanDraw("颐园居")).toBe(false);
-    expect(cardPhotoCredit({ credit: "颐园居", license: "CC BY-SA 4.0" })).toBeNull();
+    expect(
+      cardPhotoCredit({ credit: "颐园居", license: "CC BY-SA 4.0", licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0" }),
+    ).toBeNull();
     expect(cardCanDraw("Photo: Benoît Prieur — CC0 · cropped")).toBe(true);
     expect(cardCanDraw(OVERHEAD_CARD_CREDIT)).toBe(true);
   });
@@ -55,7 +80,11 @@ describe("marketCard", () => {
     })
       .jpeg()
       .toBuffer();
-    const card = await marketCard(photo, "Pittsburgh PA", "Photo: EEJCC, CC BY-SA 4.0, cropped (Wikimedia Commons)");
+    const card = await marketCard(
+      photo,
+      "Pittsburgh PA",
+      "Photo: EEJCC via Wikimedia Commons · CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0 · cropped, words added",
+    );
     const meta = await sharp(card).metadata();
     expect(meta.format).toBe("jpeg");
     expect([meta.width, meta.height]).toEqual([OG_CARD.width, OG_CARD.height]);

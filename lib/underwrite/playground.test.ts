@@ -255,6 +255,32 @@ describe("sliderValues — the Bug-9 wide slider range", () => {
       expect(values[i]).toBeGreaterThan(values[i - 1]);
   });
 
+  it("rests the vacancy lever on the model's own vacancy, up to the 99% the model stops at (research pass 38)", async () => {
+    // A vacant office at a stated 7.00% cap: the model runs 99% vacancy.
+    const { deriveUnderwriteInputs } = await import("./inputs");
+    const d = deriveUnderwriteInputs(
+      {
+        dealName: "1200 Corporate Drive",
+        assetClass: "Office",
+        metrics: [
+          { label: "Asking price", value: "8,500,000", flagged: false, page: "p. 3" },
+          { label: "Total SF", value: "42,000 SF", flagged: false, page: "p. 3" },
+          { label: "Occupancy", value: "0%", flagged: false, page: "p. 3", basis: "in_place" },
+          { label: "Cap rate", value: "7.00%", flagged: false, page: "p. 3" },
+        ],
+      } as Parameters<typeof deriveUnderwriteInputs>[0],
+      "x",
+    );
+    expect(d.inputs.vacancyPct).toBe(LEVER_STEPS.vacancyPct.max);
+    const { values, baseIdx } = sliderValues("vacancyPct", d.inputs.vacancyPct);
+    // The slider had rested at 95%: five times the revenue the model gives
+    // it, "Levered IRR 160.2%" beside the report's 12.74%.
+    expect(values[baseIdx]).toBe(d.inputs.vacancyPct);
+    expect(baseIdx).toBe(values.length - 1);
+    expect(values).toEqual([0.96, 0.97, 0.98, 0.99].map((v) => expect.closeTo(v, 10)));
+    expect(runScenario(d.inputs, { vacancyPct: values[baseIdx] }).leveredIrrPct).toBe(computeUnderwrite(d.inputs).returns.leveredIrrPct);
+  });
+
   it("a garbled out-of-range base clamps first (monotonic, never ≤0 cap)", () => {
     const { values, baseIdx } = sliderValues("exitCapPct", 0);
     expect(values[baseIdx]).toBe(LEVER_STEPS.exitCapPct.min);

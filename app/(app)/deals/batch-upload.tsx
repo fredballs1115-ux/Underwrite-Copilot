@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createDealFromBatch,
@@ -8,49 +9,61 @@ import {
 } from "./actions";
 // Each file's deal is named from its file name — a starting point the user
 // can edit before the batch runs; the single upload pre-fills the same way.
-import { nameFromFile } from "@/lib/deal-name";
-import { MAX_OM_PAGES } from "@/lib/pdf";
+import { DEAL_NAME_MAX, nameFromFile } from "@/lib/deal-name";
 import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
+// The run itself, pure (lib/batch-run): each answer's status, what the
+// button sends again, and the plan's limit said once with a link.
+import { BATCH_MAX_FILES, capNotice, runBatch, runLabel, type BatchStatus } from "@/lib/batch-run";
+import type { BuyBoxCoverage } from "@/lib/criteria";
+import { checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 
-const MAX_FILES = 4;
+const MAX_FILES = BATCH_MAX_FILES;
 const MAX_BYTES = 32 * 1024 * 1024;
-
-const ERROR_COPY: Record<string, string> = {
-  name: "Needs a deal name.",
-  auth: "Signed out — sign in and retry.",
-  limit: "Plan limit reached — this one wasn't uploaded.",
-  teamlimit: "Team plan limit reached — this one wasn't uploaded.",
-  file: "The file didn't arrive — try again.",
-  pdf: "Not a valid PDF.",
-  size: "Over the 32 MB limit.",
-  locked: "Needs a password to open — upload an unlocked copy.",
-  pages: `Over ${MAX_OM_PAGES} pages — upload the financial sections.`,
-  save: "Couldn't save the deal — try again.",
-  upload: "Upload failed — try again.",
-};
-
-type ItemStatus =
-  | { kind: "ready" }
-  | { kind: "uploading" }
-  // personal: filed in the member's own pipeline, which the team does not
-  // see (lib/personal-deal).
-  | { kind: "queued"; dealId: string; deduped: boolean; personal: boolean }
-  | { kind: "error"; message: string }
-  | { kind: "skipped"; message: string };
 
 interface Item {
   file: File;
   name: string;
-  status: ItemStatus;
+  status: BatchStatus;
 }
 
 /** Buy-box triage chip states worth showing (anything else stays hidden).
  *  Keys are the pipeline table's fit vocabulary — one vocabulary everywhere. */
-const TRIAGE_CHIP: Record<string, { label: string; cls: string }> = {
-  fits: { label: "Fits box", cls: "bg-pass/15 text-pass" },
-  near: { label: "Near box", cls: "bg-caution/15 text-caution" },
-  outside: { label: "Outside box", cls: "bg-kill/15 text-kill" },
+const TRIAGE_CHIP: Record<string, string> = {
+  fits: "Fits box",
+  near: "Near box",
+  outside: "Outside box",
 };
+
+/** The chip's colours by the fit's tone (lib/fit-label `fitTone`): the
+ *  fold's own, and muted — never green — while a criterion the price
+ *  decides could not be checked, as the pipeline card is. */
+const TRIAGE_TONE_CLS: Record<FitTone, string> = {
+  pass: "bg-pass/10 text-pass",
+  caution: "bg-caution/10 text-caution",
+  kill: "bg-kill/15 text-kill",
+  muted: "bg-faint text-muted",
+};
+
+type Triage = { fit: string; provisional: boolean; coverage?: BuyBoxCoverage | null };
+
+/** A deal's triage as a chip: "Fits box", or "Fits box (2 of 4)" where the
+ *  box could not be judged whole (lib/fit-label `fitCellText`); null for a
+ *  state not worth showing. */
+function triageChip(t: Triage | undefined): { label: string; cls: string; title: string } | null {
+  const word = t ? TRIAGE_CHIP[t.fit] : undefined;
+  if (!t || !word) return null;
+  const fold = t.fit as "fits" | "near" | "outside";
+  return {
+    label: `${fitCellText(word, t.coverage)}${t.provisional ? " ~" : ""}`,
+    cls: TRIAGE_TONE_CLS[fitTone(null, fold, t.coverage)],
+    title: [
+      t.provisional ? "Provisional — from the first-pass read; the full screen refines it" : "From the completed extraction",
+      checkedSentence(t.coverage),
+    ]
+      .filter(Boolean)
+      .join(". "),
+  };
+}
 
 /**
  * Batch OM triage: pick several OM PDFs (a call-for-offers day), queue them
@@ -75,9 +88,7 @@ export function BatchUpload({
   const [pickError, setPickError] = useState<string | null>(null);
   // Buy-box triage per queued deal — filled in by polling as first signals
   // land (~30s into each screen), so the day's stack self-sorts up front.
-  const [triage, setTriage] = useState<
-    Record<string, { fit: string; provisional: boolean }>
-  >({});
+  const [triage, setTriage] = useState<Record<string, Triage>>({});
 
   function addFiles(list: FileList | null) {
     if (!list || !list.length) return;
@@ -116,48 +127,23 @@ export function BatchUpload({
     if (running) return;
     setRunning(true);
     setFinished(false);
-    // Sequential on purpose: one small request at a time, and a mid-batch
-    // plan-limit stop skips the rest instead of half-failing in parallel.
-    let hitCap = false;
-    const snapshot = items;
-    for (let i = 0; i < snapshot.length; i++) {
-      const item = snapshot[i];
-      if (item.status.kind === "queued") continue; // re-run after a partial failure
-      if (hitCap) {
-        setItems((prev) =>
-          prev.map((it, j) =>
-            j === i ? { ...it, status: { kind: "skipped", message: "Skipped — plan limit reached." } } : it,
-          ),
-        );
-        continue;
-      }
-      setItems((prev) =>
-        prev.map((it, j) => (j === i ? { ...it, status: { kind: "uploading" } } : it)),
-      );
-      let status: ItemStatus;
-      try {
+    // Sequential on purpose (lib/batch-run): one small request at a time,
+    // and a mid-batch plan-limit stop skips the rest instead of
+    // half-failing in parallel. A row the plan stopped is never sent again.
+    await runBatch(
+      items,
+      (item) => {
         const fd = new FormData();
         fd.set("name", item.name.trim() || nameFromFile(item.file.name));
         fd.set("assetClass", assetClass);
         fd.set("om", item.file);
-        const res = await submit(fd);
-        if (res.ok) {
-          status = { kind: "queued", dealId: res.dealId, deduped: !!res.deduped, personal: !!res.personal };
-        } else {
-          if (res.error === "limit" || res.error === "teamlimit") hitCap = true;
-          status = { kind: "error", message: ERROR_COPY[res.error] ?? "Something went wrong." };
-        }
-      } catch {
-        // No answer came back: the connection dropped or the server failed
-        // first, so the deal may exist — a retry after 15 seconds would make
-        // a twin (the create action merges a repeat only inside that window).
-        status = { kind: "error", message: "No answer came back — it may have been created. Check the pipeline before retrying." };
-      }
-      setItems((prev) => prev.map((it, j) => (j === i ? { ...it, status } : it)));
-    }
+        return submit(fd);
+      },
+      (i, status) => setItems((prev) => prev.map((it, j) => (j === i ? { ...it, status } : it))),
+    );
     setRunning(false);
     setFinished(true);
-    // The new rows (with live "Screening…" status) appear behind the panel.
+    // The new rows (with their live "Reading the OM…" status) appear behind the panel.
     router.refresh();
   }
 
@@ -189,11 +175,13 @@ export function BatchUpload({
             const body = (await res.json()) as {
               fit?: string;
               provisional?: boolean;
+              coverage?: BuyBoxCoverage | null;
             };
             return {
               id,
               fit: body.fit ?? "pending",
               provisional: body.provisional ?? true,
+              coverage: body.coverage ?? null,
             };
           } catch {
             return null;
@@ -208,7 +196,7 @@ export function BatchUpload({
           // Never overwrite a resolved verdict with a transient "pending".
           if (r.fit === "pending" && next[r.id] && next[r.id].fit !== "pending")
             continue;
-          next[r.id] = { fit: r.fit, provisional: r.provisional };
+          next[r.id] = { fit: r.fit, provisional: r.provisional, coverage: r.coverage };
         }
         return next;
       });
@@ -227,10 +215,13 @@ export function BatchUpload({
 
   const queued = items.filter((it) => it.status.kind === "queued").length;
   const failed = items.filter(
-    (it) => it.status.kind === "error" || it.status.kind === "skipped",
+    (it) => it.status.kind === "error" || it.status.kind === "capped",
   ).length;
-  const canRun =
-    !running && items.some((it) => it.status.kind !== "queued" && it.status.kind !== "uploading");
+  const statuses = items.map((it) => it.status);
+  // The button says what it sends (lib/batch-run): nothing the plan's limit
+  // stopped, so there is no "Retry" that can only fail the same way.
+  const label = runLabel(statuses, running, finished);
+  const cap = capNotice(statuses);
 
   return (
     <details className="group mt-3 border-t border-line pt-3" data-qa="batch-upload">
@@ -291,6 +282,7 @@ export function BatchUpload({
               >
                 <input
                   value={item.name}
+                  maxLength={DEAL_NAME_MAX}
                   disabled={running || item.status.kind === "queued"}
                   aria-label={`Deal name for ${item.file.name}`}
                   onChange={(e) =>
@@ -336,19 +328,14 @@ export function BatchUpload({
                         {PERSONAL_CHIP}
                       </span>
                     )}
-                    {TRIAGE_CHIP[triage[item.status.dealId]?.fit ?? ""] && (
-                      <span
-                        title={
-                          triage[item.status.dealId].provisional
-                            ? "Provisional — from the first-pass read; the full screen refines it"
-                            : "From the completed extraction"
-                        }
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${TRIAGE_CHIP[triage[item.status.dealId].fit].cls}`}
-                      >
-                        {TRIAGE_CHIP[triage[item.status.dealId].fit].label}
-                        {triage[item.status.dealId].provisional ? " ~" : ""}
-                      </span>
-                    )}
+                    {(() => {
+                      const chip = triageChip(triage[item.status.dealId]);
+                      return chip ? (
+                        <span title={chip.title} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.cls}`}>
+                          {chip.label}
+                        </span>
+                      ) : null;
+                    })()}
                     <a
                       href={`/deals/${item.status.dealId}`}
                       className="text-xs font-medium text-pass hover:underline"
@@ -357,7 +344,7 @@ export function BatchUpload({
                     </a>
                   </span>
                 )}
-                {(item.status.kind === "error" || item.status.kind === "skipped") && (
+                {(item.status.kind === "error" || item.status.kind === "capped") && (
                   <span className="shrink-0 text-xs font-medium text-kill">
                     {item.status.message}
                   </span>
@@ -366,20 +353,26 @@ export function BatchUpload({
             ))}
           </ul>
         )}
+        {cap && (
+          <p className="text-sm text-kill" role="status" data-qa="batch-cap">
+            {cap.text}{" "}
+            <Link href={cap.href} className="font-medium text-brand hover:text-brand-strong">
+              {cap.link}
+            </Link>
+          </p>
+        )}
         {items.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={run}
-              disabled={!canRun}
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {running
-                ? "Uploading — keep this tab open…"
-                : failed > 0 && finished
-                  ? "Retry failed uploads"
-                  : `Screen ${items.filter((it) => it.status.kind !== "queued").length} deal${items.filter((it) => it.status.kind !== "queued").length === 1 ? "" : "s"}`}
-            </button>
+            {label && (
+              <button
+                type="button"
+                onClick={run}
+                disabled={running}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {label}
+              </button>
+            )}
             {finished && (
               <p className="text-sm text-muted" role="status">
                 {queued} queued{failed ? `, ${failed} not uploaded` : ""} — each

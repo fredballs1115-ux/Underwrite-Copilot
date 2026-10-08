@@ -1,0 +1,86 @@
+// The words a deal's cap slot says where it holds no cap of the deal's own,
+// for the pipeline's client module (its card, its list and its CSV) and its
+// tests. No imports: lib/compare-interest, which decides the slot
+// (`capSlotWithheld`, `noteCapSlot`) and holds the same words for the
+// server's surfaces (`OWN_YIELD_WORDS`, `SHARE_CAP_WORDS`), reaches the
+// whole interest reader, which the browser does not load; a test holds the
+// two copies to each other.
+
+/** Why a note's cap slot holds its yield, or "n/a": the collateral's cap is
+ *  not the buyer's figure. */
+export const NOTE_CAP_TITLE =
+  "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. The note's yield to maturity at its price stands in its place, where the note pays or may.";
+
+export type OwnYieldKind = "note" | "position";
+/** Why the slot holds no cap — and "under_water" for a note whose yield is
+ *  withheld too: its balance is over the collateral's stated value
+ *  (lib/compare-interest `capSlotReason`, research pass 38). */
+export type CapWithheldKind = OwnYieldKind | "share" | "under_water";
+
+/** A note's and a preferred equity position's own yield in the cap slot, in
+ *  words: what it runs to, the list column's micro-label, the slot where
+ *  none can be stated, the card's label and the tooltip. */
+export const OWN_YIELD: Record<OwnYieldKind, { to: string; micro: string; na: string; label: string; title: string }> = {
+  note: { to: "to maturity", micro: "ytm", na: "n/a — note", label: "Note yield", title: NOTE_CAP_TITLE },
+  position: {
+    to: "to redemption",
+    micro: "ytr",
+    na: "n/a — position",
+    label: "Position yield",
+    title:
+      "A preferred equity position has no going-in cap: its price buys a rate and a redemption, never a slice of the building. Its yield to redemption at its price stands in its place, where the redemption date has not gone by.",
+  },
+};
+
+/** Why a cap slot holds no cap: the slot where no figure stands, and its
+ *  tooltip. A share beside the loan its entity carries has no yield of its
+ *  own to show in the cap's place. */
+export const CAP_WITHHELD: Record<CapWithheldKind, { na: string; title: string }> = {
+  note: OWN_YIELD.note,
+  position: OWN_YIELD.position,
+  share: {
+    na: "n/a — share",
+    title:
+      "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, and a share of no stated percentage grosses up to nothing; a share of the general partner's interest is a share of a share, which no figure grosses up. None is the building's price, and a cap stated against it is on a basis the memorandum never says, so no cap is shown.",
+  },
+  under_water: {
+    na: "n/a — under water",
+    title:
+      "The note's balance is over the collateral's stated value: its contract yield assumes a repayment the collateral does not cover, so no yield stands in the cap's place. What the note fetches is a foreclosure's question.",
+  },
+};
+
+/** The words of the yield standing in a cap slot: a note's, else a
+ *  position's (only those two carry one). */
+export const ownYieldOf = (w: CapWithheldKind | null | undefined) => OWN_YIELD[w === "position" ? "position" : "note"];
+
+/**
+ * A plan deal's cap cell — a value-add, a lease-up, a conversion, a
+ * development, judged on its yield on total cost, never on a going-in cap
+ * — in ONE set of words for every cell that writes it: the meeting
+ * workbook's (lib/pipeline-workbook), the pipeline CSV's (`capCellText`)
+ * and the compare table's. The CSV had left the cell blank beside the
+ * workbook's "n/a — plan", and a blank reads as a cap the memorandum does
+ * not state (research pass 35).
+ */
+export const PLAN_CAP_NA = "n/a — plan";
+
+/**
+ * The cap slot as one cell of text, as the pipeline's CSV writes it: the
+ * cap; else, on a plan deal, that it is judged on its yield on cost —
+ * `PLAN_CAP_NA`, the meeting workbook's words, its yield on cost in a
+ * column of its own; else a note's or a position's own yield with what it
+ * runs to, the figure the card shows ("17.0% to maturity"); else why the
+ * cap is withheld; else blank, a cap not stated.
+ */
+export function capCellText(slots: {
+  cap: string | null;
+  noteYield?: string | null;
+  capWithheld?: CapWithheldKind | null;
+  plan?: boolean | null;
+}): string {
+  if (slots.cap) return slots.cap;
+  if (slots.plan) return PLAN_CAP_NA;
+  if (slots.noteYield) return `${slots.noteYield} ${ownYieldOf(slots.capWithheld).to}`;
+  return slots.capWithheld ? CAP_WITHHELD[slots.capWithheld].na : "";
+}

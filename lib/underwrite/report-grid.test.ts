@@ -17,8 +17,17 @@ import {
   heatCellEm,
   heatCellText,
   maxBidSentence,
+  nearlyVacantPageLine,
+  nearlyVacantReason,
+  nearlyVacantWord,
+  NEARLY_VACANT,
+  pageBaseLevers,
+  placeholderPageLine,
+  placeholderReason,
   placeholderReturnsLine,
+  placeholderWorkbookLine,
   HEAT_BG,
+  type CapGrowthGrid,
 } from "./report-grid";
 
 function baseInputs(over: Partial<UnderwriteInputs> = {}): UnderwriteInputs {
@@ -169,9 +178,9 @@ describe("heatLegend", () => {
 describe("cell text", () => {
   it("splits IRR and EM lines", () => {
     expect(heatCellIrr({ irrPct: 0.152, em: 1.94 })).toBe("15.2%");
-    expect(heatCellEm({ irrPct: 0.152, em: 1.94 })).toBe("1.9x");
+    expect(heatCellEm({ irrPct: 0.152, em: 1.94 })).toBe("1.94x");
     expect(heatCellIrr({ irrPct: null, em: 1.2 })).toBe("—");
-    expect(heatCellText({ irrPct: 0.152, em: 1.94 })).toBe("15.2% / 1.9x");
+    expect(heatCellText({ irrPct: 0.152, em: 1.94 })).toBe("15.2% / 1.94x");
   });
 
   it("never prints negative zero", () => {
@@ -236,6 +245,77 @@ describe("gridTakeaway", () => {
   });
 });
 
+describe("gridTakeaway says two full clauses, each with its own subject (research pass 35)", () => {
+  // A grid built by hand: the IRR, in percent, at each exit cap (rows) and
+  // growth rate (columns), the base at the centre.
+  const at = (irr: (r: number, c: number) => number): CapGrowthGrid => ({
+    capRows: [0.05, 0.0525, 0.055, 0.0575, 0.06],
+    growthCols: [0.02, 0.025, 0.03, 0.035, 0.04],
+    cells: [0, 1, 2, 3, 4].map((r) => [0, 1, 2, 3, 4].map((c) => ({ irrPct: irr(r, c) / 100, em: 1.5 }))),
+    baseRow: 2,
+    baseCol: 2,
+  });
+  // Clears 13% only at the 5.25% exit or tighter at base growth, 25 bps under
+  // the 5.50% base, and from 3.5% growth at the base exit.
+  const ordinary = at((r, c) => 13 + (c - 2) - (r - 1));
+
+  it("the ordinary case: the deal clears only on compression, and needs a growth rate", () => {
+    expect(gridTakeaway(ordinary, 13)).toBe(
+      "At base growth, the deal holds 13%+ only at a 5.25% exit cap or tighter, 25 bps under the base 5.50%; at the base exit cap, it needs at least 3.5% rent growth.",
+    );
+  });
+
+  // Research pass 40, M10: "holds 13%+ up to a 4.95% exit cap" read 50 bps of
+  // compression as resilience beside a base exit of 5.45%. "Up to" is said
+  // only where the base itself clears, with room above it.
+  it("says 'up to' only where the base exit clears, and the compression where only a tighter one does", () => {
+    expect(gridTakeaway(at((r, c) => 13 + (c - 2) - (r - 3)), 13)).toBe(
+      "At base growth, the deal holds 13%+ up to a 5.75% exit cap; at the base exit cap, it needs at least 2.5% rent growth.",
+    );
+    // The sample, at the demo mandate's 13% (the report's own input).
+    const sample = buildSensitivityData(sampleDerivedInputs().inputs, 13);
+    expect(sample.takeaway).toMatch(
+      /^At base growth, the deal holds 13%\+ only at a 4\.95% exit cap or tighter, 50 bps under the base 5\.45%; /,
+    );
+  });
+
+  it("no tested exit cap clears the hurdle: no 'The deal no tested …'", () => {
+    // Neither lever clears it (the pass's portfolio).
+    expect(gridTakeaway(at(() => 5), 13)).toBe(
+      "At base growth, no tested exit cap clears 13%; at the base exit cap, no tested rent growth clears it.",
+    );
+    // No cap clears at base growth, a faster RevPAR does at the base cap (the pass's hotel).
+    expect(gridTakeaway(at((r, c) => 12 - (r - 2) * 0.4 + (c - 2) * 1.5), 13, "RevPAR growth")).toBe(
+      "At base growth, no tested exit cap clears 13%; at the base exit cap, the deal needs at least 3.5% RevPAR growth.",
+    );
+  });
+
+  it("every tested exit cap clears the hurdle: no 'The deal every tested …'", () => {
+    expect(gridTakeaway(at(() => 30), 13)).toBe(
+      "At base growth, every tested exit cap clears 13%; at the base exit cap, every tested growth rate clears it.",
+    );
+  });
+
+  it("after a clause that names the deal, the hurdle is said again rather than as 'it'", () => {
+    expect(gridTakeaway(at((r, c) => 13 - (r - 1) + (c - 2) * 0.1), 13)).toBe(
+      "At base growth, the deal holds 13%+ only at a 5.25% exit cap or tighter, 25 bps under the base 5.50%; at the base exit cap, no tested rent growth clears 13%.",
+    );
+  });
+
+  it("leads with what the grids are of where the price did not buy the building, and never calls it the deal", () => {
+    const subject = "the collateral, run at the note's price";
+    expect(gridTakeaway(ordinary, 13, "rent growth", subject)).toBe(
+      "The collateral, run at the note's price: at base growth, it holds 13%+ only at a 5.25% exit cap or tighter, 25 bps under the base 5.50%; at the base exit cap, it needs at least 3.5% rent growth.",
+    );
+    expect(gridTakeaway(at(() => 5), 13, "rent growth", subject)).toBe(
+      "The collateral, run at the note's price: at base growth, no tested exit cap clears 13%; at the base exit cap, no tested rent growth clears it.",
+    );
+    for (const irr of [() => 5, () => 30, (r: number, c: number) => 13 + (c - 2) - (r - 1)]) {
+      expect(gridTakeaway(at(irr), 13, "rent growth", subject)).not.toMatch(/the deal/i);
+    }
+  });
+});
+
 describe("buildSensitivityData", () => {
   const inputs = baseInputs();
 
@@ -288,7 +368,7 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
     const line = maxBidSentence(s);
     expect(line).toMatch(
       new RegExp(
-        `^Max bid clearing your buy box's floors \\(13% IRR, 5% cash-on-cash, 5\\.75% going-in cap\\): \\${fmtBid(s.maxBid!.price).replace(".", "\\.")} \\(-\\d+\\.\\d% vs the modeled price\\); your 5% cash-on-cash floor binds\\. At that price: IRR \\d+\\.\\d%, year-1 cash-on-cash 5\\.0%, going-in cap \\d\\.\\d\\d%\\.$`,
+        `^Max bid clearing your buy box's floors \\(13% IRR, 5% cash-on-cash, 5\\.75% going-in cap\\): \\${fmtBid(s.maxBid!.price).replace(".", "\\.")} \\(-\\d+\\.\\d% vs the modelled price\\); your 5% cash-on-cash floor binds\\. At that price: IRR \\d+\\.\\d%, year-1 cash-on-cash 5\\.0%, going-in cap \\d\\.\\d\\d%\\.$`,
       ),
     );
   });
@@ -296,7 +376,7 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
   it("falls back to the screening hurdle's IRR where the box sets no floor, and says whose it is", () => {
     const none = buildSensitivityData(inputs, null, { floors: null });
     expect(none.maxBidFloors).toEqual({ floors: { minIrr: 0.15 }, from: "screening" });
-    expect(maxBidSentence(none)).toMatch(/^Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modeled price\)\./);
+    expect(maxBidSentence(none)).toMatch(/^Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modelled price\)\./);
     // A caller that passes the box's IRR as the hurdle and no floors says
     // it is the buyer's target, not the screening default.
     expect(maxBidSentence(buildSensitivityData(inputs, 13))).toMatch(/^Max bid holding your 13% IRR target: /);
@@ -304,6 +384,51 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
     expect(maxBidSentence({ ...none, maxBid: null, maxBidFloors: { floors: { minCoc: 0.5 }, from: "buybox" } })).toBe(
       "No price inside the tested range clears your buy box's floors (50% cash-on-cash) under these assumptions: the deal's economics, not its price, are the blocker.",
     );
+  });
+});
+
+describe("where no price clears the box's floors together, the sentence names which floor never clears and how far the others clear alone (research pass 35)", () => {
+  const floors = { minIrr: 0.1, minCoc: 0.05, minCap: 0.05 };
+
+  it("names the cash-on-cash floor year 1's capital puts out of reach, and solves each other floor alone", () => {
+    // $625k of year-1 NOI against $800k of first-year capital and $20k of
+    // reserves: year 1's cash flow is negative whatever the price.
+    const inputs = baseInputs({ capitalImprovementsYr1: 800_000 });
+    const s = buildSensitivityData(inputs, 10, { floors });
+    expect(s.maxBid).toBeNull();
+    // Each floor's own solve, under the bid's own levers — never asserted.
+    const levers = pageBaseLevers(inputs);
+    const irr = solveMaxBid(inputs, { minIrr: 0.1 }, levers);
+    const cap = solveMaxBid(inputs, { minCap: 0.05 }, levers);
+    expect(solveMaxBid(inputs, { minCoc: 0.05 }, levers).price).toBeNull();
+    expect(irr.price).not.toBeNull();
+    expect(cap.price).not.toBeNull();
+    expect(s.noBid).toEqual({
+      alone: [
+        { key: "minIrr", price: irr.price, unbounded: false },
+        { key: "minCoc", price: null, unbounded: false },
+        { key: "minCap", price: cap.price, unbounded: false },
+      ],
+      yearOneNegative: true,
+      yearOneCapital: 800_000,
+    });
+    expect(maxBidSentence(s)).toBe(
+      `No price inside the tested range clears your 5% cash-on-cash floor: year 1 carries $800k of capital, which leaves its cash flow negative at any price. Your 10% IRR floor alone clears up to ${fmtBid(irr.price!)}, and your 5% going-in cap floor alone up to ${fmtBid(cap.price!)}.`,
+    );
+    expect(maxBidSentence(s)).not.toContain("the deal's economics, not its price");
+  });
+
+  it("names no capital where the year's other capital lines already outrun its NOI", () => {
+    // $1M of reserves a year over $625k of NOI: negative with no budget at all.
+    const s = buildSensitivityData(baseInputs({ reservesPsf: 10 }), 10, { floors });
+    expect(s.noBid?.yearOneNegative).toBe(true);
+    expect(s.noBid?.yearOneCapital).toBeNull();
+    expect(maxBidSentence(s)).toMatch(/^No price inside the tested range clears your 5% cash-on-cash floor: year 1's cash flow is negative at any price\. /);
+  });
+
+  it("reads nothing where a bid solves, or the box sets no floor", () => {
+    expect(buildSensitivityData(baseInputs(), 10, { floors }).noBid).toBeNull();
+    expect(buildSensitivityData(baseInputs({ capitalImprovementsYr1: 800_000 }), 10).noBid).toBeNull();
   });
 });
 
@@ -393,5 +518,124 @@ describe("placeholderReturnsLine — a model on a placeholder prints none of its
       "Priced",
     );
     expect(buildSensitivityData(priced.inputs, null, { sources: priced.sources }).withheld).toBeNull();
+  });
+
+  it("says one reason on three surfaces: the report and the deal page withhold the returns, the workbook prints them live (research pass 34)", () => {
+    const price = { purchasePrice: x("assumption"), inPlaceRentAnnual: x("derived") };
+    const noi = { purchasePrice: x("extracted"), inPlaceRentAnnual: x("assumption") };
+    expect(placeholderReason(inputs, price)).toBe(
+      "no price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns would be the placeholder's.",
+    );
+    // The deal page: the reason over the tiles, the max bid named only where
+    // a floor would solve one, and the price field named while it is empty.
+    expect(placeholderPageLine(inputs, price, { priceEntered: false, maxBid: true })).toBe(
+      "The returns and the max bid are withheld: no price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns would be the placeholder's. Type the price you would pay above to run the model on it.",
+    );
+    expect(placeholderPageLine(inputs, price, { priceEntered: false, maxBid: false })).toMatch(/^The returns are withheld: /);
+    // A price typed lifts the price's half; an assumed NOI stays.
+    expect(placeholderPageLine(inputs, price, { priceEntered: true, maxBid: true })).toBeNull();
+    expect(placeholderPageLine(inputs, noi, { priceEntered: true, maxBid: false })).toBe(
+      "The returns are withheld: no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.",
+    );
+    // The workbook prints them, live: "are", and the input to replace.
+    expect(placeholderWorkbookLine(inputs, price)).toBe(
+      "No price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns are the placeholder's. Enter the price you would pay as the Purchase Price on the Assumptions tab.",
+    );
+    expect(placeholderWorkbookLine(inputs, noi)).toBe(
+      "No year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns are the assumption's. Enter the Potential Gross Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab.",
+    );
+    expect(placeholderWorkbookLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: x("derived") })).toBeNull();
+    expect(placeholderWorkbookLine(inputs, null)).toBeNull();
+  });
+
+  it("names a leased fee's ground rent rather than saying no year-1 income was read (research pass 34)", () => {
+    // The memorandum states the ground rent, the leased fee's income; the
+    // model reads no ground rent and ran an assumed NOI.
+    const rent = { provenance: "assumption" as const, note: "", notRun: { label: "ground rent", value: 600_000 } };
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: rent })).toBe(
+      "The IRR grids and the max bid are left out: the model does not run the memorandum's $600,000 ground rent as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.",
+    );
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("assumption"), inPlaceRentAnnual: rent })).toBe(
+      "The IRR grids and the max bid are left out: no price was read from the memorandum, and the model does not run its $600,000 ground rent as its year-1 income, so the model runs on a $10,000,000 placeholder price and an assumed NOI, and its returns would be a placeholder's.",
+    );
+    // The derived model's own sources carry it.
+    const fee = deriveUnderwriteInputs(
+      {
+        dealName: "Leased fee",
+        assetClass: "retail",
+        interest: { kind: "leased_fee", summary: "", share: "", groundLease: "", loan: "", page: "" },
+        metrics: [
+          { label: "Asking price", value: "$15,000,000", flagged: false, page: "p. 2" },
+          { label: "Ground rent", value: "$600,000", flagged: false, page: "p. 4" },
+          { label: "Income before ground rent", value: "$3,000,000", flagged: false, page: "p. 6" },
+        ],
+      },
+      "Leased fee",
+    );
+    const line = buildSensitivityData(fee.inputs, null, { sources: fee.sources }).withheld;
+    expect(line).toContain("the model does not run the memorandum's $600,000 ground rent as its year-1 income");
+    expect(line).not.toContain("no year-1 NOI");
+  });
+});
+
+// Research pass 38's fixtures, row for row: a building the memorandum states
+// nearly empty. The model reads the occupancy as its vacancy (it stops at
+// 99%) and grosses the year-1 revenue up through it into the rent line.
+const rp38 = (assetClass: string, rows: [string, string, string?][]) =>
+  ({
+    dealName: "1200 Corporate Drive",
+    assetClass,
+    metrics: rows.map(([label, value, basis]) => ({ label, value, flagged: false, page: "p. 3", ...(basis ? { basis } : {}) })),
+  }) as Parameters<typeof deriveUnderwriteInputs>[0];
+// A vacant office at a stated 7.00% cap: the NOI is the price times the cap.
+const OCC0_CAP = rp38("Office", [["Asking price", "8,500,000"], ["Total SF", "42,000 SF"], ["Occupancy", "0%", "in_place"], ["Cap rate", "7.00%"]]);
+// 3% occupied, the memorandum's own NOI.
+const OCC3 = rp38("Office", [["Asking price", "8,500,000"], ["Total SF", "42,000 SF"], ["Occupancy", "3%", "in_place"], ["NOI (in-place)", "45,000", "in_place"]]);
+
+describe("a building the model runs nearly vacant: the page's base is the model's own, and no bid is solved (research pass 38)", () => {
+  it("solves the report's bid levers at the model's own vacancy, the base its grids run, so the page and the report agree", () => {
+    const d = deriveUnderwriteInputs(OCC0_CAP, "x");
+    expect(d.inputs.vacancyPct).toBe(0.99);
+    // The page's resting tiles run at the sliders' base stops; the report's
+    // base case runs the model as it stands. One figure, both places.
+    const levers = pageBaseLevers(d.inputs);
+    expect(levers.vacancyPct).toBe(d.inputs.vacancyPct);
+    const page = runScenario(d.inputs, levers);
+    const report = buildSensitivityData(d.inputs, null, { sources: d.sources, occupancyPct: d.meta.occupancyPct });
+    expect(page.leveredIrrPct).toBe(report.baseCase!.leveredIrr);
+    expect(page.dscrYr1).toBe(report.baseCase!.dscrY1);
+    // The pass printed 160.2% and 13.28x on the page beside the report's 12.74%.
+    expect(page.leveredIrrPct!).toBeLessThan(0.2);
+  });
+
+  it("withholds the report's max bid with the page's own sentence, naming the occupancy stated", () => {
+    const vacant = deriveUnderwriteInputs(OCC0_CAP, "x");
+    const s = buildSensitivityData(vacant.inputs, null, { sources: vacant.sources, occupancyPct: vacant.meta.occupancyPct });
+    expect(s.maxBid).toBeNull();
+    expect(s.noBid).toBeNull();
+    // It had read "clears at every tested price" beside a base under its own hurdle.
+    expect(maxBidSentence(s)).toBe(
+      "No max bid: stated 0% occupied, the model's rent line is its year-1 revenue grossed up through 99% vacancy, so a step of vacancy moves the NOI by a multiple — run a lease-up.",
+    );
+    const three = deriveUnderwriteInputs(OCC3, "x");
+    expect(three.inputs.vacancyPct).toBeCloseTo(0.97, 10);
+    expect(nearlyVacantReason(three.inputs, three.meta.occupancyPct)).toBe(
+      "stated 3% occupied, the model's rent line is that space's revenue grossed up through 97% vacancy, so a step of vacancy moves the NOI by a multiple — run a lease-up.",
+    );
+    expect(nearlyVacantPageLine(three.inputs, three.meta.occupancyPct, { maxBid: true })).toBe(
+      "The returns, the cap on year-1 NOI and the max bid are withheld: stated 3% occupied, the model's rent line is that space's revenue grossed up through 97% vacancy, so a step of vacancy moves the NOI by a multiple — run a lease-up.",
+    );
+    expect(nearlyVacantWord(three.inputs)).toBe("97% vacant");
+    // With no occupancy handed in, the model's own vacancy is said.
+    expect(nearlyVacantReason(three.inputs)).toMatch(/^run at 97% vacancy, the model's rent line is its year-1 revenue/);
+  });
+
+  it("reads a building under the line exactly as before", () => {
+    const s = buildSensitivityData(baseInputs(), null, { occupancyPct: 0.95 });
+    expect(s.maxBidWithheld).toBeNull();
+    expect(s.maxBid).toEqual(buildSensitivityData(baseInputs(), null).maxBid);
+    expect(nearlyVacantReason(baseInputs({ vacancyPct: 0.89 }), 0.11)).toBeNull();
+    expect(nearlyVacantWord(baseInputs({ vacancyPct: 0.89 }))).toBeNull();
+    expect(nearlyVacantWord(baseInputs({ vacancyPct: NEARLY_VACANT }))).toBe("90% vacant");
   });
 });

@@ -2,7 +2,7 @@ import type { LiveRate, SeriesSource } from "@/lib/live-rates";
 import { assetWords } from "@/lib/asset-words";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
-import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { INSURANCE_INDEX_ID, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { isStateMarket } from "@/lib/market-match";
@@ -17,7 +17,7 @@ import {
   signalGoingInCap,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
-import { interestOf } from "@/lib/interest";
+import { capSlotWithheld } from "@/lib/compare-interest";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import {
   bandText,
@@ -30,6 +30,7 @@ import {
   type TrackerRead,
 } from "@/lib/tracker-read";
 import { staleMark, staleReason, type ResearchAge } from "@/lib/research-age";
+import { allowanceSentence, dayText, pctText, type AllowanceRead, type RegimeRead, type RegulationRead } from "@/lib/rent-regulation";
 
 /**
  * The model's assumptions against the published figures — pure, no model
@@ -176,6 +177,12 @@ export interface ModelVsMarketInput {
    *  (`impliedGoingInCap`) — over the whole price a share implies, for a
    *  share — and said as such */
   goingInCapSource?: "stated" | "implied" | "implied_whole";
+  /** the model's own entry, percent: its year-1 NOI over its price, the
+   *  workbook's "Going-In Cap (Yr-1 NOI / Price)" (`modelEntryCap`) — null
+   *  where it is no cap: a placeholder price or an assumed NOI, or a price
+   *  that did not buy the building. Where it sits 5 bps or more from the
+   *  going-in cap, the exit is set against it and both are named. */
+  modelEntryCapPct?: number | null;
   metro?: { id: string; name: string } | null;
   /** the metro's own series (`readMetroRates`) */
   rates?: readonly LiveRate[];
@@ -192,6 +199,14 @@ export interface ModelVsMarketInput {
    * well as against the 10-year.
    */
   tracker?: TrackerRead | null;
+  /**
+   * The rent rules that reach the building (lib/rent-regulation, read through
+   * `regulationForDeal`): where a regime's allowance is in force today, the
+   * rent-growth check shows it as a figure of its own kind — the regime's
+   * allowance for the units it regulates — and names it first, and never
+   * folds it into the market's range or the tone.
+   */
+  regulation?: RegulationRead | null;
   now: Date;
 }
 
@@ -465,6 +480,57 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
   };
 }
 
+/** The regimes reaching the building whose allowance is in force on the day,
+ *  with figures to read — the ones the rent-growth check sets beside the
+ *  market's. */
+function allowancesInForce(r: RegulationRead | null | undefined): { regime: RegimeRead; allowance: AllowanceRead }[] {
+  return (r?.regimes ?? []).flatMap((regime) =>
+    regime.allowance?.state === "current" && regime.allowance.figures.length > 0 ? [{ regime, allowance: regime.allowance }] : [],
+  );
+}
+
+/** "runs 3.0 points over both", "runs 6.7 points under it", "runs over 2.1%
+ *  and under 4.1%" — where the model's growth sits against an allowance's
+ *  figures. */
+function againstAllowance(g: number, a: AllowanceRead): string {
+  const pcts = a.figures.map((f) => f.pct);
+  const hi = Math.max(...pcts);
+  const lo = Math.min(...pcts);
+  const them = pcts.length === 1 ? "it" : pcts.length === 2 ? "both" : `each of its ${pcts.length} figures`;
+  if (g > hi + SAME) return `runs ${pts(g - hi)} over ${them}`;
+  if (g < lo - SAME) return `runs ${pts(lo - g)} under ${them}`;
+  if (hi - lo >= SAME && g > lo + SAME && g < hi - SAME) return `runs over ${pctText(lo)} and under ${pctText(hi)}`;
+  return `sits at ${them}`;
+}
+
+/**
+ * Each allowance in force as published figures of its own kind — the
+ * regime's, for the units it regulates, dated by its period's start — and
+ * the sentences that name them, first, with the model's growth against
+ * them. The model is not changed and the market's range is not widened:
+ * the figures are shown beside the market's, and the tone is the market's.
+ */
+function allowanceRead(input: ModelVsMarketInput, g: number): { published: PublishedFigure[]; lead: string } | null {
+  const inForce = allowancesInForce(input.regulation);
+  if (inForce.length === 0) return null;
+  const published: PublishedFigure[] = inForce.flatMap(({ regime, allowance: a }) =>
+    a.figures.map((f) => ({
+      label: `${initialCap(regime.name)}: allowance on the regulated units, ${f.label}`,
+      text: `${pctText(f.pct)} for ${a.applies_to} ${dayText(a.period_start)} to ${dayText(a.period_end)}`,
+      value: f.pct,
+      asOf: a.period_start,
+      publisher: initialCap(a.order),
+    })),
+  );
+  const lead = inForce
+    .map(({ regime, allowance: a }) => {
+      const where = regime.outcome === "applies" ? "" : ", where it applies (the site's rules say it possibly does here)";
+      return `${allowanceSentence(regime.name, { ...a, next: null })} That is the regime's allowance for the units it regulates${where}, not a market figure: the model's ${g.toFixed(1)}%/yr ${againstAllowance(g, a)}.`;
+    })
+    .join(" ");
+  return { published, lead };
+}
+
 function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const words = assetWords(input.assetClass ?? undefined);
   const g = input.inputs.rentGrowthPct * 100;
@@ -487,24 +553,34 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     phrases.push(`sitting tenants' rents ${signed(cpiRent.value)}% over the year to ${when} (CPI rent, ${publisherOf(cpiRent)})`);
   }
   if (published.length === 0) return null;
+  // The range and the tone are the market's figures' alone: an allowance is
+  // the regime's, for the units it regulates, and folding it in would let a
+  // 3% model read "inside" a 0–4% band on a building whose regulated rents
+  // may rise 0%.
   const values = published.map((p) => p.value);
   const tone = rangeTone(g, values);
+  const regulated = allowanceRead(input, g);
   const clause =
     tone === "ahead"
       ? `The model runs ahead of every published figure, ${byPoints(g, values)}.`
       : tone === "behind"
         ? `The model runs behind every published figure, ${byPoints(g, values)}.`
         : "The model sits inside the published range.";
+  const trailing = "A trailing year is what the assumption is being asked to beat, not a forecast.";
   return {
     key: "rent_growth",
     title: "Rent growth",
     model: `${g.toFixed(1)}%/yr`,
     modelSource: sourceWords(input.sources?.rentGrowthPct),
-    published,
+    // Where a regime's allowance is in force it is named first, before the
+    // market's figures, which speak for the market-rate units.
+    published: regulated ? [...regulated.published, ...published] : published,
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
-    read: `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} A trailing year is what the assumption is being asked to beat, not a forecast.`,
+    read: regulated
+      ? `${regulated.lead} For the market-rate units, over the past year ${joinWords(phrases)}. ${clause} ${trailing}`
+      : `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} ${trailing}`,
   };
 }
 
@@ -711,6 +787,11 @@ function capBandTail(input: ModelVsMarketInput, x: number): { figures: Published
   return { figures, sentence: `${head}, and ${position}` };
 }
 
+/** How far apart, in percentage points, the model's own entry and the
+ *  going-in cap must sit before the exit is set against the model's own:
+ *  5 bps (research pass 34). Closer than that, the two are read as one. */
+const OWN_ENTRY_APART = 0.05;
+
 function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
   const words = assetWords(input.assetClass ?? undefined);
   if (!words.operating) return null;
@@ -743,11 +824,20 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
       tone: "stated",
       toneLabel: TONE_LABEL.stated,
       scope,
-      read: `${head} ${input.plan ? "A plan deal has no going-in cap to set it against; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}${band.sentence}`,
+      read: `${head} ${input.plan ? "A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}${band.sentence}`,
     };
   }
   const inSpread = Math.round((g - ten.value) * 100);
-  const delta = exitSpread - inSpread;
+  // The model's own entry — its year-1 NOI over its price — where it sits 5
+  // bps or more from the going-in cap: the returns run from it, so the exit
+  // is set against it, and the going-in cap is named beside it. Research
+  // pass 34: a deal stated at 5.45% whose T-12 NOI over the price read
+  // 5.84% was told "the exit holds the spread" while the model sold 39 bps
+  // tighter than it bought, and nothing said so.
+  const own = input.modelEntryCapPct;
+  const ownNamed = own != null && Number.isFinite(own) && own > 0 && Math.abs(own - g) >= OWN_ENTRY_APART ? own : null;
+  const ownSpread = ownNamed != null ? Math.round((ownNamed - ten.value) * 100) : null;
+  const delta = exitSpread - (ownSpread ?? inSpread);
   const tone: CheckTone = delta > 0 ? "widens" : delta < 0 ? "compresses" : "level";
   // A cap the documents imply rather than state is said as the arithmetic
   // it is, so the reader can see what the exit is being set against.
@@ -756,13 +846,22 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
       ? `The going-in cap implied by the OM's NOI over its price, ${g.toFixed(2)}%,`
       : input.goingInCapSource === "implied_whole"
         ? `The going-in cap implied by the OM's NOI over the whole price its share implies, ${g.toFixed(2)}%,`
-        : `The going-in cap ${g.toFixed(2)}%`;
+        : ownNamed != null
+          ? `The going-in cap the OM states, ${g.toFixed(2)}%,`
+          : `The going-in cap ${g.toFixed(2)}%`;
+  const from = ownNamed != null ? " from the model's own entry" : "";
   const clause =
     tone === "widens"
-      ? `so the exit assumes the spread widens ${delta} bps with the 10-year unchanged — the conservative direction.`
+      ? `so the exit assumes the spread widens ${delta} bps${from} with the 10-year unchanged — the conservative direction.`
       : tone === "compresses"
-        ? `so the exit assumes the spread narrows ${-delta} bps with the 10-year unchanged. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.`
-        : "so the exit holds the spread with the 10-year unchanged.";
+        ? `so the exit assumes the spread narrows ${-delta} bps${from} with the 10-year unchanged. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.`
+        : ownNamed != null
+          ? "so the exit holds the spread of the model's own entry with the 10-year unchanged."
+          : "so the exit holds the spread with the 10-year unchanged.";
+  const ownClause =
+    ownNamed != null && ownSpread != null
+      ? `; the model's own year-1 NOI over its price is ${ownNamed.toFixed(2)}%, ${Math.abs(ownSpread)} bps ${ownSpread >= 0 ? "over" : "under"} it,`
+      : ",";
   return {
     key: "exit_cap",
     title: "Exit cap",
@@ -772,7 +871,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope,
-    read: `${head} ${entry} is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}${band.sentence}`,
+    read: `${head} ${entry} is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it${ownClause} ${clause}${band.sentence}`,
   };
 }
 
@@ -828,6 +927,27 @@ export function impliedGoingInCap(extraction: ExtractionResult | null): { pct: n
   return { pct: cap * 100, whole: price !== asked };
 }
 
+/**
+ * The model's own entry: its year-1 NOI over its price, percent — the
+ * underwrite workbook's "Going-In Cap (Yr-1 NOI / Price)" cell, the figure
+ * the returns run from. Null where it is no cap: a placeholder price or an
+ * assumed NOI (lib/underwrite/inputs marks each "assumption"), or a price
+ * that did not buy the building (`buildingPriceOf`: a note's, a leased
+ * fee's, a position's, such a share's).
+ */
+export function modelEntryCap(
+  derived: Pick<DerivedModel, "inputs" | "sources">,
+  extraction: ExtractionResult | null,
+): number | null {
+  const price = derived.inputs.purchasePrice;
+  if (!(price > 0)) return null;
+  if (derived.sources.purchasePrice?.provenance === "assumption") return null;
+  if (derived.sources.inPlaceRentAnnual?.provenance === "assumption") return null;
+  if (buildingPriceOf(extraction, price) == null) return null;
+  const noi = computeUnderwrite(derived.inputs).cashFlow[0]?.noi ?? null;
+  return noi != null && noi > 0 ? (noi / price) * 100 : null;
+}
+
 /** A deal's going-in cap, percent, and where it came from. */
 export interface DealGoingInCap {
   pct: number;
@@ -851,7 +971,10 @@ export function dealGoingInCap(
   firstSignal?: FirstSignal | null,
 ): DealGoingInCap | null {
   const planDeal = isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
-  if (planDeal || interestOf(extraction).kind === "note") return null;
+  // No cap where the header withholds one (`capSlotWithheld`): a note's or
+  // a preferred equity position's price buys a loan or a position, and a
+  // share's beside its entity's loan is the equity's whole.
+  if (planDeal || capSlotWithheld(extraction) != null) return null;
   const capText = findGoingInCap(extraction?.metrics ?? [])?.value ?? null;
   const parsed = capText ? parsePct(capText) : null;
   const stated =
@@ -879,7 +1002,8 @@ export function dealGoingInCap(
  * stated one, else the first signal's where it can be a cap on the price
  * (`signalGoingInCap`, the page's summary bar's own fallback); where
  * neither states one, the cap the documents' NOI implies on their price;
- * and none on a plan deal or a note. The rule lives here and nowhere else:
+ * and none on a plan deal, a note, a preferred equity position or a share
+ * beside the loan its entity carries. The rule lives here and nowhere else:
  * the page once handed in its summary bar's figure while the report and
  * the workbook read the implied cap, and one deal's exit read 60 bps of
  * widening on the page and 20 in the documents.
@@ -896,6 +1020,10 @@ export function modelVsMarketFor(args: {
    *  research tracker's */
   metro: { id: string; name: string; placedBy?: unknown } | null;
   reads: MarketReads;
+  /** the rent rules that reach the building (lib/rent-regulation
+   *  `regulationForDeal`), read by the caller on its own day — the page's
+   *  reader day, a route's UTC day */
+  regulation?: RegulationRead | null;
 }): ModelVsMarket | null {
   const { derived, extraction, storedAssetClass, metro, reads } = args;
   const planDeal = isPlanDeal(inferStrategy(extraction, args.firstSignal ?? null).kind);
@@ -913,6 +1041,9 @@ export function modelVsMarketFor(args: {
     plan: planDeal,
     goingInCapPct: goingIn?.pct ?? null,
     goingInCapSource: goingIn?.source,
+    // The model's own year-1 NOI over its price, named beside the going-in
+    // cap where the two sit apart, and the exit set against it.
+    modelEntryCapPct: modelEntryCap(derived, extraction),
     metro,
     rates: reads.rates,
     zori: reads.zori,
@@ -925,6 +1056,7 @@ export function modelVsMarketFor(args: {
     // deck's own class words ride along, so a lab, a yard or a cold-storage
     // warehouse the analyst filed as plain office or industrial reads none.
     tracker: metro && !metro.placedBy ? trackerFor(metro.id, assetClass, extraction?.assetClass ?? null) : null,
+    regulation: args.regulation ?? null,
     now: reads.now,
   });
 }

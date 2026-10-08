@@ -42,7 +42,8 @@ export const SLIDER_SWEEP_BPS = 200;
 // Public-record comp jurisdictions: RE-EXPORTED from the provider registry
 // itself (lib/public-comps/core.ts COVERAGE_SUMMARY, derived from configured
 // providers) so marketing copy can never claim coverage the code doesn't have.
-export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS } from "@/lib/public-comps/core";
+import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
+export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS };
 // The FRED series the weekday cron tracks are counted from the one table
 // both the cron and the page read (data/fred-series.json via
 // lib/live-rates.ts SERIES) — nothing here restates the number.
@@ -120,7 +121,15 @@ export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
 export const FREE_PLAN: readonly string[] = [
   `Up to ${FREE_DEALS} deals, the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers",
-  "Recorded-sales comps + local rent-rule check by address",
+  // Each said where it holds: the card had promised recorded-sales comps and
+  // a local rule check by every address, where the comps run only where a
+  // county publishes its sales to the registry and local rules only in the
+  // covered markets (research pass 32). The statewide rules are on file for
+  // ten states and no others — Oregon's statewide cap among the missing — so
+  // the line counts them; lib/plan-features.test.ts holds the count to the
+  // rules file (the batch-2 audit: it had said "statewide elsewhere").
+  "Rent-rule check by address: local in the covered markets, and the statewide rules on file for 10 states",
+  `Recorded-sales comps in ${COVERAGE_SUMMARY}`,
   "Risk digest and side-by-side deal comparison",
   "Reconcile your own underwriting model",
 ];
@@ -172,6 +181,8 @@ export const SAMPLE_COMP_PREMIUM_LINE =
   "$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it.";
 
 // NOTE deliberately absent: the Excel-preview IRR figures. Those are COMPUTED
-// from the live engine on the sample model at render time (app/page.tsx
-// imports computeModel + SAMPLE_DEAL) — hardcoding them here is exactly how
-// they drifted (7.1% vs the engine's 6.9%).
+// at render time by the screening engine (lib/underwrite/engine) on the
+// sample's one derivation, the demo workbook's (lib/sample-derive's
+// `sampleWorkbookPreview`, which app/page.tsx reads; the homepage's stress
+// bench runs the same derivation) — hardcoding them here is exactly how they
+// drifted (7.1% vs the engine's 6.9%).

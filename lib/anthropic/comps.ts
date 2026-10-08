@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -41,6 +41,9 @@ export async function scrutinizeComps(
   /** what the screen established — the deal's kind and, on a plan deal, the
    *  plan's figures — so the comps are held against the right basis */
   context?: string | null,
+  /** a forward purchase (lib/forward-purchase): its paragraph stands where
+   *  a plan's would — the price is the buyer's whole cost at delivery */
+  forward = false,
 ): Promise<BrokerCompsResult> {
   const client = getAnthropic();
 
@@ -52,17 +55,19 @@ export async function scrutinizeComps(
       {
         role: "user",
         content: [
-          // Reads the OM from the prompt cache the extraction step wrote; the
-          // context rides after it so the cached prefix stays identical.
+          // The OM under the cache breakpoint every step sends (whether this
+          // reads an earlier step's cache, with a structured-output format of
+          // its own, is the ledger's to say — ./models); the context rides
+          // after it so nothing that varies by deal sits before it.
           omDocument(om),
-          { type: "text", text: brokerCompsInstruction(context) },
+          { type: "text", text: brokerCompsInstruction(context, forward) },
           // Today's date, which a comp's age is judged against
           // (lib/anthropic/today).
           { type: "text", text: todayLine() },
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(BrokerCompsSchema) },
+    output_config: { format: screenOutputFormat(BrokerCompsSchema) },
   }, omRequestOptions(om)));
   return out;
 }

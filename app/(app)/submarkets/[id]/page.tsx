@@ -413,7 +413,7 @@ export default async function SubmarketPage({
                       p.source
                     )}
                     {p.unverified ? (
-                      <span className="ml-1 rounded bg-caution/15 px-1 text-[10px] font-medium text-caution">
+                      <span className="ml-1 rounded bg-caution/10 px-1 text-[10px] font-medium text-caution">
                         unverified
                       </span>
                     ) : null}
@@ -556,7 +556,7 @@ export default async function SubmarketPage({
                       </span>
                     ) : null}
                     {p.staleFlag ? (
-                      <span className="rounded bg-caution/15 px-1.5 py-px text-caution" title={p.staleReason ?? ""}>
+                      <span className="rounded bg-caution/10 px-1.5 py-px text-caution" title={p.staleReason ?? ""}>
                         review
                       </span>
                     ) : null}

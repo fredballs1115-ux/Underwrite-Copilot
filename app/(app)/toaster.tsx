@@ -4,12 +4,23 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
 type Tone = "success" | "error" | "info";
 type Toast = { id: number; message: string; tone: Tone };
+
+/** How long a toast stays on screen, in milliseconds; null is until it is
+ *  dismissed. An error carries instructions, so it stays until the reader
+ *  dismisses it; any other toast goes after 4.5 seconds — counted only
+ *  while it is neither hovered nor holding focus, so a reader zoomed in, or
+ *  one who has tabbed to it, never loses it mid-read (WCAG 2.2.1). */
+export function toastLifetime(tone: Tone): number | null {
+  return tone === "error" ? null : 4500;
+}
 
 const ToastCtx = createContext<(message: string, tone?: Tone) => void>(
   () => {},
@@ -29,15 +40,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
-  const push = useCallback(
-    (message: string, tone: Tone = "info") => {
-      const id = ++counter;
-      setToasts((t) => [...t, { id, message, tone }]);
-      // Errors carry instructions, so they linger; happy-path toasts don't.
-      setTimeout(() => dismiss(id), tone === "error" ? 10000 : 4500);
-    },
-    [dismiss],
-  );
+  // Each card keeps its own time (`toastLifetime`), so it can pause.
+  const push = useCallback((message: string, tone: Tone = "info") => {
+    const id = ++counter;
+    setToasts((t) => [...t, { id, message, tone }]);
+  }, []);
 
   return (
     <ToastCtx.Provider value={push}>
@@ -47,7 +54,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-2"
       >
         {toasts.map((t) => (
-          <ToastCard key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
+          <ToastCard key={t.id} toast={t} onDismiss={dismiss} />
         ))}
       </div>
     </ToastCtx.Provider>
@@ -102,19 +109,41 @@ function ToastCard({
   onDismiss,
 }: {
   toast: Toast;
-  onDismiss: () => void;
+  /** stable (the provider's own), so the clock is not re-armed by a render */
+  onDismiss: (id: number) => void;
 }) {
   const t = TONE[toast.tone];
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const paused = hovered || focused;
+  // What is left of the toast's time, carried across each pause.
+  const left = useRef(toastLifetime(toast.tone));
+  useEffect(() => {
+    const ms = left.current;
+    if (ms == null || paused) return;
+    const started = Date.now();
+    const timer = setTimeout(() => onDismiss(toast.id), ms);
+    return () => {
+      clearTimeout(timer);
+      left.current = Math.max(0, ms - (Date.now() - started));
+    };
+  }, [paused, onDismiss, toast.id]);
   return (
     <div
       role="status"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+      }}
       className={`shadow-float animate-rise pointer-events-auto flex items-start gap-2.5 rounded-xl border border-line border-l-4 ${t.accent} bg-surface px-4 py-3`}
     >
       <span className="mt-0.5 shrink-0">{t.icon}</span>
       <p className="min-w-0 flex-1 text-sm leading-relaxed">{toast.message}</p>
       <button
         type="button"
-        onClick={onDismiss}
+        onClick={() => onDismiss(toast.id)}
         aria-label="Dismiss notification"
         className="shrink-0 rounded p-0.5 text-muted transition-colors hover:text-ink"
       >

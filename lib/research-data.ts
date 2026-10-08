@@ -20,6 +20,7 @@ import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
 import { US_STATE_ABBREV } from "@/lib/address";
 import { fmrBenchmarkRows, fmrOf, newestFmrOnly, type Fmr } from "@/lib/fmr";
 import { figureNote, figureRead, rentOf } from "@/lib/tracker-read";
+import { sourceParts } from "@/lib/source-parts";
 
 export function seedRules(): RegulatoryRule[] {
   return (rulesSeed.rules as unknown as RegulatoryRule[]).filter(
@@ -146,18 +147,44 @@ export function mergeRules(dbRows: RegulatoryRule[] | null | undefined): Regulat
 const ON_MARKET_DEPTH_AS_OF = "2026-05-31";
 
 /**
+ * The Redfin page a research source cites, read out of the source as the
+ * file writes it (lib/source-parts: the address, then a note) — never an
+ * address typed here — and only where it is Redfin's own (redfin.com), so a
+ * page that credits Redfin links Redfin. Null otherwise. Redfin's 2–4 unit
+ * figures had printed with no credit on /demo and with an unlinked one on
+ * /market (research pass 31, C4).
+ */
+export function redfinSourceHref(source: string | null | undefined): string | null {
+  const { href } = sourceParts(source);
+  if (!href) return null;
+  try {
+    return /(^|\.)redfin\.com$/i.test(new URL(href).hostname) ? href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A metro's 2–4 unit sale median from the research file, with its change on
  * a year earlier as the file states it and the month it is for — so a page
  * printing the figure prints its month from the same place, never a figure
- * typed on the page. Null where the file carries no median for the metro.
+ * typed on the page — and the Redfin page the file cites for it
+ * (`redfinSourceHref`, null where it cites none). Null where the file
+ * carries no median for the metro.
  */
-export function twoToFourMedian(metroKey: string): { price: number; yoy: string | null; asOf: string } | null {
-  const value = multifamilySeed.supply_demand?.on_market_depth_may_2026?.value as
-    | Record<string, { median_sale_price?: number; yoy?: string }>
-    | undefined;
+export function twoToFourMedian(
+  metroKey: string,
+): { price: number; yoy: string | null; asOf: string; sourceHref: string | null } | null {
+  const block = multifamilySeed.supply_demand?.on_market_depth_may_2026;
+  const value = block?.value as Record<string, { median_sale_price?: number; yoy?: string }> | undefined;
   const row = value?.[metroKey];
   if (!row || typeof row.median_sale_price !== "number") return null;
-  return { price: row.median_sale_price, yoy: typeof row.yoy === "string" && row.yoy.trim() ? row.yoy : null, asOf: ON_MARKET_DEPTH_AS_OF };
+  return {
+    price: row.median_sale_price,
+    yoy: typeof row.yoy === "string" && row.yoy.trim() ? row.yoy : null,
+    asOf: ON_MARKET_DEPTH_AS_OF,
+    sourceHref: redfinSourceHref(block?.sources?.[0]),
+  };
 }
 
 /** Benchmarks derived from the sector JSONs. Kept in code (not hand-copied
@@ -523,12 +550,16 @@ export function buildSubject(input: {
   };
 }
 
-/** Parse "$1,234,567" + "12 units" into price-per-unit, when both parse. */
-export function pricePerUnit(priceText?: string | null, sizeText?: string | null): number | null {
-  const p = num(priceText);
-  const u = sizeText && /\bunits?\b/i.test(sizeText) ? num(sizeText) : undefined;
-  if (!p || !u || u < 1) return null;
-  return Math.round(p / u);
+/**
+ * The benchmarks' heading on the deal page, with the deal's own price by its
+ * class's basis beside it: the pipeline card's figure (lib/pipeline-slots
+ * `basisTag`) — "$280k/unit", "$200k/room", "$212/SF" — in the deal's own
+ * noun, or none where the card prints none. The panel had parsed the
+ * header's size text for "units", so its figure vanished whenever an area
+ * was stated, and it called a hotel's rooms units.
+ */
+export function vsMarketHeading(basis: string | null | undefined): string {
+  return `vs. market${basis ? ` — this deal ≈ ${basis}` : ""}`;
 }
 
 /** Format a benchmark's low–high for display, by what the metric IS: percent

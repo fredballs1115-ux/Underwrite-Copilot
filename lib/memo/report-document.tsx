@@ -1,11 +1,14 @@
 import "server-only";
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { compactUsd, scaledText } from "@/lib/money";
+import { Document, Page, View, Text, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
-import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
+import { regionClause } from "@/lib/region-line";
 import { currentBriefLine } from "@/lib/permit-split";
-import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
+import { OSM_LOCATION_WORDS, REPORT_FLOOD_SIZE } from "@/lib/basemaps";
+import { documentNotices } from "@/lib/data-notices";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -16,6 +19,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
+import { nameBreaks } from "./pdf-text";
 import { rangeInOrder } from "@/lib/verdict-range";
 import { typicalRangeParts } from "@/lib/typical-range";
 
@@ -32,6 +36,7 @@ export function rangeRead(omSays: string, typicalRange: string): number | null {
   return basePosition({ low: parts[0], base: omSays, high: parts[1] });
 }
 import {
+  gridNoIrrNote,
   gridTakeaway,
   heatBucket,
   heatCellIrr,
@@ -43,6 +48,8 @@ import {
   type SensitivityData,
   type HeatCell,
 } from "@/lib/underwrite/report-grid";
+import { NO_IRR_SHORT, NO_IRR_WHY } from "@/lib/underwrite/no-irr";
+import { timesWords } from "@/lib/underwrite/solver";
 import { withArticle } from "@/lib/article";
 import {
   SPREAD_BG,
@@ -54,12 +61,12 @@ import {
   type SpreadBucket,
   type YocGrid,
 } from "@/lib/plan-sensitivity";
-import { planFacts, yieldOnCostText } from "@/lib/plan-facts";
+import { planFacts, planNoiText, yieldOnCostText } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
-import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
-import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
+import { askingPriceOf, inferStrategy, isPlanDeal, notYetDelivered, planSummary } from "@/lib/deal-strategy";
+import { interestOf, isGpStake, isWholeShare, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
@@ -71,14 +78,22 @@ import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
+import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
+import { condoShortLine, readCondo } from "@/lib/condo";
+import { condoUnitsOffered } from "@/lib/condo-units";
+import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
 import type { AssumableView } from "@/lib/assumable-debt";
-import type { InputSource } from "@/lib/underwrite/inputs";
+import { basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
+import { liveReadFailedLine } from "@/lib/market-read-failed";
+import { stressTestTitle } from "@/lib/stress-test-title";
 
 const C = {
   brand: "#114e54",
@@ -105,6 +120,20 @@ export function readDay(v: string | null | undefined): string {
   const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z` : s);
   if (!s || !Number.isFinite(t)) return s;
   return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/**
+ * A source note's stored days as a reader writes them: "TTM to 2026-05-31"
+ * reads "TTM to May 31, 2026" (research pass 35). Only a real calendar day
+ * changes; anything else is left as written. The notes keep their ISO days
+ * where they are stored, for the workbook's Sources column.
+ */
+export function proseDays(s: string): string {
+  return s.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (iso, y, m, d) => {
+    const t = Date.UTC(Number(y), Number(m) - 1, Number(d));
+    const back = new Date(t);
+    return back.getUTCFullYear() === Number(y) && back.getUTCMonth() === Number(m) - 1 && back.getUTCDate() === Number(d) ? readDay(iso) : iso;
+  });
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -315,6 +344,11 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(c.read)}</Text>
         </View>
       ))}
+      {documentNotices(read.checks.flatMap((c) => c.published.map((p) => p.publisher))).map((n) => (
+        <Text key={n} style={{ fontSize: 6.5, color: C.muted, marginTop: 4 }}>
+          {str(n)}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -360,7 +394,7 @@ function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
   const seller = view.kind === "seller";
   const rate =
     view.couponPct != null && view.marketPct != null && view.underMarketBps != null
-      ? `The ${seller ? "note" : "loan"}'s ${view.couponPct.toFixed(2)}% against ${view.marketPct.toFixed(2)}% for a new one — ${Math.abs(view.underMarketBps)} bps ${
+      ? `The ${seller ? "note" : "loan"}'s ${view.couponPct.toFixed(2)}%${view.mipPct != null ? " with its MIP" : ""} against ${view.marketPct.toFixed(2)}% for a new one — ${Math.abs(view.underMarketBps)} bps ${
           view.underMarketBps >= 0 ? "under" : "over"
         }.`
       : "";
@@ -412,6 +446,17 @@ function PhotosBlock({ photos }: { photos: MemoCover[] }) {
   );
 }
 
+/** The site map's credit: what it is drawn from, what its centre is, and —
+ *  where Photon placed the point — OpenStreetMap's data. */
+export function siteMapCredit(view: Pick<FloodMapView, "ring" | "placedByOsm">): string {
+  const centre =
+    view.ring !== false
+      ? "the ring marks the building."
+      : "the frame is centred on the street the address names, not the building: the map data has no house number for it.";
+  const osm = view.placedByOsm ? ` ${OSM_LOCATION_WORDS.charAt(0).toUpperCase()}${OSM_LOCATION_WORDS.slice(1)}.` : "";
+  return `FEMA National Flood Hazard Layer over USGS The National Map; ${centre}${osm}`;
+}
+
 function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string | null }) {
   return (
     <View wrap={false}>
@@ -420,34 +465,39 @@ function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string |
           <View style={{ position: "relative", width: SITE_MAP_W, height: SITE_MAP_H, marginTop: 2 }}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image takes no alt */}
             <Image src={view.image} style={{ width: SITE_MAP_W, height: SITE_MAP_H, borderRadius: 4, objectFit: "cover" }} />
-            {/* The ring over a dark halo, so it reads over the pale tints. */}
-            <View
-              style={{
-                position: "absolute",
-                left: SITE_MAP_W / 2 - 8,
-                top: SITE_MAP_H / 2 - 8,
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                borderWidth: 1.5,
-                borderColor: "#1f2937",
-              }}
-            />
-            <View
-              style={{
-                position: "absolute",
-                left: SITE_MAP_W / 2 - 6.5,
-                top: SITE_MAP_H / 2 - 6.5,
-                width: 13,
-                height: 13,
-                borderRadius: 6.5,
-                borderWidth: 2,
-                borderColor: "#ffffff",
-              }}
-            />
+            {/* The ring over a dark halo, so it reads over the pale tints —
+                only where the frame's centre is the building's own point. */}
+            {view.ring !== false && (
+              <>
+                <View
+                  style={{
+                    position: "absolute",
+                    left: SITE_MAP_W / 2 - 8,
+                    top: SITE_MAP_H / 2 - 8,
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    borderColor: "#1f2937",
+                  }}
+                />
+                <View
+                  style={{
+                    position: "absolute",
+                    left: SITE_MAP_W / 2 - 6.5,
+                    top: SITE_MAP_H / 2 - 6.5,
+                    width: 13,
+                    height: 13,
+                    borderRadius: 6.5,
+                    borderWidth: 2,
+                    borderColor: "#ffffff",
+                  }}
+                />
+              </>
+            )}
           </View>
           <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3, textAlign: "right" }}>
-            FEMA National Flood Hazard Layer over USGS The National Map; the ring marks the building.
+            {siteMapCredit(view)}
           </Text>
         </>
       ) : null}
@@ -460,7 +510,7 @@ function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string |
                 <Image src={k.image} style={{ width: 8, height: 8, marginRight: 4, borderWidth: 0.5, borderColor: C.line }} />
               ) : null}
               <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: k.here ? "Helvetica-Bold" : "Helvetica" }}>
-                {str(k.here ? `${k.label} - at the building` : k.label)}
+                {str(k.here ? `${k.label} — ${view.ring !== false ? "at the building" : "at the frame's centre"}` : k.label)}
               </Text>
             </View>
           ))}
@@ -512,7 +562,9 @@ function LeaseholdBlock({ view }: { view: LeaseholdExitView | null | undefined }
   );
   return (
     <View style={{ marginTop: 12 }} wrap={false}>
-      <TitleRow title="The exit, on the ground lease's term" marginTop={0} />
+      {/* The lease the position runs out with: the land's, or a sandwich
+          position's master lease of the building (research pass 28). */}
+      <TitleRow title={`The exit, on the ${v.lease ?? "ground lease"}'s term`} marginTop={0} />
       <Text style={s.sub}>{str(`${v.termLine}.`)}</Text>
       {v.yearsLeft > 0 ? (
         <View style={{ marginTop: 3 }}>
@@ -588,7 +640,7 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
     <View>
       <Text style={s.sub}>
         {str(
-          `Each property as the memorandum states it - a blank is a figure it does not state. ${
+          `Each property as the memorandum states it — a blank is a figure it does not state. ${
             p.shares && basisWord
               ? `The bar is each property's share of the ${basisWord}${p.noiShares ? "; the thinner one beneath, its share of the NOI" : ""}.`
               : "No bars: the properties do not all state a count, nor all an area, so no share of the whole can be drawn."
@@ -651,6 +703,27 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
 }
 
 /**
+ * A leasehold's model caveat as paper says it. On the web it sends the
+ * reader to the ground lease calculator on the stated term; a PDF has no
+ * link, and where the report runs that term itself (`LeaseholdBlock`,
+ * "The exit, on the ground lease's term") it points there instead
+ * (research pass 35). Where the report draws no block, the caveat stands
+ * as written.
+ */
+export function caveatOnPaper(caveat: string, leasehold: LeaseholdExitView | null | undefined): string {
+  if (!leasehold) return caveat;
+  return caveat.replace(
+    /run the ground lease calculator on the stated term(, with the master rent as its rent)?\./,
+    `see The exit, on the ${leasehold.lease ?? "ground lease"}'s term, below.`,
+  );
+}
+
+const COUNT_WORDS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+/** A count of lines as a sentence says it: "the first two", never "the
+ *  first 2" (research pass 35); ten and over stay figures. */
+const countWord = (n: number) => (n > 0 && n < 10 ? COUNT_WORDS[n] : String(n));
+
+/**
  * Whose figures a printed block of the market check's evidence is: the
  * address's market first ("the Washington DC market's"), a state as the
  * state's — an outside-the-metros deal read its state and the page said
@@ -666,23 +739,36 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   // The last `national` lines are the nation's, and said so here rather
   // than folded into "each is the metro's".
   const nat = Math.min(Math.max(b.national ?? 0, 0), b.lines.length);
-  const nationSays = nat > 0 ? (nat === 1 ? " The last is the nation's, and says so." : ` The last ${nat} are the nation's, each said so.`) : "";
+  const nationSays = nat > 0 ? (nat === 1 ? " The last is the nation's, and says so." : ` The last ${countWord(nat)} are the nation's, each said so.`) : "";
   const localCount = b.lines.length - nat;
-  const first_ = localCount === 1 ? "The first is" : `The first ${localCount} are`;
+  const first_ = localCount === 1 ? "The first is" : `The first ${countWord(localCount)} are`;
+  // A Census region's rental vacancy among them is the region's, said apart
+  // as the model's header and the verdict's brief say it (audit C4, L7).
+  const region = regionClause(b.lines.slice(0, localCount));
+  // Every line the nation's: none of the market's own figures was current,
+  // said in place of "the first none are the metro's" (the pre-merge audit).
+  if (localCount === 0 && nat > 0) {
+    const each = ` Each is the nation's, and says so.`;
+    return first
+      ? `Figures the check read beside the rules of thumb: the nation's, as published, read on ${readDay(b.readOn)} — none of ${whose} own was current${
+          state ? ", and the address lies outside the metros the site tracks" : ""
+        }.${state ? "" : placedBySentence(b.placedBy)}${each}`
+      : `And the nation's, where ${sit}, read on ${readDay(b.readOn)}: none of ${whose} own was current.${each}`;
+  }
   if (!first) {
-    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} - not those properties' own, and never the portfolio's.${nationSays}`;
+    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} — not those properties' own, and never the portfolio's${region}.${nationSays}`;
   }
   const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${readDay(b.readOn)}${
-    state ? " - the address lies outside the metros the site tracks" : ""
+    state ? " — the address lies outside the metros the site tracks" : ""
   }.${state ? "" : placedBySentence(b.placedBy)}`;
   const each =
     (nat > 0
       ? state
-        ? ` ${first_} the state's, not any metro's, the submarket's or the building's.`
-        : ` ${first_} the metro's, not the submarket's or the building's.`
+        ? ` ${first_} the state's, not any metro's, the submarket's or the building's${region}.`
+        : ` ${first_} the metro's, not the submarket's or the building's${region}.`
       : state
-        ? " Each is the state's, not any metro's, the submarket's or the building's."
-        : " Each is the metro's, not the submarket's or the building's.") + nationSays;
+        ? ` Each is the state's, not any metro's, the submarket's or the building's${region}.`
+        : ` Each is the metro's, not the submarket's or the building's${region}.`) + nationSays;
   const forWhom = pf
     ? pf.here > 0
       ? ` They speak for the portfolio's ${pf.here} ${pf.here === 1 ? "property" : "properties"} in ${b.metro} of its ${pf.of}, never for the portfolio.`
@@ -745,7 +831,9 @@ function PageChrome({
             <Text style={s.pageHeadBrand}>Underwrite Copilot</Text>
           ) : null}
         </View>
-        <Text style={s.pageHeadMeta}>{dealName} — full screening report</Text>
+        <Text style={s.pageHeadMeta} hyphenationCallback={nameBreaks}>
+          {dealName} — full screening report
+        </Text>
       </View>
       <TitleRow title={title} count={count} />
       {children}
@@ -905,6 +993,11 @@ function CallInFullPage({
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
+  /** the sample deal, where the row cannot say so (the public demo builds
+   *  its row by hand): its stress test is the first-draft model's run, and
+   *  the challenger page's heading says so (lib/stress-test-title). A row
+   *  marked `is_sample` says it too. */
+  sample?: boolean;
   /** the sensitivity page's data (Feature 5): both grids, the buyer-hurdle
    *  color scale, the takeaway, and the max bid; null when the deal has no
    *  extraction to derive a model from */
@@ -920,6 +1013,15 @@ export interface ReportInput {
    *  NOI shortfall and budget overrun; null for a stabilized asset or when
    *  the OM did not state a budget and a stabilized NOI */
   plan?: PlanReport | null;
+  /** why a plan deal's plan page is left out where the route built a model
+   *  but no yield on cost can be stressed on what was read (a figure the
+   *  page needs was not read, named; the developer funds a forward
+   *  purchase's works; the price is not the project's): printed on the page
+   *  that carries the deal's terms — its pill and its sentence — whose
+   *  model reads are then withheld as a placeholder model's are. Null
+   *  everywhere else: a report whose route built no model says that
+   *  instead. */
+  planLeftOut?: { count: string; why: string } | null;
   /** the OM's real page count, from the extraction — a citation prints only
    *  when it falls inside it (lib/facts.ts: never an unvalidated page);
    *  null when the count is unknown, and then no page prints */
@@ -994,6 +1096,42 @@ export interface ReportInput {
    *  printed over the grids; absent where the caller built no model, and
    *  then the line prints alone */
   storage?: { line: string; read: string } | null;
+  /** the rent rules that reach the building — the regime, the regulated
+   *  share as stated and the allowance in force — and the model's one growth
+   *  rate set beside the allowance (lib/rent-regulation, read by the route
+   *  through `regulationForDeal`, with the derived model's
+   *  `meta.regulation`) — printed over the grids; the line alone where the
+   *  model built nothing worth printing, and nothing where the caller read
+   *  no regulation */
+  regulation?: { line: string; read: string } | null;
+  /** a forward purchase or a build-to-suit bought at delivery, and what the
+   *  model does with it — the price as paid at closing, its year-one NOI
+   *  beside the memorandum's at delivery (lib/forward-purchase via the
+   *  derived model's `meta.forward`) — printed over the grids; absent where
+   *  the caller built no model, and then the line prints alone */
+  forward?: { line: string; read: string } | null;
+  /** a mixed-use building's two incomes, and what the model does with them
+   *  — one exit cap and one growth rate for both (lib/mixed-use via the
+   *  derived model's `meta.mixedUse`) — printed over the grids; absent
+   *  where the caller built no model, and then the line prints alone */
+  mixedUse?: { line: string; read: string } | null;
+  /** an operating business on its real estate, and what the model does with
+   *  its income — capitalised as rent, nothing allocated to the business
+   *  (lib/going-concern via the derived model's `meta.goingConcern`) —
+   *  printed over the grids; absent where the caller built no model, and
+   *  then the line prints alone */
+  goingConcern?: { line: string; read: string } | null;
+  /** condominium units bought in bulk, and what the model does with them —
+   *  one building at one exit cap, no retail exit (lib/condo via the derived
+   *  model's `meta.condo`) — printed over the grids; absent where the caller
+   *  built no model, and then the line prints alone */
+  condo?: { line: string; read: string } | null;
+  /** a sandwich position, and what the model does with it — its income
+   *  capitalised at the sale as if it ran forever while the master lease
+   *  ends (lib/sandwich-lease via the derived model's `meta.sandwich`) —
+   *  printed over the grids; absent where the caller built no model, and
+   *  then the line prints alone */
+  sandwich?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427,
    *  #472): the deal's flood frame cut to the band, the key of the zones it
    *  shows and the zone sentence; null for no page */
@@ -1002,6 +1140,75 @@ export interface ReportInput {
    *  credited (lib/memo/cover-aerial `galleryPhotosFor`, #459); fewer than
    *  two is no page */
   photos?: MemoCover[] | null;
+  /** the page the memo's target-return chip names for the model's IRR —
+   *  the sensitivity page's, counted from the pages before it on a
+   *  one-page memo and call; `renderReportPdf` draws again where the page
+   *  landed elsewhere. Null where the chip names none. */
+  targetReturnPage?: number | null;
+}
+
+/** The chip the target-return check prints, as the memo clamps its label. */
+const TARGET_RETURN = "Target return";
+
+/**
+ * Why a plan deal's plan page is left out where its model was built, in
+ * words true of the deal. The plan page (lib/plan-sensitivity
+ * `buildPlanReport`) stresses a yield on cost: a stabilized NOI over the
+ * price and the buyer's budget, or over an all-in total. A forward
+ * purchase's works are the developer's; a price that is not the project's
+ * says so; otherwise the figures the page could not read are named — "read",
+ * since a budget the memorandum states may be one the reader refused. Where
+ * every figure was read, the caller simply built no plan page, and the
+ * sentence says only that.
+ */
+function planLeftOutWhy(extraction: ExtractionResult | null, signal: FirstSignal | null): { count: string; why: string } {
+  const plan = planSummary(extraction, inferStrategy(extraction, signal));
+  const terms = "these are the memorandum's terms as read, without the model's read beside them.";
+  const rest = `the plan page is left out, and ${terms}`;
+  if (plan?.forward) {
+    return { count: "the developer funds the works", why: `The developer funds the works, so the buyer has no budget for the plan page to stress: ${rest}` };
+  }
+  if (plan?.priceWithheld) {
+    return { count: "no yield on cost struck", why: `The price is ${plan.priceWithheld}, so no yield on cost is struck: ${rest}` };
+  }
+  if (plan?.costWithheld) return { count: "no yield on cost struck", why: `${plan.costWithheld.replace(/\.$/, "")}: ${rest}` };
+  const noi = plan?.stabilizedNoi?.value ?? null;
+  const budget = plan?.budget?.budget ?? null;
+  const price = plan?.price ?? (plan?.budget?.isTotal ? 0 : null);
+  const missing = [
+    noi == null ? "stabilized NOI" : noi > 0 ? null : "stabilized NOI above zero",
+    budget == null ? "budget" : budget > 0 ? null : "budget above zero",
+    price == null ? "price to set the budget against" : null,
+  ].filter((m): m is string => m != null);
+  if (missing.length === 0) return { count: "left out", why: `No plan page was built for this report, so ${terms}` };
+  const named = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} or ${missing[missing.length - 1]}`;
+  return { count: "no yield on cost struck", why: `No ${named} was read from the memorandum, so no yield on cost is struck: ${rest}` };
+}
+
+/**
+ * The memo page's target-return chip, where the buy-box check read no IRR
+ * from the screen ("—") and the report grades the model's own against the
+ * same target a few pages on: the chip names the model's figure and its
+ * page ("— Target return · model 9.3%, p. 3"; research pass 35: one PDF
+ * printed an unknown target return on page 1 and graded a 9.3% IRR against
+ * it on page 4). Only where the grids are the deal's own returns
+ * (`gridSubjectOf`), never a note's collateral's. The check itself is
+ * unchanged: reading the model's IRR into it is the owner's call.
+ */
+function withTargetReturnNote(memo: MemoData, irr: number | null, page: number | null): MemoData {
+  if (irr == null || !Number.isFinite(irr) || page == null) return memo;
+  return {
+    ...memo,
+    buyBox: memo.buyBox.map((c) =>
+      c.label === TARGET_RETURN && c.status === "unknown" ? { ...c, note: `model ${(irr * 100).toFixed(1)}%, p. ${page}` } : c,
+    ),
+  };
+}
+
+/** The model's levered IRR the sensitivity page grades: the base case's
+ *  tile, else the ink-bordered cell it equals. */
+function gradedIrrOf(s: SensitivityData): number | null {
+  return s.baseCase?.leveredIrr ?? s.grid.cells[s.grid.baseRow]?.[s.grid.baseCol]?.irrPct ?? null;
 }
 
 /** The deal's first signal, which the deal page reads beside the
@@ -1036,6 +1243,17 @@ export function buildReportData(
   student?: { line: string; read: string } | null,
   mh?: { line: string; read: string } | null,
   storage?: { line: string; read: string } | null,
+  regulation?: { line: string; read: string } | null,
+  forward?: { line: string; read: string } | null,
+  mixedUse?: { line: string; read: string } | null,
+  goingConcern?: { line: string; read: string } | null,
+  condo?: { line: string; read: string } | null,
+  sandwich?: { line: string; read: string } | null,
+  /** the day the report is read on, an ISO day — the reader's own, which the
+   *  route dates the report and names its file for: its first page's dated
+   *  lines (the rent allowance in force) read it, as the route's own
+   *  regulation read does. The clock's UTC day where a caller passes none. */
+  today?: string,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -1053,7 +1271,29 @@ export function buildReportData(
   // lines the memorandum states, as for a caller that built no model. A
   // plan deal's page already says why its IRR page is left out.
   const withheld = planDeal ? null : (sensitivity?.withheld ?? null);
-  const modelRead = <T,>(v: T | null | undefined): T | null => (withheld ? null : (v ?? null));
+  // A plan deal whose plan page could not be built (no yield on cost can be
+  // struck on what was read) prints neither page, so its model's reads
+  // would stand beside no grid at all: they are withheld as a placeholder
+  // model's are, and the page that carries its terms says why — never "No
+  // screening model was built", which is a report whose route built none
+  // (the batch audit: the page said so over the model's reads).
+  const planLeftOut = planDeal && !plan && sensitivity != null ? planLeftOutWhy(extraction, firstSignalOf(deal)) : null;
+  // A finding against the returns leaves the grids and the max bid out and
+  // the model's reads of the terms in, as the deal page prints them beside
+  // its withheld tiles (`readsStand`, research pass 38).
+  const readsWithheld = (!!withheld && !sensitivity?.readsStand) || !!planLeftOut;
+  const modelRead = <T,>(v: T | null | undefined): T | null => (readsWithheld ? null : (v ?? null));
+  // The grids the report prints, and the page they land on where the memo
+  // and the call each take one: the memo's target-return chip names it.
+  const graded = planDeal || withheld ? null : (sensitivity ?? null);
+  const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, today);
+  const irr = graded ? gradedIrrOf(graded) : null;
+  const chip = memo.buyBox.some((c) => c.label === TARGET_RETURN && c.status === "unknown");
+  const targetReturnPage =
+    graded && chip && irr != null && Number.isFinite(irr) && gridSubjectOf(extraction) == null
+      ? 2 + ((deal.verdict as VerdictResult | null) ? 1 : 0) + (plan ? 1 : 0)
+      : null;
+  const annotated = targetReturnPage != null ? withTargetReturnNote(memo, irr, targetReturnPage) : memo;
   return {
     modelVsMarket: modelVsMarket ?? null,
     assumable: modelRead(assumable),
@@ -1071,16 +1311,52 @@ export function buildReportData(
     student: modelRead(student),
     mh: modelRead(mh),
     storage: modelRead(storage),
+    // The rent rules are the site's rules and the memorandum's words, not
+    // the model's: where the model's reads are withheld, the line still
+    // prints, without the model's growth set beside the allowance.
+    regulation: regulation ? (readsWithheld ? { line: regulation.line, read: "" } : regulation) : null,
+    forward: modelRead(forward),
+    mixedUse: modelRead(mixedUse),
+    goingConcern: modelRead(goingConcern),
+    condo: modelRead(condo),
+    sandwich: modelRead(sandwich),
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
     // report as they do with the standalone memo.
-    memo: buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover),
-    sensitivity: planDeal || withheld ? null : (sensitivity ?? null),
+    memo: annotated,
+    sensitivity: graded,
     withheld,
     plan: plan ?? null,
+    planLeftOut,
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
+    targetReturnPage,
   };
+}
+
+/**
+ * The full report as PDF bytes — what the report routes serve. The memo's
+ * target-return chip names the sensitivity page by number, and that page
+ * moves where the memo or the call runs to a second page; the page is
+ * recorded where it lands as the report is laid out, and where it is not
+ * the one the chip names, the report is drawn once more naming it (the
+ * same length of words, so nothing else moves).
+ */
+export async function renderReportPdf(input: ReportInput): Promise<Buffer> {
+  let landed: number | null = null;
+  const draw = (i: ReportInput) =>
+    renderToBuffer(
+      <ReportDocument
+        input={i}
+        onSensitivityPage={(n) => {
+          landed = n;
+        }}
+      />,
+    );
+  const first = await draw(input);
+  const named = input.targetReturnPage ?? null;
+  if (named == null || landed == null || landed === named || !input.sensitivity) return first;
+  return draw({ ...input, memo: withTargetReturnNote(input.memo, gradedIrrOf(input.sensitivity), landed), targetReturnPage: landed });
 }
 
 /** A metric's page for the page column — the citation as extracted when it
@@ -1107,7 +1383,7 @@ const fmtUsd0 = (n: number): string => `$${Math.round(n).toLocaleString("en-US")
  */
 export function sourceSays(src: InputSource | null | undefined, totalPages: number | null): string {
   if (!src) return "";
-  const note = (src.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const note = proseDays((src.note ?? "").trim().replace(/[.;,\s]+$/, ""));
   const page = citedPage(src.page, totalPages);
   const tag =
     src.provenance === "extracted" ? (page === "—" ? "" : page) : src.provenance === "derived" ? "derived" : "assumption";
@@ -1118,6 +1394,9 @@ export function sourceSays(src: InputSource | null | undefined, totalPages: numb
 function provenanceOf(src: InputSource | null | undefined, totalPages: number | null): string {
   if (!src) return "";
   if (src.provenance === "extracted") {
+    // A figure read from another document (a rent roll, a T-12) is that
+    // document's, never the OM's (research pass 40, M3).
+    if (src.doc) return src.doc;
     const page = citedPage(src.page, totalPages);
     return page === "—" ? "OM" : `OM ${page}`;
   }
@@ -1130,8 +1409,11 @@ const xOrDash = (d: number | null | undefined, dp = 2) => (d == null || !Number.
 /**
  * The terms the grids run on, said under them: the hold, the loan against
  * cost and how it amortizes, the rate with its source note — dated where
- * today's curve seeded it — each with its provenance, then what the returns
- * carry for buying and selling (the deal page's playground's own line).
+ * today's curve seeded it — each with its provenance; then what every
+ * year's cash flow carries below the NOI, the asset-management fee and the
+ * capital reserves (research pass 35: both came out of every return and
+ * were named nowhere in the report); then what the returns carry for buying
+ * and selling (the deal page's playground's own line).
  */
 export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
   const tag = (src: InputSource | null) => (src ? ` (${provenanceOf(src, totalPages)})` : "");
@@ -1144,13 +1426,22 @@ export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
   // The seeded rate's note names the index and its day ("5-yr Treasury
   // 4.78% (FRED, Sep 17, 2026) + 200 bps …"); a placeholder's is only the
   // instruction to enter one, which the provenance already says.
-  const rawNote = (b.rateSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const rawNote = proseDays((b.rateSource?.note ?? "").trim().replace(/[.;,\s]+$/, ""));
   const rateNote = /^enter\b/i.test(rawNote) ? "" : rawNote;
-  return [
-    `The grids run on ${withArticle(`${b.holdYears}-year hold`)}${tag(b.holdSource)}`,
-    `a loan of ${(b.ltc * 100).toFixed(0)}% of cost${tag(b.ltcSource)}, ${amort}`,
-    `and ${withArticle(`${(b.rate * 100).toFixed(2)}% all-in rate`)}${rateNote ? `: ${rateNote}` : ""}${tag(b.rateSource)}.`,
-  ].join("; ") + ` ${b.costLine}`;
+  // Each as the model holds it, never a figure typed here.
+  const yearly = [
+    b.amFee > 0 ? `an asset-management fee of ${Number((b.amFee * 100).toFixed(2))}% of equity${tag(b.amFeeSource)}` : "",
+    b.reservesPsf > 0 ? `capital reserves of $${b.reservesPsf.toFixed(2)} a square foot, grown with expenses${tag(b.reservesSource)}` : "",
+  ].filter(Boolean);
+  return (
+    [
+      `The grids run on ${withArticle(`${b.holdYears}-year hold`)}${tag(b.holdSource)}`,
+      `a loan of ${(b.ltc * 100).toFixed(0)}% of cost${tag(b.ltcSource)}, ${amort}`,
+      `and ${withArticle(`${(b.rate * 100).toFixed(2)}% all-in rate`)}${rateNote ? `: ${rateNote}` : ""}${tag(b.rateSource)}.`,
+    ].join("; ") +
+    (yearly.length > 0 ? ` Every year's cash flow carries ${yearly.join(" and ")}.` : "") +
+    ` ${b.costLine}`
+  );
 }
 
 /**
@@ -1160,8 +1451,11 @@ export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
  * sources and uses. The workbook's Deal Summary on one strip of paper.
  */
 function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | null }) {
-  const tiles: [string, string][] = [
-    ["Levered IRR", pctOrDash(b.leveredIrr)],
+  // Where no IRR solves, the tile says so and why, small under it, in the
+  // dash's place (research pass 38, lib/underwrite/no-irr).
+  const noIrr = (b.leveredIrr == null || !Number.isFinite(b.leveredIrr)) && b.noIrr ? b.noIrr : null;
+  const tiles: [string, string, string?][] = [
+    noIrr ? ["Levered IRR", NO_IRR_SHORT, NO_IRR_WHY[noIrr]] : ["Levered IRR", pctOrDash(b.leveredIrr)],
     ["Equity multiple", xOrDash(b.equityMultiple)],
     ["Year-1 cash-on-cash", pctOrDash(b.cocY1)],
     ["Year-1 DSCR", xOrDash(b.dscrY1)],
@@ -1182,25 +1476,40 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
       <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: bold ? "Helvetica-Bold" : "Helvetica" }}>{fmtUsd0(n)}</Text>
     </View>
   );
-  const noiNote = (b.noiSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  // The year-1 NOI's note is the rent input's: how the model's rent was
+  // backed out of the NOI it anchors on, which names that NOI. Said as the
+  // rent's, with the rent's provenance (research pass 35: printed under the
+  // NOI as its own source, with an ISO day in it).
+  const rentNote = proseDays((b.noiSource?.note ?? "").trim().replace(/[.;,\s]+$/, ""));
+  const noiNote = rentNote
+    ? `The model's rent: ${rentNote[0].toLowerCase()}${rentNote.slice(1)}${b.noiSource ? ` (${provenanceOf(b.noiSource, totalPages)})` : ""}`
+    : "";
+  const exitNote = proseDays((b.exitCapSource?.note ?? "").trim().replace(/[.;,\s]+$/, ""));
   return (
     <View style={{ marginBottom: 10 }} wrap={false}>
       <TitleRow title="The base case" count="the ink-bordered cells" marginTop={0} />
       <View style={{ flexDirection: "row", borderTopWidth: 0.7, borderBottomWidth: 0.7, borderColor: C.line, paddingVertical: 5, marginBottom: 6 }}>
-        {tiles.map(([label, value]) => (
-          <View key={label} style={{ width: "20%" }}>
+        {tiles.map(([label, value, why]) => (
+          <View key={label} style={{ width: "20%", paddingRight: 4 }}>
             <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{label.toUpperCase()}</Text>
             <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>{value}</Text>
+            {why ? <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 1 }}>{str(why)}</Text> : null}
           </View>
         ))}
       </View>
+      {/* What the multiple and the year-1 return are net of, where the model
+          spends capital in year 1 (research pass 40, M6). */}
+      {b.capitalLine ? <Text style={{ fontSize: 7, color: C.muted, marginBottom: 6 }}>{str(b.capitalLine)}</Text> : null}
       <View style={{ flexDirection: "row" }}>
         <View style={{ width: "58%", paddingRight: 14 }}>
           {line("Price", `${fmtUsd0(b.price)} · ${provenanceOf(b.priceSource, totalPages)}`)}
           {line("Loan", `${fmtUsd0(b.loan)} · ${(b.ltc * 100).toFixed(0)}% of cost · ${provenanceOf(b.ltcSource, totalPages)}`)}
           {line("Equity", `${fmtUsd0(b.equity)} · total uses less the loan`)}
           {line("Hold", `${b.holdYears} years · ${provenanceOf(b.holdSource, totalPages)}`)}
-          {line("Year-1 NOI", `${fmtUsd0(b.noiY1)} · ${provenanceOf(b.noiSource, totalPages)}`, noiNote)}
+          {line("Year-1 NOI", fmtUsd0(b.noiY1), noiNote)}
+          {/* The exit the grids' bold row runs at, and where it came from:
+              on a memorandum that states no cap, the model's default. */}
+          {line("Exit cap", `${(b.exitCap * 100).toFixed(2)}%${b.exitCapSource ? ` · ${provenanceOf(b.exitCapSource, totalPages)}` : ""}`, exitNote)}
         </View>
         <View style={{ width: "42%" }}>
           <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted, marginBottom: 2 }}>USES</Text>
@@ -1222,23 +1531,98 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
 /**
  * The max bid, or why there is none, for what the price buys (lib/interest).
  * A note's model runs the collateral at the loan's price, so a bid solved on
- * it is a price for the building, never for the note: none prints. A share's
+ * it is a price for the building, never for the note: none prints. Nor on a
+ * preferred equity position, whose model runs the whole building at the
+ * position's price (lib/position): a bid solved on it is the building's,
+ * never the position's, which buys a rate and a redemption. A share's
  * model runs the whole asset its price implies, so its bid is the whole
  * building's, and says so. A share whose percentage the memorandum does not
  * state cannot be grossed up to the whole at all, so a bid solved on it is
- * neither the share's price nor the building's: none prints.
+ * neither the share's price nor the building's: none prints. A leasehold's
+ * bid is solved on the model's capitalised exit, a perpetuity's, so the
+ * line says what that price returns on the lease's term, from the term
+ * block's own read (research pass 35: "At that price: IRR 19.8%" one
+ * paragraph above a block taking 5.5 points off the base IRR).
  */
-function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestOf>): string {
+function maxBidLineFor(
+  s: SensitivityData,
+  /** what the price buys, and whether it is a share of the general partner's
+   *  interest (lib/interest `isGpStake`) */
+  interest: ReturnType<typeof interestOf> & { gpStake?: boolean },
+  leasehold?: LeaseholdExitView | null,
+): string {
   if (interest.kind === "note") {
     return "No max bid: the model's price is the collateral's, run as if the building were bought at the loan's price, so a bid solved on it is not a price for the note.";
+  }
+  if (interest.kind === "preferred_equity") {
+    return "No max bid: the model runs the whole building as if bought at the preferred equity position's price, so a bid solved on it is the building's, not a price for the position, which buys a rate and a redemption.";
+  }
+  // A share of a share (research pass 37): its percentage is the general
+  // partner's interest's, never the entity's, so nothing grosses it up.
+  if (interest.kind === "partial_interest" && interest.gpStake) {
+    return "No max bid: the price buys a share of the general partner's interest — a share of a share — so a bid solved on the model, which runs the whole building at that price, would be neither the stake's price nor the building's.";
   }
   if (interest.kind === "partial_interest" && interest.sharePct == null) {
     return "No max bid: the memorandum states no single percentage for the share, so the model cannot gross its price up to the whole building, and a bid solved on it would be neither the share's price nor the building's.";
   }
   const line = maxBidSentence(s);
-  return interest.kind === "partial_interest" && s.maxBid && !s.maxBid.unbounded
-    ? `${line} It is the whole building's price, not the share's.`
-    : line;
+  // All of the entity's interests (a stated 100%) is no share: the bid is
+  // for them, as the price is (research pass 28).
+  if (interest.kind === "partial_interest" && !isWholeShare(interest.sharePct) && s.maxBid && !s.maxBid.unbounded) {
+    return `${line} It is the whole building's price, not the share's.`;
+  }
+  const bid = s.maxBid;
+  if (interest.kind === "leasehold" && leasehold && bid) {
+    const lease = leasehold.lease ?? "ground lease";
+    const see = `see The exit, on the ${lease}'s term, below`;
+    if (leasehold.endsInHold) {
+      return `${line} It is solved on a sale the model cannot make: ${
+        leasehold.yearsLeft > 0 ? `the ${lease} ends inside its hold` : `the ${lease}'s stated end has passed`
+      } (${see}).`;
+    }
+    if (bid.onTerm) {
+      const lead = bid.unbounded ? "That is on the model's capitalised exit" : "That IRR runs on the model's capitalised exit";
+      const where = `on the term the ${lease} has left at the sale`;
+      // Unbounded, the bid is the top of the range searched (research pass
+      // 40), a multiple of the modelled price that is said.
+      const at = bid.unbounded ? `at ${timesWords(1 + bid.deltaPct)} the modelled price` : "at that price";
+      return `${line} ${lead}; ${
+        bid.onTerm.irr != null
+          ? `${where} the levered IRR ${at} is ${pctOrDash(bid.onTerm.irr)}`
+          : `${where}, the sale ${at} does not repay the model's loan, so no levered return solves`
+      } (${see}).`;
+    }
+  }
+  return line;
+}
+
+/**
+ * What the sensitivity grids are of where the price did not buy the
+ * building — the derived model's `meta.interest.basisWithheld`, the one rule
+ * every surface reads (lib/underwrite/inputs `basisWithheldOf`): the grid's
+ * takeaway names it rather than calling a note's collateral, a position's
+ * building or an equity's whole "the deal", as the caveat over the grids
+ * already says (research pass 35). Null where the price is the building's.
+ */
+export function gridSubjectOf(extraction: ExtractionResult | null): string | null {
+  const withheld = basisWithheldOf(extraction);
+  if (!withheld) return null;
+  switch (withheld.word) {
+    case "note":
+      return "the collateral, run at the note's price";
+    case "position":
+      return "the building, run at the position's price";
+    case "leased fee":
+      return "a building's model, run at the leased fee's price";
+    default:
+    {
+      // A share of no stated percentage (a GP stake's among them) is run at
+      // its own price, whatever loan is stated beside it: nothing grossed it
+      // up to an equity's whole (audit C3a, LOW-8).
+      const { sharePct, entityLoan } = interestOf(extraction);
+      return sharePct != null && entityLoan != null ? "the whole building, run at the equity's whole" : "the whole building, run at the share's own price";
+    }
+  }
 }
 
 /** What the overrun axis and sentence call the figure they stress. When the
@@ -1331,15 +1715,31 @@ function YocGridPdf({ grid, axis }: { grid: YocGrid; axis: string }) {
  */
 const fmtHurdle = (pct: number): string => `${Number(pct.toFixed(1))}%`;
 
-const fmtCompactUsd = (n: number): string =>
-  n >= 1e6
-    ? `$${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace(/\.?0+$/, "")}M`
-    : `$${Math.round(n / 1e3)}k`;
+const fmtCompactUsd = (n: number): string => compactUsd(n, { millions: "auto", trim: true, thousandsFrom: 0 });
+
+/**
+ * The retrade grid's prices, one precision down the column and its zeros
+ * kept, so the modelled row reads "$36.0M" beside "$32.4M", never "$36M"
+ * (research pass 35). The unit and the places are the smallest row's: one
+ * place in millions from $10M, two from $1M (a $1.2M deal's 5% steps would
+ * otherwise round two rows to one figure), else whole thousands.
+ */
+export function retradePrices(prices: readonly number[]): string[] {
+  const min = Math.min(...prices);
+  if (min >= 1e6) {
+    const places: 1 | 2 = min >= 1e7 ? 1 : 2;
+    return prices.map((p) => compactUsd(p, { millions: places }));
+  }
+  // Thousands down the whole column, a row past a million included
+  // ("$1,050k"), through lib/money's one rounding.
+  return prices.map((p) => `$${Number(scaledText(p, 1e3, 0)).toLocaleString("en-US")}k`);
+}
+
 
 /**
  * One sensitivity grid: a spanning axis title over the column values, a
  * left axis label over bold row labels, and two-line cells (IRR bold, EM
- * muted) colored by distance from the buyer's hurdle. The base cell wears
+ * muted) coloured by distance from the buyer's hurdle. The base cell wears
  * an ink border. Shared by the cap × growth grid and the retrade grid so
  * they can never drift apart visually.
  */
@@ -1463,18 +1863,32 @@ function HeatGrid({
           })}
         </View>
       ))}
+      {/* Where a cell has no IRR, why, once under the grid (research pass
+          38, item 15). */}
+      {gridNoIrrNote(cells) ? (
+        <Text style={{ fontSize: 7, color: C.muted, marginTop: 3 }}>{str(gridNoIrrNote(cells))}</Text>
+      ) : null}
     </View>
   );
 }
 
-export function ReportDocument({ input }: { input: ReportInput }) {
+export function ReportDocument({
+  input,
+  onSensitivityPage,
+}: {
+  input: ReportInput;
+  /** told the page the sensitivity analysis lands on as the report is laid
+   *  out (`renderReportPdf`, which the memo's target-return chip names) */
+  onSensitivityPage?: (page: number) => void;
+}) {
   const { deal, memo, sensitivity, plan, modelVsMarket } = input;
   // Older callers built the input by hand without a page count: then no
   // citation validates, and none prints (the rule in lib/facts.ts).
   const totalPages = input.totalPages ?? null;
   const dealName = memo.name;
-  // The plan's finished product in the class's own noun (lib/asset-words):
-  // a hotel development is costed per key, never per unit.
+  // The class's own noun (lib/asset-words) — a hotel's keys, never units —
+  // for the comps' basis captions and the portfolio's rows; the plan page
+  // reads the row it counts (`planCount`, below).
   const planNoun = assetWords(memo.assetClass).noun ?? { one: "unit", many: "units" };
   // A hotel's model grows its rooms revenue at the growth lever: the grid's
   // axis and its takeaway call it RevPAR growth, not rent growth.
@@ -1485,11 +1899,21 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const portfolio = readPortfolio(extraction);
   // What is being sold (#414): on a note or a share the sensitivity grids
   // are the collateral's or the whole asset's, and the page says so — and on
-  // a note, what the note itself earns at its price (#416), beside them.
+  // a note, what the note itself earns at its price (#416), beside them; on
+  // a preferred equity position, the position's own read the same way
+  // (lib/position: its yield to redemption, its cash and accrual, its stack).
   const interest = readInterest(extraction, askingPriceOf(extraction));
   const noteFigures = interest?.note
     ? [noteYieldSentence(interest.note), noteCollateralSentence(interest.note)].filter(Boolean).join(" ")
     : "";
+  const ownTerms = noteFigures
+    ? `The note, on its own terms: ${noteFigures}`
+    : interest?.position
+      ? `The position, on its own terms: ${interest.position.sentences.join(" ")}`
+      : "";
+  // What the grids are of where the price did not buy the building; null
+  // where they are the deal's own (research pass 35).
+  const gridSubject = gridSubjectOf(extraction);
   // A covenant or a contract that sets the rents (#453): the grids grow
   // every rent at one rate, which the restricted units' rents do not.
   const affordable = readAffordable(extraction);
@@ -1525,6 +1949,53 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A self-storage facility (#471), the same way.
   const storageRead = readSelfStorage(extraction);
   const storage = input.storage ?? (storageRead ? { line: storageShortLine(storageRead), read: "" } : null);
+  // The rent rules that reach the building, as the route read them: the
+  // rules need the deal's place and a day, which the route holds.
+  const regulation = input.regulation ?? null;
+  // A forward purchase (lib/forward-purchase): the model's read where the
+  // caller derived the model, else the purchase's line alone.
+  const forwardRead = readForwardPurchase(extraction);
+  const forward = input.forward ?? (forwardRead ? { line: forwardShortLine(forwardRead), read: "" } : null);
+  // A mixed-use building (lib/mixed-use), the same way.
+  const mixedUseRead = readMixedUse(extraction);
+  const mixedUse = input.mixedUse ?? (mixedUseRead ? { line: mixedUseShortLine(mixedUseRead), read: "" } : null);
+  // An operating business (lib/going-concern), the same way.
+  const goingConcernRead = readGoingConcern(extraction);
+  const goingConcern = input.goingConcern ?? (goingConcernRead ? { line: goingConcernShortLine(goingConcernRead), read: "" } : null);
+  // Condominium units bought in bulk (lib/condo), the same way.
+  const condoRead = readCondo(extraction);
+  const condo = input.condo ?? (condoRead ? { line: condoShortLine(condoRead), read: "" } : null);
+  // A sandwich position (lib/sandwich-lease), the same way.
+  const sandwichRead = readSandwichLease(extraction);
+  const sandwich = input.sandwich ?? (sandwichRead ? { line: sandwichShortLine(sandwichRead), read: "" } : null);
+  // The deal's terms beside the model, each the model's read where the
+  // caller derived one, else the memorandum's line alone: printed over the
+  // grids they speak to — the plan's or the IRR's — and, where the report
+  // has neither (a model left out, or none built), on the page that says
+  // so, never nowhere (#183).
+  const termLines = [forward, goingConcern, regulation, singleTenant, hotel, sale, roster, valueAdd, taxAbatement, siteReports, student, mh, storage, mixedUse, condo, sandwich];
+  const anyCaveat = termLines.some((t) => !!t?.line) || !!affordable?.modelCaveat;
+  const caveats = (
+    <>
+      <SingleTenantCaveat lease={forward} />
+      <SingleTenantCaveat lease={goingConcern} />
+      <AffordableCaveat read={affordable} />
+      <SingleTenantCaveat lease={regulation} />
+      <SingleTenantCaveat lease={singleTenant} />
+      <SingleTenantCaveat lease={hotel} />
+      <SingleTenantCaveat lease={sale} />
+      <SingleTenantCaveat lease={roster} />
+      <SingleTenantCaveat lease={valueAdd} />
+      <SingleTenantCaveat lease={taxAbatement} />
+      <SingleTenantCaveat lease={siteReports} />
+      <SingleTenantCaveat lease={student} />
+      <SingleTenantCaveat lease={mh} />
+      <SingleTenantCaveat lease={storage} />
+      <SingleTenantCaveat lease={mixedUse} />
+      <SingleTenantCaveat lease={condo} />
+      <SingleTenantCaveat lease={sandwich} />
+    </>
+  );
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1544,6 +2015,17 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const metrics = list(extraction?.metrics) as NonNullable<
     ExtractionResult["metrics"]
   >;
+  // The plan's finished product in the counting row's own noun
+  // (`countNounOf`): a hotel counting "Rooms" is costed per room, as the
+  // deal page's plan strip, the pipeline card and the workbook say it — else
+  // the class's (research pass 34: this page said "key" beside them). On a
+  // conversion or a development, the proposed row the plan's basis divides
+  // by (lib/criteria `planCountRow`), never today's building's.
+  const planCount = countNounOf(
+    metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
+    memo.assetClass,
+    plan?.kind ?? null,
+  );
   const chList = list(challenges?.challenges) as NonNullable<
     ChallengerResult["challenges"]
   >;
@@ -1566,6 +2048,8 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       screenYearOf(extraction),
       interestOf(extraction),
       extraction?.assetClass,
+      // A bulk condominium purchase's units offered (research pass 38).
+      condoUnitsOffered(extraction),
     ),
     planNoun.one,
   );
@@ -1582,6 +2066,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   ]
     .map((b) => ({ ...b, lines: list(b.rec?.lines).map(str).filter(Boolean).map(currentBriefLine) }))
     .filter((b) => b.lines.length > 0);
+  // A covered market whose figures could not be read that day: said under
+  // the checks, as the deal page says it (lib/market-read-failed).
+  const liveReadFailed = liveBrief ? null : liveReadFailedLine(market?.liveReadFailed);
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]
   >;
@@ -1616,8 +2103,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       title={`${dealName} — Full Screening Report`}
       author={memo.branding?.firmName ?? "Underwrite Copilot"}
     >
-      {/* Page 1: the one-page memo, unchanged — the executive read. */}
-      <MemoPage data={memo} />
+      {/* Page 1: the one-page memo, unchanged — the executive read —
+          numbered as every page after it is. */}
+      <MemoPage data={memo} pageNumbers />
 
       {/* What the memo shortens to fit or leaves out, as the verdict
           states it, before any page the model computed. */}
@@ -1648,7 +2136,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             {/* The same reader as the deal page's plan strip and the shared
                 screen (lib/plan-facts.ts) — one set of labels, one money
                 format, one blank rule — so the three never disagree. */}
-            {planFacts(plan.plan, planNoun.one).map(([label, value], _i, all) => (
+            {planFacts(plan.plan, planCount.one).map(([label, value], _i, all) => (
               <View key={label} style={{ width: `${100 / all.length}%` }}>
                 <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{str(label).toUpperCase()}</Text>
                 <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>
@@ -1665,8 +2153,18 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   : "Timeline to stabilization: not stated."
               }${
                 plan.plan.costPerUnit != null && plan.plan.units != null
-                  ? ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} planned ${planNoun.many}.`
-                  : ""
+                  ? // "planned" only where the building is still to be
+                    // delivered: a value-add's or a lease-up's units stand.
+                    ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} ${notYetDelivered(plan.kind) ? "planned " : ""}${planCount.many}.`
+                  : `${
+                      // A conversion or a development whose memorandum labels
+                      // no count proposed or planned: no basis per unit, and why.
+                      plan.plan.costPerUnitWithheld ? ` ${plan.plan.costPerUnitWithheld}` : ""
+                    }${
+                      // None outside the band any market delivers at, and why
+                      // (lib/deal-strategy `planWithBasisChecked`).
+                      plan.plan.basisWithheld ? ` ${plan.plan.basisWithheld}` : ""
+                    }`
               }`,
             )}
           </Text>
@@ -1674,7 +2172,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <TitleRow title="Yield on cost, stressed" marginTop={14} />
           <Text style={s.sub}>
             {str(
-              `The plan is judged on the spread between the finished project's yield on total cost and the cap rate that product trades at once it is done - not on a cap rate against the price. Stabilized NOI under the pro forma runs down the rows, budget over the OM's across; each cell is the yield on total cost (bold) and its spread over the ${fmtPct(
+              `The plan is judged on the spread between the finished project's yield on total cost and the cap rate that product trades at once it is done — not on a cap rate against the price. Stabilized NOI under the pro forma runs down the rows, budget over the OM's across; each cell is the yield on total cost (bold) and its spread over the ${fmtPct(
                 plan.refCap.pct,
                 2,
               )} reference cap in basis points. The ink-bordered cell is the OM's own case. A pro forma that keeps its spread with NOI 20% short and the budget 30% over is conservative; one that needs its own base case is not.`,
@@ -1687,24 +2185,25 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
             {str(
               plan.breakevens.noiCushion > 0
-                ? `Stabilized NOI can come in ${fmtPct(plan.breakevens.noiCushion)} under the OM's ${fmtCompactUsd(
-                    plan.plan.stabilizedNoi!.value,
-                  )} - down to ${fmtCompactUsd(plan.breakevens.noiAtRefCap)} - before the yield on cost falls to the ${fmtPct(
+                ? `Stabilized NOI can come in ${fmtPct(plan.breakevens.noiCushion)} under the OM's ${planNoiText(
+                    plan.plan.stabilizedNoi!,
+                    fmtCompactUsd,
+                  )} — down to ${fmtCompactUsd(plan.breakevens.noiAtRefCap)} — before the yield on cost falls to the ${fmtPct(
                     plan.refCap.pct,
                     2,
                   )} reference cap.`
-                : `The OM's ${fmtCompactUsd(plan.plan.stabilizedNoi!.value)} stabilized NOI already yields less than the ${fmtPct(
+                : `The OM's ${planNoiText(plan.plan.stabilizedNoi!, fmtCompactUsd)} stabilized NOI already yields less than the ${fmtPct(
                     plan.refCap.pct,
                     2,
-                  )} reference cap on ${fmtCompactUsd(plan.plan.totalCost ?? 0)} of total cost - the plan is under water before any stress.`,
+                  )} reference cap on ${fmtCompactUsd(plan.plan.totalCost ?? 0)} of total cost — the plan is under water before any stress.`,
             )}
           </Text>
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 3, fontFamily: "Helvetica-Oblique" }}>
             {str(
               plan.breakevens.overrunToRefCap != null
-                ? `${budgetNoun(plan)} would have to run ${fmtPct(plan.breakevens.overrunToRefCap, 0)} over - ${fmtCompactUsd(
+                ? `${budgetNoun(plan)} would have to run ${fmtPct(plan.breakevens.overrunToRefCap, 0)} over — ${fmtCompactUsd(
                     plan.plan.budget!.budget * (1 + plan.breakevens.overrunToRefCap),
-                  )} against ${fmtCompactUsd(plan.plan.budget!.budget)} - before the yield fell to the reference cap.`
+                  )} against ${fmtCompactUsd(plan.plan.budget!.budget)} — before the yield fell to the reference cap.`
                 : "Any overrun deepens a yield that already sits below the cap.",
             )}
           </Text>
@@ -1732,25 +2231,18 @@ export function ReportDocument({ input }: { input: ReportInput }) {
 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>
             {str(
-              `Reference cap: ${fmtPct(plan.refCap.pct, 2)} - ${refCapNote(
+              // A comma, not a dash, before the note: the default's own note
+              // carries a dash ("the model's exit-cap default — set your own
+              // view in the model").
+              `Reference cap: ${fmtPct(plan.refCap.pct, 2)}, ${refCapNote(
                 plan.refCap.provenance,
-              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return - this grid is.`,
+              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return — this grid is.`,
             )}
           </Text>
 
           {/* The plan deal has no sensitivity page, so its assumptions read
               lands here, under the grid it is judged on. */}
-          {!sensitivity && <AffordableCaveat read={affordable} />}
-          {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
-          {!sensitivity && <SingleTenantCaveat lease={hotel} />}
-          {!sensitivity && <SingleTenantCaveat lease={sale} />}
-          {!sensitivity && <SingleTenantCaveat lease={roster} />}
-          {!sensitivity && <SingleTenantCaveat lease={valueAdd} />}
-          {!sensitivity && <SingleTenantCaveat lease={taxAbatement} />}
-          {!sensitivity && <SingleTenantCaveat lease={siteReports} />}
-          {!sensitivity && <SingleTenantCaveat lease={student} />}
-          {!sensitivity && <SingleTenantCaveat lease={mh} />}
-          {!sensitivity && <SingleTenantCaveat lease={storage} />}
+          {!sensitivity && caveats}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1760,7 +2252,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
 
       {/* Sensitivity page (Feature 5): where the deal thrives, where it
           breaks — two grids from the same engine as the workbook and the
-          on-screen playground, colored against the BUYER'S hurdle. */}
+          on-screen playground, coloured against the BUYER'S hurdle. */}
       {sensitivity && (
         <PageChrome
           title="Sensitivity analysis"
@@ -1768,34 +2260,35 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           dealName={dealName}
           branding={memo.branding}
         >
+          {/* Where this page lands, for the memo's target-return chip that
+              names it: drawn as nothing, out of the page's flow. */}
+          {onSensitivityPage ? (
+            <Text
+              style={{ position: "absolute", top: 0, left: 0, fontSize: 1 }}
+              render={({ pageNumber }) => {
+                if (typeof pageNumber === "number") onSensitivityPage(pageNumber);
+                return "";
+              }}
+            />
+          ) : null}
           <Text style={s.sub}>
-            {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Color marks distance from the ${
+            {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Colour marks distance from the ${
               sensitivity.hurdleSource === "buybox"
                 ? `${fmtHurdle(sensitivity.hurdlePct)} IRR target in your buy box`
                 : `${fmtHurdle(sensitivity.hurdlePct)} screening hurdle`
-            } — deeper green clears it by more, deeper red misses by more. The ink-bordered cell is the modeled base case.`}
+            } — deeper green clears it by more, deeper red misses by more. The ink-bordered cell is the modelled base case.`}
           </Text>
           {interest?.modelCaveat ? (
             <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
-              {str(`${interest.label}: ${interest.modelCaveat}`)}
+              {str(`${interest.label}: ${caveatOnPaper(interest.modelCaveat, input.leasehold)}`)}
             </Text>
           ) : null}
-          {noteFigures ? (
+          {ownTerms ? (
             <Text style={{ fontSize: 8, color: C.ink, marginBottom: 6 }}>
-              {str(`The note, on its own terms: ${noteFigures}`)}
+              {str(ownTerms)}
             </Text>
           ) : null}
-          <AffordableCaveat read={affordable} />
-          <SingleTenantCaveat lease={singleTenant} />
-          <SingleTenantCaveat lease={hotel} />
-          <SingleTenantCaveat lease={sale} />
-          <SingleTenantCaveat lease={roster} />
-          <SingleTenantCaveat lease={valueAdd} />
-          <SingleTenantCaveat lease={taxAbatement} />
-          <SingleTenantCaveat lease={siteReports} />
-          <SingleTenantCaveat lease={student} />
-          <SingleTenantCaveat lease={mh} />
-          <SingleTenantCaveat lease={storage} />
+          {caveats}
 
           {/* The base case the grids are struck around, each input with
               where it came from — the workbook's Deal Summary. */}
@@ -1812,8 +2305,14 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               baseCol={sensitivity.grid.baseCol}
               hurdlePct={sensitivity.hurdlePct}
             />
+            {/* What the grids are of, said as the caveat above says it: a
+                note's collateral or an equity's whole is never "the deal". */}
             <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-              {str(hotelGrid ? gridTakeaway(sensitivity.grid, sensitivity.hurdlePct, "RevPAR growth") : sensitivity.takeaway)}
+              {str(
+                hotelGrid || gridSubject
+                  ? gridTakeaway(sensitivity.grid, sensitivity.hurdlePct, hotelGrid ? "RevPAR growth" : "rent growth", gridSubject)
+                  : sensitivity.takeaway,
+              )}
             </Text>
 
             {/* Legend — shared by both grids. */}
@@ -1854,14 +2353,14 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             returns at each exit cap. Rows re-size the loan, fees, and equity
             from the new price.
           </Text>
-          {/* The base row is the MODELED price, which is the ask only where
+          {/* The base row is the MODELLED price, which is the ask only where
               the ask is what the model runs at: a share's price grossed up
               to the whole, an auction's floor and a price backed out of NOI
               and the cap are not. The source says which. */}
           {sensitivity.priceSource ? (
             <Text style={{ fontSize: 7.5, color: C.muted, marginTop: -6, marginBottom: 4 }}>
               {str(
-                `The modeled price is ${fmtUsd0(sensitivity.priceGrid.priceRows[sensitivity.priceGrid.baseRow]?.price ?? 0)}: ${sourceSays(
+                `The modelled price is ${fmtUsd0(sensitivity.priceGrid.priceRows[sensitivity.priceGrid.baseRow]?.price ?? 0)}: ${sourceSays(
                   sensitivity.priceSource,
                   totalPages,
                 )}.`,
@@ -1872,12 +2371,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             axisLabel="PRICE"
             spanLabel="EXIT CAP"
             colLabels={sensitivity.priceGrid.capCols.map((cap) => `${(cap * 100).toFixed(2)}%`)}
-            rowLabels={sensitivity.priceGrid.priceRows.map(
-              (p) =>
-                `${fmtCompactUsd(p.price)}  ${
-                  p.deltaPct === 0 ? "(modeled)" : `(${p.deltaPct > 0 ? "+" : ""}${Math.round(p.deltaPct * 100)}%)`
-                }`,
-            )}
+            rowLabels={retradePrices(sensitivity.priceGrid.priceRows.map((p) => p.price)).map((price, i) => {
+              const d = sensitivity.priceGrid.priceRows[i].deltaPct;
+              return `${price}  ${d === 0 ? "(modelled)" : `(${d > 0 ? "+" : ""}${Math.round(d * 100)}%)`}`;
+            })}
             cells={sensitivity.priceGrid.cells}
             baseRow={sensitivity.priceGrid.baseRow}
             baseCol={sensitivity.priceGrid.baseCol}
@@ -1888,7 +2385,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               and named by the one that binds (lib/underwrite/report-grid) —
               none on a note, the whole building's on a share. */}
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {str(maxBidLineFor(sensitivity, interestOf(extraction)))}
+            {str(maxBidLineFor(sensitivity, { ...interestOf(extraction), gpStake: isGpStake(extraction) }, input.leasehold))}
           </Text>
           </View>
 
@@ -1913,6 +2410,40 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       {!sensitivity && input.withheld && (
         <PageChrome title="Sensitivity analysis" count="left out" dealName={dealName} branding={memo.branding}>
           <Text style={{ fontSize: 9, color: C.ink, marginBottom: 6 }}>{str(input.withheld)}</Text>
+          {/* The terms the memorandum states, each its line alone: the
+              model's reads are left out with its grids (#183) — but for a
+              finding against the returns alone, where they stand beside it
+              as on the deal page (research pass 38), and these print. */}
+          {plan ? null : caveats}
+          <AssumptionsBlock read={modelVsMarket} />
+          <AssumableBlock view={input.assumable} />
+          <AssumableBlock view={input.sellerNote} />
+          <LeaseholdBlock view={input.leasehold} />
+        </PageChrome>
+      )}
+
+      {/* A plan deal whose plan page could not be built: no plan page and
+          no IRR page, so where its terms print, the page says why, and they
+          print as the memorandum states them — the model's reads withheld
+          (buildReportData), never beside a "no model built" line, since a
+          model was built. */}
+      {!sensitivity && !plan && input.planLeftOut && (anyCaveat || (modelVsMarket?.checks.length ?? 0) > 0) && (
+        <PageChrome title="The plan page is left out" count={input.planLeftOut.count} dealName={dealName} branding={memo.branding}>
+          <Text style={s.sub}>{str(input.planLeftOut.why)}</Text>
+          {caveats}
+          <AssumptionsBlock read={modelVsMarket} />
+        </PageChrome>
+      )}
+
+      {/* No grid page at all — no model was built for this report — and
+          terms the grids would have carried: they print here, never
+          nowhere (#183). */}
+      {!sensitivity && !plan && !input.withheld && !input.planLeftOut && (anyCaveat || (modelVsMarket?.checks.length ?? 0) > 0) && (
+        <PageChrome title="The deal's terms" count="no model built" dealName={dealName} branding={memo.branding}>
+          <Text style={s.sub}>
+            {str("No screening model was built for this report, so these are the memorandum's terms as read, without the model's read beside them.")}
+          </Text>
+          {caveats}
           <AssumptionsBlock read={modelVsMarket} />
         </PageChrome>
       )}
@@ -1977,9 +2508,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           </View>
           {metrics.map((m, i) => (
             <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
-              <Text style={{ width: "34%", fontSize: 8.5 }}>{str(m?.label)}</Text>
+              {/* Each text cell keeps a gutter before the next column: a
+                  long value ran into the basis column's dash ("October 22,
+                  2026 at 5:00 PM ET—", research pass 35). */}
+              <Text style={{ width: "34%", fontSize: 8.5, paddingRight: 6 }}>{str(m?.label)}</Text>
               <Text
-                style={{ width: "24%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
+                style={{ width: "24%", fontSize: 8.5, fontFamily: "Helvetica-Bold", paddingRight: 6 }}
               >
                 {str(m?.value)}
               </Text>
@@ -2034,10 +2568,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             </View>
           ))}
           {/* The challenger estimates what reverting an assumption does to
-              the returns without running the engine; the box says so. */}
+              the returns without running the engine; the box says so — and
+              on the sample, whose sentence is the first-draft model's run,
+              says that (research pass 40, M8; lib/stress-test-title). */}
           {str(challenges?.stressTest) ? (
             <View style={s.summaryBox} wrap={false}>
-              <Text style={[s.headText, { marginBottom: 3 }]}>Stress test — the screen&apos;s estimate, not the model&apos;s</Text>
+              <Text style={[s.headText, { marginBottom: 3 }]}>{stressTestTitle(input.sample === true || (deal as { is_sample?: boolean }).is_sample === true)}</Text>
               <Text style={s.summaryText}>{str(challenges?.stressTest)}</Text>
             </View>
           ) : null}
@@ -2063,6 +2599,17 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             .map((g) => (
               <View key={g.label} style={{ marginBottom: 10 }}>
                 <Text style={[s.headText, { marginBottom: 4 }]}>{g.label}</Text>
+                {/* The columns named, as every other table's are, and
+                    repeated on a page the rows run onto (research pass 35:
+                    with none, the page column's dash read as the note's
+                    last word). */}
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.headText, { width: "26%" }]}>Comp</Text>
+                  <Text style={[s.headText, { width: "30%" }]}>Detail</Text>
+                  <Text style={[s.headText, { width: "14%" }]}>Support</Text>
+                  <Text style={[s.headText, { width: "22%" }]}>Why</Text>
+                  <Text style={[s.headText, { width: "8%" }]}>Page</Text>
+                </View>
                 {g.items.map((cp, i) => {
                   // Sale comps only: the basis bar and the subject's tick.
                   const scale = g.label === "Sale comps" ? compScale : null;
@@ -2071,7 +2618,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   return (
                   <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
                     <Text
-                      style={{ width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
+                      style={{ width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold", paddingRight: 6 }}
                     >
                       {str(cp?.name)}
                     </Text>
@@ -2120,7 +2667,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                         color={SUPPORT_COLOR[str(cp?.support)] ?? C.muted}
                       />
                     </View>
-                    <Text style={{ width: "22%", fontSize: 7.5, color: C.muted }}>
+                    <Text style={{ width: "22%", fontSize: 7.5, color: C.muted, paddingRight: 8 }}>
                       {str(cp?.note)}
                     </Text>
                     <Text style={{ width: "8%", fontSize: 7.5, color: C.muted }}>
@@ -2254,6 +2801,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               <Text style={s.summaryText}>{str(market?.summary)}</Text>
             </View>
           ) : null}
+          {liveReadFailed ? <Text style={[s.sub, { marginTop: 8 }]}>{liveReadFailed}</Text> : null}
           {briefBlocks.map((b, bi) => (
             <View key={`${str(b.rec.metro)}-${bi}`} style={{ marginTop: 8 }}>
               <Text style={s.sub}>{str(briefHeading(b.rec, b.first))}</Text>
@@ -2263,6 +2811,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                 </Text>
               ))}
             </View>
+          ))}
+          {/* The providers' own notices under their figures (lib/data-notices). */}
+          {documentNotices(briefBlocks.flatMap((b) => b.lines)).map((n) => (
+            <Text key={n} style={{ fontSize: 6.5, color: C.muted, marginTop: 4 }}>
+              {str(n)}
+            </Text>
           ))}
         </PageChrome>
       )}

@@ -110,6 +110,40 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(note, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
   });
 
+  it("on a preferred equity position: the price, then the position's own terms — never the building's cap (lib/position)", () => {
+    const position = [
+      { label: "Going-in cap rate", value: "5.50%", flagged: true },
+      { label: "Asking price", value: "$14,000,000", flagged: false },
+      { label: "Units", value: "240", flagged: false },
+      { label: "Whole-asset value", value: "$80,000,000", flagged: false },
+      { label: "Remedies", value: "Pledge of the sponsor's membership interests", flagged: false },
+      { label: "Senior loan balance", value: "$52,000,000", flagged: false },
+      { label: "Mandatory redemption date", value: "June 2029", flagged: false },
+      { label: "Current pay rate", value: "8.0%", flagged: false },
+      { label: "Preferred return", value: "12% preferred return, 8% current pay", flagged: false },
+      { label: "Preferred equity amount", value: "$15,000,000", flagged: false },
+      { label: "Cap rate (pro forma)", value: "6.1%", flagged: true },
+    ];
+    expect(keyTermRows(position, "stabilized", SCREEN_YEAR, 8, "preferred_equity").map((m) => m.label)).toEqual([
+      "Asking price",
+      "Preferred equity amount",
+      "Preferred return",
+      "Current pay rate",
+      "Mandatory redemption date",
+      "Senior loan balance",
+      "Remedies",
+      "Units",
+    ]);
+    // No cap on the building's income prints at all, flagged or not: beside
+    // the position's price any of them would read as a cap on it.
+    const shown = keyTermRows(position, "stabilized", SCREEN_YEAR, 30, "preferred_equity").map((m) => m.label);
+    expect(shown).not.toContain("Going-in cap rate");
+    expect(shown).not.toContain("Cap rate (pro forma)");
+    expect(shown).toContain("Whole-asset value");
+    // Read as a building, the same rows lead with its cap.
+    expect(keyTermRows(position, "stabilized", SCREEN_YEAR, 2).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate"]);
+  });
+
   it("a single tenant's lease leads after the cap (#454): when it ends, how its rent grows, the tenant's options", () => {
     const nnn = [
       { label: "Tenant credit rating", value: "BBB- (S&P)", flagged: false },
@@ -219,6 +253,174 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       "Seller financing rate",
       "Seller financing term",
     ]);
+  });
+
+  it("the rent rules lead after the count they are a share of, each row only where stated (lib/rent-regulation)", () => {
+    const walkUp = [
+      { label: "Occupancy", value: "97%", flagged: true },
+      { label: "Preferential rent", value: "$1,480", flagged: false },
+      { label: "Rent-regulated units", value: "41", flagged: false },
+      { label: "Units", value: "48", flagged: false },
+      { label: "Going-in cap rate", value: "5.10%", flagged: false },
+      { label: "Rent regulation", value: "Rent stabilization", flagged: false },
+      { label: "Asking price", value: "$14,000,000", flagged: false },
+    ];
+    expect(keyTermRows(walkUp, "stabilized", SCREEN_YEAR, 6).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Units",
+      "Rent regulation",
+      "Rent-regulated units",
+      "Preferential rent",
+    ]);
+    // No legal rent is stated, so none leads; a market-rate building's terms
+    // read as before.
+    expect(keyTermRows(walkUp.filter((m) => !/^Rent|Preferential/.test(m.label)), "stabilized", SCREEN_YEAR, 4).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Units",
+      "Occupancy",
+    ]);
+  });
+
+  it("a forward purchase's delivery, outside date, deposit and cap at delivery lead right after the price (lib/forward-purchase)", () => {
+    const forward = [
+      { label: "NOI (stabilized, pro forma)", value: "$3,960,000", flagged: true },
+      { label: "Deposit", value: "10% at signing", flagged: false },
+      { label: "Homes (proposed)", value: "180", flagged: false },
+      { label: "Outside date", value: "December 31, 2028", flagged: false },
+      { label: "Delivery date", value: "June 2028", flagged: false },
+      { label: "Purchase price", value: "$72,000,000", flagged: false },
+    ];
+    expect(keyTermRows(forward, "development", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
+      "Purchase price",
+      "Delivery date",
+      "Outside date",
+      "Deposit",
+      "NOI (stabilized, pro forma)",
+    ]);
+    // A standing building's earnest-money deposit is no forward purchase's.
+    const stabilized = [
+      { label: "Deposit", value: "$500,000 earnest money", flagged: false },
+      { label: "Going-in cap rate", value: "5.50%", flagged: false },
+      { label: "Asking price", value: "$42,000,000", flagged: false },
+    ];
+    expect(keyTermRows(stabilized, "stabilized", SCREEN_YEAR, 2).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate"]);
+  });
+
+  it("a mixed-use building's two incomes and its commercial space lead after the count, and a center's retail area never leads as one (lib/mixed-use)", () => {
+    const mixed = [
+      { label: "Occupancy", value: "95%", flagged: true },
+      { label: "Commercial occupancy", value: "80%", flagged: false },
+      { label: "Retail SF", value: "9,500 SF", flagged: false },
+      { label: "Commercial income", value: "$610,000", flagged: false },
+      { label: "Residential income", value: "$1,520,000", flagged: false },
+      { label: "Units", value: "48", flagged: false },
+      { label: "Going-in cap rate", value: "5.60%", flagged: false },
+      { label: "Asking price", value: "$25,000,000", flagged: false },
+    ];
+    expect(keyTermRows(mixed, "stabilized", SCREEN_YEAR, 7).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Units",
+      "Residential income",
+      "Commercial income",
+      "Retail SF",
+      "Commercial occupancy",
+    ]);
+    // No income half stated: the center's own retail area is not led.
+    const center = [
+      { label: "Occupancy", value: "92%", flagged: true },
+      { label: "Retail SF", value: "120,000 SF", flagged: false },
+      { label: "Going-in cap rate", value: "6.75%", flagged: false },
+      { label: "Asking price", value: "$30,000,000", flagged: false },
+    ];
+    expect(keyTermRows(center, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Occupancy"]);
+  });
+
+  it("an operating business's earnings, coverage and contracts lead after the count, and a shared row alone never leads as one (lib/going-concern)", () => {
+    const station = [
+      { label: "Occupancy", value: "100%", flagged: true },
+      { label: "Tank system", value: "Three double-walled fiberglass USTs", flagged: false },
+      { label: "Fuel supply agreement", value: "Shell through 2029", flagged: false },
+      { label: "EBITDA (T-12)", value: "$410,000", flagged: false },
+      { label: "Going-in cap rate", value: "8.00%", flagged: false },
+      { label: "Asking price", value: "$3,200,000", flagged: false },
+    ];
+    expect(keyTermRows(station, "stabilized", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "EBITDA (T-12)",
+      "Fuel supply agreement",
+      "Tank system",
+    ]);
+    // An apartment building's management fee is no operating business's.
+    const apartments = [
+      { label: "Occupancy", value: "95%", flagged: true },
+      { label: "Management fee", value: "3% of EGI", flagged: false },
+      { label: "Going-in cap rate", value: "5.50%", flagged: false },
+      { label: "Asking price", value: "$42,000,000", flagged: false },
+    ];
+    expect(keyTermRows(apartments, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Occupancy"]);
+    // A care operation's beds lead it.
+    const snf = [
+      { label: "Licensed beds", value: "120", flagged: false },
+      { label: "Management fee", value: "5% of revenue", flagged: false },
+      { label: "Asking price", value: "$18,000,000", flagged: false },
+    ];
+    expect(keyTermRows(snf, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Licensed beds", "Management fee"]);
+  });
+
+  it("condominium units' counts, dues and special assessment lead after the count, and an association's dues alone never lead as one (lib/condo)", () => {
+    const bulk = [
+      { label: "Occupancy", value: "93%", flagged: true },
+      { label: "Special assessment", value: "$4,000 a unit, roof", flagged: false },
+      { label: "HOA dues", value: "$650 per unit per month", flagged: false },
+      { label: "Units in condominium", value: "120", flagged: false },
+      { label: "Units offered", value: "42", flagged: false },
+      { label: "Asking price", value: "$16,800,000", flagged: false },
+    ];
+    expect(keyTermRows(bulk, "stabilized", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Units offered",
+      "Units in condominium",
+      "HOA dues",
+      "Special assessment",
+    ]);
+    // A build-to-rent community's association dues are no bulk purchase's.
+    const btr = [
+      { label: "Occupancy", value: "96%", flagged: true },
+      { label: "HOA dues", value: "$45 per home per month", flagged: false },
+      { label: "Homes", value: "180", flagged: false },
+      { label: "Asking price", value: "$72,000,000", flagged: false },
+    ];
+    expect(keyTermRows(btr, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Homes", "Occupancy"]);
+  });
+
+  it("a sandwich position's two rents and the master lease's end lead after the price, on a leasehold only (lib/sandwich-lease)", () => {
+    const sandwich = [
+      { label: "Occupancy", value: "91%", flagged: true },
+      { label: "Master lease expiration", value: "December 31, 2041", flagged: false },
+      { label: "Master lease options", value: "Two 5-year options", flagged: false },
+      { label: "NOI (T-12)", value: "$720,000", flagged: false },
+      { label: "Sublease income", value: "$1,820,000", flagged: false },
+      { label: "Master lease rent", value: "$1,100,000 a year", flagged: false },
+      { label: "Asking price", value: "$6,500,000", flagged: false },
+    ];
+    expect(keyTermRows(sandwich, "stabilized", SCREEN_YEAR, 6, "leasehold").map((m) => m.label)).toEqual([
+      "Asking price",
+      "Master lease rent",
+      "Sublease income",
+      "Master lease expiration",
+      "Master lease options",
+      "Occupancy",
+    ]);
+    // A seller's master lease of vacant suites on a building sold outright
+    // is a rent guarantee: its rents are never led as the position's, and
+    // fall after the flagged rows in the memorandum's order.
+    const fee = keyTermRows(sandwich, "stabilized", SCREEN_YEAR, 8, "fee_simple").map((m) => m.label);
+    expect(fee.indexOf("Master lease rent")).toBeGreaterThan(fee.indexOf("Occupancy"));
+    expect(fee.indexOf("Sublease income")).toBeGreaterThan(fee.indexOf("Occupancy"));
   });
 
   it("a student building's pre-leasing and walk lead after the price (#468)", () => {

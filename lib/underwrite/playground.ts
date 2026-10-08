@@ -5,6 +5,7 @@
 // (an annual model over a 5-year hold) to recompute on every drag tick.
 
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
+import { noIrrWhy, type NoIrrWhy } from "./no-irr";
 
 /** The levers the playground exposes. Percents are decimals (0.045 = 4.5%);
  *  purchasePrice is dollars. Price is the deep lever: the engine re-sizes the
@@ -20,6 +21,10 @@ export interface PlaygroundLevers {
 export interface ScenarioMetrics {
   /** decimal, null when the cash-flow vector has no IRR root */
   leveredIrrPct: number | null;
+  /** where no IRR solved, why — every surface says it in the "—"'s place
+   *  ("no IRR: the sale does not repay the loan", lib/underwrite/no-irr
+   *  `noIrrText`); absent or null where it solved */
+  noIrr?: NoIrrWhy | null;
   leveredEquityMultiple: number | null;
   /** year-1 levered cash flow ÷ initial equity, decimal */
   cocYr1Pct: number | null;
@@ -46,8 +51,14 @@ export const LEVER_STEPS: Record<
   exitCapPct: { step: 0.0025, span: 2, sliderSpan: 8, min: 0.0025, max: 0.25, sliderFloor: 0.02 },
   // 50bps steps; slider ±3 steps = ±150bps (the spec's 1.0–4.0% example)
   rentGrowthPct: { step: 0.005, span: 2, sliderSpan: 3, min: -0.05, max: 0.15 },
-  // 1.0pt steps; slider ±3 steps = ±3pt (the spec's 2–8% example)
-  vacancyPct: { step: 0.01, span: 2, sliderSpan: 3, min: 0, max: 0.95 },
+  // 1.0pt steps; slider ±3 steps = ±3pt (the spec's 2–8% example). The top
+  // is the model's own: lib/underwrite/inputs reads a stated occupancy as
+  // the vacancy and stops at 99%, so the slider rests on the model's
+  // vacancy, never above or below it. It stopped at 95% and clamped the
+  // base there: a building stated 0% occupied ran at 95%, five times the
+  // revenue the model's 99% gives it — "Levered IRR 160.2%" on a deal the
+  // report read at 12.74% (research pass 38).
+  vacancyPct: { step: 0.01, span: 2, sliderSpan: 3, min: 0, max: 0.99 },
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -55,7 +66,9 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 /** Stops `span` steps either side of the base, clamped to the lever's
  *  physical range. The base itself is clamped FIRST — a degenerate derived
  *  input (e.g. a 0% cap read off a garbled extraction) must not produce
- *  non-monotonic stops where dragging left raises the value. */
+ *  non-monotonic stops where dragging left raises the value. Every range
+ *  holds every base the model derives, so a route-derived model's base is
+ *  its own figure. */
 function stops(
   lever: PercentLever,
   base: number,
@@ -108,6 +121,7 @@ export function scenarioMetrics(inputs: UnderwriteInputs): ScenarioMetrics {
   const equity = r.sourcesUses.equity;
   return {
     leveredIrrPct: r.returns.leveredIrrPct,
+    noIrr: noIrrWhy(r.returns.leveredIrrPct, r.residual.netSaleProceeds, r.leveredVector.slice(1).reduce((a, b) => a + b, 0)),
     leveredEquityMultiple: r.returns.leveredEquityMultiple,
     cocYr1Pct: y1 && equity > 0 ? y1.leveredCashFlow / equity : null,
     dscrYr1: y1 ? y1.dscrNoi : null,
@@ -166,6 +180,15 @@ export const fmtPct = (dec: number | null, digits = 1): string =>
 
 export const fmtX = (x: number | null, digits = 2): string =>
   x == null || !Number.isFinite(x) ? "—" : `${x.toFixed(digits)}x`;
+
+/** An equity multiple, written one way on every surface that prints the
+ *  screening model's (research pass 40, L4 and L5): two places, and a dash
+ *  where it is at or below zero — distributions over equity at or below
+ *  nothing are not a multiple of anything, as the full report has always
+ *  said them ("—", never "-1.65x"). The workbook's cells format the same way
+ *  over their live formulas (lib/underwrite/workbook `FMT.mult`). */
+export const fmtEm = (x: number | null): string =>
+  x == null || !Number.isFinite(x) || x <= 0 ? "—" : `${x.toFixed(2)}x`;
 
 /** "+25bps" / "−50bps" / "base" for the cap & growth levers. */
 export function fmtBpsDelta(value: number, base: number): string {

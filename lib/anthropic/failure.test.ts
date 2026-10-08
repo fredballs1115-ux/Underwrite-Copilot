@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
+  EXTRACTION_STEP,
   ScreenError,
   describeRunFailure,
   looksReadable,
@@ -8,6 +11,8 @@ import {
 } from "./failure";
 import { newLedger, withUsageLedger } from "./usage";
 import { needsOperator } from "./operator-failures";
+import { EXTRACTION_TOO_LONG_FAILURE, documentFailure } from "./document-failures";
+import { screenOutputFormat } from "./output-format";
 
 /** The SDK's APIError, by shape: an HTTP status and its "401 {…}" message. */
 function apiError(status: number, type: string, message: string): Error {
@@ -80,9 +85,27 @@ describe("describeRunFailure — the analyst reads a sentence, the log keeps the
     const conn = Object.assign(new Error("Connection error."), { name: "APIConnectionError" });
     expect(describeRunFailure(conn).message).toMatch(/couldn't reach/);
     expect(describeRunFailure(new Error("fetch failed")).message).toMatch(/couldn't reach/);
-    expect(describeRunFailure(new Error("Storage download failed: Object not found")).message).toMatch(
-      /re-upload/,
-    );
+    const missing = describeRunFailure(new Error("Storage download failed: Object not found")).message;
+    expect(missing).toBe("The OM is missing from our file storage — upload it again with Replace OM.");
+    // A retry reads nothing again: the deal page offers Replace OM.
+    expect(documentFailure(missing)).toBe("replace");
+  });
+
+  it("our file storage failing on the network names our storage, never the analysis service (research pass 30)", () => {
+    for (const raw of [
+      "Storage download failed: fetch failed",
+      "Storage download failed: The operation was aborted due to timeout",
+      "Storage download failed: Gateway Timeout",
+      "Storage upload failed: socket hang up",
+    ]) {
+      const m = describeRunFailure(new Error(raw)).message;
+      expect(m, raw).toBe(
+        "We couldn't read the OM back from our file storage just now — try again in a minute; if it keeps failing, upload it again with Replace OM.",
+      );
+      expect(m, raw).not.toMatch(/analysis service/);
+      // A passing fault keeps its retry.
+      expect(documentFailure(m), raw).toBeNull();
+    }
   });
 
   it("the SDK parser's own message becomes 'incomplete or unreadable'", () => {
@@ -127,9 +150,15 @@ describe("structuredOutput / structured — a cut-off, a refusal and an empty an
   });
 
   it("names a max_tokens cut-off even when the truncated text happened to parse", () => {
-    expect(() => structuredOutput({ parsed_output: { a: 1 }, stop_reason: "max_tokens" }, "Extraction")).toThrow(
-      /Extraction was cut off/,
+    expect(() => structuredOutput({ parsed_output: { a: 1 }, stop_reason: "max_tokens" }, "The challenger")).toThrow(
+      /The challenger was cut off before it finished — try again\./,
     );
+    // The extraction's cut-off is the memorandum's: the same deck is cut off
+    // again (research pass 41), so it is named as the document's.
+    expect(() => structuredOutput({ parsed_output: { a: 1 }, stop_reason: "max_tokens" }, EXTRACTION_STEP)).toThrow(
+      EXTRACTION_TOO_LONG_FAILURE,
+    );
+    expect(EXTRACTION_STEP).toBe("Extraction");
   });
 
   it("names a refusal and a missing parsed block", () => {
@@ -170,12 +199,69 @@ describe("structuredOutput / structured — a cut-off, a refusal and an empty an
           "Failed to parse structured output: Error: Failed to parse structured output as JSON: Unterminated string in JSON at position 62",
         ),
       );
-    const err = await structured("Extraction", call).catch((e: unknown) => e);
+    const err = await structured("The verdict", call).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ScreenError);
-    expect((err as ScreenError).message).toMatch(/Extraction came back unreadable/);
+    expect((err as ScreenError).message).toMatch(/The verdict came back unreadable/);
     expect((err as ScreenError).detail).toContain("position 62");
+    // The extraction's, with no response to read its stop reason off, is
+    // the cut-off it almost always is — the memorandum's.
+    const extraction = await structured(EXTRACTION_STEP, call).catch((e: unknown) => e);
+    expect((extraction as ScreenError).message).toBe(EXTRACTION_TOO_LONG_FAILURE);
+    expect((extraction as ScreenError).detail).toContain("position 62");
+    expect(documentFailure(describeRunFailure(extraction).message)).toBe("replace");
     // Every other failure passes through untouched.
     const other = new Error("fetch failed");
     await expect(structured("Extraction", () => Promise.reject(other))).rejects.toBe(other);
+  });
+});
+
+// Research pass 41's M1: the SDK's own format threw on a cut-off extraction
+// while the response was built, so its spend never reached the ledger and
+// the page offered "Try again" on a failure the same deck repeats.
+describe("screenOutputFormat — an answer that does not parse comes back whole", () => {
+  const Schema = z.object({ dealName: z.string(), metrics: z.array(z.object({ label: z.string(), value: z.string() })) });
+  const usage = { input_tokens: 40_000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 16_000 };
+
+  it("sends the SDK's own format, byte for byte, and parses a finished answer as the SDK does", () => {
+    expect(JSON.stringify(screenOutputFormat(Schema))).toBe(JSON.stringify(zodOutputFormat(Schema)));
+    const text = JSON.stringify({ dealName: "The Maddox", metrics: [{ label: "NOI", value: "$2,860,000" }] });
+    expect(screenOutputFormat(Schema).parse(text)).toEqual(zodOutputFormat(Schema).parse(text));
+  });
+
+  it("records a cut-off extraction's spend, then names it as the memorandum's", async () => {
+    const cut = '{"dealName":"The Maddox","metrics":[{"label":"NOI","value":"$2,86';
+    expect(() => zodOutputFormat(Schema).parse(cut)).toThrow(/Failed to parse structured output/);
+    const parsed = screenOutputFormat(Schema).parse(cut);
+    const ledger = newLedger();
+    const err = await withUsageLedger(ledger, () =>
+      structured(EXTRACTION_STEP, async () => ({ parsed_output: parsed, stop_reason: "max_tokens", model: "claude-opus-4-8", usage })),
+    ).catch((e: unknown) => e);
+    expect(ledger.calls.map((c) => [c.what, c.input, c.output])).toEqual([["Extraction", 40_000, 16_000]]);
+    expect(err).toBeInstanceOf(ScreenError);
+    expect((err as ScreenError).message).toBe(EXTRACTION_TOO_LONG_FAILURE);
+    expect((err as ScreenError).detail).toMatch(/Failed to parse structured output/);
+    // The page offers another copy, never "Try again".
+    expect(documentFailure(describeRunFailure(err).message)).toBe("replace");
+  });
+
+  it("names an answer that finished but did not parse as malformed, its spend recorded, a retry offered", async () => {
+    const parsed = screenOutputFormat(Schema).parse('{"dealName": 7}');
+    const ledger = newLedger();
+    const err = await withUsageLedger(ledger, () =>
+      structured("The challenger", async () => ({ parsed_output: parsed, stop_reason: "end_turn", model: "claude-opus-4-8", usage: { ...usage, output_tokens: 900 } })),
+    ).catch((e: unknown) => e);
+    expect(ledger.calls).toHaveLength(1);
+    expect((err as ScreenError).message).toBe("The challenger came back unreadable — the answer was malformed. Try again.");
+    expect(documentFailure(describeRunFailure(err).message)).toBeNull();
+  });
+
+  it("every step's call sends the screen's format, so none throws its spend away", async () => {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = join(process.cwd(), "lib/anthropic");
+    const offenders = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && f !== "output-format.ts")
+      .filter((f) => /format:\s*zodOutputFormat\(/.test(readFileSync(join(dir, f), "utf8")));
+    expect(offenders).toEqual([]);
   });
 });

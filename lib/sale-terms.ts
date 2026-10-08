@@ -38,9 +38,10 @@
 
 import type { ExtractionResult, SaleMethod } from "@/lib/anthropic/types";
 import { parsePageNumber } from "@/lib/facts";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import { readStatedDate } from "@/lib/note-yield";
 import { withArticle } from "@/lib/article";
+import { timesWords } from "@/lib/underwrite/solver";
 
 export type { SaleMethod };
 
@@ -178,8 +179,7 @@ export interface SaleRead {
 type SaleFacts = Omit<SaleRead, "headline" | "sentences">;
 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
-const money = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dayLabel = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
@@ -327,11 +327,25 @@ function sentencesOf(r: SaleFacts): string[] {
  * The most a buyer can bid: the model's all-in ceiling at the buyer's
  * hurdle, backed out of the premium. Null without a ceiling.
  */
-export function ceilingBidLine(r: SaleRead, maxAllIn: number | null, hurdlePct: number, unbounded = false): string {
+export function ceilingBidLine(
+  r: SaleRead,
+  maxAllIn: number | null,
+  hurdlePct: number,
+  unbounded = false,
+  /** the price the model runs at — the opening floor where no asking price
+   *  is stated — which the range the bid was searched over is a multiple of */
+  modelledPrice: number | null = null,
+): string {
   if (maxAllIn == null || !(maxAllIn > 0)) return "";
-  // The solver's search stops at twice the price it started from: past it,
-  // the ceiling is the bidding's to find, not a figure the model can name.
-  if (unbounded) return `The model still clears ${withArticle(`${hurdlePct}%`)} levered IRR at ${money(maxAllIn)} all-in, twice the opening floor — at this hurdle the bidding, not the model, sets the ceiling.`;
+  // The solver searches up to a stated multiple of the price it started
+  // from (lib/underwrite/solver `MAX_BID_SEARCH_X`): a model still clearing
+  // the hurdle there pays AT LEAST that, its own ceiling above the range
+  // searched — never a model that sets none (research pass 40, H2).
+  if (unbounded) {
+    const floor = r.floorAllIn != null && modelledPrice != null && Math.abs(modelledPrice - r.floorAllIn) < 0.5;
+    const of = modelledPrice != null && modelledPrice > 0 ? `, ${timesWords(maxAllIn / modelledPrice)} ${floor ? "the opening floor" : "the modelled price"}` : "";
+    return `At ${withArticle(`${hurdlePct}%`)} levered IRR the model pays at least ${money(maxAllIn)} all-in${of}: its own ceiling lies above the range searched.`;
+  }
   const hammer = hammerFor(maxAllIn, r.premium);
   const premium = r.premium ? ` — a hammer price of ${money(hammer)} with the ${r.premium.pct}% premium on top` : "";
   const vs =

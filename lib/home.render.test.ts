@@ -6,7 +6,13 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
+import { renderToStaticMarkup } from "react-dom/server";
 import { a11yIssues } from "./render-lint";
+import { sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
+import type { SampleLegal } from "./sample-legal";
+import { DemoPanel } from "@/app/landing-interactive";
+import { StressBench } from "@/app/landing-stress";
+import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { SKYLINES, commonsPage } from "./skyline";
@@ -32,13 +38,28 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(a11yIssues(html)).toEqual([]);
   }, 60_000);
 
+  it("keeps each export tile's Pro mark a word of its own (the batch-2 audit)", async () => {
+    // The text read "Excel model, live formulasPro": the flex gap spaced
+    // the chip on screen and nothing spaced it for a screen reader.
+    const html = await renderHome();
+    const text = html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "");
+    expect(text).toContain("Excel model, live formulas Pro");
+    expect(text).toContain("One-page IC memo Pro");
+    expect(text).not.toMatch(/formulasPro|memoPro/);
+  }, 60_000);
+
   it("names the hero card's two chips: the call, and the buy-box fit", async () => {
     const html = await renderHome();
     const card = html.slice(html.indexOf("The Maddox at Brewerytown"));
     // "Caution" and "WATCH" sat side by side with nothing saying which was
     // the verdict and which the fit against the buy box.
     expect(card).toMatch(/<span class="sr-only">Verdict: <\/span>(Go|Caution|No-go)<\/span>/);
-    expect(card).toMatch(/<span class="sr-only">Buy-box <\/span>Fit \d+ · (Pursue|Watch|Pass|Outside box)<\/span>/);
+    // The fit's words, with how many of the box's criteria it stands on
+    // where the sample's memorandum leaves one unchecked (research pass 35:
+    // it states no IRR, so the box's target return is never judged).
+    expect(card).toMatch(
+      /<span class="sr-only">Buy-box <\/span>Fit \d+ · (Pursue|Watch|Pass|Outside box|\d+ of \d+ checked)( · \d+ of \d+ checked)?<\/span>/,
+    );
     // And it is the deal header's own chip for the same deal and box, never
     // a call only the homepage makes.
     const chip = buyBoxRead(
@@ -110,4 +131,60 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(values.length).toBe(terms.length);
     for (const t of terms) expect(strip.split(t).length - 1, t).toBe(1);
   }, 60_000);
+});
+
+// Research pass 34: the homepage quoted the sample's two models without
+// saying which — the Excel tile ran the first-draft model beside a link to
+// a workbook that runs the screening model, and the miniature of the deal
+// page printed "8.7%" where the page's own card says "8.72%".
+describe("the homepage's sample figures are the surfaces' own", () => {
+  const words = (html: string) =>
+    html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+
+  it("the Excel tile prints the workbook it links: its base case and two cells of its Sensitivity tab", async () => {
+    const html = await renderHome();
+    const at = html.indexOf("Excel model, live formulas");
+    expect(at).toBeGreaterThan(-1);
+    const tile = words(html.slice(at, html.indexOf("/api/demo/underwrite.xlsx", at)));
+    for (const [k, v, e] of sampleWorkbookPreview()) expect(tile).toContain(`${k} ${v} ${e}`);
+    expect(tile).toContain("Exit cap 5.45% IRR 9.3%");
+    expect(tile).not.toContain("Rent growth");
+  }, 60_000);
+
+  // Research pass 40, M1: the stress bench ran the first-draft model
+  // (lib/model/compute) at its reconciled case — 8.7% — under words naming it
+  // the engine that "builds the Excel workbook", its dot "the broker's base",
+  // while the Excel tile beside it printed the workbook's 9.3%. It runs the
+  // screening engine from the workbook's own base case now, and says so.
+  it("the stress bench runs the workbook's engine from the workbook's base case, and says which", async () => {
+    const { inputs, meta } = sampleDerivedInputs();
+    const bench = words(renderToStaticMarkup(React.createElement(StressBench, { base: inputs, units: meta.units }))).replace(/&#x27;/g, "'");
+    const tileIrr = sampleWorkbookPreview()[1][2].replace("IRR ", "");
+    expect(tileIrr).toBe("9.3%");
+    expect(bench).toContain(`Levered IRR ${tileIrr}`);
+    expect(bench).toContain("Equity multiple 1.53x");
+    expect(bench).toContain("dot = the base case");
+    expect(bench).toContain("the screening engine behind each deal page's returns and the Excel workbook, run from the workbook's own base case");
+    expect(bench).not.toMatch(/computeModel|broker/i);
+    // The page hands the bench that derivation: its section prints the tile's figure.
+    const html = await renderHome();
+    const at = html.indexOf('id="stress"');
+    expect(at).toBeGreaterThan(-1);
+    const section = words(html.slice(at, html.indexOf("</section>", at)));
+    expect(section).toContain(`Levered IRR ${tileIrr}`);
+  }, 60_000);
+
+  it("the miniature's Financials tab is the deal page's first-draft card: its figures, to its places, and its model's name", () => {
+    const panel = words(renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", legal: {} as SampleLegal })));
+    const card = words(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model })));
+    expect(card).toContain("Projected returns · first-draft model");
+    expect(panel).toContain("Projected returns · first-draft model");
+    for (const label of ["Levered IRR", "Cash-on-cash (Yr 1)", "Equity multiple"]) {
+      const figure = new RegExp(`${label.replace(/[()]/g, "\\$&")} (-?[\\d.]+[%x])`);
+      const onCard = figure.exec(card)?.[1];
+      expect(onCard, label).toBeTruthy();
+      expect(figure.exec(panel)?.[1], label).toBe(onCard);
+    }
+    expect(panel).toContain("Levered IRR 8.72%");
+  });
 });

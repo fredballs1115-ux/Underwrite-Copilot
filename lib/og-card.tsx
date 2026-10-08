@@ -47,13 +47,25 @@ export function cardCanDraw(text: string): boolean {
 }
 
 /**
- * The photograph's credit on the card, with the change the card made to it:
- * the author, the licence and "cropped", which a CC licence asks to be said.
- * Null where the card cannot draw the author's name.
+ * The photograph's credit on the card, with the changes the card made to it:
+ * the author and where the photograph is (Wikimedia Commons), the licence by
+ * name and by its address, and that the card cropped it and set words over
+ * it — "Photo: EEJCC via Wikimedia Commons · CC BY-SA 4.0,
+ * https://creativecommons.org/licenses/by-sa/4.0 · cropped, words added".
+ *
+ * The card is an image, so it carries no link: the licence's address is
+ * printed as text, exactly as the table holds it (lib/skyline's
+ * `licenseUrl`, as the runner printed each file's page), so a card whose
+ * photograph is under a 2.x or 3.0 licence names its licence's address too
+ * (research pass 31, item 15). A public-domain photograph has no address and
+ * the line names none. "words added" because the card is more than a crop:
+ * the market's name, what the page holds and this credit are set over the
+ * photograph. Null where the card cannot draw the author's name.
  */
-export function cardPhotoCredit(shot: Pick<SkylineShot, "credit" | "license">): string | null {
-  const author = shot.credit && shot.credit !== "unknown" ? shot.credit : "Wikimedia Commons";
-  const line = `Photo: ${author}, ${shot.license}, cropped (Wikimedia Commons)`;
+export function cardPhotoCredit(shot: Pick<SkylineShot, "credit" | "license" | "licenseUrl">): string | null {
+  const author = shot.credit && shot.credit !== "unknown" ? `${shot.credit} via Wikimedia Commons` : "Wikimedia Commons";
+  const licence = shot.licenseUrl ? `${shot.license}, ${shot.licenseUrl}` : shot.license;
+  const line = `Photo: ${author} · ${licence} · cropped, words added`;
   return cardCanDraw(line) ? line : null;
 }
 

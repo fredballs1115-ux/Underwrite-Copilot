@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { senderStillHasAccess } from "./share-access";
+import { SHARE_LINK_DAYS } from "./link-limits";
 
 /**
  * One resolution of a share token, for the shared page AND for the
@@ -26,7 +27,7 @@ export const SHARE_REFUSAL_COPY: Record<ShareRefusal, string> = {
   missing: "The link doesn't exist — ask the sender for a fresh one.",
   revoked: "The sender revoked this link.",
   expired:
-    "The link expired — share links live for 30 days. Ask the sender for a fresh one.",
+    `The link expired — share links live for ${SHARE_LINK_DAYS} days. Ask the sender for a fresh one.`,
   unavailable: "The deal behind this link is no longer available.",
   sender_lost_access: "The sender no longer has access to this deal.",
 };

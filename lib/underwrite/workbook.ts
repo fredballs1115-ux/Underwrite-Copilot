@@ -10,8 +10,14 @@ import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strateg
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { datedLong } from "@/lib/debt-index";
+import { documentNotices } from "@/lib/data-notices";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
+import { WORKBOOK_WITHHELD_WORD, modelReadsWithheld, placeholderWorkbookLine, withheldWorkbookRead } from "./report-grid";
+import { yearOneCapitalLine } from "./cost-note";
+import { noIrrText } from "./no-irr";
+import type { PlausibilityFinding } from "@/lib/deal-strategy";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -49,13 +55,55 @@ const LINE = "FFE7E4DD";
 
 const FMT = {
   usd: '$#,##0;($#,##0);"-"',
+  // A price backed out of an NOI of zero or less over the stated cap is no
+  // price (lib/underwrite/inputs `noPrice`, research pass 38): the cell keeps
+  // the model's figure, live, and shows words for it until a price is typed.
+  usdNoPrice: '$#,##0;"no price: enter one";"no price: enter one"',
   psf: "$0.00",
   pct1: "0.0%",
   pct2: "0.00%",
-  mult: '0.0"x"',
+  // Two places, as the report prints a multiple ("1.53x"): one figure, one
+  // way of writing it — and, as the report and the deal page write it, a
+  // dash where it is at or below zero, which is no multiple of anything
+  // (research pass 40, L4). The cell keeps its live formula and its value.
+  mult: '0.00"x";"—";"—"',
   int: "#,##0",
   ratio: '0.00"x"',
+  // A return the deal page withholds (research pass 40, H1): the cell keeps
+  // its live formula and shows the word for every value it can take — a
+  // positive, a negative, a zero and the words a no-IRR cell returns — so
+  // nothing reads as a figure until the reader gives it a format of its own.
+  withheld: Array(4).fill(`"${WORKBOOK_WITHHELD_WORD}"`).join(";"),
 } as const;
+
+/** How many characters of 10 pt text a line of the Cover's 64-wide column C
+ *  holds — Excel's Arial reaches its edge sooner than LibreOffice's does. */
+const COVER_LINE = 80;
+
+/** A stabilized deal's year-1 NOI over its total uses, in the Deal
+ *  Summary's return block: what it is, never a "stabilized" figure — and
+ *  over the uses at closing, which leave out the capital the model spends
+ *  in year 1, where the plan block's Total Cost carries it (research pass
+ *  40, L6: it read "Year-1 Yield on Total Cost"). */
+export const YEAR1_YIELD_LABEL = "Year-1 Yield on Total Uses (before yr-1 capital)";
+/** The same on a leased fee, whose price is the land's. */
+export const YEAR1_YIELD_LAND_LABEL = "Year-1 Yield on Total Uses (the Land's, before yr-1 capital)";
+/** About what one line of the Deal Summary's 18-wide value column holds at
+ *  10 pt: a market name past it wraps. */
+const MARKET_LINE = 20;
+
+/** The Return Summary's unlevered pair, said as what they leave out: the
+ *  engine's unlevered flows are the property's before debt, and the asset
+ *  management fee, a fee on the equity, rides only in the levered ones
+ *  (research pass 40, L3). */
+export const UNLEVERED_IRR_LABEL = "Unlevered IRR (before AM fee)";
+export const UNLEVERED_EM_LABEL = "Unlevered Equity Multiple (before AM fee)";
+
+/** The Assumptions tab's rent line, as it is: the year-1 NOI grossed up
+ *  through the expense ratio and the vacancy, other income folded in — the
+ *  building's potential gross revenue, never a rent roll's rents (research
+ *  pass 40, M2). Its named range stays InPlaceRent. */
+export const RENT_LINE_LABEL = "Potential Gross Revenue (annual) — the year-1 NOI grossed up through the expense ratio and vacancy";
 
 function sourceText(s: InputSource | undefined): string {
   if (!s) return "";
@@ -147,15 +195,36 @@ export async function buildUnderwriteWorkbook(
    *  were read on, printed on the cover and set as the file's created and
    *  modified time (it was 1970) */
   builtAt: Date = new Date(),
+  /** the plausibility check's findings on the deal page's own read (lib/
+   *  deal-strategy `assessPlausibility` over the extraction and the first
+   *  signal): where one stands against the returns, the Deal Summary marks
+   *  them withheld over their live formulas and says why, as the page
+   *  withholds its tiles (research pass 40, H1); absent, only the model's
+   *  own vacancy is read for that */
+  findings?: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null,
+  /** the deal page's read of what the price buys (lib/compare-interest
+   *  `modelReturnsRead` over the screening model, on the reader's day): a
+   *  leasehold whose lease ends inside the hold has its returns marked
+   *  withheld, as the page and the report withhold them (audit C4, M3) */
+  interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null,
+  /** the moment the file is made, set as its created and modified time
+   *  where the caller dates the cover on another day (the reader's: the
+   *  route passes noon on it, which is no moment anyone exported the file) */
+  exportedAt: Date = builtAt,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
   const holdYears = result.holdYears;
+  // The returns the deal page withholds — a leasehold whose lease ends
+  // inside the hold, a building run nearly vacant, a finding against them —
+  // said once and marked wherever the workbook prints them; every cell
+  // keeps its formula.
+  const withheld = withheldWorkbookRead(inputs, model.meta.occupancyPct, findings, interest);
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
-  wb.created = builtAt;
-  wb.modified = builtAt;
+  wb.created = exportedAt;
+  wb.modified = exportedAt;
 
   const wsCover = wb.addWorksheet("Cover", { views: [{ showGridLines: false }] });
   const wsSummary = wb.addWorksheet("Deal Summary", { views: [{ showGridLines: false }] });
@@ -174,9 +243,9 @@ export async function buildUnderwriteWorkbook(
   const wsMonthly = wb.addWorksheet("Monthly Cash Flow", {
     views: [{ state: "frozen", xSplit: 1, ySplit: 3, showGridLines: false }],
   });
-  const wsDebt = wb.addWorksheet("Debt Schedule", {
-    views: [{ state: "frozen", xSplit: 0, ySplit: 3, showGridLines: false }],
-  });
+  // Frozen at its monthly table's header, which buildDebtSchedule places
+  // under the annual rollup.
+  const wsDebt = wb.addWorksheet("Debt Schedule", { views: [{ showGridLines: false }] });
   const wsOps = wb.addWorksheet("Operating Metrics", { views: [{ showGridLines: false }] });
   const wsSens = wb.addWorksheet("Sensitivity", { views: [{ showGridLines: false }] });
   // Hidden tab holding one live cash-flow block per sensitivity scenario.
@@ -192,11 +261,11 @@ export async function buildUnderwriteWorkbook(
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
-  buildDealSummary(wsSummary, model, cf, holdYears);
+  buildDealSummary(wsSummary, model, cf, holdYears, withheld);
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
-  buildDebtSchedule(wsDebt, inputs);
+  const debtHeadRow = buildDebtSchedule(wsDebt, inputs);
   buildOperatingMetrics(wsOps, cf, model, holdYears);
-  buildSensitivity(wsSens, wsEng, inputs);
+  buildSensitivity(wsSens, wsEng, inputs, model.sources.purchasePrice?.noPrice != null, withheld != null);
 
   const visible = [
     wsCover,
@@ -218,8 +287,9 @@ export async function buildUnderwriteWorkbook(
     fitToPage: false,
     printTitlesColumn: "A:A",
   };
-  // The amortization table spans pages — repeat its header row on each.
-  wsDebt.pageSetup = { ...wsDebt.pageSetup, printTitlesRow: "3:3" };
+  // The amortization table spans pages — repeat its header row on each. The
+  // annual rollup sits above it, so no page puts this header over the rollup.
+  wsDebt.pageSetup = { ...wsDebt.pageSetup, printTitlesRow: `${debtHeadRow}:${debtHeadRow}` };
 
   // Firm branding (Feature 6): file properties + print chrome, plus the
   // Cover's "Prepared by" line (written in buildCover) — additive only, so
@@ -240,6 +310,21 @@ function buildCover(
   builtAt: Date = new Date(),
 ) {
   const { meta } = model;
+  // The full report's gate (lib/underwrite/report-grid `modelReadsWithheld`):
+  // on a placeholder price or an assumed year-1 NOI, the model's reads of the
+  // terms below are left out, said once at their foot, and only the
+  // memorandum's terms print (research pass 38: the cover read "the model
+  // does not bid at all" on an auction whose NOI was the model's own 6%).
+  const readsWithheld = modelReadsWithheld(model.inputs, model.sources, meta.strategy != null && isPlanDeal(meta.strategy));
+  let readLeftOut = false;
+  const showRead = (read: string | null | undefined): boolean => {
+    if (!read) return false;
+    if (readsWithheld) {
+      readLeftOut = true;
+      return false;
+    }
+    return true;
+  };
   ws.getColumn(1).width = 3;
   ws.getColumn(2).width = 26;
   ws.getColumn(3).width = 64;
@@ -273,16 +358,31 @@ function buildCover(
   const fact = (lab: string, val: string | null | undefined) => {
     label(ws.getCell(r, 2), lab, { bold: true, size: 10, color: MUTED });
     label(ws.getCell(r, 3), val || "—", { size: 10 });
+    // Both at the top of the row, so a label sits beside the first line of
+    // a value that wraps rather than at the foot of a tall row.
+    ws.getCell(r, 2).alignment = { vertical: "top" };
+    ws.getCell(r, 3).alignment = { vertical: "top" };
     r++;
+  };
+  // A value or a description longer than column C holds on one line wraps,
+  // its row given the lines it needs: a line of the 64-wide column holds
+  // about 80 characters at 10 pt, the measure Excel's Arial reaches first.
+  const wrapToFit = (row: number, col: number, text: string) => {
+    if (text.length <= COVER_LINE) return;
+    const cell = ws.getCell(row, col);
+    cell.alignment = { ...cell.alignment, wrapText: true, vertical: "top" };
+    ws.getRow(row).height = Math.ceil(text.length / COVER_LINE) * 13 + 2;
   };
   fact("Asset class", meta.assetClass);
   fact("Market", meta.market);
   fact("Address", meta.address);
-  // The day the workbook was built: every "years from today" below — a
+  // The day the workbook was made: every "years from today" below — a
   // ground lease's term, an abatement's end — counts from it, and a file
-  // opened months later would otherwise read them as this year's.
+  // opened months later would otherwise read them as this year's. Named
+  // "Prepared", never "Built", which under the address reads as the year
+  // the building was built.
   fact(
-    "Built",
+    "Prepared",
     builtAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }),
   );
   // The deal's strategy decides what its figures mean. On a plan deal
@@ -295,20 +395,38 @@ function buildCover(
     // label (lib/interest): the type describes the collateral, the
     // leaseholder's building or the lessee's equipment, never what the
     // price buys.
-    fact("Deal type", dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment));
-    const reading = ws.getCell(r, 3);
-    reading.value = isPlanDeal(dealKind)
-      ? `${STRATEGY_READING[dealKind]} This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.`
-      : STRATEGY_READING[dealKind];
-    reading.font = { name: ARIAL, size: 9, color: MUTED };
-    reading.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(r).height = isPlanDeal(dealKind) ? 54 : 28;
-    r++;
+    const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment);
+    fact("Deal type", kindLabel);
+    // Where the label says whose strategy it is, the strategy's own reading
+    // ("NOI ÷ price is the going-in cap") is of a building this price does
+    // not buy — and "What is being sold" below says what the model is on
+    // it — so the reading is left out. What this model books on a plan deal
+    // is true whatever the price buys, and stays.
+    const ofCollateral = kindLabel !== STRATEGY_LABEL[dealKind];
+    const booksLine =
+      "This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.";
+    const readingText = isPlanDeal(dealKind)
+      ? ofCollateral
+        ? booksLine
+        : `${STRATEGY_READING[dealKind]} ${booksLine}`
+      : ofCollateral
+        ? null
+        : STRATEGY_READING[dealKind];
+    if (readingText) {
+      const reading = ws.getCell(r, 3);
+      reading.value = readingText;
+      reading.font = { name: ARIAL, size: 9, color: MUTED };
+      reading.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = isPlanDeal(dealKind) && !ofCollateral ? 54 : 28;
+      r++;
+    }
   }
   // What is being sold (#414): a note, a share, a leasehold — and what this
   // model is and is not on it, before anyone reads a return off it.
   if (meta.interest) {
     fact("What is being sold", meta.interest.line);
+    // A note's or a leasehold's line runs past the band at one line.
+    wrapToFit(r - 1, 3, meta.interest.line);
     if (meta.interest.modelCaveat) {
       const c = ws.getCell(r, 3);
       c.value = meta.interest.modelCaveat;
@@ -318,27 +436,65 @@ function buildCover(
       r++;
     }
   }
+  // A forward purchase or a build-to-suit bought at delivery
+  // (lib/forward-purchase): the price at delivery, the clock, the yield and
+  // the deposit, then what this model does with them — the price as paid at
+  // closing, its year-one NOI beside the memorandum's at delivery.
+  if (meta.forward) {
+    fact("The forward purchase", meta.forward.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (showRead(meta.forward.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.forward.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
+  // An operating business on its real estate (lib/going-concern): what is
+  // sold, the operator's earnings and the rent's coverage, then what this
+  // model does with the income — capitalised as rent, nothing allocated to
+  // the business.
+  if (meta.goingConcern) {
+    fact("The operating business", meta.goingConcern.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (showRead(meta.goingConcern.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.goingConcern.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // The seller's loan offered for assumption (#419): as stated, then what
   // it is worth against this model's own new loan.
   if (meta.assumable) {
     fact("The seller's loan", meta.assumable.line);
-    const c = ws.getCell(r, 3);
-    c.value = meta.assumable.read;
-    c.font = { name: ARIAL, size: 9, color: MUTED };
-    c.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(r).height = 40;
-    r++;
+    if (showRead(meta.assumable.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.assumable.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 40;
+      r++;
+    }
   }
   // A note the seller offers to carry (#462): as stated, then what it is
   // worth against this model's own new loan.
   if (meta.sellerNote) {
     fact("The seller's note", meta.sellerNote.line);
-    const c = ws.getCell(r, 3);
-    c.value = meta.sellerNote.read;
-    c.font = { name: ARIAL, size: 9, color: MUTED };
-    c.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(r).height = 40;
-    r++;
+    if (showRead(meta.sellerNote.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.sellerNote.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 40;
+      r++;
+    }
   }
   // A covenant or a contract that sets the rents (#453): how much of the
   // building is restricted and until when, then what this model's one rent
@@ -356,6 +512,23 @@ function buildCover(
       r++;
     }
   }
+  // The rent rules that reach the building (lib/rent-regulation): the
+  // regime, the regulated share as stated and the allowance in force, then
+  // this model's one rent growth rate set beside the allowance — the Rent
+  // Growth input stays the model's.
+  if (meta.regulation) {
+    fact("The rent rules", meta.regulation.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (showRead(meta.regulation.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.regulation.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // The one lease a single-tenant property is (#454): the tenant, the
   // term and the increases, then what they mean for this model — the years
   // left at its sale, and "enter 1.92% as the rent growth" where the
@@ -364,7 +537,7 @@ function buildCover(
     fact("The single tenant", meta.singleTenant.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.singleTenant.read) {
+    if (showRead(meta.singleTenant.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.singleTenant.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -380,7 +553,7 @@ function buildCover(
     fact("The tenants", meta.roster.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.roster.read) {
+    if (showRead(meta.roster.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.roster.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -396,7 +569,7 @@ function buildCover(
     fact("The value-add program", meta.valueAdd.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.valueAdd.read) {
+    if (showRead(meta.valueAdd.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.valueAdd.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -411,7 +584,7 @@ function buildCover(
     fact("The tax abatement", meta.taxAbatement.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.taxAbatement.read) {
+    if (showRead(meta.taxAbatement.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.taxAbatement.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -426,7 +599,7 @@ function buildCover(
     fact("Student housing", meta.student.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.student.read) {
+    if (showRead(meta.student.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.student.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -442,7 +615,7 @@ function buildCover(
     fact("The park", meta.mh.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.mh.read) {
+    if (showRead(meta.mh.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.mh.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -457,12 +630,62 @@ function buildCover(
     fact("The facility", meta.storage.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.storage.read) {
+    if (showRead(meta.storage.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.storage.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
       c.alignment = { wrapText: true, vertical: "top" };
       ws.getRow(r).height = 40;
+      r++;
+    }
+  }
+  // A mixed-use building (lib/mixed-use): its two incomes as stated and the
+  // commercial share of each, then what this model does with them — one
+  // exit cap and one growth rate for both.
+  if (meta.mixedUse) {
+    fact("The two incomes", meta.mixedUse.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (showRead(meta.mixedUse.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.mixedUse.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
+  // Condominium units bought in bulk (lib/condo): the units offered of the
+  // condominium's, a year of their dues and a special assessment, then what
+  // this model does with them — one building at one exit cap, no retail
+  // exit.
+  if (meta.condo) {
+    fact("The condominium units", meta.condo.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (showRead(meta.condo.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.condo.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
+  // A sandwich position (lib/sandwich-lease): the sublease income against
+  // the master rent and the master lease's end, then what this model does
+  // with the position — its income capitalised at the sale as if it ran
+  // forever, while the master lease ends.
+  if (meta.sandwich) {
+    fact("The sandwich position", meta.sandwich.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (showRead(meta.sandwich.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.sandwich.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
       r++;
     }
   }
@@ -473,7 +696,7 @@ function buildCover(
     fact("The reports", meta.siteReports.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.siteReports.read) {
+    if (showRead(meta.siteReports.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.siteReports.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -489,7 +712,7 @@ function buildCover(
     fact("How it is sold", meta.sale.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.sale.read) {
+    if (showRead(meta.sale.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.sale.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -505,7 +728,7 @@ function buildCover(
     fact("The hotel", meta.hotel.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.hotel.read) {
+    if (showRead(meta.hotel.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.hotel.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -518,7 +741,9 @@ function buildCover(
   // lease has left then, and the Exit Cap that runs the workbook on the
   // term — the input stays the model's; the reader decides. The lease's
   // end rides in "What is being sold" above.
-  if (meta.leasehold) {
+  if (meta.leasehold && !showRead(meta.leasehold.line)) {
+    // Left out whole: the exit on the term is the model's own arithmetic.
+  } else if (meta.leasehold) {
     fact("The exit, on the lease's term", meta.leasehold.line);
     // A sentence, not a figure: wrapped, with the room it needs.
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
@@ -531,6 +756,15 @@ function buildCover(
       ws.getRow(r).height = 64;
       r++;
     }
+  }
+  // Why the model's reads above are left out, once, where any was.
+  if (readLeftOut && readsWithheld) {
+    const c = ws.getCell(r, 3);
+    c.value = `The model's reads of these terms are left out: ${readsWithheld}`;
+    c.font = { name: ARIAL, size: 9, color: MUTED };
+    c.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r).height = 40;
+    r++;
   }
   r++;
 
@@ -554,6 +788,10 @@ function buildCover(
   for (const [name, desc] of toc) {
     label(ws.getCell(r, 2), name, { bold: true, size: 10 });
     label(ws.getCell(r, 3), desc, { size: 10, color: MUTED });
+    // Inside the band: a description longer than the column wraps under it
+    // (Operating Metrics' had printed past the band's end).
+    ws.getCell(r, 2).alignment = { vertical: "top" };
+    wrapToFit(r, 3, desc);
     r++;
   }
   r++;
@@ -645,9 +883,18 @@ function buildAssumptions(
     const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], interest?.kind, interest?.equipment);
     label(ws.getCell(r, 2), kindLabel);
     const note = ws.getCell(r, 3);
+    // As on the cover: where the label says whose strategy it is, the
+    // strategy's reading is of a building this price does not buy and is
+    // left out; what the rows below are on a plan deal stays.
+    const ofCollateral = kindLabel !== STRATEGY_LABEL[dealKind];
+    const planLine = "Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.";
     note.value = isPlanDeal(dealKind)
-      ? `${STRATEGY_READING[dealKind]} Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.`
-      : STRATEGY_READING[dealKind];
+      ? ofCollateral
+        ? planLine
+        : `${STRATEGY_READING[dealKind]} ${planLine}`
+      : ofCollateral
+        ? null
+        : STRATEGY_READING[dealKind];
     note.font = { name: ARIAL, size: 9, color: MUTED };
     if (kindLabel !== STRATEGY_LABEL[dealKind]) {
       // The qualified label is longer than the column: wrapped, with the
@@ -659,7 +906,7 @@ function buildAssumptions(
     }
     r++;
   }
-  input("Purchase Price", inp.purchasePrice, "PurchasePrice", FMT.usd, "purchasePrice", true);
+  input("Purchase Price", inp.purchasePrice, "PurchasePrice", sources.purchasePrice?.noPrice ? FMT.usdNoPrice : FMT.usd, "purchasePrice", true);
   // Hold is STRUCTURAL: it sets the number of cash-flow years and the sale
   // year, which are baked at export. Not a flex input — editing it in the file
   // would only partially recalc (a longer-hold IRR would be wrong). Nor does a
@@ -690,7 +937,15 @@ function buildAssumptions(
   derived("Closing Costs % of price", "ClosingCostsTotal/PurchasePrice", "ClosingCostPct_Buy", FMT.pct2);
 
   header("Income");
-  input("In-Place Rental Revenue (annual)", inp.inPlaceRentAnnual, "InPlaceRent", FMT.usd, "inPlaceRentAnnual");
+  // The rent line is the year-1 NOI grossed up through the expense ratio and
+  // the vacancy (lib/underwrite/inputs): named so, wrapped in its column
+  // (research pass 40, M2: "In-Place Rental Revenue $7.47M" sat against the
+  // sample's $6.5M collected).
+  input(RENT_LINE_LABEL, inp.inPlaceRentAnnual, "InPlaceRent", FMT.usd, "inPlaceRentAnnual");
+  ws.getCell(r - 1, 1).alignment = { indent: 1, wrapText: true, vertical: "top" };
+  ws.getCell(r - 1, 2).alignment = { vertical: "top" };
+  ws.getCell(r - 1, 3).alignment = { vertical: "top" };
+  ws.getRow(r - 1).height = 40;
   input("Expense Recoveries (annual)", inp.expenseRecoveriesAnnual, "Recoveries", FMT.usd, "expenseRecoveriesAnnual");
   input("Other Revenue (annual)", inp.otherRevenueAnnual, "OtherRev", FMT.usd, "otherRevenueAnnual");
   input("General Vacancy & Credit Loss %", inp.vacancyPct, "VacancyPct", FMT.pct1, "vacancyPct", true);
@@ -717,12 +972,18 @@ function buildAssumptions(
   // The engine charges TI × the building's whole rentable SF in every year
   // (the Cash Flow tab's Tenant Improvements line) — so the label says so,
   // and a per-lease allowance on the space that rolls is not typed in here.
+  // Each says first what its figure is — a default of none, where the model
+  // holds none (research pass 40, M4) — then how the Cash Flow tab charges it.
+  const chargedNote = (key: "tiPsf" | "lcPct", how: string) => {
+    const s = sources[key];
+    label(ws.getCell(r - 1, 3), s ? `${sourceText(s)}. ${how}` : how, { color: s ? provColor(s.provenance) : MUTED, size: 9 });
+  };
   input("TI $/SF/yr, whole building", inp.tiPsf, "TIPSF", FMT.psf);
-  label(ws.getCell(r - 1, 3), "Charged on every SF of the building, every year — not a per-lease allowance", { color: MUTED, size: 9 });
+  chargedNote("tiPsf", "Charged on every SF of the building, every year — not a per-lease allowance");
   // The same for the commission: the Cash Flow tab charges it on the year's
   // whole rent, every year, not on the leases that roll.
   input("Leasing Commission % of all rent, every year", inp.lcPct, "LCPct", FMT.pct1);
-  label(ws.getCell(r - 1, 3), "Charged on the year's whole rent, every year — not a commission on the leases that roll", { color: MUTED, size: 9 });
+  chargedNote("lcPct", "Charged on the year's whole rent, every year — not a commission on the leases that roll");
 
   header("Fees");
   input("Asset Management Fee % of equity/yr", inp.amFeePctEquity, "AMFeePctEquity", FMT.pct2, "amFeePctEquity");
@@ -738,7 +999,8 @@ function buildAssumptions(
 
   header("Exit");
   input("Exit Cap", inp.exitCapPct, "ExitCap", FMT.pct2, "exitCapPct", true);
-  input("Sale Costs % of price", inp.saleCostPct, "SaleCostPct", FMT.pct1, "saleCostPct");
+  // Struck on the sale price, not the purchase price (research pass 40, L7).
+  input("Sale Costs % of sale price", inp.saleCostPct, "SaleCostPct", FMT.pct1, "saleCostPct");
 }
 
 // ── CASH FLOW (ANNUAL) ────────────────────────────────────────────────────────
@@ -911,43 +1173,80 @@ function buildPortfolio(ws: ExcelJS.Worksheet, p: PortfolioRead, noun: { one: st
  * was built, and the Assumptions tab stays the live model.
  */
 function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
-  [24, 12, 26, 56, 10, 12, 18, 30, 110].forEach((w, i) => {
+  // Narrow enough to print one page wide at a readable size — the tab had
+  // been some 300 characters wide, its last column 110, and printed at a
+  // few points' type — with the words wrapped inside their columns, each
+  // row given the lines its longest cell needs. It prints landscape, one
+  // page wide (printSetup).
+  const widths = [14, 9, 14, 24, 8, 11, 12, 13, 44];
+  widths.forEach((w, i) => {
     ws.getColumn(i + 1).width = w;
   });
+  const lastCol = widths.length;
+  const tabWidth = widths.reduce((s, w) => s + w, 0);
+  // Lines a text takes in a width: Excel's Arial holds about 1.15
+  // characters a column unit at 9 pt and 1.0 at 10 pt (on the safe side).
+  const linesIn = (text: string, width: number, size: number) =>
+    Math.max(1, Math.ceil(text.length / Math.max(1, Math.floor(width * (size <= 9 ? 1.15 : 1.0)))));
+  const lineHeight = (size: number) => (size <= 9 ? 12 : 13);
+  // A sentence across the tab's width, wrapped, on a row of its own.
+  const across = (row: number, text: string, opts: { color?: { argb: string }; size?: number } = {}) => {
+    const size = opts.size ?? 10;
+    ws.mergeCells(row, 1, row, lastCol);
+    label(ws.getCell(row, 1), text, { color: opts.color, size });
+    ws.getCell(row, 1).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(row).height = linesIn(text, tabWidth, size) * lineHeight(size) + 2;
+  };
+  // A cell that wraps in its column; returns the height it needs.
+  const wrapped = (cell: ExcelJS.Cell, text: string, size: number): number => {
+    cell.alignment = { ...cell.alignment, wrapText: true, vertical: "top" };
+    return linesIn(text, widths[Number(cell.col) - 1], size) * lineHeight(size) + 3;
+  };
   titleRow(ws, "Assumptions against the published figures");
   // The deal page's card's own words (lib/model-vs-market-scope): the
   // published figures for the market or the state, and the nation's — the
   // day in the card's own format ("Sep 21, 2026"), never the ISO key.
-  label(ws.getCell(2, 1), readScope(read, datedLong(read.readOn)), { color: MUTED, size: 9 });
-  label(
-    ws.getCell(3, 1),
+  across(2, readScope(read, datedLong(read.readOn)), { color: MUTED, size: 9 });
+  across(
+    3,
     `A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)} The model's figures are the Assumptions tab's as built; change them there.`,
     { color: MUTED, size: 9 },
   );
   const headers = ["Assumption", "Model", "Model source", "Published figure", "Figure", "As of", "Publisher", "Read", "What the figures say"];
   sectionHeader(ws, 5, headers[0], 1, headers.length);
   headers.forEach((h, i) => {
-    if (i === 0) return;
     const c = ws.getCell(5, i + 1);
-    c.value = h.toUpperCase();
-    c.font = { name: ARIAL, size: 10, bold: true, color: WHITE };
+    if (i > 0) {
+      c.value = h.toUpperCase();
+      c.font = { name: ARIAL, size: 10, bold: true, color: WHITE };
+    }
+    c.alignment = { wrapText: true, vertical: "bottom" };
   });
+  ws.getRow(5).height = 28;
   let r = 6;
   for (const c of read.checks) {
     const figures = c.published.length > 0 ? c.published : [null];
     figures.forEach((p, i) => {
+      // The row's height: the most lines any of its wrapped cells needs.
+      let height = lineHeight(10) + 3;
       if (i === 0) {
         label(ws.getCell(r, 1), c.title, { bold: true });
+        height = Math.max(height, wrapped(ws.getCell(r, 1), c.title, 10));
         label(ws.getCell(r, 2), c.model);
+        ws.getCell(r, 2).alignment = { vertical: "top" };
         label(ws.getCell(r, 3), c.modelSource, { color: MUTED, size: 9 });
+        height = Math.max(height, wrapped(ws.getCell(r, 3), c.modelSource, 9));
         label(ws.getCell(r, 8), c.toneLabel);
+        height = Math.max(height, wrapped(ws.getCell(r, 8), c.toneLabel, 10));
         const s = ws.getCell(r, 9);
         s.value = c.read;
         s.font = { name: ARIAL, size: 9, color: MUTED };
-        s.alignment = { wrapText: true, vertical: "top" };
+        height = Math.max(height, wrapped(s, c.read, 9));
       }
       if (p) {
-        label(ws.getCell(r, 4), `${p.label}: ${p.text}`, { size: 9 });
+        const said = `${p.label}: ${p.text}`;
+        label(ws.getCell(r, 4), said, { size: 9 });
+        height = Math.max(height, wrapped(ws.getCell(r, 4), said, 9));
         const v = ws.getCell(r, 5);
         // Raw, so it sorts and computes, and shown in its unit: a published
         // figure is a percent change or a level in percent (PublishedFigure),
@@ -955,6 +1254,7 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
         v.value = p.value;
         v.numFmt = '0.00"%"';
         v.font = { name: ARIAL, size: 10, color: INK };
+        v.alignment = { vertical: "top" };
         // A feed's observation day is a date, so the column sorts by it; a
         // research figure's period ("Q1 2026", "undated") stays as written,
         // and so does a day that does not exist, never rolled into another.
@@ -964,15 +1264,25 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
           asOf.value = new Date(day);
           asOf.numFmt = "mmm d, yyyy";
           asOf.font = { name: ARIAL, size: 9, color: INK };
-          asOf.alignment = { horizontal: "left" };
+          asOf.alignment = { horizontal: "left", vertical: "top" };
         } else {
           label(asOf, p.asOf, { size: 9 });
+          height = Math.max(height, wrapped(asOf, p.asOf, 9));
         }
         label(ws.getCell(r, 7), p.publisher, { size: 9, color: MUTED });
+        height = Math.max(height, wrapped(ws.getCell(r, 7), p.publisher, 9));
       }
+      ws.getRow(r).height = height;
       r++;
     });
     bottomBorder(ws, r - 1, 1, headers.length);
+  }
+  // The providers' own notices under their figures (lib/data-notices): an
+  // export travels with no page around it.
+  r++;
+  for (const n of documentNotices(read.checks.flatMap((c) => c.published.map((p) => p.publisher)))) {
+    across(r, n, { color: MUTED, size: 9 });
+    r++;
   }
 }
 
@@ -1125,7 +1435,16 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
 }
 
 // ── DEAL SUMMARY ────────────────────────────────────────────────────────────
-function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap, holdYears: number) {
+function buildDealSummary(
+  ws: ExcelJS.Worksheet,
+  model: DerivedModel,
+  cf: CfMap,
+  holdYears: number,
+  /** the returns the deal page withholds, and why (lib/underwrite/report-grid
+   *  `withheldWorkbookRead`): marked over their live formulas, the reason in
+   *  the band; null where they stand */
+  withheld: { line: string; cap: boolean } | null = null,
+) {
   const { meta } = model;
   ws.getColumn(1).width = 30;
   ws.getColumn(2).width = 18;
@@ -1145,14 +1464,41 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   const levcfY1 = cfAddr(cf.rows.levcf, cf.firstOpCol);
 
   // ── KPI BAND ── five headline tiles the IC reads first. Values are live
-  // formulas over the same named cells the rest of the book uses.
+  // formulas over the same named cells the rest of the book uses. A price
+  // no document stated is the model's placeholder, marked as the Project
+  // Overview marks an assumed size; a share's price grossed up to the whole
+  // is named as that whole (`meta.priceLabel`), never a price the share
+  // costs.
   let r = 3;
+  // A price backed out of an NOI of zero or less is none: the tile says so
+  // in words, live, until a price is typed (research pass 38).
+  const noPrice = model.sources.purchasePrice?.noPrice != null;
+  const priceFmt = noPrice ? FMT.usdNoPrice : FMT.usd;
+  const priceTile =
+    model.sources.purchasePrice?.provenance === "assumption"
+      ? "Purchase Price (assumed)"
+      : noPrice
+        ? "Purchase Price (none read)"
+        : (meta.priceLabel ?? "Purchase Price");
+  // Where no levered IRR solves, why, live (research pass 38, lib/underwrite/
+  // no-irr): the sale's net proceeds short of the loan, the equity's cash
+  // back nil, or no rate at all — where the tile had said "—" and the
+  // returns block "check inputs". NetSaleProceeds is the Residual block's.
+  const noIrrFormula = `IF(NetSaleProceeds<0,"${noIrrText("sale")}",IF(SUM(${levcfRange})+NetSaleProceeds<=0,"${noIrrText("nothingBack")}","${noIrrText("noRate")}"))`;
+  // Whether it solves on the model as built, so the tile has room for the
+  // words it will show.
+  const irrSolves = computeUnderwrite(model.inputs).returns.leveredIrrPct != null;
+  // A return the deal page withholds shows the word over its live formula
+  // (research pass 40, H1), the reason said in the band below — and the cap
+  // on year-1 NOI with them where the page's cap field withholds it too.
+  const retFmt = (fmt: string) => (withheld ? FMT.withheld : fmt);
+  const capFmt = (fmt: string) => (withheld?.cap ? FMT.withheld : fmt);
   const kpis: [string, string, string][] = [
-    ["Purchase Price", "PurchasePrice", FMT.usd],
-    ["Levered IRR", `IFERROR(IRR(${levRange}),"—")`, FMT.pct1],
-    ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult],
-    ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, FMT.pct1],
-    ["Year-1 DSCR", dscrY1, FMT.ratio],
+    [priceTile, "PurchasePrice", priceFmt],
+    ["Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, retFmt(FMT.pct1)],
+    ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, retFmt(FMT.mult)],
+    ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, retFmt(FMT.pct1)],
+    ["Year-1 DSCR", dscrY1, retFmt(FMT.ratio)],
   ];
   // Tiles live in columns 1,2,4,5 + one merged pair — keep it simple: five
   // tiles across columns 1..5 with the spacer col 3 carrying the middle tile.
@@ -1164,7 +1510,9 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     l.value = lab.toUpperCase();
     l.font = { name: ARIAL, size: 8, bold: true, color: MUTED };
     l.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
-    l.alignment = { horizontal: "center", vertical: "middle" };
+    // Wrapped, so a longer name ("WHOLE PRICE (49% SHARE GROSSED UP)") takes
+    // a second line inside its tile rather than being cut at its edge.
+    l.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     // Outlined as a tile pair: label carries the top edge, value the bottom.
     l.border = { top: tileEdge, left: tileEdge, right: tileEdge };
     const v = ws.getCell(r + 1, col);
@@ -1172,28 +1520,50 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     v.font = { name: ARIAL, size: 13, bold: true, color: BRAND };
     v.numFmt = fmt;
     v.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
-    v.alignment = { horizontal: "center", vertical: "middle" };
+    v.alignment = { horizontal: "center", vertical: "middle", ...(lab === "Levered IRR" ? { wrapText: true } : {}) };
     v.border = { bottom: tileEdge, left: tileEdge, right: tileEdge };
+    // The reason no IRR solves is words: smaller, so they sit in the tile —
+    // unless the tile shows the one word a withheld return shows.
+    if (lab === "Levered IRR" && !irrSolves && !withheld) v.font = { name: ARIAL, size: 9, bold: true, color: BRAND };
   });
-  ws.getRow(r).height = 14;
-  ws.getRow(r + 1).height = 24;
+  // A tile's name past what one line of its tile holds gets the second line.
+  ws.getRow(r).height = kpis.some(([lab]) => lab.length > 28) ? 24 : 14;
+  ws.getRow(r + 1).height = irrSolves || withheld ? 24 : 40;
   const dealKind = meta.strategy ?? "unknown";
   const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
-  if (planDeal) {
-    // On a plan deal the tiles are the screening model's returns, struck
-    // with the whole budget in year 1 — the deal page's own caveat, said
-    // under them before anyone quotes one.
-    const row = r + 2;
+  // What the tiles' returns rest on, said under them before anyone quotes
+  // one, a merged row a sentence: on a plan deal they are the screening
+  // model's, struck with the whole budget in year 1 (the deal page's own
+  // caveat); where the price buys a note, a share, a position, a lease or
+  // the land, what the model is and is not on it (the cover's own line,
+  // lib/interest) — the deal page and the compare table withhold a note's,
+  // a position's and such a share's returns; and on a placeholder price or
+  // an assumed year-1 NOI they are the placeholder's — the report and the
+  // deal page withhold them on that rule (lib/underwrite/report-grid); and
+  // on a building the model runs nearly vacant, or beside a finding against
+  // the returns, the page's own reason for withholding them, the cells
+  // marked over their live formulas (research pass 40, H1).
+  const bandNotes = [
+    planDeal ? PLAN_RETURNS_CAVEAT_WORKBOOK : null,
+    meta.interest?.modelCaveat ?? null,
+    placeholderWorkbookLine(model.inputs, model.sources),
+    withheld?.line ?? null,
+    // What the multiple and the year-1 return are net of, where the model
+    // spends capital in year 1 (research pass 40, M6) — not under returns
+    // the band withholds.
+    withheld ? null : yearOneCapitalLine(model.inputs.capitalImprovementsYr1),
+  ].filter((s): s is string => !!s);
+  bandNotes.forEach((text, i) => {
+    const row = r + 2 + i;
     ws.mergeCells(row, 1, row, 5);
     const c = ws.getCell(row, 1);
-    c.value = PLAN_RETURNS_CAVEAT_WORKBOOK;
+    c.value = text;
     c.font = { name: ARIAL, size: 9, color: MUTED };
     c.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(row).height = 36;
-    r += 4;
-  } else {
-    r += 3;
-  }
+    // A line of the band's width holds about 125 characters at this size.
+    ws.getRow(row).height = Math.max(36, Math.ceil(text.length / 125) * 12 + 12);
+  });
+  r += 3 + bandNotes.length;
 
   // ── PROJECT OVERVIEW ──
   sectionHeader(ws, r, "Project Overview", 1, 5); r++;
@@ -1202,7 +1572,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   label(ws.getCell(r, 1), "Building Name"); label(ws.getCell(r, 2), meta.dealName);
   label(ws.getCell(r, 4), "Asset Class"); label(ws.getCell(r, 5), meta.assetClass); r++;
   label(ws.getCell(r, 1), "Address"); label(ws.getCell(r, 2), meta.address || "—");
-  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—"); r++;
+  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—");
+  // A long market name ("Washington-Arlington-Alexandria, DC-VA-MD-WV")
+  // wraps inside its 18-wide column, the row tall enough for its lines,
+  // where it ran past the tab's last column; the row's other cells sit at
+  // its top beside the name's first line.
+  if ((meta.market || "").length > MARKET_LINE) {
+    for (const c of [1, 2, 4]) ws.getCell(r, c).alignment = { ...ws.getCell(r, c).alignment, vertical: "top" };
+    ws.getCell(r, 5).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r).height = Math.ceil(meta.market.length / MARKET_LINE) * 13;
+  }
+  r++;
   // A size the documents do not state is the count × a typical unit or a
   // placeholder (the Assumptions tab names which) — marked here as the
   // Operating Metrics tab marks it by leaving its per-SF figures out.
@@ -1235,7 +1615,14 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
         noiCell.value = meta.stabilizedNoi.value;
         styleInput(noiCell, FMT.usd);
         noiCell.alignment = { horizontal: "right" };
-        label(ws.getCell(r, 3), meta.stabilizedNoi.page ? `OM ${meta.stabilizedNoi.page}` : "OM", { color: MUTED, size: 9 });
+        // A month the OM states is credited as the month, times twelve: the
+        // OM states no such year (audit C4, M2).
+        const omAt = meta.stabilizedNoi.page ? `OM ${meta.stabilizedNoi.page}` : "OM";
+        label(
+          ws.getCell(r, 3),
+          meta.stabilizedNoi.month != null ? `${omAt}: $${Math.round(meta.stabilizedNoi.month).toLocaleString("en-US")} a month × 12` : omAt,
+          { color: MUTED, size: 9 },
+        );
       } else {
         // A blank is null, never zero: the OM stated no stabilized figure.
         label(noiCell, "not stated", { color: MUTED });
@@ -1254,17 +1641,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   sectionHeader(ws, r, "Sources", 1, 2);
   sectionHeader(ws, r, "Uses", 4, 5); r++;
   const rowStart = r;
-  const usesRow = (rr: number, lab: string, formula: string, name?: string, bold = false) => {
+  const usesRow = (rr: number, lab: string, formula: string, name?: string, bold = false, fmt: string = FMT.usd) => {
     label(ws.getCell(rr, 4), lab, { bold, indent: 1 });
     const c = ws.getCell(rr, 5);
     c.value = { formula } as ExcelJS.CellFormulaValue;
     if (name) c.name = name;
-    styleFormula(c, FMT.usd, INK, bold);
+    styleFormula(c, fmt, INK, bold);
   };
   // Uses = acquisition cost + financing. Capital improvements / TI / LC are
   // OPERATING outflows in the Cash Flow ladder, not capitalized here — folding
   // them into uses AND the ladder would double-count them.
-  usesRow(r, "Purchase Price", "PurchasePrice"); r++;
+  usesRow(r, "Purchase Price", "PurchasePrice", undefined, false, priceFmt); r++;
   usesRow(r, "DD / Closing Costs", "ClosingCostsTotal"); r++;
   usesRow(r, "Acquisition Fee", "MIN(AcqFeePct*PurchasePrice,AcqFeeCap)", "AcqFee"); r++;
   usesRow(r, "Loan Basis (acquisition cost)", `SUM(${cellA1(rowStart, 5)}:${cellA1(r - 1, 5)})`, "LoanBasis"); r++;
@@ -1340,15 +1727,46 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   resRow("Net Sale Proceeds", "GrossSale-SaleCosts-OutstandingDebt", FMT.usd, "NetSaleProceeds", false, true);
 
   let rr = resTop;
+  // A label longer than its 30-wide column holds on one line (about 34
+  // characters at 10 pt in Excel) wraps onto a second line rather than
+  // being cut — the plan's yield on cost says what it divides by, which is
+  // why it reads under the other documents' — and the row's cells in both
+  // blocks sit at its top, beside the label's first line.
+  const fitLabel = (row: number, lab: string) => {
+    if (lab.length <= 34) return;
+    for (const c of [1, 2, 4, 5]) {
+      const cell = ws.getCell(row, c);
+      cell.alignment = { ...cell.alignment, vertical: "top", ...(c === 4 ? { wrapText: true } : {}) };
+    }
+    // Two lines of the 30-wide column hold about 56 characters; a longer
+    // label gets the third.
+    ws.getRow(row).height = Math.max(26, Math.ceil(lab.length / 28) * 13);
+  };
   const ret = (lab: string, formula: string, fmt: string, name?: string) => {
     label(ws.getCell(rr, 4), lab, { indent: 1 });
     const c = ws.getCell(rr, 5);
     c.value = { formula } as ExcelJS.CellFormulaValue;
     if (name) c.name = name;
     styleFormula(c, fmt);
+    fitLabel(rr, lab);
     rr++;
   };
-  if (planDeal) {
+  // Where the price did not buy the building (lib/deal-strategy
+  // `buildingPriceOf` answers none), no building's cap or yield is struck on
+  // it: the cell says so in the compare table's words ("n/a — note"). No
+  // formula reads these cells, so none is left pointing at nothing.
+  const basisWithheld = meta.interest?.basisWithheld ?? null;
+  const withheldRet = (lab: string) => {
+    label(ws.getCell(rr, 4), lab, { indent: 1 });
+    label(ws.getCell(rr, 5), `n/a — ${basisWithheld!.word}`, { color: MUTED });
+    ws.getCell(rr, 5).alignment = { horizontal: "right" };
+    fitLabel(rr, lab);
+    rr++;
+  };
+  if (planDeal && basisWithheld) {
+    withheldRet("Cap on Yr-1 Income (as modelled)");
+    withheldRet("Yield on Cost (OM stabilized NOI / uses + capital plan)");
+  } else if (planDeal) {
     // A plan deal has no going-in cap: year-1 income here is in-place or
     // assumed, so the cell says what it is. The yield the plan is judged on
     // is the OM's stabilized NOI over total cost — never year-1 NOI over
@@ -1356,23 +1774,55 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     // (price, closing, fees) plus the capital plan, so it reads a little
     // under the deal page's, the memo's and the report's, which divide by
     // the price plus the budget; the label says which.
-    ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // No cap on a price of zero or less, which is none (research pass 38);
+    // marked withheld on a building run nearly vacant, as the page's cap.
+    ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, capFmt(FMT.pct2));
     ret(
       "Yield on Cost (OM stabilized NOI / uses + capital plan)",
       `IF(OR(NOT(ISNUMBER(StabilizedNOI)),TotalCost=0),"n/a",StabilizedNOI/TotalCost)`,
       FMT.pct2,
       "YieldOnCost",
     );
+  } else if (basisWithheld && meta.interest?.kind !== "leased_fee") {
+    // Withheld where the deal header's cap slot is (lib/compare-interest
+    // `capSlotWithheld`: a note, a position, a share beside its entity's
+    // loan), and on a share of no stated percentage, whose price is no
+    // building's and whose cap the deal page's playground withholds too.
+    withheldRet("Going-In Cap (Yr-1 NOI / Price)");
+    withheldRet(YEAR1_YIELD_LABEL);
   } else {
     // The model's year-1 NOI over the price — not the OM's stated cap, which
-    // the deal's header and cards print; the label says which it is.
-    ret("Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
-    ret("Stabilized Yield (on cost)", `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
+    // the deal's header and cards print; the label says which it is. On a
+    // leased fee the price is the land's, and the cap stands as the deal
+    // header and the playground print it, labelled so (the second audit,
+    // MED-5: the workbook had said "n/a — leased fee" beside the page's
+    // 4.00%); what a leased fee's cap means is the owner's.
+    const onLand = basisWithheld != null && meta.interest?.kind === "leased_fee";
+    // No cap or yield on a price or uses of zero or less, which are none: an
+    // NOI under zero over the quotient it backed out read as the stated cap
+    // (research pass 38). Marked withheld on a building run nearly vacant,
+    // as the page's cap field is (research pass 40).
+    ret(onLand ? "Going-In Cap on the Land's Price (Yr-1 NOI / Price)" : "Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, capFmt(FMT.pct2));
+    // Year-1 NOI over the total uses — no stabilized figure, so never called
+    // one (it read "Stabilized Yield (on cost)").
+    ret(onLand ? YEAR1_YIELD_LAND_LABEL : YEAR1_YIELD_LABEL, `IF(TotalUses<=0,"n/a",${noiY1}/TotalUses)`, capFmt(FMT.pct2));
   }
-  ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
-  ret("Levered IRR", `IFERROR(IRR(${levRange}),"check inputs")`, FMT.pct1, "LeveredIRR");
-  ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, FMT.mult);
-  ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult, "LeveredEM");
+  // The returns the tiles show, marked as the tiles are where the page
+  // withholds them (research pass 40, H1). The unlevered pair runs on the
+  // property's cash flow before debt, and the asset management fee — charged
+  // on the equity — rides only in the levered flows: the labels say so
+  // (research pass 40, L3).
+  ret(UNLEVERED_IRR_LABEL, `IFERROR(IRR(${unlevRange}),"check inputs")`, retFmt(FMT.pct1));
+  ret("Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, retFmt(FMT.pct1), "LeveredIRR");
+  // Its words wrap in their column, the row tall enough for them, where no
+  // IRR solves on the model as built.
+  if (!irrSolves && !withheld) {
+    const c = ws.getCell(rr - 1, 5);
+    c.alignment = { ...c.alignment, wrapText: true, vertical: "top" };
+    ws.getRow(rr - 1).height = 38;
+  }
+  ret(UNLEVERED_EM_LABEL, `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, retFmt(FMT.mult));
+  ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, retFmt(FMT.mult), "LeveredEM");
   r = Math.max(r, rr) + 1;
 
   label(ws.getCell(r, 1), "Sensitivity matrices live on the Sensitivity tab; monthly detail and the amortization table on their own tabs.", { color: MUTED, size: 9 });
@@ -1481,9 +1931,17 @@ function buildMonthlyCashFlow(ws: ExcelJS.Worksheet, cf: CfMap, inp: UnderwriteI
  * fixed payment splits into interest + principal off the running balance. The
  * exit-month balance ties to the Deal Summary's closed-form Outstanding Debt
  * (CheckDebtTie) — same math, iterated vs closed form.
+ *
+ * The annual rollup sits ABOVE the monthly table. The table's header row is
+ * repeated at the top of every printed page and frozen on screen, so a block
+ * after the table printed and scrolled under a header that was not its own
+ * ("Month · Op Year · Beginning Balance" over "Op Year · Payments") —
+ * research pass 35. Returns that header's row, which the caller repeats in
+ * print.
  */
-function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
+function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs): number {
   const holdMonths = Math.max(1, inp.holdMonths);
+  const years = Math.ceil(holdMonths / 12);
   ws.getColumn(1).width = 10;
   ws.getColumn(2).width = 10;
   for (let c = 3; c <= 7; c++) ws.getColumn(c).width = 16;
@@ -1491,7 +1949,47 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
   titleRow(ws, "Debt Schedule");
   label(ws.getCell(1, 3), "exact monthly amortization — exit payoff ties to Deal Summary", { color: MUTED, size: 9 });
 
-  const headRow = 3;
+  // Where each block sits: the rollup's section header and its column
+  // labels, a row a year, a blank row, then the monthly table's header and
+  // its months.
+  const rollupHead = 3;
+  const rollupFirst = rollupHead + 2;
+  const headRow = rollupFirst + years + 1;
+  const first = headRow + 1;
+  const lastRow = first + holdMonths - 1;
+  // Frozen at the monthly header, which stays in view over the months.
+  ws.views = [{ state: "frozen", xSplit: 0, ySplit: headRow, showGridLines: false }];
+
+  // Annual rollup: interest / principal / total by operating year.
+  sectionHeader(ws, rollupHead, "Annual Rollup", 1, 7);
+  ["Op Year", "", "", "Payments", "Interest", "Principal", "Year-End Balance"].forEach((h, i) => {
+    if (!h) return;
+    const c = ws.getCell(rollupHead + 1, 1 + i);
+    c.value = h;
+    c.font = { name: ARIAL, size: 9, bold: true, color: MUTED };
+    c.alignment = { horizontal: i === 0 ? "center" : "right" };
+  });
+  for (let y = 1; y <= years; y++) {
+    const r = rollupFirst + y - 1;
+    const from = first + (y - 1) * 12;
+    const to = Math.min(first + y * 12 - 1, lastRow);
+    const yc = ws.getCell(r, 1);
+    yc.value = y;
+    yc.font = { name: ARIAL, size: 9, color: MUTED };
+    yc.alignment = { horizontal: "center" };
+    const put = (col: number, formula: string) => {
+      const c = ws.getCell(r, col);
+      c.value = { formula } as ExcelJS.CellFormulaValue;
+      styleFormula(c, FMT.usd);
+      c.font = { ...c.font, size: 9 };
+    };
+    put(4, `SUM(${cellA1(from, 4)}:${cellA1(to, 4)})`);
+    put(5, `SUM(${cellA1(from, 5)}:${cellA1(to, 5)})`);
+    put(6, `SUM(${cellA1(from, 6)}:${cellA1(to, 6)})`);
+    put(7, cellA1(to, 7));
+  }
+  bottomBorder(ws, rollupFirst + years - 1, 1, 7);
+
   const heads = ["Month", "Op Year", "Beginning Balance", "Payment", "Interest", "Principal", "Ending Balance"];
   heads.forEach((h, i) => {
     const c = ws.getCell(headRow, 1 + i);
@@ -1501,7 +1999,6 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
     c.alignment = { horizontal: i < 2 ? "center" : "right" };
   });
 
-  const first = headRow + 1;
   for (let m = 1; m <= holdMonths; m++) {
     const r = first + m - 1;
     const y = Math.ceil(m / 12);
@@ -1528,7 +2025,6 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
     put(7, `MAX(0,${cellA1(r, 3)}-${cellA1(r, 6)})`);
     if (m % 12 === 0) bottomBorder(ws, r, 1, 7);
   }
-  const lastRow = first + holdMonths - 1;
 
   // Tie check: iterated ending balance == the closed-form Outstanding Debt.
   const tieRow = lastRow + 2;
@@ -1545,39 +2041,7 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
       { type: "cellIs", operator: "equal", priority: 2, formulae: ["TRUE"], style: { font: { color: { argb: "FF1B7A5E" }, bold: true } } },
     ],
   });
-
-  // Annual rollup: interest / principal / total by operating year.
-  let r = tieRow + 2;
-  sectionHeader(ws, r, "Annual Rollup", 1, 7);
-  r++;
-  ["Op Year", "", "", "Payments", "Interest", "Principal", "Year-End Balance"].forEach((h, i) => {
-    if (!h) return;
-    const c = ws.getCell(r, 1 + i);
-    c.value = h;
-    c.font = { name: ARIAL, size: 9, bold: true, color: MUTED };
-    c.alignment = { horizontal: i === 0 ? "center" : "right" };
-  });
-  r++;
-  const years = Math.ceil(holdMonths / 12);
-  for (let y = 1; y <= years; y++) {
-    const from = first + (y - 1) * 12;
-    const to = Math.min(first + y * 12 - 1, lastRow);
-    const yc = ws.getCell(r, 1);
-    yc.value = y;
-    yc.font = { name: ARIAL, size: 9, color: MUTED };
-    yc.alignment = { horizontal: "center" };
-    const put = (col: number, formula: string) => {
-      const c = ws.getCell(r, col);
-      c.value = { formula } as ExcelJS.CellFormulaValue;
-      styleFormula(c, FMT.usd);
-      c.font = { ...c.font, size: 9 };
-    };
-    put(4, `SUM(${cellA1(from, 4)}:${cellA1(to, 4)})`);
-    put(5, `SUM(${cellA1(from, 5)}:${cellA1(to, 5)})`);
-    put(6, `SUM(${cellA1(from, 6)}:${cellA1(to, 6)})`);
-    put(7, cellA1(to, 7));
-    r++;
-  }
+  return headRow;
 }
 
 // ── SENSITIVITY ───────────────────────────────────────────────────────────────
@@ -1617,7 +2081,9 @@ function buildOperatingMetrics(
   model: DerivedModel,
   holdYears: number,
 ) {
-  ws.getColumn(1).width = 34;
+  // Wide enough for "Year-1 Potential Gross Revenue / Unit / Month" and
+  // "All-in Basis / Unit (price + capital plan)" beside their figures.
+  ws.getColumn(1).width = 46;
   const firstCol = 2;
   const lastCol = firstCol + holdYears - 1;
   for (let c = firstCol; c <= lastCol; c++) ws.getColumn(c).width = 13;
@@ -1646,25 +2112,51 @@ function buildOperatingMetrics(
   bottomBorder(ws, r, 1, lastCol);
   r++;
 
+  // A building the model runs 90% vacant or more: its potential gross
+  // revenue is a sliver of income grossed up, so a breakeven occupancy
+  // struck against it is no figure (research pass 38 — 0.8% on a vacant
+  // building): the row is left out with a sentence. Elsewhere a breakeven
+  // over 100% is said rather than printed — the year's expenses and debt
+  // service are more than the building collects full — and the formula
+  // stays live.
+  const vacancyPct = Math.round(model.inputs.vacancyPct * 100);
+  const breakevenLeftOut = model.inputs.vacancyPct >= 0.9;
+  // Where the expense ratio is the class's screening default, not a T-12's
+  // load, the operating expenses and the potential gross revenue are the
+  // year-1 NOI grossed up through it and the vacancy (lib/underwrite/inputs):
+  // the expense ratio, the NOI margin and the breakeven struck on them would
+  // only restate the default, so they are left out with a sentence, as the
+  // per-SF yardsticks are on an assumed area (research pass 40, M2). The
+  // ratios that read the NOI and the debt alone stay.
+  const defaultRatio = model.meta.defaultExpenseRatio ?? null;
+  const breakeven = (y: number) => `(-${at("opex", y)}-${at("debt", y)})/${at("pgr", y)}`;
   const ratioRows: [string, (y: number) => string, string][] = [
-    [
-      "Expense Ratio (OpEx / EGR)",
-      (y) => `IF(${at("egr", y)}=0,"n/a",-${at("opex", y)}/${at("egr", y)})`,
-      FMT.pct1,
-    ],
-    [
-      "NOI Margin",
-      (y) => `IF(${at("egr", y)}=0,"n/a",${at("noi", y)}/${at("egr", y)})`,
-      FMT.pct1,
-    ],
+    ...(defaultRatio
+      ? []
+      : ([
+          [
+            "Expense Ratio (OpEx / EGR)",
+            (y: number) => `IF(${at("egr", y)}=0,"n/a",-${at("opex", y)}/${at("egr", y)})`,
+            FMT.pct1,
+          ],
+          [
+            "NOI Margin",
+            (y: number) => `IF(${at("egr", y)}=0,"n/a",${at("noi", y)}/${at("egr", y)})`,
+            FMT.pct1,
+          ],
+        ] as [string, (y: number) => string, string][])),
     ["DSCR (NOI)", (y) => `${at("dscr", y)}`, FMT.ratio],
     ["Debt Yield", (y) => `${at("debtyield", y)}`, FMT.pct1],
-    [
-      "Breakeven Occupancy",
-      (y) =>
-        `IF(${at("pgr", y)}=0,"n/a",(-${at("opex", y)}-${at("debt", y)})/${at("pgr", y)})`,
-      FMT.pct1,
-    ],
+    ...(breakevenLeftOut || defaultRatio
+      ? []
+      : ([
+          [
+            "Breakeven Occupancy",
+            (y: number) =>
+              `IF(${at("pgr", y)}=0,"n/a",IF(${breakeven(y)}>1,"not reached at full occupancy",${breakeven(y)}))`,
+            FMT.pct1,
+          ],
+        ] as [string, (y: number) => string, string][])),
     [
       "Cash-on-Cash (levered)",
       (y) => `IF(Equity=0,"n/a",${at("levcf", y)}/Equity)`,
@@ -1686,20 +2178,48 @@ function buildOperatingMetrics(
       const cell = ws.getCell(r, firstCol + y);
       cell.value = { formula: f(y) } as ExcelJS.CellFormulaValue;
       styleFormula(cell, fmt);
-      cell.alignment = { horizontal: "right" };
+      // A breakeven past full occupancy is said in words, which wrap inside
+      // the year's column rather than run under the next year's figure.
+      cell.alignment = lab === "Breakeven Occupancy" ? { horizontal: "right", wrapText: true } : { horizontal: "right" };
     }
     r++;
   });
   bottomBorder(ws, r - 1, 1, lastCol);
   r++;
-  label(
-    ws.getCell(r, 1),
+  // Why rows read off a default ratio are left out, in one sentence a block.
+  const defaultRatioNote = (rows: string, these: string) =>
+    `${rows} left out: the expense ratio is the ${defaultRatio!.classWord} default (${Math.round(defaultRatio!.ratio * 100)}% of EGI), not a T-12's, so the operating expenses and the potential gross revenue are the year-1 NOI grossed up through it and the vacancy, and ${these} would be struck on that default, not on the building's own figures.`;
+  if (breakevenLeftOut) {
+    label(
+      ws.getCell(r, 1),
+      `Breakeven Occupancy left out: the model runs the building ${vacancyPct}% vacant, so its Potential Gross Revenue is its year-1 income grossed up from ${100 - vacancyPct}% occupancy, and a breakeven occupancy struck against it is no figure to screen on.`,
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
+  if (defaultRatio) {
+    label(
+      ws.getCell(r, 1),
+      breakevenLeftOut
+        ? defaultRatioNote("Expense Ratio and NOI Margin", "the two")
+        : defaultRatioNote("Expense Ratio, NOI Margin and Breakeven Occupancy", "the three"),
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
+  if (!breakevenLeftOut && !defaultRatio) {
     // What the formula covers, said: the row leaves reserves, capital and
-    // the asset management fee out, so it is not where cash flow crosses zero.
-    "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
-    { color: MUTED, size: 9 },
-  );
-  r += 2;
+    // the asset management fee out, so it is not where cash flow crosses
+    // zero — and where they are more than the building collects full, the
+    // row says so.
+    label(
+      ws.getCell(r, 1),
+      "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
+  r++;
 
   sectionHeader(ws, r, "Per-unit & per-SF yardsticks — year 1", 1, lastCol);
   r++;
@@ -1721,13 +2241,49 @@ function buildOperatingMetrics(
     r++;
   };
 
-  const units = model.meta.units;
+  // A bulk condominium purchase's yardsticks are a unit it buys: the units
+  // offered, never the condominium's whole count (research pass 38).
+  const offered = model.meta.unitsOffered ?? null;
+  const units = offered ?? model.meta.units;
   // The per-unit rows in the class's own noun (lib/asset-words): "Price /
   // Key" on a hotel, "Price / Pad" on a park. The named range stays
   // UnitsCount, so every formula reads the same cell whatever it is called.
   const capWord = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
   const nounOne = capWord(model.meta.unitNoun?.one ?? "unit");
-  const nounMany = capWord(model.meta.unitNoun?.many ?? "units");
+  const nounMany = offered != null ? `${capWord(model.meta.unitNoun?.many ?? "units")} offered` : capWord(model.meta.unitNoun?.many ?? "units");
+  // A development priced at its land: its price is the land's, and a figure
+  // struck on it is the land's cost a planned unit, never a price a unit
+  // (research pass 38).
+  const priceWord = model.meta.priceIsLand ? "Land cost" : "Price";
+  const plusPlan = model.meta.priceIsLand ? "land + capital plan" : "price + capital plan";
+  // Where the price did not buy the building (lib/deal-strategy
+  // `buildingPriceOf` answers none), no building basis is struck on it: the
+  // price and all-in rows are left out with the reason, and the rows that
+  // divide the building's own income stay. No formula reads them.
+  const basisWithheld = model.meta.interest?.basisWithheld ?? null;
+  const basisNote = (rows: string) => {
+    label(ws.getCell(r, 1), `${rows} left out: ${basisWithheld!.why}, so no building basis is struck on it.`, { color: MUTED, size: 9 });
+    r++;
+  };
+  // Where no price was read, the Purchase Price is the site's placeholder,
+  // and a basis struck on it is the placeholder's ("Price / Unit $35,714"
+  // for 280 apartments, beside a memorandum's own $185,000 a unit —
+  // research pass 38): left out with the reason, as the per-SF block is on
+  // an assumed area.
+  const pricePlaceholder = model.sources.purchasePrice?.provenance === "assumption";
+  // And where the price was backed out of an NOI of zero or less over the
+  // stated cap, it is none, and no basis is struck on it (research pass 38).
+  const noPrice = model.sources.purchasePrice?.noPrice ?? null;
+  const placeholderNote = (rows: string) => {
+    label(
+      ws.getCell(r, 1),
+      noPrice
+        ? `${rows} left out: no price was read from the memorandum, and its ${noPrice.label} is not a year's income to price on, so the Purchase Price is no price and no basis is struck on it.`
+        : `${rows} left out: no price was read from the memorandum, so the Purchase Price is a placeholder and a basis struck on it would be the placeholder's.`,
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  };
   let zebra = false;
   if (units && units > 0) {
     label(ws.getCell(r, 1), nounMany);
@@ -1738,29 +2294,43 @@ function buildOperatingMetrics(
     styleInput(u, FMT.int);
     u.alignment = { horizontal: "right" };
     r++;
-    twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
-    // What a finished unit costs all-in — the basis a comp is held against
-    // on a plan deal; on a stabilized asset with no capital plan it equals
-    // the price per unit. Live: it moves with the capital plan input.
-    twoCol(
-      `All-in Basis / ${nounOne} (price + capital plan)`,
-      "(PurchasePrice+CapImprovements)/UnitsCount",
-      FMT.usd,
-      (zebra = !zebra),
-    );
-    twoCol(
-      `Year-1 Rent / ${nounOne} / Month`,
-      `${at("rent", 0)}/UnitsCount/12`,
-      FMT.usd,
-      (zebra = !zebra),
-    );
+    if (basisWithheld) {
+      basisNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
+    } else if (pricePlaceholder || noPrice) {
+      placeholderNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
+    } else {
+      twoCol(`${priceWord} / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
+      // What a finished unit costs all-in — the basis a comp is held against
+      // on a plan deal; on a stabilized asset with no capital plan it equals
+      // the price per unit. Live: it moves with the capital plan input.
+      twoCol(
+        `All-in Basis / ${nounOne} (${plusPlan})`,
+        "(PurchasePrice+CapImprovements)/UnitsCount",
+        FMT.usd,
+        (zebra = !zebra),
+      );
+    }
+    // The rent line is the Assumptions tab's potential gross revenue, the
+    // year-1 NOI grossed up (research pass 40, M2), and is named so; where
+    // the expense ratio is the class's default it and the opex are left out
+    // (below), and the NOI, the anchor, stays.
+    if (!defaultRatio) {
+      twoCol(
+        `Year-1 Potential Gross Revenue / ${nounOne} / Month`,
+        `${at("rent", 0)}/UnitsCount/12`,
+        FMT.usd,
+        (zebra = !zebra),
+      );
+    }
     twoCol(`Year-1 NOI / ${nounOne}`, `${at("noi", 0)}/UnitsCount`, FMT.usd, (zebra = !zebra));
-    twoCol(
-      `Year-1 OpEx / ${nounOne}`,
-      `-${at("opex", 0)}/UnitsCount`,
-      FMT.usd,
-      (zebra = !zebra),
-    );
+    if (!defaultRatio) {
+      twoCol(
+        `Year-1 OpEx / ${nounOne}`,
+        `-${at("opex", 0)}/UnitsCount`,
+        FMT.usd,
+        (zebra = !zebra),
+      );
+    }
   } else {
     label(
       ws.getCell(r, 1),
@@ -1774,26 +2344,46 @@ function buildOperatingMetrics(
   // the yardsticks are omitted with a stated reason, never printed as if
   // "$680/SF" were the deal's figure.
   if (model.sources.rsf?.provenance !== "assumption") {
-    twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
-    twoCol(
-      "All-in Basis / SF (price + capital plan)",
-      "(PurchasePrice+CapImprovements)/RSF",
-      FMT.psf,
-      (zebra = !zebra),
-    );
+    if (basisWithheld) {
+      basisNote("Price / SF and All-in Basis / SF");
+    } else if (pricePlaceholder || noPrice) {
+      placeholderNote("Price / SF and All-in Basis / SF");
+    } else {
+      twoCol(`${priceWord} / SF`, "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
+      twoCol(
+        `All-in Basis / SF (${plusPlan})`,
+        "(PurchasePrice+CapImprovements)/RSF",
+        FMT.psf,
+        (zebra = !zebra),
+      );
+    }
     twoCol("Year-1 NOI / SF", `${at("noi", 0)}/RSF`, FMT.psf, (zebra = !zebra));
-    twoCol(
-      "Year-1 Rent / SF / Year",
-      `${at("rent", 0)}/RSF`,
-      FMT.psf,
-      (zebra = !zebra),
-    );
+    if (!defaultRatio) {
+      twoCol(
+        "Year-1 Potential Gross Revenue / SF / Year",
+        `${at("rent", 0)}/RSF`,
+        FMT.psf,
+        (zebra = !zebra),
+      );
+    }
   } else {
     label(
       ws.getCell(r, 1),
       "Building size not stated in the OM or rent roll — per-SF yardsticks omitted rather than guessed (enter RSF on Assumptions to add them).",
       { color: MUTED, size: 9 },
     );
+    r++;
+  }
+  // The rows a default ratio leaves out of this block, said once.
+  const leftOut = defaultRatio
+    ? [
+        ...(units && units > 0 ? [`Potential Gross Revenue / ${nounOne} / Month`, `OpEx / ${nounOne}`] : []),
+        ...(model.sources.rsf?.provenance !== "assumption" ? ["Potential Gross Revenue / SF / Year"] : []),
+      ]
+    : [];
+  if (leftOut.length > 0) {
+    const rows = leftOut.length === 1 ? leftOut[0] : `${leftOut.slice(0, -1).join(", ")} and ${leftOut[leftOut.length - 1]}`;
+    label(ws.getCell(r, 1), defaultRatioNote(`Year-1 ${rows}`, leftOut.length === 1 ? "it" : "they"), { color: MUTED, size: 9 });
     r++;
   }
   bottomBorder(ws, r - 1, 1, 2);
@@ -1823,13 +2413,20 @@ function buildSensitivity(
   wsSens: ExcelJS.Worksheet,
   eng: ExcelJS.Worksheet,
   inp: UnderwriteInputs,
+  /** the price was backed out of an NOI of zero or less, and is none: the
+   *  price axis says so in words, live, until a price is typed */
+  noPrice = false,
+  /** the deal page withholds the returns (lib/underwrite/report-grid
+   *  `withheldWorkbookRead`): one line under the tab's own says so, the
+   *  Deal Summary's band says why, and every cell stays live */
+  withheld = false,
 ) {
   const inc = defaultIncrements(inp);
   const steps = [-2, -1, 0, 1, 2];
   const AXES = {
     cap: { name: "ExitCap", step: inc.capStep, min: 0.0025, fmt: FMT.pct2 },
     hold: { name: "HoldMonths", step: inc.monthsStep, min: 12, fmt: FMT.int },
-    price: { name: "PurchasePrice", step: inc.priceStep, min: 0, fmt: FMT.usd },
+    price: { name: "PurchasePrice", step: inc.priceStep, min: 0, fmt: noPrice ? FMT.usdNoPrice : FMT.usd },
     ltc: { name: "LTC", step: inc.ltcStep, min: 0, fmt: FMT.pct2 },
     rate: { name: "AllInRate", step: inc.rateStep, min: 0.0025, fmt: FMT.pct2 },
   } satisfies Record<string, SensAxisDef>;
@@ -1948,9 +2545,21 @@ function buildSensitivity(
   let r = 2;
   label(
     wsSens.getCell(r, 1),
+    // "centred", the spelling of the "Centre row/column" line under the
+    // grids: one tab, one spelling.
     "Live — every cell is a full re-run of the model, its axes centred on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
     { color: MUTED, size: 9 },
   );
+  // On the row the tab leaves blank, so nothing below it moves: where the
+  // deal page withholds these returns, the grids are the same model's, and
+  // the Deal Summary's band says why (research pass 40, H1).
+  if (withheld) {
+    label(
+      wsSens.getCell(r + 1, 1),
+      "The deal page withholds this model's returns and the full report leaves its grids out — the Deal Summary says why.",
+      { color: MUTED, size: 9 },
+    );
+  }
   r += 2;
 
   const IRR_COLS = { from: 2, to: 6 }; // B..F
@@ -2001,12 +2610,14 @@ function buildSensitivity(
         const { irr, em } = cells[ri][ci];
         const ic = wsSens.getCell(r, IRR_COLS.from + ci);
         ic.value = { formula: `IF(${irr}="","",${irr})` } as ExcelJS.CellFormulaValue;
-        ic.numFmt = FMT.pct1;
+        // A return the deal page withholds shows the word over its live
+        // formula, as the Deal Summary's do (audit C4, L1).
+        ic.numFmt = withheld ? FMT.withheld : FMT.pct1;
         ic.alignment = { horizontal: "center" };
         ic.font = { name: ARIAL, size: 9, bold: ri === 2 && ci === 2, color: INK };
         const ec = wsSens.getCell(r, EM_COLS.from + ci);
         ec.value = { formula: `IF(${em}="","",${em})` } as ExcelJS.CellFormulaValue;
-        ec.numFmt = FMT.mult;
+        ec.numFmt = withheld ? FMT.withheld : FMT.mult;
         ec.alignment = { horizontal: "center" };
         ec.font = { name: ARIAL, size: 9, bold: ri === 2 && ci === 2, color: INK };
       });
@@ -2016,7 +2627,8 @@ function buildSensitivity(
 
     // Color scales: red → white → green, low to high (higher is better for
     // both IRR and EM). Excel renders these; recalc engines just ignore them.
-    for (const cols of [IRR_COLS, EM_COLS]) {
+    // None over withheld returns: a shade ranks the figures the word hides.
+    for (const cols of withheld ? [] : [IRR_COLS, EM_COLS]) {
       wsSens.addConditionalFormatting({
         ref: `${cellA1(bodyTop, cols.from)}:${cellA1(bodyBottom, cols.to)}`,
         rules: [
@@ -2031,7 +2643,7 @@ function buildSensitivity(
     }
     r += 2;
   }
-  label(wsSens.getCell(r, 1), "Center row/column = the model's base case. Bold cell = base scenario.", { color: MUTED, size: 9 });
+  label(wsSens.getCell(r, 1), "Centre row/column = the model's base case. Bold cell = base scenario.", { color: MUTED, size: 9 });
   // The centre follows the input; the step does not. Said, so a price typed
   // into the file is not expected to rescale the price step.
   const bps = (d: number) => `${Math.round(d * 10_000)} bps`;

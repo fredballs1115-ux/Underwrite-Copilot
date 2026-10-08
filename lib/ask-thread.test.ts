@@ -83,6 +83,8 @@ import { AskPanel } from "@/app/(app)/deals/[id]/ask-panel";
 import { OM_REPLACED, memorandumReplacedSince, parseDealQa, type AskEntry } from "./deals";
 import { omFingerprint } from "./om-fingerprint";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { ASK_QUESTION_CAP } from "./ask-cap";
+import { readFileSync } from "node:fs";
 
 const ask = (question: string) => {
   const fd = new FormData();
@@ -209,12 +211,13 @@ describe("askDeal — what Ask is told about the deal, as the screen's steps are
     take: "An office-to-residential conversion — check the construction budget before the price.",
   };
   const ADDRESS = "1400 Market St, Philadelphia, PA 19102";
-  const flags = (label: string, status = "ok") => ({
+  const flags = (label: string, status = "ok", pointIsBuilding = true) => ({
     status,
     subject: { lat: 39.95, lng: -75.16, label },
     tractGeoid: null,
     opportunityZone: null,
     flood: { zone: "AE", subtype: null, isHighRisk: true },
+    pointIsBuilding,
     retrievedAt: "2026-10-01T00:00:00.000Z",
     note: "",
   });
@@ -232,7 +235,12 @@ describe("askDeal — what Ask is told about the deal, as the screen's steps are
   it("carries FEMA's zone where the lookup answered for the address the deal has now", async () => {
     db.deal = { ...db.deal, extraction, first_signal: null, site_flags: flags(ADDRESS), address: { label: ADDRESS } };
     await ask("Is it in a flood zone?");
-    expect(db.context).toContain("FEMA's flood map puts the building in Zone AE, a Special Flood Hazard Area");
+    expect(db.context).toContain("FEMA's flood map puts the building's point in Zone AE, a Special Flood Hazard Area");
+    // A lookup made at a point placed only to the street is the address's
+    // point, as the flood view says it (the audit's L10).
+    db.deal = { ...db.deal, site_flags: flags(ADDRESS, "ok", false) };
+    await ask("Is it in a flood zone?");
+    expect(db.context).toContain("FEMA's flood map puts the point the address was placed at in Zone AE");
     // A lookup made for the address before an edit is the old building's,
     // and one still pending has said nothing: neither is read.
     for (const stale of [flags("500 Elm St, Philadelphia, PA 19103"), flags(ADDRESS, "pending")]) {
@@ -328,6 +336,13 @@ describe("AskPanel — page chips open the OM only for the memorandum the deal h
     expect(html).toMatch(/<span[^>]*title="the cover"[^>]*>p\. 3<\/span>/);
   });
 
+  it("says the questions asked of the memorandum it holds now, against the cap, before the cap refuses one (research pass 42)", () => {
+    // the earlier memorandum's answer counts toward that deck's cap, not this one's
+    expect(visibleText(html)).toContain("1 of 25 questions asked of this memorandum");
+    expect(ASK_QUESTION_CAP).toBe(25);
+    expect(readFileSync("app/(app)/deals/[id]/ask-actions.ts", "utf8")).toContain("const MAX_QUESTIONS = ASK_QUESTION_CAP;");
+  });
+
   it("promises no answer time: nothing measures one", () => {
     expect(visibleText(html)).toMatch(/Answers cite the OM’s pages\./);
     expect(visibleText(html)).not.toMatch(/second|minute/);
@@ -338,6 +353,21 @@ describe("AskPanel — page chips open the OM only for the memorandum the deal h
       React.createElement(AskPanel, { dealId: DEAL, qa, hasOm: false, isSample: false, isPro: true, omUrl: null }),
     );
     expect(bare).not.toMatch(/#page=/);
+  });
+});
+
+describe("AskPanel — on the sample deal, said with the plan it needs (research pass 32)", () => {
+  const sample = (isPro: boolean) =>
+    visibleText(
+      renderToStaticMarkup(
+        React.createElement(AskPanel, { dealId: DEAL, qa: [], hasOm: false, isSample: true, isPro, omUrl: null }),
+      ),
+    );
+
+  it("tells a free reader Ask is Pro on a real deal, never to ask away", () => {
+    expect(sample(false)).toContain("On Pro, you can put questions to a real deal's memorandum.");
+    expect(sample(false)).not.toMatch(/ask away/);
+    expect(sample(true)).toContain("upload a real deal and ask away");
   });
 });
 

@@ -1,6 +1,7 @@
 import "server-only";
+import { compactUsd } from "@/lib/money";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
@@ -10,18 +11,27 @@ import {
   assessPlausibility,
   findPricedMetric,
   inferStrategy,
+  isForwardPurchase,
+  isOutdoorStorageYard,
   isPlanDeal,
   planSummary,
+  planWithBasisChecked,
   plausibilityNote,
+  unitCountFromMetrics,
   type DealStrategy,
 } from "@/lib/deal-strategy";
-import { foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
-import { interestOf } from "@/lib/interest";
+import { buildingSfFromMetrics, buyBoxCoverage, foldBuyBoxChecks, parsePrice, priceRange, priceRefusal, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { checkedSentence } from "@/lib/fit-label";
+import type { MandateScore } from "@/lib/mandate";
+import { entityLoanWords, interestOf, isGpStake, isMasterLeasehold, isTenancyInCommon, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
+import { condoUnitsOffered } from "@/lib/condo-units";
 import { assetWords } from "@/lib/asset-words";
+import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
+import { regionClause } from "@/lib/live-market-brief";
 import type {
   ExtractionResult,
   FirstSignal,
@@ -96,10 +106,12 @@ export interface VerdictInputs {
   /** the code's checks of this deal against that box — the deal page's own
    *  read (lib/buy-box-chip `dealCheckSource`, lib/criteria
    *  `evaluateBuyBox`): each criterion's call in the code's own sentence,
-   *  and the red lines it trips (lib/mandate `evalDealbreakers`) — so the
-   *  verdict judges fit on the calls the page's chip shows rather than
-   *  re-deriving them; absent with no box */
-  buyBoxChecks?: { checks: BuyBoxCheck[]; tripped: string[] } | null;
+   *  the red lines it trips (lib/mandate `evalDealbreakers`) and the
+   *  mandate-fit score beside them (lib/mandate `scoreMandateFit`), whose
+   *  cash-on-cash floor and red lines the coverage counts — so the verdict
+   *  judges fit on the calls the page's chip shows rather than re-deriving
+   *  them; absent with no box */
+  buyBoxChecks?: { checks: BuyBoxCheck[]; tripped: string[]; mandate?: MandateScore | null } | null;
   /** the latest published rates, dated, with the spread the site's model
    *  adds for the deal's class (lib/debt-index `ratesPromptLine`) — the line
    *  the challenger is handed; absent where the table seeds nothing */
@@ -121,8 +133,7 @@ const FOLD_WORD: Record<"fits" | "near" | "outside", string> = {
 };
 
 // "$170k", "$40.8M" — as the deal context writes a figure (lib/deal-context).
-const compact = (n: number): string =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+const compact = (n: number): string => compactUsd(n);
 const dollars = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
 const shareText = (pct: number): string => `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
 
@@ -135,19 +146,37 @@ const shareText = (pct: number): string => `${Number.isInteger(pct) ? pct : pct.
  * The brief used to print the asking price beside the unit count and leave
  * the division to the synthesizer: a 49% share's $20M over 240 units read
  * $83k a unit where the building's basis is $170k, a note's price is a
- * loan's, and an auction's starting bid is where the bidding opens. Each of
- * those says what the code computes, or that there is none and why.
+ * loan's, a preferred equity position's buys a rate and a redemption, and an
+ * auction's starting bid is where the bidding opens. Each of those says what
+ * the code computes, or that there is none and why.
  */
 function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedClass: string | null | undefined): string {
   const { kind, sharePct, entityLoan } = interestOf(ex);
   if (kind === "note") {
     return "THE BUILDING'S BASIS: none — this sells a loan, and its price is a loan's. No price per unit or per SF, no cap and no property return is struck on it; the collateral's own figures belong to the collateral's owner.";
   }
+  // A preferred equity position (lib/position): its price buys a rate and a
+  // redemption in the owning entity, so a property model's returns at that
+  // price are the building's, never the position's.
+  if (kind === "preferred_equity") {
+    return "THE BUILDING'S BASIS: none — this sells a preferred equity position in the owning entity, and its price buys a preferred return and a redemption, never a slice of the building. No price per unit or per SF, no cap and no property return is struck on it: a property model run at that price returns the whole building's cash flows on it, which are the building's, not the position's. The position's return is its rate and its redemption — read by its yield to redemption at its price and by where its last dollar sits on the stated value.";
+  }
   if (kind === "leased_fee") {
     return "THE BUILDING'S BASIS: none — the price buys the land under the ground lease, not the building, and is never divided over the building's units or area.";
   }
+  // A share of the general partner's interest is a share of a share
+  // (research pass 37): its percentage is never the entity's.
+  if (kind === "partial_interest" && isGpStake(ex)) {
+    return "THE BUILDING'S BASIS: none — this sells a share of the general partner's interest, a share of a share: its price buys the general partner's capital share and promote, never a slice of the building, and is never grossed up or divided over the whole building's units or area.";
+  }
   if (kind === "partial_interest" && sharePct == null) {
     return "THE BUILDING'S BASIS: none — the OM states no percentage for the share, so the whole its price implies cannot be read, and the share's price is never divided over the whole building's units or area.";
+  }
+  // A master lease of the building, sublet (a sandwich position): the price
+  // buys the position between the two rents, not the building (research
+  // pass 38: the card had read its price over the building as "$20/SF").
+  if (isMasterLeasehold(ex)) {
+    return "THE BUILDING'S BASIS: none — this sells a master lease of the building, sublet to its tenants: the price buys the position between the master rent and the sublease income, not the building, and is never divided over the building's units or area.";
   }
   const words = assetWords(shownAssetClass(storedClass, ex));
   const noun = words.noun ?? { one: "unit", many: "units" };
@@ -155,42 +184,86 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   // The price row the basis divides — the same row the card's basis reads,
   // at the year the screen read the memorandum.
   const row = findPricedMetric(metrics, strategy.kind, screenYearOf(ex));
-  const tag = buildingBasisTag(ex, strategy.kind, storedClass);
+  // The figure alone: the line below says whose it is.
+  const tag = buildingBasisTag(ex, strategy.kind, storedClass, { bare: true });
   if (isPlanDeal(strategy.kind)) {
     // A plan deal's basis is its total cost; the shell's or the land's price
     // over units that do not exist yet is no basis at all.
-    const plan = planSummary(ex, strategy);
-    const deal = strategy.label.toLowerCase();
-    const never = strategy.kind === "development" ? "the land's price" : "the price alone";
+    // No all-in basis is handed on where the plausibility check finds it
+    // outside the band (research pass 38: "$243 per planned unit").
+    const plan = planWithBasisChecked(ex, strategy, planSummary(ex, strategy));
+    // A forward purchase's total cost is its price, the buyer's whole cost
+    // at delivery: the developer's budget is never added to it (research
+    // pass 41 — "the land's price is never the basis" had been said of it).
+    const deal = plan?.forward ? "forward purchase" : `${strategy.label.toLowerCase()} deal`;
+    const cost = plan?.forward ? "the price, the buyer's whole cost at delivery" : "total cost";
+    const never = plan?.forward
+      ? "the price plus the developer's budget"
+      : strategy.kind === "development"
+        ? "the land's price"
+        : "the price alone";
     const priceAlone = tag ? ` The price alone is ${tag}, before the works.` : "";
+    if (plan?.basisWithheld) {
+      return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}, and none is handed on. ${plan.basisWithheld} No basis range is built on it.${priceAlone}`;
+    }
     if (plan?.costPerUnit != null && plan.units != null && plan.totalCost != null) {
-      return `THE BUILDING'S BASIS, computed in code: on this ${deal} deal it is total cost — ${compact(plan.totalCost)} over ${plan.units.toLocaleString("en-US")} planned ${noun.many} is ${compact(plan.costPerUnit)} per planned ${noun.one}, never ${never} over them.${priceAlone}`;
+      return `THE BUILDING'S BASIS, computed in code: on this ${deal} it is ${cost} — ${compact(plan.totalCost)} over ${plan.units.toLocaleString("en-US")} planned ${noun.many} is ${compact(plan.costPerUnit)} per planned ${noun.one}, never ${never} over them.${priceAlone}`;
     }
     if (plan?.totalCost != null) {
-      return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, ${compact(plan.totalCost)} all-in as computed in code; the OM states no planned count to set it per ${noun.one}, and ${never} is never the basis.${priceAlone}`;
+      return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}, ${compact(plan.totalCost)} all-in as computed in code; the OM states no planned count to set it per ${noun.one}, and ${never} is never the basis.${priceAlone}`;
     }
     // A share beside its entity's loan: the plan's own sentence on why.
-    if (plan?.costWithheld) return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost. ${plan.costWithheld}`;
-    return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, which the code cannot compute from what the OM states; ${never} is never the basis.${priceAlone}`;
+    if (plan?.costWithheld) return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}. ${plan.costWithheld}`;
+    return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}, which the code cannot compute from what the OM states; ${never} is never the basis.${priceAlone}`;
   }
   // A share beside the loan its entity carries: grossed up, its price is the
   // equity's whole, which no basis is struck on.
+  // All of the entity's interests (a stated 100%, research pass 28): the
+  // price is the whole's, nothing grossed up.
+  const allInterests = isWholeShare(sharePct);
+  // All the tenant-in-common interests are together the whole property, held
+  // by no entity (the audit C3b LOW-1).
+  const allWhat = isTenancyInCommon(ex) ? "all the tenant-in-common interests" : "all of the entity's interests";
   if (kind === "partial_interest" && entityLoan != null) {
-    return `THE BUILDING'S BASIS: none — the share's price grossed up is the equity's whole, not the building's: the building's cost is that plus the entity's stated ${compact(entityLoan)} loan, which the model does not add, so no price per unit or per SF and no cap is struck on it.`;
+    return allInterests
+      ? `THE BUILDING'S BASIS: none — the price for ${allWhat} is the equity's whole, not the building's: the building's cost is that plus ${entityLoanWords(ex, compact(entityLoan))}, which the model does not add, so no price per unit or per SF and no cap is struck on it.`
+      : `THE BUILDING'S BASIS: none — the ${isTenancyInCommon(ex) ? "interest's" : "share's"} price grossed up is the equity's whole, not the building's: the building's cost is that plus ${entityLoanWords(ex, compact(entityLoan))}, which the model does not add, so no price per unit or per SF and no cap is struck on it.`;
   }
   if (tag) {
     const range = row ? priceRange(row.value) : null;
-    const what =
-      sharePct != null
-        ? `the whole the ${shareText(sharePct)} share's price implies`
+    // A tenancy in common is title to the property, not a share of an
+    // entity: its percentage is an undivided interest's (research pass 41).
+    const share = isTenancyInCommon(ex) ? "interest" : "share";
+    const what = allInterests
+      ? isTenancyInCommon(ex)
+        ? "the price for all the tenant-in-common interests, together the whole property, nothing grossed up"
+        : "the price for all of the owning entity's interests, nothing grossed up"
+      : sharePct != null
+        ? `the whole the ${shareText(sharePct)} ${share}'s price implies`
         : range
           ? "the top of the price range the OM states, the end that does not flatter a return"
           : "the asking price";
-    const over = words.basis === "sf" ? "the building's area" : `the OM's ${noun.one} count`;
-    const never = sharePct != null ? " The share's own price over the whole building is no basis." : "";
+    // A bulk condominium purchase's price is over the units it buys (the
+    // card's own count, lib/condo-units), never the condominium's whole.
+    const offered = words.basis === "sf" ? null : condoUnitsOffered(ex);
+    const over =
+      words.basis === "sf"
+        ? "the building's area"
+        : offered != null
+          ? `the ${offered.toLocaleString("en-US")} ${offered === 1 ? noun.one : noun.many} offered`
+          : `the OM's ${noun.one} count`;
+    const never = sharePct != null && !allInterests ? ` The ${share}'s own price over the whole building is no basis.` : "";
     return `THE BUILDING'S BASIS, computed in code: ${tag} — ${what}, over ${over}.${never} Build the basis range on this figure.`;
   }
   const price = row ? parsePrice(row.value) : null;
+  // A price row whose value is no price — a percentage, a share of a loan's
+  // balance, a figure per unit (lib/criteria `priceRefusal`): said as
+  // written, and nothing is divided by it (research pass 38: "6.25% cap
+  // rate" read as a $6.25 price, then "the OM states no building area").
+  const refused = row && price == null ? priceRefusal(row.value) : null;
+  if (row && refused) {
+    return `THE BUILDING'S BASIS: none — the OM's ${row.label.trim().toLowerCase()} reads “${row.value.trim()}”, ${refused}, not the price, so the deal reads as unpriced and no basis is computed from it.`;
+  }
   const sale = price == null ? readSale(ex) : null;
   if (sale?.startingBid != null) {
     const allIn =
@@ -200,6 +273,22 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
     return `THE BUILDING'S BASIS: none — the OM states no asking price, and the ${dollars(sale.startingBid)} starting bid${allIn} is where the bidding opens, not a price: a cap or a return struck on it is the ceiling of what the building yields and a basis struck on it the floor of what it costs, never the deal's.`;
   }
   if (price == null) return "THE BUILDING'S BASIS: none — the OM states no asking price to compute one from.";
+  // A basis the plausibility check finds outside any market's band is never
+  // handed on as one, nor a range built on it (research pass 38: "$2k/unit
+  // … Build the basis range on this figure" beside the check's own finding).
+  const over = words.basis === "sf" ? "the building's area" : `the OM's ${noun.one} count`;
+  if (assessPlausibility(ex, strategy).some((f) => f.code === "basis_out_of_band")) {
+    return `THE BUILDING'S BASIS: none handed on — the price over ${over} falls outside the band any market trades at, which the plausibility check reads as a misread of the price or of ${over}; no basis range is built on it.`;
+  }
+  if (words.basis === "sf" && isOutdoorStorageYard(ex.assetClass)) {
+    return "THE BUILDING'S BASIS: none — an outdoor-storage yard trades by the usable acre, and its price over the shop building on it is no basis.";
+  }
+  if (words.basis === "acre") {
+    return "THE BUILDING'S BASIS: none — the price buys land, which trades by the acre or by the buildable foot, and the code strikes no basis on it.";
+  }
+  // Only where the memorandum states no count or area does the line say so.
+  const stated = words.basis === "sf" ? buildingSfFromMetrics(metrics) != null : unitCountFromMetrics(metrics) != null;
+  if (stated) return `THE BUILDING'S BASIS: none computed — the ${dollars(price)} price over ${over} is no basis the code strikes.`;
   return `THE BUILDING'S BASIS: none computed — the OM states no ${words.basis === "sf" ? "building area" : `${noun.one} count`} to set the price over.`;
 }
 
@@ -217,17 +306,25 @@ function nationalNote(b: { lines: string[]; national?: number }): string {
     : "";
 }
 
+/** Every line of a stored block the nation's: none of the market's own
+ *  figures was current that day. */
+const noneOwn = (b: { lines: string[]; national?: number }): boolean => b.lines.length > 0 && (b.national ?? 0) >= b.lines.length;
+
 export function buildBrief(input: VerdictInputs): string {
   const sections: string[] = [];
 
   // Deal identity first — the ranges must be grounded in the actual asset,
-  // asset class, and submarket, not synthesized in a vacuum.
+  // asset class, and submarket, not synthesized in a vacuum. The class is the
+  // one every page shows (shownAssetClass: the analyst's where they filed
+  // one, the deck's where they left it to Auto), so the line never names a
+  // class the basis and the box's checks below are not in (research pass 41).
   const ex = input.extraction;
+  const shownClass = ex ? assetClassLabel(shownAssetClass(input.assetClass, ex)) || ex.assetClass : "";
   sections.push(
     "## Deal",
     ex
       ? [
-          `${ex.dealName ?? "(unnamed)"} — ${ex.assetClass}${ex.market ? ` — ${ex.market}` : ""}`,
+          `${ex.dealName ?? "(unnamed)"} — ${shownClass}${ex.market ? ` — ${ex.market}` : ""}`,
           ex.address ? `Address: ${ex.address}` : "",
         ]
           .filter(Boolean)
@@ -263,6 +360,9 @@ export function buildBrief(input: VerdictInputs): string {
       strategy,
       planSummary(ex, strategy),
       ex,
+      // The deal context above says the type, its summary and the plan's
+      // figures: the note leaves them to it (research pass 41).
+      !!input.dealContext?.trim(),
     );
     if (note) sections.push("## Deal strategy, the plan, and figures that do not tie", note);
   }
@@ -278,6 +378,11 @@ export function buildBrief(input: VerdictInputs): string {
     const checks = input.buyBoxChecks?.checks ?? [];
     const tripped = input.buyBoxChecks?.tripped ?? [];
     const fold = foldBuyBoxChecks(checks);
+    // How much of the box that call stands on, as the deal page's chip says
+    // it ("2 of 4 checked"): a note's or an unpriced deal's fit is no fit on
+    // the criteria the price decides — the score's cash-on-cash floor and
+    // red lines counted with the checks.
+    const covered = checkedSentence(buyBoxCoverage(checks, input.buyBoxChecks?.mandate ?? null));
     sections.push(
       "## The buyer's standing buy box",
       [
@@ -288,6 +393,7 @@ export function buildBrief(input: VerdictInputs): string {
               "The code's checks of this deal against the box, computed before you read this — the calls the deal page's buy-box chip shows. Use each call and its figure as it stands; never re-derive a check or recompute its figure:",
               ...checks.map((c) => `- ${c.label} — ${CHECK_WORD[c.status]}: ${c.detail}`),
               ...(fold ? [`The code's call across the checks: ${FOLD_WORD[fold]}.`] : []),
+              ...(covered ? [covered] : []),
               ...(tripped.length > 0 ? [`Red lines the buyer set that this deal trips: ${tripped.join("; ")}.`] : []),
               "",
               "Judge this deal's fit on these checks: reference clear misses in the reason and topRisks, and if the deal fails the box on price or basis, say in nextSteps what entry price WOULD fit. The code computes no entry price: one you name is your own estimate — give its arithmetic and say it is yours. A deal can be well-underwritten and still be outside the box — say so plainly.",
@@ -377,7 +483,23 @@ export function buildBrief(input: VerdictInputs): string {
   // screen range or a next step that turns on one of them can name the
   // figure and its date as its source rather than a rule of thumb.
   const live = input.market?.liveBrief;
-  if (live && live.lines.length > 0) {
+  if (live && live.lines.length > 0 && noneOwn(live)) {
+    // Every line the nation's: none of the market's own figures was
+    // current, and the section says so rather than "each is the state's"
+    // (the pre-merge audit).
+    const whose = live.grain === "state" ? `the state of ${live.metro}'s` : `the ${live.metro} market's`;
+    sections.push(
+      `## The nation's published figures the market check read on ${live.readOn} — none of ${whose} own was current${
+        live.grain === "state" ? ", and the deal lies outside the metros the site tracks" : ""
+      }`,
+      [
+        ...live.lines.map((l) => `- ${currentBriefLine(l)}`),
+        `Each is dated and is the nation's, not ${live.grain === "state" ? "the state's, any metro's" : "the metro's"}, the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the nation's.${
+          live.grain === "state" ? "" : placedBySentence(live.placedBy)
+        }`,
+      ].join("\n"),
+    );
+  } else if (live && live.lines.length > 0) {
     sections.push(
       live.grain === "state"
         ? `## The state of ${live.metro}'s published figures the market check read on ${live.readOn} — the deal lies outside the metros the site tracks`
@@ -385,8 +507,8 @@ export function buildBrief(input: VerdictInputs): string {
       [
         ...live.lines.map((l) => `- ${currentBriefLine(l)}`),
         (live.grain === "state"
-          ? "Each is dated and is the state's, not any metro's, the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the state's."
-          : `Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.${placedBySentence(live.placedBy)}`) +
+          ? `Each is dated and is the state's, not any metro's, the submarket's or the building's${regionClause(live.lines)}. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the state's.`
+          : `Each is dated and is the metro's, not the submarket's or the building's${regionClause(live.lines)}. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.${placedBySentence(live.placedBy)}`) +
           nationalNote(live),
       ].join("\n"),
     );
@@ -398,13 +520,23 @@ export function buildBrief(input: VerdictInputs): string {
     if (o.lines.length === 0) continue;
     const pf = o.portfolio;
     const where = pf ? `, where ${pf.here} of the portfolio's ${pf.of} properties ${pf.here === 1 ? "sits" : "sit"}` : "";
+    if (noneOwn(o)) {
+      sections.push(
+        `## The nation's published figures, read on ${o.readOn} — none of ${o.grain === "state" ? `the state of ${o.metro}'s` : `the ${o.metro} market's`} own was current${where}`,
+        [
+          ...o.lines.map((l) => `- ${currentBriefLine(l)}`),
+          "Each is dated and is the nation's, not that market's, never the portfolio's. Where a range, a risk or a next step turns on one, name the figure and its date, and say it is the nation's.",
+        ].join("\n"),
+      );
+      continue;
+    }
     sections.push(
       o.grain === "state"
         ? `## The state of ${o.metro}'s published figures${where}, read on ${o.readOn}`
         : `## The ${o.metro} market's published figures${where}, read on ${o.readOn}`,
       [
         ...o.lines.map((l) => `- ${currentBriefLine(l)}`),
-        `Each is dated and is ${o.grain === "state" ? "the state's" : "the metro's"} — it speaks for the properties in ${o.metro} alone, never for the portfolio or for another market's properties. Where a range, a risk or a next step turns on one, name the figure, its date and its market.` +
+        `Each is dated and is ${o.grain === "state" ? "the state's" : "the metro's"}${regionClause(o.lines)} — it speaks for the properties in ${o.metro} alone, never for the portfolio or for another market's properties. Where a range, a risk or a next step turns on one, name the figure, its date and its market.` +
           nationalNote(o),
       ].join("\n"),
     );
@@ -431,6 +563,11 @@ export async function synthesizeVerdict(
   input: VerdictInputs,
 ): Promise<VerdictResult> {
   const client = getAnthropic();
+  // A forward purchase reads the three deal-killers on the purchase's terms,
+  // as the challenger, the comps and the market check do: the deal's kind
+  // read with the first signal, as the brief reads it.
+  const ex = input.extraction;
+  const forward = !!ex && isForwardPurchase(ex, inferStrategy(ex, input.firstSignal ?? null));
 
   const out = await structured("The verdict", () => client.messages.parse({
     model: MODELS.verdict,
@@ -440,7 +577,7 @@ export async function synthesizeVerdict(
       {
         role: "user",
         content: [
-          { type: "text", text: verdictInstruction() },
+          { type: "text", text: verdictInstruction(forward) },
           {
             type: "text",
             text: `Here is the gathered analysis to synthesize:\n\n${buildBrief(
@@ -453,7 +590,7 @@ export async function synthesizeVerdict(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(VerdictSchema) },
+    output_config: { format: screenOutputFormat(VerdictSchema) },
   }));
   return out;
 }

@@ -27,6 +27,7 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
 import { ruleCounts } from "@/lib/research-data";
@@ -43,6 +44,7 @@ import { MarketsGallery } from "./markets-gallery";
 import { HERO_STRIP, HERO_WORDS_TOP, PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
+import { compactUsd } from "@/lib/money";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -260,21 +262,15 @@ const STATS: { value: number; suffix: string; label: string }[] = [
   { value: RULES.all, suffix: "", label: "rules checked by address" },
 ];
 
-// Live-engine rows for the Excel-preview tile: the sample model recomputed
-// at render, so the page can never disagree with what the workbook computes.
-const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
-  const inputs = SAMPLE_DEAL.model.inputs;
-  const irr = (over: Partial<typeof inputs>) => {
-    const r = computeModel({ ...inputs, ...over }).returns.leveredIrrPct;
-    return r == null ? "—" : `IRR ${r.toFixed(1)}%`;
-  };
-  return [
-    ["Purchase price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`, irr({})],
-    ["Exit cap", `${inputs.exitCapPct.toFixed(2)}%`, irr({})],
-    ["Exit cap (flexed)", "5.75%", irr({ exitCapPct: 5.75 })],
-    ["Rent growth (flexed)", "2.5%", irr({ rentGrowthPct: 2.5 })],
-  ];
-})();
+// The Excel-preview tile's rows: the sample workbook's own figures — its
+// engine on the one derivation the demo workbook is built from, and two
+// cells of its Sensitivity tab (lib/sample-derive) — so the tile and the
+// workbook it links can never disagree.
+const XLSX_PREVIEW_ROWS: [string, string, string][] = sampleWorkbookPreview();
+
+// The stress bench's base: the same derivation, run here so the browser
+// gets the inputs and never the derivation (its readers hold data tables).
+const BENCH = sampleDerivedInputs();
 
 // The plan cards' lists are the billing page's too (lib/marketing-constants
 // FREE_PLAN, PRO_PLAN_LINES), each Pro line held to the gate that makes it
@@ -299,7 +295,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Are my documents private?",
-    a: "Yes. Documents are stored in private storage with isolation enforced at the database level. Your deals are visible only to you — or to your teammates if you join a team — and your documents are never shared beyond that or resold.",
+    a: "Yes. Documents are stored in private storage with isolation enforced at the database level, and your deals are visible only to you — or to your teammates if you join a team. To run a screen, a document is read by Anthropic's Claude API, which does not train on it; the security page lists every outside service and what it receives. Nothing you upload is ever sold.",
   },
   {
     q: "Is this investment advice?",
@@ -532,7 +528,7 @@ export default function Home() {
           on the dark hero and the light body alike). */}
       <ScrollProgress />
       {/* Nav — dark, so it reads as one piece with the hero. */}
-      <header className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
+      <header data-home-bar className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
           {/* min-w-0 + truncate: on narrow phones the wordmark gives way
               instead of colliding with the CTA (the logo always stays). */}
@@ -736,7 +732,7 @@ export default function Home() {
 
         {/* The problem, drawn: two analysts, one deal, the spread between
             them. Both ends are neutral on purpose — the spread is the problem. */}
-        <section id="problem" className="scroll-mt-16">
+        <section id="problem">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="The problem" title={`Same deal, same data room, ${SPREAD_BPS} bps apart.`} />
             <Reveal>
@@ -785,7 +781,7 @@ export default function Home() {
         </section>
 
         {/* The six-stage screen — a rail of icons, then the trace of it running. */}
-        <section id="screen" className="scroll-mt-16 border-t border-line bg-faint">
+        <section id="screen" className="border-t border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="How it works" title="Six stages, same order." />
             <Reveal delay={60}>
@@ -831,14 +827,14 @@ export default function Home() {
         </section>
 
         {/* Break it yourself — the deterministic engine, live in the browser. */}
-        <section id="stress" className="band-dark scroll-mt-16 text-white">
+        <section id="stress" className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
               <SectionHead eyebrow="Try the engine" title="Break it yourself." dark />
             </Reveal>
             <Reveal delay={80}>
               <div className="mt-8">
-                <StressBench />
+                <StressBench base={BENCH.inputs} units={BENCH.meta.units} />
               </div>
             </Reveal>
             {/* The bench stresses one screened deal. /tools is the same
@@ -869,7 +865,7 @@ export default function Home() {
                 <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                   {groupedTools().map(({ group, tools }) => (
                     <div key={group}>
-                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/55">
                         {group}
                       </p>
                       <ul className="mt-2 flex flex-wrap gap-1.5">
@@ -913,7 +909,15 @@ export default function Home() {
                 {/* Excel model — the flagship tile */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold">Excel model, live formulas</h3>
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                      Excel model, live formulas
+                      {/* On your own deals the exports are Pro, as the hero's
+                          card marks them; the samples download free
+                          (research pass 32). The space keeps "Pro" a word of
+                          its own to a screen reader; the flex gap spaces it
+                          on screen. */}{" "}
+                      <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
+                    </h3>
                     <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                       Sample
                     </span>
@@ -951,7 +955,10 @@ export default function Home() {
 
                 {/* Memo */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="text-sm font-semibold">One-page IC memo</h3>
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                    One-page IC memo{" "}
+                    <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
+                  </h3>
                   <div className="mt-4 flex-1">
                     <div className="rounded-lg border border-line bg-paper p-3">
                       <div className="flex items-center justify-between">
@@ -1032,7 +1039,7 @@ export default function Home() {
         </section>
 
         {/* Everything else, as icons. */}
-        <section id="toolkit" className="scroll-mt-16">
+        <section id="toolkit">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
               <SectionHead eyebrow="Also in the box" title="Everything else, at a glance." />
@@ -1058,7 +1065,7 @@ export default function Home() {
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="scroll-mt-16 border-t border-line">
+        <section id="pricing" className="border-t border-line">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <Reveal>
             <SectionHead eyebrow="Pricing" title="Start free. Upgrade when the screen earns it." />
@@ -1104,7 +1111,7 @@ export default function Home() {
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {PRO_PLAN_LINES.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
-                      <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
+                      <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/10 text-[10px] font-bold text-pass">
                         ✓
                       </span>
                       {f}
@@ -1184,14 +1191,14 @@ export default function Home() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="scroll-mt-16 border-y border-line bg-faint">
+        <section id="faq" className="border-y border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="FAQ" title="The questions we'd ask too." />
             <div className="mx-auto mt-8 max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
               {FAQ.map((f, i) => (
                 <details key={f.q} className="group">
                   <summary className="flex cursor-pointer items-center gap-3 px-5 py-4 text-sm font-medium transition-colors hover:bg-faint [&::-webkit-details-marker]:hidden">
-                    <span className="font-mono text-xs tabular-nums text-brand/50">
+                    <span className="font-mono text-xs tabular-nums text-brand/80">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="flex-1">{f.q}</span>
@@ -1395,7 +1402,7 @@ function DealPreview() {
         <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 border-y border-line py-3">
           {(
             [
-              ["Price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`],
+              ["Price", compactUsd(inputs.purchasePrice, { wholeMillionsFrom: 0 })],
               ["Size", `${inputs.units} units`],
               ["Going-in cap", `${r.goingInCapPct.toFixed(2)}%`],
               // The real deal header carries a fourth figure now — the deal's
@@ -1421,7 +1428,7 @@ function DealPreview() {
               key={a}
               className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-medium shadow-sm"
             >
-              {a}
+              {a}{" "}
               <span className="rounded-full bg-brand/10 px-1.5 py-px text-[9px] font-semibold text-brand">
                 Pro
               </span>

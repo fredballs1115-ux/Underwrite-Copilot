@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ScrollRegion } from "@/app/scroll-region";
 import type { Bridge, BridgeStep } from "@/lib/bridge/attribution";
 import { fieldFormat, formatFieldPair, formatFieldValue } from "@/lib/bridge/fields";
 
@@ -205,6 +206,7 @@ function CopyLine({ text }: { text: string }) {
           }
         }}
         className="shrink-0 rounded-md border border-brand px-3 py-1.5 text-sm font-medium text-brand transition hover:bg-brand hover:text-white"
+        aria-live="polite"
       >
         {copied ? "Copied" : "Copy"}
       </button>
@@ -278,7 +280,7 @@ export function BridgeView({
         <Waterfall bridge={bridge} />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+      <ScrollRegion label="IRR change by assumption" className="rounded-lg border border-line bg-surface">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-muted">
@@ -297,7 +299,7 @@ export function BridgeView({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
 
       <p className="text-xs leading-relaxed text-muted">
         {bridge.method === "exact"
@@ -305,7 +307,11 @@ export function BridgeView({
               bridge.steps.length === 1 ? "" : "s"
             } (${bridge.scenariosEvaluated} model runs); contributions sum to the move.`
           : `Sampled Shapley attribution over ${bridge.steps.length} changed assumptions, averaged across 2,000 orderings (${bridge.scenariosEvaluated} model runs); ± is one standard error.`}{" "}
-        Residual {Math.abs(bridge.unexplainedBps).toFixed(2)} bps.
+        Residual {Math.abs(bridge.unexplainedBps).toFixed(2)} bps.{" "}
+        {/* The engine's unlevered IRR runs on the property's flows before
+            debt; the asset management fee rides only in the levered ones
+            (research pass 40, L3). */}
+        Unlevered: the IRR before debt and before the asset management fee, which only the levered IRR carries.
         {bridge.flooredScenarios > 0
           ? ` ${bridge.flooredScenarios} intermediate scenario${
               bridge.flooredScenarios === 1 ? "" : "s"

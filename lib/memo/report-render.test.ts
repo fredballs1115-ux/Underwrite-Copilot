@@ -6,12 +6,15 @@
 // fails in CI, not at a user's download click.
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { afterEach, describe, it, expect, vi } from "vitest";
+import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, rangeRead, readDay, ReportDocument } from "./report-document";
+import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices } from "./report-document";
+import { readInterest } from "@/lib/interest";
+import { MemoDocument, buildMemoData } from "./memo-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
-import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
-import { pdfFillCountOf, pdfFillRectsOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
+import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
+import { pdfFillCountOf, pdfFillRectsOf, pdfPageRunsOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { readPortfolio } from "@/lib/portfolio";
 import { TINY_PNG_DATA_URI, tinyPng } from "./test-png";
 import { floodZoneLine, type FloodMapView } from "@/lib/site-flags/core";
@@ -20,6 +23,7 @@ const tinyDataUri = (rgb: [number, number, number]) => `data:image/png;base64,${
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { regulationForDeal } from "@/lib/rent-regulation";
 import { buildSensitivityData, gridTakeaway, pageBaseLevers } from "@/lib/underwrite/report-grid";
 import { bidFloors, fmtBid, solveMaxBid } from "@/lib/underwrite/solver";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
@@ -127,6 +131,31 @@ describe("ReportDocument (full report)", () => {
     expect(briefedText).toContain("Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED)");
     expect(briefedText).toContain("10-year Treasury 4.94%");
     expect(await pdfTextOf(buf)).not.toContain("Figures the check read");
+    // FRED's own notice under its figures (the batch-2 audit, LOW-7); the
+    // BLS's only where its own API answered one, which neither line did.
+    expect(briefedText.replace(/\s+/g, " ")).toContain(FRED_NOTICE);
+    expect(briefedText.replace(/\s+/g, " ")).not.toContain(BLS_NOTICE);
+    expect((await pdfTextOf(buf)).replace(/\s+/g, " ")).not.toContain(FRED_NOTICE);
+
+    // A covered market whose figures could not be read that day says so
+    // under the checks (lib/market-read-failed, research pass 30).
+    const readFailed = {
+      ...deal,
+      market: { ...SAMPLE_DEAL.market, liveReadFailed: { market: "Philadelphia PA", grain: "metro" } },
+    } as unknown as DealRow;
+    const failedText = (
+      await pdfTextOf(
+        await renderToBuffer(
+          React.createElement(ReportDocument, {
+            input: buildReportData(readFailed, "August 24, 2026", checks, sensitivity),
+          }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      )
+    ).replace(/\s+/g, " ");
+    expect(failedText).toMatch(
+      /The published figures for the Philadelphia PA market could not be read when this check ran, so it reasoned from rules of thumb alone . re-screen to include them\./,
+    );
+    expect(await pdfTextOf(buf)).not.toContain("could not be read when this check ran");
 
     // The model's assumptions against the published figures land under the
     // sensitivity grids when the route read them; the plain report has no
@@ -221,6 +250,154 @@ describe("ReportDocument (full report)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it("prints the demo report's pages, and its debt sentence says what its model runs (research pass 35)", async () => {
+    // The demo report route's own chain (app/api/demo/report).
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = sampleDerivedInputs();
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) });
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity);
+    // The fictional memorandum runs to its last cited page and past it.
+    expect(input.totalPages).toBe(48);
+    const text = pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]));
+    // The terms' page column: each row's own page, no longer a dash.
+    expect(text).toMatch(/Asking price\n\$68,000,000\n—\np\. 3\n/);
+    expect(text).toMatch(/Loan-to-value\n60%\n—\np\. 44\n/);
+    // The base case cites the ask's page; the comps carry theirs.
+    expect(text.replace(/\s+/g, " ")).toContain("Price $68,000,000 · OM p. 3");
+    expect(text).toMatch(/Parkside — 1\.4 mi[\s\S]*?\np\. 14\n/);
+    // The debt killer says what the model runs: no interest-only year.
+    expect(derived.inputs.ioMonths).toBe(0);
+    const flat = text.replace(/\s+/g, " ");
+    // And the measure the model sizes its loan on: 60% of cost, its
+    // default, never "LTV" beside the base case's "60% of cost" (audit C3a,
+    // LOW-13); the memorandum's own "Loan-to-value 60%" row stays as stated.
+    expect(derived.inputs.ltc).toBe(0.6);
+    expect(derived.sources.ltc?.provenance).toBe("assumption");
+    expect(derived.inputs.allInRatePct).toBe(0.06);
+    expect(derived.inputs.amortMonths).toBe(360);
+    expect(flat).toContain("60% of cost, the model's default, at 6.0%, amortizing over 30 years.");
+    expect(flat).not.toContain("60% LTV at 6.0%");
+    expect(flat).toContain("amortizing over 30 years; and a 6.00% all-in rate");
+    expect(flat).not.toMatch(/year of IO/);
+  }, 60000);
+
+  it("numbers the memo's pages in the full report as it numbers every other, each number on its own page's foot (research pass 35)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = sampleDerivedInputs();
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) });
+    // Two overrides turn the memo onto a second page, numbered too.
+    const overrides = [
+      "Rent growth check dismissed: the renovated comps support 4% for two years (analyst)",
+      "Supply check dismissed: the pipeline counts a project that broke ground in 2019 and delivered last spring (analyst)",
+    ];
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    const pages = pdfPageRunsOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(deal, "October 5, 2026", checks, sensitivity, undefined, null, overrides),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    );
+    expect(pages[1].map((r) => r.text).join(" ")).toContain("screening memo, continued");
+    pages.forEach((runs, i) => {
+      const n = runs.find((r) => r.text === `${i + 1} / ${pages.length}`);
+      expect(n, `page ${i + 1}`).toBeDefined();
+      // In the footer band at the page's foot, never drawn off the page —
+      // as the memo's page-wide line height once drew it.
+      expect(n!.y, `page ${i + 1}`).toBeGreaterThan(10);
+      expect(n!.y, `page ${i + 1}`).toBeLessThan(40);
+    });
+    // The standalone memo keeps its own footer: the name, no page count.
+    const memo = pdfPageRunsOf(
+      await renderToBuffer(React.createElement(MemoDocument, { data: buildMemoData(deal, "October 5, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    );
+    expect(memo).toHaveLength(1);
+    expect(memo[0].some((r) => /^\d+ \/ \d+$/.test(r.text))).toBe(false);
+    const name = memo[0].filter((r) => r.text === "Underwrite Copilot").map((r) => r.y);
+    expect(Math.min(...name)).toBeLessThan(40);
+  }, 60000);
+
+  it("names the model's IRR and its page on the memo's unknown target-return chip, the page where it lands (research pass 35)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    // The screen reads no IRR off the sample's memorandum: the check is unknown.
+    expect(checks.find((c) => c.label === "Target return")?.status).toBe("unknown");
+    const derived = sampleDerivedInputs();
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) });
+    const irr = `${(sensitivity.baseCase!.leveredIrr! * 100).toFixed(1)}%`;
+    // The memo and the call take a page each: the grids land on page 3.
+    const input = buildReportData(deal, "October 5, 2026", checks, sensitivity);
+    expect(input.targetReturnPage).toBe(3);
+    expect(input.memo.buyBox.find((c) => c.label === "Target return")).toEqual({ label: "Target return", status: "unknown", note: `model ${irr}, p. 3` });
+    const pages = pdfPageTextsOf(await renderReportPdf(input)).map((p) => p.replace(/\s+/g, " "));
+    expect(pages[0]).toContain(`Target return · model ${irr}, p. 3`);
+    expect(pages[2]).toContain("Sensitivity analysis");
+    expect(pages[2]).toContain(`LEVERED IRR ${irr}`);
+    // Two overrides run the memo onto a second page: the grids land on
+    // page 4, and the chip is drawn again naming it.
+    const overridden = buildReportData(deal, "October 5, 2026", checks, sensitivity, undefined, null, [
+      "Rent growth check dismissed: the renovated comps support 4% for two years (analyst)",
+      "Supply check dismissed: the pipeline counts a project that broke ground in 2019 and delivered last spring (analyst)",
+    ]);
+    expect(overridden.targetReturnPage).toBe(3);
+    const moved = pdfPageTextsOf(await renderReportPdf(overridden)).map((p) => p.replace(/\s+/g, " "));
+    expect(moved[1]).toContain("screening memo, continued");
+    expect(moved[3]).toContain("Sensitivity analysis");
+    expect(moved[0]).toContain(`Target return · model ${irr}, p. 4`);
+    expect(moved.join(" ")).not.toContain(", p. 3");
+    // On a note the grids are the collateral's: the chip names nothing.
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const noteEx = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Unpaid principal balance", "$80,000,000")],
+    } as ExtractionResult;
+    const noteDerived = deriveUnderwriteInputs(noteEx, SAMPLE_DEAL.name);
+    const note = buildReportData({ ...deal, extraction: noteEx } as unknown as DealRow, "October 5, 2026", checks, buildSensitivityData(noteDerived.inputs, 13, { sources: noteDerived.sources }));
+    expect(note.targetReturnPage).toBeNull();
+    expect(note.memo.buyBox.find((c) => c.label === "Target return")?.note).toBeUndefined();
+    // The standalone memo has no model: no note either.
+    expect(buildMemoData(deal, "October 5, 2026", checks).buyBox.some((c) => c.note)).toBe(false);
+  }, 90000);
 
   it("says the challenges run most severe first, the order the challenger is asked for, never the order deals die", async () => {
     // The prompt's own order, so the subtitle cannot drift from it again.
@@ -358,13 +535,96 @@ describe("ReportDocument (full report)", () => {
       interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest", groundLease: "", loan: "", page: "" },
       metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
     } as ExtractionResult);
-    expect(share).toMatch(/Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modeled price\)\..* It is the whole building's price, not the share's\./);
+    expect(share).toMatch(/Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modelled price\)\..* It is the whole building's price, not the share's\./);
     const unstated = await render({
       ...SAMPLE_DEAL.extraction,
       interest: { kind: "partial_interest", summary: "", share: "A minority interest in the owning entity", groundLease: "", loan: "", page: "" },
     } as ExtractionResult);
     expect(unstated).toContain("No max bid: the memorandum states no single percentage for the share");
     expect(unstated).not.toMatch(/Max bid (clearing|holding)/);
+    // A share of the general partner's interest is a share of a share
+    // (research pass 37): it states a percentage, of the general partner's
+    // interest, and no bid is solved on it.
+    const gpStake = await render({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "50% of the general partner interest", groundLease: "", loan: "", page: "" },
+    } as ExtractionResult);
+    expect(gpStake).toContain("No max bid: the price buys a share of the general partner's interest — a share of a share");
+    expect(gpStake).not.toContain("no single percentage");
+    expect(gpStake).not.toMatch(/Max bid (clearing|holding)/);
+    // All of the entity's interests (a stated 100%, research pass 28): the
+    // bid is solved on the price itself, and it is no share's.
+    const whole = await render({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "100% of the beneficial interests, offered in $100,000 units", groundLease: "", loan: "", page: "" },
+    } as ExtractionResult);
+    expect(whole).toMatch(/Max bid holding the 15% screening hurdle: \$[\d.]+M/);
+    expect(whole).not.toContain("no single percentage");
+    expect(whole).not.toContain("not the share's");
+    expect(whole).toContain("All of the owning entity's interests");
+  }, 60000);
+
+  it("names what the grids are of under them where the price did not buy the building, never 'the deal' (research pass 35)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const takeawayOf = async (extraction: ExtractionResult) => {
+      const deal = {
+        name: SAMPLE_DEAL.name,
+        asset_class: SAMPLE_DEAL.asset_class,
+        extraction,
+        challenges: null,
+        comps: null,
+        market: null,
+        reconciliation: null,
+        verdict: SAMPLE_DEAL.verdict,
+        prior_screen: null,
+      } as unknown as DealRow;
+      const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+      const sensitivity = buildSensitivityData(derived.inputs, 13, { sources: derived.sources });
+      const text = pdfTextOf(
+        await renderToBuffer(
+          React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      ).replace(/\s+/g, " ");
+      return { text, sensitivity };
+    };
+    // The sample: the deal's own, in two full clauses.
+    const sample = await takeawayOf(SAMPLE_DEAL.extraction as ExtractionResult);
+    expect(sample.sensitivity.takeaway).toMatch(/^At base growth, /);
+    expect(sample.text).toContain(sample.sensitivity.takeaway);
+    // A note: the collateral, run at the note's price.
+    const note = await takeawayOf({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Unpaid principal balance", "$80,000,000"), row("Note rate", "5.25%"), row("Maturity date", "March 31, 2028")],
+    } as ExtractionResult);
+    const noteLine = gridTakeaway(note.sensitivity.grid, 13, "rent growth", "the collateral, run at the note's price");
+    expect(noteLine).toMatch(/^The collateral, run at the note's price: at base growth, /);
+    expect(note.text).toContain(noteLine);
+    expect(note.text).not.toContain(note.sensitivity.takeaway);
+    // A preferred equity position: the building, run at its price.
+    const position = await takeawayOf({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$14,000,000" } : m)),
+        row("Preferred equity amount", "$15,000,000"),
+        row("Preferred return", "12% preferred return, 8% current pay"),
+        row("Mandatory redemption date", "June 2029"),
+      ],
+    } as ExtractionResult);
+    expect(position.text).toContain(gridTakeaway(position.sensitivity.grid, 13, "rent growth", "the building, run at the position's price"));
+    // A share beside the loan its entity carries: the equity's whole.
+    const share = await takeawayOf({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
+        row("Entity loan balance", "$56,500,000"),
+      ],
+    } as ExtractionResult);
+    expect(share.text).toContain(gridTakeaway(share.sensitivity.grid, 13, "rent growth", "the whole building, run at the equity's whole"));
+    for (const t of [note.text, position.text, share.text]) expect(t).not.toMatch(/the deal (holds|needs)/i);
   }, 60000);
 
   it("prints the base case the grids are struck around, each input with its source, and the terms every cell runs on under the grid", async () => {
@@ -399,13 +659,39 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain(`Loan ${usd(b.loan)} · 60% of cost · assumption`);
     expect(text).toContain(`Equity ${usd(b.equity)} · total uses less the loan`);
     expect(text).toContain("Hold 5 years · assumption");
-    expect(text).toContain(`Year-1 NOI ${usd(b.noiY1)} · derived`);
+    // The year-1 NOI's note is the rent's derivation, said as the rent's
+    // (research pass 35: it printed as the NOI's own source).
+    expect(text).toContain(
+      `Year-1 NOI ${usd(b.noiY1)} The model's rent: grossed up from the OM's NOI (pro forma) — the only NOI stated; on a stabilized asset it is next year's income (derived)`,
+    );
+    expect(text).not.toContain(`Year-1 NOI ${usd(b.noiY1)} · derived`);
+    // The exit cap the grids' bold row runs at, with where it came from.
+    expect(text).toContain(
+      "Exit cap 5.45% · derived Defaulted to the OM's stated going-in cap; the model's own year-1 NOI over its price is 5.71% — set your exit view",
+    );
     expect(text).toContain(`Total uses ${usd(b.totalUses)}`);
     expect(text).toContain(`Total sources ${usd(b.loan + b.equity)}`);
-    // The grid's terms: the rate a placeholder, said only as an assumption.
+    // The grid's terms: the rate a placeholder, said only as an assumption;
+    // the asset-management fee and the reserves every year carries, as the
+    // model holds them.
     expect(text).toContain(
-      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.",
+      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). Every year's cash flow carries an asset-management fee of 0.5% of equity (assumption) and capital reserves of $0.25 a square foot, grown with expenses (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.",
     );
+    // A memorandum that states no cap: the model's default, said as one.
+    const uncapped = await render(
+      deriveUnderwriteInputs({ ...extraction, metrics: extraction.metrics.filter((m) => !/cap/i.test(m.label)) }, SAMPLE_DEAL.name),
+    );
+    // …with the gap to the model's own entry (research pass 38).
+    expect(uncapped.text).toContain(
+      "Exit cap 6.00% · assumption Default 6.00%; the model's own year-1 NOI over its price is 5.71%: 29 bps of expansion ride in these returns — set your exit view",
+    );
+    // The sample's own model, its T-12 folded in: the trailing year's day in
+    // prose, never "TTM to 2026-05-31".
+    const actuals = sampleDerivedInputs();
+    expect(actuals.sources.inPlaceRentAnnual?.note).toContain("TTM to 2026-05-31");
+    const withActuals = await render(actuals);
+    expect(withActuals.text).toContain("The model's rent: grossed up from the T-12 actual NOI (TTM to May 31, 2026) at the T-12 actual expense ratio (derived)");
+    expect(withActuals.text).not.toContain("2026-05-31");
     // A rate seeded off today's curve prints its dated source note.
     const seeded = await render(
       deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name, undefined, {
@@ -417,7 +703,7 @@ describe("ReportDocument (full report)", () => {
     );
   }, 60000);
 
-  it("labels the retrade grid's base row the modeled price, never the ask, and says what the model priced it at", async () => {
+  it("labels the retrade grid's base row the modelled price, never the ask, and says what the model priced it at", async () => {
     const render = async (extraction: ExtractionResult) => {
       const deal = {
         name: extraction.dealName ?? SAMPLE_DEAL.name,
@@ -437,8 +723,22 @@ describe("ReportDocument (full report)", () => {
     };
     // The sample: the ask is what the model runs at, cited to its page.
     const sample = await render({ ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 });
-    expect(sample).toContain("$68M (modeled)");
-    expect(sample).toContain("The modeled price is $68,000,000: OM asking / purchase price (p. 3).");
+    // One place down the column, its zero kept: it read "$68M (modeled)"
+    // beside "$61.2M (-10%)" (research pass 35).
+    expect(sample).toContain("$61.2M (-10%) ");
+    expect(sample).toContain("$64.6M (-5%) ");
+    expect(sample).toContain("$68.0M (modelled) ");
+    expect(sample).toContain("$71.4M (+5%) ");
+    expect(sample).toContain("$74.8M (+10%) ");
+    expect(sample).toContain("The modelled price is $68,000,000: OM asking / purchase price (p. 3).");
+    // One spelling on the page, the one the site uses more of: it printed
+    // "modeled" and "Color marks distance" beside the cost line's "none is
+    // modelled" and the flood page's "colours" and "centred" (research pass
+    // 35).
+    expect(sample).toContain("Colour marks distance from the");
+    expect(sample).toContain("The ink-bordered cell is the modelled base case.");
+    expect(sample).toContain("none is modelled on the purchase");
+    expect(sample).not.toMatch(/\bmodeled\b|\bColor\b|\bcolors?\b|\bcolored\b|\bcenter(ed|s)?\b|\bcapitalized\b/i);
     expect(sample).not.toContain("(ask)");
     // A 49% share: the $33.3M ask grossed up to the $68M whole the model runs.
     const share = await render({
@@ -447,11 +747,22 @@ describe("ReportDocument (full report)", () => {
       interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
       metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
     } as ExtractionResult);
-    expect(share).toContain("$68M (modeled)");
-    expect(share).toContain("The modeled price is $68,000,000: The OM's $33,320,000 for a 49% share, grossed up to the whole asset");
+    expect(share).toContain("$68.0M (modelled)");
+    expect(share).toContain("The modelled price is $68,000,000: The OM's $33,320,000 for a 49% share, grossed up to the whole asset");
     expect(share).toContain("(derived).");
     expect(share).not.toContain("(ask)");
   }, 60000);
+
+  it("prints the retrade grid's prices at one precision down the column, the smallest row's", () => {
+    // From $10M, one place in millions, its zero kept.
+    expect(retradePrices([32_400_000, 34_200_000, 36_000_000, 37_800_000, 39_600_000])).toEqual(["$32.4M", "$34.2M", "$36.0M", "$37.8M", "$39.6M"]);
+    // A column that starts under $10M takes two places all the way down,
+    // so a $1.2M deal's 5% steps stay five figures, not three.
+    expect(retradePrices([1_080_000, 1_140_000, 1_200_000, 1_260_000, 1_320_000])).toEqual(["$1.08M", "$1.14M", "$1.20M", "$1.26M", "$1.32M"]);
+    expect(retradePrices([9_000_000, 9_500_000, 10_000_000, 10_500_000, 11_000_000])).toEqual(["$9.00M", "$9.50M", "$10.00M", "$10.50M", "$11.00M"]);
+    // A column that starts under $1M is in thousands throughout.
+    expect(retradePrices([900_000, 950_000, 1_000_000, 1_050_000, 1_100_000])).toEqual(["$900k", "$950k", "$1,000k", "$1,050k", "$1,100k"]);
+  });
 
   it("leaves the IRR grids, the max bid and every model read out of an unpriced memorandum's report, and says why where the grids would have been", async () => {
     const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
@@ -496,7 +807,9 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Sensitivity analysis");
     expect(text).toContain("left out");
     expect(text).toContain(
-      "The IRR grids and the max bid are left out: no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on a $10,000,000 placeholder price and an assumed NOI, and its returns would be a placeholder's.",
+      // The memorandum's own NOI is named, never said to be unread (research
+      // pass 38).
+      "The IRR grids and the max bid are left out: no price was read from the memorandum, so its $3,880,000 NOI (in-place) has no price to be set against, and the model runs on a $10,000,000 placeholder price and an assumed NOI; its returns would be a placeholder's.",
     );
     expect(text).not.toContain("(ask)");
     expect(text).not.toContain("Max bid");
@@ -634,9 +947,56 @@ describe("ReportDocument (full report)", () => {
       React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
-    expect(text).toContain("it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.");
+    expect(text).toContain("it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the screen did not read as a figure of its own.");
     // $80M over $300M alone would read 27%: never printed.
     expect(text).not.toMatch(/puts the balance at \d+% of its value/);
+  }, 45000);
+
+  it("on a preferred equity position, prints its own terms under the model's caveat, and no max bid (lib/position)", async () => {
+    // The day its yield to redemption is read on.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "preferred_equity" as const, summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$14,000,000" } : m)),
+        row("Preferred equity amount", "$15,000,000"),
+        row("Preferred return", "12% preferred return, 8% current pay"),
+        row("Current pay rate", "8.0%"),
+        row("Mandatory redemption date", "June 2029"),
+        row("Senior loan balance", "$52,000,000"),
+        row("Whole-asset value", "$80,000,000"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    expect(sensitivity).not.toBeNull();
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity);
+    const buf = await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    // The caveat over the grids, then what the position itself earns.
+    expect(text).toContain("A preferred equity position in the owning entity: The property model runs the whole building at the position's price; that is not this position's return");
+    expect(text).toContain("The position, on its own terms: A preferred equity position of $15.0M at 8.00% current pay and 4.00% accruing");
+    expect(text).toContain("14.3% to redemption at its $14.0M price.");
+    expect(text).toContain("the position's first dollar sits at 65.0% and its last at 86.1% at redemption (83.8% today).");
+    // A bid solved on the building's cash flows at the position's price is
+    // no price for the position.
+    expect(text).toContain("No max bid: the model runs the whole building as if bought at the preferred equity position's price");
+    expect(text).not.toMatch(/Max bid (clearing|holding)/);
+    // The memo page under the title says it in a clause.
+    expect(text).toContain("A preferred equity position in the owning entity, not the property, 14.3% to its Jun 2029 redemption at the $14.0M price");
   }, 45000);
 
   it("prints the seller's loan offered for assumption beside the model it was priced against (#419)", async () => {
@@ -758,7 +1118,94 @@ describe("ReportDocument (full report)", () => {
     )).replace(/\s+/g, " ");
     expect(bareText).toContain("Single tenant: Walgreens Co.");
     expect(bareText).not.toContain("At the model's sale in 5 years");
+    // A report with no grid page at all (no model built) still prints the
+    // lease, on a page that says why (#183).
+    const noModel = buildReportData(deal, "September 30, 2026", [], null);
+    const noModelText = (await pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input: noModel }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    )).replace(/\s+/g, " ");
+    expect(noModelText).toContain("The deal's terms");
+    expect(noModelText).toContain("No screening model was built for this report");
+    expect(noModelText).toContain("Single tenant: Walgreens Co.");
   }, 60000);
+
+  // The batch audit: a plan deal whose plan page could not be built printed
+  // "No screening model was built for this report" and then the model's own
+  // reads — "At the model's sale in 5 years …", "the model's 6.00% exit cap".
+  it("says why a plan deal's plan page is left out where its model was built, and prints its terms without the model's reads", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 4", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      strategy: { kind: "development", summary: "Ground-up development", capitalBudget: "", timeline: "" },
+      singleTenant: { tenant: "Walgreens Co.", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+      metrics: [row("Asking price", "$10,000,000"), row("Units", "100"), row("Lease expiration", "March 31, 2046"), row("Rent increases", "10% every 5 years")],
+    } as unknown as ExtractionResult;
+    const deal = {
+      name: "X",
+      asset_class: "multifamily",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: null,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "X");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const plan = buildPlanReport(extraction, { pct: derived.inputs.exitCapPct, provenance: "assumption" }, null);
+    expect(plan).toBeNull();
+    expect(derived.meta.singleTenant?.read).toBeTruthy();
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, plan, null, undefined, null, null, null, null, derived.meta.singleTenant ?? null);
+    expect(input.singleTenant).toBeNull();
+    expect(input.planLeftOut?.count).toBe("no yield on cost struck");
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).not.toContain("No screening model was built");
+    expect(text).toContain("The plan page is left out");
+    expect(text).toContain(
+      "No stabilized NOI or budget was read from the memorandum, so no yield on cost is struck: the plan page is left out, and these are the memorandum's terms as read, without the model's read beside them.",
+    );
+    // The lease's own line, as the memorandum states it — none of the
+    // model's read of it.
+    expect(text).toContain("Single tenant: Walgreens Co.");
+    expect(text).not.toContain("At the model's sale");
+    expect(text).not.toContain("exit cap");
+    // A report whose route built no model still says so.
+    const none = buildReportData(deal, "October 5, 2026", [], null, undefined, null);
+    expect(none.planLeftOut).toBeNull();
+    const noneText = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input: none }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(noneText).toContain("No screening model was built for this report");
+    expect(noneText).not.toContain("The plan page is left out");
+    // A forward purchase's works are the developer's: said as that, never
+    // as a memorandum that states too little.
+    const forward = {
+      ...extraction,
+      singleTenant: undefined,
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [row("Purchase price", "$48,000,000"), row("NOI (stabilized, pro forma)", "$2,880,000"), row("Construction budget", "$31,000,000"), row("Delivery date", "Q3 2027")],
+    } as unknown as ExtractionResult;
+    const fwdDerived = deriveUnderwriteInputs(forward, "Y");
+    const fwd = buildReportData({ ...deal, extraction: forward } as unknown as DealRow, "October 5, 2026", [], buildSensitivityData(fwdDerived.inputs, null), undefined, null);
+    expect(fwd.planLeftOut).toEqual({
+      count: "the developer funds the works",
+      why: "The developer funds the works, so the buyer has no budget for the plan page to stress: the plan page is left out, and these are the memorandum's terms as read, without the model's read beside them.",
+    });
+    // Every figure the plan page needs read, and no plan page handed in: the
+    // memorandum is never said to state too little.
+    const whole = {
+      ...extraction,
+      singleTenant: undefined,
+      metrics: [row("Purchase price", "$20,000,000"), row("NOI (stabilized, pro forma)", "$2,100,000"), row("Total project cost", "$30,000,000")],
+    } as unknown as ExtractionResult;
+    const wholeDerived = deriveUnderwriteInputs(whole, "Z");
+    expect(buildPlanReport(whole, { pct: wholeDerived.inputs.exitCapPct, provenance: "assumption" }, null)).not.toBeNull();
+    const notHanded = buildReportData({ ...deal, extraction: whole } as unknown as DealRow, "October 5, 2026", [], buildSensitivityData(wholeDerived.inputs, null), undefined, null);
+    expect(notHanded.planLeftOut).toEqual({
+      count: "left out",
+      why: "No plan page was built for this report, so these are the memorandum's terms as read, without the model's read beside them.",
+    });
+  }, 90000);
 
   it("prints what a hotel is sold with over the grids, and the PIP the model carries (#455)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
@@ -788,6 +1235,43 @@ describe("ReportDocument (full report)", () => {
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("Hotel: flagged Courtyard by Marriott, sold unencumbered; PIP $4.2M");
     expect(text).toContain("The model carries the $4.2M PIP as its first year's capital");
+  }, 60000);
+
+  it("names the floor no price clears, and the IRR's own reach, where a hotel's PIP sinks year 1 (research pass 35)", async () => {
+    // The pass's hotel: $36M for 180 keys at 8.0% on a $2.88M T-12 NOI, and
+    // a $4.2M PIP the model carries as its first year's capital.
+    const hotel = {
+      dealName: "Hilton Garden Inn Midtown",
+      assetClass: "hospitality",
+      market: "Nashville, TN",
+      totalPages: 52,
+      hotel: { brand: "Hilton Garden Inn", franchise: "", management: "", encumbrance: "brand", pip: "", page: "p. 6" },
+      metrics: [
+        { label: "Asking price", value: "$36,000,000", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Keys", value: "180", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Going-in cap", value: "8.0%", flagged: false, page: "p. 5", basis: "in_place" },
+        { label: "NOI (T-12)", value: "$2,880,000", flagged: false, page: "p. 5", basis: "in_place" },
+        { label: "PIP cost", value: "$4,200,000", flagged: false, page: "p. 6", basis: "na" },
+      ],
+    } as unknown as ExtractionResult;
+    const deal = { name: hotel.dealName, asset_class: "hospitality_str", extraction: hotel, challenges: null, comps: null, market: null, reconciliation: null, verdict: SAMPLE_DEAL.verdict, prior_screen: null } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(hotel, hotel.dealName!);
+    expect(derived.inputs.capitalImprovementsYr1).toBe(4_200_000);
+    const floors = bidFloors(SAMPLE_DEMO_BOX)!;
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors });
+    expect(sensitivity.maxBid).toBeNull();
+    const levers = pageBaseLevers(derived.inputs);
+    const irr = solveMaxBid(derived.inputs, { minIrr: floors.minIrr }, levers);
+    const cap = solveMaxBid(derived.inputs, { minCap: floors.minCap }, levers);
+    const text = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(text).toContain(
+      `No price inside the tested range clears your 5% cash-on-cash floor: year 1 carries $4.2M of capital, which leaves its cash flow negative at any price. Your 13% IRR floor alone clears up to ${fmtBid(irr.price!)}, and your 5.75% going-in cap floor alone up to ${fmtBid(cap.price!)}.`,
+    );
+    expect(text).not.toContain("the deal's economics, not its price, are the blocker");
   }, 60000);
 
   it("prints how the property is sold over the grids, and the ceiling bid (#456)", async () => {
@@ -1032,6 +1516,294 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("a downside it does not run");
   }, 60000);
 
+  it("prints the rent rules over the grids, and the model's one growth rate beside the allowance in force (lib/rent-regulation)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Year built", value: "1931", flagged: false, page: "", basis: "na" as const },
+        { label: "Rent-regulated units", value: "180", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const address = { label: "100 Walk-up St, Brooklyn, NY 11215", street: "100 Walk-up St", city: "Brooklyn", state: "NY", zip: "11215", county: "Kings County", submarket: "" };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      address,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // As the route reads it: through the one call, on the route's day.
+    const read = regulationForDeal({ extraction, address, siteFlags: null, assetClass: SAMPLE_DEAL.asset_class }, "2026-10-05");
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name, undefined, undefined, { regulation: read });
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(
+      deal,
+      "October 5, 2026",
+      [],
+      sensitivity,
+      undefined,
+      null,
+      null,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      derived.meta.regulation ?? null,
+    );
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.regulation?.read).toMatch(/^The model grows every rent /);
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Rent regulation: NYC rent stabilization applies; 180 of the 248 units rent-regulated as stated (73%)");
+    expect(text).toContain("NYC rent stabilization allows 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027");
+    expect(text).toContain("The model's one growth rate is the market-rate units', not the regulated ones'.");
+    // A model on a placeholder figure prints no read of its own: the rules'
+    // line stands alone.
+    const withheld = buildReportData(
+      deal,
+      "October 5, 2026",
+      [],
+      { ...sensitivity, withheld: "The model runs on a placeholder price." },
+      undefined,
+      null,
+      null,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      derived.meta.regulation ?? null,
+    );
+    expect(withheld.regulation).toEqual({ line: derived.meta.regulation!.line, read: "" });
+    // ... and prints there, on the page that says the grids are left out —
+    // never nowhere (#183).
+    const withheldText = (await pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input: withheld }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    )).replace(/\s+/g, " ");
+    expect(withheldText).toContain("The model runs on a placeholder price.");
+    expect(withheldText).toContain("Rent regulation: NYC rent stabilization applies");
+    expect(withheldText).not.toContain("The model's one growth rate is the market-rate units'");
+  }, 60000);
+
+  it("carries a forward purchase as buildReportData's last argument, and prints it under the plan page's grid where the report has one (lib/forward-purchase)", async () => {
+    const extraction: ExtractionResult = {
+      dealName: "Ridgeline Distribution",
+      assetClass: "industrial",
+      market: "Columbus, OH",
+      address: "",
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "p. 2" },
+        { label: "NOI (stabilized, pro forma)", value: "$2,880,000", flagged: false, page: "p. 4" },
+        { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "p. 4" },
+        { label: "Construction budget", value: "$31,000,000", flagged: false, page: "p. 6" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "p. 4" },
+      ],
+    };
+    const deal = {
+      name: extraction.dealName,
+      asset_class: "industrial",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, extraction.dealName!);
+    expect(derived.meta.forward?.read).toMatch(/^The model runs the price as paid at closing with income from its first year/);
+    const refCap = { pct: derived.inputs.exitCapPct, provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const) };
+    // The developer funds the works: no budget is the buyer's, so the plan
+    // has no yield-on-cost grid to stress and the route builds no plan page.
+    expect(buildPlanReport(extraction, refCap)).toBeNull();
+    const args = (plan: ReturnType<typeof buildPlanReport>) =>
+      buildReportData(deal, "October 5, 2026", [], null, undefined, plan, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.forward ?? null);
+    const input = args(null);
+    expect(input.forward).toEqual(derived.meta.forward);
+    // Page one is the memo, which says the purchase under the title.
+    const page1 = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(page1).toContain("Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's; 6.00% at delivery");
+    // Where a plan page is drawn — here the same deck's grid, as if the
+    // buyer built it — the purchase and the model's read print under it.
+    const own = { ...extraction, strategy: { ...extraction.strategy!, summary: "Ground-up distribution center" } };
+    const ownPlan = buildPlanReport(own, refCap);
+    expect(ownPlan).not.toBeNull();
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input: args(ownPlan) }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, Q3 2027.");
+  }, 60000);
+
+  it("prints a mixed-use building's two incomes over the grids, and the one exit cap the model runs both at (lib/mixed-use)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Residential income", value: "$1,520,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Commercial income", value: "$610,000", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "mixed_use",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.mixedUse ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.mixedUse).toEqual(derived.meta.mixedUse);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial). The model capitalises the $610k of commercial income at the same");
+  }, 60000);
+
+  it("prints an operating business over the grids, and the income the model capitalises as rent (lib/going-concern)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Asking price", value: "$3,200,000", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$256,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "EBITDA (T-12)", value: "$410,000", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: "Route 9 Fuel & Market",
+      asset_class: "auto",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "Route 9 Fuel & Market");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.goingConcern ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.goingConcern).toEqual(derived.meta.goingConcern);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("Fuel station and its store: sold with the business; EBITDA (T-12) $410k. The model capitalises its $256k year-one income");
+  }, 60000);
+
+  it("prints condominium units over the grids, and the model's one building (lib/condo)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Harbor View",
+      assetClass: "Condominium Units (bulk sale)",
+      metrics: [
+        { label: "Asking price", value: "$16,800,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Units", value: "42", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Units in building", value: "120", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: "Harbor View",
+      asset_class: "auto",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "Harbor View");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.condo ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.condo).toEqual(derived.meta.condo);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("Condominium units: 42 of 120 units; dues $328k a year. The model sells the 42 units as one building");
+  }, 60000);
+
+  it("prints a sandwich position over the grids, and the model's perpetuity against its master lease (lib/sandwich-lease)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Founders Plaza",
+      assetClass: "Office",
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+      metrics: [
+        { label: "Asking price", value: "$6,500,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Master lease rent", value: "$1,100,000 a year", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Sublease income", value: "$1,820,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Master lease expiration", value: "December 31, 2091", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: "Founders Plaza",
+      asset_class: "auto",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "Founders Plaza");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.sandwich ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.sandwich).toEqual(derived.meta.sandwich);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2091. The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2091",
+    );
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,
@@ -1150,7 +1922,93 @@ describe("ReportDocument (full report)", () => {
     const without = await render(null);
     expect((await pdfFillCountOf(buf)) - (await pdfFillCountOf(without))).toBeGreaterThanOrEqual(6);
     expect(await pdfTextOf(without)).not.toContain("The exit, on the ground lease's term");
+    // The model's caveat above the grids points to the block on paper,
+    // which has no link to the calculator (research pass 35); with no block
+    // it stands as written.
+    expect(text).toContain(
+      "On a leasehold the value at exit is what the term left will bear — see The exit, on the ground lease's term, below.",
+    );
+    expect(text).not.toContain("ground lease calculator");
+    expect((await pdfTextOf(without)).replace(/\s+/g, " ")).toContain(
+      "On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.",
+    );
   }, 45000);
+
+  it("points a master lease's caveat on paper to the master lease's own term, and leaves any other caveat as written (research pass 35)", () => {
+    const sandwich = {
+      ...SAMPLE_DEAL.extraction,
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+    } as ExtractionResult;
+    const caveat = readInterest(sandwich, 6_500_000)?.modelCaveat ?? "";
+    expect(caveat).toContain("run the ground lease calculator on the stated term, with the master rent as its rent.");
+    const view = { lease: "master lease" } as unknown as Parameters<typeof caveatOnPaper>[1];
+    expect(caveatOnPaper(caveat, view)).toBe(
+      "The screening model capitalises the exit like a fee-simple building. On a master lease the position ends with the lease, so the value at exit is what the term left will bear — see The exit, on the master lease's term, below.",
+    );
+    expect(caveatOnPaper(caveat, null)).toBe(caveat);
+    // A leased fee's caveat names the calculator's leased-fee side, which no
+    // block of the report runs: as written.
+    const leasedFee = readInterest({ ...SAMPLE_DEAL.extraction, interest: { kind: "leased_fee", summary: "", share: "", groundLease: "", loan: "", page: "" } } as ExtractionResult, 6_500_000)?.modelCaveat ?? "";
+    expect(caveatOnPaper(leasedFee, view)).toBe(leasedFee);
+  });
+
+  it("says what a leasehold's max bid returns on the lease's term, not only on the capitalised exit (research pass 35)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      totalPages: 48,
+      interest: { kind: "leasehold", summary: "The leasehold interest in the building", share: "", groundLease: "Ground lease through December 31, 2071; unsubordinated.", loan: "", page: "p. 12" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Ground lease expiration", "December 31, 2071"), row("Ground lease extension options", "Four 10-year options")],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // The route's own chain: the box's floors, and the term's own read.
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const floors = bidFloors(SAMPLE_DEMO_BOX)!;
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors, termRead: termReadFor(extraction) });
+    const bid = sensitivity.maxBid!;
+    expect(bid.unbounded).toBe(false);
+    // The term block's own read at the bid's price, under the bid's levers.
+    const onTerm = readLeaseholdExit(extraction, { ...derived.inputs, ...pageBaseLevers(derived.inputs), purchasePrice: bid.price })!.onTerm!;
+    expect(bid.onTerm).toEqual({ irr: onTerm.leveredIrrPct! / 100 });
+    // On the term, the bid's price earns less than the capitalised exit says.
+    expect(onTerm.leveredIrrPct! / 100).toBeLessThan(bid.at!.irr!);
+    const view = leaseholdExitView(readLeaseholdExit(extraction, derived.inputs)!);
+    const text = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, undefined, undefined, undefined, null, null, view),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(text).toContain(
+      `going-in cap ${(bid.at!.cap! * 100).toFixed(2)}%. That IRR runs on the model's capitalised exit; on the term the ground lease has left at the sale the levered IRR at that price is ${onTerm.leveredIrrPct!.toFixed(1)}% (see The exit, on the ground lease's term, below).`,
+    );
+    // A report without the term block says nothing of a term.
+    const bare = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    );
+    expect(bare).not.toContain("That IRR runs on the model's capitalised exit");
+  }, 60000);
 
   it("gives a portfolio memorandum a page of its own: each property, its bars and what the memorandum states", async () => {
     const prop = (name: string, address: string, count: string, noi: string, occupancy: string, allocatedPrice: string, page: string) => ({
@@ -1198,6 +2056,8 @@ describe("ReportDocument (full report)", () => {
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("The portfolio");
     expect(text).toContain("3 properties · 3 markets");
+    // A dash, not a spaced hyphen (research pass 35).
+    expect(text).toContain("Each property as the memorandum states it — a blank is a figure it does not state.");
     expect(text).toContain("Pittsburgh PA · 1");
     expect(text).toContain("Ohio · 1");
     expect(text).toContain("Ohio City Commons carries 54% of the stated NOI — the portfolio's income rides on one property.");
@@ -1271,15 +2131,119 @@ describe("ReportDocument (full report)", () => {
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain(
-      "Figures the check read beside the rules of thumb: the state of Pennsylvania's, as published, read on Sep 23, 2026 - the address lies outside the metros the site tracks. The first is the state's, not any metro's, the submarket's or the building's. The last is the nation's, and says so.",
+      "Figures the check read beside the rules of thumb: the state of Pennsylvania's, as published, read on Sep 23, 2026 — the address lies outside the metros the site tracks. The first is the state's, not any metro's, the submarket's or the building's. The last is the nation's, and says so.",
     );
     expect(text).not.toContain("the Pennsylvania market's");
     expect(text).toContain("They speak for the portfolio's 1 property in Pennsylvania of its 3, never for the portfolio.");
     expect(text).toContain("• Unemployment 3.7% (Aug 2026, Pennsylvania; FRED)");
     expect(text).toContain(
-      "And the Cleveland OH market's own, where 2 of the portfolio's 3 properties sit, read on Sep 23, 2026. Each is the metro's - not those properties' own, and never the portfolio's.",
+      "And the Cleveland OH market's own, where 2 of the portfolio's 3 properties sit, read on Sep 23, 2026. Each is the metro's — not those properties' own, and never the portfolio's.",
     );
     expect(text).toContain("• Unemployment 4.4% (Jul 2026, Cleveland MSA; FRED)");
+  }, 60000);
+
+  it("counts the brief's lines in words — the first two, the last three — never as bare figures (research pass 35)", async () => {
+    const deal = {
+      name: "The Maddox",
+      asset_class: "multifamily",
+      extraction: { dealName: "The Maddox", assetClass: "multifamily", metrics: [{ label: "Asking price", value: "$40,000,000", flagged: false, page: "p. 3" }] },
+      challenges: null,
+      comps: null,
+      market: {
+        checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],
+        summary: "One aggressive assumption.",
+        liveBrief: {
+          metro: "Washington DC",
+          grain: "metro" as const,
+          readOn: "2026-09-23",
+          lines: [
+            "Unemployment 3.4% (Jul 2026, Washington MSA; FRED)",
+            "Payrolls +0.6% y/y (Jul 2026, Washington MSA; FRED)",
+            "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)",
+            "Debt market — CRE delinquency 1.4% (Q2 2026; FRED)",
+            "Insurance — premiums +6.1% y/y (Aug 2026; BLS via FRED)",
+          ],
+          national: 3,
+        },
+      },
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const text = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    // It read "The first 2 are the metro's … The last 3 are the nation's".
+    expect(text).toContain(
+      "The first two are the metro's, not the submarket's or the building's. The last three are the nation's, each said so.",
+    );
+    // Audit C4, L7: a Census region's rental vacancy line among the first
+    // is the region's, and said apart.
+    const regional = {
+      ...deal,
+      market: {
+        ...(deal.market as object),
+        liveBrief: {
+          metro: "Washington DC",
+          grain: "metro" as const,
+          readOn: "2026-09-23",
+          lines: [
+            "Unemployment 3.4% (Jul 2026, Washington MSA; FRED)",
+            "Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)",
+            "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)",
+          ],
+          national: 1,
+        },
+      },
+    } as unknown as DealRow;
+    const regionText = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(regional, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(regionText).toContain(
+      "The first two are the metro's, not the submarket's or the building's — save the rental vacancy line for the South Census region, which is the region's and says so. The last is the nation's, and says so.",
+    );
+  }, 90000);
+
+  // The pre-merge audit (C1, M3): a block of the nation's lines alone was
+  // headed as the state's figures, "The first 0 are the state's".
+  it("heads a block of the nation's lines alone as the nation's, saying none of the market's own was current", async () => {
+    const deal = {
+      name: "Harrisburg Office",
+      asset_class: "office",
+      extraction: { dealName: "Harrisburg Office", assetClass: "office", metrics: [{ label: "Asking price", value: "$12,000,000", flagged: false, page: "p. 3" }] },
+      challenges: null,
+      comps: null,
+      market: {
+        checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],
+        summary: "One aggressive assumption.",
+        liveBrief: {
+          metro: "Pennsylvania",
+          grain: "state" as const,
+          readOn: "2026-09-23",
+          lines: ["Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)", "Debt market — CRE delinquency 1.4% (Q2 2026; FRED)"],
+          national: 2,
+        },
+      },
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const text = (
+      await pdfTextOf(
+        await renderToBuffer(
+          React.createElement(ReportDocument, { input: buildReportData(deal, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      )
+    ).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Figures the check read beside the rules of thumb: the nation's, as published, read on Sep 23, 2026 — none of the state of Pennsylvania's own was current, and the address lies outside the metros the site tracks. Each is the nation's, and says so.",
+    );
+    expect(text).not.toContain("The first 0");
+    expect(text).not.toContain("the state of Pennsylvania's, as published");
   }, 60000);
 
   it("says how a county-placed deal reached its market's figures (#447)", async () => {
@@ -1338,6 +2302,32 @@ describe("ReportDocument (full report)", () => {
     for (const p of termPages) expect(p, p.slice(0, 200)).toMatch(/\nTERM\nVALUE\nBASIS\nPAGE\nFLAG\n/);
   }, 45000);
 
+  it("names the comp table's columns, and keeps each cell off the next column's (research pass 35)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: {
+        ...SAMPLE_DEAL.extraction,
+        metrics: [...SAMPLE_DEAL.extraction.metrics, { label: "Offers due", value: "October 22, 2026 at 5:00 PM ET", flagged: false, page: "p. 2", basis: "na" }],
+      },
+      challenges: null,
+      comps: SAMPLE_DEAL.comps,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const text = pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    );
+    // A header row over each group of comps, as every other table has.
+    expect(text).toMatch(/SALE COMPS\nCOMP\nDETAIL\nSUPPORT\nWHY\nPAGE\n/);
+    expect(text).toMatch(/LEASE COMPS\nCOMP\nDETAIL\nSUPPORT\nWHY\nPAGE\n/);
+    // A value as wide as its column wraps inside it, short of the basis
+    // column's dash: it printed "October 22, 2026 at 5:00 PM ET—".
+    expect(text).toMatch(/Offers due\nOctober 22, 2026 at 5:00 PM ?\nET\n—\np\. 2\n/);
+  }, 45000);
+
   it("calls a hotel's growth axis RevPAR growth, which is what the model's growth lever grows there", async () => {
     const hotel = {
       dealName: "Hilton Garden Inn Midtown",
@@ -1375,6 +2365,13 @@ describe("ReportDocument (full report)", () => {
     expect(readDay("")).toBe("");
     expect(readDay(null)).toBe("");
     expect(readDay("last week")).toBe("last week");
+    // A source note's stored days, in prose (research pass 35); anything
+    // that is no calendar day is left as written.
+    expect(proseDays("Grossed up from the T-12 actual NOI (TTM to 2026-05-31) at the T-12 actual expense ratio")).toBe(
+      "Grossed up from the T-12 actual NOI (TTM to May 31, 2026) at the T-12 actual expense ratio",
+    );
+    expect(proseDays("Rent roll actual as of 2026-05-01, re-read 2026-09-30")).toBe("Rent roll actual as of May 1, 2026, re-read Sep 30, 2026");
+    expect(proseDays("Lot 2026-13-45; parcel 1999-02-30")).toBe("Lot 2026-13-45; parcel 1999-02-30");
   });
 
   it("reads the OM's figure onto its typical range", () => {
@@ -1464,6 +2461,84 @@ describe("ReportDocument (full report)", () => {
     expect(withPlan).toBe(without + 1);
   }, 45000);
 
+  it("costs a hotel plan per room where the memorandum counts rooms, per key where it counts keys, as the deal page and the workbook do (research pass 34)", async () => {
+    const hotel = (countLabel: string): ExtractionResult => ({
+      dealName: "Harbor Point Hotel — Ground-up Select Service",
+      assetClass: "hospitality_str",
+      market: "Norfolk, VA",
+      strategy: {
+        kind: "development",
+        summary: "Build a 160-room select-service hotel on the waterfront site.",
+        capitalBudget: "$42M hard and soft costs",
+        timeline: "20 months of construction, 18 months of ramp",
+      },
+      metrics: [
+        { label: "Land cost", value: "$6,000,000", flagged: false, page: "p. 3" },
+        { label: "NOI (stabilized, pro forma)", value: "$4,200,000", flagged: false, page: "p. 12" },
+        { label: "Total project cost", value: "$48,000,000", flagged: false, page: "p. 14" },
+        { label: countLabel, value: "160", flagged: false, page: "p. 4" },
+      ],
+    });
+    const render = async (ex: ExtractionResult) => {
+      const deal = { name: ex.dealName, asset_class: "hospitality_str", extraction: ex, challenges: null, comps: null, market: null, reconciliation: null, verdict: SAMPLE_DEAL.verdict, prior_screen: null } as unknown as DealRow;
+      const plan = buildPlanReport(ex, { pct: 0.075, provenance: "assumption" });
+      expect(plan).not.toBeNull();
+      const input = buildReportData(deal, "October 5, 2026", [], null, undefined, plan);
+      return pdfTextOf(
+        await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]),
+      ).replace(/\s+/g, " ");
+    };
+    const rooms = await render(hotel("Rooms (proposed)"));
+    expect(rooms).toContain("BASIS PER ROOM (ALL-IN)");
+    expect(rooms).toContain("The all-in basis is total cost over the 160 planned rooms.");
+    expect(rooms).not.toContain("BASIS PER KEY");
+    expect(rooms).not.toContain("planned keys");
+    // The class's noun where the count is in keys: unchanged.
+    const keys = await render(hotel("Keys (proposed)"));
+    expect(keys).toContain("BASIS PER KEY (ALL-IN)");
+    expect(keys).toContain("The all-in basis is total cost over the 160 planned keys.");
+    // The memo page under the title says the same noun (research pass 35).
+    expect(rooms).toContain("$300,000 per planned room all-in");
+  }, 60000);
+
+  it("costs a value-add's standing units without calling them planned, on the plan page and the memo (research pass 35)", async () => {
+    const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
+    const ex = {
+      dealName: "Riverside Commons — Value-Add",
+      assetClass: "multifamily",
+      market: "Richmond, VA",
+      totalPages: 40,
+      strategy: { kind: "value_add", summary: "Renovate 192 of 240 classic units over 30 months.", capitalBudget: "$4,800,000", timeline: "30 months" },
+      metrics: [
+        row("Asking price", "$42,000,000"),
+        row("Units", "240"),
+        { label: "NOI (in-place)", value: "$2,310,000", flagged: false, page: "p. 8", basis: "in_place" },
+        { label: "NOI (stabilized, pro forma)", value: "$2,950,000", flagged: true, page: "p. 9", basis: "pro_forma" },
+        row("Renovation budget", "$4,800,000", "p. 10"),
+      ],
+    } as unknown as ExtractionResult;
+    const deal = { name: ex.dealName, asset_class: "multifamily", extraction: ex, challenges: null, comps: null, market: null, reconciliation: null, verdict: SAMPLE_DEAL.verdict, prior_screen: null } as unknown as DealRow;
+    const plan = buildPlanReport(ex, { pct: 0.06, provenance: "assumption" });
+    expect(plan?.kind).toBe("value_add");
+    const input = buildReportData(deal, "October 5, 2026", [], null, undefined, plan);
+    const text = pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    ).replace(/\s+/g, " ");
+    // They read "over the 240 planned units" and "$195,000 per planned unit
+    // all-in" on 240 apartments that stand today.
+    expect(text).toContain("The all-in basis is total cost over the 240 units.");
+    expect(text).toContain("$195,000 per unit all-in");
+    expect(text).not.toContain("planned unit");
+    // The plan page's asides are set off by dashes, not spaced hyphens;
+    // the reference cap's note, which carries a dash of its own, by a comma.
+    expect(text).toContain("at once it is done — not on a cap rate against the price.");
+    expect(text).toContain("Stabilized NOI can come in 4.8% under the OM's $2.95M — down to $2.81M — before the yield on cost falls to the 6.00% reference cap.");
+    expect(text).toContain("The budget would have to run 49% over — $7.17M against $4.8M — before the yield fell to the reference cap.");
+    expect(text).toContain("Reference cap: 6.00%, the model's exit-cap default — set your own view in the model.");
+    expect(text).toContain("so its IRR grid is not the plan's return — this grid is.");
+    expect(text).not.toMatch(/[\w%)] - [\w$]/);
+  }, 60000);
+
   it("gives the site a page of its own: FEMA's flood map as one picture, the ring on the building, the key with the building's zone marked, and the zone's sentence (#427, #472)", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,
@@ -1508,11 +2583,13 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("The site");
     expect(text).toContain("FEMA flood map");
     expect(text).toContain("FEMA National Flood Hazard Layer over USGS The National Map; the ring marks the building.");
-    expect(text).toContain("1% annual chance flood hazard - at the building");
+    // A dash, not a spaced hyphen (research pass 35).
+    expect(text).toContain("1% annual chance flood hazard — at the building");
+    expect(text).not.toContain("hazard - at");
     expect(text).toContain("Floodway");
     expect(text).toContain("0.2% annual chance flood hazard");
     expect(text).toContain(
-      "The building sits in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
+      "FEMA's map puts the building's point in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, one Fannie Mae or Freddie Mac buys, or one a federal agency insures or guarantees — the lender's own flood determination decides — and the premium belongs in the expense line.",
     );
 
     // One page more than the report without it, carrying the map and the
@@ -1555,6 +2632,16 @@ describe("ReportDocument (full report)", () => {
     expect(wordsOnly).toContain("The site");
     expect(wordsOnly).toContain("a Special Flood Hazard Area");
     expect(wordsOnly).not.toContain("the ring marks the building");
+
+    // A point placed on the street, not at the house, and placed by Photon:
+    // no ring, the zone read at the frame's centre, OpenStreetMap credited
+    // (the batch-2 audit).
+    const street = (await pdfTextOf(await render({ ...view, ring: false, placedByOsm: true }))).replace(/\s+/g, " ");
+    expect(street).toContain(
+      "FEMA National Flood Hazard Layer over USGS The National Map; the frame is centred on the street the address names, not the building: the map data has no house number for it. Location © OpenStreetMap contributors (openstreetmap.org/copyright).",
+    );
+    expect(street).toContain("1% annual chance flood hazard — at the frame's centre");
+    expect(street).not.toContain("the ring marks the building");
   }, 45000);
 
   it("gives the memorandum's other photographs a page of their own, each with its page's credit, and none for fewer than two (#459)", async () => {

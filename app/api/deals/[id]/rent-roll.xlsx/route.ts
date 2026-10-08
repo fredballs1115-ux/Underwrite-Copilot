@@ -9,6 +9,7 @@ import { openingProfile } from "@/lib/rentroll/profiles";
 import { DEFAULT_LEASE_UP_MONTHS, analyzeRentRoll, defaultAbsorptionSfPerMonth } from "@/lib/rentroll/analytics";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { currentDealModel } from "@/lib/bridge/deal-assumptions";
+import { unstatedPrice } from "@/lib/underwrite/report-grid";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export const runtime = "nodejs";
@@ -90,7 +91,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   // With no as-of date on the roll, today — the reader's own day (lib/
   // reader-day), the day the page counts from, so the two never differ.
-  const asOf = record.asOfDate ?? readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  const readerDay = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  const asOf = record.asOfDate ?? readerDay;
   const analytics = analyzeRentRoll(record.leases, { asOf, nra: record.nra });
   const nra = record.nra && record.nra > 0 ? record.nra : analytics.totalSf || 1;
 
@@ -98,12 +100,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // defaults when it hasn't. Either way they land as editable blue inputs.
   // The deal's own model, derived as every other surface derives it
   // (lib/bridge/deal-assumptions), but seeded for this workbook's hold.
+  // Its dated readers read the reader's day, as the deal page's do
+  // (research pass 40).
   const model = await currentDealModel(
     supabase,
     id,
     deal.name as string,
     (deal.extraction as ExtractionResult | null) ?? null,
     EXPORT_HOLD_YEARS * 12,
+    new Date(`${readerDay}T12:00:00Z`),
   );
   const base = model?.inputs ?? null;
 
@@ -111,6 +116,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // words only: the figures and every formula are the export's as before.
   const vacancySource = model?.sources.vacancyPct;
   const rateSeed = model?.meta.rateSeed ?? null;
+  // The model's price where no memorandum stated one, said beside the price
+  // cell and above the IRR, never printed as if a memorandum had stated it
+  // (research pass 40, item 15).
+  const priceMark = model ? unstatedPrice(model.inputs, model.sources) : null;
   const notes: WorkbookNotes = {
     asOf: record.asOfDate
       ? `The rent roll's as-of date, ${longDay(asOf)}. Drives years-to-expiry.`
@@ -131,6 +140,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         : `The deal model's ${vacancySource?.note ?? "vacancy"}, taken off every year's revenue on top of the lease-up — set your own.`,
     reimbursement:
       "0%: this export assumes no tenant reimburses an operating expense. On net or base-year leases, enter the share they recover.",
+    ...(priceMark ? { price: priceMark.cell, priceIsNone: priceMark.kind === "none" } : {}),
   };
 
   const inputs: WorkbookInputs = {

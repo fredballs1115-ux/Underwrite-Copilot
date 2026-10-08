@@ -25,6 +25,28 @@
 import { changedPaths } from "./fields";
 import type { Assumptions } from "./model";
 
+/** The most versions the bridge page lists, newest first; the rest are
+ *  counted, never left unsaid (research pass 42). */
+export const VERSION_LIST_MAX = 60;
+
+/** What the bridge page's list is of where it is cut: "the newest 60 of 214
+ *  saved versions" — null where it lists every one (or the count did not
+ *  come back). */
+export function versionListCut(shown: number, total: number | null | undefined): string | null {
+  return total != null && total > shown ? `the newest ${shown} of ${total} saved versions` : null;
+}
+
+/** What the deal page's Bridge badge counts, said on it — "214 versions" —
+ *  and in its title: every saved version of the deal's assumptions, the
+ *  automatic snapshots and the scenarios saved by hand. */
+export function versionBadge(count: number): { text: string; title: string } {
+  const versions = count === 1 ? "version" : "versions";
+  return {
+    text: `${count} ${versions}`,
+    title: `Assumption bridge — which input moved the IRR, and by how much. ${count} saved ${versions} of the deal's assumptions: the automatic snapshots of the model's inputs and the scenarios saved by hand.`,
+  };
+}
+
 export interface VersionLike {
   id: string;
   version_label: string;

@@ -18,10 +18,16 @@
 // in the screen yet) are excluded from the denominator, never counted as a
 // pass or a fail. Any tripped dealbreaker caps the verdict at PASS.
 
+import { compactUsd } from "@/lib/money";
 import { countNoun } from "@/lib/asset-words";
+import type { CapWithheldKind } from "@/lib/cap-slot";
 import {
   type BuyBox,
+  type Holding,
+  type ShareRead,
   buildingSfFromMetrics,
+  capWithheldDetail,
+  capWithheldOf,
   findMetric,
   findPriceRow,
   parseCount,
@@ -35,6 +41,9 @@ import {
   NEAR_REL,
   NEAR_CAP_PT,
   NEAR_IRR_PT,
+  planKindLabel,
+  returnWithheldDetail,
+  returnWithheldOf,
   screenYearOf,
   unitCountRow,
 } from "./criteria";
@@ -88,7 +97,32 @@ export interface MandateScore {
   dealbreakerTripped: boolean;
   /** dealbreakers configured but not evaluable against this screen yet */
   unresolvedDealbreakers: number;
+  /** each red line the box sets that applies to this deal, as the fit's
+   *  coverage counts it (lib/criteria `buyBoxCoverage`): a criterion of its
+   *  own, checked or not; absent where the box sets none */
+  dealbreakerCriteria?: DealbreakerCriterion[];
 }
+
+/** One red line as a criterion of the box (`MandateScore.dealbreakerCriteria`). */
+export interface DealbreakerCriterion {
+  /** its name as the coverage's sentence says it — "Cap-rate dealbreaker" */
+  label: string;
+  /** whether this screen could judge it, tripped or clear */
+  checked: boolean;
+  /** whether the price decides it — the price ceiling, the cap floor, the
+   *  basis ceiling — so a fit judged without it is no green light */
+  onPrice: boolean;
+}
+
+/** Each red line's name, as the coverage says it, and whether the price
+ *  decides it. Keyed by the names `evalDealbreakers` files them under. */
+const RED_LINE: Record<"asset class" | "location" | "price" | "cap rate" | "basis / unit", Omit<DealbreakerCriterion, "checked">> = {
+  "asset class": { label: "Asset-class dealbreaker", onPrice: false },
+  location: { label: "Location dealbreaker", onPrice: false },
+  price: { label: "Price dealbreaker", onPrice: true },
+  "cap rate": { label: "Cap-rate dealbreaker", onPrice: true },
+  "basis / unit": { label: "Basis dealbreaker", onPrice: true },
+};
 
 /** Structural shape of the extraction the score reads — kept local so this
  *  module stays importable everywhere without dragging in heavy types. */
@@ -106,6 +140,21 @@ interface ExtractionLike {
   /** what the price buys (#414); on a note the stated cap is the
    *  collateral's, so no cap floor is scored on it */
   interest?: { kind?: string | null } | null;
+  /** why the deal's cap slot holds no cap of its own (lib/criteria
+   *  `capWithheldOf`): no cap floor is scored or tripped on it */
+  capWithheld?: CapWithheldKind | null;
+  /** whether a per-unit figure the memorandum states is the building's: a
+   *  basis ceiling is never tripped on one that is not */
+  statedBasisIsBuildings?: boolean;
+  /** what a partial interest holds and the loan stated on a tenancy in
+   *  common's property (lib/criteria `Holding`), so the cap's words say a
+   *  TIC and a GP stake as what they are */
+  holding?: Holding | null;
+  loanWords?: string | null;
+  /** a share's holding (lib/criteria `ShareRead`): a GP stake's and a
+   *  share of no stated percentage's IRR is never scored, and a tenancy in
+   *  common's words name the property's loan */
+  shareRead?: ShareRead | null;
   /** the day the screen read the memorandum — a price label's year is read
    *  against its year (lib/criteria `screenYearOf`) */
   screenedOn?: string | null;
@@ -131,14 +180,13 @@ function goingInCapPct(metrics: MetricLike[]): number | null {
   return m ? parsePct(m.value) : null;
 }
 
-/** A note's price is a loan's (#414): the cap its memorandum states is the
- *  collateral's, a return the note's buyer does not earn, so a cap floor is
- *  never scored or tripped on it — evaluateBuyBox's rule. */
-function isNote(extraction: ExtractionLike | null): boolean {
-  return extraction?.interest?.kind === "note";
-}
-const NOTE_CAP_DETAIL = (floor: number) =>
-  `Mandate wants ≥${floor}% going-in, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`;
+/** A note's price is a loan's (#414), a preferred equity position's buys a
+ *  rate and a redemption, and a share's beside its entity's loan grosses up
+ *  to the equity's whole: the cap the memorandum states is a return none of
+ *  their buyers earns, so a cap floor is never scored or tripped on it —
+ *  evaluateBuyBox's rule, by the deal's cap slot's own reason
+ *  (lib/criteria `capWithheldOf`). */
+const capStands = (extraction: ExtractionLike | null): boolean => capWithheldOf(extraction) == null;
 
 /** The deal's asset class: the explicit override wins, else what the screen
  *  read. Mirrors evaluateBuyBox. */
@@ -208,23 +256,26 @@ function scoreBand(
   return { status: "miss", earned: 0 };
 }
 
-const fmtM = (d: number) =>
-  d >= 1e6 ? `$${(d / 1e6).toFixed(1)}M` : `$${Math.round(d / 1e3)}k`;
+const fmtM = (d: number) => compactUsd(d, { thousandsFrom: 0 });
 
 /** Evaluate the hard dealbreakers against the screen. Each returns a bucket:
- *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet).
- *  Exported for the verdict's brief, which names the red lines a deal trips
- *  in these sentences rather than re-deriving them. */
+ *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet) —
+ *  and each red line that applies is a criterion of the box (`criteria`),
+ *  checked or not, which the fit's coverage counts. Exported for the
+ *  verdict's brief, which names the red lines a deal trips in these
+ *  sentences rather than re-deriving them. */
 export function evalDealbreakers(
   dealAssetClass: string,
   extraction: ExtractionLike | null,
   box: BuyBox,
-): { tripped: string[]; clear: string[]; unknown: string[] } {
+): { tripped: string[]; clear: string[]; unknown: string[]; criteria: DealbreakerCriterion[] } {
   const db = box.dealbreakers!;
   const metrics = extraction?.metrics ?? [];
   const tripped: string[] = [];
   const clear: string[] = [];
   const unknown: string[] = [];
+  const criteria: DealbreakerCriterion[] = [];
+  const judged = (name: keyof typeof RED_LINE, checked: boolean) => criteria.push({ ...RED_LINE[name], checked });
 
   // Asset class must be in the mandate list (needs a mandate list to mean
   // anything — inert without one).
@@ -234,6 +285,7 @@ export function evalDealbreakers(
     if (!actual) unknown.push("asset class");
     else if (wanted.includes(actual.toLowerCase())) clear.push("asset class");
     else tripped.push(`asset class is ${actual}, outside the mandate`);
+    judged("asset class", !!actual);
   }
 
   // Must sit in a target geography (needs targets to mean anything).
@@ -242,6 +294,7 @@ export function evalDealbreakers(
     if (!haystack) unknown.push("location");
     else if (inTargetGeo(box, haystack)) clear.push("location");
     else tripped.push("location outside every target market");
+    judged("location", !!haystack);
   }
 
   // Hard purchase-price ceiling — the shared price row, so a development's
@@ -255,26 +308,33 @@ export function evalDealbreakers(
     if (price == null) unknown.push("price");
     else if (price <= ceiling) clear.push("price");
     else tripped.push(`price ${fmtM(price)} over the ${fmtM(ceiling)} ceiling`);
+    judged("price", price != null);
   }
 
-  // Hard going-in cap floor.
+  // Hard going-in cap floor — never on a cap the deal's cap slot withholds.
   if (db.minCapPct != null) {
-    const cap = isNote(extraction) ? null : goingInCapPct(metrics);
+    const cap = capStands(extraction) ? goingInCapPct(metrics) : null;
     if (cap == null) unknown.push("cap rate");
     else if (cap >= db.minCapPct) clear.push("cap rate");
     else tripped.push(`going-in cap ${cap.toFixed(2)}% under the ${db.minCapPct}% floor`);
+    judged("cap rate", cap != null);
   }
 
-  // Hard basis-per-unit ceiling.
+  // Hard basis-per-unit ceiling — never on a per-unit figure struck on a
+  // price that is not the building's (a note's, a position's, the land's, a
+  // share's), which is on a basis the memorandum never says.
   if (db.maxPerUnitK != null) {
-    const perUnit = moneyOf(metrics, METRIC_FIND.perUnit);
+    const perUnit = extraction?.statedBasisIsBuildings === false ? null : moneyOf(metrics, METRIC_FIND.perUnit);
     const ceiling = db.maxPerUnitK * 1e3;
     if (perUnit == null) unknown.push("basis / unit");
     else if (perUnit <= ceiling) clear.push("basis / unit");
-    else tripped.push(`basis ${fmtM(perUnit)}/unit over the ${fmtM(ceiling)}/unit ceiling`);
+    // On a plan deal the figure is the price over the units, never the
+    // plan's all-in basis, and is said so (the box's check, lib/criteria).
+    else tripped.push(`${planKindLabel(extraction) ? "price" : "basis"} ${fmtM(perUnit)}/unit over the ${fmtM(ceiling)}/unit ceiling`);
+    judged("basis / unit", perUnit != null);
   }
 
-  return { tripped, clear, unknown };
+  return { tripped, clear, unknown, criteria };
 }
 
 /**
@@ -293,6 +353,7 @@ export function scoreMandateFit(
   const dims: MandateDimension[] = [];
   let dealbreakerTripped = false;
   let unresolvedDealbreakers = 0;
+  let dealbreakerCriteria: DealbreakerCriterion[] = [];
 
   // ---- Asset class (binary) ---------------------------------------------
   if (box.assetClasses?.length) {
@@ -410,13 +471,13 @@ export function scoreMandateFit(
 
   // ---- Going-in cap (floor) ---------------------------------------------
   if (box.minCapPct != null) {
-    const note = isNote(extraction);
-    const cap = note ? null : goingInCapPct(metrics);
+    const withheld = capWithheldOf(extraction);
+    const cap = withheld ? null : goingInCapPct(metrics);
     const s = scoreFloor(cap, box.minCapPct, NEAR_CAP_PT, WEIGHTS.cap);
     const detail =
       s.status === "unknown"
-        ? note
-          ? NOTE_CAP_DETAIL(box.minCapPct)
+        ? withheld
+          ? capWithheldDetail(box.minCapPct, withheld, extraction)
           : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`
         : s.status === "pass"
           ? `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${cap!.toFixed(2)}%. Clears the floor.`
@@ -443,11 +504,16 @@ export function scoreMandateFit(
 
   // ---- Target return / IRR (floor) --------------------------------------
   if (box.minIrrPct != null) {
-    const irr = pctOf(metrics, METRIC_FIND.irr);
+    // Where the price buys no building the IRR the memorandum states is no
+    // return its buyer earns (lib/criteria `returnWithheldOf`): never scored.
+    const withheld = returnWithheldOf(extraction);
+    const irr = withheld ? null : pctOf(metrics, METRIC_FIND.irr);
     const s = scoreFloor(irr, box.minIrrPct, NEAR_IRR_PT, WEIGHTS.irr);
     const detail =
       s.status === "unknown"
-        ? `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen.`
+        ? withheld
+          ? returnWithheldDetail(box.minIrrPct, withheld, extraction)
+          : `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen.`
         : s.status === "pass"
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${irr!.toFixed(1)}%. On target (broker figure — verify).`
           : s.status === "partial"
@@ -458,26 +524,30 @@ export function scoreMandateFit(
 
   // ---- Dealbreakers (hard) ----------------------------------------------
   if (!hasNoDealbreakers(box.dealbreakers)) {
-    const { tripped, clear, unknown } = evalDealbreakers(dealAssetClass, extraction, box);
+    const { tripped, clear, unknown, criteria } = evalDealbreakers(dealAssetClass, extraction, box);
     unresolvedDealbreakers = unknown.length;
+    dealbreakerCriteria = criteria;
     let status: DimensionStatus, earned: number, detail: string;
     if (tripped.length) {
       dealbreakerTripped = true;
       status = "miss";
       earned = 0;
       detail = `Dealbreaker: ${tripped.join("; ")}. Automatic PASS.`;
-    } else if (clear.length) {
+    } else if (clear.length && !unknown.length) {
       status = "pass";
       earned = WEIGHTS.dealbreakers;
-      detail = unknown.length
-        ? `No dealbreaker tripped (${unknown.length} couldn't be checked — verify).`
-        : "No dealbreaker tripped. All red lines clear.";
+      detail = "No dealbreaker tripped. All red lines clear.";
     } else {
-      // Only unknowns — never claim the red lines passed when none could be
-      // checked. Excluded from the score, surfaced for manual review.
+      // A red line that could not be checked may be the one the deal
+      // crosses: "no red line crossed" is never claimed — let alone scored
+      // at the dimension's full weight — while one is unchecked (the audit
+      // of 2026-10-05). Excluded from the score, surfaced for review, and
+      // counted by the fit's coverage as a criterion not checked.
       status = "unknown";
       earned = 0;
-      detail = `${unknown.length} dealbreaker${unknown.length > 1 ? "s" : ""} couldn't be checked against the screen yet.`;
+      detail = clear.length
+        ? `No dealbreaker tripped of the ${clear.length} checked, but ${unknown.length} couldn't be checked against the screen yet — verify.`
+        : `${unknown.length} dealbreaker${unknown.length === 1 ? "" : "s"} couldn't be checked against the screen yet.`;
     }
     dims.push({ key: "dealbreakers", label: "Dealbreakers", weight: WEIGHTS.dealbreakers, earned, status, detail });
   }
@@ -502,5 +572,5 @@ export function scoreMandateFit(
             ? "WATCH"
             : "PASS";
 
-  return { score, verdict, dimensions: dims, dealbreakerTripped, unresolvedDealbreakers };
+  return { score, verdict, dimensions: dims, dealbreakerTripped, unresolvedDealbreakers, dealbreakerCriteria };
 }

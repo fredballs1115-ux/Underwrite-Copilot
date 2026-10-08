@@ -10,6 +10,8 @@
  * Pure, no I/O, no "use client": the page and the modules import it alike.
  */
 
+import { compactUsd } from "@/lib/money";
+
 // The sign goes OUTSIDE the dollar, and it is the minus sign (U+2212), the
 // way the rest of the site writes money: "−$1.5M" on a re-screen's diff,
 // "−$578/mo" under a fair market rent. Interpolating a negative straight in
@@ -25,15 +27,12 @@ export const money = (n: number, body: (abs: number) => string): string => {
   return `${n < 0 && /[1-9]/.test(figure) ? "−" : ""}$${figure}`;
 };
 
-/** $13.48M at a million and over, $560,000 under it; "—" for no figure. */
+/** $13.48M at a million and over, $560,000 under it; "—" for no figure.
+ *  Rounded as every compact figure on the site is (lib/money `compactUsd`):
+ *  a half-step up, counted in whole numbers — $1,005,000 is "$1.01M", where
+ *  a float's toFixed had read "$1.00M". */
 export const usd = (n: number | null): string =>
-  n === null
-    ? "—"
-    : money(n, (a) =>
-        a >= 1_000_000
-          ? `${(a / 1_000_000).toFixed(2)}M`
-          : Math.round(a).toLocaleString("en-US"),
-      );
+  n === null ? "—" : compactUsd(n, { millions: 2, thousandsFrom: Infinity });
 
 /** Every dollar: $13,480,465. */
 export const usdExact = (n: number | null): string =>

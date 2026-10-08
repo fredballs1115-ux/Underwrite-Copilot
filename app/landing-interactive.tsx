@@ -11,6 +11,7 @@ import { SAMPLE_COMP_PREMIUM_LINE } from "@/lib/marketing-constants";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { computeModel } from "@/lib/model/compute";
 import type { SampleLegal } from "@/lib/sample-legal";
+import { compactUsd } from "@/lib/money";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -92,6 +93,10 @@ export function CountUp({
 
 // Derived once from the sample fixture through the SAME computeModel the
 // product ships — this widget cannot disagree with the engine or the demo.
+// The Financials tab's returns are the deal page's Financials tab's: the
+// first-draft model's card, which prints them to two places and names its
+// model (research pass 34: the miniature printed "8.7%" beside the card's
+// "8.72%", and named no model beside a page that runs two).
 const INPUTS = SAMPLE_DEAL.model.inputs;
 const RETURNS = computeModel(INPUTS).returns;
 const VERDICT_WORD =
@@ -100,8 +105,8 @@ const VERDICT_WORD =
     : SAMPLE_DEAL.verdict.verdict === "pass_on"
       ? "No-go"
       : "Caution";
-const pct1 = (n: number | null) =>
-  n == null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`;
+const pct2 = (n: number | null) =>
+  n == null || !isFinite(n) ? "—" : `${n.toFixed(2)}%`;
 
 // The REAL deal page's section list (deal-view.tsx SECTIONS) — the homepage
 // walkthrough uses the product's own information architecture, not a
@@ -138,7 +143,9 @@ function RangeRow({
         ].map(([k, v, e]) => (
           <div
             key={k as string}
-            className={`px-2.5 py-1.5 ${e ? "bg-brand/5" : "bg-surface"}`}
+            // Opaque, so the grid's line colour never shows through the
+            // base's tint (research pass 33).
+            className={`px-2.5 py-1.5 ${e ? "bg-[color-mix(in_oklab,var(--color-brand)_5%,var(--color-surface))]" : "bg-surface"}`}
           >
             <p className="text-[9px] uppercase tracking-wide text-muted">
               {k as string}
@@ -239,7 +246,7 @@ function SummaryFigures() {
     <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-line px-3 py-2.5">
       {(
         [
-          ["Price", `$${(INPUTS.purchasePrice / 1e6).toFixed(0)}M`],
+          ["Price", compactUsd(INPUTS.purchasePrice, { wholeMillionsFrom: 0 })],
           ["Size", `${INPUTS.units} units`],
           ["Going-in cap", `${RETURNS.goingInCapPct.toFixed(2)}%`],
         ] as const
@@ -324,7 +331,9 @@ function LegalBlock({ legal }: { legal: SampleLegal }) {
   );
 }
 
-function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
+/** One tab's panel (exported for the homepage's render test, which holds
+ *  the Financials tab to the deal page's first-draft card). */
+export function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
   switch (tab) {
     case "Overview":
       return (
@@ -354,12 +363,15 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
     case "Financials":
       return (
         <div className="space-y-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Projected returns · first-draft model
+          </p>
           <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
             {(
               [
-                ["Levered IRR", pct1(RETURNS.leveredIrrPct)],
+                ["Levered IRR", pct2(RETURNS.leveredIrrPct)],
                 ["Equity multiple", RETURNS.equityMultiple ? `${RETURNS.equityMultiple.toFixed(2)}x` : "—"],
-                ["Cash-on-cash", pct1(RETURNS.cashOnCashPct)],
+                ["Cash-on-cash (Yr 1)", pct2(RETURNS.cashOnCashPct)],
               ] as const
             ).map(([k, v]) => (
               <div key={k} className="bg-surface px-2 py-2">

@@ -203,6 +203,24 @@ export function sizeLoan(inp: SizingInputs): Sizing {
 }
 
 /**
+ * The one line under a sizing whose loan is more than the price (research
+ * pass 38, C28): a loan-to-value typed over 100%, or a coverage test under
+ * 1.00x, sizes debt past the building's value, and the card's equity reads
+ * as a negative cheque with nothing beside it to say why. Null where the
+ * loan is within the price.
+ */
+export function loanPastPriceLine(inp: SizingInputs, s: Sizing): string | null {
+  if (s.loan == null || s.equity == null || !(s.equity < 0)) return null;
+  const why = [
+    positive(inp.maxLtvPct) && inp.maxLtvPct > 100 ? "a loan-to-value over 100%" : null,
+    positive(inp.minDscr) && inp.minDscr < 1 ? "a debt service coverage under 1.00x" : null,
+  ].filter((w): w is string => w != null);
+  return `The loan is more than the price, so the equity reads as a negative cheque: ${
+    why.length ? why.join(" and ") : "the tests as set"
+  } ${why.length === 1 ? "lends" : "lend"} past the building's value.`;
+}
+
+/**
  * The occupancy at which the building exactly covers its operating expenses
  * and its debt service, as a percent of gross potential rent.
  *

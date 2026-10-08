@@ -8,7 +8,8 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { FREE_DEALS, FREE_DEALS_LINE, FREE_PLAN, PRO_PLAN, PRO_PLAN_LINES, PRO_UPSELL } from "./marketing-constants";
+import { seedRules } from "./research-data";
+import { COMPS_JURISDICTIONS, FREE_DEALS, FREE_DEALS_LINE, FREE_PLAN, PRO_PLAN, PRO_PLAN_LINES, PRO_UPSELL } from "./marketing-constants";
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -124,6 +125,17 @@ describe("the free allowance is said as the cap counts it", () => {
   it("the team trial is counted by its own constant, never the personal one", () => {
     expect(APP.filter((f) => /\$\{FREE_DEALS\} shared deals/.test(read(f)))).toEqual([]);
     expect(read("app/page.tsx")).toContain("`Up to ${TEAM_TRIAL_DEALS} shared deals free to try it`");
+  });
+
+  it("the free card promises comps and local rules only where they run (research pass 32)", () => {
+    expect(FREE_PLAN).toContain(`Recorded-sales comps in ${COMPS_JURISDICTIONS}`);
+    // Statewide only where a state's rule is on file, counted from the
+    // rules file so the line cannot drift from it (the batch-2 audit).
+    const statewide = new Set(seedRules().filter((r) => !r.jurisdiction_local).map((r) => r.jurisdiction_state));
+    const line = FREE_PLAN.find((f) => /^Rent-rule check by address: local in the covered markets/.test(f)) ?? "";
+    expect(line).toBe(`Rent-rule check by address: local in the covered markets, and the statewide rules on file for ${statewide.size} states`);
+    expect(FREE_PLAN.some((f) => /statewide elsewhere/.test(f))).toBe(false);
+    expect(FREE_PLAN.some((f) => /comps \+ local rent-rule check by address/.test(f))).toBe(false);
   });
 
   it("the plan card and the calls to sign up read one line", () => {

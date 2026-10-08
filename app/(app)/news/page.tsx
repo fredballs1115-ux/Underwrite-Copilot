@@ -6,7 +6,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import { fetchLiveHeadlines } from "@/lib/news/live";
 import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
 import { LiveHeadlinesView } from "./live-headlines";
-import { ScoredFeedView, type AlertRow, type ItemRow } from "./scored-feed";
+import { SCORED_READ, ScoredFeedView, type AlertRow, type ItemRow } from "./scored-feed";
 
 export const metadata: Metadata = { title: "News" };
 export const dynamic = "force-dynamic";
@@ -84,13 +84,14 @@ export default async function NewsPage({
   const supabase = await createSupabaseServerClient();
   let items: ItemRow[] = [];
   let alerts: AlertRow[] = [];
+  let total: number | null = null;
   try {
-    const [{ data: it }, { data: al }] = await Promise.all([
+    const [{ data: it }, { data: al }, counted] = await Promise.all([
       supabase
         .from("market_intel_items")
         .select("url, title, source, sector, relevance, summary, action, published_at, created_at")
         .order("created_at", { ascending: false })
-        .limit(200),
+        .limit(SCORED_READ),
       supabase
         .from("regulatory_alerts")
         .select("id, rule_id, headline, url, detail, detected_at")
@@ -101,8 +102,12 @@ export default async function NewsPage({
         // it would have let anyone hide an alert from all.
         .order("detected_at", { ascending: false })
         .limit(5),
+      // Every story the sweep has scored, counted, so the feed says it lists
+      // the newest of them (research pass 42).
+      supabase.from("market_intel_items").select("url", { count: "exact", head: true }),
     ]);
     items = (it as ItemRow[] | null) ?? [];
+    total = counted.error ? null : (counted.count ?? null);
     alerts = (al as AlertRow[] | null) ?? [];
   } catch {
     // tables absent until migrations run — the view's empty line explains
@@ -125,7 +130,7 @@ export default async function NewsPage({
         <LiveHeadlinesSection />
       </Suspense>
 
-      <ScoredFeedView items={items} alerts={alerts} wantSector={params.sector ?? ""} />
+      <ScoredFeedView items={items} alerts={alerts} wantSector={params.sector ?? ""} total={total} />
     </div>
   );
 }

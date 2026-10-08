@@ -1,17 +1,20 @@
-import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
+import { compactUsd } from "@/lib/money";
+import { METRIC_FIND, findMetric, parseMoney, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   buildingPriceOf,
   findPriceMetric,
   inferStrategy,
   planSummary,
+  planWithBasisChecked,
   statedBasisIsBuildings,
-  unitCountFromMetrics,
   type StrategyKind,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { priceUnitCount } from "@/lib/condo-units";
+import { statedCapRead } from "@/lib/compare-interest";
 import { dealClassKey } from "@/lib/asset-words";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 
 /**
@@ -56,6 +59,28 @@ export interface AnalyticsRow {
   stage?: string | null;
   verdict: unknown;
   extraction: unknown;
+  /** the screen's first signal (FirstSignal): its take names a plan the
+   *  extraction's rows may not, as the deal page reads it */
+  first_signal?: unknown;
+}
+
+/**
+ * What the analytics page's figures are of, as its read finds them (research
+ * pass 42, H3): every screened deal the reader can see, which row-level
+ * security makes their own and their team's. Said as the reader's own only
+ * where no teammate's screen is among them — never "an OM you ran" over a
+ * teammate's deal. Whose deals the page pools is the owner's call; these
+ * words follow the read.
+ */
+export function analyticsScope(own: number, team: number, typed = 0): string {
+  // A deal typed by hand (lib/manual-deal `typedByHand`) was extracted from
+  // no OM: where any is among them the words say so (audit C5, LOW-8).
+  if (team <= 0)
+    return typed > 0
+      ? "What your own screens add up to — every figure below is as extracted from an OM you screened or as you entered it by hand, never restated."
+      : "What your own screens add up to — every figure below was extracted from an OM you screened, never restated.";
+  const source = typed > 0 ? "is as extracted from a screened OM or as entered by hand" : "was extracted from a screened OM";
+  return `What the screens in your pipeline add up to — ${own} of yours and ${team} of your team's — every figure below ${source}, never restated.`;
 }
 
 export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
@@ -68,16 +93,25 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     // strategy reader never meets a missing array.
     const metrics = Array.isArray(raw.metrics) ? raw.metrics : [];
     const extraction = { ...raw, metrics } as ExtractionResult;
-    const strategy = inferStrategy(extraction);
-    const plan = planSummary(extraction, strategy);
+    // The deal's kind as its own page reads it: the extraction and the
+    // first signal, whose take can name the plan the rows do not — read
+    // alone, a value-add the signal names was plotted as a stabilized cap.
+    const signal = (r.first_signal as FirstSignal | null | undefined) ?? null;
+    const strategy = inferStrategy(extraction, signal);
+    const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
 
-    // A plan deal has no going-in cap: a stabilized or pro forma cap, or a
-    // yield on cost, describes the finished project, not the price paid.
-    // …and a note's cap is the collateral's, a leased fee's a ground rent's
-    // (#415): neither is plotted among buildings' going-in caps.
+    // The cap the deal's own header prints (lib/compare-interest
+    // `statedCapRead`): the memorandum's going-in cap, else its first
+    // signal's, which the series had left out (the audit of 2026-10-05). A
+    // plan deal is judged on its yield on total cost: a stabilized or pro
+    // forma cap, or a yield on cost, describes the finished project, not the
+    // price paid. …and no cap the header withholds is plotted
+    // (`capSlotWithheld`: a note's is the collateral's, a position's the
+    // building's, a share's beside its entity's loan on a basis never said),
+    // nor a leased fee's, a ground rent's (#415), among buildings' going-in
+    // caps.
     const interestKind = interestOf(extraction).kind;
-    const capMetric = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
-    const capPct = capMetric ? parsePct(capMetric.value) : null;
+    const capPct = interestKind === "leased_fee" ? null : (statedCapRead(extraction, plan != null, signal)?.pct ?? null);
 
     // The asking / purchase price — or, on a development, the land cost.
     const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
@@ -111,7 +145,9 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
       if (directPer) perUnit = parseMoney(directPer.value);
       const basisPrice = buildingPriceOf(extraction, price);
       if (perUnit == null && basisPrice != null) {
-        const units = unitCountFromMetrics(metrics);
+        // A bulk condominium purchase's price is over the units offered
+        // (lib/condo-units `priceUnitCount`, the card's count).
+        const units = priceUnitCount(extraction);
         if (units != null) perUnit = basisPrice / units;
       }
     }
@@ -217,9 +253,4 @@ export function parsedPhrase(n: number): string {
   return `${n} deals parsed`;
 }
 
-export const fmtUsdCompact = (dollars: number): string =>
-  dollars >= 1e6
-    ? `$${(dollars / 1e6).toFixed(1)}M`
-    : dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k`
-      : `$${Math.round(dollars)}`;
+export const fmtUsdCompact = (dollars: number): string => compactUsd(dollars);

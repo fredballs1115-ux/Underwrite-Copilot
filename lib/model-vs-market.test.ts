@@ -179,7 +179,7 @@ describe("modelVsMarket — the model's four assumptions against the published f
   it("a plan deal has no going-in cap: the exit's spread is stated, not set against an entry", () => {
     const c = check({ ...base, plan: true, goingInCapPct: null }, "exit_cap")!;
     expect(c.tone).toBe("stated");
-    expect(c.read).toContain("A plan deal has no going-in cap to set it against; the spread is the claim");
+    expect(c.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it; the spread is the claim");
     const noCap = check({ ...base, goingInCapPct: null }, "exit_cap")!;
     expect(noCap.tone).toBe("stated");
     expect(noCap.read).toContain("No going-in cap to set it against; the spread is the claim.");
@@ -321,9 +321,17 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
 });
 
 // ── One read for every surface ──────────────────────────────────────────────
-import { dealGoingInCap, impliedGoingInCap, modelVsMarketFor } from "./model-vs-market";
+import { dealGoingInCap, impliedGoingInCap, modelEntryCap, modelVsMarketFor } from "./model-vs-market";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import ExcelJS from "exceljs";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { buildUnderwriteWorkbook } from "./underwrite/workbook";
+import { buildSensitivityData } from "./underwrite/report-grid";
+import { buildReportData, ReportDocument } from "./memo/report-document";
+import { pdfTextOf } from "./memo/pdf-text-of";
+import { SAMPLE_DEAL } from "./sample-deal";
+import type { DealRow } from "./deals";
 
 /** A first signal naming no plan, carrying whatever cap the fast read found. */
 const signalWithCap = (goingInCap: string, assetClass = "industrial"): FirstSignal => ({
@@ -392,7 +400,12 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     // The page, the report and the workbook all hand the signal in, so all
     // three read its 5.5% — the page's summary bar's own fallback.
     const own = modelVsMarketFor({ derived, extraction: noCap, firstSignal: signalWithCap("5.5%"), storedAssetClass: "industrial", metro: null, reads })!;
-    expect(own.checks[2].read).toContain("The going-in cap 5.50% is 56 bps over it, so the exit assumes the spread widens 50 bps");
+    // The model's own year-1 NOI over its price is 6.00%, 50 bps from the
+    // signal's cap: both are named, and the exit is set against the model's
+    // own entry, which it holds (research pass 34).
+    expect(own.checks[2].read).toContain(
+      "The going-in cap the OM states, 5.50%, is 56 bps over it; the model's own year-1 NOI over its price is 6.00%, 106 bps over it, so the exit holds the spread of the model's own entry with the 10-year unchanged.",
+    );
     // The extraction's stated cap outranks the signal's.
     const stated = modelVsMarketFor({ derived, extraction, firstSignal: signalWithCap("5.5%"), storedAssetClass: "industrial", metro: null, reads })!;
     expect(stated.checks[2].read).toContain("The going-in cap 6.00% is 106 bps over it");
@@ -427,8 +440,13 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     expect(impliedGoingInCap(deal)?.pct).toBeCloseTo(5.8, 6);
     const model = deriveUnderwriteInputs(deal, deal.dealName!);
     const exit = modelVsMarketFor({ derived: model, extraction: deal, firstSignal: signalWithCap("5.4%"), storedAssetClass: "industrial", metro: null, reads })!.checks.find((c) => c.key === "exit_cap");
-    expect(exit?.read).toContain("The going-in cap 5.40%");
+    expect(exit?.read).toContain("The going-in cap the OM states, 5.40%,");
     expect(exit?.read).not.toContain("implied");
+    // The model runs the documents' 5.80%, and the exit is set against it
+    // (research pass 34), the going-in cap named beside it.
+    expect(exit?.read).toContain(
+      "the model's own year-1 NOI over its price is 5.80%, 86 bps over it, so the exit assumes the spread widens 20 bps from the model's own entry",
+    );
   });
 
   it("a plan deal reads no going-in cap, whatever the extraction states", () => {
@@ -445,11 +463,11 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const r = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, storedAssetClass: "auto", metro: { id: "dc", name: "Washington DC" }, reads });
     const exit = r?.checks.find((c) => c.key === "exit_cap");
     expect(exit?.tone).toBe("stated");
-    expect(exit?.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(exit?.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
     // Not the first signal's either, nor the one its figures would imply: a
     // plan's NOI belongs over total cost, and the page shows none.
     const shown = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, firstSignal: signalWithCap("5.0%"), storedAssetClass: "auto", metro: null, reads });
-    expect(shown?.checks.find((c) => c.key === "exit_cap")?.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(shown?.checks.find((c) => c.key === "exit_cap")?.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
   });
 
   it("reads the plan the first signal names, as the page does (the audit of 2026-09-30)", () => {
@@ -468,7 +486,7 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const exitOf = (r: ReturnType<typeof modelVsMarketFor>) => r?.checks.find((c) => c.key === "exit_cap");
     const withSignal = modelVsMarketFor({ derived, extraction, firstSignal: signal, storedAssetClass: "industrial", metro: null, reads });
     expect(exitOf(withSignal)?.tone).toBe("stated");
-    expect(exitOf(withSignal)?.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(exitOf(withSignal)?.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
     const without = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads });
     expect(exitOf(without)?.read).toContain("The going-in cap 6.00%");
   });
@@ -510,8 +528,123 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
       interest: { kind: "note", summary: "The first mortgage note", share: "", groundLease: "", loan: "", page: "p. 2" },
     };
     expect(dealGoingInCap(note, signalWithCap("6.0%"))).toBeNull();
+    // Wherever the header withholds the cap (lib/compare-interest
+    // `capSlotWithheld`): a preferred equity position's price buys a
+    // position, and a stated cap is the building's on a value it never paid.
+    const position: ExtractionResult = {
+      ...extraction,
+      interest: { kind: "preferred_equity", summary: "Preferred equity in the owning entity", share: "", groundLease: "", loan: "", page: "p. 2" },
+    };
+    expect(dealGoingInCap(position)).toBeNull();
+    // A share keeps the memorandum's cap; beside its entity's own loan, the
+    // grossed-up price is the equity's whole and no cap is set against it.
+    const share: ExtractionResult = {
+      ...extraction,
+      interest: { kind: "partial_interest", summary: "A 49% interest in the owning entity", share: "49%", groundLease: "", loan: "", page: "p. 2" },
+    };
+    expect(dealGoingInCap(share)).toEqual({ pct: 6, source: "stated" });
+    const shareBesideLoan: ExtractionResult = {
+      ...share,
+      metrics: [...share.metrics, { label: "Entity loan balance", value: "$56,500,000", page: "4", flagged: false }],
+    };
+    expect(dealGoingInCap(shareBesideLoan)).toBeNull();
     const conversion: FirstSignal = { ...signalWithCap("6.0%"), take: "A conversion of a vacant plant to last-mile logistics." };
     expect(dealGoingInCap(extraction, conversion)).toBeNull();
+  });
+});
+
+// Research pass 34: the exit defaults to the OM's stated cap while the model
+// enters at its own year-1 NOI over its price. Stated at 5.25% with only a
+// $1.7M pro forma NOI on $30M, the model buys at 5.67% and sells at 5.25% —
+// and the card, the report and the workbook's Market Read said "the exit
+// holds the spread". Each now names both and sets the exit against the
+// model's own entry.
+describe("the exit is set against the model's own entry where it sits apart from the stated cap", () => {
+  const shapeA: ExtractionResult = {
+    dealName: "Juniper Flats",
+    assetClass: "multifamily",
+    market: "Washington, DC",
+    address: "100 Juniper St NW, Washington, DC",
+    metrics: [
+      { label: "Asking price", value: "$30,000,000", flagged: false, page: "p. 3" },
+      { label: "Cap rate", value: "5.25%", flagged: false, page: "p. 3" },
+      { label: "NOI (pro forma)", value: "$1,700,000", flagged: false, page: "p. 9" },
+      { label: "Units", value: "100", flagged: false, page: "p. 2" },
+    ],
+  };
+  const derived = deriveUnderwriteInputs(shapeA, shapeA.dealName!);
+  const reads = { rates, zori, national, now: FIXTURE_NOW };
+  const read = modelVsMarketFor({ derived, extraction: shapeA, storedAssetClass: "multifamily", metro: null, reads })!;
+  const exit = read.checks.find((c) => c.key === "exit_cap")!;
+  const sentence =
+    "The exit cap 5.25% is 31 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap the OM states, 5.25%, is 31 bps over it; the model's own year-1 NOI over its price is 5.67%, 73 bps over it, so the exit assumes the spread narrows 42 bps from the model's own entry with the 10-year unchanged. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.";
+
+  it("names the stated cap and the model's own entry, and calls the compression what it is", () => {
+    expect(derived.inputs.exitCapPct).toBe(0.0525);
+    expect(modelEntryCap(derived, shapeA)).toBeCloseTo((1_700_000 / 30_000_000) * 100, 10);
+    expect(exit.tone).toBe("compresses");
+    expect(exit.toneLabel).toBe("assumes cap compression");
+    expect(exit.read).toBe(sentence);
+    expect(gluedWords(exit.read)).toEqual([]);
+    // The exit's own source says which cap it defaulted to, and the model's.
+    expect(derived.sources.exitCapPct?.note).toBe(
+      "Defaulted to the OM's stated going-in cap; the model's own year-1 NOI over its price is 5.67% — set your exit view",
+    );
+  });
+
+  it("is said the same on the deal page's card, the report and the workbook's Market Read", async () => {
+    const card = visibleText(renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read })));
+    expect(card).toContain(sentence);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(derived, null, read)) as unknown as ArrayBuffer);
+    const tab = wb.getWorksheet("Market Read")!;
+    const cells: string[] = [];
+    tab.eachRow((row) => row.eachCell((c) => cells.push(String(c.value ?? ""))));
+    expect(cells).toContain(sentence);
+    const deal = {
+      name: shapeA.dealName,
+      asset_class: "multifamily",
+      extraction: shapeA,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const sensitivity = buildSensitivityData(derived.inputs, null, { sources: derived.sources });
+    const pdf = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, read),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(pdf)).replace(/\s+/g, " ");
+    expect(text).toContain("the model's own year-1 NOI over its price is 5.67%, 73 bps over it, so the exit assumes the spread narrows 42 bps from the model's own entry");
+    expect(text).not.toContain("holds the spread");
+  }, 60_000);
+
+  it("leaves a model whose entry is the stated cap, a placeholder's, or a price that did not buy the building as before", () => {
+    // The model runs price × the stated cap: one figure, said once.
+    const capOnly: ExtractionResult = { ...shapeA, metrics: shapeA.metrics.filter((m) => !/NOI/.test(m.label)) };
+    const d = deriveUnderwriteInputs(capOnly, "x");
+    const one = modelVsMarketFor({ derived: d, extraction: capOnly, storedAssetClass: "multifamily", metro: null, reads })!.checks.find((c) => c.key === "exit_cap")!;
+    expect(one.read).toContain("The going-in cap 5.25% is 31 bps over it, so the exit holds the spread with the 10-year unchanged.");
+    expect(one.read).not.toContain("own entry");
+    expect(d.sources.exitCapPct?.note).toBe("Defaulted to the OM's stated going-in cap — set your exit view");
+    // A note's price is a loan's: no cap is struck on it, and none is named.
+    const note: ExtractionResult = { ...shapeA, interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" } };
+    const n = deriveUnderwriteInputs(note, "x");
+    expect(modelEntryCap(n, note)).toBeNull();
+    expect(n.sources.exitCapPct?.note).not.toContain("own year-1 NOI");
+    // A placeholder price: the model's NOI over it is no entry.
+    const unpriced: ExtractionResult = {
+      ...shapeA,
+      metrics: [
+        { label: "Asking price", value: "Call for offers", flagged: false, page: "p. 3" },
+        { label: "NOI (in-place)", value: "$1,700,000", flagged: false, page: "p. 9" },
+      ],
+    };
+    expect(modelEntryCap(deriveUnderwriteInputs(unpriced, "x"), unpriced)).toBeNull();
   });
 });
 
@@ -557,8 +690,16 @@ describe("the going-in cap the documents imply where they state none", () => {
   it("a stated cap wins, and is said as the stated one", () => {
     const stated: ExtractionResult = { ...priced, metrics: [...priced.metrics, { label: "Going-in cap rate", value: "7.0%", flagged: false, page: "p. 3" }] };
     const exit = exitOf(modelVsMarketFor({ derived: deriveUnderwriteInputs(stated, "x"), extraction: stated, storedAssetClass: "auto", metro: null, reads }));
-    expect(exit?.read).toContain("The going-in cap 7.00% is 206 bps over it");
+    expect(exit?.read).toContain("The going-in cap the OM states, 7.00%, is 206 bps over it");
     expect(exit?.read).not.toContain("implied");
+    // The exit defaults to the stated 7.00% while the model runs the T-12's
+    // $1.5M over the $20M price, 7.50%: it sells 50 bps tighter than it buys,
+    // which "holds the spread" had hidden (research pass 34).
+    expect(exit?.tone).toBe("compresses");
+    expect(exit?.read).toContain(
+      "the model's own year-1 NOI over its price is 7.50%, 256 bps over it, so the exit assumes the spread narrows 50 bps from the model's own entry with the 10-year unchanged. Cap compression is not a plan",
+    );
+    expect(exit?.read).not.toContain("holds the spread");
   });
 
   it("grosses a share's price up to the whole and says so; a note and a leased fee imply none", () => {
@@ -735,7 +876,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
 
   it("credits each figure to its own house, area and period — never the block's first link or the snapshot's day", () => {
     // Chicago's cap is Essex Realty's April 2026 average for the small-building
-    // stock; the block's first link is JPMorgan's, the vacancy's source.
+    // stock; the block's first link is Cushman & Wakefield's, the vacancy's source.
     const chicago = trackerFor("chicago", "multifamily")!;
     expect(chicago.cap).toMatchObject({
       house: "Essex Realty",
@@ -745,7 +886,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
       construct: "a transaction average of 175 sales, not a quoted band",
     });
     expect(chicago.cap!.slice).toContain("Class B/C neighborhood buildings");
-    expect(chicago.vacancy!.links).toEqual(["https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook"]);
+    expect(chicago.vacancy!.links).toEqual(["https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/multifamily"]);
     // Prince George's County's office figure is Colliers' Suburban Maryland survey area, both counties together.
     expect(trackerFor("pg_county", "office")!.vacancy).toMatchObject({
       house: "Colliers",
@@ -985,7 +1126,7 @@ describe("the tracker inside the model's checks", () => {
     // A plan deal states its spread and still reads the range.
     const plan = check({ ...apt, plan: true }, "exit_cap")!;
     expect(plan.tone).toBe("stated");
-    expect(plan.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(plan.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
     expect(plan.read).toContain("apartment cap range is 5.25–5.50%");
     // Washington's range is undated: the leaderboard would not rank it, so
     // it is shown and the exit is not held to it — no compression named.
@@ -1145,5 +1286,125 @@ describe("a deal outside the covered metros anchors its vacancy check on the sta
     // rent-growth check is left out rather than read against nothing.
     expect(modelVsMarket(pa)!.checks.map((x) => x.key)).toEqual(["expense_growth", "vacancy", "exit_cap"]);
     expect(modelVsMarket(pa)!.metro).toBe("Pennsylvania");
+  });
+});
+
+// ── A rent-regulated building: the regime's allowance beside the market's ─────
+import { regulationForDeal } from "./rent-regulation";
+
+describe("a rent-regulated building's allowance, shown beside the market's figures and never folded into them (lib/rent-regulation)", () => {
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "" });
+  const deck = (...metrics: ReturnType<typeof row>[]): ExtractionResult => ({
+    dealName: "The Walk-up",
+    assetClass: "multifamily",
+    metrics: [row("Asking price", "$14,000,000"), ...metrics],
+  });
+  const BROOKLYN = { state: "NY", city: "Brooklyn", county: "Kings County" };
+  const OCT_5 = new Date("2026-10-05T12:00:00Z");
+  const stabilized = regulationForDeal(
+    { extraction: deck(row("Units", "48"), row("Year built", "1931"), row("Rent-regulated units", "41")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+    "2026-10-05",
+  );
+
+  it("a NYC stabilized deal at a 3% model growth never reads only 'inside the published range': the allowance is named first, as a figure of its own kind", () => {
+    const plain = check({ ...base, now: OCT_5 }, "rent_growth")!;
+    expect(plain.read).toContain("The model sits inside the published range.");
+    const c = check({ ...base, now: OCT_5, regulation: stabilized }, "rent_growth")!;
+    // The chip is the market's: the allowance never joins its range.
+    expect(c.tone).toBe("inside");
+    expect(c.toneLabel).toBe("inside the published range");
+    // The sentence names the allowance first, as the regime's for the units
+    // it regulates, with the model's growth against it.
+    expect(c.read).toBe(
+      "Under NYC rent stabilization, the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease and 0% on a two-year lease (the Rent Guidelines Board's Apartment/Loft Order #58). That is the regime's allowance for the units it regulates, not a market figure: the model's 3.0%/yr runs 3.0 points over both. For the market-rate units, over the past year the metro's asking rents moved +2.3% (apartments alone +1.1%) over the year to Aug 2026 (Zillow) and sitting tenants' rents +5.0% over the year to Aug 2026 (CPI rent, BLS). The model sits inside the published range. A trailing year is what the assumption is being asked to beat, not a forecast.",
+    );
+    expect(c.read.startsWith("The model grows rents")).toBe(false);
+    // The allowance's figures lead the published list; the market's follow,
+    // as they were.
+    expect(c.published.slice(0, 2)).toEqual([
+      {
+        label: "NYC rent stabilization: allowance on the regulated units, a one-year lease",
+        text: "0% for leases commencing Oct 1, 2026 to Sep 30, 2027",
+        value: 0,
+        asOf: "2026-10-01",
+        publisher: "The Rent Guidelines Board's Apartment/Loft Order #58",
+      },
+      {
+        label: "NYC rent stabilization: allowance on the regulated units, a two-year lease",
+        text: "0% for leases commencing Oct 1, 2026 to Sep 30, 2027",
+        value: 0,
+        asOf: "2026-10-01",
+        publisher: "The Rent Guidelines Board's Apartment/Loft Order #58",
+      },
+    ]);
+    expect(c.published.slice(2)).toEqual(plain.published);
+    expect(gluedWords(c.read)).toEqual([]);
+  });
+
+  it("keeps the tone the market's: a model behind every market figure stays behind beside a 0% allowance", () => {
+    // 0.5% against the market's 1.1–5.0% is behind; with the 0% allowance
+    // folded into the range it would have read inside.
+    const behind = check({ ...base, now: OCT_5, inputs: { ...base.inputs, rentGrowthPct: 0.005 }, regulation: stabilized }, "rent_growth")!;
+    expect(behind.tone).toBe("behind");
+    expect(behind.read).toContain("the model's 0.5%/yr runs 0.5 points over both.");
+    expect(behind.read).toContain("For the market-rate units, over the past year");
+    expect(behind.read).toContain("The model runs behind every published figure, by 0.6 to 4.5 points.");
+  });
+
+  it("names a DC rent-controlled building's two caps, a regime that only possibly applies as such, and nothing for an allowance not in force", () => {
+    const dc = regulationForDeal(
+      { extraction: deck(row("Units", "24"), row("Year built", "1962")), address: { state: "DC", city: "Washington" }, siteFlags: null, assetClass: "multifamily" },
+      "2026-09-21",
+    );
+    const c = check({ ...base, regulation: dc }, "rent_growth")!;
+    expect(c.read).toMatch(
+      /^Under DC rent stabilization, the allowance for increases taking effect May 1, 2026 to Apr 30, 2027 is 4\.1% on a rent-controlled unit and 2\.1% on a unit with a registered elderly or disabled tenant \(the Rental Housing Commission's caps for Rent Control Year 2026\)\. That is the regime's allowance for the units it regulates, not a market figure: the model's 3\.0%\/yr runs over 2\.1% and under 4\.1%\. For the market-rate units,/,
+    );
+    // A building whose year the memorandum does not state: the regime only
+    // possibly applies, and the sentence says so.
+    const possibly = regulationForDeal(
+      { extraction: deck(row("Units", "48")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+      "2026-10-05",
+    );
+    expect(check({ ...base, now: OCT_5, regulation: possibly }, "rent_growth")!.read).toContain(
+      "That is the regime's allowance for the units it regulates, where it applies (the site's rules say it possibly does here), not a market figure",
+    );
+    // Before the filed period begins and after it ends, no allowance is in
+    // force: the check reads as it would without the regulation.
+    const before = regulationForDeal(
+      { extraction: deck(row("Units", "48"), row("Year built", "1931")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+      "2026-09-21",
+    );
+    expect(check({ ...base, regulation: before }, "rent_growth")).toEqual(check(base, "rent_growth"));
+    const after = regulationForDeal(
+      { extraction: deck(row("Units", "48"), row("Year built", "1931")), address: BROOKLYN, siteFlags: null, assetClass: "multifamily" },
+      "2027-11-15",
+    );
+    expect(check({ ...base, regulation: after }, "rent_growth")).toEqual(check(base, "rent_growth"));
+  });
+
+  it("draws the allowance first on the card, clean", () => {
+    const html = renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read: modelVsMarket({ ...base, now: OCT_5, regulation: stabilized }) }));
+    const text = visibleText(html);
+    expect(text).toContain("Under NYC rent stabilization, the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease");
+    expect(text).toContain("inside the published range");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("is handed through the one read every surface calls", () => {
+    const extraction = deck(row("Units", "48"), row("Year built", "1931"), row("Rent-regulated units", "41"), row("NOI (in-place)", "$700,000"));
+    const derived = deriveUnderwriteInputs(extraction, "fallback");
+    const read = modelVsMarketFor({
+      derived,
+      extraction,
+      storedAssetClass: "multifamily",
+      metro: { id: "dc", name: "Washington DC" },
+      reads: { rates, zori, national, now: OCT_5 },
+      regulation: stabilized,
+    })!;
+    expect(read.checks.find((x) => x.key === "rent_growth")!.read.startsWith("Under NYC rent stabilization")).toBe(true);
+    const without = modelVsMarketFor({ derived, extraction, storedAssetClass: "multifamily", metro: { id: "dc", name: "Washington DC" }, reads: { rates, zori, national, now: OCT_5 } })!;
+    expect(without.checks.find((x) => x.key === "rent_growth")!.read.startsWith("The model grows rents")).toBe(true);
   });
 });

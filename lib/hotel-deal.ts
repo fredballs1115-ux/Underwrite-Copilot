@@ -23,7 +23,11 @@
 // AN ENCUMBRANCE IS A CONTRACT THE BUYER TAKES. Sold encumbered by
 // management, the buyer keeps the manager, its fee and its term; by the
 // brand, the flag and its standards. Unencumbered is the buyer's choice of
-// both, and nothing here says what that choice is worth.
+// both, and nothing here says what that choice is worth. Where the price
+// buys no hotel — a note, a preferred equity position, a share, the land
+// under it — the contracts and the PIP are said as their holder's (lib/
+// interest `propertyHolderOf`: the borrower's, the owning entity's, the
+// co-owners', the leaseholder's), and a note's as the collateral's.
 //
 // THE FLAG HAS A CLOCK, AND SO DOES THE MANAGER. A franchise that ends
 // inside the hold is a relicensing — with its own PIP — or a hotel that
@@ -54,7 +58,8 @@ import { unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import { endHasPassed, endsByYear, fromToday, yearsText } from "@/lib/ground-lease-term";
-import { parseUsd } from "@/lib/money";
+import { PROPERTY_HOLDER_WORDS, propertyHolderOf, type PropertyHolder } from "@/lib/interest";
+import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 
 export type { HotelEncumbrance };
 
@@ -94,10 +99,11 @@ function pctOf(value: string): number | null {
 
 /** A room rate or RevPAR a value states, to the cent ("$189.50") —
  *  parseUsd rounds to whole dollars, which an ADR cannot afford. A range
- *  ("$180–$195") is no single figure. */
+ *  ("$180–$195") is no single figure (lib/money `statesRange`, so "$189.50
+ *  – 2025 actual" is the rate it states). */
 function dollarsOf(value: string): number | null {
+  if (statesRange(value)) return null;
   const v = value.replace(/,/g, "");
-  if (/\d\s*[-–—]\s*\$?\d/.test(v)) return null;
   const m = v.match(/\$?\s*(\d+(?:\.\d+)?)/);
   if (!m) return null;
   const n = Number(m[1]);
@@ -124,6 +130,12 @@ export interface HotelDealRead {
   franchise: string;
   management: string;
   encumbrance: HotelEncumbrance;
+  /** who holds the hotel's contracts and capital on this deal, by what the
+   *  price buys (lib/interest `propertyHolderOf`): the buyer on a fee
+   *  simple, the borrower on a note, the owning entity on a position or a
+   *  share — so no sentence has a note's buyer keep a manager it never
+   *  bought */
+  holder: PropertyHolder;
   /** the PIP's own words */
   pip: string;
   /** cited only where it parses and falls inside the memorandum */
@@ -227,6 +239,7 @@ export function readHotelDeal(ex: ExtractionResult | null | undefined, asOf: Dat
     franchise,
     management,
     encumbrance,
+    holder: propertyHolderOf(ex),
     pip,
     page,
     keys,
@@ -259,14 +272,7 @@ const ENCUMBRANCES: HotelEncumbrance[] = ["unencumbered", "brand", "management",
 
 const noPeriod = (s: string) => s.replace(/[.;,\s]+$/, "");
 // "$4.2M", "$35k", "$12.5k": a PIP per key is often a half-thousand.
-const money = (n: number) => {
-  if (n >= 1e6) return `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`;
-  if (n >= 1e3) {
-    const k = Math.round(n / 100) / 10;
-    return `$${Number.isInteger(k) ? k.toLocaleString("en-US") : k.toFixed(1)}k`;
-  }
-  return `$${Math.round(n).toLocaleString("en-US")}`;
-};
+const money = (n: number) => compactUsd(n, { thousandsPlaces: 1 });
 const dollars = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 const pct1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)}%`;
 
@@ -279,13 +285,59 @@ const ENCUMBRANCE_SENTENCE: Record<HotelEncumbrance, string> = {
   unknown: "",
 };
 
+// A note's hotel is its collateral: the borrower keeps the contracts, and
+// whether each binds a lender that takes the hotel in a foreclosure is the
+// documents' to say, never this reader's.
+const COLLATERAL_ENCUMBRANCE_SENTENCE: Record<HotelEncumbrance, string> = {
+  unencumbered:
+    "The collateral is unencumbered — free of its brand and its management — so whoever owns it chooses both: the borrower now, or a lender that takes the hotel in a foreclosure.",
+  management:
+    "The collateral is encumbered by its management agreement: the borrower keeps the manager, its fee and its term, and whether the agreement binds a lender that takes the hotel in a foreclosure is the loan documents' to say.",
+  brand:
+    "The collateral is encumbered by its franchise: the borrower keeps the flag, its fees and its standards, and whether the flag stays with a lender that takes the hotel in a foreclosure is the franchise's and the loan documents' to say.",
+  brand_and_management:
+    "The collateral is encumbered by both its franchise and its management agreement: the borrower keeps the flag and the manager, their fees and their terms, and whether each binds a lender that takes the hotel in a foreclosure is the documents' to say.",
+  unknown: "",
+};
+
+/** The encumbrance as the holder meets it: sold with the hotel to the
+ *  buyer; the collateral's on a note; and on a position, a share or the
+ *  land under the hotel, the owner's or the leaseholder's, the hotel not
+ *  changing hands. */
+function encumbranceSentence(r: Pick<HotelFacts, "encumbrance" | "holder">): string {
+  if (r.holder === "buyer" || r.encumbrance === "unknown") return ENCUMBRANCE_SENTENCE[r.encumbrance];
+  if (r.holder === "borrower") return COLLATERAL_ENCUMBRANCE_SENTENCE[r.encumbrance];
+  const w = PROPERTY_HOLDER_WORDS[r.holder];
+  const keep = w.plural ? "keep" : "keeps";
+  const sentence: Record<Exclude<HotelEncumbrance, "unknown">, string> = {
+    unencumbered: `It is unencumbered — free of its brand and its management — so ${w.who} ${w.plural ? "choose" : "chooses"} both.`,
+    management: `It is encumbered by its management agreement: ${w.who} ${keep} the manager, its fee and its term rather than choosing ${w.plural ? "their" : "its"} own.`,
+    brand: `It is encumbered by its franchise: ${w.who} ${keep} the flag, its fees and its standards.`,
+    brand_and_management: `It is encumbered by both its franchise and its management agreement: ${w.who} ${keep} the flag and the manager, their fees and their terms.`,
+  };
+  return sentence[r.encumbrance];
+}
+
+/** Whose capital the PIP is, after its figure: the buyer's on top of the
+ *  price; on a note the borrower's, and what is unspent at a foreclosure
+ *  the collateral's to bear; on a position or a share the owning entity's,
+ *  apart from what this interest costs; on a leased fee the leaseholder's,
+ *  reaching the land's buyer only through the ground rent's cover. */
+const PIP_FUNDS: Record<PropertyHolder, string> = {
+  buyer: " — capital the buyer funds on top of the price.",
+  borrower: " — capital the borrower funds, and whatever of it is unspent at a foreclosure the collateral bears.",
+  entity: " — capital the owning entity funds, apart from the price of this interest.",
+  co_owners: " — capital the co-owners fund, this interest its share of it, beyond its price.",
+  leaseholder: " — capital the leaseholder funds, which reaches this buyer only through the ground rent's cover.",
+};
+
 function flagSentence(r: HotelFacts): string {
   if (r.independent) return "The hotel is independent, as stated — no flag, no franchise fees, and no brand's reservation system behind it.";
   return r.brand ? `The hotel is flagged ${noPeriod(r.brand)}, as stated.` : "";
 }
 
 function pipSentence(r: HotelFacts): string {
-  const funds = " — capital the buyer funds on top of the price.";
+  const funds = PIP_FUNDS[r.holder];
   const unit = r.keyNoun.replace(/s$/, "");
   const across = r.keys != null ? ` across its ${r.keys.toLocaleString("en-US")} ${r.keyNoun}` : "";
   if (r.pipTotal != null && r.pipPerKey != null) {
@@ -335,7 +387,7 @@ function roomsSentences(r: HotelFacts): string[] {
 function sentencesOf(r: HotelFacts): string[] {
   return [
     flagSentence(r),
-    ENCUMBRANCE_SENTENCE[r.encumbrance],
+    encumbranceSentence(r),
     pipSentence(r),
     // A hotel often runs on past its license's or its agreement's stated
     // end, on an extension or month to month: said as a question, never as
@@ -400,7 +452,10 @@ export function hotelShortLine(r: HotelDealRead): string {
     brand_and_management: "sold encumbered by the franchise and management",
     unknown: "",
   };
-  const head = [who, sale[r.encumbrance]].filter(Boolean).join(", ");
+  // The hotel is sold only where the price buys it; a note's, a position's,
+  // a share's or the land's buyer buys no hotel, which stays as encumbered.
+  const encumbered = r.holder === "buyer" ? sale[r.encumbrance] : sale[r.encumbrance].replace(/^sold /, "");
+  const head = [who, encumbered].filter(Boolean).join(", ");
   const parts = [`Hotel${head ? `: ${head}` : ""}`];
   const unit = r.keyNoun.replace(/s$/, "");
   if (r.pipTotal != null) parts.push(`PIP ${money(r.pipTotal)}${r.pipPerKey != null ? ` (${money(r.pipPerKey)} ${withArticle(unit)})` : ""}`);
@@ -410,6 +465,46 @@ export function hotelShortLine(r: HotelDealRead): string {
     parts.push(`the franchise ends ${r.franchiseEnds.from === "year" ? `in ${endLabel(r.franchiseEnds)}` : endLabel(r.franchiseEnds)}`);
   }
   return parts.join("; ");
+}
+
+/**
+ * What the memorandum says a hotel's sale carries, for the letter of
+ * intent's review note (research pass 35): the flag, the encumbrance and
+ * the PIP as stated — "the hotel is flagged Hilton Garden Inn and sold
+ * encumbered by the franchise, with a $4.2M PIP". The letter (lib/loi) says
+ * beside it that the PSA should condition the closing on the franchisor
+ * approving the transfer and the PIP as issued. Null where no franchisor
+ * has a transfer to approve: an independent hotel, one sold unencumbered
+ * (the buyer chooses its flag), and one the memorandum names no flag,
+ * brand encumbrance or PIP for.
+ */
+export function hotelSaleFacts(r: HotelDealRead): string | null {
+  if (r.independent || r.encumbrance === "unencumbered") return null;
+  const flagSold = r.encumbrance === "brand" || r.encumbrance === "brand_and_management";
+  if (!r.brand && !flagSold && r.pipStated == null && !r.pip) return null;
+  const sold: Record<HotelEncumbrance, string> = {
+    brand: "sold encumbered by the franchise",
+    brand_and_management: "sold encumbered by the franchise and management",
+    management: "sold encumbered by management",
+    unencumbered: "",
+    unknown: "",
+  };
+  const unit = r.keyNoun.replace(/s$/, "");
+  // The PIP as stated: its total, or its figure a key, or its words — never
+  // the one derived from the other.
+  const pip =
+    r.pipStated === "total" && r.pipTotal != null
+      ? withArticle(`${money(r.pipTotal)} PIP`)
+      : r.pipStated === "per_key" && r.pipPerKey != null
+        ? `a PIP of ${money(r.pipPerKey)} ${withArticle(unit)}`
+        : r.pip
+          ? `a PIP stated as “${noPeriod(r.pip)}”`
+          : null;
+  const head = [r.brand ? `flagged ${noPeriod(r.brand)}` : "", sold[r.encumbrance]].filter(Boolean).join(" and ");
+  if (!head) return pip ? `the sale carries ${pip}` : null;
+  // A flag with no PIP stated: silence is not a zero, since a brand may
+  // require one on a change of ownership.
+  return `the hotel is ${head}${pip ? `, with ${pip}` : ", and states no PIP"}`;
 }
 
 /**
@@ -447,6 +542,24 @@ export function hotelContextLine(r: HotelDealRead): string {
 export function hotelNote(r: HotelDealRead): string {
   const traps: string[] = [];
   const perKey = (n: number) => `${money(n)} ${withArticle(r.keyNoun.replace(/s$/, ""))}`;
+  // Whose the contracts and the capital are (lib/interest
+  // `propertyHolderOf`): on a note the borrower's, and what binds a lender
+  // that takes the collateral is the documents' question.
+  const w = PROPERTY_HOLDER_WORDS[r.holder];
+  const note = r.holder === "borrower";
+  const liveWith = note
+    ? "are the borrower's to live with, and whether they bind a lender that takes the hotel in a foreclosure is the loan documents' to say"
+    : `are ${w.whose} to live with`;
+  // Whether the flag goes where the hotel goes: to the buyer on a sale; on a
+  // note to a lender that takes the collateral; on a position or a share it
+  // stays with the owner whose interest changes hands.
+  const flagGoes: Record<PropertyHolder, string> = {
+    buyer: "whether it transfers to the buyer",
+    co_owners: "whether it transfers to the buyer",
+    borrower: "whether it carries to a lender that takes the hotel in a foreclosure",
+    entity: "whether a sale of an interest in the owning entity needs the brand's consent",
+    leaseholder: "what its lapse would do to the ground rent's cover",
+  };
   // Each trap says what the facts above say, never "none stated" over a
   // figure or words the memorandum gives.
   traps.push(
@@ -455,16 +568,21 @@ export function hotelNote(r: HotelDealRead): string {
       : r.pip
         ? `(a) THE PIP — stated in words, with no cost ("${noPeriod(r.pip)}"): ask for the brand's PIP report and what it costs a key, and never read a return that does not pay for it`
         : r.independent
-          ? "(a) NO BRAND'S PIP — an independent hotel has no brand to require one, but what its rooms need is the buyer's capital: ask for the property condition report"
+          ? `(a) NO BRAND'S PIP — an independent hotel has no brand to require one, but what its rooms need is ${note ? "the borrower's capital and the collateral's condition" : `${w.whose} capital`}: ask for the property condition report`
           : "(a) THE PIP — none stated: ask whether the brand requires one on the sale, and what it costs a key",
   );
+  const choose = w.plural ? "choose" : "chooses";
   traps.push(
     r.encumbrance === "management" || r.encumbrance === "brand_and_management"
-      ? "(b) THE MANAGEMENT ENCUMBRANCE — the manager, its base and incentive fees, its term, its termination rights and its key-money are the buyer's to live with: read the agreement, not the summary"
+      ? `(b) THE MANAGEMENT ENCUMBRANCE — the manager, its base and incentive fees, its term, its termination rights and its key-money ${liveWith}: read the agreement, not the summary`
       : r.encumbrance === "brand"
-        ? "(b) THE BRAND ENCUMBRANCE — the sale carries the franchise: its term, its transfer and change-of-ownership terms, the PIP it requires and its fees are the buyer's to live with: read the license agreement, not the summary"
+        ? `(b) THE BRAND ENCUMBRANCE — ${r.holder === "buyer" ? "the sale carries" : "the hotel carries"} the franchise: its term, its transfer and change-of-ownership terms, the PIP it requires and its fees ${liveWith}: read the license agreement, not the summary`
         : r.encumbrance === "unencumbered"
-          ? "(b) UNENCUMBERED — the buyer chooses the manager and the flag: price the transition, the new franchise's own PIP and application fee, and any downtime"
+          ? r.holder === "buyer"
+            ? "(b) UNENCUMBERED — the buyer chooses the manager and the flag: price the transition, the new franchise's own PIP and application fee, and any downtime"
+            : note
+              ? "(b) UNENCUMBERED — whoever owns the collateral chooses the manager and the flag, the borrower now or a lender that takes the hotel in a foreclosure: price what a change would cost it — the transition, a new franchise's own PIP and application fee, and any downtime"
+              : `(b) UNENCUMBERED — ${w.who} ${choose} the manager and the flag: price what a change would cost — the transition, a new franchise's own PIP and application fee, and any downtime`
           : "(b) THE ENCUMBRANCE — the memorandum does not say whether the sale is encumbered by management or the brand: ask, since it decides who runs the hotel",
   );
   traps.push(
@@ -475,8 +593,8 @@ export function hotelNote(r: HotelDealRead): string {
         : r.independent
           ? "(c) NO FLAG — the hotel is independent: its bookings are its own to win, and a flag later brings a PIP and fees of its own"
           : r.franchise
-            ? `(c) THE FLAG'S TERM — the franchise as stated ("${noPeriod(r.franchise)}") gives no end the screen reads as a date: ask for the license's term and whether it transfers to the buyer`
-            : "(c) THE FLAG'S TERM — no franchise expiration stated: ask for the license's term and whether it transfers to the buyer",
+            ? `(c) THE FLAG'S TERM — the franchise as stated ("${noPeriod(r.franchise)}") gives no end the screen reads as a date: ask for the license's term and ${flagGoes[r.holder]}`
+            : `(c) THE FLAG'S TERM — no franchise expiration stated: ask for the license's term and ${flagGoes[r.holder]}`,
   );
   traps.push(
     r.ties === false

@@ -1,29 +1,31 @@
-import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
-import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
+import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
-import { inferStrategy } from "@/lib/deal-strategy";
+import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { assumableView, readAssumable, type AssumableView } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
-import { leaseholdExitView, readLeaseholdExit, type LeaseholdExitView } from "@/lib/leasehold-exit";
+import { leaseholdExitView, readLeaseholdExit, termReadFor, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { verdictBehind } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
-import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, screeningCompareModel, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { modelReturnsRead } from "@/lib/compare-interest";
 import { bidFloors, type BidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -31,6 +33,7 @@ import { coverPictureFor, galleryPhotosFor } from "@/lib/memo/cover-aerial";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { floodMapFor } from "@/lib/flood-map";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
+import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 
 export const runtime = "nodejs";
 
@@ -98,7 +101,9 @@ export async function GET(
   // screen's call — not one report.
   const { data: latestJob } = await supabase
     .from("analysis_jobs")
-    .select("status, step")
+    // Its last write too: a run that stopped making progress is waited on
+    // by nothing, and the refusal says so (lib/screen-run `isStalled`).
+    .select("status, step, updated_at")
     .eq("deal_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -106,16 +111,22 @@ export async function GET(
   const behind = verdictBehind(latestJob);
   if (behind) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=${behind === "running" ? "reportrunning" : "reportstale"}`, req.url),
+      new URL(`/deals/${id}?error=${behind === "running" ? "reportrunning" : behind === "stalled" ? "reportstalled" : "reportstale"}`, req.url),
       302,
     );
   }
 
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // The day the report is dated: the reader's own (lib/reader-day), never
+  // the server's UTC day, which is tomorrow from 8 pm Eastern — and the day
+  // its file is named for and its rent rules are read on, read once so the
+  // three cannot differ.
+  const tz = (await cookies()).get(TZ_COOKIE)?.value;
+  const now = new Date();
+  const dateStr = readerDateLong(tz, now);
+  const readerDay = readerToday(tz, now);
+  // Its noon, the day every dated reader of the model reads on, as the deal
+  // page reads on its reader's (research pass 40).
+  const readerNoon = new Date(`${readerDay}T12:00:00Z`);
 
   let buyBoxChecks: BuyBoxCheck[] = [];
   // The buy-box target IRR anchors the sensitivity page's color scale, so
@@ -131,18 +142,15 @@ export async function GET(
     };
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
     if (box) {
-      // The deal page's own check source — first signal, structured address
-      // and inferred kind folded in — so page and PDF make the same call.
+      // The deal page's own check source (lib/buy-box-chip
+      // `dealCheckSource`) — first signal, structured address, inferred kind
+      // and what the price buys folded in — so page and PDF make the same
+      // call.
       const extraction = (deal.extraction as ExtractionResult | null) ?? null;
       const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
       buyBoxChecks = evaluateBuyBox(
         deal.asset_class,
-        buyBoxCheckSource(
-          extraction,
-          firstSignal,
-          (deal.address as StructuredAddress | null) ?? null,
-          inferStrategy(extraction, firstSignal).kind,
-        ),
+        dealCheckSource(extraction, firstSignal, (deal.address as StructuredAddress | null) ?? null),
         box,
       );
       hurdlePct = box.minIrrPct ?? null;
@@ -178,6 +186,31 @@ export async function GET(
   let student: { line: string; read: string } | null = null;
   let mh: { line: string; read: string } | null = null;
   let storage: { line: string; read: string } | null = null;
+  // A forward purchase (lib/forward-purchase), read against the model.
+  let forward: { line: string; read: string } | null = null;
+  // A mixed-use building (lib/mixed-use), read against the model.
+  let mixedUse: { line: string; read: string } | null = null;
+  // An operating business on its real estate (lib/going-concern).
+  let goingConcern: { line: string; read: string } | null = null;
+  // Condominium units bought in bulk (lib/condo).
+  let condo: { line: string; read: string } | null = null;
+  // A sandwich position (lib/sandwich-lease).
+  let sandwich: { line: string; read: string } | null = null;
+  // The rent rules that reach the building (lib/rent-regulation), through the
+  // one call every surface makes, on the reader's day — the day the report
+  // is dated and its file named for. Read apart from the model, so its line
+  // prints even where the model is not built; the model's read is added
+  // where it is.
+  const regulationRead = regulationForDeal(
+    {
+      extraction: (deal.extraction as ExtractionResult | null) ?? null,
+      address: addressUpgrade(deal.address, (deal.extraction as ExtractionResult | null) ?? null) ?? (deal.address as StructuredAddress | null) ?? null,
+      siteFlags: (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null,
+      assetClass: deal.asset_class as string | null,
+    },
+    readerDay,
+  );
+  let regulation: { line: string; read: string } | null = regulationRead ? { line: regulationShortLine(regulationRead), read: "" } : null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -218,12 +251,32 @@ export async function GET(
             : null,
         },
         modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+        { regulation: regulationRead, asOf: readerNoon },
       );
       // The sources say whether the price and the year-1 NOI are the
       // documents' or placeholders; on a placeholder's model the report
       // leaves the grids and the max bid out and says why. The max bid is
       // solved on the box's floors, as the deal page solves it.
-      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, { sources: derived.sources, floors });
+      // A leasehold's bid is solved on the capitalised exit; the term's own
+      // read says what it returns on the lease's term (research pass 35).
+      // A building the model runs nearly vacant has no returns worth a grid:
+      // the deal page withholds its tiles, and the report leaves its grids,
+      // base case and max bid out with the page's reason (research pass 40).
+      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, {
+        sources: derived.sources,
+        floors,
+        termRead: termReadFor(extraction),
+        occupancyPct: derived.meta.occupancyPct ?? null,
+        // Where a leasehold's lease ends inside the hold, the grids and the
+        // bid are left out over the leasehold card's own sentence — the
+        // deal page's read of the same model (lib/compare-interest).
+        interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs)),
+        // And where the plausibility check finds the figures do not tie, on
+        // the deal page's own read (its kind with the first signal): the
+        // page withholds its tiles, and the report its grids (research pass
+        // 38).
+        findings: assessPlausibility(extraction, inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null)),
+      });
       // The plan page for the kind the deal page reads — the extraction and
       // the first signal — the same read buildReportData gates the IRR page on.
       plan = buildPlanReport(
@@ -234,7 +287,7 @@ export async function GET(
         },
         (deal.first_signal as FirstSignal | null) ?? null,
       );
-      const assumableRead = readAssumable(extraction, derived.inputs);
+      const assumableRead = readAssumable(extraction, derived.inputs, readerNoon);
       // A note the seller offers to carry (#462), priced against this
       // model's own new loan the way the deal page prices it.
       const sellerRead = readSellerFinancing(extraction, derived.inputs);
@@ -242,7 +295,7 @@ export async function GET(
       assumable = assumableRead
         ? assumableView(assumableRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed)
         : null;
-      const leaseholdRead = readLeaseholdExit(extraction, derived.inputs);
+      const leaseholdRead = readLeaseholdExit(extraction, derived.inputs, readerNoon);
       leasehold = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
       // The one lease a single-tenant property is (#454), read against this
       // model — the workbook cover's own two lines.
@@ -261,10 +314,18 @@ export async function GET(
       student = derived.meta.student ?? null;
       mh = derived.meta.mh ?? null;
       storage = derived.meta.storage ?? null;
+      forward = derived.meta.forward ?? null;
+      mixedUse = derived.meta.mixedUse ?? null;
+      goingConcern = derived.meta.goingConcern ?? null;
+      condo = derived.meta.condo ?? null;
+      sandwich = derived.meta.sandwich ?? null;
+      // The rent rules, with this model's one growth rate set beside the
+      // allowance in force (the workbook cover's own two lines).
+      regulation = derived.meta.regulation ?? regulation;
       // How it is sold (#456): the ceiling bid at this report's own hurdle,
       // the buy box's where set — the same one its grids are coloured by.
       sale = derived.meta.sale
-        ? { line: derived.meta.sale.line, read: saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT) }
+        ? { line: derived.meta.sale.line, read: saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT, readerNoon) }
         : null;
 
       // The model's assumptions against the published figures — the same
@@ -289,6 +350,7 @@ export async function GET(
           storedAssetClass: deal.asset_class as string | null,
           metro,
           reads: await todayReads(metro),
+          regulation: regulationRead,
         });
       } catch (err) {
         console.warn(`report assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
@@ -350,11 +412,10 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage);
-    const element = React.createElement(ReportDocument, {
-      input,
-    }) as unknown as Parameters<typeof renderToBuffer>[0];
-    const buffer = await renderToBuffer(element);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay);
+    // The memo's target-return chip names the page the model's IRR is
+    // graded on, which the helper checks against where it lands.
+    const buffer = await renderReportPdf(input);
 
     const safe =
       (deal.name || "deal")
@@ -364,7 +425,7 @@ export async function GET(
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safe}-full-report-${new Date().toISOString().slice(0, 10)}.pdf"`,
+        "Content-Disposition": `attachment; filename="${safe}-full-report-${readerDay}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

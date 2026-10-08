@@ -41,14 +41,18 @@
 // junior lien, a B-note, subordinate debt or a position behind a senior loan
 // is at risk from its LAST dollar, which sits on top of the senior balance —
 // $15M behind a $60M senior loan on a $70M value had read 21% where the
-// stack is 107%. The memorandum states no senior balance (the extraction has
-// no row for one), so the loan-to-value is withheld, never computed. The
-// position is read from the words only where they place THIS note (a second
-// lien, a B-note, a junior participation, "behind a $60M senior loan"); a
-// mention of other debt beside a first-lien note leaves it first, a negated
-// one ("no mezzanine or junior debt") is no mention, and a bare mention with
-// nothing to place the note is said as unclear, never as a senior loan ahead
-// of it (the audit of 2026-10-01).
+// stack is 107%. Where the memorandum states the senior loan's balance (the
+// extraction's "Senior loan balance" row, research pass 28), the stack is
+// read off it: the senior's balance over the stated value is where this
+// note's first dollar sits, the senior's and the note's together where its
+// last does. Where no such row is read, the loan-to-value is withheld,
+// never computed. The position is read from the words only where they place
+// THIS note (a second lien, a B-note, a junior participation, "behind a $60M
+// senior loan"); a mention of other debt beside a first-lien note leaves it
+// first, a negated one ("no mezzanine or junior debt") is no mention, and a
+// bare mention with nothing to place the note is said as unclear, never as
+// a senior loan ahead of it (the audit of 2026-10-01) — and a senior balance
+// is read only beside words that place the note behind it.
 
 import { withArticle } from "@/lib/article";
 import { parseUsd } from "@/lib/money";
@@ -83,12 +87,17 @@ export interface NoteTerms {
   /** the collateral's value as the OM states it */
   collateralValue: number | null;
   /** the note sits behind other debt, or may, as the memorandum's words for
-   *  it say (`isSubordinateNote`): its loan-to-value needs a senior balance
-   *  the memorandum does not state, and is withheld */
+   *  it say (`isSubordinateNote`): its loan-to-value needs the senior
+   *  balance, and is withheld — read on top of that balance only where the
+   *  memorandum states it (`seniorBalance`) */
   subordinate: boolean;
   /** which of the two: placed behind other debt, or named beside it with no
    *  order stated (`notePosition`); absent reads as `subordinate` says */
   position?: NotePosition;
+  /** behind a senior loan: that loan's balance, from the row the extraction
+   *  labels "Senior loan balance" — only as stated, and only where the words
+   *  place this note behind it; absent otherwise */
+  seniorBalance?: number;
 }
 
 export interface NoteRead {
@@ -114,12 +123,20 @@ export interface NoteRead {
    *  an interest-only period beside an amortization */
   paymentBasis: string | null;
   /** the balance over the collateral's stated value, percent — null on a
-   *  subordinate note, whose loan-to-value runs on top of a senior balance
-   *  the memorandum does not state */
+   *  subordinate note, whose loan-to-value runs on top of the senior balance
+   *  (`stackAtBalancePct`, where the memorandum states it) */
   ltvAtBalancePct: number | null;
   /** the price over the collateral's stated value, percent — null on a
    *  subordinate note, as above */
   ltvAtPricePct: number | null;
+  /** behind a senior loan whose balance the memorandum states
+   *  (`NoteTerms.seniorBalance`), over the collateral's stated value,
+   *  percent: the senior's balance — where this note's first dollar sits;
+   *  the senior's and the note's balance — its last dollar; and the senior's
+   *  balance and the price — the buyer's. Null without both stated figures */
+  seniorLtvPct: number | null;
+  stackAtBalancePct: number | null;
+  stackAtPricePct: number | null;
   /** past maturity on the reading's date: its day has gone by. On the day
    *  itself the note is due, not past it */
   matured: boolean;
@@ -323,20 +340,32 @@ const pct = (text: string): number | null => {
   return Number.isFinite(n) && n > 0 && n < 50 ? n : null;
 };
 
+// The loan ahead of a note, by its own name: its rows are never the note's
+// own terms ("Senior loan balance" is not this note's balance, "Senior loan
+// maturity" not its maturity).
+const SENIOR_LOAN = /\bsenior\s+(?:loan|mortgage|debt|lien|financing)\b/i;
+// The row the extraction labels "Senior loan balance": that loan's balance,
+// and no other of its terms ("Senior loan rate" is no balance).
+const SENIOR_BALANCE_ROW =
+  /^\s*senior\s+(?:loan|mortgage|debt|lien|financing)(?:\s+(?:balance|amount|outstanding|upb))?\s*(?:\([^)]*\))?\s*$/i;
+
 /** The rows a note's terms are read from — one finder behind the reader
  *  and the key-terms block that leads with them. */
 function noteRowsOf(ex: MetricRows) {
+  // The note's own terms, never the senior loan's.
+  const own = (re: RegExp, not?: RegExp) => rowOf(ex, re, not ? new RegExp(`${not.source}|${SENIOR_LOAN.source}`, "i") : SENIOR_LOAN);
   return {
-    balanceRow: rowOf(ex, /unpaid principal|\bupb\b|outstanding (loan |note )?balance|(loan|note) balance/i),
-    rateRow: rowOf(ex, /^(note|interest|coupon|contract) rate\b|^coupon\b|note coupon/i),
+    balanceRow: own(/unpaid principal|\bupb\b|outstanding (loan |note )?balance|(loan|note) balance/i),
+    seniorRow: rowOf(ex, SENIOR_BALANCE_ROW),
+    rateRow: own(/^(note|interest|coupon|contract) rate\b|^coupon\b|note coupon/i),
     // "Yield to maturity" is a return, not the date the loan comes due; an
     // extended maturity is the borrower's option, not the contract's date.
-    maturityRow: rowOf(ex, /maturity|matures/i, /yield|\bytm\b|extension|extended/i),
-    amortRow: rowOf(ex, /amorti[sz]ation|amortizing/i),
+    maturityRow: own(/maturity|matures/i, /yield|\bytm\b|extension|extended/i),
+    amortRow: own(/amorti[sz]ation|amortizing/i),
     // An interest-only row says how long the interest-only period runs — its
     // figure is that period, never an amortization.
-    ioRow: rowOf(ex, /interest[- ]only|\bi\/?o\b/i, /amorti[sz]/i),
-    statusRow: rowOf(ex, /payment status|performing|delinquen|default status|loan status/i),
+    ioRow: own(/interest[- ]only|\bi\/?o\b/i, /amorti[sz]/i),
+    statusRow: own(/payment status|performing|delinquen|default status|loan status/i),
     valueRow: rowOf(ex, /collateral value|whole[- ]asset value|as[- ]is value|appraised value|property value|broker opinion of value|\bbov\b/i),
   };
 }
@@ -355,7 +384,7 @@ export function noteTermRows<M extends { label: string; value: string }>(metrics
  *  — each only as stated, null where the OM says nothing. Its position is
  *  read from the interest's own sentence and terms and the note's rows. */
 export function readNoteTerms(ex: MetricRows): NoteTerms {
-  const { balanceRow, rateRow, maturityRow, amortRow, ioRow, statusRow, valueRow } = noteRowsOf(ex);
+  const { balanceRow, seniorRow, rateRow, maturityRow, amortRow, ioRow, statusRow, valueRow } = noteRowsOf(ex);
   // The payment status is no position ("4 months behind on payments"), so
   // its row is not read for one.
   const position = [
@@ -387,6 +416,9 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
       : /performing|current/.test(statusText)
         ? "performing"
         : null;
+  // The loan ahead of the note, only where the words place the note behind
+  // it and the row states a sum: a share of value ("65% LTV") is no balance.
+  const senior = placed === "behind" && seniorRow && !/%|percent/i.test(seniorRow.value) ? money(seniorRow.value) : null;
 
   return {
     balance: balanceRow ? money(balanceRow.value) : null,
@@ -400,6 +432,7 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
     collateralValue: valueRow ? money(valueRow.value) : null,
     subordinate: placed !== "first",
     position: placed,
+    ...(senior != null ? { seniorBalance: senior } : {}),
   };
 }
 
@@ -513,12 +546,46 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
     daysLeft,
     ytmPct,
     paymentBasis,
-    // Behind a senior loan the note's last dollar sits on top of a balance
-    // the memorandum does not state: withheld, never struck on the note's
-    // own balance alone.
+    // Behind a senior loan the note's last dollar sits on top of the senior
+    // balance: never struck on the note's own balance alone.
     ltvAtBalancePct: terms.collateralValue != null && !terms.subordinate ? (balance / terms.collateralValue) * 100 : null,
     ltvAtPricePct: terms.collateralValue != null && !terms.subordinate ? (price / terms.collateralValue) * 100 : null,
+    // …and read on top of it where the memorandum states it.
+    ...stackOf(terms, balance, price),
     matured,
     thisMonth,
   };
+}
+
+/** Behind a senior loan whose balance the memorandum states, the stack over
+ *  the collateral's stated value: the senior alone, with the note's balance,
+ *  and with the price — each null without both stated figures, and on a
+ *  note the words do not place behind it. */
+function stackOf(terms: NoteTerms, balance: number, price: number): Pick<NoteRead, "seniorLtvPct" | "stackAtBalancePct" | "stackAtPricePct"> {
+  const value = terms.collateralValue;
+  const senior = terms.seniorBalance;
+  if (!terms.subordinate || terms.position === "unclear" || senior == null || !(senior > 0) || value == null || !(value > 0)) {
+    return { seniorLtvPct: null, stackAtBalancePct: null, stackAtPricePct: null };
+  }
+  return {
+    seniorLtvPct: (senior / value) * 100,
+    stackAtBalancePct: ((senior + balance) / value) * 100,
+    stackAtPricePct: ((senior + price) / value) * 100,
+  };
+}
+
+/**
+ * Whether the note is under water: its balance over the collateral's stated
+ * value — behind a senior loan whose balance the memorandum states, the
+ * senior loan and this note together over it (research pass 38). Its
+ * contract yield then assumes a repayment the collateral does not cover, so
+ * no surface shows that yield as the note's figure: the cap slot reads "n/a
+ * — under water", and the sentence says what the yield assumes. What the
+ * note fetches is a foreclosure's question. False where no value is stated,
+ * and where the memorandum leaves the debt's order unclear.
+ */
+export function noteUnderWater(n: NoteRead | null | undefined): boolean {
+  if (!n) return false;
+  if (n.ltvAtBalancePct != null) return n.ltvAtBalancePct > 100;
+  return n.stackAtBalancePct != null && n.stackAtBalancePct > 100;
 }

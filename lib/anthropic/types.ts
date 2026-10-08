@@ -56,6 +56,12 @@ export interface FirstSignal {
   perUnit: string;
   /** one skeptical sentence: what kind of deal this is and the first thing to check */
   take: string;
+  /** what the document IS, by its own pages — one of lib/document-kind's
+   *  `DOCUMENT_KINDS` ("offering_memorandum", "lease", "rent_roll"…), read
+   *  through `documentKindOf`; absent on a signal read before it was asked
+   *  and on a deal typed in by hand. The deal page warns on anything but an
+   *  OM; nothing stops a screen on it. */
+  documentKind?: string;
 }
 
 /** Step 1 — Extraction */
@@ -152,6 +158,13 @@ export interface ExtractionResult {
    *  deck changed since) keeps its first stamp — or its lack of one, and
    *  with it the 2026 reading (lib/criteria `screenStampFor`). */
   screenedOn?: string;
+  /** The round of readers the screen read under (lib/reader-round
+   *  `READER_ROUND`), stamped beside `screenedOn` by the pipeline and the
+   *  manual-deal path — never a field the model writes. Absent on an
+   *  extraction stored before the stamp (round 0), whose missing fields may
+   *  be ones its screen never asked for: lib/older-screen says so where the
+   *  absence changes what a figure means. */
+  readerRound?: number;
   /** Which memorandum this extraction was read from: the fingerprint of its
    *  bytes (lib/om-fingerprint), stamped with `screenedOn`, so a re-screen
    *  can tell the same deck from a reissued one. Absent on a deal entered by
@@ -368,7 +381,7 @@ export interface ExtractedAffordability {
   page: string;
 }
 
-export type InterestKind = "fee_simple" | "leasehold" | "leased_fee" | "note" | "partial_interest" | "unknown";
+export type InterestKind = "fee_simple" | "leasehold" | "leased_fee" | "note" | "partial_interest" | "preferred_equity" | "unknown";
 
 export interface ExtractedInterest {
   kind: InterestKind;
@@ -460,6 +473,12 @@ export interface MarketResult {
    *  The national figures ride in `liveBrief` alone. Absent on a single
    *  property, a portfolio in one market, or a check run before this. */
   otherBriefs?: LiveBriefRecord[] | null;
+  /** The deal sits in a market the site reads figures for, and the check
+   *  could read none of them — a failed read of the figures or of the
+   *  deal's address (lib/market-read-failed): said as a failed read on the
+   *  page, never as a market outside the covered ones. Absent where the
+   *  figures were read or there were none to read. */
+  liveReadFailed?: { market: string | null; grain?: "metro" | "state" } | null;
 }
 
 export interface LiveBriefRecord {

@@ -18,9 +18,11 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
 import {
+  GOOGLE_NO_STORE,
   IMAGE_CREDIT,
   fetchBestAerialImage,
   fetchOneImage,
+  isGoogleImage,
   type ImageSource,
 } from "@/lib/imagery";
 import { DEAL_AERIAL_FRAMES, nearestFrame } from "@/lib/image-frames";
@@ -51,13 +53,16 @@ export async function GET(
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const q = new URL(req.url).searchParams;
+  // The Google satellite frame is no longer drawn here: no page asks for it
+  // since the deal page and the compare columns were held off Google's
+  // imagery (a544615), and each frame was a billed Google call. Refused
+  // before anything is fetched (research pass 39).
+  if (q.get("src") === "satellite") return new NextResponse(null, { status: 404 });
   // `src` pins the answer to ONE source with no fallback. The deal page uses
-  // it so each tab can credit exactly what it is showing: crediting Google
-  // for a USGS frame is sloppy, and crediting USGS for a Google frame drops
-  // an attribution Google requires. Without it, best-available wins.
-  const pinned = ({ satellite: "satellite", usgs: "aerial" } as const)[
-    q.get("src") ?? ""
-  ] as ImageSource | undefined;
+  // it so each tab can credit exactly what it is showing: crediting USGS for
+  // another source's frame drops an attribution. Without it, best-available
+  // wins.
+  const pinned = ({ usgs: "aerial" } as const)[q.get("src") ?? ""] as ImageSource | undefined;
 
   const frame = nearestFrame(DEAL_AERIAL_FRAMES, q.get("w"), q.get("h"));
   const size = {
@@ -80,8 +85,9 @@ export async function GET(
     headers: {
       "content-type": best.response.headers.get("content-type") ?? "image/jpeg",
       // A day, not a week: adding the Google key must upgrade an existing
-      // deal's shot on the next view, not after a week of cached USGS.
-      "cache-control": "private, max-age=86400",
+      // deal's shot on the next view, not after a week of cached USGS. A
+      // Google frame is never kept at all (lib/imagery GOOGLE_NO_STORE).
+      "cache-control": isGoogleImage(best.source) ? GOOGLE_NO_STORE : "private, max-age=86400",
       "x-image-source": best.source,
       "x-image-credit": IMAGE_CREDIT[best.source],
     },

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
+import { regulationForDeal } from "@/lib/rent-regulation";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 
 const metric = (
@@ -342,6 +343,29 @@ describe("the area a deal states none of", () => {
     expect(m.sources.rsf?.note).toBe("248 units × 850 SF typical — enter the rentable SF");
   });
 
+  // Research pass 28: licensed beds are a count now, so a care facility
+  // that states no area runs on its beds × the class's 600 SF where it ran
+  // on the 100,000 SF placeholder; a marina's slips change no figure, its
+  // class (none) carrying no typical size.
+  it("runs a care facility on its licensed beds, and a marina's slips on the placeholder still", () => {
+    const snf = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$18,000,000"), metric("NOI (in-place)", "$1,350,000"), metric("Licensed beds", "120")], {
+        assetClass: "Skilled Nursing Facility",
+      }),
+      "fallback",
+    );
+    expect(snf.meta.units).toBe(120);
+    expect(snf.meta.rsf).toBe(120 * 600);
+    // The count in the memorandum's own noun (audit A, L2).
+    expect(snf.sources.rsf?.note).toBe("120 beds × 600 SF typical — enter the rentable SF");
+    const marina = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$14,000,000"), metric("NOI (in-place)", "$1,050,000"), metric("Wet slips", "250")], { assetClass: "Marina" }),
+      "fallback",
+    );
+    expect(marina.meta.units).toBe(250);
+    expect(marina.meta.rsf).toBe(100_000);
+  });
+
   it("speaks a hotel's count in keys", () => {
     const m = deriveUnderwriteInputs(
       ex([metric("Asking price", "$24,000,000"), metric("NOI (in-place)", "$2,000,000"), metric("Keys", "120")], {
@@ -476,6 +500,212 @@ describe("deriveUnderwriteInputs — a self-storage facility's premium over stre
     expect(m.meta.storage?.read).toMatch(/^The model grows today's rent, the rate increases' premium included; with every tenant at street its year-one rent would be \$\d+k lower/);
     expect(m.meta.storage?.read).toContain(`Its ${Math.round(m.inputs.vacancyPct * 1000) / 10}% vacancy is held flat across its years`);
     expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.storage).toBeNull();
+  });
+});
+
+describe("deriveUnderwriteInputs — the rent rules that reach the building, beside the model's one growth rate (lib/rent-regulation)", () => {
+  const walkUp = ex([
+    metric("Asking price", "$14,000,000"),
+    metric("NOI (in-place)", "$700,000"),
+    metric("Units", "48"),
+    metric("Year built", "1931"),
+    metric("Rent-regulated units", "41"),
+  ]);
+  const regulation = regulationForDeal(
+    { extraction: walkUp, address: { state: "NY", city: "Brooklyn", county: "Kings County" }, siteFlags: null, assetClass: "multifamily" },
+    "2026-10-05",
+  );
+
+  it("says the read in a line and sets the model's growth beside the allowance in force, never changing it", () => {
+    const m = deriveUnderwriteInputs(walkUp, "fallback", undefined, undefined, { regulation });
+    expect(m.meta.regulation?.line).toBe(
+      "Rent regulation: NYC rent stabilization applies; 41 of the 48 units rent-regulated as stated (85%); 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027",
+    );
+    expect(m.meta.regulation?.read).toBe(
+      `The model grows every rent ${Math.round(m.inputs.rentGrowthPct * 10000) / 100}% a year; NYC rent stabilization allows 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027 (the Rent Guidelines Board's Apartment/Loft Order #58), and 41 of the 48 units are regulated as the memorandum states. The model's one growth rate is the market-rate units', not the regulated ones'.`,
+    );
+    // The model is the same model: no input moves for the regulation.
+    expect(m.inputs).toEqual(deriveUnderwriteInputs(walkUp, "fallback").inputs);
+    // Absent where the caller read none.
+    expect(deriveUnderwriteInputs(walkUp, "fallback").meta.regulation).toBeNull();
+  });
+
+  it("carries the memorandum's own claim with no model read where no rule the site holds reaches the building", () => {
+    const claim = regulationForDeal(
+      { extraction: walkUp, address: { state: "TX", city: "Austin" }, siteFlags: null, assetClass: "multifamily" },
+      "2026-10-05",
+    );
+    const m = deriveUnderwriteInputs(walkUp, "fallback", undefined, undefined, { regulation: claim });
+    expect(m.meta.regulation?.line).toMatch(/^Rent regulation: The memorandum states regulated rents, which no rule the site holds reaches here/);
+    expect(m.meta.regulation?.read).toBe("");
+  });
+});
+
+describe("deriveUnderwriteInputs — a forward purchase, said and never changed (lib/forward-purchase)", () => {
+  const strategy = (summary: string) => ({ kind: "development" as const, summary, capitalBudget: "", timeline: "" });
+  const btr = ex(
+    [
+      metric("Purchase price", "$72,000,000"),
+      metric("Homes", "180"),
+      metric("NOI (stabilized, pro forma)", "$3,960,000"),
+      metric("Estimated delivery", "June 2028"),
+      metric("Deposit", "10% at signing, non-refundable after due diligence"),
+    ],
+    { assetClass: "sfr_btr", strategy: strategy("Forward purchase of a 180-home build-to-rent community, purchase at certificate of occupancy") },
+  );
+
+  it("says the purchase in a line and the model's year-one NOI beside the memorandum's at delivery", () => {
+    const m = deriveUnderwriteInputs(btr, "fallback");
+    expect(m.meta.forward?.line).toBe("Forward purchase: $72.0M paid at delivery (June 2028), the works the developer's; 5.50% at delivery on the stated NOI; deposit 10% at signing, non-refundable after due diligence");
+    expect(m.meta.forward?.read).toBe(
+      "The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, June 2028, and the deposit sits outside its cash flows. Its year-one NOI is an assumed 6.00% of the price, $4.32M, above the $3.96M the memorandum states at delivery.",
+    );
+    // No budget is the buyer's: the capital line's note says the developer
+    // funds the works, never "enter the construction cost".
+    expect(m.inputs.capitalImprovementsYr1).toBe(0);
+    expect(m.sources.capitalImprovementsYr1?.note).toBe(
+      "No construction budget is the buyer's: on a forward purchase the developer funds the works and the price is all-in at delivery",
+    );
+    // Anything else carries none.
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.forward).toBeNull();
+  });
+
+  it("says a budget stated on a forward deck is the developer's, and charges it as before — the model's figures are the owner's to change", () => {
+    const withBudget = ex([...btr.metrics, metric("Construction budget", "$58,000,000", { page: "p. 12" })], {
+      assetClass: "sfr_btr",
+      strategy: btr.strategy,
+    });
+    const m = deriveUnderwriteInputs(withBudget, "fallback");
+    expect(m.inputs.capitalImprovementsYr1).toBe(58_000_000);
+    expect(m.sources.capitalImprovementsYr1?.note).toBe(
+      "Construction budget — the developer's budget: on a forward purchase the developer funds the works and the price is all-in at delivery, yet this model charges it as the buyer's first-year capital; enter 0 to run the price alone",
+    );
+    // The same deck the buyer builds reads as before.
+    const own = ex(withBudget.metrics, { assetClass: "sfr_btr", strategy: strategy("Ground-up 180-home community") });
+    const o = deriveUnderwriteInputs(own, "fallback");
+    expect(o.meta.forward).toBeNull();
+    expect(o.inputs).toEqual(m.inputs);
+    expect(o.sources.capitalImprovementsYr1?.note).toBe("Construction budget — spent in year 1 in this annual model; the OM's own timeline may run longer");
+    expect(deriveUnderwriteInputs(ex(btr.metrics, { assetClass: "sfr_btr", strategy: strategy("Ground-up 180-home community") }), "fallback").sources.capitalImprovementsYr1?.note).toBe(
+      "A development deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it",
+    );
+  });
+});
+
+describe("deriveUnderwriteInputs — a mixed-use building's two incomes under one cap (lib/mixed-use)", () => {
+  it("says the two incomes in a line and that the model capitalises and grows both at one rate, and changes nothing", () => {
+    const mixed = ex(
+      [
+        metric("Asking price", "$25,000,000"),
+        metric("Units", "48"),
+        metric("NOI (in-place)", "$1,400,000"),
+        metric("Going-in cap rate", "5.60%"),
+        metric("Residential income", "$1,520,000"),
+        metric("Commercial income", "$610,000"),
+      ],
+      { assetClass: "Retail / Multifamily" },
+    );
+    const m = deriveUnderwriteInputs(mixed, "fallback");
+    expect(m.meta.mixedUse?.line).toBe("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    expect(m.meta.mixedUse?.read).toBe(
+      "The model capitalises the $610k of commercial income at the same 5.60% exit cap as the residential and grows it at the same 3.0% a year: one cap and one growth rate for two incomes that trade to different buyers at different caps, the commercial 28.6% of it.",
+    );
+    // The model is the same model: no input moves for the read.
+    expect(m.inputs).toEqual(deriveUnderwriteInputs(ex(mixed.metrics.slice(0, 4), { assetClass: "Retail / Multifamily" }), "fallback").inputs);
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.mixedUse).toBeNull();
+  });
+});
+
+describe("deriveUnderwriteInputs — an operating business's income capitalised as rent (lib/going-concern)", () => {
+  const station = ex(
+    [metric("Asking price", "$3,200,000"), metric("NOI (in-place)", "$256,000"), metric("EBITDA (T-12)", "$410,000")],
+    {
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+    },
+  );
+
+  it("says the business in a line and that the model capitalises its income as rent, allocating nothing to the business", () => {
+    const m = deriveUnderwriteInputs(station, "fallback");
+    expect(m.meta.goingConcern?.line).toBe("Fuel station and its store: sold with the business; EBITDA (T-12) $410k");
+    expect(m.meta.goingConcern?.read).toBe(
+      `The model capitalises its $256k year-one income at a ${(m.inputs.exitCapPct * 100).toFixed(2)}% exit cap as if it were rent; on a fuel station and its store that income is the operation's, which the real estate does not earn without an operator, and the model allocates nothing to the business.`,
+    );
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.goingConcern).toBeNull();
+  });
+
+  it("on a lease to the operator says the read with no model line: the rent is the landlord's income", () => {
+    const wash = ex([metric("Asking price", "$4,600,000"), metric("Annual base rent", "$276,000"), metric("EBITDAR (T-12)", "$720,000")], {
+      assetClass: "Car wash",
+      singleTenant: { tenant: "Tidal Wave Auto Spa", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+    });
+    const m = deriveUnderwriteInputs(wash, "fallback");
+    expect(m.meta.goingConcern).toEqual({ line: "Car wash: leased to the operator; EBITDAR (T-12) $720k; rent covered 2.61x", read: "" });
+  });
+});
+
+describe("deriveUnderwriteInputs — condominium units sold as one building (lib/condo)", () => {
+  it("says the units in a line and that the model sells them as one building at its exit cap, and nothing on anything else", () => {
+    const bulk = ex(
+      [
+        metric("Asking price", "$16,800,000"),
+        metric("Units", "42"),
+        metric("NOI (in-place)", "$840,000"),
+        metric("HOA dues", "$650 per unit per month"),
+        metric("Units in building", "120"),
+      ],
+      { assetClass: "Condominium Units (bulk sale)" },
+    );
+    const m = deriveUnderwriteInputs(bulk, "fallback");
+    expect(m.meta.condo?.line).toBe("Condominium units: 42 of 120 units; dues $328k a year");
+    expect(m.meta.condo?.read).toBe(
+      `The model sells the 42 units as one building at its ${(m.inputs.exitCapPct * 100).toFixed(2)}% exit cap; a bulk buyer's other exit, the units sold one by one, is priced a unit at a time, which the model does not run.`,
+    );
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.condo).toBeNull();
+  });
+});
+
+describe("deriveUnderwriteInputs — a sandwich position capitalised as if it ran forever (lib/sandwich-lease)", () => {
+  // Read on a pinned day: the model reads the master lease's term off the
+  // clock, and the years after its sale move with it.
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5, 12)), toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const interest = {
+    kind: "leasehold" as const,
+    summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+    share: "",
+    groundLease: "Master lease of the building from its owner",
+    loan: "",
+    page: "",
+  };
+  const rows = [
+    metric("Asking price", "$6,500,000"),
+    metric("Master lease rent", "$1,100,000 a year, increasing 2% annually"),
+    metric("Sublease income", "$1,820,000"),
+    metric("NOI (T-12)", "$720,000"),
+    metric("Master lease expiration", "December 31, 2041"),
+  ];
+
+  it("says the two rents and the master lease's end in a line, and where the lease ends against the model's sale", () => {
+    const m = deriveUnderwriteInputs(ex(rows, { assetClass: "office", interest }), "fallback");
+    expect(m.inputs.holdMonths).toBe(60);
+    expect(m.meta.sandwich?.line).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2041");
+    expect(m.meta.sandwich?.read).toBe(
+      "The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2041, 10.2 years after the model's sale, and the position with it — the exit on that term is the one to read.",
+    );
+    // A master lease ending inside the hold: the sale the model prices cannot happen.
+    const short = deriveUnderwriteInputs(ex([...rows.slice(0, 4), metric("Master lease expiration", "June 30, 2029")], { assetClass: "office", interest }), "fallback");
+    expect(short.meta.sandwich?.read).toContain("the master lease ends Jun 2029, inside the model's 5-year hold, so the sale the model prices cannot happen.");
+  });
+
+  it("nothing on a plain leasehold or a building bought outright", () => {
+    const plain = { ...interest, summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" };
+    expect(deriveUnderwriteInputs(ex(rows, { assetClass: "office", interest: plain }), "fallback").meta.sandwich).toBeNull();
+    expect(deriveUnderwriteInputs(ex(rows, { assetClass: "office" }), "fallback").meta.sandwich).toBeNull();
   });
 });
 

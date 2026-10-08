@@ -13,6 +13,9 @@ import {
 } from "./deal-strategy";
 import { buildYieldOnCostGrid, planBreakevens } from "./plan-sensitivity";
 import { planFacts } from "./plan-facts";
+import { countNounOf } from "./criteria";
+import { deriveInternalComps } from "./internal-comps";
+import { buildComps } from "./market-memory";
 
 const m = (label: string, value: string, page = ""): ExtractedMetric => ({
   label,
@@ -110,5 +113,83 @@ describe("a stated total cost with no price is still a total cost", () => {
     expect(note).toContain("total cost $60.0M");
     expect(note).toContain("yield on total cost 7.50%");
     expect(note).not.toContain("less the price");
+  });
+});
+
+// The audit of 2026-10-05 (LOW-9): a conversion's all-in cost was divided by
+// the first count row the memorandum states — today's building's — so an
+// office-to-hotel conversion stating "Units 40", "Keys (proposed) 160" and a
+// $60M total cost printed "Basis per unit (all-in) $1.5M" where a proposed
+// key costs $375k.
+describe("a plan's basis divides by the count of what its total cost buys", () => {
+  const conversion = (rows: ExtractedMetric[]): ExtractionResult => ({
+    dealName: "Midtown Suites — office to hotel",
+    assetClass: "hospitality",
+    market: "Dallas, TX",
+    address: "100 Main St, Dallas, TX",
+    strategy: { kind: "conversion", summary: "Office to hotel", capitalBudget: "", timeline: "" },
+    metrics: rows,
+  });
+  const ROWS = [
+    m("Asking price", "$30,000,000"),
+    m("Units", "40"),
+    m("Total project cost", "$60,000,000"),
+    m("Stabilized NOI", "$5,000,000"),
+  ];
+
+  it("on a conversion, the proposed count in its own noun, never today's", () => {
+    const ex = conversion([...ROWS, m("Keys (proposed)", "160")]);
+    const plan = planSummary(ex, inferStrategy(ex))!;
+    expect(plan.units).toBe(160);
+    expect(plan.costPerUnit).toBe(375_000);
+    expect(plan.costPerUnitWithheld).toBeNull();
+    // The plan's figures but the count are unchanged.
+    expect(plan).toMatchObject({ price: 30_000_000, totalCost: 60_000_000 });
+    expect(plan.yieldOnCost).toBeCloseTo(5 / 60, 9);
+    const noun = countNounOf(ex.metrics, "hospitality", "conversion").one;
+    expect(noun).toBe("key");
+    expect(planFacts(plan, noun)).toContainEqual(["Basis per key (all-in)", "$375k"]);
+    // Read without the kind, the noun is today's count row's, as before.
+    expect(countNounOf(ex.metrics, "hospitality").one).toBe("unit");
+  });
+
+  it("with no count labelled proposed or planned, no basis per unit — and the plan says why", () => {
+    const ex = conversion(ROWS);
+    const plan = planSummary(ex, inferStrategy(ex))!;
+    expect(plan.units).toBeNull();
+    expect(plan.costPerUnit).toBeNull();
+    expect(plan.costPerUnitWithheld).toBe(
+      "No basis per unit (all-in) is struck: the memorandum labels no count proposed or planned, so its 40 units are not read as the finished project's.",
+    );
+    expect(planFacts(plan, "unit").map(([label]) => label)).not.toContain("Basis per unit (all-in)");
+    // The rest of the plan stands.
+    expect(plan).toMatchObject({ totalCost: 60_000_000 });
+  });
+
+  it("a development reads its proposed count; a value-add's units stand as they are", () => {
+    const dev = {
+      ...conversion([m("Land cost", "$12,000,000"), m("Total development cost", "$120,000,000"), m("Units (proposed)", "300")]),
+      strategy: undefined,
+    };
+    expect(planSummary(dev, inferStrategy(dev))).toMatchObject({ kind: "development", units: 300, costPerUnit: 400_000 });
+    const va: ExtractionResult = {
+      ...conversion([m("Asking price", "$48,000,000"), m("Units", "240"), m("Renovation budget", "$12,000,000"), m("Stabilized NOI", "$4,200,000")]),
+      assetClass: "multifamily",
+      strategy: { kind: "value_add", summary: "Interior upgrades", capitalBudget: "", timeline: "" },
+    };
+    expect(planSummary(va, inferStrategy(va))).toMatchObject({ units: 240, costPerUnit: 250_000, costPerUnitWithheld: null });
+  });
+
+  it("the comp and market memories pool the plan's own basis, in the proposed count's noun", () => {
+    const ex = conversion([...ROWS, m("Keys (proposed)", "160")]);
+    const row = { id: "c", name: "Midtown Suites", asset_class: "hospitality", created_at: "2026-10-01T00:00:00Z", is_sample: false, verdict: null, extraction: ex };
+    const [comp] = deriveInternalComps("other", "hospitality", { assetClass: "hospitality" }, [row]);
+    expect(comp.basisLabel).toBe("$375k/key all-in");
+    const [pooled] = buildComps([row]);
+    expect(pooled).toMatchObject({ perUnit: 375_000, perUnitBasis: "unit", perUnitNoun: "key", allIn: true });
+    // With no count labelled proposed, neither pools a basis.
+    const bare = { ...row, extraction: conversion(ROWS) };
+    expect(deriveInternalComps("other", "hospitality", { assetClass: "hospitality" }, [bare])[0]?.basisLabel ?? null).toBeNull();
+    expect(buildComps([bare])[0]?.perUnit ?? null).toBeNull();
   });
 });

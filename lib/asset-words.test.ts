@@ -193,6 +193,36 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Something else entirely")).toBeNull();
   });
 
+  // Research pass 28: a medical tenant's outpatient space named by its own
+  // use filed as no class — the generic defaults, and every class's traps.
+  it("files a dialysis center, an urgent care, a surgery center, a freestanding ER and a veterinary clinic as medical office", () => {
+    for (const phrase of [
+      "Dialysis Center",
+      "Urgent Care",
+      "Urgent care clinic",
+      "Ambulatory Surgery Center",
+      "Ambulatory surgical center (ASC)",
+      "ASC",
+      "Surgery center",
+      "Freestanding ER",
+      "Free-standing emergency department",
+      "Veterinary Clinic",
+      "Veterinary hospital",
+      "Animal hospital",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("medical_office");
+    }
+    // The net-lease rule reads first, as it did: one tenant on a net lease.
+    for (const phrase of ["Dialysis Center (NNN)", "Single-tenant urgent care", "Net lease dialysis clinic", "NNN veterinary clinic"]) {
+      expect(assetClassKey(phrase), phrase).toBe("net_lease");
+    }
+    // A strip an urgent care anchors is retail, and a medical office is as before.
+    expect(assetClassKey("Retail strip (urgent care anchored)")).toBe("retail");
+    expect(assetClassKey("NNN medical office")).toBe("medical_office");
+    // "Vet" inside another word names no clinic.
+    expect(assetClassKey("Veteran housing")).toBe("multifamily");
+  });
+
   it("files a site as land only where no lease comes with it, and scattered-site housing as housing", () => {
     // The land rule's bare "site" ran first and filed all three as land: no
     // NOI, no rate seed, the land traps.
@@ -240,6 +270,83 @@ describe("the asset-words table", () => {
     }
     // Care is still care, whatever the age restriction beside it.
     expect(assetClassKey("Active adult and assisted living community")).toBe("senior_housing");
+    // Senior APARTMENTS sell no care either (research pass 28's amendment):
+    // filed as senior housing they lost the rent rules and ran on licensed
+    // care's defaults.
+    for (const phrase of ["Senior Apartments (LIHTC, 62+)", "Affordable Senior Housing", "62+ apartments", "Senior apartments", "Seniors rental housing"]) {
+      expect(assetClassKey(phrase), phrase).toBe("multifamily");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // A care or service word the phrase denies names no care (audit C3a:
+    // each had filed as licensed senior housing, losing the rent rules).
+    for (const phrase of [
+      "Senior Apartments (55+), no services",
+      "Age-restricted senior apartments (62+) - no care provided",
+      "Senior apartments without meals or services",
+      "Senior apartments (62+), non-licensed",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("multifamily");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // A care word beside a denial of another is still care.
+    expect(assetClassKey("Senior apartments with assisted living, no meals")).toBe("senior_housing");
+    // A care or service word keeps a phrase senior housing — "senior living"
+    // among them, the industry's word for a care community, apartments or
+    // not (the audit of 2026-10-05: "Senior Living Apartments" filed as
+    // rental housing while the going-concern reader called it a care
+    // community).
+    for (const phrase of [
+      "Senior housing",
+      "Senior living",
+      "Senior Living Apartments",
+      "Independent living apartments",
+      "Senior apartments with assisted living",
+      "Affordable senior housing with services",
+      "Senior apartments with meals",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("senior_housing");
+    }
+    // But "senior living" beside an affordable or age-restricted program's
+    // own words is a tax-credit building with an age restriction, which
+    // sells no care (the pre-merge audit: each filed as senior housing, so
+    // no rent rules and licensed care's defaults).
+    for (const phrase of ["Senior Living Apartments (LIHTC, 62+)", "Affordable senior living apartments, age 62+", "Senior living apartments (Section 8, 62 and over)"]) {
+      expect(assetClassKey(phrase), phrase).toBe("multifamily");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // A care word proper keeps it care, whatever the program beside it.
+    for (const phrase of ["Senior Living Apartments (LIHTC, 62+) with assisted living", "Senior living (62+) with meals and services", "Licensed senior living, age-restricted"]) {
+      expect(assetClassKey(phrase), phrase).toBe("senior_housing");
+    }
+    // A skilled nursing facility by any of its names is senior housing; each
+    // filed as no class, so every class's traps and the generic defaults.
+    for (const phrase of [
+      "SNF",
+      "Skilled Nursing Facility",
+      "Nursing Home",
+      "Nursing facility",
+      "Post-Acute Care",
+      "Nursing and Rehabilitation Center",
+      "Rehabilitation & Nursing Center",
+      "Skilled Nursing & Rehab",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("senior_housing");
+    }
+    // Rehabilitation alone is no nursing facility (the audit of 2026-10-05):
+    // a rehabilitation hospital, an addiction or a behavioral-health
+    // rehabilitation center and an outpatient therapy clinic sell no
+    // residence, and are left to the medical rules or to no class.
+    for (const phrase of [
+      "Inpatient Rehabilitation Hospital",
+      "Addiction Rehabilitation Center",
+      "Outpatient Physical Therapy & Rehabilitation Center",
+      "Behavioral Health Rehabilitation Facility",
+      "Rehabilitation center",
+    ]) {
+      expect(assetClassKey(phrase), phrase).not.toBe("senior_housing");
+    }
+    // A building's rehabilitation is no rehabilitation center.
+    expect(assetClassKey("Historic rehabilitation of an office building")).toBe("office");
     // An age-restricted park is a park: the manufactured-housing rule reads
     // it first.
     expect(assetClassKey("55+ manufactured home community")).toBe("manufactured_housing");

@@ -25,7 +25,15 @@
 // joins this table after that run showed it resolving to a real image.
 // `scripts/probe-skylines.mjs` is that probe — run it before adding a market.
 
-import { CROPPED_WORDS, creditText, photographerParts, type CreditLink, type CreditPart } from "./credit-parts";
+import {
+  creditText,
+  galleryCreditLineOf,
+  galleryCreditPartsOf,
+  photographerParts,
+  type CreditLink,
+  type CreditPart,
+  type GalleryAuthor,
+} from "./credit-parts";
 
 /** One market's photograph, with everything its licence obliges us to show. */
 export interface SkylineShot {
@@ -48,6 +56,17 @@ export interface SkylineShot {
    *  panorama cut to the card by its height stays sharp
    *  (lib/market-picture's `marketPhotoWidth`) */
   size?: readonly [number, number];
+  /** where a band crops the photograph from top to bottom, a percent of
+   *  its height (drawn as `object-position: 50% <bandFocusY>%`), for a
+   *  photograph the band's own 42% cut wrong: a tall subject's top lost,
+   *  or the subject sunk under the words' scrim (research pass 29). Judged
+   *  by eye through the bands' own crops — the laptop band at 1104×336,
+   *  /market's at 1062×336, the tablet's at 730×336 and the phone's strip
+   *  at 300×224 — with the scrim and the words painted on, so the
+   *  subject's top clears the frame and the scrim does not bury it. For a
+   *  band (`PlaceBackdrop`) only, never a card or a tile, whose frames are
+   *  other shapes. Unset, the band's own 42%. */
+  bandFocusY?: number;
 }
 
 /** The table's key for a metro area the site reads no figures for (#472):
@@ -113,6 +132,11 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [3008, 2000],
+    // The wheel is taller than a laptop's band: at 42% its crown of
+    // gondolas went off the top, at 0% the whole upper arc stands clear
+    // and the hub sits in the words' scrim (research pass 29's
+    // band-laptop-0 sheet, and the focus sheets cut 2026-10-05).
+    bandFocusY: 0,
   },
   // Northern Virginia is the one suburban market that gets a skyline, and
   // Rosslyn is the reason. PG County and Montgomery County still keep their
@@ -215,6 +239,11 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [4000, 1668],
+    // At 42% the skyline sat under the words' scrim below empty sky; at 80%
+    // it stands above the scrim, the Willis Tower's antennas clear of the
+    // top on /market's band and on /tools' shorter one, which 100% cut
+    // (band-laptop-1; focus sheets 2026-10-05).
+    bandFocusY: 80,
   },
   // Third sheet (skyline-sheet run 35661336976): the 6000px file it
   // replaces was a tight cluster of downtown towers under a blue sky —
@@ -253,6 +282,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [8330, 3456],
+    // Both tall towers' tops clear the laptop band at 16%; at 42% both were
+    // cut (band-laptop-1; focus sheets 2026-10-05).
+    bandFocusY: 16,
   },
   atlanta: {
     file: "Atlanta, Georgia Skyline.jpg",
@@ -261,6 +293,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [1920, 1280],
+    // At 42% the laptop band kept the freeway and lost the towers' tops; at
+    // 6% the skyline stands whole above the words' scrim, Bank of America
+    // Plaza's spire clear (band-laptop-1; focus sheets 2026-10-05).
+    bandFocusY: 6,
   },
   // Fourth sheet (skyline-sheet run 35752500514, the first one-market run,
   // thirty-six files deep): the hazy plane-window aerial gives way to the
@@ -327,6 +363,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [4320, 2160],
+    // The tallest tower's top clears the laptop band at 22%; at 42% it was
+    // cut (band-laptop-2; focus sheets 2026-10-05).
+    bandFocusY: 22,
   },
   // minneapolis: chosen by eye from contact sheet 8 (skyline-sheet run
   // 35943350787, 2026-09-24) — the article's lead, the skyline over the river at 4828px — over St. Anthony Falls at dusk, which is the falls rather than the city, and a 5168×1528 strip.
@@ -357,6 +396,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [4810, 2762],
+    // The tallest tower's pointed crown is whole in the laptop band at 8%;
+    // at 42% it was cut off (band-laptop-2; focus sheets 2026-10-05).
+    bandFocusY: 8,
   },
   // raleigh: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the article's lead, the tower cluster and the amphitheatre lit low from the west at 4000px — over two panoramio street views, a Fayetteville Street frame and, from the search, a photograph of Kyiv by a Raleigh photographer.
@@ -448,6 +490,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [7823, 5035],
+    // The tallest tower's pyramid top is whole in the laptop band at 23%; at
+    // 42% the band kept its shaft and cut the top (band-laptop-4; focus
+    // sheets 2026-10-05).
+    bandFocusY: 23,
   },
   // detroit: chosen by eye from contact sheet 10 (skyline-sheet run
   // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 4773px — over a night frame from 2021 whose Renaissance Center falls out of the phone's crop, a Gordie Howe Bridge aerial and a 1929 panorama (a PNG).
@@ -478,6 +524,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [8199, 4340],
+    // Key Tower's pyramid and spire are whole in the laptop band at 4%; at
+    // 42% the pyramid was cut (band-laptop-4; focus sheets 2026-10-05).
+    bandFocusY: 4,
   },
   // phoenix: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35944782635, 2026-09-24), through the market band's own crop — the article's lead, an oblique aerial of the towers with the mountains beyond them — over a street corner and the airport's control tower, which are what the six-market sheet held, a hazy dusk from South Mountain and two night frames the band turns black.
@@ -518,6 +567,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC0",
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     size: [4032, 2454],
+    // The towers are whole in the laptop band at 16%, the fountain at the
+    // scrim's edge; at 42% the band was half lake and the towers' tops cut
+    // (band-laptop-4; focus sheets 2026-10-05).
+    bandFocusY: 16,
   },
   // indianapolis: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35945058692, 2026-09-24), through the market band's own crop — the monument at the city's centre against a sunset — over two midday panoramas where the city is a strip under the words and the stadium and reservoir aerials the six-market sheet held; the credit is the name the runner printed, without the permission link printed after it.
@@ -528,6 +581,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [4382, 2230],
+    // The tallest tower and the flag on its neighbour are whole in the
+    // laptop band at 22%, the monument above the scrim; at 42% the tower's
+    // top was cut (band-laptop-5; focus sheets 2026-10-05).
+    bandFocusY: 22,
   },
   // riverside: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35945179705, 2026-09-24), through the market band's own crop — a real view of the place from the mountain over the campus — there is no skyline to photograph, and the convention-centre aerial and the San Bernardino station and airport frames were the alternatives.
@@ -539,6 +596,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     size: [2512, 1844],
   },  // ── Metro areas the site reads no figures for (#472) ──────────────────────
+  // Aguadilla, PR: skyline-sheet run 37287443715 — an article's lead, the town on its bay from the air in summer sun, a beach and a breakwater on turquoise water below houses climbing to green hills, a white block by the pier; no horizon, but the houses stand side-on in perspective over the sea, so it reads as a town, not a map (Hot Springs' case); a 1519px film scan, served at its own width as Erie's is. Over Rincón from a drone as a 2.8:1 panorama whose card is grey cloud with the town under the words, Crash Boat Beach's pier of bathers' backs under a flag, the beach under palms, palm fronds over a sunset beach and a bar's view of umbrellas and parked cars.
+  "cbsa:10380": {
+    file: "Aguadilla Pueblo.jpg",
+    place: "Aguadilla on its bay from the air, a beach and a breakwater below houses climbing green hills",
+    credit: "U.S. Corps of Engineers",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Aguadilla, PR",
+    size: [1519, 961],
+  },
   // Akron, OH: skyline-sheet run 36782855933 — the skyline at a card's full height, over a warmer panorama too short for the deal page's frame.
   "cbsa:10420": {
     file: "AkronPanorama.jpg",
@@ -548,6 +615,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "",
     name: "Akron, OH",
     size: [3296, 1679],
+  },
+  // Albany, OR: skyline-sheet run 37387656865 — from Albany's category, an Oregon State Archives photograph: a green steel truss bridge over the river beyond a timber pier walkway with railings and a lamppost, autumn trees on the banks, a grey-white clouded sky; the trusses above the words in both crops, the 21:9 keeping the near arch whole with a little sky above it; crisp; soft overcast light. The credit is the photographer and the archive as printed (Daphne-Fairhope-Foley's precedent). Over the same bridge from a timber railing whose 21:9 cuts the arches' tops, the Linn County Courthouse with a flagpole the 21:9 cuts, 1st Ave SW under a signal arm and street signs, a street clock close, and an aerial its title places at Portland's Fremont Bridge.
+  "cbsa:10540": {
+    file: "Albany - DPLA - 06f3bb247d96d8dcd93b6e575b04adc7.jpg",
+    place: "A green steel truss bridge over the river beyond a timber pier walkway",
+    credit: "Gary Halvorson, Oregon State Archives",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Albany, OR",
+    size: [2000, 1330],
   },
   // Albany, NY: skyline-sheet run 36779692322 — the plaza the city is known by; the one clear frame of seven.
   "cbsa:10580": {
@@ -584,6 +661,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Allentown, PA",
     size: [2048, 1151],
   },
+  // Altoona, PA: skyline-sheet run 37313470791 — an article's lead, the city from a hill in warm late-day light, a domed church, a white tower block and a water tower over brick blocks and houses, a long wooded ridge on the horizon with cloud on its top, whole in both crops (the 21:9 keeps the ridge and a strip of sky), crisp. Over Horseshoe Curve from straight above (a map), its park's lawn and benches as a 4.4:1 strip, the domed church at a street's end over a road and cars, a highway under cloud twice and a red cactus twice.
+  "cbsa:11020": {
+    file: "Altoona, Pennsylvania.jpg",
+    place: "Altoona from a hill, a domed church and a white tower block over brick blocks and houses, a ridge beyond",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Altoona, PA",
+    size: [7302, 4381],
+  },
   // Amarillo, TX: skyline-sheet run 36818765688 — Palo Duro Canyon, the landmark the area is known by, its red-banded walls and mesas over juniper from the CCC overlook, sharp, the far rim whole at the 21:9's top; over downtown under a grey overcast behind a signal mast, the towers small under heavy cloud behind scrub and a fence, Cadillac Ranch tiny in a brown field from a drone, a street of signs, the canyon from high in the air, and a canyon strip too short for a phone's card.
   "cbsa:11100": {
     file: "Palo Duro Canyon from CCC Overlook 2024.jpg",
@@ -593,6 +680,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Amarillo, TX",
     size: [2999, 2000],
+  },
+  // Amherst Town-Northampton, MA: skyline-sheet run 37278011774 — an article's photograph, the UMass Amherst campus from a drone in autumn colour, its library tower and the high-rise halls among red and gold trees, the hills on the horizon under a deep blue sky, every top and the horizon whole in both crops; over the campus from its playing fields as a 3:1 strip, Amherst from the air (the 21:9 cuts the library tower's top), Northampton's rooftops (the 21:9 loses the sky and the horizon and reads as roofs), a 1912 newsboy, an alley's murals, an elm and a shopfront.
+  "cbsa:11200": {
+    file: "UMass Amherst campus aerial view.jpg",
+    place: "The UMass Amherst campus from the air in autumn colour, hills on the horizon",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Amherst Town-Northampton, MA",
+    size: [4827, 3137],
   },
   // Anchorage, AK: skyline-sheet run 36782967654 — the snow on the mountains behind downtown, over the city article's lead, a view from above whose card crop loses the mountains.
   "cbsa:11260": {
@@ -613,6 +710,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Ann Arbor, MI",
     size: [4024, 1901],
+  },
+  // Anniston-Oxford, AL: skyline-sheet run 37387656865 — the Anniston article's lead, a downtown street: a row of red brick and painted fronts with green awnings and arched windows, a lamppost, the street running to a tall pale office block, a blue sky with cumulus; the row's cornices above the words in both crops; crisp. The title is kept whole. The runner printed the author as "Rivers Langley; SaveRivers", a name and an account; the credit is the name in it, as Auburn-Opelika's "Rivers A. Langley; SaveRivers" is — zori probe_url run 37389642101 printed the file page's Author field as "Rivers Langley; SaveRivers" (the account's user page linked), and the file names no other attribution beside the licence. Over Oxford's corner under wires and signals hung on a wire, the county courthouse with a wire across it and its cupola cut at 21:9, a NARA record card of a foundry, and a stereoscopic card of a furnace (once as a PNG).
+  "cbsa:11500": {
+    file: "Anniston, Alabama.JPG",
+    place: "A downtown Anniston street of brick fronts and green awnings under cumulus",
+    credit: "Rivers Langley",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Anniston-Oxford, AL",
+    size: [3915, 2090],
   },
   // Asheville, NC: skyline-sheet run 36782967654 — the city under its mountains, over a grey-sky cityscape and a washed-out panorama.
   "cbsa:11700": {
@@ -655,6 +762,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bakersfield, CA",
     size: [3088, 2048],
   },
+  // Bangor, ME: skyline-sheet run 37278011774 — downtown across the river under a clear blue sky, a brick tower, a church spire and the old blocks among trees behind an iron rail bridge on stone piers, a motorboat on deep blue water, the city above the card's words and nothing tall for the 21:9 to cut; over the Penobscot through forest from a bridge's observatory, with no Bangor in the frame, and three winter frames: a street of parked trucks, a wet crossing under a signal's arm and a pub's sign.
+  "cbsa:12620": {
+    file: "BangorSkyline.jpg",
+    place: "Downtown Bangor across the river under a clear blue sky, a rail bridge on stone piers in front",
+    credit: "GambitMG at English Wikipedia",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Bangor, ME",
+    size: [2048, 1536],
+  },
   // Barnstable Town, MA: skyline-sheet run 36816098960 — the Old Harbor Life Saving Station small on the dune line at sunset under heavy blue-grey cloud, golden grass across the foot, from the Cape Cod article, whole in both crops. Chosen over the sheet's first pick, White Crest Beach in Wellfleet: its photographer's attribution page (en.wikipedia User:MattWade/ImageAttribution, read from the runner in zori run 36817794786) asks for his name linked to his own user page, a link this credit line does not carry. Over Provincetown under a pale sky from the Pilgrim Monument and Chatham Light at night.
   "cbsa:12700": {
     file: "Old Harbor Life Saving Station, Sunset.JPG",
@@ -664,6 +781,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Barnstable Town, MA",
     size: [3888, 2592],
+  },
+  // Bay City, MI: skyline-sheet run 37387656865 — the city article's lead, the riverfront across the Saginaw River: a low row of brick blocks, townhouses and a pale balconied block at the right, docks, grey water, a broad clouded sky with blue patches over the top two thirds; the row just above the words in both crops; crisp, light noise on the water; a modest pick, the buildings small in the frame. The runner printed the author as "WeaponizingArchitecture", an account name; zori probe_url run 37389642101 printed it as the file page's Author field, linking the account's user page, and the file names no other attribution beside the licence. Over the downtown historic district under wires and hung signals, a dusk frame of a thin row under an empty sky, the Masonic Temple in heavy processing with its roof cut at 21:9, a speedboat under a bridge, and an 1888 photograph of Saginaw.
+  "cbsa:13020": {
+    file: "Bay City, Michigan (2022).jpg",
+    place: "Bay City's riverfront across the Saginaw River under a clouded sky",
+    credit: "WeaponizingArchitecture",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Bay City, MI",
+    size: [4030, 2267],
+  },
+  // Beckley, WV: skyline-sheet run 37313470791 — from the bridge's category, the New River Gorge Bridge's steel arch across the gorge from the low bridge below, under a deep blue sky with cumulus, the wooded walls falling to the river, the deck running off the left edge as the bridge does; whole in the card, and the only one of three frames whose deck the 21:9 keeps under a strip of sky; crisp; the bridge is in Fayette County, inside the metro area (the file name says so), so the picture is named for the metro area and its place says it is the bridge (Belton's rule). Over the same view half a minute either side (the 21:9 cuts the deck in both), the deck's roadway over fog (a road filling the frame, its author printed unknown) and a cabin in a meadow.
+  "cbsa:13220": {
+    file: "2017-09-08 13 59 38 View northwest down the New River towards the New River Gorge Bridge (U.S. Route 19) from the Tunney Hunsaker Bridge (Fayette County Route 82) over the New River between Fayette and South Fayette in Fayette County, West Virginia.jpg",
+    place: "The New River Gorge Bridge's arch across the wooded gorge, under a blue sky with cumulus",
+    credit: "Famartin",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Beckley, WV",
+    size: [3264, 2448],
   },
   // Bellingham, WA: skyline-sheet run 36816430466 — an article's lead, downtown from a low drone under cumulus, the red-brick Old City Hall's clock tower and the downtown blocks in sun, forested hills and a ridge behind, every top whole in both crops. Over an aerial over the harbour's industrial waterfront with Mount Baker on the horizon, a 1972 slide of the harbour full of logs, a 1908 postcard with its printed title and a barge leaving the port under grey cloud.
   "cbsa:13380": {
@@ -725,6 +862,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bismarck, ND",
     size: [3648, 1831],
   },
+  // Blacksburg-Christiansburg-Radford, VA: skyline-sheet run 37330328150 — from Burruss Hall's category: Virginia Tech's Burruss Hall, its stone tower across the Drillfield's lawn among autumn trees and two flags, half the frame an empty deep blue sky; the tower above the card's words in both crops, the long name across the hall's base at 21:9; crisp; the round's modest pick with Sheboygan's, the subject small in the frame. The title is kept whole. Over a turreted Victorian house whose turret the 21:9 cuts, a downtown corner under signal arms (the article's lead), a book drop behind caution tape, a man talking, a manhole cover and a 7-Eleven.
+  "cbsa:13980": {
+    file: "Virginia Tech Burruss Hall from Drillfield.JPG",
+    place: "Virginia Tech's Burruss Hall across the Drillfield in autumn",
+    credit: "Eric T Gunther",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Blacksburg-Christiansburg-Radford, VA",
+    size: [3264, 2448],
+  },
+  // Bloomington, IL: skyline-sheet run 37349000346 — an article's lead, the white stone building with its portico, pediment and dark clock dome topped by a green lantern, under a clear blue sky (the file calls it the city hall); the card keeps the whole building and the dome above the words, the 21:9 keeps the dome and lantern whole a little below its top edge; crisp; converging verticals. Over an oblique aerial of subdivisions in haze, the Normal Theater's lettered marquee at dusk, and five locomotives in a yard.
+  "cbsa:14010": {
+    file: "Bloomington, IL city hall 1 (cropped).jpg",
+    place: "Bloomington's domed stone building with its clock and lantern under a blue sky",
+    credit: "Daniel Schwen",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Bloomington, IL",
+    size: [4036, 2032],
+  },
   // Bloomington, IN: skyline-sheet run 37236836751 — an article's lead, Kirkwood Avenue at sunset, its shops, lamps and trees running to the courthouse's dome under a lit sky, whole in both crops; over five portraits of the courthouse, each losing its dome's top at 21:9, two with cars along the foot, a portrait with a portable toilet and parked cars, and the dome's interior.
   "cbsa:14020": {
     file: "Bloomington IN Kirkwood.jpg",
@@ -785,6 +942,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Brownsville-Harlingen, TX",
     size: [7328, 3274],
   },
+  // Brunswick-St. Simons, GA: skyline-sheet run 37278486927 — the Sidney Lanier Bridge from a drone in the late light, its two cable-stayed pylons over the river and the marshes, the sea on the horizon under a blue sky, whole in both crops; over a car carrier on grey water, the bridge small under a pale haze from Jekyll, the bridge from the interstate behind a barrier, and two beach frames with the bridge a speck on the horizon.
+  "cbsa:15260": {
+    file: "Sidney Lanier Bridge Aerial.jpg",
+    place: "The Sidney Lanier Bridge over the river and the marshes from the air, the sea on the horizon",
+    credit: "Devin Morris",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Brunswick-St. Simons, GA",
+    size: [4032, 3024],
+  },
   // Buffalo, NY: skyline-sheet run 36752030741 — the one usable frame of fourteen; the band would clip Seneca One's top.
   "cbsa:15380": {
     file: "Buffalo, NY skyline.jpg",
@@ -794,6 +961,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Buffalo, NY",
     size: [4032, 2268],
+  },
+  // Burlington, NC: skyline-sheet run 37387656865 — the city article's lead, which its file calls the tallest building in Burlington: a pale tower among low brick blocks from a drone, autumn trees, a water tower on the horizon, a blue sky with thin cloud; an oblique with a horizon; the tower whole in the card, the 21:9 keeping its roof's parapet and cutting the flags and poles on the roof; crisp. The runner printed the author as "Ak1047", an account name; zori probe_url run 37389642101 printed it as the file page's Author field, an account whose user page was never created, and the file names no other attribution beside the licence. Over the Alamance County Courthouse in Graham with a Confederate monument's statue beside it (whole and crisp, passed over for the monument), an abandoned car showroom, and the train station under a lattice mast.
+  "cbsa:15500": {
+    file: "Tallest building in Burlington.jpg",
+    place: "Burlington's tallest building among low brick blocks, from the air",
+    credit: "Ak1047",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Burlington, NC",
+    size: [5181, 2889],
   },
   // Canton-Massillon, OH: skyline-sheet run 36816207134 — the Pro Football Hall of Fame, an article's lead and the landmark the place is known by, its dome and bronze relief under a clear sky, whole on the card and at 16:9; the 21:9 crop sets the dome's cap against its top edge. Over downtown's skyline across warehouse roofs under a blue sky, downtown behind autumn leaves across a parking lot, City Hall's tower behind a signal pole and over a wall, a soft winter strip 513px tall, a 1909 plate of the fire station and a night postcard of the square.
   "cbsa:15940": {
@@ -814,6 +991,36 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Fort Myers, FL",
     size: [5805, 3870],
+  },
+  // Cape Girardeau, MO-IL: skyline-sheet run 37388585938 — a one-market run's find, from the Bill Emerson Memorial Bridge's category (the bridge's other files in the run sit in Cape Girardeau's own category): the cable-stayed bridge from a riverside lawn, its near H-pylon and fans of white cables across a deep blue sky with cumulus, the far pylon at the left, a riverside yard with yellow machines; the near pylon whole in both crops with sky above its tip; crisp. The two-state title is cut to its first city and state. Over the same bridge from a dry bank under a plain sky, again with its tips at the 21:9's edge, in gold evening light, at night, the American Queen at the riverfront, a caboose, a brick house behind a fence and a college building behind bare trees. The six-market sheet (run 37387809602) held the courthouse up a street under a wire with its spire cut at 21:9, a FEMA flood photograph, and three Mississippi River views its titles place at Lake Pepin, Eunice (Arkansas) and the Guthrie Theater.
+  "cbsa:16020": {
+    file: "Bill Emerson Bridge.jpg",
+    place: "The Bill Emerson Memorial Bridge's pylons and cable fans over the Mississippi",
+    credit: "Daniel Schwen",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Cape Girardeau, MO",
+    size: [5045, 2000],
+  },
+  // Carson City, NV: skyline-sheet run 37277388755 — an article's lead, the State Capitol's silver cupola from a low drone in early spring, its stone front and portico among bare trees, the foothills on the horizon under a blue sky with cumulus, the cupola and its finial whole in both crops and only the flagpole running off the 21:9's top; over downtown from a drone whose foreground is a parking lot and a substation, the Capitol behind frosted branches at 1600px, a cigarette card, an 1875 plate and one printed postcard twice.
+  "cbsa:16180": {
+    file: "Nevada State Capitol Building - Carson City.jpg",
+    place: "The Nevada State Capitol's silver cupola among bare trees, the foothills beyond under a blue sky",
+    credit: "Quintin Soloviev",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Carson City, NV",
+    size: [7584, 5613],
+  },
+  // Casper, WY: skyline-sheet run 37277388755 — the city across the plain from Casper Mountain, framed by ponderosa pines under a clear sky, whole in both crops; the city is a band in the middle distance, a real view of the place as Riverside's from Box Springs Mountain is; over an over-processed 3.8:1 strip from the same mountain, the mountain's snow under a grey cloud and a farm of radio towers.
+  "cbsa:16220": {
+    file: "Casper from Casper Mountain.jpg",
+    place: "Casper spread across the plain below Casper Mountain, framed by pines",
+    credit: "Milonica",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Casper, WY",
+    size: [4032, 1960],
   },
   // Cedar Rapids, IA: skyline-sheet run 36816207134 — downtown across the river under a grey sky, from the city's article, every tower whole in both crops, the water along the foot. Over the same skyline at night under a rising moon, whose card goes black above the towers and below the water, brick fronts from the pavement with a skywalk, a bridge's underside over a gravel bar and a highway bridge behind a railing.
   "cbsa:16300": {
@@ -985,6 +1192,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Des Moines, IA",
     size: [2450, 1544],
   },
+  // Dothan, AL: skyline-sheet run 37388036901 — the city article's lead (a 3:1 frame), downtown's cream tower topped by a lattice mast and a white radar dome, a ribbed office block beside it, low roofs with satellite dishes and trees, a clear blue sky; the tower and its dome whole in both crops; crisp; a modest pick, the drawn cover a fair alternative. The runner printed the author as "Prussian_Fool", an account name; zori probe_url run 37389642101 printed it as the file page's Author field, underscore and all, an account whose user page was never created, and the file names no other attribution beside the licence. Over two wider frames of the same view with the tower low under an empty sky, a street under poles and wires, the library and the post office across roads under wires, and a helicopter on a pole.
+  "cbsa:20020": {
+    file: "DowntownDothan02 (cropped).jpg",
+    place: "Downtown Dothan's tower with its mast and radar dome under a clear sky",
+    credit: "Prussian_Fool",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Dothan, AL",
+    size: [4930, 1634],
+  },
   // Dover, DE: skyline-sheet run 37237349944 — an article's lead, a downtown street of brick and painted shop fronts with awnings in winter sun under a blue sky, the card keeping the whole frame and the 21:9 trimming only the edge building's cornice and the trees' crowns, the parked cars under the words; over a race-day crowd at the speedway, a highway from an overpass and a highway's direction sign.
   // The runner printed the author as "Tim Kiser ( w:User:Malepheasant )", and the file page's own Author field is the same, a name and his Wikipedia user page, with no attribution template, and its description names the street, West Loockerman Street, on Dec 30, 2006 (zori probe_url run 37240141265); the credit is the name in it, as Duluth's is.
   "cbsa:20100": {
@@ -995,6 +1212,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/2.5",
     name: "Dover, DE",
     size: [2624, 1640],
+  },
+  // Dubuque, IA: skyline-sheet run 37278011774 — an article's lead, downtown's steeples and towers in autumn under a blue sky with cumulus, the wooded bluffs beyond, the brush in front falling under the card's words, every top whole in both crops; over the Fenelon Place Elevator's tracks down a green slope with no sky and no city.
+  "cbsa:20220": {
+    file: "Dubuque IA - overview.jpg",
+    place: "Downtown Dubuque's steeples and towers in autumn under a blue sky, wooded bluffs beyond",
+    credit: "Dirk",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Dubuque, IA",
+    size: [4152, 2246],
   },
   // Duluth, MN: skyline-sheet run 36818844258 — the lift bridge the city is known by, at dusk, its truss across the frame, sharp and whole at the top in both crops; over a drone frame of the canal's piers and the bridge under a flat grey overcast, downtown above the freeway's direction signs, two black-and-white plates, sled dogs and a rock cut. The runner printed the author as "Mfield , Matthew Field, http://www.photography.mattfield.com"; the file page's own Author field is the same, with no attribution template and an empty permission (zori probe_url run 37234876098); the credit is the name in it.
   "cbsa:20260": {
@@ -1015,6 +1242,36 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Durham, NC",
     size: [11884, 3064],
+  },
+  // Eau Claire, WI: skyline-sheet run 37278486927 — an article's photograph, downtown from a drone in summer, the river curving round its point under footbridges, the blocks beyond to a wooded horizon, whole in both crops, a 2.73:1 frame a card asks for at 2400; over the same downtown across the river under heavy cumulus (one frame, cropped and whole) and a house under a wire and a pole.
+  "cbsa:20740": {
+    file: "Eau Claire, Wisconsin downtown zoomed.jpg",
+    place: "Downtown Eau Claire from the air in summer, the river curving round its point under footbridges",
+    credit: "Wikideas1",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Eau Claire, WI",
+    size: [6946, 2544],
+  },
+  // Elizabethtown, KY: skyline-sheet run 37388036901 — an article's lead, the LaRue County Courthouse (its lettering says so; Larue County is in the metro area, the delineation's list): red brick, a white portico, a clock cupola with its cross, a tall flag at the right, a pine bough at the left edge, a lawn, a grey overcast; the cupola whole in both crops, the 21:9 cutting the flag's top; crisp; flat grey light; a modest pick, named for the metro area. The runner printed the author as "Antony-22", an account name; zori probe_url run 37389764574 printed it as the file page's Author field, linking the account's user page, and the file names no other attribution beside the licence. Over the Hardin County Courthouse with a flagpole through its front and the flags cut at 21:9, three houses, a church behind trees, City Hall under wires, and a postcard of Elizabethtown, North Carolina.
+  "cbsa:21060": {
+    file: "LaRue County Courthouse 2022a.jpg",
+    place: "The LaRue County Courthouse's portico and clock cupola",
+    credit: "Antony-22",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Elizabethtown, KY",
+    size: [6240, 4160],
+  },
+  // Elmira, NY: skyline-sheet run 37388036901 — the city article's lead, Elmira on the Chemung River from a height: the river curving through green banks to the city's blocks and a bridge under a wooded ridge in autumn colour, teasel heads framing both edges, a blue sky with small clouds; the city just above the words in both crops; crisp. The runner printed the author as "DSKEO", an account name; zori probe_url run 37389642101 printed it as the file page's Author field, an account whose user page was never created, and the file names no other attribution beside the licence. Over the Chemung County Courthouse with three flagpoles through its front and its tower cut at 21:9, two river views their titles place at Corning's Brisco Bridge rather than Elmira, and an engraved letterhead.
+  "cbsa:21300": {
+    file: "Chemung River Elmira.jpg",
+    place: "Elmira on the Chemung River under its wooded ridge in autumn",
+    credit: "DSKEO",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Elmira, NY",
+    size: [2776, 1851],
   },
   // El Paso, TX: skyline-sheet run 36779692322 — the article's lead, over a flatter midday aerial.
   "cbsa:21340": {
@@ -1056,6 +1313,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Evansville, IN",
     size: [2200, 1020],
   },
+  // Fairbanks-College, AK: skyline-sheet run 37278486927 — an article's lead, downtown under snow from a drone, the river and its bridges winding through, low sun on the blocks and a plume of steam on the horizon under a pastel sky, whole in both crops; over the river at blue hour whose subject is a chain hotel's lit name, the airport from a plane, a wing over the hills, a riverboat from above and three frames of a search-and-rescue exercise.
+  "cbsa:21820": {
+    file: "Aerial view of Fairbanks Alaska skyline (Quintin Soloviev).jpg",
+    place: "Downtown Fairbanks under snow from the air, the river and its bridges winding through",
+    credit: "Quintin Soloviev",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Fairbanks-College, AK",
+    size: [3314, 2209],
+  },
   // Fargo, ND: skyline-sheet run 36816207134 — downtown's historic storefronts in sun under a deep blue sky, every cornice and the pediment whole in both crops, the parked cars at the kerb under the card's words. Over an aerial whose deal-page crops lose the horizon and read as rooftops, an archive frame of passengers before a train, a street corner of signals and signs under a white sky, and two brick warehouses with water towers under a white sky.
   "cbsa:22020": {
     file: "Downtown Fargo District 01.jpg",
@@ -1065,6 +1332,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Fargo, ND",
     size: [6048, 4024],
+  },
+  // Farmington, NM: skyline-sheet run 37313645151 — the Shiprock article's photograph, the rock rising off the desert floor under heavy broken cloud with blue between, its dike running off to the left, snow on far mountains at the right, whole in both crops above the words, crisp (the clouds a little over-processed); a 2.56:1 frame, served at 2400; Shiprock is in San Juan County, the metro area's one county, so the picture is named for the metro area and its place says it is Shiprock (Belton's rule); the credit is the name inside the "Dave Bunnell redirect" the runner printed, which is the file page's Author field whole (its metadata's Artist, an account with no user page: zori probe_url run 37329561789), the same page linking User:Dave Bunnell (run 37329450866). Over the rock close under a blue sky (the 21:9 cuts its summit), Bisti's hoodoos close, Aztec Ruins' low walls as a 4.5:1 strip, the city's lights at night from the air and the civic centre's front with a crowd.
+  "cbsa:22140": {
+    file: "Shiprock NM viewed from the north.jpg",
+    place: "Shiprock rising off the desert floor under heavy broken cloud",
+    credit: "Dave Bunnell",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Farmington, NM",
+    size: [5762, 2250],
   },
   // Fayetteville, NC: skyline-sheet run 36798176732 — downtown's church spires and tree-lined street from above in clear daylight, every spire whole in both crops, over the Market House down Hay Street on a grey winter day through a heavy phone filter. The runner printed the author as "Public domain, City of Fayetteville"; the credit is the name in it.
   "cbsa:22180": {
@@ -1106,6 +1383,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Flint, MI",
     size: [3989, 2244],
   },
+  // Florence-Muscle Shoals, AL: skyline-sheet run 37382918468 — a one-market run for a round 15 market, from Florence's category: the O'Neal Bridge's white steel truss across the Tennessee at blue hour, lit by low sun, flags at a riverside plaza, the dark river and its reflections, a deep blue sky; the whole truss above the words in both crops; crisp. The bridge joins Florence (Lauderdale County) to Sheffield (Colbert County), both inside the metro area. The title is kept whole. The runner printed the author as "Noahmcdonald1", an account name; zori probe_url run 37383378486 printed it as the file page's Author field, an account with no user page; the file's own name says Noah McDonald, and the credit is the author Commons names (Milwaukee's precedent). Over Wilson Dam's powerhouse in low sun behind a dark slope of shrubs and a fence, the same bridge in evening light under a GFDL licence, a NARA aerial plate, a lettered Blues Trail marker, a mall's entrance and a creek mouth near Sheffield. Round 15's sheet (run 37330328150) held a roof before a tower block, a street of parked cars, a postcard and two frames outside the metro area.
+  "cbsa:22520": {
+    file: "Florence, Alabama O'Neal Bridge by Noah McDonald.jpg",
+    place: "The O'Neal Bridge's white truss across the Tennessee at blue hour",
+    credit: "Noahmcdonald1",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Florence-Muscle Shoals, AL",
+    size: [5184, 3456],
+  },
   // Fort Wayne, IN: skyline-sheet run 36787230817 — its tallest towers and a domed clock tower whole in both crops under a clear sky, over the same skyline smaller behind Promenade Park.
   "cbsa:23060": {
     file: "Downtown Fort Wayne, Indiana Skyline from Old Fort, May 2014.jpg",
@@ -1126,6 +1413,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Fresno, CA",
     size: [4052, 1348],
   },
+  // Gadsden, AL: skyline-sheet run 37388036901 — from Noccalula Falls' category: the falls' two white long-exposure cascades over a dark rock ledge into a pool, dark pines, a deep blue sky; whole in both crops; crisp; the whole frame in a strong blue-cyan cast, which reads as dusk; a modest pick. The credit is the photographer and the agency as printed (Daphne-Fairhope-Foley's precedent). Over steep aerials of downtown that read as maps (one in black and white), an oblique of the town on the Coosa with no sky, three airliner frames over cloud, and autumn trees on a riverbank that names no town.
+  "cbsa:23460": {
+    file: "View of Nocolulu falls from the shore in Godsden Alabama.jpg",
+    place: "Noccalula Falls' two cascades over their rock ledge",
+    credit: "Gentry George, U.S. Fish and Wildlife Service",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Gadsden, AL",
+    size: [4936, 3324],
+  },
   // Gainesville, FL: skyline-sheet run 36808459092 — a one-market run's pick of nineteen: Sweetwater Wetlands Park from above under a sky of cumulus, an oblique with a horizon, sharp and whole in both crops, over Century Tower, whose crown the wide crop cuts, the county's buildings behind signals and street signs, a museum at the card's foot, a camera's viewfinder and a coastal lab's sign; the six-market sheet had held parked cars under a crane, a steep aerial of Depot Park and a watermarked drone frame.
   "cbsa:23540": {
     file: "Sweetwater Wetlands Park.jpg",
@@ -1135,6 +1432,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Gainesville, FL",
     size: [3992, 2242],
+  },
+  // Gettysburg, PA: skyline-sheet run 37279345706 — a one-market run's find of eighteen, an article's lead: cannons on Seminary Ridge in the evening light by a split-rail fence and a stone wall, under leaning trees and a blue sky, the gun's wheel standing above the card's words, whole in both crops; over the field from Little Round Top (handsome, and at a card's size a field), Devil's Den behind a road of parked cars, Forbes Rock in snowy woods, a farmhouse and its barns, a regiment's monument, engravings and a painting, a museum case and a ranger under a tent. The six-market sheet (run 37278011774) held only the two Little Round Top frames.
+  "cbsa:23900": {
+    file: "15-23-0291, artillery on seminary ridge - panoramio.jpg",
+    place: "Cannons on Seminary Ridge at Gettysburg in evening light, by a split-rail fence and a stone wall",
+    credit: "David Dugan",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Gettysburg, PA",
+    size: [2048, 1367],
+  },
+  // Glens Falls, NY: skyline-sheet run 37278011774 — an article's lead, Lake George from a drone between forested hills, boats' wakes on deep blue water and mountains beyond under a bright sky with cumulus, an oblique with a horizon, whole in both crops; the lake lies between the metro area's two counties, Warren and Washington, so the picture is named for the metro area and its place says it is the lake (Belton's and Cocoa Beach's rule). Over the lake from Black Mountain under grey cloud, downtown Glens Falls by telephoto (the 21:9 loses its horizon and reads as rooftops), a fountain at a roundabout under crossing signs, a sunrise panorama whose village falls dark under the words, a 1782 book's plate and a camp's wooded point under haze.
+  "cbsa:24020": {
+    file: "Lake George aerial view 2025.jpg",
+    place: "Lake George from the air between forested hills, mountains beyond under a bright sky",
+    credit: "Hayden Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Glens Falls, NY",
+    size: [4000, 3000],
   },
   // Grand Junction, CO: skyline-sheet run 37236536465 — an article's lead, the city across its valley under the Book Cliffs and a storm-dark sky lit warm at the horizon, a bluff and junipers before it, whole in both crops; over the cliffs over downtown shot through tinted glass with a smudge in the sky, a city bus and the national monument's entrance sign.
   "cbsa:24300": {
@@ -1155,6 +1472,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     name: "Grand Rapids, MI",
     size: [4000, 1475],
+  },
+  // Great Falls, MT: skyline-sheet run 37279768946 — a one-market run's find of twenty, from the Great Falls of the Missouri River's category: the falls the city is named for, pouring over rock ledges below a dam's curved spillway beside a brick powerhouse, under a deep blue summer sky with cumulus, the spillway and the falls above the card's words, whole in both crops; over the same falls from the riverbed with the cascade under the words, downtown under snow as a flat strip under a grey sky, another town's main street, a bulletin board, a cattle drive, a town hall, a burger restaurant and a weather station's group photo. The six-market sheet (run 37277388755) held a winter street of signals, the dam under power lines and the river's ledges with no sky.
+  "cbsa:24500": {
+    file: "Great Falls of the Missouri River (1).jpg",
+    place: "The Great Falls of the Missouri River over rock ledges below a dam's curved spillway, under a summer sky",
+    credit: "Chris06",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Great Falls, MT",
+    size: [2048, 1536],
   },
   // Greeley, CO: skyline-sheet run 36816430466 — downtown's historic fronts in sun under a clear sky, a brick block with arched windows under a white cornice beside a cream one under a green cornice, a painted sign on the wall behind; the card clips the white cornice's corner and the 21:9 most of its length. Over pear trees in blossom before a storefront with bicycles and parked cars, a winter street corner of crossing signs under a white sky, the town's green sign with a sculpture and people (and again at a tilt), a shoe store's sign, two streets of parked cars and signs under a white sky, and Denver's skyline from Westminster behind a freight trailer.
   "cbsa:24540": {
@@ -1185,6 +1512,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     name: "Greensboro, NC",
     size: [2703, 953],
+  },
+  // Greenville, NC: skyline-sheet run 37330328150 — an article's lead, the city from a rooftop at sunset, orange and violet cloud over a radio mast, a street of brick blocks running away under its lights and signals, a new hotel block at the right; the card keeps the sunset, the mast and the hotel whole, the 21:9's top meets the hotel's flat roof with nothing lost; crisp, an HDR look. The runner printed the author as "Aaron Hines/City of Greenville", a photographer and an agency, credited as printed as Daphne-Fairhope-Foley's is. Over a steep drone frame of the same blocks at dusk with no horizon (a map) and a PNG of residence halls behind signal arms.
+  "cbsa:24780": {
+    file: "Greenville, North Carolina - 2026 9.jpg",
+    place: "Greenville from a rooftop at sunset, a street of brick blocks running away under its lights",
+    credit: "Aaron Hines/City of Greenville",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Greenville, NC",
+    size: [5237, 3489],
   },
   // Greenville, SC: skyline-sheet run 36750858237 — the picture the city is known by and its only usable file; credited as Commons names the author (the filename names Yousef AbdulHusain).
   "cbsa:24860": {
@@ -1236,6 +1573,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Hilton Head Island-Bluffton-Port Royal, SC",
     size: [3072, 2304],
   },
+  // Homosassa Springs, FL: skyline-sheet run 37321374937 — a one-market run's find of twenty-eight, from Three Sisters Springs' category: the spring run's clear turquoise water over pale sand under a deep blue sky, the hammock's trees and palms with moss along both banks, kayakers far up the run and one close at the right beside the card's words, whole in both crops (the 21:9 keeps a band of sky), crisp; the springs are in Crystal River, in Citrus County, the metro area's one county, so the picture is named for the metro area and its place says it is Three Sisters Springs (Belton's rule). Over the spring pool under the hammock with no sky and a log under the words, manatees in turquoise water with no shore, the state park's visitor building, murals, observatory, fountain and gift shop, Crystal River's docks, canals and signs, and Yellowstone's geyser basin filed under the springs. The six-market sheet (run 37313645151) held only a white elk wading, highway signs, a footbridge and the visitor centre's interior.
+  "cbsa:26140": {
+    file: "Three Sister Springs.jpg",
+    place: "Three Sisters Springs' clear turquoise run under the hammock, kayakers on the water",
+    credit: "CityofCrystalRiver",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Homosassa Springs, FL",
+    size: [3936, 2624],
+  },
+  // Hot Springs, AR: skyline-sheet run 37277388755 — an article's photograph, downtown from the air in summer, a twin-towered hotel and a brick tower in sun in a valley of forested mountains, the town running on up the valley; no horizon, but the buildings stand side-on with their faces lit, so it reads as a photograph, not a map, every top whole in both crops; over Central Avenue from a high window at dawn behind a plain hotel, a hooded figure in a spring's steam at night and a historical marker.
+  "cbsa:26300": {
+    file: "Downtown Hot Springs, Arkansas (aerial).jpg",
+    place: "Downtown Hot Springs among its forested mountains from the air, a twin-towered hotel in sun",
+    credit: "Samuel Grant",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Hot Springs, AR",
+    size: [3872, 2592],
+  },
   // Huntsville, AL: skyline-sheet run 36782967654 — the downtown towers over the park's water, over two aerials of the interstate. The runner printed the author as "No machine-readable author provided. Anivron assumed (based on copyright claims)."; the credit is the name in it, without Commons' sentence around it.
   "cbsa:26620": {
     file: "Downtown Huntsville, Alabama.jpg",
@@ -1276,6 +1633,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Jackson, MS",
     size: [2247, 822],
   },
+  // Janesville-Beloit, WI: skyline-sheet run 37349000346 — the Beloit article's lead, downtown Beloit from a brick-paved intersection: a pale green Art Deco block with a flag, red brick blocks and a white cupola beyond, a lamppost and a tree, a blue sky with cumulus; the blocks above the words in both crops, the green block's flag at the 21:9's top edge; crisp, saturated colour. The title is kept whole, the photograph the second city's (Auburn-Opelika's precedent). The runner printed the author as "Visit Beloit", an organisation's account; zori probe_url run 37382024313 printed it as the file page's Author field, an account whose user page was never created, and the file names no other attribution beside the licence. Over Beloit's ironworks behind trees across the river, a wide Janesville street, a car park twice, Beloit at night in snow under a signal arm, and Janesville's Town Square, a low row of blocks under a grey sky.
+  "cbsa:27500": {
+    file: "Downtown Beloit, Wisconsin.jpg",
+    place: "Downtown Beloit, a pale green Art Deco block and red brick blocks over a brick-paved street",
+    credit: "Visit Beloit",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Janesville-Beloit, WI",
+    size: [4928, 3264],
+  },
+  // Jefferson City, MO: skyline-sheet run 37279496897 — a one-market run's find of seventeen, from the Capitol's category: the State Capitol from the air in late autumn, its dome and the statue on its lantern whole in both crops (the 21:9 with a small margin), the river behind it and bare trees around; no horizon, but the building stands in elevation and fills the frame, so it reads as the Capitol, not a map. Over the article's lead, whose 21:9 cuts the statue (Topeka's fault), the Capitol in its 2019 scaffolding, two views from its rotunda over a parapet or a railyard and a substation, a panorama of another city from a memorial arch, archive plates, engravings, chrysanthemums and a parking truck. The six-market sheet (run 37278486927) held only the lead, the scaffolding, a rotunda view and a cigarette card.
+  "cbsa:27620": {
+    file: "AP of Missouri State Capitol Building.jpg",
+    place: "The Missouri State Capitol from the air in late autumn, the river behind it",
+    credit: "KTrimble at English Wikipedia",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Jefferson City, MO",
+    size: [4288, 2773],
+  },
   // Johnson City, TN: skyline-sheet run 37236686331 — downtown at dusk, a lit church steeple and a brick tower against a sky fading from blue to orange, the mountains behind, a 2.64:1 strip whose full height both crops keep, served whole at its own width; over the same view by day under bare branches, a street of parked cars under a tree, another town's main street, and four frames of Virginia's Skyline Drive.
   "cbsa:27740": {
     file: "Downtown Johnson City Sunset.jpg",
@@ -1285,6 +1662,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Johnson City, TN",
     size: [2353, 892],
+  },
+  // Johnstown, PA: skyline-sheet run 37314140256 — from the Inclined Plane's category: the city from the incline's hill, downtown's brick blocks, a stone church and the taller towers on the valley's floor, long brick mill sheds beyond and wooded ridges all round under a white sky, the incline's bridge over the river at the foot; the card and the 21:9 both keep the ridges and a strip of sky; crisp; the view the city is known by, from its own landmark. Over two more frames from the same spot framed lower (one loses the sky at 21:9), the same view as a 4.65:1 strip 1810px tall, the article's lead in haze, a snowy hill over a frozen river, two airliner aerials and a drawn bird's-eye map.
+  "cbsa:27780": {
+    file: "Johnstown, Pennsylvania from the Inclined Plane, 09-12-2026 3.jpg",
+    place: "Johnstown from the Inclined Plane's hill, downtown and the mills in the valley among wooded ridges",
+    credit: "Cutlass",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Johnstown, PA",
+    size: [6000, 4000],
   },
   // Kahului-Wailuku, HI: skyline-sheet run 36816430466 — Iao Valley's green ridges above Wailuku under a blue sky and cumulus, sharp, the summit whole with room in both crops; a crop of the photographer's own stitched panorama, without its black corners. Over that panorama and another whose unfilled black corners show in both crops, a tighter crop credited to a sentence naming a file, the Iao Needle under a mist that leaves half the card blank, a hazy view of West Maui from Haleakala's road, and two frames of Kahului Harbor's water and breakwater.
   "cbsa:27980": {
@@ -1305,6 +1692,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Kennewick-Richland, WA",
     size: [3919, 2618],
+  },
+  // Kenosha, WI: skyline-sheet run 37287680216 — an article's lead, the red North Pier lighthouse at the end of its pier on blue water under a blue sky with cumulus, the tower standing above the card's words, whole in both crops; the credit "Wrongdave at English Wikipedia" as printed (Bangor's form). Over the harbour and its far shore as a 3.4:1 panorama whose walkers stand under the words, a street with a motorcycle and parked cars, a grey street of snowbanks and SUVs, an empty street under a gym's sign and a survey plate of the harbour.
+  "cbsa:28450": {
+    file: "Kenosha North Pier Lighthouse.jpg",
+    place: "Kenosha's red North Pier lighthouse at the end of its pier under a blue sky with cumulus",
+    credit: "Wrongdave at English Wikipedia",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Kenosha, WI",
+    size: [2016, 1512],
   },
   // Killeen-Temple, TX: skyline-sheet run 36787138337 — a domed courthouse under a clear sky, whole in both crops and 926px tall, over a distant strip of Temple's towers behind trees and grey street corners; the card names the metro area, since the photograph is Belton's.
   "cbsa:28660": {
@@ -1346,6 +1743,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Knoxville, TN",
     size: [5374, 3583],
   },
+  // La Crosse-Onalaska, WI-MN: skyline-sheet run 37278011774 — an article's photograph, downtown along the river from a drone, its brick blocks, a blue bridge and the bluffs on the horizon under a clear sky, whole in both crops; a 4.78:1 frame, the table's widest, which a card asks for at 2400 and a 3x phone draws about 1.3x (Louisville's 4.18:1 draws 1.17x). Over the bluff's face as a 180-degree panorama twice, a hazy park from above with no horizon, Onalaska's dark hills over the lake, an arena's roof, the bridge from the bluff in black and white and two frames of a roadside camera.
+  "cbsa:29100": {
+    file: "La Crosse panoramic aerial.jpg",
+    place: "Downtown La Crosse along the river from the air, a blue bridge and the bluffs beyond",
+    credit: "Wikideas1",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "La Crosse, WI",
+    size: [10504, 2196],
+  },
   // Lafayette, LA: skyline-sheet run 36808145480 — the city article's lead, downtown's towers from a rooftop under a clear sky, whole in both crops, over the same rooftops from other angles, a panorama whose card keeps neither tower whole, a PNG (never served), a 2008 parking lot under a white sky, a 2008 tower close up under haze, and a bank tower over a parking lot.
   "cbsa:29180": {
     file: "Downtown Lafayette LA 2021.jpg",
@@ -1355,6 +1762,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Lafayette, LA",
     size: [8000, 6000],
+  },
+  // Lake Havasu City-Kingman, AZ: skyline-sheet run 37277388755 — an article's lead, London Bridge from the water, one arch framing the channel, its stone pier and balustrade in sun and shadow under a broken sky, whole in both crops; wreaths hang on its piers (the file is dated Nov 27, 2025). Over the bridge from above among parking lots with no horizon, a 1973 scan through a plane's window, the lake from a hotel's balcony, a lizard, a bare tree over a marsh and the lake at dusk over a road sign.
+  "cbsa:29420": {
+    file: "20251127 LondonBridge.jpg",
+    place: "London Bridge at Lake Havasu City from the water, an arch over the channel",
+    credit: "Guninvalid",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Lake Havasu City-Kingman, AZ",
+    size: [4000, 1848],
   },
   // Lakeland, FL: skyline-sheet run 36786974652 — the towers, fountain and waterside arches whole in both crops, over a softer daylight frame of the same shore and grey, distant views from Lake Morton.
   "cbsa:29460": {
@@ -1406,6 +1823,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Lawrence, KS",
     size: [3000, 1688],
   },
+  // Lawton, OK: skyline-sheet run 37321853635 — a one-market run's find of twenty-six, from the Wichita Mountains Wildlife Refuge's category: the Wichitas' low granite profile on the horizon at a winter sunrise across a frosted prairie, a big sky of streaked cloud with the sun's glare at the left, the mountains above the card's words in both crops, crisp; the refuge is in Comanche County, inside the metro area, so the picture is named for the metro area and its place says it is the refuge (Belton's rule). Over a granite gorge's pool between lichened cliffs (no sky at 21:9), a fishing pier running into the words twice, a coreopsis valley with no mountain, the old high school whose dome the card cuts, Mount Scott's summit road, hazy views of the lake and the plain, a storm view in heavy HDR soft at 1:1, a dusk view whose author is printed unknown, a lizard, anglers and seven bison. The six-market sheet (run 37313645151) held only Mount Scott's views.
+  "cbsa:30020": {
+    file: "A sunrise in winter, Wichita Mountains Wildlife Refuge, SW Oklahoma, U.S.jpg",
+    place: "The Wichita Mountains on the horizon at a winter sunrise, across the refuge's frosted prairie",
+    credit: "Larry Smith",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Lawton, OK",
+    size: [4000, 2573],
+  },
+  // Lewiston-Auburn, ME: skyline-sheet run 37389070836 — a one-market run for a round 16 market, from Auburn's category: the Lewiston-Auburn Railroad Bridge (its title), a rust-red steel truss footbridge straight ahead along a railed walkway with two walkers, bare trees down the left third, brick mill buildings and their stacks across the river at the right, a clear blue sky; the truss portal whole in both crops with sky above it; crisp. The title is kept whole. Over a hospital campus under many wires, Lewiston from a height behind a utility pole and wires, a mall's front, a sewage plant under construction, and Androscoggin River views that name no town in the metro area or lie in New Hampshire. Round 16's sheet (run 37349271496) held two drone frames whose 21:9 had no sky and a frame of Brunswick.
+  "cbsa:30340": {
+    file: "Approaching the Lewiston-Auburn Railroad Bridge, Auburn ME.jpg",
+    place: "The Lewiston-Auburn Railroad Bridge, a rust-red truss footbridge, under a blue sky",
+    credit: "John Phelan",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Lewiston-Auburn, ME",
+    size: [3072, 2304],
+  },
   // Lexington, KY: skyline-sheet run 36780959488 — the landmark the city is known by, sharp at dusk; the downtown aerial was 1544px and dated.
   "cbsa:30460": {
     file: "Rupp Arena view from Triangle Park.jpg",
@@ -1415,6 +1852,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Lexington, KY",
     size: [6088, 4059],
+  },
+  // Lexington Park, MD: skyline-sheet run 37288974243 — a one-market run's find of thirty-one, from Calvert Cliffs State Park's category: the sandstone cliffs in morning sun with trees on their top, driftwood on the beach and the bay with a further headland under a deep blue sky, whole in both crops; a phone's frame, a little smoothed at 1:1 and clean at card size; the park is in Calvert County, inside the metro area, so the picture is named for the metro area and its place says it is the cliffs (Belton's rule), the round's weakest with Houma's. Over the park's own lead, the headland under a flat white sky, cliff faces under haze, a pond and a trail marker, Point Lookout's riprap and open water, the Patuxent at sunset from a bridge and Solomons' roads under wires and signs. The six-market sheet (run 37287443715) held only the Patuxent and Point Lookout frames.
+  "cbsa:30500": {
+    file: "2016-07-20 10 10 04 Cliffs to the north of Grays Creek in Calvert Cliffs State Park, Calvert County, Maryland.jpg",
+    place: "The cliffs of Calvert Cliffs State Park over the beach and the bay in morning sun",
+    credit: "Famartin",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Lexington Park, MD",
+    size: [3200, 2380],
   },
   // Lincoln, NE: skyline-sheet run 36800019700 — the State Capitol's tower over downtown under a clear sky, the Sower whole in every crop; the Capitol's own portraits lose the Sower in the deal page's crops, the same skyline's other frames are smaller, paler or put a crane against the tower, the night frames are blown by floodlights, and the rest are rooftops, street corners, a theatre, a hotel's canopy and two congressmen.
   "cbsa:30700": {
@@ -1486,6 +1933,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Manchester-Nashua, NH",
     size: [8064, 5376],
   },
+  // Mankato, MN: skyline-sheet run 37349000346 — from Mankato's category: the Union Depot's canopy and brick gabled building beyond two railway tracks, a parking garage at the left edge, a blue sky with cumulus; the depot above the words in both crops, the tracks and ballast under them; crisp, clean midday light; the round's modest pick, the drawn cover a fair alternative. Over a drone frame of downtown whose 21:9 loses the sky and reads as rooftops, a NARA aerial its title places at New Ulm, and three sepia photographs of a hardware store's interior.
+  "cbsa:31860": {
+    file: "2009-0805-Mankato-UnionDepot.jpg",
+    place: "Mankato's Union Depot beyond its tracks under cumulus",
+    credit: "Bobak Ha'Eri",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Mankato, MN",
+    size: [3462, 2256],
+  },
+  // Mayagüez, PR: skyline-sheet run 37288750601 — a one-market run's find of twenty-three, from the lighthouse's category: Los Morrillos lighthouse at Cabo Rojo from above in warm late light, on its limestone cliffs over the sea, the lagoons and the hills beyond under a soft blue sky, the lighthouse above the card's words and whole in both crops (the 21:9 keeps the lagoons' far shore and loses the hills); Cabo Rojo is in the metro area, so the picture is named for the metro area and its place says it is Cabo Rojo (Belton's rule). Over the same lighthouse under a dramatic sky and two more frames whose 21:9 cuts its lantern, one with a photographer's watermark, the lighthouse small across grey water, seven frames of the cliffs and surf with no sky, the plaza's fountain and statue (the 21:9 cuts its head), the theatre's front (the 21:9 cuts its dome), a drone frame centred on a brewery's painted advertisement, mid-rise blocks under overcast and seven 1898 plates. The six-market sheet (run 37287552719) held the brewery, the overcast blocks and four of the plates.
+  "cbsa:32420": {
+    file: "Faro de Los Morrillos, Cabo Rojo.jpg",
+    place: "Los Morrillos lighthouse on its cliffs at Cabo Rojo from above, lagoons and hills beyond",
+    credit: "Jerjes Medina Albino",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Mayagüez, PR",
+    size: [4000, 3000],
+  },
   // McAllen, TX: skyline-sheet run 36782733907 — the city article's lead, over a cityscape led by a parking lot.
   "cbsa:32580": {
     file: "Skyline of McAllen.jpg",
@@ -1505,6 +1972,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Memphis, TN",
     size: [5979, 2988],
+  },
+  // Michigan City-La Porte, IN: skyline-sheet run 37314140256 — from Washington Park's category: the pierhead lighthouse at dusk from a drone, white with its red roof and black lantern at the end of its catwalk and breakwater, a boat's wake beside it, the harbour's lights along the shore and a power station's stack and cooling tower at the right under a blue-grey sky; an oblique with a horizon, the lantern standing above the card's words and whole in both crops (116 px under the 21:9's top), crisp. Over the lighthouse lit against a rose dusk (the 21:9 cuts its vane), the old lighthouse museum under overcast (the 21:9 cuts its lantern), the museum under a blue sky with a flagpole and its historical marker.
+  "cbsa:33140": {
+    file: "Michigan City East Lighthouse aerial 2021 - Michigan City, Indiana.jpg",
+    place: "Michigan City's pierhead lighthouse at dusk from the air, the harbour's lights along the shore",
+    credit: "Dan Previte",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Michigan City-La Porte, IN",
+    size: [5464, 3640],
+  },
+  // Midland, MI: skyline-sheet run 37381601175 — a one-market run's find of twenty-four, from The Tridge's category: the Tridge at dusk, its lit arches each strung with lamps over still water at blue hour, reflected whole, dark trees between, a deep blue sky; the place the city is known by; both arches and their reflections whole in both crops; crisp in the lamps, a little soft in the dark trees. Over the same bridge from its deck with the pylon's top cut in both crops, the bridge in snow under a grey sky, its railing close, and Dow Gardens' pavilions, barn and bridges in snow. The six-market sheet (run 37349000346) held the Alden Dow House across a pond with its chimney cut at 21:9, Dow Gardens' flowering tree by a footbridge, the courthouse behind a tree trunk, a PNG of the 2020 flood and an airliner's view of the Dow plant.
+  "cbsa:33220": {
+    file: "Tridge At Dusk.jpg",
+    place: "The Tridge's lit arches reflected in the river at dusk",
+    credit: "Phil Squattrito",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Midland, MI",
+    size: [2981, 1959],
   },
   // Midland, TX: skyline-sheet run 36818765688 — the downtown towers the city is known by, in low sun from a drone, an oblique with the plain running out to a horizon, sharp, the towers whole in both crops; over the courthouse square through a window, a black mullion down the middle of both crops.
   "cbsa:33260": {
@@ -1565,6 +2052,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Morgantown, WV",
     size: [2848, 1709],
+  },
+  // Mount Vernon-Anacortes, WA: skyline-sheet run 37313645151 — an article's lead, the Skagit Valley's tulip fields in bands of orange and yellow running to red barns and a white gambrel barn, the foothills under cloud beyond; the card keeps the barns and the hills, the 21:9 loses the hills and trims the red barn's roof at its top edge, the tulips filling it; an older camera's 1600px frame, a little soft at 1:1, vivid at card size; the valley's fields are in Skagit County, the metro area's one county, so the picture is named for the metro area and its place says it is the Skagit Valley (Belton's rule). Over Mount Vernon from a drone over the Skagit (crisp, but the 21:9 loses the horizon and reads as rooftops), Anacortes under a grey overcast, an intersection of signals and cars, the river in flood at the floodwall, and Deception Pass, which straddles Island County, at dusk and from the air.
+  "cbsa:34580": {
+    file: "Skagit Valley 1.JPG",
+    place: "Tulip fields in the Skagit Valley, bands of orange and yellow running to red barns",
+    credit: "Gina from Kent, WA, USA",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
+    name: "Mount Vernon-Anacortes, WA",
+    size: [1600, 1200],
+  },
+  // Muskegon-Norton Shores, MI: skyline-sheet run 37314140256 — an article's lead, downtown across Muskegon Lake on a clear evening, a tall brick tower with green roofs, a white office block and a red clock tower over the breakwall under a pale sky, whole in both crops, crisp at 1:1; a soft willow fills the right third and grass the foreground under the words, the round's weakest with Wenatchee's and Wheeling's. Over the harbour's breakwaters and channel from the air (a 1500px film scan whose 21:9 reads close to a map, its printed credit two lines on a card), three 1911 negatives of the harbour, a garbage truck and a lettered postcard; a one-market run (37321177414) found only the same postcard twice more, two 1911 negatives of a lightship, two men in a bed and the lake from the space station.
+  "cbsa:34740": {
+    file: "Muskegon skyline and lake.jpg",
+    place: "Downtown Muskegon across Muskegon Lake, a tall brick tower over the breakwall",
+    credit: "bigmikesndtech",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Muskegon-Norton Shores, MI",
+    size: [3072, 2048],
   },
   // Myrtle Beach, SC: skyline-sheet run 36787138337 — the towers and the beach whole in both crops in daylight, over a hazy high view up the strand to Cherry Grove Pier.
   "cbsa:34820": {
@@ -1666,6 +2173,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Omaha, NE",
     size: [7279, 4652],
   },
+  // Owensboro, KY: skyline-sheet run 37349135113 — an article's lead, the cable-stayed Natcher Bridge across the Ohio from a drone, its two pylons and fans of cables, barges and a power plant's cooling tower and stack on the flat far shore, a band of blue sky; an oblique with a horizon; both pylons above the words in both crops; crisp, light JPEG blocking on the water. Over a brick block at a corner under signal arms and an autumn tree over low buildings.
+  "cbsa:36980": {
+    file: "US 231 Natcher Bridge - Up River.jpg",
+    place: "The Natcher Bridge across the Ohio from the air, its two pylons and cable fans",
+    credit: "Thomas Hughes",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Owensboro, KY",
+    size: [4000, 3000],
+  },
   // Oxnard, CA: skyline-sheet run 36782733907 — the harbour's boats and palms, over an aerial of the Ventura coast in oversaturated colour.
   "cbsa:37100": {
     file: "CI Harbor Panorama (cropped).jpg",
@@ -1696,6 +2213,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Panama City-Panama City Beach, FL",
     size: [5472, 3648],
   },
+  // Parkersburg-Vienna, WV: skyline-sheet run 37349271496 — an article's lead, the white Blennerhassett Mansion on its island in the Ohio (Wood County), both wings joined by curved colonnades, every chimney, spring trees behind, a blue sky, the lawn and a gravel path in tree shadow in front; the mansion whole above the words in both crops; crisp, clean light; named for the metro area. The runner printed the author as "WVhybrid", an account name; zori probe_url run 37382024313 printed it as the file page's Author field, linking the account's English Wikipedia user page, and the file names no other attribution beside the licence. Over the brown Little Kanawha between wooded banks, a carved datestone, two roads and a 7-Eleven.
+  "cbsa:37620": {
+    file: "Blennerhassett Mansion.JPG",
+    place: "The Blennerhassett Mansion on its island in the Ohio, its wings and colonnades",
+    credit: "WVhybrid",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Parkersburg-Vienna, WV",
+    size: [3456, 2304],
+  },
   // Pensacola, FL: skyline-sheet run 36783120462 — the white sand the area is known by (an article's lead), over an aerial of the bay.
   "cbsa:37860": {
     file: "Pensacola Beach, United States (Unsplash).jpg",
@@ -1725,6 +2252,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Pittsfield, MA",
     size: [4000, 2000],
+  },
+  // Ponce, PR: skyline-sheet run 37288646346 — a one-market run's find of fifteen, from search: the port of Ponce and its marina point from the air, sailboats in the harbour and a container ship at the quay, the city along the far shore and the mountains on the horizon under a pale sky; the card keeps the mountains, the 21:9 loses them and keeps the far shore, so it still reads as a harbour in perspective, not a map; a 1511px film scan, served at its own width as Erie's is. Over a 1977 survey plate of the firehouse and the cathedral, the city hall behind trees and a lamppost, Castillo Serrallés on its hill under a white sky (the 21:9 cuts its tower), a 1960s aerial of a hotel, a lettered university postcard, a dam's construction site, a carnival float and a crafts fair at night, a painted lion, a grackle, an iguana, an 1898 landing painted and a tug from a warship's deck. The six-market sheet (run 37287443715) held the plate, the city hall, Castillo Serrallés, the grackle and a book's plate of the plaza.
+  "cbsa:38660": {
+    file: "Ponce Puerto Rico port aerial view.jpg",
+    place: "The port of Ponce from the air, its marina and harbour, the mountains beyond",
+    credit: "Tony Santana, U.S. Army Corps of Engineers",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Ponce, PR",
+    size: [1511, 998],
   },
   // Portland, ME: skyline-sheet run 36782855933 — a picture from the city's own article, the marina in front of downtown, over an aerial and a grey view from the islands.
   "cbsa:38860": {
@@ -1775,6 +2312,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Provo, UT",
     size: [5248, 2952],
+  },
+  // Pueblo, CO: skyline-sheet run 37340733360 — a one-market run's find of twenty-three, from the Historic Arkansas Riverwalk's category: the Riverwalk's channel curving away past a café promenade and its trees, brick blocks with arched windows and a flag beyond, a small cascade at the far end, under a blue sky with cloud; the card keeps the channel and the blocks, the 21:9 the brick block, the flag and a strip of sky; crisp; the place the city is known by. Over the Veterans' footbridge with the sky most of the card, the steel mill's sheds and a rusted stack from a drone (the 21:9 cuts its crown), the channel busy with a crane and brush, children in a fountain, a quilt sculpture, the railyard's ruins and a painted advertisement. The six-market sheet (run 37330183778) held the courthouse's dome over a car park with its spires cut at 21:9, a drone frame whose 21:9 reads as rooftops, and cottonwoods on a river whose file names no place.
+  "cbsa:39380": {
+    file: "Historic Arkansas Riverwalk of Pueblo.JPG",
+    place: "The Historic Arkansas Riverwalk's channel curving between trees and brick blocks",
+    credit: "Jeffrey Beall",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Pueblo, CO",
+    size: [6000, 4000],
+  },
+  // Racine-Mount Pleasant, WI: skyline-sheet run 37287680216 — an article's photograph, Wind Point Lighthouse from a drone, the white tower and its red lantern over the keeper's red-roofed house among trees, the lake beyond under mist and a grey sky; an oblique with a horizon, the lantern whole in both crops (the 21:9 with a small margin), crisp. Over the article's lead, the Research Tower over the brick Administration Building under a blue sky (a company's headquarters), the lighthouse from the ground (the 21:9 cuts its lantern), twice behind pines across a lawn, and a coloured postcard of a square.
+  "cbsa:39540": {
+    file: "Aerial view of Wind Point Lighthouse, Wisconsin, US julesvernex2.jpg",
+    place: "Wind Point Lighthouse and the keeper's house from the air, the lake beyond under mist",
+    credit: "Jules Verne Times Two",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Racine-Mount Pleasant, WI",
+    size: [8052, 5871],
   },
   // Rapid City, SD: skyline-sheet run 37236951448 — downtown in warm low sun under the foothills of the Black Hills, the city and the ridge above it whole in both crops; over a drone frame of a highway, a gas station and car parks under a hazy sky, downtown from the hillside with treetops across half the card and flat ground behind, a sky of cloud over a sliver of plain, the Needles from Harney Peak, a street front behind a tree's trunk, office towers through blurred pine and a winter aerial that reads as a map.
   "cbsa:39660": {
@@ -1836,6 +2393,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Rockford, IL",
     size: [3456, 2304],
   },
+  // Saginaw, MI: skyline-sheet run 37287680216 — an article's lead, downtown across the river in the evening under a blue sky, a tall old block and an Art Deco tower over the riverbank's buildings, a bridge and a boat's wake at the right, whole in both crops; a little smoothed at 1:1, clean at card and header size, a windowless white wall at the left edge. Over the Castle Museum (the 21:9 cuts a tower's lantern), a speedboat's wake under two bridges at 1600px, a concert on a lawn from above and three archive plates of 1888, 1912 and 1915.
+  "cbsa:40980": {
+    file: "Saginaw, Michigan Skyline (2022).jpg",
+    place: "Downtown Saginaw across the river in the evening, a bridge at the right",
+    credit: "WeaponizingArchitecture",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Saginaw, MI",
+    size: [3706, 2084],
+  },
   // St. George, UT: skyline-sheet run 36808230184 — the city below its red sandstone bluffs, snow-capped mountains under cloud beyond, an article's lead, whole in both crops, over four views of Snow Canyon State Park — red and white sandstone and sage, the park rather than the city, one with a dark shadow across a third of the card.
   "cbsa:41100": {
     file: "EM ST. GEORGE, UTAH (2624012794).jpg",
@@ -1855,6 +2422,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Salem, OR",
     size: [3796, 2473],
+  },
+  // San Angelo, TX: skyline-sheet run 37330183778 — an article's lead, the Concho River through town between grassy banks, a promenade on the left, a road bridge and a footbridge beyond, cumulus reflected in the still water; the water under the card's words, the bridges, trees and sky above them in both crops; crisp, a few thin wires behind the road bridge faint at card size. Over a road off a bridge with a lamppost up the frame and the Cactus Hotel's lettered roof, the Art Deco city hall whose roof the 21:9 meets, Fort Concho's barracks whose chimneys it cuts, and the river at a weir under a white overcast.
+  "cbsa:41660": {
+    file: "San Angelo September 2019 66 (Concho River).jpg",
+    place: "The Concho River through San Angelo, its bridges under cumulus reflected in still water",
+    credit: "Michael Barera",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "San Angelo, TX",
+    size: [6000, 4000],
+  },
+  // Sandusky, OH: skyline-sheet run 37313470791 — the Cedar Point article's photograph, the peninsula from a plane, its beach and breakwater, the coasters among trees and the parking lots at its root, the bay and its far shore on the horizon under a blue sky with a line of cumulus; an oblique with a horizon, whole in both crops; a little soft at 1:1, the coasters small and legible at card size. Over riders over the park's "Welcome to Cedar Point" sign, two coasters close, and Kelleys Island from high above in glare (a map). Marblehead Lighthouse's article and category gave nothing on the sheet.
+  "cbsa:41780": {
+    file: "Cedar Point from the air.jpg",
+    place: "Cedar Point's peninsula from the air, its beach and coasters, the bay beyond",
+    credit: "Nyttend",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Sandusky, OH",
+    size: [2816, 2112],
   },
   // San Jose-Sunnyvale-Santa Clara, CA: skyline-sheet run 36816505479 — a one-market run's pick of twenty-eight: downtown's towers lit against a violet night sky, sharp and whole in both crops, the crane and every tower with sky above; over the same frame uncropped, downtown small across the valley floor from a height, a look up at the Hotel De Anza with parked cars and a one-way sign at its foot, a steep look down in hazy midday light, a hazy strip 501px tall at 2400 wide, suburbs under green hills, Santana Row's shopping street, a crowd at the Civic, storefronts and a theatre's marquee, two hazy views from airliners, San Francisco's Golden Gate and Alviso's fireworks. The card names the Census title's first city, as Oxnard's, Bakersfield's and Stockton's do: the whole title ran into the credit on a phone's card.
   "cbsa:41940": {
@@ -1947,6 +2534,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Scranton, PA",
     size: [4177, 2350],
+  },
+  // Sheboygan, WI: skyline-sheet run 37330877189 — an article's lead, the city's riverfront: a railing promenade with lampposts and a gazebo, condominium blocks among trees and a tower with a lettered crown behind, under a pale sky that fills half the frame; the blocks and the tower above the words in both crops, the water under them; crisp, flat light; the round's modest pick with Blacksburg's. The runner printed the author as "AsherHeimermann", and the file page's Author field is that account, its user page never created (zori probe_url run 37343970376). Over Lake Michigan's beach and a rowboat in a file with a black border down both edges, a street of parked cars under wreathed lampposts, and two trains.
+  "cbsa:43100": {
+    file: "Sheboygan Riverfront.jpg",
+    place: "Sheboygan's riverfront, a promenade with lampposts, blocks among trees and a tower behind",
+    credit: "AsherHeimermann",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Sheboygan, WI",
+    size: [4608, 2762],
+  },
+  // Sherman-Denison, TX: skyline-sheet run 37349135113 — the Denison article's lead, Main Street: a receding row of red, tan and brown brick fronts with arched windows, a striped awning, wreathed lampposts, a distant theatre's lettered marquee and two parked cars, a pale sky at the top right; no wires or signal arms; the row above the words in both crops, the 21:9 cutting the nearest front's arched window at its top left; crisp. The title is kept whole, the photograph the second city's. The runner printed the author as "Renelibrary", an account name; zori probe_url run 37382024313 printed it as the file page's Author field, an account whose user page was never created, and the file names no other attribution beside the licence. Over Sherman's stone building whose eave the 21:9 meets, Lake Texoma's grey water with no sky at 21:9, two 1896 tornado PNGs, a college plate and a private house.
+  "cbsa:43300": {
+    file: "DenisonTexas1.jpg",
+    place: "Denison's Main Street, a row of brick fronts with arched windows",
+    credit: "Renelibrary",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Sherman-Denison, TX",
+    size: [4272, 2848],
   },
   // Shreveport-Bossier City, LA: skyline-sheet run 36797923875 — both banks of the river at golden hour, every tower whole in both crops, an oblique with a horizon; the bureau's other drone frame carries a dark propeller-shaped blur in its corner, the panorama is a grey sky behind a highway barrier, and the Regions tower loses its top in the wide crop over a rooftop.
   "cbsa:43340": {
@@ -2088,6 +2695,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Tulsa, OK",
     size: [4000, 3000],
   },
+  // Twin Falls, ID: skyline-sheet run 37313470791 — the Shoshone Falls article's photograph, the falls in their basalt amphitheatre at July's low water, white veils down the columns into the dark pool, the canyon's far rim and its trees with a strip of sky; the card keeps the sky, the 21:9 loses it and keeps the falls and the rim in perspective; a 2013 phone frame, a little soft at 1:1, clean at card size; the falls are on the Snake where it parts Twin Falls and Jerome counties, both in the metro area, so the picture is named for the metro area and its place says it is Shoshone Falls (Belton's rule). Over the canyon from the Perrine Bridge in evening light (the runner-up, a canyon rather than the falls), the same in April, houses on the gorge's floor, dark walls under power lines, a street of pickups under trees and a 1400px strip of the canyon.
+  "cbsa:46300": {
+    file: "2013-07-07 17 41 52 Shoshone Falls in Idaho viewed from the northwest.jpg",
+    place: "Shoshone Falls in its basalt canyon, the dark pool below",
+    credit: "Famartin",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Twin Falls, ID",
+    size: [3264, 2448],
+  },
   // Honolulu, HI: skyline-sheet run 36750858237 — the article's lead image, whole in every crop.
   "cbsa:46520": {
     file: "2022 Views from Diamond Head 02.jpg",
@@ -2107,6 +2724,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Utica-Rome, NY",
     size: [3600, 1904],
+  },
+  // Valdosta, GA: skyline-sheet run 37382707897 — a one-market run for a round 15 market, from the Lowndes County Courthouse's category: the courthouse's front, garlanded columns, its side domes and the central cupola and lantern under blue sky and cumulus, trees at either side; the whole building above the card's words; the 21:9 keeps the lantern but its top edge cuts the thin finial rod above it (seen at 2x); crisp; a modest pick, the drawn cover a fair alternative. Over the same front under a white overcast whose 21:9 cuts the cupola, its corner with the lantern cut at 21:9, the front close at night, Christmas trees, a linen postcard, bicycle racks, shopfronts and a dashcam frame. Round 15's sheet (run 37330328150) held the dome down a street under a signal arm, the courthouse close with its dome cut, an airliner's map and trail paths.
+  "cbsa:46660": {
+    file: "Front of Lowndes County Courthouse.JPG",
+    place: "The Lowndes County Courthouse's front, its domes and cupola under cumulus",
+    credit: "Daniel Mayer",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
+    name: "Valdosta, GA",
+    size: [2795, 1643],
   },
   // Vallejo, CA: skyline-sheet run 36787230817 — the ferries and the old brick waterfront whole in both crops under a grey sky, over aerials, a theme park's coasters and San Francisco's Golden Gate.
   "cbsa:46700": {
@@ -2137,6 +2764,46 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Waterbury-Shelton, CT",
     size: [4000, 3000],
+  },
+  // Waterloo-Cedar Falls, IA: skyline-sheet run 37330877189 — an article's lead, downtown Waterloo across the frozen river in winter, a covered footbridge on its piers, the hotel block with its lettered rooftop sign, an orange-roofed bank and a red brick block under a white sky, ice and dark water in front; the blocks above the words in both crops, a flagpole's tip near the 21:9's top; crisp, a little over-sharpened. The title is kept whole, the photograph the first city's. The credit is the Flickr-style "from" form the runner printed, as Mount Vernon-Anacortes' is. Over a corner of shopfronts and signals in Cedar Falls (that article's lead) and a street of tall brick blocks behind a signal pole in grey light.
+  "cbsa:47940": {
+    file: "Waterloo, Iowa (2014) (cropped).jpg",
+    place: "Downtown Waterloo across the frozen river in winter, a covered footbridge in front",
+    credit: "David Wilson from Oak Park, Illinois, USA",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Waterloo-Cedar Falls, IA",
+    size: [2642, 1390],
+  },
+  // Wausau, WI: skyline-sheet run 37330877189 — from the Wausau article: downtown at dusk from a drone over the river, two lit causeways running past an island park to the white domed tower and the lit blocks, wooded hills and a thin band of dusk sky at the top; an oblique with a horizon, the tower above the card's words in both crops; crisp; a 2.89:1 frame, which a card asks for at 2400. The runner printed the author as "Wikideas1", and the file page's Author field is that account's user page (zori probe_url run 37343970376); the file is CC0. Over downtown across a wooded valley with no sky, the 400 Block's lawn with traffic cones, a hazy view from Rib Mountain over a bench, and the quarry's cliffs.
+  "cbsa:48140": {
+    file: "Wausau, Wisconsin downtown.jpg",
+    place: "Downtown Wausau at dusk from the air, lit causeways crossing the river to the domed tower",
+    credit: "Wikideas1",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Wausau, WI",
+    size: [7364, 2552],
+  },
+  // Wenatchee-East Wenatchee, WA: skyline-sheet run 37313645151 — the Lake Chelan article's photograph, uplake from the south shore in winter, snowy ridges in alpenglow above the dark lake under pink cloud, whole in both crops, crisp; Lake Chelan is in Chelan County, inside the metro area, so the picture is named for the metro area and its place says it is Lake Chelan, as Glens Falls' is Lake George; nothing of Wenatchee itself reached the sheet, the round's weakest with Muskegon's and Wheeling's. Over snowy vineyard rows across the lake under a grey sky, a boat at a dock and a tent, data centres' roofs in brown hills from the air and the Columbia from an airliner (maps).
+  "cbsa:48300": {
+    file: "Uplake from the south shore Lake Chelan.jpg",
+    place: "Lake Chelan in winter, snowy ridges in alpenglow above the dark lake",
+    credit: "Themerganser",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Wenatchee-East Wenatchee, WA",
+    size: [3072, 2304],
+  },
+  // Wheeling, WV: skyline-sheet run 37313470791 — from Downtown Wheeling's category: downtown across the Ohio from Wheeling Island under a heavy, textured grey sky, brick towers and the Capitol Music Hall's painted wall at the left, the wooded hill behind and the river in front, whole in both crops; a phone frame with an HDR look, a little smoothed at 1:1, clean at card size, leaves at the left edge. Over the same shore smaller behind bushes and a dock's pilings as a 2.4:1 panorama, the Suspension Bridge from its own deck between traffic signals and under its cables, a stereoview card and its PNG, and a street of brick warehouses under wires and stop signs.
+  "cbsa:48540": {
+    file: "Downtown Wheeling, WV - 20200628 - 14 - Skyline from Wheeling Island.jpg",
+    place: "Downtown Wheeling across the Ohio River under a heavy grey sky",
+    credit: "Andre Carrotflower",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Wheeling, WV",
+    size: [4032, 3024],
   },
   // Wichita, KS: skyline-sheet run 36780959488 — the article's lead.
   "cbsa:48620": {
@@ -2336,6 +3003,89 @@ export function skylineSrcSet(id: string): string {
 }
 
 /**
+ * How wide a photograph is drawn to cover a box `height` px tall, from its
+ * recorded size: a panorama cut to a squarer box is covered by its HEIGHT,
+ * so it is drawn wider than the box (#446). Null where the size is not
+ * recorded. The one copy of that arithmetic: a pipeline card's width
+ * (lib/market-picture's `marketPhotoWidth`) and a band's `sizes`
+ * (`bandSizes`) both read it.
+ */
+export function coverWidth(shot: Pick<SkylineShot, "size">, height: number): number | null {
+  const [w, h] = shot.size ?? [0, 0];
+  return w > 0 && h > 0 ? (height * w) / h : null;
+}
+
+/** A band's picture box from one window width up: the band's width (its
+ *  column's, in px, or the window's) and its height (in px, at the least
+ *  the band is drawn, or the window's). */
+export interface BandBox {
+  /** the window width this box holds from, in px (0 for the base) */
+  min: number;
+  width: number | "100vw";
+  height: number | "100vh";
+}
+
+/**
+ * `sizes` for a photograph covering a band — #446's card rule for a band.
+ * A band's height is set in pixels, not by its width, so a panorama covers
+ * it by its height and is drawn wider than the band (`coverWidth`): where a
+ * band said only its width ("100vw"), Portland's 3.75:1 panorama on a
+ * phone's band was asked for at a phone's width and drawn 1.69× its file,
+ * and the sign-in page's Baltimore 3.6×. So each breakpoint says the wider
+ * of the band's width and the width that covers its height, with a media
+ * condition where the window decides which (`min-width` for a band of set
+ * height, `max-aspect-ratio` for one the window's height — the viewer's own
+ * rule, lib/photo-srcset). Plain lengths and `calc()` only, which every
+ * browser's `sizes` reads. Without a recorded size, the band's width alone,
+ * as before.
+ */
+export function bandSizes(shot: Pick<SkylineShot, "size"> | null, boxes: readonly BandBox[]): string {
+  const [w, h] = shot?.size ?? [0, 0];
+  const known = w > 0 && h > 0;
+  const px = (n: number) => `${Math.ceil(n)}px`;
+  const width = (b: BandBox) => (b.width === "100vw" ? "100vw" : px(b.width));
+  const sorted = [...boxes].sort((a, b) => b.min - a.min);
+  const entries: Array<{ media: string[]; value: string }> = [];
+  sorted.forEach((box, i) => {
+    const upper = i === 0 ? Infinity : sorted[i - 1].min;
+    const from = box.min > 0 ? [`(min-width: ${box.min}px)`] : [];
+    if (!known || !shot) {
+      entries.push({ media: from, value: width(box) });
+      return;
+    }
+    if (box.height === "100vh") {
+      // Covered by the window's height wherever the window is narrower than
+      // the photograph's shape (or than the band's own width at that height).
+      const k = Math.ceil((w / h) * 1000) / 1000;
+      const byHeight = `calc(100vh * ${k})`;
+      const narrower = box.width === "100vw" ? `(max-aspect-ratio: ${w}/${h})` : `(min-height: ${Math.ceil((box.width * h) / w)}px)`;
+      entries.push({ media: [...from, narrower], value: byHeight });
+      entries.push({ media: from, value: width(box) });
+      return;
+    }
+    const cover = coverWidth(shot, box.height)!;
+    if (box.width !== "100vw") {
+      entries.push({ media: from, value: px(Math.max(box.width, cover)) });
+    } else if (cover <= box.min) {
+      entries.push({ media: from, value: "100vw" });
+    } else if (cover >= upper) {
+      entries.push({ media: from, value: px(cover) });
+    } else {
+      // The window decides: wider than the cover width, the band's width.
+      entries.push({ media: [`(min-width: ${Math.ceil(cover)}px)`], value: "100vw" });
+      entries.push({ media: from, value: px(cover) });
+    }
+  });
+  // An entry saying what the next one says adds nothing: the next one holds
+  // from a smaller width and answers the same.
+  const kept = entries.filter((e, i) => {
+    const next = entries[i + 1];
+    return !(next && next.value === e.value && e.media.length === 1 && next.media.length <= 1);
+  });
+  return kept.map((e) => (e.media.length ? `${e.media.join(" and ")} ${e.value}` : e.value)).join(", ");
+}
+
+/**
  * One attribution line for a GRID of these photographs.
  *
  * A tile 240px wide has no room for a photographer's name under it, but
@@ -2366,7 +3116,14 @@ export function galleryCredit(ids: readonly string[]): string {
  * one sentence. The parts themselves are lib/credit-parts', which imports
  * nothing, so a client handed a credit as data never loads this table.
  */
-export { CROPPED_WORDS, type CreditLink, type CreditPart } from "./credit-parts";
+export {
+  CROPPED_WORDS,
+  type CreditLink,
+  type CreditPart,
+  type GalleryAuthor,
+  type GalleryPhoto,
+  type PhotoCredit,
+} from "./credit-parts";
 
 /** One photograph's credit, in parts. */
 export function skylineCredit(shot: SkylineShot): { place: string; author: CreditLink; license: CreditLink } {
@@ -2384,86 +3141,21 @@ export function skylineCreditParts(shot: SkylineShot): CreditPart[] {
   return [`${c.place} · `, ...photographerParts(c.author, c.license, true)];
 }
 
-/** One photograph in a grid's credit: what it shows, linked to its own
- *  page, and the licence that photograph is under, linked to its text. */
-export interface GalleryPhoto extends CreditLink {
-  license: CreditLink;
+/** The photographs the markets named have, in the order named. */
+function shotsOf(ids: readonly string[]): SkylineShot[] {
+  return ids.map((id) => skylineFor(id)).filter((s): s is SkylineShot => Boolean(s));
 }
 
-/** One photographer in a grid's credit, with every one of their photographs
- *  the grid shows, each by what it shows and linked to its own page, each
- *  with its own licence. */
-export interface GalleryAuthor {
-  name: string;
-  photos: GalleryPhoto[];
-}
-
-/**
- * A grid's credit, in parts: each photographer once, with every photograph
- * of theirs the grid shows linked to its own file's page — the first cut
- * linked a photographer's name to their first file only, so on the
- * homepage, where Bruce Emmerling took both Richmond's and Norfolk's,
- * Norfolk's photograph was linked nowhere — each with the licence it is
- * under, and the licences the grid's photographs are under, each once.
- * Null where no market shown has a photograph.
- */
+/** A grid's credit, in parts, for the markets named (lib/credit-parts
+ *  `galleryCreditPartsOf`). Null where no market named has a photograph. */
 export function galleryCreditParts(ids: readonly string[]): { authors: GalleryAuthor[]; licenses: CreditLink[] } | null {
-  const shots = ids.map((id) => skylineFor(id)).filter((s): s is SkylineShot => Boolean(s));
-  if (shots.length === 0) return null;
-  const authors = new Map<string, GalleryAuthor>();
-  for (const s of shots) {
-    const name = authorOf(s);
-    const author = authors.get(name) ?? { name, photos: [] };
-    const url = commonsPage(s.file);
-    if (!author.photos.some((p) => p.url === url)) author.photos.push({ name: s.place, url, license: { name: s.license, url: s.licenseUrl } });
-    authors.set(name, author);
-  }
-  const licenses = new Map<string, CreditLink>();
-  for (const s of shots) if (!licenses.has(s.license) || (!licenses.get(s.license)!.url && s.licenseUrl)) licenses.set(s.license, { name: s.license, url: s.licenseUrl });
-  return {
-    authors: [...authors.values()],
-    licenses: [...licenses.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-  };
+  return galleryCreditPartsOf(shotsOf(ids).map(skylineCredit));
 }
 
-/**
- * The grid's one line, as parts: a photographer with one photograph shown is
- * their name linked to it; one with several is their name, then each of
- * those photographs by what it shows, linked to its own page — "Bruce
- * Emmerling (Downtown Richmond; Downtown Norfolk from the Elizabeth River)",
- * semicolons because a place can hold a comma. Each photographer's licence
- * follows them, linked to its text — or, where their photographs shown are
- * under different licences, each photograph's follows it — so a reader can
- * tell which photograph is under which licence. The line had listed the
- * grid's licences once each at its end ("CC BY 2.0 / CC BY-SA 4.0 / Public
- * domain"), which said none of that (the research pass of 2026-10-01).
- * Then where they came from and that the photographs are cropped. Null
- * where no market shown has a photograph. "Photographs", not "Skyline
- * photographs": a market is shown by the photograph it is known by, which
- * may be a memorial, a wheel on the river or a row of houses.
- */
+/** The grid's one line, as parts, for the markets named (lib/credit-parts
+ *  `galleryCreditLineOf`). Null where no market named has a photograph. */
 export function galleryCreditLine(ids: readonly string[]): CreditPart[] | null {
-  const parts = galleryCreditParts(ids);
-  if (!parts) return null;
-  const out: CreditPart[] = ["Photographs by "];
-  parts.authors.forEach((a, i) => {
-    if (i) out.push(" · ");
-    if (a.photos.length === 1) {
-      out.push({ name: a.name, url: a.photos[0].url }, ", ", a.photos[0].license);
-      return;
-    }
-    const one = a.photos.every((p) => p.license.name === a.photos[0].license.name);
-    out.push(`${a.name} (`);
-    a.photos.forEach((p, j) => {
-      if (j) out.push("; ");
-      out.push({ name: p.name, url: p.url });
-      if (!one) out.push(", ", p.license);
-    });
-    out.push(")");
-    if (one) out.push(", ", a.photos[0].license);
-  });
-  out.push(` — via Wikimedia Commons, ${CROPPED_WORDS}.`);
-  return out;
+  return galleryCreditLineOf(shotsOf(ids).map(skylineCredit));
 }
 
 function authorOf(shot: SkylineShot): string {

@@ -3,6 +3,695 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🔴 2026-10-05 — your repository is public, with confidential deal work on main
+
+`gh api repos/fredballs1115-ux/Underwrite-Copilot` reports `"visibility":
+"public"`. Main holds 55 files that are not the site and were never meant
+to be published, added June 30 – July 1:
+
+- `equity-deck/` — a deal's investment overview deck, built from a
+  broker's confidential opinion of value, with its build scripts and
+  photographs (its own `CHANGES.md` says what it holds; this file does not
+  repeat it).
+- `scratchpad/` — submarket charts and workbooks built from a licensed
+  data service's exports, with their build scripts.
+
+In order: (1) make the repository private today (GitHub → Settings →
+General → Danger Zone → Change visibility). Private repositories run
+Actions on your plan's free minutes, and the scheduled pulls spend some;
+Render keeps deploying only if it is connected through its GitHub app.
+(2) Say "remove them" and I delete both folders from main at once; say
+"purge history" and I prepare the history rewrite (a force-push to main)
+for you to approve — deleting in a commit leaves them in history.
+(3) They have been public about three months: whether anyone is told is
+yours and your firm's counsel's.
+
+## 🟠 2026-10-05 — the data the site shows, against each provider's terms
+
+Research pass 31 audited every source's licence. Every quote below was
+printed by the GitHub runner from the provider's own page (the sandbox
+cannot reach them); the decisions are yours, and the code changes wait for
+them.
+
+- **Freddie Mac's mortgage survey** (the 30- and 15-year tiles on /tools'
+  and /market's rates strip, and the leverage check's survey read). Its
+  terms (freddiemac.com/terms, zori probe run 37262564561): "Data is
+  provided for internal business purposes or your own personal use only"
+  and "You may not redistribute Data, publish Data, or commercially exploit
+  Data or derived products/services without a separate written agreement
+  or license from Freddie Mac." FRED's notes on both series say "Copyright,
+  2016, Freddie Mac. Reprinted with permission." **My recommendation:
+  remove both tiles and the survey read** (the leverage check already
+  reads the 10-year plus the class spread) unless Freddie Mac grants a
+  licence. This answers the "terms question" listed under 2026-09-30.
+- **Google News** (the News page's search doors and the weekday intel's
+  Google watches). Google's terms (google.com/intl/en_us/terms_google_news.html,
+  zori probe run 37262837134): "You may only display the content of the
+  Service for your own personal use (i.e., non-commercial use) … For
+  example, you may not … take the results from the Service and reformat
+  and display them". The feed's own `<copyright>` reads "This XML feed is
+  made available solely fo[r …]". The site fetches, scores, reformats and
+  displays it. Bing's RSS answered the runner with an HTML page, so its
+  terms are unprinted. **My recommendation: drop the search-host doors and
+  the Google watches** and keep publishers' own feeds and government feeds
+  (each feed's terms printed before it is relied on).
+- **Realtor.com** (the for-sale line and the hotness rank on /market and
+  the market check). Its terms of service (same run): "Move grants you a
+  limited license to access and use the Move Network and Content solely for
+  informational, personal and non-commercial purposes" and "No
+  reproduction, distribution, or transmission of the copyrighted materials
+  on the Move Network is permitted without the written permission of
+  Move." The research data page printed no permission of its own. **Ask
+  Realtor.com's economics team, or remove.**
+- **Redfin** (the 2–4 unit medians in the research files). Its terms of use
+  (same run): "Any information you obtain from the Redfin website is
+  intended for your personal, non-commercial use." **Ask, or remove.**
+- **Zillow** (asking rents, the apartment index, home values). Its terms
+  (same run) allow "the aggregate level data provided on the Zillow
+  Local-Info Pages (the “Aggregate Data”)" to be "used for non-personal
+  uses, e.g., real estate market analysis", displayed in derivative works
+  "only so long as the Zillow Compani[es …]" — the print cut off there.
+  The site credits Zillow everywhere; whether the research CSVs are that
+  Aggregate Data is yours to read on the page.
+- **Brokerage research figures** (CBRE, Colliers, Cushman & Wakefield and
+  others in `data/research`, ranked on /market and in downloads). Pass 31
+  found their site terms limit use to personal, non-commercial; those
+  pages are not yet runner-printed. Decide keep / ask / signed-in only.
+- **FRED itself is fine** with its notice: its API terms (zori probe run
+  37262488972) require "This product uses the FRED® API but is not
+  endorsed or certified by the Federal Reserve Bank of St. Louis." shown
+  prominently — now in every footer and under the rates strip — and the
+  owner's permission for a third-party series beyond personal use. Among
+  the 41 national series only Freddie Mac's survey and SOFR are
+  copyrighted (rates run 37262658315); the New York Fed licenses SOFR "for
+  your personal or business purposes" with its notice, now printed under
+  every SOFR figure the site draws with the DTCC sentence, as is the BLS's
+  "cannot vouch" sentence. The Claude steps judge a floating loan against
+  SOFR and are told never to write its level, since their words reach the
+  deal page and the shared screen with no notice under them. The exports
+  carry the notices too: the report's market page and assumptions read,
+  and the workbook's Market Read tab, print FRED's under its figures and
+  the BLS's where its own API answered one. Pass 31's summary that FRED forbids storing or databases was
+  wrong: no line of the printed terms says so.
+  - **The BLS asks for the retrieval date** of what its API returned. The
+    pull never stamps the day it fetched an observation it already had,
+    so the site cannot say it yet; stamping it on every BLS upsert is a
+    change to the weekday pull. Say if you want it.
+  - **A market's link-preview card** puts words over a Creative Commons
+    photograph. It now names the licence's address and says "cropped,
+    words added"; whether a card over a CC BY-SA photograph must itself be
+    offered under BY-SA is a licensing question for you or counsel.
+- **Google Maps, the day you set the key.** Its Platform terms (printed
+  from cloud.google.com/maps-platform/terms, zori probe run 37266021924):
+  "(e) No Use With Non-Google Maps. To avoid quality issues and/or brand
+  confusion, Customer will not use the Google Maps Core Services with or
+  near a non-Google Map in a Customer Application. For example, Customer
+  will not (i) display or use Places content on a non-Google Map, (ii)
+  display Street View imagery and non-Google Maps on the same screen, or
+  (iii) link a Google Map to non-Google Maps Content or a non-Google Map."
+  The site's maps are USGS, FEMA and OpenStreetMap tiles. What the code
+  does now: the terms page states Google's terms only once the key is
+  set; the pipeline map's hover card and every deal avatar never ask for a
+  Google picture; and the deal page and the compare page will be held off
+  Google too (their filmstrip and columns draw the aerial and the flood
+  map beside it). That leaves Street View on the pipeline's cards and
+  list rows only, in an application that also has map pages — whether
+  that is "near a non-Google Map in a Customer Application" is for you to
+  read, with counsel if need be, before you set the key.
+
+## 🟡 2026-10-05 — a stranger's first hour (research pass 32): yours
+
+The fixes that were ours are in the batch (the sign-in form keeps the
+address, the sign-up notice names it, a weak password is said by the
+service's reasons, an invite opens on Create account, the upload lands
+where its own-pipeline notice shows, the FAQ and /security say who reads
+a document, the free plan's card says where comps and local rules run,
+the exports are marked Pro, and the onboarding order). These are yours:
+
+1. **Sign in with Microsoft (and Google).** It skips the check-your-email
+   step where sign-ups are lost, and Dealpath sells the same to the same
+   buyers. Needs your app registrations in Supabase's Auth providers, and
+   the privacy page naming them.
+2. **A free export while checkout is dark.** The memo, the report and the
+   Excel model are Pro, and Upgrade cannot take money yet; a newcomer has
+   nothing to take to a committee. Letting a free account export its first
+   screened deal is a pricing decision.
+3. **The reset and confirmation emails' templates.** Corporate link
+   scanners (Outlook's Safe Links and its kind) open an email's link to
+   check it and use its one-time code up, and a reset asked for on a
+   laptop cannot be opened on a phone. `/auth/confirm` is built: it takes
+   the link's token hash and verifies only when the person presses its
+   button. Point the templates at it in Supabase (Auth → Email
+   Templates), following Supabase's own token-hash guidance for the exact
+   variable names: the reset as `/auth/confirm?token_hash=…&type=recovery`
+   and the confirmation as `type=signup` (or `email`, as their guide
+   says), each with `&next=` where it carried one.
+4. **The address box runs on Photon's free demo geocoder**
+   (photon.komoot.io), which promises no uptime and throttles heavy use.
+   Self-hosting it, or another geocoder, is yours; its credit to
+   OpenStreetMap is now on the page.
+5. **Anthropic's terms, printed** (zori probe run 37265637547): "Anthropic
+   may not train models on Customer Content from Services", and "Customer
+   Content is Customer's Confidential Information". /security now quotes
+   the first; it claims no retention period.
+
+## 🟢 2026-10-05 — the second batch (PR #463, in progress)
+
+Nothing in it needs a migration, a key or a purchase so far. Research pass
+25 measured the site's speed from a local build in Chromium; the fixes
+that change nothing a visitor sees are in. Three faster paths change
+how the site is built, so they are yours to decide:
+
+1. **Let a CDN cache /tools and /market.** Both pages render on every visit
+   (112–158 ms of server time each on the sandbox's four cores; Render's
+   starter instance has half of one) because the public shell asks who is
+   signed in (`app/public-shell.tsx`, `getCurrentUser`). A shell that asks
+   in the browser would let both be static and cached. It changes how the
+   chrome learns who you are.
+2. **A faster IRR search.** The engine's `irr` (`lib/underwrite/engine.ts`)
+   scans from −89% in 0.1-point steps before it bisects, about a thousand
+   NPV evaluations a call, and /tools' solver cards spend about 258 ms of
+   a phone's load there. A wider first bracket finds the same root, but the
+   engine is the one the Excel export is held to in CI.
+3. **One sign-in check per page instead of two.** The proxy and the page
+   each ask Supabase Auth who you are. `getClaims()` verifies the session
+   locally where the project signs its tokens with asymmetric keys; whether
+   yours does is a setting in Supabase (Auth → JWT signing keys).
+
+Rent regulation now reaches the screen (NYC's 0% Order #58 renewals, DC's
+4.1% and 2.1% caps, LA's 3%, Montgomery County's 5.2%, Washington's and
+Takoma Park's figures, each filed only as a primary source printed it).
+The model still grows every rent at one rate; growing regulated units at
+the allowance is the model-math item already below. San Francisco's and
+Prince George's pages refuse the runner and Jersey City's states no
+figure, so none is filed for them; a source the runner can read would let
+one in.
+
+**A forward purchase or build-to-suit** is now read apart from a
+development (the price paid at delivery, the developer's works, the
+delivery clock, the deposit). One decision is yours, because it changes
+the model's math: run the model on the memorandum's NOI at delivery (and
+its delivery cap as the exit default) instead of refusing that figure and
+assuming 6% of the price, and put the deposit paid at signing into the
+cash flows. Pass 28 measured the 180-home build-to-rent example: 8.27%
+unlevered and 10.43% levered today, against 6.19% and 5.69% on the
+memorandum's $3.96M at the same 6% exit, or 7.77% and 9.29% with the exit
+at its stated 5.5%.
+
+**When a screen goes wrong (research pass 30).** The fixes that are ours
+are in this batch (a stalled run no longer reads as running, a failure a
+retry cannot fix offers Replace OM instead of Try again, and more). Three
+are yours:
+1. **Deploys and running screens.** `render.yaml` now gives the web service
+   five minutes (`maxShutdownDelaySeconds: 300`, Render's maximum) to finish
+   the screens running when a deploy lands, since screens run in-process
+   until the worker is deployed. Watch the next deploy's log: a screen
+   started just before it should finish. If the service was not created
+   from the Blueprint, set the same value in Render's dashboard.
+2. **A failed screen keeps its free deal** until the deal is deleted. Whether
+   a screen that never produced a verdict should give its slot back is a
+   billing policy.
+3. **Replacing a deal's memorandum has no billing check**: a free account
+   can screen any number of different memoranda under one deal by
+   replacing its OM. Whether a replacement counts as a new screen is yours.
+
+**Re-filed classes (research pass 28, as pass 23's were told to you).** A
+deck naming a dialysis center, an urgent care, an ambulatory surgery
+center, a freestanding ER or a veterinary clinic now files as medical
+office; an SNF, a nursing home, post-acute care and a rehabilitation center
+as senior housing; and senior apartments, affordable senior housing and
+"62+" apartments with no care or service word as rental housing. Each runs
+on its class's existing defaults; the commit messages give the measured
+moves. A deal anchored on a stated NOI keeps its NOI.
+
+**Pictures (research pass 29, judged by eye on the real components).**
+The defects that were ours are being fixed in this batch (the market
+caption's contrast, a credit shown over the drawn cover while a photo
+loads, cards too narrow at tablet widths, the phone bands, tower tops cut
+on laptop bands, and smaller items). These five are yours:
+1. **Portrait covers lose their tops.** A tall memorandum cover cut to the
+   card's or header's wide frame keeps its middle, so a tower's crown and
+   spire go; the memo's and the email's crops keep them. Proposal: anchor
+   only a portrait source's crop at its top third. It reverses the
+   recorded "crops stay centred" decision for that one case.
+2. **The memo's cover photograph is 1.45 inches** in the header's corner.
+   A listing flyer leads with the photograph across the top; that is a
+   layout change to the one-page memo.
+3. **The deal page leads with the USGS overhead** where a deal has no
+   photograph and no market photograph (and shows nothing with no
+   address), while its pipeline card wears the drawn cover. Leading with
+   the cover there, the aerial one step along, is yours to decide.
+4. **A photograph per comparable**: a memorandum's sale-comps pages
+   usually print one; lifting them is an extraction change.
+5. **A photograph of every building without one** needs a new source: the
+   Street View key (above, with Google's terms), or Mapillary (CC BY-SA,
+   but its terms restrict building a database of places). Never a listing
+   portal's photograph.
+
+**Keyboard and screen readers (research pass 33).** Every fix that was
+ours is in (focus rings everywhere, nothing focused under a sticky bar,
+real tabs, 4.5:1 labels, each deal's name in its browser tab, a
+half-typed deadline never saved). Three are yours:
+1. **Single-key shortcuts on the pipeline** ("n" opens the new-deal form,
+   "/" jumps to search). A speech-input user who says a word outside a
+   field can trigger them, and nothing turns them off (WCAG 2.1.4). The
+   fix is a modifier, as ⌘K has, or an off switch; either changes a habit.
+2. **Text sizes in pixels.** A reader who sets the browser's default text
+   size larger (rather than zooming) gets the body larger and every 9–13px
+   label unchanged: 784 uses in 126 files. Zoom works, so it is not a
+   failure; a px-to-rem sweep renders identically at default settings,
+   and it is yours because it touches nearly every page.
+3. **An accessibility statement.** Buyers who ask for one mostly name WCAG
+   2.1 AA. It is a public claim, so it should be written only once you
+   want to stand behind it.
+
+**From the batch's two audits.** Every finding that was ours is fixed.
+Three are yours:
+1. **Dallas retail on the homepage band** is credited to "CoStar-derived
+   tracking", which puts a CoStar-derived figure on a public page against
+   the site's own no-CoStar rule. Keep it, replace it, or leave the cell
+   empty.
+2. **A Fannie Mae figure credited to Northmarq**: the short credit drops
+   "(citing Fannie Mae)" from a research figure Northmarq published citing
+   Fannie Mae. Which name the credit carries is a licensing call.
+3. **A bulk condominium deal's count.** A memorandum stating "Units: 120"
+   and "Units offered: 42" puts every per-unit figure (the basis tag, the
+   model) on the 120. Saying which count the deal's count row is changes
+   the extraction.
+
+**The documents, as their reader opens them (research pass 35).** Every
+document was built for seven kinds of deal and read page by page:
+- the memo;
+- the full report;
+- the three workbooks;
+- the letter of intent;
+- the calendar file;
+- the emails.
+
+The fixes that are ours are being made in this batch. These are yours:
+1. **How a note, a preferred position or an unpriced portfolio scores
+   against a property buy box.** Today two criteria that pass, with the
+   price-dependent ones unknown, score "Fit 100 · Pursue". The chip will
+   now say how many criteria were checked. Whether such a deal should
+   score at all is the rule, and that is yours.
+2. **A hotel's stated PIP is paid out of year-1 cash flow.** That puts the
+   year-1 cash-on-cash at −20% on the test deal, so no price clears a
+   cash-on-cash floor. Lenders usually fund a PIP at closing, from a
+   reserve. Moving it changes the model.
+3. **The letter of intent's binding sections**: exclusivity,
+   confidentiality, brokerage, assignment, governing law and the offer's
+   expiry. Brokers expect them, and legal text is yours to write or
+   approve.
+4. **The target-return check reads the screen's IRR, not the model's.**
+   The report will mark the chip with the model's figure. Making the check
+   itself read the model's IRR is yours.
+5. **The model's defaults, each with no source behind it**:
+   - a pro forma NOI used for year 1 where it is the only NOI stated (4.7%
+     high on the test deal);
+   - the 6.00% exit where no cap is stated;
+   - the 0.5% asset-management fee and the $0.25/SF reserves;
+   - the workbook's live price sensitivity, which steps $1M at a time and
+     so cannot reach the max bid.
+6. **Two larger changes every IC template suggests:**
+   - put the model's returns on the one-page memo;
+   - have a Caution call close on its conditions rather than its next
+     steps, which is a prompt change.
+
+**The deal page on a phone (research pass 36).** Every deal-type panel was
+measured at 390, 820 and 1280. A real deal carries one to five panels, which
+is up to four phone screens before the section tabs. The small fixes are in
+this batch: the floating bar shows as the figures leave, the "figures that
+don't tie" warning sits right after the plan, the panels get a wider column,
+and the bars, keys, ticks, money and fold controls are drawn one way. These
+are yours:
+1. **A summary strip under the header's figures**: the deal's own pipeline
+   chips (the card's words and colours), each a jump to its panel. It adds
+   to the page and takes nothing away. This is the one I would do first.
+2. **Fold the panels on a phone** to their headline and picture. Every panel
+   at once would go from 21.9 screens to about 13.2 (simulated), but the
+   model line would hide behind a tap.
+3. **A sticky section bar**, or the panels as their own tab or section.
+4. **Two columns of panels on a wide screen.** It saves less than it sounds:
+   13.8 screens become 11.2–11.8.
+5. **One export menu** for the IC memo, the full report and the model.
+6. **One order and one tone rule for every panel.** The eight earlier panels
+   lead with a paragraph, the nine later ones with a picture, and a neutral
+   panel is teal-tinted in six and white in six. The site's own rule says a
+   picture leads.
+7. **The shared screen's order.** A partner reads every panel before the
+   call. The call now shows as a chip beside the title; moving the verdict
+   block above the panels is yours.
+8. **Dark mode on phones.** The site now asks phones not to darken it. Check
+   it on a Samsung phone, whose browser honours that request only in some
+   versions.
+9. **The order of the header's controls on a phone.** The tools and the
+   controls now scroll sideways in one row each, so the Stage select and the
+   deal's menu start past the screen's right edge. Both are reachable and
+   named; whether they should lead the row is yours.
+10. **The plan's stress grid** (`PlanSensitivity`) sits after the listing
+    team, where it once followed the "figures that don't tie" warning. It
+    was left where it is because the fix moved one element.
+11. **The panels grew a little on a phone.** The wider column, the stacked
+    bar rows and the full-width word tiles make each panel 18–116px taller
+    at 390. Folding them (item 2) is the answer to that, and it is yours.
+
+**Deals the model cannot run honestly yet (research passes 37 and 38).**
+The fixes that are ours withhold the returns, refuse the misread figure
+and say why; each of these would change what the model computes, so it is
+yours:
+1. **Anchor year 1 on a stated NOI when no price is stated.** On a "call
+   for offers" deal the model runs on a $10M placeholder price, and a
+   stated NOI over $2.5M is judged against it and set aside. Letting the
+   NOI anchor year 1 ends a dead end where typing a price never shows a
+   return. Recommended.
+2. **The exit cap where none is stated**: the model's own entry rather
+   than a flat 6.00% (an 8% entry printed 25.1% where its own entry gives
+   15.0%). Already on your list; the page now says the gap.
+3. **A nearly vacant building and land**: the rent line is grossed up
+   through 97–99% vacancy, and land carries an assumed 6% NOI and a loan.
+   A lease-up path, a land residual, or the returns withheld for good.
+4. **A non-recourse floor at the sale**, so an equity multiple never reads
+   below 0x.
+5. **Prices stated as a share or a rate**: "75% of UPB" times the stated
+   balance, "per unit" times the count, "per acre" times the acres, each
+   marked derived. Today such a price is refused and the deal reads as
+   unpriced.
+6. ~~**An NOI stated a month at a time**~~ — done (research pass 40): the
+   model runs twelve times the month the memorandum states, and every note
+   says the month (`lib/stated-period.ts`).
+7. **Which end of a stated cap range the exit takes** (the low end today,
+   the flattering one for an exit).
+8. **A leasehold or master lease ending inside the hold**: run the model
+   to the lease's end. Its returns are withheld until then.
+9. **Price support in the NOI** (a seller's master lease on vacant space,
+   a rent guarantee): run the NOI without it, or end it at its term.
+10. **A C-PACE installment as debt service** in the model and its
+    coverage.
+11. **A GP stake's promote**: modelling it is large; its returns are
+    withheld as a share of a share until then.
+12. **Duplexes to fourplexes** now file as multifamily, which changes
+    those deals' defaults (a fourplex had run on a 100,000 SF placeholder).
+    Say if you would rather the re-filing waited.
+
+**From the pre-merge audit (2026-10-05):**
+1. **The memo PDF prints your 1031 clock.** The shared screen and every
+   Claude step keep it out because a counterparty who learns the buyer's
+   deadline holds the price, and the memo is the page you forward. Decide
+   whether the memo carries it, or only on request.
+2. **"Senior living apartments (LIHTC, 62+)"** now files as rental
+   housing, by the site's rule that an age-restricted building selling no
+   care is housing. Say if "senior living" should win.
+3. **A sandwich position's model** still capitalises its income forever
+   (the lines say so, and the leasehold card carries the term).
+4. **Offers due before your relinquished property transfers** raise a
+   reverse-exchange question the 1031 clock does not ask.
+
+**From the second pre-merge audit (2026-10-05):**
+1. **A leased fee's model.** Should it read the stated ground rent as its
+   NOI, and is a leased fee's cap a figure (as the deal header and the
+   playground show it) or "n/a" (as the workbook printed it)? The fix
+   round makes the workbook follow the header's rule for now.
+2. **The report's and the workbook's returns on a note, a position or a
+   share beside its entity's loan.** The deal page and the compare table
+   withhold them; the report and the workbook print them beside a caveat
+   saying they are not the buyer's. Say if they should be withheld there
+   too.
+3. **A position's accrued-to-date balance.** Where the redemption has gone
+   by or none is stated, the position's last dollar is placed without any
+   accrued return, said as "at least".
+4. **Puerto Rico deals.** The fix round lets a deal in Puerto Rico reach
+   its metro area's photograph (San Juan, Ponce, Mayagüez, Aguadilla). It
+   reads no market figures, since the site carries none for Puerto Rico.
+   Say if you would rather leave those deals on the drawn cover.
+5. **The research reseed** above also carries Chicago's corrected band to
+   signed-in pages.
+
+**From the check of the model's arithmetic (research pass 40, October 5).**
+The screening model was worked by hand from first principles on twelve
+deals: the engine, the workbook's live formulas, the report's grids and the
+max bid agree with the hand figures to the dollar. The fix round makes the
+report and the workbook withhold the returns wherever the deal page does,
+and corrects the words around several figures. These are yours, since each
+changes a figure the model runs on or how a figure is defined:
+1. **An interest-only period of part of a year** (say 18 months) is charged
+   by whole years in the annual cash flow while the debt schedule runs the
+   months, so the two disagree (a levered IRR of 7.13% against 7.28% worked
+   by hand). Only a figure typed into the workbook reaches it.
+2. **An amortization shorter than the hold** keeps charging debt service
+   after the loan is paid off, and **a hold of part of a year** runs whole
+   years of cash beside a part-year payoff. Both are reached only by typing
+   into the workbook.
+3. **The equity multiple nets a year-1 capital call against the
+   distributions** (1.52x printed, 1.42x as distributions over
+   contributions on a deal carrying $2M of repairs). The fix round says so
+   beside the figure; the definition is yours.
+4. **The T-12's other income is folded into the rent line.** Splitting it
+   into its own line changes the rows the model runs on.
+5. **A note's yield to maturity drops the part-month before maturity**, so
+   a discount note reads slightly high.
+6. **Leasing capital.** Tenant improvements and leasing commissions default
+   to zero on every class (the workbook will say "None modelled"). A default
+   for office, retail and industrial is yours.
+7. **The construction panel's 55% average draw** errs high against the
+   equity-first draw the /tools card runs; the panel will say so, and
+   switching the method is yours.
+
+**From the check of what each Claude step is handed (research pass 41,
+October 5).** Every step's input was rebuilt from the code on 29 deal
+shapes. The fix round corrects the words each step reads; these are yours,
+since each changes how a step is called, what it costs, or what it is told
+to weigh:
+1. **The prompt cache (pass 18's item, below), now worth checking first.**
+   Each step that reads the memorandum sends its own output format, and
+   Anthropic's documentation says a change of format invalidates the
+   cache. If so, the deck is written to the cache on five calls a screen
+   and read back on none: about 3.8 times what one write and four reads
+   cost, roughly $9 against $2.50 a screen on a 300,000-token deck at the
+   list price. One real screen settles it: in `analysis_jobs.usage` (or the
+   cost card on /data-health), does every call that reads the memorandum
+   show a cache write near the deck's size and a cache read near zero? If
+   it does, the calls need restructuring, which changes how every step is
+   called.
+2. **The extraction's 16,000-token answer.** A 150-property portfolio with
+   a full set of rows comes close, and the code's own estimate puts a long
+   tape with many rows past it. The fix round names a cut-off as the
+   document's and records its spend; raising the cap is yours (up to about
+   20,000 needs no other change, more needs a streamed call). Measure a
+   real portfolio screen's output first.
+3. **Thinking, before any model switch.** The steps send no thinking
+   setting, so thinking is off on today's model. On the newer models named
+   as the cost lever, thinking is on by default and counts against each
+   step's answer cap, which was sized for answers alone (the verdict's
+   4,000, Ask's 2,500, the first signal's 1,500). One call on the new model
+   should be read before the switch.
+4. **A plan deal's in-place cap in the buy box.** The pipeline card shows
+   "n/a — plan", but the buy box still judges a value-add's stated going-in
+   cap. Say whether it should.
+5. **The reconciler reads the PDF** where the screen reads the text layer
+   (a third to a quarter of the tokens). Switching it changes what that
+   step reads.
+6. **Trap lists that do not concern the deal.** A class phrase no rule
+   files (a fuel station and its store) gets all sixteen classes' traps,
+   about 10,000 characters; one cited report fires all five site-report
+   traps; the market figures' preamble describes lines the block may not
+   hold. Gating each changes what a step is told to look for.
+7. **Dated market claims in the trap lists** ("as of August 2026 …
+   several big-port submarkets had repriced double digits off peak") and
+   one rule of thumb stated as near-certain. A step may repeat them as
+   fact; sourcing, dating or removing them is yours.
+
+**From the check of what grows with an account (research pass 42,
+October 5).** One read from Supabase returns at most the project's row
+limit (1,000 by default), as an ordinary answer, and no page asked for a
+total. The fix round, still running, pages every list a page counts, says
+where a list is cut, and dates every call wherever a deal is summarized. These are yours:
+1. **Your project's row limit**: Supabase's dashboard, Settings, API, "Max
+   rows". Every "past 1,000" in the report means that number.
+2. **The pipeline at scale.** At 1,000 deals the pipeline page is about
+   10 MB of HTML, more than half of it the drawn covers written into the
+   page. Serving the cover as a cached picture, or showing the newest N
+   with "the newest N of M", changes what the page shows and loads.
+3. **Whose deals analytics pools.** It reads every deal the reader can
+   see, a team's included; the fix round will make its words say so. Say if it
+   should read the reader's own screens only, as the market page does.
+4. **Whether a rate move is a saved version.** The model's rate follows
+   the day's Treasury, so a deal viewed on a day the rate moved saves a new
+   Assumption Bridge version, up to one a weekday. Keeping only what a
+   reader sets changes what the bridge keeps.
+5. **A free re-screen of older deals.** A deal screened before the site
+   read what a memorandum sells reads as a fee simple; the fix round will
+   say so on the deal and its card. Re-screening every such deal costs model
+   calls.
+6. **A font that prints every name.** The memo and report print in
+   Helvetica, which has no Japanese, Arabic or emoji, so the fix round
+   will print "Deal (name not printable in this PDF's font)" and the address.
+   Embedding a Unicode font means a licence, more bytes and every page
+   measured again.
+7. **The free-deal limit's database check** needs a lock to hold under
+   load. It is a migration; the details are in our chat.
+8. **Ask's 25 questions.** The panel will say how many are asked; whether
+   the plan's own line states the limit is yours.
+9. **Counts only the database can give** (each one query in the SQL
+   editor):
+   - `select count(*) from benchmarks;`
+   - `select count(*) from profiles where email_weekly_digest;`
+   - `select count(*) from deals where extraction is not null and not (extraction ? 'interest');`
+   - `select deal_id, count(*) from deal_versions group by 1 order by 2 desc limit 5;`
+   - `select url, count(*) from regulatory_alerts group by url order by 2 desc limit 5;`
+
+**From the security review of October 5 (research pass 39):**
+1. **Run migration 0036 first** (item 1 under 2026-09-30 below), before
+   anything else on this page: the review found its exposures live today.
+   **Then run 0037** (`supabase/migrations/0037_job_queue_and_lookups.sql`)
+   and `supabase/CHECK_MIGRATIONS.sql` again; its two new rows should read
+   ✅. 0037 holds each deal to one live job row whoever writes it, and holds
+   the two public-record lookups to the sizes the app itself asks for. Its
+   one cost: on a deal that still holds several old job rows, the comp
+   search's and the model build's first progress mark is refused; the run
+   itself still starts.
+2. **Your buy box on a shared screen.** The verdict is handed your buy box
+   so its call can weigh it, and the shared screen prints the verdict's
+   reason and risks as written, so where a deal misses your box those
+   words can name your price band, return floors or priorities to whoever
+   holds the link. Recommended: the verdict writes its fit apart from its
+   reason and risks, and the shared screen never prints the fit. It
+   changes the verdict's prompt and fields, so it waits for your yes.
+   Until then the share panel says the link's reasons can name your box.
+3. **Who reads the public-record tables in bulk.** Any signed-in account
+   can read the property and recorded-sales tables the comps page draws
+   on. Say whether that should stay open to every account. Narrowing it
+   breaks two reads on the deal page's public-record card (the street-address
+   lookup in markets with no coordinates, and the last recorded sale), which
+   would move behind the server first; the two lookups, the comps pull and
+   the scripts keep working as they are.
+4. **The free plan's screening allowance** (item 11 under 2026-09-30
+   below) is the one guard on what an account spends; the review weighs
+   it again.
+
+**Run the research seed after the merge** (`node scripts/seed-research.mjs`,
+the step that writes the FY2027 fair market rents). The runner read every
+source link the audit had marked dead. Two research figures changed:
+1. **Chicago's apartment vacancy** now reads 5.1% (Cushman & Wakefield's
+   Q2 2026 occupancy of 94.9%). JPMorgan's page states neither the 96.3%
+   occupancy nor the 3.7% the file had credited to it, and no cited page
+   states the old 4.6%.
+2. **Montgomery County's industrial rent** lost its link: Colliers took the
+   report down and the Internet Archive holds no copy.
+
+Visitors read the file today. Signed-in pages read the benchmarks table
+over the file, so they keep the old 3.7–4.6% band until the seed runs.
+
+**Photographs, round 12.** Fifteen more metro areas now show a photograph
+of their market, each judged by eye through the card's and the deal page's
+crops, with every credit exactly as the runner printed it. Helena, Fort
+Smith and Corvallis keep the drawn cover. Six choices are yours to
+overrule (each alternative is the drawn cover unless said):
+1. **La Crosse** is a 4.78:1 panorama, the table's widest. A 3x phone's
+   card draws it about 1.3x its pixels, a little soft; a 2x phone is sharp.
+2. **Lake Havasu City**'s London Bridge wears Christmas wreaths on its
+   piers (photographed Nov 27, 2025), on a card shown all year.
+3. **Casper** is the round's weakest: at a phone's card size the city is a
+   band in the distance below Casper Mountain's pines.
+4. **Hot Springs** and **Jefferson City** are aerials without a horizon.
+   They read as a town and a building rather than a map, but they bend the
+   no-map-like-aerial rule.
+5. **Two credits read "<user> at English Wikipedia"** as printed (Bangor,
+   Jefferson City). A probe of the two file pages would print the bare
+   username, if you prefer it.
+6. **"Amherst Town-Northampton, MA"** keeps the Census title whole; Boise's
+   precedent would shorten it to the town's everyday name.
+
+**Photographs, round 13.** Seven more: Ponce, Aguadilla, Mayagüez (Los
+Morrillos lighthouse at Cabo Rojo), Lexington Park (Calvert Cliffs),
+Racine-Mount Pleasant, Saginaw and Kenosha. I left Houma's one usable frame
+(a hazy film-scan aerial of Larose) on the drawn cover, with ten others.
+Four choices are yours to overrule:
+1. **Ponce** and **Aguadilla** are Corps of Engineers film scans about
+   1500px wide, served at their own width as Erie's is: sharp on a phone's
+   card, softer than the other picks on a 2x deal header.
+2. **Aguadilla** has no sky in either crop: the town climbing from its
+   beach, half rooftops at 21:9 (Hot Springs' case).
+3. **Lexington Park** is the round's weakest, a sandy cliff face under a
+   tree line.
+4. **Kenosha**'s credit reads "Wrongdave at English Wikipedia" as printed,
+   like Bangor's.
+
+**Photographs, round 14.** Thirteen more: Beckley, Twin Falls, Altoona,
+Wheeling, Sandusky, Mount Vernon-Anacortes, Wenatchee-East Wenatchee,
+Farmington, Lawton, Homosassa Springs, Michigan City-La Porte,
+Muskegon-Norton Shores and Johnstown. Columbus (Indiana), Grand Island,
+Walla Walla, Sioux City and Lewiston keep the drawn cover. Four choices are
+yours to overrule:
+1. **Three modest picks**: Wheeling (an overcast frame), Wenatchee (Lake
+   Chelan, in the metro area's county but about 40 miles from the city) and
+   Muskegon (a willow fills a third of the frame). The drawn cover is the
+   alternative for each.
+2. **Farmington's credit reads "Dave Bunnell".** The file page's Author
+   field is the account name "Dave Bunnell redirect", which has no user
+   page; the credit takes the name inside it, as Duluth's did. Say if you
+   would rather print the account name whole.
+3. **Seven picks show a landmark of the metro area rather than its city**
+   (the New River Gorge Bridge, Shoshone Falls, the Skagit Valley's tulip
+   fields, Lake Chelan, Shiprock, the Wichita Mountains, Three Sisters
+   Springs), each named for the metro area, as Belton's is.
+4. **Four hyphenated titles are kept whole** ("Mount Vernon-Anacortes, WA",
+   "Wenatchee-East Wenatchee, WA", "Michigan City-La Porte, IN",
+   "Muskegon-Norton Shores, MI"); cutting each to its first city is yours.
+
+**Photographs, round 15.** Seven more: San Angelo (the Concho River),
+Pueblo (the Historic Arkansas Riverwalk), Greenville, NC (the city from a
+rooftop at sunset), Blacksburg-Christiansburg-Radford (Burruss Hall),
+Waterloo-Cedar Falls (downtown across the frozen river), Wausau (downtown
+at dusk from a drone) and Sheboygan (its riverfront). Eleven keep the
+drawn cover, and Columbus (Indiana), Grand Island and Walla Walla still do
+after a deeper search each. Three choices are yours to overrule:
+1. **Two modest picks**: Blacksburg (the hall is small under a sky that
+   fills the card) and Sheboygan (a plain riverfront in flat light). The
+   drawn cover is the alternative for each.
+2. **Two hyphenated titles are kept whole** ("Blacksburg-Christiansburg-
+   Radford, VA", "Waterloo-Cedar Falls, IA"); cutting each to its first
+   city is yours.
+3. **Two credits are account names** as the runner printed them:
+   "Wikideas1" (Wausau, CC0) and "AsherHeimermann" (Sheboygan).
+
+**Photographs, round 16.** Nine more: Bloomington, IL (its domed stone
+building), Janesville-Beloit (downtown Beloit), Mankato (the Union Depot),
+Midland, MI (the Tridge at dusk), Owensboro (the Natcher Bridge from the
+air), Parkersburg-Vienna (the Blennerhassett Mansion), Sherman-Denison
+(Denison's Main Street), and two of round 15's drawn covers, Florence-Muscle
+Shoals (the O'Neal Bridge) and Valdosta (the courthouse). Eleven keep the
+drawn cover. Three choices are yours to overrule:
+1. **Two modest picks**: Mankato (the tracks fill half the card) and
+   Valdosta (the deal page's wide header cuts the thin rod above the
+   courthouse's lantern). The drawn cover is the alternative for each.
+2. **Pinehurst-Southern Pines keeps the drawn cover**: its one clean
+   frame is a golf hole among pines that names no place. Say if you would
+   rather have it.
+3. **Four credits are account names** as the runner printed them:
+   "WVhybrid" (Parkersburg-Vienna), "Renelibrary" (Sherman-Denison), "Visit
+   Beloit" (Janesville-Beloit) and "Noahmcdonald1" (Florence-Muscle Shoals,
+   whose file's name says Noah McDonald; the credit is the author Commons
+   names).
+
+**Photographs, round 17.** Ten more: Albany, OR (a green truss bridge),
+Anniston-Oxford (a downtown street), Bay City (the riverfront), Burlington,
+NC (its tallest building from the air), Cape Girardeau (the Bill Emerson
+Bridge), Dothan (its tower and radar dome), Elizabethtown (the LaRue County
+Courthouse), Elmira (the city on the Chemung), Gadsden (Noccalula Falls)
+and, from round 16, Lewiston-Auburn (the railroad bridge). Nine keep the
+drawn cover. Three choices are yours to overrule:
+1. **Four modest picks**: Bay City (the buildings small in the frame),
+   Dothan, Elizabethtown (flat grey light) and Gadsden (a strong blue
+   cast). The drawn cover is the alternative for each.
+2. **Cleveland, TN keeps the drawn cover**: its one strong frame, Craigmiles
+   Hall from a drone, carries a studio's watermark in a corner. The card
+   and the deal page's header crop it away, but the full-screen viewer
+   shows it. Say if you would rather have it.
+3. **Burlington's runner-up was passed over**: a crisp frame of the
+   Alamance County Courthouse with a Confederate monument's statue beside
+   it. The tower was chosen instead; say if you would rather have the
+   courthouse.
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**
@@ -32,7 +721,9 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
    budgeted:
    - `CENSUS_API_KEY`: a deal's own census tract figures;
    - `GOOGLE_MAPS_API_KEY`: Street View photographs of a building with no
-     memorandum photo;
+     memorandum photo. Google's terms forbid keeping the image, so every
+     view of such a photograph is a billed call; set a quota on the key in
+     Google's console when you add it;
    - `HUD_API_TOKEN` (free, huduser.gov): the yearly fair market rent pull
      (`fmr.yml`) reads it; until it is set, the rents are the ones seeded from
      HUD's own FY2027 file.
@@ -2290,9 +2981,22 @@ overhead shot. Without it nothing breaks or looks broken.
    without it and fails only here.
 3. **Billing** must be enabled on the project. Google's free allowance for
    Street View is a Pro-SKU tier (roughly 5,000 calls/month at the time of
-   writing — confirm on Google's pricing page, it changes). Our metadata
-   verdict is cached per deal for 30 days, so a deal costs about one call,
-   not one per page view.
+   writing — confirm on Google's pricing page, it changes). **Nothing is
+   cached** (since Oct 5): Google's policies prohibit keeping its imagery
+   (only place and panorama IDs may be stored), so every view of a Street
+   View photograph is one billed image request; the metadata check before
+   it does not consume quota. Set a daily quota cap in the Cloud console.
+   Google also asks for its logo as the attribution "whenever possible"
+   (the site writes "Street View imagery © Google" in words). Its terms
+   (cloud.google.com/maps-platform/terms, zori probe run 37262665824) go
+   further than a footer link: the site's terms must "notify users that
+   the Customer Application includes Google Maps features and content" and
+   "state that use of Google Maps features and content is subject to" the
+   Google Maps End User Additional Terms of Service and Google's Privacy
+   Policy, and Street View may not be shown "and non-Google Maps on the
+   same screen" — the deal page draws its map, aerial and flood views
+   beside it. The code is made to comply before you set the key (see the
+   licences section at the top).
 4. **Credentials → Create credentials → API key.** Restrict it under **API
    restrictions** to the Street View Static API. Do NOT add an HTTP-referrer
    restriction: this key is used server-side and sends no referrer, so a

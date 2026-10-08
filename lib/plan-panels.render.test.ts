@@ -13,7 +13,8 @@ import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
 import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { DEFAULT_DRAW_PROFILE } from "@/lib/construction-debt";
-import { gluedWords, visibleText } from "@/lib/render-lint";
+import { a11yIssues, gluedWords, visibleText } from "@/lib/render-lint";
+import { NY_FED_SOFR_NOTICE, NY_FED_SOFR_NOTICES } from "@/lib/data-notices";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -172,13 +173,16 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(text).toContain("Construction rate: a flat 8.00% placeholder, not seeded from an index — enter your quote.");
     expect(text).toContain("Default 60% loan-to-cost — enter your quote.");
     expect(text).toContain("Default 6.0% exit cap — set your exit view.");
+    // No SOFR figure on the panel, so no New York Fed notice either.
+    expect(text).not.toContain(NY_FED_SOFR_NOTICE);
     expect(gluedWords(text)).toEqual([]);
   });
 
   it("a seeded rate keeps its dated note, and an exit cap the model gave is no default", () => {
     const rateSeed = {
       pct: 7.81,
-      note: "30-day avg SOFR 4.31% (FRED, Sep 17, 2026) + 350 bps construction spread, a screening default — enter your quote",
+      note: "30-day avg SOFR 4.31% (New York Fed via FRED, Sep 17, 2026) + 350 bps construction spread, a screening default — enter your quote",
+      index: "SOFR30DAYAVG",
     };
     const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, exitCapPct: 5.5, rateSeed }));
     expect(html).toMatch(/aria-label="Construction loan rate percent"[^>]*value="7.81"/);
@@ -188,6 +192,10 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(text).not.toContain("placeholder");
     expect(text).toContain("Default 60% loan-to-cost — enter your quote.");
     expect(text).not.toContain("exit cap — set your exit view");
+    // The note prints SOFR's figure, so the New York Fed's notice and the
+    // DTCC sentence stand under it, once (lib/data-notices).
+    expect(text.split(NY_FED_SOFR_NOTICES).length - 1).toBe(1);
+    expect(gluedWords(text)).toEqual([]);
   });
 
   it("states the draw's average from the module's own constant, never a second copy of it", () => {
@@ -198,6 +206,21 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/construction-debt-panel.tsx"), "utf8");
     expect(src).not.toMatch(/\b0\.55\b/);
     expect(src).toContain("DEFAULT_DRAW_PROFILE");
+  });
+
+  // Research pass 40, L11: the 55% average is a shortcut for a loan drawn
+  // from the first day, and the site's own construction-draw card shows a
+  // lender's equity-first funding draws less — so the reserve here errs high,
+  // and the panel says so beside the method, which stays as it is.
+  it("says the draw's average errs high against the equity-first draw the /tools card runs", () => {
+    const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, props));
+    // The link breaks the visible text's lines: read it as one run of words.
+    expect(visibleText(html).replace(/\s+/g, " ")).toContain(
+      "That is a screening shortcut for a loan drawn from the first day: a lender has the equity in first, so the loan draws later and the reserve here errs high — the construction draw card runs the draw month by month.",
+    );
+    expect(html).toContain('href="/tools#construction-draw"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 });
 
@@ -251,7 +274,11 @@ describe("SharePlan — the plan on the shared screen", () => {
     expect(html).toContain("$180.0M"); // total cost
     expect(html).toContain("11.67%"); // yield on cost
     expect(html).toContain("24 months of construction");
-    expect(html).toContain("A conversion deal has no going-in cap");
+    // Judged on its yield on total cost, never "has no going-in cap": a
+    // value-add's or an occupied conversion's key terms beside the plan can
+    // print the memorandum's in-place cap (research pass 34).
+    expect(html).toContain("A conversion deal is judged on its yield on total cost, not on its in-place cap");
+    expect(html).not.toContain("has no going-in cap");
     expect(html).toContain("never a cap rate on the acquisition price");
     // Nothing from the deal page that has no counterpart here.
     expect(html).not.toContain("challenger");

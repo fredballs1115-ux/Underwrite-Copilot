@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
-import { costAssumptionsLine } from "@/lib/underwrite/cost-note";
+import { costAssumptionsLine, defaultExitGap, yearOneCapitalLine } from "@/lib/underwrite/cost-note";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
+import { NO_IRR_WHY, noIrrText } from "@/lib/underwrite/no-irr";
 import { modelLoanCoverageLine } from "@/lib/sizer-terms";
 import {
   sliderValues,
@@ -11,6 +12,7 @@ import {
   yearOneNoi,
   fmtPct,
   fmtX,
+  fmtEm,
   fmtBpsDelta,
   fmtPtDelta,
   type ScenarioMetrics,
@@ -18,7 +20,18 @@ import {
 import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
-import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
+import { noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
+import {
+  MISREAD_WORD,
+  misreadPageLine,
+  nearlyVacantPageLine,
+  nearlyVacantWord,
+  placeholderPageLine,
+  placeholderReason,
+  type ModelSources,
+} from "@/lib/underwrite/report-grid";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
+import type { PlausibilityFinding } from "@/lib/deal-strategy";
 
 /** Everything the playground needs, computed server-side once. */
 export interface PlaygroundData {
@@ -35,11 +48,67 @@ export interface PlaygroundData {
   /** the deal's strategy kind from the derived model (stabilized / value_add /
    *  conversion …). A plan deal's price ⇄ cap control says what its cap is. */
   strategy?: string | null;
+  /** where each of the model's inputs came from (lib/underwrite/inputs): a
+   *  price or a year-1 NOI the model had to assume makes its returns a
+   *  placeholder's, which the tiles and the max bid withhold, as the full
+   *  report leaves them out (lib/underwrite/report-grid
+   *  `placeholderReturnsLine`); absent, the returns stand as before */
+  sources?: ModelSources | null;
+  /** what the price buys, read by the compare table's rule on this model
+   *  (lib/compare-interest `modelReturnsRead`): a note's, a preferred
+   *  equity position's, or a share's beside its entity's loan or of no
+   *  stated percentage — returns the price did not buy, withheld with its
+   *  line, as the first-draft card withholds them; and a leasehold's whose
+   *  lease ends inside the hold, withheld with the leasehold card's own
+   *  sentence (research pass 38); absent, they stand */
+  interest?: ModelReturnsRead | null;
+  /** the occupancy the model read, decimal (the derived model's
+   *  `meta.occupancyPct`): where the model runs the building 90% vacant or
+   *  more, its returns, its cap and its max bid are withheld, the sentence
+   *  naming the occupancy stated (lib/underwrite/report-grid
+   *  `nearlyVacantReason`) */
+  occupancyPct?: number | null;
+  /** the plausibility check's findings on the memorandum's figures (lib/
+   *  deal-strategy `assessPlausibility`, the panel under the deal's header):
+   *  while a high one or an implied cap under the floor stands, the tiles
+   *  and the max bid are withheld with its claim (lib/underwrite/report-grid
+   *  `misreadPageLine`); absent, they stand */
+  findings?: PlausibilityFinding[] | null;
+  /** whether the price is the building's (lib/deal-strategy
+   *  `buildingPriceOf`; the derived model's `meta.interest.basisWithheld` is
+   *  none): only then is the model's own entry — its year-1 NOI over its
+   *  price — set against a default exit cap under the tiles (lib/underwrite/
+   *  cost-note `defaultExitGap`), as the exit's SOURCE note sets it; absent,
+   *  it is */
+  buildingPriced?: boolean;
+  /** the model's name for its price where it is not the price as stated for
+   *  what is sold (the derived model's `meta.priceLabel`: "Whole Price (49%
+   *  share grossed up)"): the price field says it, never "Purchase price"
+   *  over a figure the share does not cost (research pass 40, M7); absent,
+   *  the field reads "Purchase price" */
+  priceLabel?: string | null;
+  /** the share of the whole a partial interest's price buys, as the
+   *  memorandum states it (lib/interest `interestOf`), where the model runs
+   *  the whole it grosses the price up to: the max bid states the share's
+   *  bid, the whole's times the share, beside the whole's; absent where no
+   *  percentage is stated or the price is the whole's */
+  sharePct?: number | null;
+  /** what that share is called in the bid's words: "interest" on an
+   *  undivided interest held as a tenant in common, which is title to the
+   *  property and never an entity's share (lib/interest `isTenancyInCommon`,
+   *  research pass 37, audit C4 L4), as the price label names it; absent,
+   *  "share" */
+  shareNoun?: "share" | "interest";
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
 
 const finite = (n: number | null): n is number => n != null && Number.isFinite(n);
+
+/** The levered IRR as a tile says it: the rate, or why none solved — "no
+ *  IRR: the sale does not repay the loan" where a dash stood (research pass
+ *  38, lib/underwrite/no-irr). */
+const irrText = (m: ScenarioMetrics): string => (finite(m.leveredIrrPct) ? fmtPct(m.leveredIrrPct) : m.noIrr ? noIrrText(m.noIrr) : fmtPct(null));
 
 /** Swap the scenario's computed IRR / CoC into the metric set the mandate
  *  score reads, replacing the OM's broker figures — same scorer, model basis.
@@ -108,6 +177,64 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     vacIdx !== vacs.baseIdx ||
     priceOverride != null;
 
+  // What the model had to assume (lib/underwrite/inputs): a placeholder
+  // price until the reader types one, an assumed NOI whatever price is
+  // typed. Its returns are then a placeholder's — the full report leaves
+  // them out, and the tiles and the max bid here are withheld on the same
+  // rule (lib/underwrite/report-grid), the reason said over them.
+  const sources = data.sources ?? null;
+  const pricePlaceholder = sources?.purchasePrice?.provenance === "assumption";
+  // A price backed out of the memorandum's NOI of zero or less over its cap
+  // is no price (lib/underwrite/inputs `noPrice`, research pass 38): never
+  // shown, and the field waits for the reader's as over the placeholder.
+  const noPrice = sources?.purchasePrice?.noPrice != null;
+  const priceMissing = pricePlaceholder || noPrice;
+  const priceEntered = priceOverride != null;
+  // And what the price buys (lib/compare-interest): a note's or a position's
+  // model runs the building at a price that did not buy it, so its returns
+  // are withheld whatever price is typed — the first-draft card's rule; and
+  // a leasehold whose lease ends inside the hold sells a building that has
+  // reverted (research pass 38), said by when ("lease ends in year 3").
+  const own = data.interest?.withheld ?? null;
+  const ownWord = own ? (data.interest?.word ?? own) : null;
+  // A building the model runs 90% vacant or more (research pass 38): its
+  // rent line is the occupied space's revenue grossed up through the
+  // vacancy, so a step of the lever moves the NOI by a multiple, and no
+  // return, cap or bid is struck on it.
+  const vacantWord = nearlyVacantWord(inputs);
+  // And figures the plausibility check finds do not tie (lib/deal-strategy
+  // `findingWithholdsReturns`: a high finding, or an implied cap under the
+  // floor — an NOI stated a month at a time): returns built on them would
+  // be a misread's, whatever price is typed.
+  const misread = misreadPageLine(data.findings, { maxBid: false }) != null;
+  const placeholder = placeholderReason(inputs, sources, { priceEntered }) != null;
+  const withheld = own != null || placeholder || vacantWord != null || misread;
+  // The base case, at the modelled price, is a placeholder's wherever the
+  // model assumed either figure: a moved lever is then set against nothing.
+  const baseWithheld = own != null || placeholderReason(inputs, sources) != null || vacantWord != null || misread;
+  const compare = dirty && !baseWithheld;
+  const naWord =
+    ownWord ??
+    (placeholder
+      ? priceMissing && !priceEntered
+        ? "no price"
+        : noPrice
+          ? "no income"
+          : "assumed NOI"
+      : (vacantWord ?? (misread ? MISREAD_WORD : "")));
+  // No cap is struck on year-1 NOI where the price did not buy the
+  // building, where the NOI is the model's assumption (an assumed 6% of the
+  // price printed "6.00%" on every such deal), or where the building runs
+  // nearly vacant: the field says which (research pass 38). A lease that
+  // ends inside the hold leaves year 1 inside it: its cap stands.
+  const noiAssumed = sources?.inPlaceRentAnnual?.provenance === "assumption";
+  // No cap on no price, nor on an NOI of zero or less at a price typed.
+  const capNa =
+    (own !== "lease" ? ownWord : null) ??
+    (noPrice ? (priceEntered ? "no income" : "no price") : null) ??
+    (noiAssumed ? "assumed NOI" : null) ??
+    vacantWord;
+
   // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics
   // disagree with what the levers say they're at.
@@ -148,26 +275,30 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // the two score different figures, and the chip says which it scores.
   const score = useMemo(() => {
     if (!box || !checkSource) return null;
-    const at = (m: ScenarioMetrics) =>
+    // A withheld return swaps nothing: the box scores the memorandum's own
+    // figures in its place, and the chip's line says so.
+    const at = (m: ScenarioMetrics, swap: boolean) =>
       buyBoxRead(
         dealAssetClass,
         {
           ...checkSource,
-          metrics: withScenarioReturns(checkSource.metrics, m.leveredIrrPct, m.cocYr1Pct),
+          metrics: swap ? withScenarioReturns(checkSource.metrics, m.leveredIrrPct, m.cocYr1Pct) : checkSource.metrics,
         },
         box,
       );
-    const b = at(base);
-    const c = dirty ? at(current) : b;
+    const b = at(base, !baseWithheld);
+    const c = dirty ? at(current, !withheld) : b;
     if (c.mandate?.score == null || !c.mandate.verdict) return null;
     // The returns the box scores that the model, not the memorandum, put
     // in: a floor the box does not set, or a return with no root, swaps
     // nothing, and the chip must not claim it.
     const m = dirty ? current : base;
-    const scored = [
-      box.minIrrPct != null && finite(m.leveredIrrPct) ? "IRR" : null,
-      box.minCoCPct != null && finite(m.cocYr1Pct) ? "cash-on-cash" : null,
-    ].filter((s): s is string => s != null);
+    const scored = withheld
+      ? []
+      : [
+          box.minIrrPct != null && finite(m.leveredIrrPct) ? "IRR" : null,
+          box.minCoCPct != null && finite(m.cocYr1Pct) ? "cash-on-cash" : null,
+        ].filter((s): s is string => s != null);
     return {
       chip: c.chip,
       score: c.mandate.score,
@@ -175,13 +306,19 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       scored,
       onMemorandum: scoreMandateFit(dealAssetClass, checkSource, box).score,
     };
-  }, [box, checkSource, dealAssetClass, base, current, dirty]);
+  }, [box, checkSource, dealAssetClass, base, current, dirty, withheld, baseWithheld]);
 
   // Max bid: the highest price that still clears the box's return floors,
   // solved under the CURRENT slider scenario — drag exit cap out 50bps and
   // watch your number drop. Pure engine (grid + bisection), ~2ms per solve.
+  const floorsSet = !!box && (box.minIrrPct != null || box.minCoCPct != null || box.minCapPct != null);
+  // Where the model's price is a placeholder, the bid is measured against
+  // the price the reader typed, never against the placeholder.
+  const bidAgainst = priceMissing && priceOverride != null ? priceOverride : null;
   const bid = useMemo(() => {
-    if (!box) return null;
+    // A bid solved on a placeholder's returns is the placeholder's (the
+    // report leaves it out too).
+    if (!box || withheld) return null;
     const floors: BidFloors = {
       ...(box.minIrrPct != null ? { minIrr: box.minIrrPct / 100 } : {}),
       ...(box.minCoCPct != null ? { minCoc: box.minCoCPct / 100 } : {}),
@@ -189,12 +326,28 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     };
     if (floors.minIrr == null && floors.minCoc == null && floors.minCap == null)
       return null;
-    return solveMaxBid(inputs, floors, {
+    const solveOn = bidAgainst != null ? { ...inputs, purchasePrice: bidAgainst } : inputs;
+    const levers = {
       exitCapPct: caps.values[capIdx],
       rentGrowthPct: growths.values[growthIdx],
       vacancyPct: vacs.values[vacIdx],
-    });
-  }, [box, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx]);
+    };
+    const solved = solveMaxBid(solveOn, floors, levers);
+    // Where no price clears the floors together, the report's own sentence:
+    // which floor never clears and how far the others clear alone (audit
+    // C3a, MED-7) — one deal, one reason.
+    // Said against the price it was solved on — the one the reader typed,
+    // where the model's is a placeholder — and, on a share, with the
+    // share's own bid beside the whole's (audit C6, LOW-6).
+    const share = data.sharePct != null ? { pct: data.sharePct, noun: data.shareNoun ?? "share" } : null;
+    return {
+      ...solved,
+      noBid:
+        solved.price == null
+          ? noBidSentence(floors, noBidRead(solveOn, floors, levers), { vs: bidAgainst != null ? "the price entered" : "the modelled price", share })
+          : null,
+    };
+  }, [box, withheld, bidAgainst, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx, data.sharePct, data.shareNoun]);
 
   const reset = () => {
     setCapIdx(caps.baseIdx);
@@ -203,8 +356,41 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     setPriceOverride(null);
   };
 
-  // The DSCR the tile shows, against the coverage the debt sizer tests.
-  const coverageLine = modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
+  // The DSCR the tile shows, against the coverage the debt sizer tests —
+  // none where the tile withholds it.
+  const coverageLine = withheld ? null : modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
+  // What the multiple and the year-1 return are net of, where the model
+  // spends capital in year 1 (lib/underwrite/cost-note).
+  const capitalLine = yearOneCapitalLine(inputs.capitalImprovementsYr1);
+  // Where the memorandum states no going-in cap, the exit at rest is the
+  // model's default: its gap to the model's own entry — the year-1 NOI over
+  // the price the tiles run on, both the memorandum's — said under the tiles
+  // as the exit's SOURCE note says it (research pass 38: a 25.1% IRR rode
+  // 200 bps of compression nobody chose). Only while the exit lever sits on
+  // the default, and never over withheld tiles.
+  const exitDefault =
+    !withheld &&
+    capIdx === caps.baseIdx &&
+    data.buildingPriced !== false &&
+    sources?.exitCapPct?.provenance === "assumption" &&
+    sources.purchasePrice?.provenance !== "assumption" &&
+    sources.inPlaceRentAnnual?.provenance !== "assumption";
+  const atPrice = priceOverride ?? inputs.purchasePrice;
+  const entry = exitDefault && atPrice > 0 ? noiY1 / atPrice : null;
+  const exitGap = entry != null ? defaultExitGap(caps.values[capIdx], entry) : null;
+  // Why the tiles are withheld, said over them: what the price buys (the
+  // first-draft card's own line), then the report's placeholder reason.
+  const interestLine =
+    own != null && data.interest?.line
+      ? `${data.interest.line}${floorsSet ? " The max bid, solved on them, is withheld too." : ""}`
+      : null;
+  // A placeholder's reason first; else, on a building the model runs nearly
+  // vacant, that reason; else the finding that stands against the returns
+  // (lib/underwrite/report-grid) — one sentence over the tiles.
+  const withheldLine =
+    placeholderPageLine(inputs, sources, { priceEntered, maxBid: floorsSet && own == null }) ??
+    nearlyVacantPageLine(inputs, data.occupancyPct, { maxBid: floorsSet && own == null }) ??
+    misreadPageLine(data.findings, { maxBid: floorsSet && own == null });
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -214,6 +400,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         </h2>
         <p className="text-xs text-muted">Live — no re-screen.</p>
       </div>
+      {/* Which model this is, where a second model's returns can be seen
+          beside it (the first-draft model's, on the Financials tab): the
+          one the Excel workbook and the full report carry. */}
+      <p className="mt-1 text-xs text-muted" data-qa="playground-model">
+        The screening model — the one the Excel workbook and the full report carry.
+      </p>
 
       <PriceCapControls
         basePrice={inputs.purchasePrice}
@@ -221,6 +413,9 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         value={priceOverride}
         onChange={setPriceOverride}
         planDeal={planDeal}
+        pricePlaceholder={priceMissing}
+        capWithheld={capNa}
+        priceLabel={data.priceLabel ?? null}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -253,11 +448,59 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Metric label="Levered IRR" value={fmtPct(current.leveredIrrPct)} cur={current.leveredIrrPct} was={base.leveredIrrPct} baseText={fmtPct(base.leveredIrrPct)} dirty={dirty} />
-        <Metric label="Equity multiple" value={fmtX(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtX(base.leveredEquityMultiple)} dirty={dirty} />
-        <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={dirty} />
-        <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={dirty} />
+      {/* What a lever's move did, said to a screen reader as it happens: the
+          headline return, against the base once a lever has moved. The four
+          tiles stay out of the live region, which would read all four at
+          every step (research pass 33). */}
+      <p role="status" className="sr-only">
+        {/* A return that does not solve is said in words, never read aloud
+            as "Levered IRR —" (the pre-merge audit). */}
+        {withheld
+          ? "Levered IRR withheld"
+          : !finite(current.leveredIrrPct)
+            ? `No levered IRR solves at these levers${current.noIrr ? `: ${NO_IRR_WHY[current.noIrr]}` : ""}`
+            : compare
+              ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${finite(base.leveredIrrPct) ? fmtPct(base.leveredIrrPct) : `none solves${base.noIrr ? ` (${NO_IRR_WHY[base.noIrr]})` : ""}`}`
+              : baseWithheld
+                ? `Levered IRR ${fmtPct(current.leveredIrrPct)} at your price`
+                : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
+      </p>
+      {interestLine && (
+        <p className="mt-4 text-[11px] leading-relaxed text-caution" data-qa="playground-interest">
+          {interestLine}
+        </p>
+      )}
+      {withheldLine && (
+        <p className={`${interestLine ? "mt-1.5" : "mt-4"} text-[11px] leading-relaxed text-caution`} data-qa="playground-withheld">
+          {withheldLine}
+        </p>
+      )}
+      <div className={`${interestLine || withheldLine ? "mt-2" : "mt-4"} grid grid-cols-2 gap-3 sm:grid-cols-4`}>
+        {withheld ? (
+          // Returns the price did not buy, or a placeholder's, are not
+          // figures to read: each tile says why, as the first-draft card
+          // says "n/a — note".
+          ["Levered IRR", "Equity multiple", "Year-1 CoC", "Year-1 DSCR"].map((label) => (
+            <Metric key={label} label={label} value={`n/a — ${naWord}`} cur={null} was={null} baseText="" dirty={false} withheld />
+          ))
+        ) : (
+          <>
+            {/* Where no IRR solves, the tile says why in the dash's place
+                (research pass 38), small, as a withheld tile is. */}
+            <Metric
+              label="Levered IRR"
+              value={irrText(current)}
+              cur={current.leveredIrrPct}
+              was={base.leveredIrrPct}
+              baseText={irrText(base)}
+              dirty={compare}
+              withheld={current.leveredIrrPct == null && current.noIrr != null}
+            />
+            <Metric label="Equity multiple" value={fmtEm(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtEm(base.leveredEquityMultiple)} dirty={compare} />
+            <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={compare} />
+            <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={compare} />
+          </>
+        )}
       </div>
       {/* The model sizes its loan by cost alone, with no coverage test: where
           the DSCR the tile shows is under the debt sizer's own test, one
@@ -268,13 +511,37 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         </p>
       )}
       {/* The costs these returns carry and the card cannot show: the
-          model's defaults, said as defaults (lib/underwrite/cost-note). */}
-      <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
-        {costAssumptionsLine(inputs)}
-      </p>
-      {planDeal && (
+          model's defaults, said as defaults (lib/underwrite/cost-note).
+          Not under withheld tiles, where "these returns" would name
+          figures the card does not show. */}
+      {!withheld && (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
+          {costAssumptionsLine(inputs)}
+        </p>
+      )}
+      {/* Where the model spends capital in year 1, what the multiple and the
+          year-1 return are net of (research pass 40, M6). */}
+      {!withheld && capitalLine && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted" data-qa="playground-capital">
+          {capitalLine}
+        </p>
+      )}
+      {exitGap && entry != null && (
+        // A default exit under the model's own entry is compression riding
+        // in the returns — said in the caution tone; over it, plainly.
+        <p
+          className={`mt-1.5 text-[11px] leading-relaxed ${entry > caps.values[capIdx] ? "text-caution" : "text-muted"}`}
+          data-qa="playground-exit-gap"
+        >
+          {`Exit cap — ${exitGap}.`}
+        </p>
+      )}
+      {planDeal && !withheld && (
         // The full report leaves these out on a plan deal for this reason
-        // (lib/memo/report-document); the page says it beside them.
+        // (lib/memo/report-document); the page says it beside them — and,
+        // as the cost line, never under withheld tiles, where "these
+        // returns" and "a bid solved on them" would name figures the card
+        // does not show (the second audit, LOW-6).
         <p className="mt-1.5 text-[11px] leading-relaxed text-caution" data-qa="playground-plan-caveat">
           {PLAN_RETURNS_CAVEAT}
         </p>
@@ -284,11 +551,14 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         <MaxBidCard
           bid={bid}
           box={box!}
-          modeledPrice={inputs.purchasePrice}
+          modeledPrice={bidAgainst ?? inputs.purchasePrice}
+          against={bidAgainst != null ? "yours" : "modeled"}
           dirty={dirty}
+          sharePct={data.sharePct ?? null}
+          shareNoun={data.shareNoun ?? "share"}
         />
       )}
-      {box && !bid && (
+      {box && !floorsSet && (
         <p className="mt-3 text-xs text-muted">
           Add an IRR, cash-on-cash, or cap-rate floor to your buy box and this
           panel will solve for your max bid.
@@ -306,7 +576,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
             >
               {score.chip.label}
             </span>
-            <span>{playgroundFitLine(score, dirty)}</span>
+            <span>{playgroundFitLine(score, compare)}</span>
           </p>
         ) : box && checkSource ? (
           // A box IS set but no configured dimension is computable for this
@@ -376,6 +646,12 @@ function parsePriceText(s: string): number | null {
 
 const fmtUsd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
+/** Under this a price typed where the model has no price of its own is
+ *  taken for a fragment on its way to a figure ("5" before "5,000,000"):
+ *  the 1% of the placeholder's $10,000,000 the guard holds a fragment to
+ *  over the placeholder. A keystroke filter, no figure about a deal. */
+const FRAGMENT_FLOOR = 100_000;
+
 /**
  * Price ⇄ going-in cap, as one linked control. Typing either reprices the
  * whole model: price is a real engine input (debt, fees, and equity re-size
@@ -388,6 +664,9 @@ function PriceCapControls({
   value,
   onChange,
   planDeal = false,
+  pricePlaceholder = false,
+  capWithheld = null,
+  priceLabel = null,
 }: {
   basePrice: number;
   noiY1: number;
@@ -397,6 +676,20 @@ function PriceCapControls({
    *  year-1 income as modelled, never on the finished project's stabilized
    *  pro forma — say so, or the control reads as the plan's yield */
   planDeal?: boolean;
+  /** no price was read: the modelled price is a placeholder, so the fields
+   *  wait empty for the reader's, and nothing is set against the placeholder */
+  pricePlaceholder?: boolean;
+  /** why no cap is struck on year-1 NOI, in the words after "n/a — ": what
+   *  the price buys where it is no building's (lib/compare-interest
+   *  `withheld`: the building's income over a note's or a position's price
+   *  is a cap nobody earns), an NOI the model assumed ("assumed NOI"), or a
+   *  building it runs nearly vacant ("97% vacant"). The cap field says it
+   *  and takes no figure; the price still does */
+  capWithheld?: string | null;
+  /** what the price is where it is not the price as stated for what is sold
+   *  (`PlaygroundData.priceLabel`): the field's name, said in its accessible
+   *  name too; absent, "Purchase price" */
+  priceLabel?: string | null;
 }) {
   const [editing, setEditing] = useState<"price" | "cap" | null>(null);
   const [draft, setDraft] = useState("");
@@ -404,6 +697,9 @@ function PriceCapControls({
   const capPct = price > 0 && noiY1 > 0 ? (noiY1 / price) * 100 : null;
   const atBase = value == null;
   const deltaPct = basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0;
+  // A placeholder price is no price to show in a field labelled "Purchase
+  // price", nor a cap struck on it: both wait for the reader's figure.
+  const blank = pricePlaceholder && atBase;
 
   // Snapping back to (nearly) the modeled price clears the override entirely,
   // so "base" stays an exact state, never a float hair away from it.
@@ -411,8 +707,10 @@ function PriceCapControls({
     if (n == null) return;
     // Ignore keystroke fragments ("5" on the way to "55000000"): only prices
     // within 1%–100x of the modeled price commit; anything else waits for
-    // more typing. Snapping (nearly) back to base clears the override.
-    if (n < basePrice * 0.01 || n > basePrice * 100) return;
+    // more typing. Snapping (nearly) back to base clears the override. A
+    // modelled figure of zero or less is no price to measure a fragment
+    // against (research pass 38), so there a fragment is judged by its size.
+    if (basePrice > 0 ? n < basePrice * 0.01 || n > basePrice * 100 : n < FRAGMENT_FLOOR) return;
     onChange(Math.abs(n - basePrice) < 0.5 ? null : n);
   };
   const commitPrice = (s: string) => {
@@ -434,26 +732,29 @@ function PriceCapControls({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-xs font-semibold tracking-tight">Your price</span>
         <span className="text-[11px] text-muted">
-          {planDeal
-            ? "type a price or a cap — year-1 income as modelled, not the plan's stabilized pro forma"
-            : "type a price or a going-in cap"}
+          {capWithheld
+            ? "type a price"
+            : planDeal
+              ? "type a price or a cap — year-1 income as modelled, not the plan's stabilized pro forma"
+              : "type a price or a going-in cap"}
         </span>
       </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-3">
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-muted">
-            Purchase price
+          <span className="text-[11px] uppercase tracking-wide text-muted" data-qa="playground-price-label">
+            {priceLabel ?? "Purchase price"}
           </span>
           <input
             inputMode="decimal"
-            value={editing === "price" ? draft : fmtUsd0(price)}
+            value={editing === "price" ? draft : blank ? "" : fmtUsd0(price)}
+            placeholder={blank ? "Type a price" : undefined}
             onFocus={(e) => {
               setEditing("price");
               setDraft(e.currentTarget.value);
             }}
             onChange={(e) => commitPrice(e.currentTarget.value)}
             onBlur={() => setEditing(null)}
-            aria-label="Purchase price scenario"
+            aria-label={`${priceLabel ?? "Purchase price"} scenario`}
             className={inputCls}
           />
         </label>
@@ -461,28 +762,47 @@ function PriceCapControls({
           <span className="text-[11px] uppercase tracking-wide text-muted">
             {planDeal ? "Cap on Yr-1 income (as modelled)" : "Cap on Yr-1 NOI (as modelled)"}
           </span>
-          <input
-            inputMode="decimal"
-            value={
-              editing === "cap"
-                ? draft
-                : capPct != null
-                  ? `${capPct.toFixed(2)}%`
-                  : "—"
-            }
-            onFocus={(e) => {
-              setEditing("cap");
-              setDraft(e.currentTarget.value);
-            }}
-            onChange={(e) => commitCap(e.currentTarget.value)}
-            onBlur={() => setEditing(null)}
-            aria-label="Going-in cap scenario"
-            className={inputCls}
-          />
+          {capWithheld ? (
+            // No building's cap on a price that did not buy the building.
+            <input
+              readOnly
+              value={`n/a — ${capWithheld}`}
+              aria-label="Going-in cap scenario"
+              className={`${inputCls} text-muted`}
+            />
+          ) : (
+            <input
+              inputMode="decimal"
+              value={
+                editing === "cap"
+                  ? draft
+                  : blank
+                    ? ""
+                    : capPct != null
+                      ? `${capPct.toFixed(2)}%`
+                      : "—"
+              }
+              placeholder={blank ? "or a cap" : undefined}
+              onFocus={(e) => {
+                setEditing("cap");
+                setDraft(e.currentTarget.value);
+              }}
+              onChange={(e) => commitCap(e.currentTarget.value)}
+              onBlur={() => setEditing(null)}
+              aria-label="Going-in cap scenario"
+              className={inputCls}
+            />
+          )}
         </label>
         <div className="flex items-end pb-2.5">
-          {atBase ? (
-            <span className="text-xs text-muted">at the modeled price</span>
+          {pricePlaceholder ? (
+            // Nothing is set against a placeholder: the price is the reader's
+            // own, or there is none yet.
+            <span className="text-xs text-muted">
+              {atBase ? "no price was read — type the price you would pay" : "your price"}
+            </span>
+          ) : atBase ? (
+            <span className="text-xs text-muted">at the modelled price</span>
           ) : (
             <span
               className={`text-xs font-medium tabular-nums ${
@@ -490,7 +810,7 @@ function PriceCapControls({
               }`}
             >
               {deltaPct >= 0 ? "+" : "−"}
-              {Math.abs(deltaPct).toFixed(1)}% vs modeled ({fmtUsd0(basePrice)})
+              {Math.abs(deltaPct).toFixed(1)}% vs modelled ({fmtUsd0(basePrice)})
             </span>
           )}
         </div>
@@ -522,13 +842,34 @@ function MaxBidCard({
   bid,
   box,
   modeledPrice,
+  against = "modeled",
   dirty,
+  sharePct = null,
+  shareNoun = "share",
 }: {
-  bid: MaxBidSolution;
+  /** the solve, and where no price clears, the report's sentence why
+   *  (lib/underwrite/solver `noBidSentence`), null where it names nothing */
+  bid: MaxBidSolution & { noBid?: string | null };
   box: BuyBox;
+  /** the price the bid is set against: the modelled one, or the reader's
+   *  own where the model's is a placeholder (`against: "yours"`) */
   modeledPrice: number;
+  against?: "modeled" | "yours";
   dirty: boolean;
+  /** a partial interest's stated share, where the model runs the whole its
+   *  price grosses up to (`PlaygroundData.sharePct`): the bid solved is the
+   *  whole's, and the share's — the whole's times the share — is said
+   *  beside it (research pass 40, M7) */
+  sharePct?: number | null;
+  /** what the share is called (`PlaygroundData.shareNoun`) */
+  shareNoun?: "share" | "interest";
 }) {
+  const vs = against === "yours" ? "your price" : "the modelled price";
+  // The share's bid, rounded down as the whole's is, so it still clears.
+  const shareBid = (whole: number, atLeast = false): string | null =>
+    sharePct != null
+      ? `the whole's price, the ${shareNoun} grossed up; the ${Number(sharePct.toFixed(2))}% ${shareNoun}'s is ${atLeast ? "at least " : ""}${fmtBid(whole * (sharePct / 100))}`
+      : null;
   return (
     <div className="mt-3 rounded-xl border border-brand/25 bg-brand/[0.04] p-3.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -540,13 +881,17 @@ function MaxBidCard({
       </div>
       {bid.price == null ? (
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          No price in range clears your floors under this scenario — the deal
-          economics, not the price, are the blocker.
+          {bid.noBid ??
+            "No price in range clears your floors under this scenario — the deal economics, not the price, are the blocker."}
         </p>
       ) : bid.unbounded ? (
+        // Every floor still clears at the top of the range searched — the
+        // window doubles from twice the price while they clear (research
+        // pass 40, H2) — so the bid is at least that top, and said so.
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          Your floors hold even at twice the modeled price — the buy box
-          isn&apos;t the constraint on this deal.
+          {`Your floors hold even at ${timesWords(1 + (bid.deltaPct ?? 0))} ${vs} (${fmtBid(bid.price)}), the top of the range searched — the buy box isn't the constraint on this deal.${
+            shareBid(bid.price) ? ` That is ${shareBid(bid.price, true)}.` : ""
+          }`}
         </p>
       ) : (
         <>
@@ -561,7 +906,7 @@ function MaxBidCard({
                 }`}
               >
                 {bid.deltaPct >= 0 ? "+" : "−"}
-                {Math.abs(bid.deltaPct * 100).toFixed(1)}% vs the modeled price
+                {Math.abs(bid.deltaPct * 100).toFixed(1)}% vs {vs}
               </span>
             )}
             {bid.binding && (
@@ -570,6 +915,12 @@ function MaxBidCard({
               </span>
             )}
           </p>
+          {shareBid(bid.price) && (
+            // The bid is the whole's: the share's is said beside it.
+            <p className="mt-1 text-[11px] text-muted" data-qa="max-bid-share">
+              {`That is ${shareBid(bid.price)}.`}
+            </p>
+          )}
           {bid.at && (
             <p className="mt-1 text-[11px] tabular-nums text-muted">
               at that price: IRR {fmtPct(bid.at.irr)} · year-1 CoC{" "}
@@ -610,8 +961,8 @@ function Lever({
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium">{label}</span>
         <span className="font-mono text-sm font-semibold tabular-nums">
-          {display(v)}
-          <span className={`ml-1.5 text-[11px] font-normal ${atBase ? "text-muted" : "text-brand"}`}>
+          {display(v)}{" "}
+          <span className={`ml-0.5 text-[11px] font-normal ${atBase ? "text-muted" : "text-brand"}`}>
             {atBase
               ? `base ${base}`
               : `(base ${base}, ${d === "base" ? "no change" : d})`}
@@ -626,6 +977,9 @@ function Lever({
         value={idx}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={`${label} scenario`}
+        // The slider moves along stops; what a screen reader says is the
+        // figure the stop sets, never the stop's index (research pass 33).
+        aria-valuetext={atBase ? `${display(v)}, the base` : `${display(v)}, base ${base}`}
         className="mt-2 w-full accent-brand"
       />
       <div className="flex justify-between text-[10px] tabular-nums text-muted">
@@ -643,6 +997,7 @@ function Metric({
   was,
   baseText,
   dirty,
+  withheld = false,
 }: {
   label: string;
   value: string;
@@ -650,6 +1005,8 @@ function Metric({
   was: number | null;
   baseText: string;
   dirty: boolean;
+  /** a return withheld, its value the reason ("n/a — no price"), said small */
+  withheld?: boolean;
 }) {
   // Higher is better for all four headline metrics.
   const cls =
@@ -661,7 +1018,11 @@ function Metric({
   return (
     <div className="rounded-xl border border-line/70 p-3">
       <p className="text-[11px] text-muted">{label}</p>
-      <p className={`font-mono text-lg font-semibold tabular-nums ${cls}`}>{value}</p>
+      {withheld ? (
+        <p className="mt-1 text-sm font-medium text-muted">{value}</p>
+      ) : (
+        <p className={`font-mono text-lg font-semibold tabular-nums ${cls}`}>{value}</p>
+      )}
       {dirty && <p className="text-[10px] tabular-nums text-muted">base {baseText}</p>}
     </div>
   );

@@ -1,5 +1,6 @@
+import { compactUsd } from "@/lib/money";
 import type { Metadata } from "next";
-import { Fragment } from "react";
+import { Fragment, Suspense } from "react";
 import Link from "next/link";
 import { MarketBand } from "@/app/place-band";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -34,7 +35,8 @@ import { RentBoard } from "./rent-board";
 import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
 import { RealtorLine } from "./realtor-line";
-import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { mergeBenchmarks, redfinSourceHref, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { signedInBenchmarkRows, signedInStockCounts } from "@/lib/research-read";
 import { DC_AREA_METRO, FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrOf, fmrTwoBed, fmrWhen, readFmrMetric } from "@/lib/fmr";
 import { datedLong } from "@/lib/debt-index";
 import { asOfLabel } from "@/lib/research";
@@ -55,6 +57,7 @@ import { MarketNote } from "./market-note";
 import { SubmarketsPanel } from "./submarkets-panel";
 import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
 import { listSubmarkets } from "@/lib/market/store";
+import { readMarketMemory } from "@/lib/market-memory-read";
 import type { Submarket } from "@/lib/market/types";
 import { MarketCompare } from "./market-compare";
 import { COMPARE_METROS } from "./compare-metros";
@@ -248,15 +251,13 @@ export default async function MarketDataPage({
   // explicit user_id filter is what keeps this memory private to the buyer.
   // The reader's own submarkets are read beside it: the page puts the
   // covered markets first for a reader with neither.
+  // Every one of them, a page at a time (lib/market-memory-read, the one read
+  // the deal page's "From your past screens" strip counts from too): the
+  // newest 500 had stopped every count and range here, and stated another
+  // count than the strip's for the same market (research pass 42).
   const [{ data, error }, submarkets] = user
     ? await Promise.all([
-        supabase
-          .from("deals")
-          .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
-          .eq("user_id", user.id)
-          .not("extraction", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(500),
+        readMarketMemory(supabase, user.id),
         // Migration 0033 not applied yet: the table is missing, the list
         // is empty, and a create attempt says so itself.
         listSubmarkets(supabase, user.id).catch((): Submarket[] => []),
@@ -278,7 +279,7 @@ export default async function MarketDataPage({
     groups: groups.length,
     submarkets: submarkets.length,
   });
-  const explorer = <MetroExplorer selected={metroParam} />;
+  const explorer = <MetroExplorer selected={metroParam} signedIn={!!user} />;
 
   return (
     <div className="space-y-6">
@@ -368,13 +369,35 @@ export default async function MarketDataPage({
       <SectorHeatGrid />
       {/* The same board over the demand side: every metro area × every
           sector's payrolls against a year ago, live from FRED. */}
-      <SectorJobsBoardLive />
-      <SurveyVacancyBoardLive />
-      <RentBoardLive />
-      <MidAtlanticTable />
+      {/* Each section below reads on its own and streams when it is ready
+          (research pass 25): without a boundary of its own, every section
+          held the whole page behind its skeleton until the slowest read
+          answered — 7 s and more whenever a read was retried. */}
+      <Suspense fallback={null}>
+        <SectorJobsBoardLive />
+      </Suspense>
+      <Suspense fallback={null}>
+        <SurveyVacancyBoardLive />
+      </Suspense>
+      <Suspense fallback={null}>
+        <RentBoardLive />
+      </Suspense>
+      <Suspense fallback={null}>
+        <MidAtlanticTable signedIn={!!user} />
+      </Suspense>
       <SectorExplorer selected={sectorParam} />
-      <LiveRatesStrip />
-      <IntelDigestCard />
+      <Suspense fallback={null}>
+        <LiveRatesStrip />
+      </Suspense>
+      {/* The weekday intel is granted to signed-in readers (migration 0024):
+          a visitor with no account read none of it, and the card told them
+          "Nothing notable from the weekday intel job yet" whatever the job
+          had found. */}
+      {user ? (
+        <Suspense fallback={null}>
+          <IntelDigestCard />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
@@ -386,15 +409,14 @@ export default async function MarketDataPage({
 // visible from day one (it doesn't depend on the user's own screens), every
 // row with provenance. Recorded-sales COVERAGE for auto-comps is stated
 // from the provider registry so it can't drift.
-async function MidAtlanticTable() {
-  const supabase = await createSupabaseServerClient();
+async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
   let benchmarks = seedBenchmarks();
-  try {
-    const { data } = await supabase.from("benchmarks").select("*");
-    if (data?.length) benchmarks = mergeBenchmarks(data as never);
-  } catch {
-    // seeds stand
-  }
+  // The table's rows are granted to signed-in readers (migration 0023); a
+  // visitor with no account reads the checked-in files, as the session read
+  // gave them before. One cached read serves every signed-in reader
+  // (lib/research-read); a failed read keeps the files.
+  const rows = signedIn ? await signedInBenchmarkRows() : null;
+  if (rows?.length) benchmarks = mergeBenchmarks(rows);
   const mf = benchmarks.filter((b) => b.sector === "multifamily" && b.metro);
   // Covered markets ONLY (per the 15-market scope): benchmark rows for
   // metros outside the covered list exist in the research seeds but are not
@@ -428,8 +450,9 @@ async function MidAtlanticTable() {
     .sort((a, b) => (a.price!.low ?? 0) - (b.price!.low ?? 0));
   if (priceRows.length === 0) return null;
   const tableStale = staleMark(researchAge(priceRows[0].price!.as_of, todayIso()));
+  const redfinHref = redfinSourceHref(priceRows[0].price!.source);
 
-  const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
+  const money = (n: number | null) => (n === null ? "—" : compactUsd(n, { thousandsFrom: 0 }));
   const range = (b: { low: number | null; high: number | null } | undefined) =>
     !b || b.low === null
       ? "—"
@@ -444,7 +467,21 @@ async function MidAtlanticTable() {
           Mid-Atlantic 2–4 unit market
         </h2>
         <span className="text-[11px] text-muted">
-          {`${priceRows[0].price!.as_of} · Redfin public dataset`}
+          {`${priceRows[0].price!.as_of} · `}
+          {/* Redfin credited and linked to the page the research file cites
+              for these rows (research pass 31, C4: named, never linked). */}
+          {redfinHref && linkOk(redfinHref) !== false ? (
+            <a
+              href={redfinHref}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+            >
+              Redfin public dataset
+            </a>
+          ) : (
+            "Redfin public dataset"
+          )}
           {/* The month's figures are dated its last day; past the research
               rule's limit (lib/research-age) the date says its age and that
               it is stale — the deal page's rows say the same of these rows. */}
@@ -595,7 +632,33 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function MetroExplorer({ selected }: { selected?: string }) {
+/** The property database's counts for an ingested market, for a signed-in
+ *  reader — zero rows draws nothing rather than a hollow "0". */
+async function PropertyStockLine({ market }: { market: string }) {
+  const stock = await signedInStockCounts(market);
+  if (!stock) return null;
+  return (
+    <p className="text-sm">
+      <span className="text-[11px] uppercase tracking-wide text-muted">
+        Property database
+      </span>{" "}
+      <span className="font-mono font-semibold tabular-nums">
+        {stock.parcels.toLocaleString()}
+      </span>{" "}
+      investable parcels ·{" "}
+      <span className="font-mono font-semibold tabular-nums">
+        {stock.sales.toLocaleString()}
+      </span>{" "}
+      deed-recorded sales
+      <span className="ml-1.5 text-[11px] text-muted">
+        — counts from ingested government records, read within the hour;
+        single-family excluded at ingestion
+      </span>
+    </p>
+  );
+}
+
+async function MetroExplorer({ selected, signedIn }: { selected?: string; signedIn: boolean }) {
   const metros = metrosSeed.metros ?? [];
   // A metro area read without a brief (#404) gets its own page body: the
   // same live pictures, none of the research a briefed market carries.
@@ -621,33 +684,14 @@ async function MetroExplorer({ selected }: { selected?: string }) {
     (active.rule_ids as string[] | undefined)?.includes(r.id)
   );
   // Live property-DB stock counts for metros whose bulk pipeline is wired —
-  // real rows replace hand-entered stats; zero rows renders nothing rather
-  // than a hollow "0".
+  // real rows replace hand-entered stats. The counts are granted to signed-in
+  // readers (migration 0028), and are drawn on their own line that streams
+  // when it is ready (PropertyStockLine), so the brief never waits on two
+  // exact counts over the property database.
   const ingestMarket = (active as { ingest_market?: string }).ingest_market;
-  const stockRead = async (): Promise<{ parcels: number; sales: number } | null> => {
-    if (!ingestMarket) return null;
-    try {
-      const supabase = await createSupabaseServerClient();
-      const [p, s] = await Promise.all([
-        supabase
-          .from("properties")
-          .select("id", { count: "exact", head: true })
-          .eq("market", ingestMarket),
-        supabase
-          .from("recorded_sales")
-          .select("id", { count: "exact", head: true })
-          .eq("market", ingestMarket),
-      ]);
-      return (p.count ?? 0) > 0 || (s.count ?? 0) > 0 ? { parcels: p.count ?? 0, sales: s.count ?? 0 } : null;
-    } catch {
-      // migration 0028 not run — no line
-      return null;
-    }
-  };
   // None of the reads waits on another, so they run together — one read's
-  // wall clock, not five, as the read-only branch above already does.
-  const [stock, live, national, zori, realtor] = await Promise.all([
-    stockRead(),
+  // wall clock, not four, as the read-only branch above already does.
+  const [live, national, zori, realtor] = await Promise.all([
     // The metro's own figures, live from FRED — its unemployment, jobs,
     // permits and house prices, read the way the rates strip is and cached
     // per metro. A metro FRED does not publish for gets no panel.
@@ -747,25 +791,11 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           )}
         </div>
 
-        {stock && (
-          <p className="text-sm">
-            <span className="text-[11px] uppercase tracking-wide text-muted">
-              Property database
-            </span>{" "}
-            <span className="font-mono font-semibold tabular-nums">
-              {stock.parcels.toLocaleString()}
-            </span>{" "}
-            investable parcels ·{" "}
-            <span className="font-mono font-semibold tabular-nums">
-              {stock.sales.toLocaleString()}
-            </span>{" "}
-            deed-recorded sales
-            <span className="ml-1.5 text-[11px] text-muted">
-              — live counts from ingested government records; single-family
-              excluded at ingestion
-            </span>
-          </p>
-        )}
+        {signedIn && ingestMarket ? (
+          <Suspense fallback={null}>
+            <PropertyStockLine market={ingestMarket} />
+          </Suspense>
+        ) : null}
 
         <p className="text-xs text-muted">{compsLine}</p>
 
@@ -1342,7 +1372,7 @@ function Stat({ label, value }: { label: string; value: string | null }) {
     <div className="flex items-baseline justify-between gap-2">
       <dt className="text-xs text-muted">{label}</dt>
       <dd className="font-mono text-sm tabular-nums">
-        {value ?? <span className="text-line">—</span>}
+        {value ?? <span className="text-muted">—</span>}
       </dd>
     </div>
   );

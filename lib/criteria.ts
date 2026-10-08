@@ -5,9 +5,12 @@
 // mandate's bound, the deal's figure, and the call in plain English.
 // (Universal module: used by server pages and the background pipeline.)
 
+import { SCALE_WORDS, compactUsd, scaleOf, scaledText } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { assetWords, countNoun } from "@/lib/asset-words";
+import { EXCHANGE_FILERS, exchangeDay, type ExchangeBlock } from "@/lib/exchange-window";
 import { dayIn } from "@/lib/reader-day";
+import type { CapWithheldKind } from "@/lib/cap-slot";
 
 export interface GeoTarget {
   /** display label, e.g. "Dallas, TX" or "Tarrant County, TX" */
@@ -57,6 +60,12 @@ export interface BuyBox {
   dealbreakers?: Dealbreakers;
   /** free-text priorities, fed to the verdict synthesizer verbatim */
   notes?: string;
+  /** the buyer's 1031 exchange (lib/exchange-window): the day the
+   *  relinquished property was transferred (an ISO day), who files the
+   *  return and whether it is extended — read against each deal's
+   *  offers-due day and what its price buys. Absent, no exchange: a blank
+   *  is null. The box is the reader's, so never on the shared screen. */
+  exchange?: ExchangeBlock;
 }
 
 /**
@@ -97,6 +106,12 @@ export interface BuyBoxCheck {
   status: BuyBoxStatus;
   /** one plain-English analyst line: mandate, deal figure, call */
   detail: string;
+  /** the criterion turns on the price — the price band, the basis, the
+   *  going-in cap, the target return — so a note's or a position's price, a
+   *  plan deal or a memorandum that states no cap or return can leave it
+   *  unknown, and a fit judged without it is no green light
+   *  (`buyBoxCoverage`) */
+  onPrice?: boolean;
 }
 
 // Near-miss tolerances, per criterion kind. Exported because the mandate-fit
@@ -297,10 +312,12 @@ export const METRIC_FIND = {
   // The going-in cap is today's income against the price. A stabilized, pro
   // forma, forward or at-completion cap — or a yield on cost — describes a
   // plan deal's finished project, and reading it as the going-in cap is how
-  // a conversion "cleared" a 6% floor at 11.7%.
+  // a conversion "cleared" a 6% floor at 11.7%. A forward purchase's cap at
+  // delivery ("Delivery cap rate", "Cap rate at delivery", research pass 28)
+  // is struck on a building not yet standing, never today's income.
   goingInCap: {
     inc: /going[- ]?in cap/i,
-    exc: /stabili[sz]|pro ?forma|forward|projected|at completion|yield/i,
+    exc: /stabili[sz]|pro ?forma|forward|projected|at completion|deliver|yield/i,
   },
   capRate: {
     // "Cap rate" or "Capitalization rate" — the OM's formal wording.
@@ -309,8 +326,9 @@ export const METRIC_FIND = {
     // parentheses or a cap on cost is a projection, not today's income
     // against the price (a Year-1 cap is the going-in figure by another
     // name, so the shared year guard starts at 2 — as classifyNoi's does).
+    // A cap at delivery is a forward purchase's, as above.
     exc: new RegExp(
-      String.raw`exit|terminal|reversion|residual|stabili[sz]|pro ?forma|forward|projected|at completion|yield|on cost|\(\s*(19|20)\d\d|` +
+      String.raw`exit|terminal|reversion|residual|stabili[sz]|pro ?forma|forward|projected|at completion|deliver|yield|on cost|\(\s*(19|20)\d\d|` +
         LATER_YEAR.source,
       "i",
     ),
@@ -348,7 +366,9 @@ export function findPriceRow(
   screenYear: number,
 ): MetricLike | null {
   const ask = findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc(screenYear));
-  if (ask && parseMoney(ask.value) != null) return ask;
+  // An ask whose value is no price ("6.25% cap rate", "75% of UPB", "185,000
+  // per unit" — `priceRefusal`) states no figure, as "Call for offers" does.
+  if (ask && parsePrice(ask.value) != null) return ask;
   return kind === "development"
     ? (findMetric(metrics, METRIC_FIND.landPrice.inc, METRIC_FIND.landPrice.exc) ?? ask)
     : ask;
@@ -396,8 +416,39 @@ export function isEmptyBuyBox(box: BuyBox | null | undefined): boolean {
     box.minCoCPct == null &&
     box.minIrrPct == null &&
     hasNoDealbreakers(box.dealbreakers) &&
-    !box.notes?.trim()
+    !box.notes?.trim() &&
+    !box.exchange?.relinquishedTransferOn
   );
+}
+
+/** A real calendar day, as an ISO date — "2026-09-15", never "2026-02-31" —
+ *  in a year an exchange can have run in. */
+function isExchangeDay(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const t = Date.parse(`${s}T00:00:00Z`);
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== s) return false;
+  const year = Number(s.slice(0, 4));
+  return year >= 2000 && year <= 2100;
+}
+
+/**
+ * The buy box's 1031 exchange from what the form sends (or the stored
+ * jsonb), each part only as given: the relinquished property's transfer day
+ * as a real calendar day, else no exchange at all (a blank is null, and a
+ * filer or an extension with no day has nothing to run from); the filer
+ * only as one of `EXCHANGE_FILERS`; the extension only where ticked.
+ */
+export function sanitizeExchange(raw: unknown): ExchangeBlock | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const day = typeof r.relinquishedTransferOn === "string" ? r.relinquishedTransferOn.trim() : "";
+  if (!isExchangeDay(day)) return undefined;
+  const filer = EXCHANGE_FILERS.find((f) => f.id === r.filer)?.id;
+  return {
+    relinquishedTransferOn: day,
+    ...(filer ? { filer } : {}),
+    ...(r.returnExtended === true ? { returnExtended: true } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +538,11 @@ export function serializeBuyBoxStore(store: BuyBoxStore): BuyBox | Record<string
   };
 }
 
+// The figure a value leads with, as `parseMoney` reads it once the dollar
+// sign and the commas are dropped: the digits, never an ordinal's, and a
+// scale only where it ends its word (lib/money's one table).
+const MONEY_FIGURE = new RegExp(String.raw`^\s*(\d+(?:\.\d+)?)(?!\.?\d)(?!(?:st|nd|rd|th)\b)(?:\s*(${SCALE_WORDS})(?![a-z]))?`);
+
 /** "$70.7M" / "$70,700,000" / "285k" / "1.2 mm" → dollars (or plain
  *  number), or null. Reads the approximations an OM writes — "±$42M",
  *  "~$42M", "approx. $42,000,000", "circa $42M", "USD 42,000,000" — as
@@ -505,51 +561,50 @@ export function parseMoney(raw: string): number | null {
     s = s.replace(/^[-−–]\s*/, "");
     sign = -1;
   }
-  s = s.replace(/[,$\s]/g, "").toLowerCase();
-  const m = s.match(/^\$?(\d+(?:\.\d+)?)(mm|m|k|b)?/);
+  // A scale is read only where it ends its word (lib/money's one table): the
+  // spaces stay in, so the first letter of the next word is never a scale.
+  // With every space dropped, "$450,000 more" read as 450,000 million and
+  // "$600,000 base rent" as 600,000 billion. The digits never give back a
+  // decimal to a word glued after them (audit C3a): with a word boundary
+  // after the scale, "$12.5mil" read as 12, "1.25x" as 1 and "$32.50psf" as
+  // 32. An ordinal is no figure ("2nd lien").
+  s = s.replace(/[,$]/g, "").toLowerCase();
+  const m = s.match(MONEY_FIGURE);
   if (!m) return null;
   const n = Number(m[1]);
   if (!Number.isFinite(n)) return null;
-  const suffix = m[2];
-  const mult = suffix === "b" ? 1e9 : suffix === "m" || suffix === "mm" ? 1e6 : suffix === "k" ? 1e3 : 1;
-  return sign * n * mult;
+  return sign * n * scaleOf(m[2]);
 }
 
 // ── A price stated as a range (#466) ─────────────────────────────────────
 
-const RANGE_SCALE: Record<string, number> = {
-  k: 1e3,
-  thousand: 1e3,
-  m: 1e6,
-  mm: 1e6,
-  million: 1e6,
-  b: 1e9,
-  bn: 1e9,
-  billion: 1e9,
-};
-const RANGE_FIGURE = String.raw`\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?`;
+// Each end's scale from lib/money's one table: "$40–42 mil" had read as
+// forty to forty-two dollars.
+const RANGE_FIGURE = String.raw`\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(${SCALE_WORDS})?`;
 const PRICE_RANGE = new RegExp(
   String.raw`^(?:(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*)?(?:between\s+)?${RANGE_FIGURE}\s*(?:[-–—]|to|and)\s*${RANGE_FIGURE}\b`,
   "i",
 );
 
 /**
- * A price the OM states as a RANGE — pricing guidance, a whisper — as its
- * two ends: "$40,000,000 – $42,000,000", "$40M-$42M", "$40–42M", "$40 to
- * $42 million", "between $40M and $42M". The second figure's scale carries
- * to a first written without one ("$40–42M" is $40M to $42M) wherever that
- * makes a range at all, so "$950,000 – $1.1M" keeps its first figure whole.
- * Null for a single figure, and for two figures that are not a range: a
- * second no larger than the first ("$42,000,000 – $500,000 credit",
- * "$42,000,000 – 5.25% cap") or more than twice it.
+ * Two figures stated as a RANGE, as its two ends: "$40,000,000 –
+ * $42,000,000", "$40M-$42M", "$40–42M", "$40 to $42 million", "between $40M
+ * and $42M". The second figure's scale carries to a first written without
+ * one ("$40–42M" is $40M to $42M) wherever that makes a range at all, so
+ * "$950,000 – $1.1M" keeps its first figure whole. Null for a single figure,
+ * and for two figures that are not a range: a second no larger than the
+ * first ("$42,000,000 – $500,000 credit", "$42,000,000 – 5.25% cap") or more
+ * than twice it. Any two figures — a market lot rent's "$500–$550 a month"
+ * too (lib/manufactured-housing); a price's range is `priceRange`, which
+ * refuses a value that is no price.
  */
-export function priceRange(raw: string): { low: number; high: number } | null {
+export function figureRange(raw: string): { low: number; high: number } | null {
   const m = PRICE_RANGE.exec(raw.trim());
   if (!m) return null;
   const n1 = Number(m[1].replace(/,/g, ""));
   const n2 = Number(m[3].replace(/,/g, ""));
-  const s1 = m[2] ? (RANGE_SCALE[m[2].toLowerCase()] ?? 1) : 1;
-  const s2 = m[4] ? (RANGE_SCALE[m[4].toLowerCase()] ?? 1) : 1;
+  const s1 = scaleOf(m[2]);
+  const s2 = scaleOf(m[4]);
   const high = n2 * s2;
   let low = n1 * s1;
   // "$40–42M": the first figure borrows the second's scale where, so
@@ -559,29 +614,91 @@ export function priceRange(raw: string): { low: number; high: number } | null {
   return { low, high };
 }
 
+// ── A price row's value that is no price (research pass 38) ──────────────
+
+// The figure a value leads with, as `parseMoney` reads it: an approximation
+// word, a bracket or a sign, the dollar, the digits and their scale.
+const LEAD_FIGURE = new RegExp(
+  String.raw`^(?:(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*)?(?:between\s+)?\(?\s*[-−–]?\s*(?:us\$|usd|\$)?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:${SCALE_WORDS})(?![a-z]))?`,
+  "i",
+);
+// What a figure is counted per: a unit by any of the nouns a class counts in,
+// a foot by any of its spellings, an acre, a building. Only these: "per the
+// OM", "per broker" and "per appraisal" say where the ask came from.
+const PER_WHAT = String.raw`(?:units?|doors?|keys?|beds?|rooms?|pads?|sites?|lots?|homes?|houses?|spaces?|stalls?|suites?|apartments?|apts?|slips?|berths?|bays?|acres?|ac|sf|s\.f\.?|sq\.?\s*f(?:oo|ee)?t|square\s+f(?:oo|ee)t|r?sf|nrsf|gsf|nsf|usf|gla|nra|rba|gba|nla|foot|feet|ft|buildings?|propert(?:y|ies)|parcels?)\b`;
+const PER_PERIOD = String.raw`(?:years?|yr|annum|annually|months?|mo|monthly)\b`;
+const PER = (what: string) => new RegExp(String.raw`^\s*(?:\$?\s*\/\s*${what}|(?:per|a|an|each)\s+${what})`, "i");
+// The words right after the figure, and what they make it: never the price.
+const NO_PRICE: [RegExp, string][] = [
+  [/^\s*(?:%|pct\b|percent\b|per\s?cent\b)/i, "a percentage"],
+  [/^\s*(?:¢|cents?\b)/i, "a share of the loan's balance"],
+  [/^\s*(?:of\s+(?:the\s+)?)?(?:par|upb)\b|^\s*of\s+(?:the\s+)?(?:face|unpaid|outstanding|balance|principal)\b/i, "a share of the loan's balance"],
+  [/^\s*[x×](?![a-z])/i, "a multiple"],
+  [/^\s*(?:psf\b|p\.s\.f\.?|each\b)/i, "a figure per unit, per foot or per acre"],
+  [PER(PER_WHAT), "a figure per unit, per foot or per acre"],
+  [PER(PER_PERIOD), "a figure per year or per month"],
+];
+
+/**
+ * Why a price row's value is no price, in a few words — "a percentage", "a
+ * share of the loan's balance", "a multiple", "a figure per unit, per foot or
+ * per acre", "a figure per year or per month" — or null where it is one. Read
+ * off the words right after the figure the value leads with, or after a
+ * range's second figure: "6.25% cap rate", "75% of UPB", "80 cents on the
+ * dollar", "185,000 per unit", "425/SF", "1,850,000 per acre". Each states a
+ * fact about the price, never the price: read as the whole price, "6.25% cap
+ * rate" put a $6.25 ask on a 410,000 SF warehouse and "75% of UPB" a $75 one
+ * on a $20M note. A dollar figure with its cap or its share in words after
+ * it — "$42,000,000 (5.25% cap)", "$15,000,000 (75% of UPB)" — is the price.
+ */
+export function priceRefusal(raw: string): string | null {
+  const s = raw.trim();
+  const lead = (figureRange(s) ? PRICE_RANGE.exec(s) : null) ?? LEAD_FIGURE.exec(s);
+  if (!lead) return null;
+  const tail = s.slice(lead[0].length);
+  for (const [words, why] of NO_PRICE) if (words.test(tail)) return why;
+  return null;
+}
+
+/**
+ * A price the OM states as a RANGE — pricing guidance, a whisper — as its two
+ * ends (`figureRange`); null for a value that is no price (`priceRefusal`): a
+ * range of figures per unit is no range of prices.
+ */
+export function priceRange(raw: string): { low: number; high: number } | null {
+  return priceRefusal(raw) ? null : figureRange(raw);
+}
+
 /**
  * A PRICE, read on the side that does not flatter the buyer: the top of a
  * range the OM states — a lower price lifts every return and every cap
  * struck on it — else the one figure `parseMoney` reads. Every reader of an
  * asking price goes through here; `parseMoney` stays the reader of every
  * other figure, since an income's or a cost's unflattering side is not its
- * top. It read "$40,000,000 – $42,000,000" guidance as $40M before.
+ * top. It read "$40,000,000 – $42,000,000" guidance as $40M before. A value
+ * that is no price (`priceRefusal`: a percentage, a share of a loan's
+ * balance, a figure per unit, foot or acre) is none, so the deal reads as
+ * unpriced and its row stays in the key terms as written (research pass 38).
  */
 export function parsePrice(raw: string): number | null {
-  const r = priceRange(raw);
+  if (priceRefusal(raw)) return null;
+  const r = figureRange(raw);
   return r ? r.high : parseMoney(raw);
 }
 
-const rangeEnd = (n: number, unit: number, suffix: string) => {
-  const v = n / unit;
-  return `${Number.isInteger(v) ? v : Math.round(v * 10) / 10}${suffix}`;
-};
+// Counted in tenths of the unit in whole numbers, as every compact figure
+// is (lib/money `scaledText`): "$40–42M", "$9–9.5M".
+const rangeEnd = (n: number, unit: number, suffix: string) => `${scaledText(n, unit, 1, true)}${suffix}`;
+
+// A figure that rounds to a thousand thousands is said in millions, as
+// `compactUsd` says it alone: "$1M", never "$1000k".
+const inMillions = (n: number) => Math.round(n / 100) >= 10_000;
 
 /** A range as one short figure — "$40–42M", "$950k–$1.1M" — for a slot
  *  that shows one price. */
 export function priceRangeShort(r: { low: number; high: number }): string {
-  if (r.low >= 1e6) return `$${rangeEnd(r.low, 1e6, "")}–${rangeEnd(r.high, 1e6, "M")}`;
-  if (r.high >= 1e6) return `$${rangeEnd(r.low, 1e3, "k")}–$${rangeEnd(r.high, 1e6, "M")}`;
+  if (inMillions(r.low)) return `$${rangeEnd(r.low, 1e6, "")}–${rangeEnd(r.high, 1e6, "M")}`;
+  if (inMillions(r.high)) return `$${rangeEnd(r.low, 1e3, "k")}–$${rangeEnd(r.high, 1e6, "M")}`;
   if (r.low >= 1e3) return `$${rangeEnd(r.low, 1e3, "")}–${rangeEnd(r.high, 1e3, "k")}`;
   return `$${Math.round(r.low)}–${Math.round(r.high)}`;
 }
@@ -594,12 +711,7 @@ export function parsePct(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const fmtM = (dollars: number) =>
-  dollars >= 1e6
-    ? `$${(dollars / 1e6).toFixed(1)}M`
-    : dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k`
-      : `$${Math.round(dollars)}`;
+const fmtM = (dollars: number) => compactUsd(dollars);
 
 const fmtSf = (sf: number) =>
   sf >= 1e6
@@ -625,9 +737,225 @@ interface ExtractionLike {
   /** what the price buys (#414); a note's price is a loan's, so the
    *  collateral's cap is not the buyer's and no cap floor is checked on it */
   interest?: { kind?: string | null } | null;
+  /** why the deal's cap slot holds no cap of its own, carried in by
+   *  `buyBoxCheckSource`'s reads (`capWithheldOf`); absent on a raw
+   *  extraction */
+  capWithheld?: CapWithheldKind | null;
+  /** whether a per-unit figure the memorandum states is the building's,
+   *  carried in by `buyBoxCheckSource`'s reads; absent on a raw extraction,
+   *  which is read as before */
+  statedBasisIsBuildings?: boolean;
+  /** what a partial interest holds, carried in by `buyBoxCheckSource`'s
+   *  reads (`Holding`); absent on a raw extraction and on any other share */
+  holding?: Holding | null;
+  /** the loan the memorandum states on a tenancy in common's property, in
+   *  lib/interest's `entityLoanWords`; absent where none is stated */
+  loanWords?: string | null;
+  /** a share's holding, carried in by `buyBoxCheckSource`'s reads
+   *  (`ShareRead`); absent on a raw extraction and on anything but a share */
+  shareRead?: ShareRead | null;
   /** the day the screen read the memorandum (ExtractionResult.screenedOn) —
    *  the year a price label's year is judged against (`screenYearOf`) */
   screenedOn?: string | null;
+}
+
+/** What a partial interest holds, where its words say: an undivided
+ *  interest in the property held as a tenant in common (lib/interest
+ *  `isTenancyInCommon`) — title to real estate, never a share of an entity —
+ *  or a share of the general partner's interest (`isGpStake`), a share of a
+ *  share. */
+export type Holding = "tic" | "gp_stake";
+
+/**
+ * What a share of the owning entity is, by lib/interest's readers (which
+ * this module cannot import): a share of the general partner's interest (a
+ * share of a share, `isGpStake`), whether a percentage of the entity is
+ * stated (`interestOf`'s `sharePct`), and whether it is an undivided interest
+ * held as a tenant in common, whose loan is the property's and whose share
+ * is an interest, never an entity's (`isTenancyInCommon`, research pass 37).
+ */
+export interface ShareRead {
+  gpStake: boolean;
+  pctStated: boolean;
+  tic: boolean;
+  /** a stated 100%: all the interests, the price the whole's, nothing
+   *  grossed up (lib/interest `isWholeShare`) */
+  all?: boolean;
+}
+
+/**
+ * Why a deal's stated going-in cap is no cap its buyer earns — its cap
+ * slot's own reason (lib/compare-interest `capSlotWithheld`), carried in by
+ * `buyBoxCheckSource`'s reads: the price buys a loan or a preferred equity
+ * position, or a share beside the loan its entity carries, whose price
+ * grossed up is the equity's whole. A raw extraction, built without the
+ * reads, is read by its stored kind alone: a note, a position. Null where the
+ * stated cap stands. One reader for the buy box's check, the mandate's cap
+ * dimension and its dealbreaker floor.
+ */
+export function capWithheldOf(ex: ExtractionLike | null | undefined): CapWithheldKind | null {
+  if (!ex) return null;
+  if (ex.capWithheld !== undefined) return ex.capWithheld;
+  const kind = ex.interest?.kind;
+  return kind === "note" ? "note" : kind === "preferred_equity" ? "position" : null;
+}
+
+/** A share's price grossed up beside the loan the memorandum states, in the
+ *  words its holding takes: on a tenancy in common the loan is the
+ *  property's and the share an interest, since no entity owns the property
+ *  (research pass 37, audit C4 L3). */
+const besideTheLoan = (ex: Pick<ExtractionLike, "shareRead"> | null | undefined): string => {
+  const s = ex?.shareRead;
+  // All the interests (a stated 100%): the price is the whole's, nothing
+  // grossed up, as the deal's own lead says (audit C5, LOW-7).
+  if (s?.all) {
+    return s.tic
+      ? "beside the loan on the property, the price for all the tenant-in-common interests is the equity's whole, nothing grossed up, not the building's"
+      : "beside the loan its entity carries, the price for all of the entity's interests is the equity's whole, nothing grossed up, not the building's";
+  }
+  return s?.tic
+    ? "beside the loan on the property, this interest's price grossed up is the equity's whole, not the building's"
+    : "beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's";
+};
+
+/** Whose return a stated IRR is not, in the withheld check's words. */
+const returnHolder = (ex: Pick<ExtractionLike, "shareRead"> | null | undefined): string =>
+  ex?.shareRead?.all ? "these interests'" : ex?.shareRead?.tic ? "this interest's" : "this share's";
+
+/** The going-in cap check's words where the cap is withheld, by the cap
+ *  slot's own reason — the buy box's check and the mandate's dimension say
+ *  the same sentence. */
+export function capWithheldDetail(
+  floorPct: number,
+  why: CapWithheldKind,
+  ex?: Pick<ExtractionLike, "holding" | "loanWords" | "shareRead"> | null,
+): string {
+  const head = `Mandate wants ≥${floorPct}% going-in`;
+  if (why === "note") {
+    return `${head}, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`;
+  }
+  if (why === "position") {
+    return `${head}, but this is a preferred equity position: its price buys a rate and a redemption, never a slice of the building, and the building's cap is not a return the position's buyer earns.`;
+  }
+  // What the share holds, said as the deal's own surfaces say it (the audit
+  // C3b MED-4: a tenancy in common had read "a share of the owning entity",
+  // which its own lead says it is not, and its loan "its entity's").
+  if (ex?.holding === "gp_stake") {
+    return `${head}, but this sells a share of the general partner's interest, a share of a share: no figure grosses its price up to the building's, and the building's cap is not a return its buyer earns.`;
+  }
+  // All the interests (a stated 100%): nothing is grossed up, as the deal's
+  // own lead says (audit C5, LOW-7).
+  if (ex?.shareRead?.all) return `${head}, but ${besideTheLoan(ex)}: a cap stated against that price is on a basis the memorandum never says.`;
+  // A share of no stated percentage grosses up to nothing, whatever loan is
+  // stated beside it, as the report and the workbook say (lib/underwrite/
+  // inputs `basisWithheldOf`; audit C6, MED-4).
+  if (ex?.shareRead && !ex.shareRead.pctStated) {
+    return ex.holding === "tic"
+      ? `${head}, but this interest's price, which no stated percentage grosses up, sits beside ${ex.loanWords ?? "the loan the memorandum states on the property"}: it is no building's price, and a cap stated against it is on a basis the memorandum never says.`
+      : `${head}, but this share's price, which no stated percentage grosses up, sits beside the loan its entity carries: it is no building's price, and a cap stated against it is on a basis the memorandum never says.`;
+  }
+  if (ex?.holding === "tic") {
+    return `${head}, but beside ${ex.loanWords ?? "the loan the memorandum states on the property"}, this interest's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
+  }
+  return `${head}, but beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
+}
+
+/** Why the target-return check holds no IRR the memorandum states to the
+ *  box's floor: the cap slot's own reasons (`capWithheldOf`: a note, a
+ *  preferred equity position, a share beside the loan its entity carries),
+ *  a leased fee, whose price buys the land under the ground lease, a share
+ *  of the general partner's interest (a share of a share), and a share of
+ *  no stated percentage, whose price grosses up to no building's. */
+export type ReturnWithheldKind = CapWithheldKind | "leased_fee" | "gp_stake" | "share_unstated";
+
+/**
+ * Why an IRR the memorandum states is no return of this deal's buyer
+ * (research pass 41): where the price buys no building, a stated IRR is the
+ * property's — the collateral's, the building's above a position or the
+ * entity's loan, the building's above the land — or of a kind the screen
+ * does not read, and the box holds none of them to its target, as the cap
+ * and basis checks beside it hold none. A GP stake's price buys a share of
+ * a share, and a share of no stated percentage grosses up to no building's
+ * price (audit C4, L2). One reader for the buy box's check and the
+ * mandate's IRR dimension. Null where the stated IRR is checked — a share
+ * of a stated percentage with no entity loan among them, whose deal-level
+ * IRR is the owner's call.
+ */
+export function returnWithheldOf(ex: ExtractionLike | null | undefined): ReturnWithheldKind | null {
+  if (!ex) return null;
+  if (ex.shareRead?.gpStake) return "gp_stake";
+  // A share of no stated percentage, beside its entity's loan or not: its
+  // price grosses up to nothing, never to the equity's whole (audit C6,
+  // MED-4).
+  if (ex.interest?.kind === "partial_interest" && ex.shareRead && !ex.shareRead.pctStated) return "share_unstated";
+  const cap = capWithheldOf(ex);
+  if (cap) return cap;
+  return ex.interest?.kind === "leased_fee" ? "leased_fee" : null;
+}
+
+/** The target-return check's words where the IRR is withheld, by the same
+ *  reasons — the buy box's check and the mandate's dimension say the same
+ *  sentence. */
+export function returnWithheldDetail(
+  targetPct: number,
+  why: ReturnWithheldKind,
+  ex?: Pick<ExtractionLike, "shareRead" | "capWithheld" | "holding" | "loanWords"> | null,
+): string {
+  const head = `Mandate targets ≥${targetPct}% IRR`;
+  if (why === "gp_stake") {
+    return `${head}, but this is a share of the general partner's interest: a share of a share, whose price no figure grosses up to the building's, so an IRR the memorandum states is not read as this stake's return.`;
+  }
+  if (why === "share_unstated") {
+    // The loan stated beside it is said beside the reason, never folded into
+    // an equity's whole (audit C6, MED-4).
+    const loan = ex?.capWithheld === "share";
+    if (ex?.holding === "tic" || ex?.shareRead?.tic) {
+      const beside = loan ? `, ${ex?.loanWords ?? "the loan the memorandum states on the property"} beside it` : "";
+      return `${head}, but this undivided interest states no percentage of the property: its price grosses up to no building's${beside}, so an IRR the memorandum states is not read as this interest's return.`;
+    }
+    return `${head}, but this share states no percentage of the owning entity: its price grosses up to no building's${
+      loan ? ", the loan its entity carries stated beside it" : ""
+    }, so an IRR the memorandum states is not read as this share's return.`;
+  }
+  if (why === "note" || why === "under_water") {
+    return `${head}, but this is a note: its price is a loan's, and an IRR the memorandum states is not read as the note's return — the collateral's is not a return the note's buyer earns.`;
+  }
+  if (why === "position") {
+    return `${head}, but this is a preferred equity position: its price buys a rate and a redemption, never a slice of the building, and an IRR the memorandum states is not read as the position's return.`;
+  }
+  if (why === "leased_fee") {
+    return `${head}, but the price buys the land under the ground lease: the screen does not read whether an IRR the memorandum states is the land's or the building's above it, so it is not held to the target.`;
+  }
+  return `${head}, but ${besideTheLoan(ex)}: an IRR the memorandum states is not read as ${returnHolder(ex)} return.`;
+}
+
+/**
+ * Why a per-unit figure the memorandum states is no basis of the building's
+ * (lib/deal-strategy `statedBasisIsBuildings`, carried in by the reads), in
+ * the words the basis check says it — the collateral's, the land's, the
+ * whole's or the share's, never the building bought outright. Null where the
+ * figure stands, and on a raw extraction.
+ */
+export function basisWithheldWhy(ex: ExtractionLike | null | undefined, noun: string): string | null {
+  if (ex?.statedBasisIsBuildings !== false) return null;
+  switch (ex.interest?.kind) {
+    case "note":
+      return `this is a note: its price is a loan's, and a per-${noun} figure on it is the collateral's, not a basis the note's buyer pays`;
+    case "preferred_equity":
+      return "this is a preferred equity position: its price buys a rate and a redemption, never a slice of the building, and no basis is struck on it";
+    case "leased_fee":
+      return "the price buys the land under the ground lease, and is never divided over the building";
+    case "partial_interest":
+      if (ex.holding === "gp_stake") {
+        return `this sells a share of the general partner's interest, a share of a share: its price is never grossed up or divided over the building, and no per-${noun} basis is struck on it`;
+      }
+      if (ex.holding === "tic") {
+        return `this sells an undivided interest held as a tenant in common: a per-${noun} figure the memorandum states is on a basis it never says, the whole's or the interest's`;
+      }
+      return `this sells a share of the owning entity: a per-${noun} figure the memorandum states is on a basis it never says, the whole's or the share's`;
+    default:
+      return `a per-${noun} figure the memorandum states is not the building's basis`;
+  }
 }
 
 export function findMetric(
@@ -809,8 +1137,9 @@ export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
 // A row COUNTS the units only when its label, read whole, has the shape of
 // a count label: an optional "total" / "number of" / "#" prefix, an
 // optional physical qualifier (residential, apartment, rental, guest,
-// storage, student …), the noun (units, doors, keys, rooms, beds, pads,
-// sites, suites, apartments, homes, lots, spaces) and nothing after it but
+// storage, student, licensed, certified, wet …), the noun (units, doors,
+// keys, rooms, beds, pads, sites, campsites, suites, apartments, homes,
+// lots, spaces, slips) and nothing after it but
 // "count" / "total" / "proposed" / "planned". Everything that merely
 // mentions units — "Unit mix", "Unit sizes", "Units per acre", a price per
 // unit — and every PARTIAL count — "Vacant units", "Affordable units",
@@ -818,8 +1147,12 @@ export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
 // count, and reading one as the count puts a wrong basis on every per-unit
 // surface. Whitelisting the shape beats blacklisting adjectives: the next
 // OM's "Units delivered" needs no new word.
+// A care facility's licensed or certified beds, a marina's (wet) slips and a
+// campground's campsites are each the whole count in the deck's own noun
+// (research pass 28): an SNF's per-bed and a marina's per-slip basis had
+// never been struck.
 const COUNT_LABEL =
-  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+(?:of\s+)?)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built|approved|entitled|zoned|permitted)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?)\s+)?(?:units?|doors?|keys?|rooms?|guest ?rooms?|beds?|pads?|sites?|home ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?)(?:\s+(?:count|total|proposed|planned))?$/i;
+  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+(?:of\s+)?)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built|approved|entitled|zoned|permitted)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?|licensed|certified|wet)\s+)?(?:units?|doors?|keys?|rooms?|guest ?rooms?|beds?|pads?|sites?|home ?sites?|camp ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?|slips?)(?:\s+(?:count|total|proposed|planned))?$/i;
 // A parenthetical naming a subset — "(Phase I)", "(Building A)", "(of 312)"
 // — keeps the row from being the count; any other ("(proposed)", "(per
 // OM)", "(IL/AL/MC)") is dropped before the shape is read.
@@ -855,7 +1188,7 @@ export function isCountLabel(label: string): boolean {
 // "150 guest rooms", "240 rental units" — so the qualifiers COUNT_LABEL
 // admits are stripped here too.
 const COUNT_WORD =
-  /\b(units?|keys?|doors?|apartments?|apts?\.?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?|suites?|total|residential|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|senior|manufactured|mobile[- ]home|mh|rv)\b/gi;
+  /\b(units?|keys?|doors?|apartments?|apts?\.?|homes?|residences?|beds?|pads?|rooms?|sites?|camp ?sites?|lots?|spaces?|suites?|slips?|total|residential|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|senior|manufactured|mobile[- ]home|mh|rv|licensed|certified|wet)\b/gi;
 // A footnote marker on a label or a value — "Units*", "312¹", "Units (1)"
 // — is not part of the count.
 const FOOTNOTE_MARK = /[*†‡¹²³⁴]+/g;
@@ -922,6 +1255,45 @@ export function unitCountRow<M extends MetricLike>(metrics: readonly M[]): M | n
 export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
   const row = unitCountRow(metrics);
   return row ? parseCount(row.value) : null;
+}
+
+/** A count row that names the finished product: "Units (proposed)", "Keys
+ *  (proposed)" — the extraction's own label for a plan's count — "Proposed
+ *  units", "Planned keys". */
+const PLANNED_COUNT = /\b(?:proposed|planned)\b/i;
+
+/**
+ * The row that counts what a plan's total cost buys. On a conversion or a
+ * development — whose building is not yet the finished product — only a
+ * count row the memorandum labels proposed or planned, in that row's own
+ * noun: a count of today's building ("Units 40" beside "Keys (proposed)
+ * 160" on an office-to-hotel conversion) is no count of the finished
+ * product, and the all-in cost over it had read $1.5M a unit where the key
+ * costs $375k (the audit of 2026-10-05). Null where it states none. On any
+ * other kind the count row (`unitCountRow`): a value-add's or a lease-up's
+ * units stand.
+ */
+export function planCountRow<M extends MetricLike>(metrics: readonly M[], kind: string | null | undefined): M | null {
+  if (kind !== "conversion" && kind !== "development") return unitCountRow(metrics);
+  return unitCountRow(metrics.filter((m) => PLANNED_COUNT.test(m.label)));
+}
+
+/** What one of what that count counts is called, singular and plural: the
+ *  counting row's own noun (`countNoun` — a hotel counting "Rooms" is per
+ *  room), else the class's, else units. The plan's basis on the deal page,
+ *  the shared screen and the report reads it, as the workbook's and the
+ *  pipeline card's per-unit figures do (research pass 34: the plan said
+ *  "key" beside their "room"). Given the deal's kind, the row the plan's
+ *  basis divides by (`planCountRow`): on a conversion, the proposed keys'
+ *  noun, never today's units'. */
+export function countNounOf(
+  metrics: readonly MetricLike[],
+  cls: string | null | undefined,
+  kind?: string | null,
+): { one: string; many: string } {
+  const row = kind === undefined ? unitCountRow(metrics) : (planCountRow(metrics, kind) ?? unitCountRow(metrics));
+  const many = countNoun(row?.label, cls);
+  return { one: many.replace(/s$/, ""), many };
 }
 
 // ── Today's occupancy ────────────────────────────────────────────────────
@@ -1055,11 +1427,49 @@ interface AddressLike {
 }
 
 /**
+ * What the buy box reads off a deal beside its rows, by the readers every
+ * slot of the deal reads — readers this module cannot import (lib/deal-
+ * strategy imports it, and the pipeline's client bundle must not load the
+ * interest reader): lib/buy-box-chip's `dealCheckSource` makes them, and
+ * every page, route and document builds its source there.
+ */
+export interface SourceReads {
+  /** what the price buys, as lib/interest `interestOf` reads it — a share
+   *  the extraction filed whose rows say a preferred equity position is one */
+  interestKind: string;
+  /** why the deal's cap slot holds no cap of its own (lib/compare-interest
+   *  `capSlotWithheld`): a note, a position, a share beside the loan its
+   *  entity carries; null where the stated cap stands */
+  capWithheld: CapWithheldKind | null;
+  /** whether a per-unit figure the memorandum states is the building's
+   *  (lib/deal-strategy `statedBasisIsBuildings`): false for a note, a
+   *  position, a leased fee and a share */
+  statedBasisIsBuildings: boolean;
+  /** on a share of the owning entity, what it is (`ShareRead`): a GP stake
+   *  and a share of no stated percentage hold no stated IRR to the target,
+   *  and a tenancy in common's withheld checks say the property's loan;
+   *  null on anything but a share */
+  share?: ShareRead | null;
+  /** the first signal's going-in cap, as the deal header reads it
+   *  (lib/deal-strategy `signalGoingInCap`): only where it can be a cap on
+   *  the price at all; null otherwise */
+  signalCap: { text: string; pct: number } | null;
+  /** what a partial interest holds (`Holding`): absent where it is neither */
+  holding?: Holding | null;
+  /** the loan stated on a tenancy in common's property, in lib/interest's
+   *  `entityLoanWords`: absent where none is stated */
+  loanWords?: string | null;
+}
+
+/**
  * Build the pseudo-extraction the buy box is judged against: the full
  * extraction when it's in, else the ~30s first signal standing in, with the
  * user-entered address widening the location haystack either way. ONE
  * implementation — the deal page, the triage endpoint, and anything else
- * must agree on what "fits the box" means mid-screen.
+ * must agree on what "fits the box" means mid-screen. Every caller goes
+ * through lib/buy-box-chip's `dealCheckSource`, which hands in the kind and
+ * the reads; built without the reads, the extraction's stored interest is
+ * read as before.
  */
 export function buyBoxCheckSource(
   extraction: ExtractionLike | null,
@@ -1070,6 +1480,8 @@ export function buyBoxCheckSource(
    *  "unknown" still judges its land cost as the price and a plan deal
    *  keeps its "no going-in cap" reading */
   strategyKind?: string | null,
+  /** what the price buys, by the deal's own readers (`SourceReads`) */
+  reads?: SourceReads | null,
 ): ExtractionLike | null {
   const addressHaystack = [
     extraction?.address,
@@ -1082,13 +1494,15 @@ export function buyBoxCheckSource(
   // The first signal's cap is a fast read with no label to check. It counts
   // as the going-in cap only when it can be a cap on the price at all: a
   // yield on cost or a stabilized pro forma on a plan deal reads as "105%"
-  // here, and a buy-box check on that would be confidently wrong.
-  const signalCapPct = firstSignal ? parsePct(firstSignal.goingInCap) : null;
-  const signalCapPlausible = signalCapPct != null && signalCapPct > 0.5 && signalCapPct <= 25;
+  // here, and a buy-box check on that would be confidently wrong. Read by
+  // the deal header's own reader (the reads' `signalCap`), so the cap the
+  // header prints is the cap the box judges — at the figure that reader
+  // read, whatever else its text carries.
+  const signalCapRow = reads?.signalCap ? { label: "Going-in cap rate", value: `${reads.signalCap.pct}%` } : null;
   const signalMetrics = firstSignal
     ? [
         { label: "Asking price", value: firstSignal.askPrice },
-        ...(signalCapPlausible ? [{ label: "Going-in cap rate", value: firstSignal.goingInCap }] : []),
+        ...(signalCapRow ? [signalCapRow] : []),
         {
           // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
           // must all count — a per-SF figure misread as per-unit would give
@@ -1101,19 +1515,39 @@ export function buyBoxCheckSource(
       ].filter((m) => m.value.trim())
     : [];
   if (!extraction && !firstSignal && !dealAddress) return null;
+  // Where the memorandum states no going-in cap, the header prints the first
+  // signal's (lib/pipeline-slots `statedCapSlot`) — none on a plan deal,
+  // none where the cap slot is withheld — and the box judges the same
+  // figure: it had said "no parseable cap rate" beside the cap the header
+  // printed (the audit of 2026-10-05).
+  const kind = strategyKind ?? extraction?.strategy?.kind ?? null;
+  const planDeal = !!kind && kind !== "stabilized" && kind !== "unknown";
+  const stated = extraction?.metrics;
+  const metrics = stated
+    ? signalCapRow && !planDeal && !reads?.capWithheld && !findGoingInCap(stated)
+      ? [...stated, signalCapRow]
+      : stated
+    : signalMetrics;
   return {
     assetClass: extraction?.assetClass ?? firstSignal?.assetClass ?? "",
     market: extraction?.market ?? firstSignal?.market ?? "",
     address: addressHaystack,
-    metrics: extraction?.metrics ?? signalMetrics,
+    metrics,
     // The kind rides along: without it the buy box loses the plan deal's
     // cap reading and the development's land price on the very page that
     // shows them.
     strategy: strategyKind ? { kind: strategyKind } : (extraction?.strategy ?? null),
     // What the price buys rides along too: without it a note's collateral
     // cap is held to the box's cap floor and the mandate's dealbreaker on
-    // every page, where the rule is that a note's price is a loan's.
-    interest: extraction?.interest ?? null,
+    // every page, where the rule is that a note's price is a loan's. With the
+    // deal's own reads, as its cap slot reads it: a position's price and a
+    // share's beside its entity's loan strike no cap either, and a per-unit
+    // figure on a price that is not the building's is no basis.
+    interest: reads ? { kind: reads.interestKind } : (extraction?.interest ?? null),
+    ...(reads ? { capWithheld: reads.capWithheld, statedBasisIsBuildings: reads.statedBasisIsBuildings } : {}),
+    ...(reads?.holding ? { holding: reads.holding } : {}),
+    ...(reads?.loanWords ? { loanWords: reads.loanWords } : {}),
+    ...(reads?.share ? { shareRead: reads.share } : {}),
     // So does the day the screen read the memorandum: the price band and
     // the mandate's ceiling read a label's year against it, as the page's
     // price slot does.
@@ -1132,6 +1566,76 @@ export function foldBuyBoxChecks(
   if (checks.some((c) => c.status === "near")) return "near";
   if (checks.some((c) => c.status === "pass")) return "fits";
   return null;
+}
+
+/** How much of the box the fit stands on (research pass 35). */
+export interface BuyBoxCoverage {
+  /** the criteria the screen could judge, pass, near or miss */
+  checked: number;
+  /** every criterion the box sets: the checks the deal page lists, its
+   *  cash-on-cash floor and each red line that applies */
+  total: number;
+  /** the criteria it could not judge, by the deal page's own labels */
+  unchecked: string[];
+  /** one of those turns on the price (`BuyBoxCheck.onPrice`, the
+   *  cash-on-cash floor, a price, cap or basis red line) */
+  priceUnchecked: boolean;
+}
+
+/** What the coverage reads off the mandate-fit score (lib/mandate
+ *  `MandateScore`): its dimensions, and the red lines as criteria. */
+interface MandateCoverageLike {
+  dimensions: ReadonlyArray<{ key: string; label: string; status: string }>;
+  dealbreakerCriteria?: ReadonlyArray<{ label: string; checked: boolean; onPrice: boolean }>;
+}
+
+/**
+ * How many of the box's criteria the fold and the score were judged on —
+ * ONE count, beside the fold, that every surface drawing the fit reads (lib/
+ * fit-label says it): the deal header's chip and the screen-complete email
+ * (lib/buy-box-chip), the pipeline's card, list and CSV, the meeting
+ * workbook, the compare table, the batch upload's chip, the verdict's brief
+ * and the deal page's mandate gauge. The fold calls a
+ * deal "fits" on any pass with no miss, and the mandate-fit score rescales
+ * over what it could read (lib/mandate), so a note whose cap and return the
+ * box cannot judge read "Fit 100 · Pursue" and "Fits" on two of its four
+ * criteria. The count is of the checks the deal page lists, and of the
+ * criteria the mandate-fit score judges that no check lists: the box's
+ * cash-on-cash floor, and each red line (the audit of 2026-10-05 — a fit
+ * whose cash-on-cash floor or whose cap-rate dealbreaker could not be
+ * checked had read a green "Pursue"). Each of those turns on the price but
+ * the asset-class and location red lines. A caller with no score passes
+ * null, and the checks alone are counted.
+ */
+export function buyBoxCoverage(checks: BuyBoxCheck[], mandate: MandateCoverageLike | null): BuyBoxCoverage {
+  const unknown = checks.filter((c) => c.status === "unknown");
+  let checked = checks.length - unknown.length;
+  let total = checks.length;
+  const unchecked = unknown.map((c) => c.label);
+  let priceUnchecked = unknown.some((c) => c.onPrice === true);
+  // The year-one cash-on-cash floor: the score judges it, no check lists it.
+  // A return on the equity the price sets, so it turns on the price.
+  for (const d of mandate?.dimensions ?? []) {
+    if (d.key !== "coc") continue;
+    total += 1;
+    if (d.status === "unknown") {
+      unchecked.push(d.label);
+      priceUnchecked = true;
+    } else {
+      checked += 1;
+    }
+  }
+  // Each red line the box sets, tripped, clear or not checked.
+  for (const red of mandate?.dealbreakerCriteria ?? []) {
+    total += 1;
+    if (red.checked) {
+      checked += 1;
+    } else {
+      unchecked.push(red.label);
+      if (red.onPrice) priceUnchecked = true;
+    }
+  }
+  return { checked, total, unchecked, priceUnchecked };
 }
 
 export function evaluateBuyBox(
@@ -1319,7 +1823,7 @@ export function evaluateBuyBox(
         ? range.low
         : range.high
       : metric
-        ? parseMoney(metric.value)
+        ? parsePrice(metric.value)
         : null;
     const shown = (n: number) => (range ? `${fmtM(range.low)}–${fmtM(range.high)}` : fmtM(n));
     const noun = metric && /\b(land|site)\b/i.test(metric.label) ? "land cost" : "ask";
@@ -1339,6 +1843,7 @@ export function evaluateBuyBox(
             : "asking price";
       checks.push({
         label: "Price",
+        onPrice: true,
         status: "unknown",
         detail: `Mandate is ${bandText}; no parseable ${missing} in the screen yet.`,
       });
@@ -1348,6 +1853,7 @@ export function evaluateBuyBox(
       if (!belowMin && !aboveMax) {
         checks.push({
           label: "Price",
+          onPrice: true,
           status: "pass",
           detail: `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}. Inside the band.`,
         });
@@ -1359,6 +1865,7 @@ export function evaluateBuyBox(
         const end = range ? `its ${belowMin ? "bottom" : "top"} ` : "";
         checks.push({
           label: "Price",
+          onPrice: true,
           status: near ? "near" : "miss",
           detail: near
             ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. Close enough to price; a retrade could land it inside.`
@@ -1378,28 +1885,49 @@ export function evaluateBuyBox(
     // The deal's own noun (lib/asset-words): a hotel is held to the mandate
     // per key, a park per pad — the figure the OM quotes is the one tested.
     const noun = assetWords(cls).noun?.one ?? "unit";
-    const label = `Basis / ${noun}`;
-    if (dollars == null) {
+    // On a plan deal the figure is the price over the units, and the deal's
+    // basis is its total cost (lib/deal-strategy `planSummary`): the check
+    // is labelled by what it divides, the mandate's own "max price per
+    // unit", never as a second basis beside the plan's (research pass 41).
+    const onPlan = planKindLabel(extraction) != null;
+    const label = `${onPlan ? "Price" : "Basis"} / ${noun}`;
+    const caps = onPlan ? "Mandate caps the price" : "Mandate caps basis";
+    const what = onPlan ? `per-${noun} price` : `per-${noun} figure`;
+    // A per-unit figure on a price that is not the building's — a note's, a
+    // position's, the land's, a share's — is on a basis the memorandum never
+    // says: the box's ceiling is never held to it (the audit of 2026-10-05).
+    const withheld = basisWithheldWhy(extraction, noun);
+    if (withheld) {
       checks.push({
         label,
+        onPrice: true,
         status: "unknown",
-        detail: `Mandate caps basis at ${fmtM(max)}/${noun}; no parseable per-${noun} figure yet.`,
+        detail: `${caps} at ${fmtM(max)}/${noun}, but ${withheld}.`,
+      });
+    } else if (dollars == null) {
+      checks.push({
+        label,
+        onPrice: true,
+        status: "unknown",
+        detail: `${caps} at ${fmtM(max)}/${noun}; no parseable ${what} yet.`,
       });
     } else if (dollars <= max) {
       checks.push({
         label,
+        onPrice: true,
         status: "pass",
-        detail: `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Inside.`,
+        detail: `${caps} at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Inside.`,
       });
     } else {
       const off = (dollars - max) / max;
       const near = off <= NEAR_REL;
       checks.push({
         label,
+        onPrice: true,
         status: near ? "near" : "miss",
         detail: near
-          ? `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}, ${Math.round(off * 100)}% over. Within negotiating range.`
-          : `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Rich for the mandate.`,
+          ? `${caps} at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}, ${Math.round(off * 100)}% over. Within negotiating range.`
+          : `${caps} at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Rich for the mandate.`,
       });
     }
   }
@@ -1409,25 +1937,33 @@ export function evaluateBuyBox(
     const metric = findGoingInCap(metrics);
     const pct = metric ? parsePct(metric.value) : null;
     const planKind = planKindLabel(extraction);
-    if (extraction?.interest?.kind === "note") {
+    const withheld = capWithheldOf(extraction);
+    if (withheld) {
       // A note's price is a loan's: the cap the memorandum states is the
-      // collateral's, which the buyer of the note does not earn (#414).
+      // collateral's, which the buyer of the note does not earn (#414). A
+      // preferred equity position's buys a rate and a redemption, and a
+      // share's beside its entity's loan grosses up to the equity's whole:
+      // the deal's cap slot holds no cap on any of them, and the box holds
+      // none to its floor (the audit of 2026-10-05).
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: "unknown",
-        detail: `Mandate wants ≥${box.minCapPct}% going-in, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`,
+        detail: capWithheldDetail(box.minCapPct, withheld, extraction),
       });
     } else if (pct == null) {
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: "unknown",
         detail: planKind
-          ? `Mandate wants ≥${box.minCapPct}% going-in, but ${withArticle(planKind)} deal has no going-in cap — its stabilized figure is the finished project's, judged on yield on total cost, not on a cap against the price.`
+          ? `Mandate wants ≥${box.minCapPct}% going-in, but ${withArticle(planKind)} deal is judged on its yield on total cost, not on a going-in cap — its stabilized figure is the finished project's, never a cap against the price.`
           : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`,
       });
     } else if (pct >= box.minCapPct) {
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: "pass",
         detail: `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${pct.toFixed(2)}%. Clears the floor.`,
       });
@@ -1436,6 +1972,7 @@ export function evaluateBuyBox(
       const near = box.minCapPct - pct <= NEAR_CAP_PT;
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: near ? "near" : "miss",
         detail: near
           ? `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${pct.toFixed(2)}%, ${gapBps}bps light. Close; a price cut could clear it.`
@@ -1448,15 +1985,28 @@ export function evaluateBuyBox(
   if (box.minIrrPct != null) {
     const metric = findMetric(metrics, METRIC_FIND.irr.inc);
     const pct = metric ? parsePct(metric.value) : null;
-    if (pct == null) {
+    // Where the price buys no building, the IRR the memorandum states is no
+    // return its buyer earns, as the cap and the basis beside it are not
+    // (research pass 41): the fit says it was not judged on it.
+    const withheld = returnWithheldOf(extraction);
+    if (withheld) {
       checks.push({
         label: "Target return",
+        onPrice: true,
+        status: "unknown",
+        detail: returnWithheldDetail(box.minIrrPct, withheld, extraction),
+      });
+    } else if (pct == null) {
+      checks.push({
+        label: "Target return",
+        onPrice: true,
         status: "unknown",
         detail: `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen yet.`,
       });
     } else if (pct >= box.minIrrPct) {
       checks.push({
         label: "Target return",
+        onPrice: true,
         status: "pass",
         detail: `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${pct.toFixed(1)}%. On target (broker figure — verify).`,
       });
@@ -1464,6 +2014,7 @@ export function evaluateBuyBox(
       const near = box.minIrrPct - pct <= NEAR_IRR_PT;
       checks.push({
         label: "Target return",
+        onPrice: true,
         status: near ? "near" : "miss",
         detail: near
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${pct.toFixed(1)}%, ${(box.minIrrPct - pct).toFixed(1)}pt shy. Within reach if the assumptions hold up.`
@@ -1476,7 +2027,7 @@ export function evaluateBuyBox(
 }
 
 /** Human/prompt-readable one-liners describing the mandate (skips unset fields). */
-export function buyBoxLines(box: BuyBox): string[] {
+export function buyBoxLines(box: BuyBox, opts: { exchange?: boolean } = {}): string[] {
   const lines: string[] = [];
   if (box.assetClasses?.length)
     lines.push(`Asset classes: ${box.assetClasses.join(", ")}`);
@@ -1522,5 +2073,21 @@ export function buyBoxLines(box: BuyBox): string[] {
     if (parts.length) lines.push(`Dealbreakers: ${parts.join("; ")}`);
   }
   if (box.notes?.trim()) lines.push(`Priorities: ${box.notes.trim()}`);
+  // The buyer's 1031 exchange (lib/exchange-window), as the box holds it;
+  // each deal's deadlines against it are the deal's own read. Never in the
+  // lines a Claude step reads (`exchange: false`): the verdict's words reach
+  // a shared screen, and a counterparty who learns the buyer must close by a
+  // date holds the price.
+  const exchange = opts.exchange === false ? null : sanitizeExchange(box.exchange);
+  if (exchange) {
+    const filer = EXCHANGE_FILERS.find((f) => f.id === exchange.filer);
+    lines.push(
+      `1031 exchange: the relinquished property transferred ${exchangeDay(exchange.relinquishedTransferOn!)}; ${
+        // Only the article is lowercased: "an S corporation", never "an s
+        // corporation" (the pre-merge audit).
+        filer ? `${filer.label.charAt(0).toLowerCase()}${filer.label.slice(1)} files the return (${filer.form})` : "who files the return is not set, so it is read as an individual's"
+      }${exchange.returnExtended ? "; the return is extended" : ""}`,
+    );
+  }
   return lines;
 }

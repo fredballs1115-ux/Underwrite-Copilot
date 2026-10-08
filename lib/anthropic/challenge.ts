@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -35,10 +35,14 @@ export async function challengeAssumptions(
   /** the trap lists the memorandum's own words call for (prompts
    *  `keyedTrapsFor`), read after the class's own */
   keyed: readonly KeyedTrapList[] = [],
+  /** a forward purchase (lib/forward-purchase): its paragraph stands where
+   *  a plan's construction paragraph would — the buyer carries no
+   *  construction — and its facts and traps ride in `reconNote` */
+  forward = false,
 ): Promise<ChallengerResult> {
   const client = getAnthropic();
   const instruction =
-    challengerInstruction(assetClass, keyed) +
+    challengerInstruction(assetClass, keyed, forward) +
     (reconNote?.trim()
       ? `\n\n${reconNote.trim()} Where a figure the OM relies on is contradicted by the rent roll or T-12, treat that as a first-order challenge and put the exact discrepancy to the broker.`
       : "");
@@ -51,7 +55,9 @@ export async function challengeAssumptions(
       {
         role: "user",
         content: [
-          // Reads the OM from the prompt cache the extraction step wrote.
+          // The OM under the cache breakpoint every step sends; whether this
+          // reads an earlier step's cache, with a structured-output format of
+          // its own, is the ledger's to say (./models).
           omDocument(om),
           { type: "text", text: instruction },
           // Today's date, after the cached document (lib/anthropic/today).
@@ -59,7 +65,7 @@ export async function challengeAssumptions(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(ChallengerSchema) },
+    output_config: { format: screenOutputFormat(ChallengerSchema) },
   }, omRequestOptions(om)));
   return out;
 }

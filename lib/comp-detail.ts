@@ -8,6 +8,7 @@
 // a percentage with no "cap" beside it, or a cap stated as a range is not a
 // basis or a cap, and reads as nothing — the same honesty as the report's
 // rangeRead.
+import { compactUsd } from "@/lib/money";
 import { buildingSfFromMetrics, parsePrice } from "@/lib/criteria";
 import { findPricedMetric, isOutdoorStorageYard, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
 import type { InterestKind } from "@/lib/interest";
@@ -148,16 +149,22 @@ export function subjectBasis(
    *  read for an outdoor-storage yard (lib/deal-strategy
    *  `isOutdoorStorageYard`) */
   assetClass?: string | null,
+  /** the units a bulk condominium purchase buys (lib/condo-units
+   *  `condoUnitsOffered`): its price a unit divides by them, never by the
+   *  condominium's whole count (research pass 38) */
+  unitsOffered?: number | null,
 ): SubjectBasis {
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
-  if (interest?.kind === "note" || interest?.kind === "leased_fee") return none;
+  // A preferred equity position's price buys a rate and a redemption,
+  // nobody's basis (lib/position).
+  if (interest?.kind === "note" || interest?.kind === "leased_fee" || interest?.kind === "preferred_equity") return none;
   if (interest?.kind === "partial_interest" && (interest.sharePct == null || interest.entityLoan != null)) return none;
   const row = findPricedMetric(metrics, kind, screenYear);
   const stated = row ? parsePrice(row.value) : null;
   if (stated == null || stated < 10_000) return none;
   const price = interest?.sharePct != null ? stated / (interest.sharePct / 100) : stated;
-  const units = unitCountFromMetrics(metrics);
+  const units = unitsOffered != null && unitsOffered > 0 ? unitsOffered : unitCountFromMetrics(metrics);
   const sf = isOutdoorStorageYard(assetClass) ? null : buildingSfFromMetrics(metrics);
   return {
     perUnit: units != null && units > 0 ? Math.round(price / units) : null,
@@ -216,7 +223,7 @@ export function basisScale(
  *  caption a bar's tooltip uses. */
 export function fmtBasis(value: number, unit: "unit" | "sf", noun = "unit"): string {
   if (unit === "sf") return `$${Math.round(value).toLocaleString("en-US")}/SF`;
-  return value >= 1_000_000
-    ? `$${(value / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M/${noun}`
-    : `$${Math.round(value / 1_000).toLocaleString("en-US")}k/${noun}`;
+  // The pipeline card's own basis writer (lib/pipeline-slots `basisTag`):
+  // one figure, one rounding, on the card and beside the comps.
+  return `${compactUsd(value, { trim: true })}/${noun}`;
 }

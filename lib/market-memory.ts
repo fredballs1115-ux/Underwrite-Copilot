@@ -8,13 +8,13 @@
 // teammate's, never another account's); this module just shapes and groups
 // them. Pure + unit-tested.
 
+import { compactUsd } from "@/lib/money";
 import {
   buildingSfFromMetrics,
-  findGoingInCap,
   findMetric,
   parseMoney,
-  parsePct,
   parsePrice,
+  planCountRow,
   METRIC_FIND,
   screenYearOf,
 } from "@/lib/criteria";
@@ -29,8 +29,10 @@ import {
   unitCountRow,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { priceUnitCount } from "@/lib/condo-units";
+import { statedCapRead } from "@/lib/compare-interest";
 import { assetWords, countNoun, dealClassKey, perSuffix } from "@/lib/asset-words";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 export interface MarketComp {
   dealId: string;
@@ -91,6 +93,10 @@ interface DealRowLike {
   is_sample: boolean | null;
   verdict: unknown;
   extraction: unknown;
+  /** the screen's first signal (FirstSignal), read with the extraction for
+   *  the deal's kind, as its own page reads it; absent on a row the caller
+   *  did not select it for */
+  first_signal?: unknown;
 }
 
 /** A class handed in by a caller, as the key the comps are grouped under
@@ -131,6 +137,11 @@ function deriveBasis(
    *  outdoor-storage yard, which trades by the usable acre, so a yard's shop
    *  building never puts a per-SF figure into the memory */
   perSfBasis = true,
+  /** the count a plan's all-in cost divides by: the plan's own
+   *  (lib/deal-strategy `planSummary`'s units — on a conversion or a
+   *  development its proposed count, never today's building's); absent,
+   *  the memorandum's count row */
+  count?: number | null,
 ): { value: number; basis: "unit" | "sf" } | null {
   // The class says the basis (lib/asset-words): apartments, hotels, parks,
   // student beds and garages trade per unit, key, pad, bed or space — one
@@ -146,8 +157,9 @@ function deriveBasis(
     }
     if (price == null) return null;
     // The shared count reader: "312 units" parses, a "Unit mix" row ahead
-    // of "Units" never shadows it — and "212 keys" counts the same way.
-    const n = unitCountFromMetrics(metrics);
+    // of "Units" never shadows it — and "212 keys" counts the same way. A
+    // plan's all-in cost divides by the plan's own count.
+    const n = count !== undefined ? count : unitCountFromMetrics(metrics);
     if (n != null && n > 0) return { value: price / n, basis: "unit" };
     return null;
   }
@@ -180,23 +192,30 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const assetClass = dealClassKey(row.asset_class, extraction);
     if (!assetClass) continue;
 
-    // The deal's kind first, as the comp memory and the analytics read it.
-    // A plan deal (value-add, lease-up, conversion, development) has no
-    // going-in cap — its stabilized cap or yield on cost is the finished
-    // project's — and its basis is total cost over the planned units,
-    // never a shell's or a site's price over apartments not built yet.
+    // The deal's kind first, as the comp memory and the analytics read it —
+    // and as the deal's own page does, with the first signal, whose take
+    // can name a plan the rows do not. A plan deal (value-add, lease-up,
+    // conversion, development) is judged on its yield on total cost — its
+    // stabilized cap or yield on cost is the finished project's — and its
+    // basis is total cost over the planned units, never a shell's or a
+    // site's price over apartments not built yet.
     const ext = { ...extraction, metrics } as ExtractionResult;
-    const strategy = inferStrategy(ext);
+    const signal = (row.first_signal as FirstSignal | null | undefined) ?? null;
+    const strategy = inferStrategy(ext, signal);
     const plan = planSummary(ext, strategy);
 
-    // The shared going-in reader on an operating asset only: a plan deal's
-    // stabilized / pro forma cap never averages into what the account
-    // "usually sees" in a market — and neither does a note's (the
-    // collateral's, on a price that is a loan's) or a leased fee's (a
-    // ground rent's cap, a different market entirely), #415.
+    // The cap the deal's own header prints (lib/compare-interest
+    // `statedCapRead`): the memorandum's going-in cap, else its first
+    // signal's — the memory had left the signal's out (the audit of
+    // 2026-10-05) — on an operating asset only: a plan deal's stabilized /
+    // pro forma cap never averages into what the account "usually sees" in
+    // a market — and neither does a cap the header withholds
+    // (`capSlotWithheld`: a note's, the collateral's on a price that is a
+    // loan's; a position's; a share's beside its entity's loan) or a leased
+    // fee's (a ground rent's cap, a different market entirely), #415.
     const interestKind = interestOf(ext).kind;
-    const cap = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
-    const rawCap = cap ? parsePct(cap.value) : null;
+    const cap = interestKind === "leased_fee" ? null : statedCapRead(ext, plan != null, signal);
+    const rawCap = cap?.pct ?? null;
     // Drop physically implausible caps (a mis-extraction like -5% or 300%) —
     // not fabrication, just refusing to average garbage into the market read.
     const capPct = rawCap != null && rawCap > 0 && rawCap <= 25 ? rawCap : null;
@@ -211,9 +230,11 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const perSfBasis = !isOutdoorStorageYard(extraction?.assetClass) && !isOutdoorStorageYard(row.asset_class);
     const basis = plan
       ? plan.totalCost != null
-        ? deriveBasis(metrics, assetClass, plan.totalCost, true, true, perSfBasis)
+        ? deriveBasis(metrics, assetClass, plan.totalCost, true, true, perSfBasis, plan.units)
         : null
-      : deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext), perSfBasis);
+      : // A bulk condominium purchase's price is over the units offered
+        // (lib/condo-units `priceUnitCount`, the card's count).
+        deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext), perSfBasis, priceUnitCount(ext));
 
     // Nothing usable → not a comp (never pad the memory with empty rows).
     if (capPct == null && !basis) continue;
@@ -233,7 +254,9 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
       // The memorandum's own noun wins where it counted in one ("212
       // keys", "Pads"); the class's stands in for a bare count.
       perUnitNoun:
-        basis?.basis === "unit" ? countNoun(unitCountRow(metrics)?.label, assetClass).replace(/s$/, "") : null,
+        basis?.basis === "unit"
+          ? countNoun((plan ? planCountRow(metrics, strategy.kind) : unitCountRow(metrics))?.label, assetClass).replace(/s$/, "")
+          : null,
       allIn: plan != null && basis != null,
     });
   }
@@ -409,11 +432,8 @@ export function marketMemoryFor(
 /** "$274k/unit", "$200k/key", "$60k/pad", "$212/SF" — a unit basis wears the
  *  noun it was counted in (lib/asset-words), never "unit" for a hotel's keys. */
 export const fmtBasis = (dollars: number, basis: "unit" | "sf", noun: string | null = "unit") =>
-  basis === "unit"
-    ? dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k/${noun ?? "unit"}`
-      : `$${Math.round(dollars)}/${noun ?? "unit"}`
-    : `$${Math.round(dollars)}/SF`;
+  // The pipeline card's own basis writer (lib/pipeline-slots `basisTag`).
+  basis === "unit" ? `${compactUsd(dollars, { trim: true })}/${noun ?? "unit"}` : `$${Math.round(dollars)}/SF`;
 
 /** "Basis / key", "Basis / SF": the group's own noun where it carries a
  *  basis, else the class's (lib/asset-words `perSuffix` — "/acre" on land,
@@ -427,20 +447,27 @@ export function basisLabel(g: Pick<MarketGroup, "assetClass" | "perUnit">): stri
   return `Basis / ${suffix.slice(1)}`;
 }
 
-/** "4.9–5.5%" or "5.2%" when the ends coincide. */
+/** "4.90–5.45%" or "5.20%" when the ends coincide: two decimals, as every
+ *  surface prints a deal's own cap (research pass 34), so a range's end
+ *  reads as the deal it came from does. */
 export function fmtCapRange(s: Stat): string {
-  const lo = s.min.toFixed(1);
-  const hi = s.max.toFixed(1);
+  const lo = s.min.toFixed(2);
+  const hi = s.max.toFixed(2);
   return lo === hi ? `${lo}%` : `${lo}–${hi}%`;
 }
 
 export function fmtBasisRange(s: BasisStat): string {
   const noun = s.noun ?? "unit";
   if (s.min === s.max) return fmtBasis(s.min, s.basis, noun);
-  // Share the "/key" or "/SF" suffix across the range.
+  // Share the "/key" or "/SF" suffix across the range, and the "k" where
+  // both ends are in thousands. Each end is the card's own figure
+  // (lib/money `compactUsd`), so a key past a million reads "$1.2M", never
+  // "$1200k".
   if (s.basis === "unit") {
-    const lo = s.min >= 1e3 ? `$${Math.round(s.min / 1e3)}` : `$${Math.round(s.min)}`;
-    const hi = s.max >= 1e3 ? `${Math.round(s.max / 1e3)}k` : `${Math.round(s.max)}`;
+    const lo = compactUsd(s.min, { trim: true });
+    const hi = compactUsd(s.max, { trim: true });
+    if (lo === hi) return `${lo}/${noun}`;
+    if (lo.endsWith("k") && hi.endsWith("k")) return `${lo.slice(0, -1)}–${hi.slice(1)}/${noun}`;
     return `${lo}–${hi}/${noun}`;
   }
   return `$${Math.round(s.min)}–${Math.round(s.max)}/SF`;
