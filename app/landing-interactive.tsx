@@ -27,6 +27,16 @@ export interface SampleFit {
   criteria: BoxCriterion[];
 }
 
+/** The sample's base-case returns, formatted on the server from the one
+ *  derivation the Excel tile and the stress bench read (lib/sample-derive
+ *  `sampleBaseReturns`), so the walkthrough prints the page's one IRR. */
+export interface SampleReturns {
+  irr: string;
+  equityMultiple: string;
+  cashOnCash: string;
+  exitCap: string;
+}
+
 const CRITERION_MARK: Record<BoxCriterion["status"], [string, string, string]> = {
   pass: ["✓", "text-pass border-line", "met"],
   near: ["~", "text-caution border-caution/30", "just short"],
@@ -132,11 +142,11 @@ export function CountUp({
 /* ------------------------------------------------------------------ */
 
 // Derived once from the sample fixture through the SAME computeModel the
-// product ships — this widget cannot disagree with the engine or the demo.
-// The Financials tab's returns are the deal page's Financials tab's: the
-// first-draft model's card, which prints them to two places and names its
-// model (research pass 34: the miniature printed "8.7%" beside the card's
-// "8.72%", and named no model beside a page that runs two).
+// product ships, for the summary's price, size and going-in cap. The
+// Financials tab's returns come from the server (`SampleReturns`): the
+// workbook's base case, the one the Excel tile and the stress bench print,
+// so the page shows the sample one levered IRR (research pass 43, L3; the
+// tab had printed the first-draft model's 8.72% beside the tile's 9.3%).
 const INPUTS = SAMPLE_DEAL.model.inputs;
 const RETURNS = computeModel(INPUTS).returns;
 const VERDICT_WORD =
@@ -145,8 +155,6 @@ const VERDICT_WORD =
     : SAMPLE_DEAL.verdict.verdict === "pass_on"
       ? "No-go"
       : "Caution";
-const pct2 = (n: number | null) =>
-  n == null || !isFinite(n) ? "—" : `${n.toFixed(2)}%`;
 
 // The REAL deal page's section list (deal-view.tsx SECTIONS) — the homepage
 // walkthrough uses the product's own information architecture, not a
@@ -373,7 +381,17 @@ function LegalBlock({ legal }: { legal: SampleLegal }) {
 
 /** One tab's panel (exported for the homepage's render test, which holds
  *  the Financials tab to the deal page's first-draft card). */
-export function DemoPanel({ tab, legal, fit }: { tab: Tab; legal: SampleLegal; fit: SampleFit }) {
+export function DemoPanel({
+  tab,
+  legal,
+  fit,
+  returns,
+}: {
+  tab: Tab;
+  legal: SampleLegal;
+  fit: SampleFit;
+  returns: SampleReturns;
+}) {
   switch (tab) {
     case "Overview":
       return (
@@ -404,14 +422,14 @@ export function DemoPanel({ tab, legal, fit }: { tab: Tab; legal: SampleLegal; f
       return (
         <div className="space-y-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-            Projected returns · first-draft model
+            Projected returns · the Excel workbook&apos;s base case
           </p>
           <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
             {(
               [
-                ["Levered IRR", pct2(RETURNS.leveredIrrPct)],
-                ["Equity multiple", RETURNS.equityMultiple ? `${RETURNS.equityMultiple.toFixed(2)}x` : "—"],
-                ["Cash-on-cash (Yr 1)", pct2(RETURNS.cashOnCashPct)],
+                ["Levered IRR", returns.irr],
+                ["Equity multiple", returns.equityMultiple],
+                ["Cash-on-cash (Yr 1)", returns.cashOnCash],
               ] as const
             ).map(([k, v]) => (
               <div key={k} className="bg-surface px-2 py-2">
@@ -423,7 +441,7 @@ export function DemoPanel({ tab, legal, fit }: { tab: Tab; legal: SampleLegal; f
           <RangeRow
             label="Exit cap"
             low="5.25%"
-            base={`${INPUTS.exitCapPct.toFixed(2)}%`}
+            base={returns.exitCap}
             high="5.75%"
             src="the market check's typical range, a rule of thumb; the OM holds 5.25%."
           />
@@ -532,7 +550,7 @@ export function DemoPanel({ tab, legal, fit }: { tab: Tab; legal: SampleLegal; f
 }
 
 /** Tabbed walkthrough mirroring the real deal page's sections — sample data. */
-export function DemoTabs({ legal, fit }: { legal: SampleLegal; fit: SampleFit }) {
+export function DemoTabs({ legal, fit, returns }: { legal: SampleLegal; fit: SampleFit; returns: SampleReturns }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
   function onKeys(e: KeyboardEvent<HTMLDivElement>) {
@@ -581,7 +599,7 @@ export function DemoTabs({ legal, fit }: { legal: SampleLegal; fit: SampleFit })
       {/* min-h pinned to the tallest panel so switching tabs never reflows
           the section — clicking around must feel solid, not jumpy. */}
       <div role="tabpanel" className="animate-fade min-h-[24rem] p-4" key={tab}>
-        <DemoPanel tab={tab} legal={legal} fit={fit} />
+        <DemoPanel tab={tab} legal={legal} fit={fit} returns={returns} />
       </div>
     </div>
   );

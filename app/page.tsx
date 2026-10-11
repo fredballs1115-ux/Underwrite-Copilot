@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
-import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFit } from "./landing-interactive";
+import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFit, type SampleReturns } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { ScrollProgress } from "./scroll-progress";
 import type { Metadata } from "next";
@@ -27,7 +27,8 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
+import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
+import { fmtEm, fmtPct } from "@/lib/underwrite/playground";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
 import { ruleCounts } from "@/lib/research-data";
@@ -272,6 +273,16 @@ const XLSX_PREVIEW_ROWS: [string, string, string][] = sampleWorkbookPreview();
 // The stress bench's base: the same derivation, run here so the browser
 // gets the inputs and never the derivation (its readers hold data tables).
 const BENCH = sampleDerivedInputs();
+
+// The walkthrough's Financials tab: the same derivation's base case, so the
+// page prints the sample one levered IRR, the Excel tile's and the bench's.
+const BASE_RETURNS = sampleBaseReturns();
+const SAMPLE_RETURNS: SampleReturns = {
+  irr: fmtPct(BASE_RETURNS.leveredIrrPct),
+  equityMultiple: fmtEm(BASE_RETURNS.leveredEquityMultiple),
+  cashOnCash: fmtPct(BASE_RETURNS.cocYr1Pct),
+  exitCap: fmtPct(BASE_RETURNS.exitCapPct, 2),
+};
 
 // The sample against its demo buy box, read the way the deal page's header
 // reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, a criterion the
@@ -845,7 +856,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={legal} fit={SAMPLE_FIT} />
+              <DemoTabs legal={legal} fit={SAMPLE_FIT} returns={SAMPLE_RETURNS} />
             </Reveal>
           </div>
         </section>

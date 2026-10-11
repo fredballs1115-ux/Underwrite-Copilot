@@ -9,6 +9,7 @@
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildSensitivityGrids, type SensCell } from "@/lib/underwrite/sensitivity";
+import { runScenario } from "@/lib/underwrite/playground";
 
 /** The sample's actuals, in the shape deriveUnderwriteInputs takes. */
 export const SAMPLE_ACTUALS = {
@@ -25,6 +26,19 @@ export const SAMPLE_ACTUALS = {
 /** The sample deal's derived model inputs, actuals included. */
 export function sampleDerivedInputs() {
   return deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS);
+}
+
+/**
+ * The base case's returns as the workbook and the stress bench run them
+ * (lib/underwrite/playground `runScenario` on `sampleDerivedInputs`), with
+ * the exit cap they run at. The homepage's Financials tab prints these, so
+ * the page shows the sample one levered IRR: the tab had printed the
+ * first-draft model's 8.72% at a 5.50% exit beside the Excel tile's 9.3%
+ * at 5.45% (research pass 43, L3).
+ */
+export function sampleBaseReturns() {
+  const { inputs } = sampleDerivedInputs();
+  return { ...runScenario(inputs, {}), exitCapPct: inputs.exitCapPct };
 }
 
 /**

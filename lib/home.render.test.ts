@@ -8,11 +8,11 @@ import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
 import { renderToStaticMarkup } from "react-dom/server";
 import { a11yIssues } from "./render-lint";
-import { sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
+import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
+import { fmtEm, fmtPct } from "./underwrite/playground";
 import type { SampleLegal } from "./sample-legal";
 import { DemoPanel } from "@/app/landing-interactive";
 import { StressBench } from "@/app/landing-stress";
-import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { buyBoxCoverage } from "./criteria";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
@@ -155,7 +155,7 @@ function sampleFit() {
 describe("the homepage's buy box is the deal header's read", () => {
   it("the Buy box tab prints the header's chip and every criterion its count counts", () => {
     const fit = sampleFit();
-    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", legal: {} as SampleLegal, fit }));
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", legal: {} as SampleLegal, fit, returns: { irr: "", equityMultiple: "", cashOnCash: "", exitCap: "" } }));
     expect(html).not.toContain("WATCH");
     expect(html).toContain(`>${fit.label}</span>`);
     const read = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
@@ -211,17 +211,28 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     expect(section).toContain(`Levered IRR ${tileIrr}`);
   }, 60_000);
 
-  it("the miniature's Financials tab is the deal page's first-draft card: its figures, to its places, and its model's name", () => {
-    const panel = words(renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", legal: {} as SampleLegal, fit: sampleFit() })));
-    const card = words(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model })));
-    expect(card).toContain("Projected returns · first-draft model");
-    expect(panel).toContain("Projected returns · first-draft model");
-    for (const label of ["Levered IRR", "Cash-on-cash (Yr 1)", "Equity multiple"]) {
-      const figure = new RegExp(`${label.replace(/[()]/g, "\\$&")} (-?[\\d.]+[%x])`);
-      const onCard = figure.exec(card)?.[1];
-      expect(onCard, label).toBeTruthy();
-      expect(figure.exec(panel)?.[1], label).toBe(onCard);
-    }
-    expect(panel).toContain("Levered IRR 8.72%");
+  // Research pass 43, L3: the tab printed the first-draft model's 8.72% at a
+  // 5.50% exit beside the Excel tile's 9.3% at 5.45% — two levered IRRs for
+  // one sample. It prints the workbook's base case, the tile's and the
+  // bench's, through the one derivation.
+  it("the miniature's Financials tab prints the page's one levered IRR: the workbook's base case", () => {
+    const { inputs, meta } = sampleDerivedInputs();
+    const bench = words(renderToStaticMarkup(React.createElement(StressBench, { base: inputs, units: meta.units })));
+    const tileIrr = sampleWorkbookPreview()[1][2].replace("IRR ", "");
+    const r = sampleBaseReturns();
+    const returns = {
+      irr: fmtPct(r.leveredIrrPct),
+      equityMultiple: fmtEm(r.leveredEquityMultiple),
+      cashOnCash: fmtPct(r.cocYr1Pct),
+      exitCap: fmtPct(r.exitCapPct, 2),
+    };
+    const panel = words(renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", legal: {} as SampleLegal, fit: sampleFit(), returns })));
+    expect(panel).toContain("Projected returns · the Excel workbook's base case".replace("'", "&#x27;"));
+    expect(panel).toContain(`Levered IRR ${tileIrr}`);
+    expect(bench).toContain(`Levered IRR ${tileIrr}`);
+    expect(panel).toContain(`Equity multiple ${returns.equityMultiple}`);
+    expect(bench).toContain(`Equity multiple ${returns.equityMultiple}`);
+    expect(panel).toContain(`Base ${sampleWorkbookPreview()[1][1]}`);
+    expect(panel).not.toContain("8.72%");
   });
 });
