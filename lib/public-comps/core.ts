@@ -769,6 +769,24 @@ export function evidenceNote(count: number): string {
   }
 }
 
+/**
+ * The $/SF middle said with the count behind it, which is only the sales
+ * that state an area — "median $245/SF on 6 of 40 sales" — under the price
+ * median's own floors on THAT count: none below MEDIAN_FLOOR (compStats
+ * takes none), and "thin" said where it rests on three or four. "" where
+ * there is no $/SF middle.
+ */
+export function perSqftPhrase(
+  stats: Pick<RecordCompsStats, "medianPerSqft" | "perSqftCount" | "count">,
+  areaCount: number,
+): string {
+  const n = stats.perSqftCount ?? areaCount;
+  if (stats.medianPerSqft == null || compEvidence(n) === "none" || compEvidence(n) === "individual") return "";
+  const fig = `$${Math.round(stats.medianPerSqft).toLocaleString("en-US")}/SF`;
+  const of = n === stats.count ? `on all ${n} sales` : `on ${n} of ${stats.count} sales`;
+  return `${medianLabel(n)} ${fig} ${of}${compEvidence(n) === "thin" ? ", thin" : ""}`;
+}
+
 /** A search's radius as the readout says it: "1 mi", "3 mi". */
 function radiusText(km: number): string {
   const miles = kmToMiles(km);

@@ -123,6 +123,18 @@ describe("the comps readout as pictures", () => {
     expect(count(draw(result(comps), apartments(500_000, { portfolio: true })), "comps-subject")).toBe(0);
   });
 
+  it("says the $/SF median with the count of sales that state an area, under the floors", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const text = visibleText(draw(result(comps))).replace(/\s+/g, " ");
+    expect(text).toMatch(/median \$\d{3}\/SF on 3 of 6 sales, thin/);
+    // two sales stating an area make no $/SF middle at all
+    const two = Array.from({ length: 4 }, (_, i) => sale(i));
+    expect(visibleText(draw(result(two)))).not.toContain("/SF on");
+    // every sale states one
+    const all = Array.from({ length: 5 }, (_, i) => sale(i, { sqft: 2_000 }));
+    expect(visibleText(draw(result(all))).replace(/\s+/g, " ")).toMatch(/median \$\d{3}\/SF on all 5 sales/);
+  });
+
   it("compares price a square foot with its own count where both state one", () => {
     // sales 1, 3, 5 state 1,800 SF: three sales behind the $/SF median
     const comps = Array.from({ length: 6 }, (_, i) => sale(i));

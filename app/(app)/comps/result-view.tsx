@@ -15,6 +15,7 @@ import {
   evidenceNote,
   medianLabel,
   noSalesSentence,
+  perSqftPhrase,
   salesPhrase,
   type RecordCompsResult,
 } from "@/lib/public-comps/core";
@@ -109,6 +110,9 @@ export function CompsResultView({
       : null;
   const subjectPrice = call && subject ? subject.price : null;
   const note = evidenceNote(s.count);
+  // The $/SF middle rests only on the sales that state an area, so it is
+  // said with that count, under the same floors (lib/public-comps/core).
+  const sfPhrase = perSqftPhrase(s, result.comps.filter((c) => perSqftOf(c) !== null).length);
 
   return (
     <>
@@ -116,10 +120,12 @@ export function CompsResultView({
         <span className="font-semibold">{salesPhrase(s.count)}</span>{" "}
         <span className="text-muted">{scope}</span> — {medianLabel(s.count)}{" "}
         <span className="font-mono font-semibold tabular-nums">{fmtMoney(s.medianPrice)}</span>
-        {s.medianPerSqft && (
+        {sfPhrase && (
           <>
             {" · "}
-            <span className="font-mono tabular-nums">${s.medianPerSqft}/SF</span>
+            <span className="tabular-nums" data-qa="comps-per-sf">
+              {sfPhrase}
+            </span>
           </>
         )}
         {s.count > 1 && (
@@ -272,7 +278,7 @@ function SalesTable({ comps, start }: { comps: RecordCompsResult["comps"]; start
                   </a>
                 </td>
                 <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{fmtMoney(c.price)}</td>
-                <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{psf ? `$${psf}` : "—"}</td>
+                <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{psf ? `$${psf.toLocaleString("en-US")}` : "—"}</td>
                 <td className="py-1.5 pr-3 text-xs text-muted">{c.propertyType.toLowerCase()}</td>
                 <td className="py-1.5 text-right font-mono text-xs tabular-nums text-muted">{fmtMiles(c.distanceKm)}</td>
               </tr>
