@@ -94,7 +94,7 @@ describe("the comps readout as pictures", () => {
       note: "Public records.",
     });
     const text = visibleText(html);
-    expect(text).toContain("No recorded sales within 3 mi of the address in the last 36 months, in the property database's New York City records.");
+    expect(text).toContain("No recorded sales within 3 mi of the address in the 36 months to Oct 8, 2026, in the property database's New York City records.");
     expect(text).not.toContain("wired");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
@@ -140,6 +140,18 @@ describe("the comps readout as pictures", () => {
     const comps = Array.from({ length: 6 }, (_, i) => sale(i));
     const text = visibleText(draw(result(comps), apartments(500_000, { perSf: 250 })));
     expect(text).toMatch(/This deal's \$250\/SF is \d+% (above|below) the median of the 3 sales that state an area\./);
+  });
+
+  it("dates the window and the bars by the search's day, and the database's by its ingest", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const text = visibleText(draw(result(comps))).replace(/\s+/g, " ");
+    expect(text).toContain("the 24 months to Oct 8, 2026");
+    expect(text).toContain("Sales by quarter, to Oct 8, 2026");
+    const db = visibleText(
+      draw({ ...result(comps), providerId: "ingested_db", ingestedThrough: "2026-08-31" }),
+    ).replace(/\s+/g, " ");
+    expect(db).toContain("Sales by quarter, to Aug 31, 2026");
+    expect(db).toContain("its records last ingested Aug 31, 2026");
   });
 
   it("numbers the rows as their pins and folds the sales past twelve", () => {

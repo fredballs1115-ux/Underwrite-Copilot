@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { compsTableText, perSqftOf, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
-import type { RecordComp } from "./core";
+import { compsTableText, evidenceThrough, perSqftOf, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
+import { pulledLine, type RecordComp } from "./core";
 
 const comp = (over: Partial<RecordComp>): RecordComp => ({
   address: "1 Main St",
@@ -84,6 +84,34 @@ describe("perSqftOf", () => {
     expect(perSqftOf({ price: 500_000, sqft: 2_000 })).toBe(250);
     expect(perSqftOf({ price: 500_000, sqft: 150 })).toBeNull();
     expect(perSqftOf({ price: 500_000, sqft: null })).toBeNull();
+  });
+});
+
+describe("the quarter bars, read through the evidence's own day", () => {
+  it("run from the window's first quarter to the day's, never to the last sale alone", () => {
+    const bars = salesByQuarter([{ saleDate: "2025-02-10" }, { saleDate: "2025-05-03" }], {
+      through: "2026-10-08",
+      monthsBack: 24,
+    });
+    expect(bars[0].label).toBe("Q4 2024");
+    expect(bars[bars.length - 1].label).toBe("Q4 2026");
+    expect(bars.filter((b) => b.count > 0)).toHaveLength(2);
+  });
+
+  it("run through the database's last ingest where it is earlier than the search", () => {
+    expect(evidenceThrough({ retrievedAt: "2026-10-08T12:00:00Z", ingestedThrough: "2026-07-31" })).toBe("2026-07-31");
+    expect(evidenceThrough({ retrievedAt: "2026-10-08T12:00:00Z" })).toBe("2026-10-08");
+  });
+});
+
+describe("a stored pull's day", () => {
+  it("is said, and past thirty days asks for a refresh", () => {
+    expect(pulledLine("2026-10-01T09:00:00Z", "2026-10-11")).toEqual({ stale: false, text: "Pulled Oct 1, 2026." });
+    expect(pulledLine("2026-08-02T09:00:00Z", "2026-10-11")).toEqual({
+      stale: true,
+      text: "Pulled Aug 2, 2026, over 30 days ago — refresh for the sales recorded since.",
+    });
+    expect(pulledLine("", "2026-10-11")).toBeNull();
   });
 });
 

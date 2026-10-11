@@ -1883,6 +1883,7 @@ export default async function DealPage({
           result={publicComps}
           hasAddress={!!dealAddress?.label}
           subject={compsCallSubject}
+          today={todayIso}
         />
         <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} today={todayIso} />
         <PublicRecordCard

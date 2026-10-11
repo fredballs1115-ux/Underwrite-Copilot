@@ -137,7 +137,7 @@ async function tryDbComps(
   assetClass: string,
   radiusKm: number,
   monthsBack: number
-): Promise<Omit<RecordComp, "distanceKm">[] | null> {
+): Promise<DbRow[] | null> {
   try {
     const { data, error } = await admin.rpc("nearby_sales", {
       in_lat: subject.lat,
@@ -157,26 +157,42 @@ async function tryDbComps(
       sqft: r.building_sf === null || r.building_sf === undefined ? null : Number(r.building_sf),
       propertyType: String(r.asset_class ?? "recorded sale"),
       sourceUrl: String(r.source_url ?? ""),
+      ingestedAt: typeof r.ingested_at === "string" ? r.ingested_at.slice(0, 10) : "",
     }));
   } catch {
     return null;
   }
 }
 
+/** A database row as read: a sale, and the day the ingest wrote it. */
+type DbRow = Omit<RecordComp, "distanceKm"> & { ingestedAt: string };
+
+/** The newest ingest day among rows read, or undefined. */
+const newestIngest = (rows: DbRow[]): string | undefined =>
+  rows.reduce<string | undefined>((m, r) => (r.ingestedAt && (!m || r.ingestedAt > m) ? r.ingestedAt : m), undefined);
+
 const DB_PROVIDER_NAME = "Ingested public deed records (property database)";
 
 /** Whether the property database holds any recorded sale filed under a
- *  market — an existence read, one row. False on a failed read: coverage is
- *  never claimed on a read that did not answer. */
-async function dbHoldsMarket(
+ *  market, and the day its newest row was ingested — one row read, newest
+ *  ingest first. Null on none or a failed read: coverage is never claimed
+ *  on a read that did not answer. */
+async function dbMarketIngested(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   ingestMarket: string,
-): Promise<boolean> {
+): Promise<{ ingestedThrough?: string } | null> {
   try {
-    const { data, error } = await admin.from("recorded_sales").select("id").eq("market", ingestMarket).limit(1);
-    return !error && Array.isArray(data) && data.length > 0;
+    const { data, error } = await admin
+      .from("recorded_sales")
+      .select("ingested_at")
+      .eq("market", ingestMarket)
+      .order("ingested_at", { ascending: false })
+      .limit(1);
+    if (error || !Array.isArray(data) || data.length === 0) return null;
+    const at = (data[0] as { ingested_at?: unknown }).ingested_at;
+    return typeof at === "string" ? { ingestedThrough: at.slice(0, 10) } : {};
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -235,7 +251,16 @@ export async function computeRecordComps(input: {
     }
   }
   if (db && db.length > 0) {
-    const comps = finalizeComps(db, subject, radiusKm);
+    const ingestedThrough = newestIngest(db);
+    const comps = finalizeComps(
+      db.map((row) => {
+        const sale: Omit<RecordComp, "distanceKm"> & { ingestedAt?: string } = { ...row };
+        delete sale.ingestedAt;
+        return sale;
+      }),
+      subject,
+      radiusKm,
+    );
     const stored = comps.slice(0, STORED_COMPS);
     return {
       ...base,
@@ -256,6 +281,7 @@ export async function computeRecordComps(input: {
       capped: db.length >= RECORDED_SALES.limit,
       sourceOrder: "nearest",
       found: comps.length,
+      ...(ingestedThrough ? { ingestedThrough } : {}),
     };
   }
 
@@ -281,7 +307,8 @@ export async function computeRecordComps(input: {
             label: input.label,
           })
         : null;
-    if (market && (await dbHoldsMarket(admin, market.ingestMarket))) {
+    const held = market ? await dbMarketIngested(admin, market.ingestMarket) : null;
+    if (market && held) {
       return {
         ...base,
         status: "no_sales",
@@ -297,6 +324,7 @@ export async function computeRecordComps(input: {
         comps: [],
         found: 0,
         dbMarket: market.name,
+        ...held,
       };
     }
     return { ...base, status: "no_provider" };

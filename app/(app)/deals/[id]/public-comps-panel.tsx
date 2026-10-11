@@ -5,7 +5,7 @@
 // this panel is the pricing read.
 
 import { CompsResultView } from "@/app/(app)/comps/result-view";
-import type { RecordCompsResult } from "@/lib/public-comps/core";
+import { pulledLine, type RecordCompsResult } from "@/lib/public-comps/core";
 import type { SubjectForCall } from "@/lib/public-comps/vs-median";
 import { refreshRecordComps } from "./comps-actions";
 
@@ -23,17 +23,33 @@ function RefreshButton({ dealId }: { dealId: string }) {
   );
 }
 
+/** "Pulled Oct 8, 2026" under the heading, or, past STALE_PULL_DAYS,
+ *  "Pulled Aug 2, 2026, over 30 days ago — refresh …" (lib/public-comps/core). */
+function PulledOn({ retrievedAt, today }: { retrievedAt: string; today: string }) {
+  const line = pulledLine(retrievedAt, today);
+  if (!line) return null;
+  return (
+    <p className={`mt-1 text-[11px] ${line.stale ? "text-caution" : "text-muted"}`} data-qa="comps-pulled">
+      {line.text}
+    </p>
+  );
+}
+
 export function PublicCompsPanel({
   dealId,
   result,
   hasAddress,
   subject,
+  today,
 }: {
   dealId: string;
   result: RecordCompsResult | null;
   hasAddress: boolean;
   /** the deal the sales are read for (lib/public-comps/vs-median) */
   subject: SubjectForCall | null;
+  /** the reader's day (ISO), read once by the page: a stored pull past
+   *  STALE_PULL_DAYS says when it was pulled and asks for a refresh */
+  today: string;
 }) {
   if (!hasAddress) return null; // the research panel already asks for an address
 
@@ -50,7 +66,10 @@ export function PublicCompsPanel({
           page to check.
         </p>
       ) : (
-        <CompsResultView result={result} subject={subject} />
+        <>
+          <PulledOn retrievedAt={result.retrievedAt} today={today} />
+          <CompsResultView result={result} subject={subject} />
+        </>
       )}
     </section>
   );

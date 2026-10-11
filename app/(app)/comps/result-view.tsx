@@ -14,6 +14,7 @@ import {
   compsScope,
   evidenceNote,
   medianLabel,
+  dayText,
   noSalesSentence,
   perSqftPhrase,
   salesPhrase,
@@ -21,7 +22,7 @@ import {
 } from "@/lib/public-comps/core";
 import { vsMedianRead, vsMedianSentence, type SubjectForCall } from "@/lib/public-comps/vs-median";
 import { placementNote } from "@/lib/public-comps/subject-point";
-import { compsTableText, perSqftOf, priceTrack, salesByQuarter } from "@/lib/public-comps/picture";
+import { compsTableText, evidenceThrough, perSqftOf, priceTrack, salesByQuarter } from "@/lib/public-comps/picture";
 import { CopySalesButton, RecordSalesMap, type MapSale } from "./record-sales-map";
 
 const fmtMoney = (n: number) => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
@@ -220,12 +221,8 @@ export function CompsResultView({
         >
           dataset
         </a>
-        {" · retrieved "}
-        {new Date(result.retrievedAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}
+        {` · retrieved ${dayText(result.retrievedAt)}`}
+        {result.ingestedThrough ? ` · its records last ingested ${dayText(result.ingestedThrough)}` : ""}
         {". "}
         {result.note}
       </p>
@@ -297,7 +294,16 @@ function SalesTable({ comps, start }: { comps: RecordCompsResult["comps"]; start
  */
 function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; subjectPrice: number | null }) {
   const track = priceTrack(result.comps, result.stats?.medianPrice ?? null, subjectPrice);
-  const quarters = salesByQuarter(result.comps);
+  // The bars run through the evidence's own day — the search's, or the
+  // database's last ingest where earlier — never today; a capped newest-
+  // first source's window starts at its oldest sale kept, not the months
+  // asked, so it is drawn from that sale.
+  const through = evidenceThrough(result);
+  const newestCut = result.capped && result.sourceOrder === "newest";
+  const quarters = salesByQuarter(
+    result.comps,
+    through ? { through, monthsBack: newestCut ? null : (result.params?.monthsBack ?? null) } : null,
+  );
   if (!track && quarters.length === 0) return null;
   const peak = Math.max(1, ...quarters.map((q) => q.count));
   return (
@@ -361,7 +367,7 @@ function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; su
       {quarters.length > 0 && (
         <figure className="min-w-0">
           <figcaption className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Sales by quarter
+            Sales by quarter{through ? `, to ${dayText(through)}` : ""}
           </figcaption>
           <div className="mt-3 flex h-16 items-end gap-1" data-bar="comps-quarters">
             {quarters.map((q) => (

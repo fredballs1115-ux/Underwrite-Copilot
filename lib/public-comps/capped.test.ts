@@ -11,10 +11,15 @@ let rpcRows: Record<string, unknown>[] | null = null;
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => ({
     rpc: async () => (rpcRows ? { data: rpcRows, error: null } : { data: null, error: { message: "absent here" } }),
+    // no market held: the database's empty answer is no coverage here
+    from: () => {
+      const b = { select: () => b, eq: () => b, order: () => b, limit: () => b, then: (r: (v: unknown) => void) => r({ data: [], error: null }) };
+      return b;
+    },
   }),
 }));
 
-import { PROVIDERS, STORED_COMPS, compsCutNote, compsScope, type RecordComp, type RecordCompsResult } from "./core";
+import { PROVIDERS, STORED_COMPS, compsCutNote, compsScope, windowText, type RecordComp, type RecordCompsResult } from "./core";
 import { computeRecordComps } from "./run";
 import { RECORDED_SALES } from "@/lib/public-record-asks";
 import { CompsResultView } from "@/app/(app)/comps/result-view";
@@ -99,12 +104,12 @@ describe("a live provider's newest 80", () => {
     const said = new Date(`${oldest}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
     expect(compsScope(r)).toBe(`within 1 mi · sold since ${said} · multifamily/mixed`);
     expect(compsCutNote(r)).toBe(
-      "The source returns its 80 newest sales a search and returned 80: older sales within 1 mi and the last 24 months were not read; the 40 nearest of the 80 found are kept.",
+      `The source returns its 80 newest sales a search and returned 80: older sales within 1 mi and ${windowText(24, r.retrievedAt)} were not read; the 40 nearest of the 80 found are kept.`,
     );
     const text = visibleText(renderToStaticMarkup(React.createElement(CompsResultView, { result: r }))).replace(/\s+/g, " ");
     expect(text).toContain(`40 recorded sales within 1 mi · sold since ${said} · multifamily/mixed — median`);
-    expect(text).not.toContain("40 recorded sales within 1 mi · last 24 months");
-    expect(text).toContain("older sales within 1 mi and the last 24 months were not read");
+    expect(text).not.toContain(`40 recorded sales within 1 mi · ${windowText(24, r.retrievedAt)}`);
+    expect(text).toContain(`older sales within 1 mi and ${windowText(24, r.retrievedAt)} were not read`);
   });
 
   it("is not flagged where the source returned fewer than it asks for — and the stored cut is said", async () => {
@@ -112,7 +117,7 @@ describe("a live provider's newest 80", () => {
     const r = await computeRecordComps(ASK);
     expect(r.capped).toBe(false);
     expect(r.found).toBe(63);
-    expect(compsScope(r)).toBe("within 1 mi · last 24 months · multifamily/mixed");
+    expect(compsScope(r)).toBe(`within 1 mi · ${windowText(24, r.retrievedAt)} · multifamily/mixed`);
     expect(compsCutNote(r)).toBe("The 40 nearest of the 63 found are kept.");
   });
 
@@ -122,7 +127,7 @@ describe("a live provider's newest 80", () => {
     expect(r.capped).toBe(false);
     expect(compsCutNote(r)).toBe("");
     const text = visibleText(renderToStaticMarkup(React.createElement(CompsResultView, { result: r }))).replace(/\s+/g, " ");
-    expect(text).toContain("12 recorded sales within 1 mi · last 24 months · multifamily/mixed");
+    expect(text).toContain(`12 recorded sales within 1 mi · ${windowText(24, r.retrievedAt)} · multifamily/mixed`);
   });
 });
 
@@ -144,7 +149,7 @@ describe("the property database's nearest 80", () => {
     expect(r.capped).toBe(true);
     expect(r.sourceOrder).toBe("nearest");
     const far = Math.max(...r.comps.map((c: RecordComp) => c.distanceKm));
-    expect(compsScope(r)).toBe(`within ${(far / 1.609344).toFixed(1)} mi · last 24 months · multifamily`);
+    expect(compsScope(r)).toBe(`within ${(far / 1.609344).toFixed(1)} mi · ${windowText(24, r.retrievedAt)} · multifamily`);
     expect(compsCutNote(r)).toBe(
       "The property database returns its 80 nearest sales a search and returned 80: sales farther out, within 1 mi, were not read; the 40 nearest of the 80 found are kept.",
     );

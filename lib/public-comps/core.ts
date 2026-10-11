@@ -88,6 +88,11 @@ export interface RecordCompsResult {
    *  holds that market's sales, so none found is a finding about the
    *  address, never "no source" */
   dbMarket?: string;
+  /** the day the property database's newest row read was ingested (ISO
+   *  yyyy-mm-dd): its sales are as fresh as its last ingest, not the day
+   *  of the search. Absent on a live provider's result and on one stored
+   *  before it was recorded. */
+  ingestedThrough?: string;
 }
 
 export const HONESTY_NOTE =
@@ -793,7 +798,8 @@ function radiusText(km: number): string {
   return miles < 1.1 ? "1 mi" : `${Math.round(miles)} mi`;
 }
 
-/** A sale's day as the readout says it: "Aug 2, 2026" (UTC, its own day). */
+/** A sale's day as the readout says it: "Aug 2, 2026" (UTC, its own day).
+ *  Hoisted: windowText and dayText above read it. */
 function saleDay(iso: string): string {
   const t = Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
   return Number.isFinite(t)
@@ -802,15 +808,54 @@ function saleDay(iso: string): string {
 }
 
 /**
- * What a result's sales cover, said after their count: "within 1 mi · last
- * 24 months · multifamily". Where the source stopped at its limit (research
+ * A search's window, dated: "the 24 months to Oct 8, 2026" — the day the
+ * search was run, since "the last 24 months" read later reads as through
+ * the reader's today. "the last 24 months" only where no day is known.
+ */
+export function windowText(monthsBack: number, retrievedAt?: string | null): string {
+  const t = retrievedAt ? Date.parse(retrievedAt) : NaN;
+  return Number.isFinite(t) ? `the ${monthsBack} months to ${saleDay(new Date(t).toISOString())}` : `the last ${monthsBack} months`;
+}
+
+/** A day as the readout says it ("Oct 8, 2026"), from an ISO timestamp or
+ *  day, read in UTC, its own day; "" for none. */
+export function dayText(iso: string | null | undefined): string {
+  return iso ? saleDay(iso) : "";
+}
+
+/** A stored pull older than this many days says so and asks for a refresh:
+ *  recorded sales file every week, and a set read a month ago is missing a
+ *  month of them. */
+export const STALE_PULL_DAYS = 30;
+
+/** The day a stored pull was made, said on the deal: "Pulled Oct 8, 2026."
+ *  or, past STALE_PULL_DAYS on the reader's day, "Pulled Aug 2, 2026, over
+ *  30 days ago — refresh for the sales recorded since." Null without a day. */
+export function pulledLine(retrievedAt: string | null | undefined, today: string): { text: string; stale: boolean } | null {
+  const day = dayText(retrievedAt);
+  if (!retrievedAt || !day) return null;
+  const age = Date.parse(`${today.slice(0, 10)}T00:00:00Z`) - Date.parse(`${retrievedAt.slice(0, 10)}T00:00:00Z`);
+  const stale = Number.isFinite(age) && age > STALE_PULL_DAYS * 86_400_000;
+  return {
+    stale,
+    text: stale
+      ? `Pulled ${day}, over ${STALE_PULL_DAYS} days ago — refresh for the sales recorded since.`
+      : `Pulled ${day}.`,
+  };
+}
+
+/**
+ * What a result's sales cover, said after their count: "within 1 mi · the
+ * 24 months to Oct 8, 2026 · multifamily". Where the source stopped at its limit (research
  * pass 42) the set covers less than the search asked, and says what it does
  * cover: a newest-first source's sales reach back only to the oldest one
  * kept ("sold since Aug 2, 2026", never "last 24 months"), and the property
  * database's nearest-first sales reach out only to the farthest one kept
  * ("within 0.6 mi", never the mile asked).
  */
-export function compsScope(r: Pick<RecordCompsResult, "params" | "capped" | "sourceOrder" | "comps">): string {
+export function compsScope(
+  r: Pick<RecordCompsResult, "params" | "capped" | "sourceOrder" | "comps"> & { retrievedAt?: string },
+): string {
   if (!r.params) return "";
   const { radiusKm, monthsBack, classFilter } = r.params;
   const dates = r.comps.map((c) => c.saleDate).filter(Boolean).sort();
@@ -818,21 +863,25 @@ export function compsScope(r: Pick<RecordCompsResult, "params" | "capped" | "sou
   const within =
     r.capped && r.sourceOrder === "nearest" && r.comps.length > 0 ? `within ${fmtMiles(far)}` : `within ${radiusText(radiusKm)}`;
   const window =
-    r.capped && r.sourceOrder === "newest" && dates.length > 0 ? `sold since ${saleDay(dates[0])}` : `last ${monthsBack} months`;
+    r.capped && r.sourceOrder === "newest" && dates.length > 0
+      ? `sold since ${saleDay(dates[0])}`
+      : r.retrievedAt
+        ? windowText(monthsBack, r.retrievedAt)
+        : `last ${monthsBack} months`;
   return `${within} · ${window} · ${classFilter}`;
 }
 
 /**
  * A search that answered with no sales, said as what it asked: "No recorded
- * sales within 3 mi of the address in the last 36 months, in the property
- * database's New York City records." Where the source answered nothing at
+ * sales within 3 mi of the address in the 36 months to Oct 8, 2026, in the
+ * property database's New York City records." Where the source answered nothing at
  * all the readout says so instead (status `no_provider`).
  */
 export function noSalesSentence(
-  r: Pick<RecordCompsResult, "params" | "providerName" | "providerId" | "dbMarket">,
+  r: Pick<RecordCompsResult, "params" | "providerName" | "providerId" | "dbMarket"> & { retrievedAt?: string },
 ): string {
   const within = r.params ? `within ${radiusText(r.params.radiusKm)} of the address` : "near the address";
-  const window = r.params ? ` in the last ${r.params.monthsBack} months` : "";
+  const window = r.params ? ` in ${windowText(r.params.monthsBack, r.retrievedAt)}` : "";
   const cls = r.params && r.params.classFilter !== "all sales" ? ` (${r.params.classFilter})` : "";
   const where =
     r.providerId === "ingested_db"
@@ -852,7 +901,9 @@ export function noSalesSentence(
  * months" said as the whole set.
  */
 export function compsCutNote(
-  r: Pick<RecordCompsResult, "params" | "capped" | "sourceOrder" | "comps" | "found" | "providerId">,
+  r: Pick<RecordCompsResult, "params" | "capped" | "sourceOrder" | "comps" | "found" | "providerId"> & {
+    retrievedAt?: string;
+  },
 ): string {
   const kept = r.comps.length;
   const found = r.found ?? kept;
@@ -860,7 +911,7 @@ export function compsCutNote(
   if (!r.capped) return cut ? `${cut[0].toUpperCase()}${cut.slice(1)}.` : "";
   const limit = RECORDED_SALES.limit;
   const radius = r.params ? radiusText(r.params.radiusKm) : "the radius";
-  const months = r.params ? `the last ${r.params.monthsBack} months` : "the window";
+  const months = r.params ? windowText(r.params.monthsBack, r.retrievedAt) : "the window";
   const source = r.providerId === "ingested_db" ? "The property database" : "The source";
   const tail = cut ? `; ${cut}` : "";
   switch (r.sourceOrder) {

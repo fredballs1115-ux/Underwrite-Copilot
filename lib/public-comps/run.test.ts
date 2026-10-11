@@ -11,7 +11,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createSupabaseAdminClient: vi.fn() }));
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { computeRecordComps } from "./run";
-import { noSalesSentence } from "./core";
+import { noSalesSentence, windowText } from "./core";
 
 type Row = Record<string, unknown>;
 
@@ -37,6 +37,7 @@ function fakeAdmin(answers: (Row[] | Error)[], marketRows: Row[]) {
           market = v;
           return builder;
         },
+        order: () => builder,
         limit: () => builder,
         then(resolve: (v: unknown) => void) {
           resolve({ data: marketRows.filter((r) => r.market === market).slice(0, 1), error: null });
@@ -69,8 +70,9 @@ const brooklyn = { label: "100 Court St, Brooklyn, NY 11201", state: "NY", city:
 
 describe("an empty answer from the property database", () => {
   it("is widened once and said as none found in a market the database holds", async () => {
-    const admin = fakeAdmin([[], []], [{ market: "nyc" }]);
+    const admin = fakeAdmin([[], []], [{ market: "nyc", ingested_at: "2026-09-30T04:00:00Z" }]);
     const r = await computeRecordComps(brooklyn);
+    expect(r.ingestedThrough).toBe("2026-09-30");
     expect(admin.calls).toHaveLength(2);
     expect(admin.calls[1].in_radius_m).toBe(4800);
     expect(r.status).toBe("no_sales");
@@ -78,7 +80,7 @@ describe("an empty answer from the property database", () => {
     expect(r.dbMarket).toBe("New York City");
     expect(r.params).toMatchObject({ radiusKm: 4.8, monthsBack: 36 });
     expect(noSalesSentence(r)).toBe(
-      "No recorded sales within 3 mi of the address in the last 36 months, in the property database's New York City records.",
+      `No recorded sales within 3 mi of the address in ${windowText(36, r.retrievedAt)}, in the property database's New York City records.`,
     );
   });
 
@@ -120,11 +122,14 @@ describe("an empty answer from the property database", () => {
       building_sf: 5000,
       asset_class: "multifamily",
       source_url: "https://example.org/",
+      ingested_at: `2026-09-2${i}T00:00:00Z`,
     });
     fakeAdmin([[], [sale(1), sale(2), sale(3)]], [{ market: "nyc" }]);
     const r = await computeRecordComps(brooklyn);
     expect(r.status).toBe("ok");
     expect(r.comps).toHaveLength(3);
     expect(r.params?.radiusKm).toBe(4.8);
+    expect(r.ingestedThrough).toBe("2026-09-23");
+    expect(r.comps[0]).not.toHaveProperty("ingestedAt");
   });
 });

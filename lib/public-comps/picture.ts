@@ -104,12 +104,31 @@ const quarterOf = (iso: string): { y: number; q: number } | null => {
  * there, which a bar of zero would say no better than the axis does.
  * Empty below two dated sales.
  */
-export function salesByQuarter(comps: Pick<RecordComp, "saleDate">[]): QuarterBar[] {
+export function salesByQuarter(
+  comps: Pick<RecordComp, "saleDate">[],
+  /** the day the evidence runs through — the search's day, or the property
+   *  database's last ingest where that is earlier (`evidenceThrough`) — and
+   *  the window's months: the bars run from the window's first quarter to
+   *  that day's, so quarters after the last sale read as none sold rather
+   *  than falling off the axis, and quarters after the day are never drawn
+   *  as a freeze. Without it, the sales' own span, as before. */
+  window?: { through: string; monthsBack: number | null } | null,
+): QuarterBar[] {
   const qs = comps.map((c) => quarterOf(c.saleDate)).filter((q): q is { y: number; q: number } => q !== null);
   if (qs.length < 2) return [];
   const key = (q: { y: number; q: number }) => q.y * 4 + (q.q - 1);
-  const first = Math.min(...qs.map(key));
-  const last = Math.max(...qs.map(key));
+  let first = Math.min(...qs.map(key));
+  let last = Math.max(...qs.map(key));
+  const end = window ? quarterOf(window.through) : null;
+  if (end) {
+    last = Math.max(last, key(end));
+    if (window?.monthsBack) {
+      const d = new Date(`${window.through.slice(0, 10)}T00:00:00Z`);
+      d.setUTCMonth(d.getUTCMonth() - window.monthsBack);
+      const start = quarterOf(d.toISOString());
+      if (start) first = Math.min(first, key(start));
+    }
+  }
   // A malformed year far from the rest would draw hundreds of empty bars;
   // past five years of quarters the picture is no longer the window's.
   if (last - first > 20) return [];
@@ -120,6 +139,17 @@ export function salesByQuarter(comps: Pick<RecordComp, "saleDate">[]): QuarterBa
     out.push({ label: `Q${(k % 4) + 1} ${Math.floor(k / 4)}`, count: counts.get(k) ?? 0 });
   }
   return out;
+}
+
+/**
+ * The day a result's evidence runs through: the search's own day, or the
+ * property database's last ingest where that is earlier — a database's
+ * sales are only as fresh as the run that wrote them. ISO yyyy-mm-dd.
+ */
+export function evidenceThrough(r: Pick<RecordCompsResult, "retrievedAt" | "ingestedThrough">): string {
+  const pulled = (r.retrievedAt ?? "").slice(0, 10);
+  const ingested = (r.ingestedThrough ?? "").slice(0, 10);
+  return ingested && (!pulled || ingested < pulled) ? ingested : pulled;
 }
 
 /** A sale's price a square foot, where the record states an area a sale of
