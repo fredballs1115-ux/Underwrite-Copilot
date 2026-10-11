@@ -224,6 +224,28 @@ describe("ReportDocument (full report)", () => {
     );
     expect(pdfFillCountOf(buf) - pdfFillCountOf(bare)).toBe(saleCount * 3);
 
+    // A comp stating only a price a foot beside comps stating one a unit is
+    // drawn on a per-SF track of its own (lib/comp-detail `basisTracks`),
+    // never dropped: every comp still draws its track and fill, and the
+    // captions say which comps each track draws.
+    const mixed = {
+      ...deal,
+      comps: {
+        ...SAMPLE_DEAL.comps,
+        saleComps: SAMPLE_DEAL.comps.saleComps.map((c, i) => (i === 0 ? { ...c, detail: "$410/SF" } : c)),
+      },
+    } as unknown as DealRow;
+    const mixedBuf = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(mixed, "August 24, 2026", checks, sensitivity),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    // The per-SF comp's tick is drawn only where the subject states a basis a foot.
+    expect(pdfFillCountOf(mixedBuf) - pdfFillCountOf(bare)).toBeGreaterThanOrEqual(saleCount * 3 - 1);
+    const mixedText = (await pdfTextOf(mixedBuf)).replace(/\s+/g, " ");
+    expect(mixedText).toContain("the 1 comp stating a price per SF");
+    expect(mixedText).toContain("the 2 comps stating a price per");
+
     // The reconciliation page draws each gap from a centre line — a track,
     // the fill and the centre tick, three fills a drawn row. Two of the
     // sample's three rows are a gap (their figures' own: $173,500 and 300

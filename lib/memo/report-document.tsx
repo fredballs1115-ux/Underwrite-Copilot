@@ -88,7 +88,7 @@ import type { AssumableView } from "@/lib/assumable-debt";
 import { basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
-import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
+import { basisTracks, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
@@ -2036,11 +2036,13 @@ export function ReportDocument({
     BrokerCompsResult["leaseComps"]
   >;
   const redFlags = list(comps?.redFlags).map(str);
-  // Each sale comp's stated basis on one track with the subject's own as a
-  // tick — lib/comp-detail, the reader behind the deal page's comps table,
-  // so the report and the page never disagree on a comp. Drawn as plain
-  // Views under the detail text; a comp that states no basis draws none.
-  const compScale = basisScale(
+  // Each sale comp's stated basis on the track of the basis it states (per
+  // unit, else per SF), with the subject's own as a tick — lib/comp-detail's
+  // `basisTracks`, the reader behind the deal page's comps bars, so the
+  // report and the page never disagree on a comp and no comp stating a basis
+  // goes undrawn. Drawn as plain Views under the detail text; a comp that
+  // states no basis draws none.
+  const compTracks = basisTracks(
     saleComps,
     subjectBasis(
       metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
@@ -2612,7 +2614,8 @@ export function ReportDocument({
                 </View>
                 {g.items.map((cp, i) => {
                   // Sale comps only: the basis bar and the subject's tick.
-                  const scale = g.label === "Sale comps" ? compScale : null;
+                  const at = g.label === "Sale comps" ? (compTracks?.trackOf[i] ?? null) : null;
+                  const scale = at != null ? (compTracks?.tracks[at] ?? null) : null;
                   const share = scale?.shares[i] ?? null;
                   const track = 60;
                   return (
@@ -2676,13 +2679,23 @@ export function ReportDocument({
                   </View>
                   );
                 })}
-                {g.label === "Sale comps" && compScale ? (
-                  <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
-                    {compScale.subjectValue != null
-                      ? `Bars: each comp's basis per ${compScale.unit === "unit" ? compScale.noun : "SF"}; the tick is the subject at ${fmtBasis(compScale.subjectValue, compScale.unit, compScale.noun)}.`
-                      : `Bars: each comp's basis per ${compScale.unit === "unit" ? compScale.noun : "SF"}, scaled to the widest in the set.`}
-                  </Text>
-                ) : null}
+                {g.label === "Sale comps" && compTracks
+                  ? compTracks.tracks.map((t, k) => {
+                      const per = t.unit === "unit" ? t.noun : "SF";
+                      // Two tracks: each caption says which comps it draws.
+                      const which =
+                        compTracks.tracks.length > 1
+                          ? `the ${compTracks.counts[k]} ${compTracks.counts[k] === 1 ? "comp" : "comps"} stating a price per ${per}`
+                          : "each comp";
+                      return (
+                        <Text key={t.unit} style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
+                          {t.subjectValue != null
+                            ? `Bars: ${which}, per ${per}; the tick is the subject at ${fmtBasis(t.subjectValue, t.unit, t.noun)}.`
+                            : `Bars: ${which}, per ${per}, scaled to the widest in the set.`}
+                        </Text>
+                      );
+                    })
+                  : null}
               </View>
             ))}
           {redFlags.length > 0 && (
