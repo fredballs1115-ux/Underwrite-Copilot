@@ -41,6 +41,7 @@ export function PublicCompsPanel({
   hasAddress,
   subject,
   today,
+  dbMarketsLine = "",
 }: {
   dealId: string;
   result: RecordCompsResult | null;
@@ -50,6 +51,9 @@ export function PublicCompsPanel({
   /** the reader's day (ISO), read once by the page: a stored pull past
    *  STALE_PULL_DAYS says when it was pulled and asks for a refresh */
   today: string;
+  /** the property database's markets holding recorded sales, by name, for
+   *  the no-source sentence */
+  dbMarketsLine?: string;
 }) {
   if (!hasAddress) return null; // the research panel already asks for an address
 
@@ -68,7 +72,7 @@ export function PublicCompsPanel({
       ) : (
         <>
           <PulledOn retrievedAt={result.retrievedAt} today={today} />
-          <CompsResultView result={result} subject={subject} />
+          <CompsResultView result={result} subject={subject} dbMarketsLine={dbMarketsLine} />
         </>
       )}
     </section>

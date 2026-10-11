@@ -40,6 +40,7 @@ export function CompsResultView({
   result,
   subject = null,
   showMap = false,
+  dbMarketsLine = "",
 }: {
   result: RecordCompsResult;
   /** the deal the sales are read for, where there is one: its building
@@ -48,12 +49,17 @@ export function CompsResultView({
   subject?: SubjectForCall | null;
   /** draw the sales on a map (the comps page; the deal page has its own) */
   showMap?: boolean;
+  /** the property database's markets holding recorded sales today, said by
+   *  name ("New York City and Boston"; lib/public-comps/db-coverage), "" for
+   *  none or unread — named beside the live sources where no source reaches */
+  dbMarketsLine?: string;
 }) {
   if (result.status === "no_provider") {
     return (
       <p className="mt-2 text-sm text-muted">
         No public-records source is wired for this jurisdiction yet — live
         today: {COVERAGE_SUMMARY}
+        {dbMarketsLine ? `; in the property database: ${dbMarketsLine}` : ""}
         {COVERAGE_DISCOVERY.length > 0 && (
           <>
             {"; being wired: "}

@@ -59,6 +59,8 @@ import { dealTypeLabel, interestOf, interestTag, isTenancyInCommon, readInterest
 import { subjectBasis } from "@/lib/comp-detail";
 import { condoUnitsOffered } from "@/lib/condo-units";
 import type { SubjectForCall } from "@/lib/public-comps/vs-median";
+import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
+import { marketNames } from "@/lib/public-comps/db-markets";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { capSlotWithheld, goingInCapFigure, modelReturnsRead } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -1162,6 +1164,11 @@ export default async function DealPage({
     portfolio: readPortfolio(extraction) !== null,
     planOrLand: strategy.kind === "development" || strategy.kind === "conversion" || compsClassKey === "land_infill",
   };
+  // Where no source reaches the deal, the no-source sentence names the
+  // property database's markets that hold recorded sales (the cached count
+  // read), read only then.
+  const compsDbMarketsLine =
+    publicComps?.status === "no_provider" ? marketNames(await dbMarketsWithSales()) : "";
   // Also re-kick a lingering "pending" sentinel: a deploy can kill the
   // after() worker between claim and result, and claimRecordComps's
   // stale-pending reclaim (10-min threshold) is only reachable if someone
@@ -1884,6 +1891,7 @@ export default async function DealPage({
           hasAddress={!!dealAddress?.label}
           subject={compsCallSubject}
           today={todayIso}
+          dbMarketsLine={compsDbMarketsLine}
         />
         <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} today={todayIso} />
         <PublicRecordCard

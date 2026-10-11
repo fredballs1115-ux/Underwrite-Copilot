@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { parseStructuredAddress } from "@/lib/address";
 import { coveredState, metroForAddress } from "@/lib/market-match";
-import { COVERAGE_DISCOVERY, COVERAGE_LIVE } from "@/lib/public-comps/core";
 import { computeRecordComps } from "@/lib/public-comps/run";
 import { AddressAutocomplete } from "../address-autocomplete";
 import { CompsResultView } from "./result-view";
+import { CoverageChips } from "./coverage-chips";
+import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
+import { marketNames } from "@/lib/public-comps/db-markets";
 
 export const metadata: Metadata = { title: "Pull comps" };
 // Every render with an address hits the geocoder + the property DB / live
@@ -47,6 +49,9 @@ export default async function PullCompsPage({
         hasStreet: picked ? !!picked.street?.trim() : true,
       })
     : null;
+  // The property database's markets that hold recorded sales today (the
+  // cached count read), named on the chips and in a no-source sentence.
+  const dbMarkets = await dbMarketsWithSales();
   // Same chip the deal page shows: one click from a comps pull to the
   // address's market brief (rules, rents, data coverage).
   const metro = picked ? metroForAddress(picked) : null;
@@ -59,7 +64,7 @@ export default async function PullCompsPage({
           Recorded sales around an address, from the public record — the same
           read every screened deal gets.
         </p>
-        <CoverageChips />
+        <CoverageChips dbMarkets={dbMarkets} />
       </header>
 
       <form method="get" className="flex flex-wrap items-end gap-2">
@@ -142,7 +147,7 @@ export default async function PullCompsPage({
               </Link>
             </p>
           ) : null}
-          <CompsResultView result={result} showMap />
+          <CompsResultView result={result} showMap dbMarketsLine={marketNames(dbMarkets)} />
         </section>
       ) : (
         <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
@@ -168,36 +173,5 @@ export default async function PullCompsPage({
         </section>
       )}
     </div>
-  );
-}
-
-/** Where the records reach, as chips: each live source's region, then the
- *  property database's markets, then the sources still being wired (muted). */
-function CoverageChips() {
-  return (
-    <ul className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]" aria-label="Where recorded sales are read">
-      {COVERAGE_LIVE.map((p) => (
-        <li
-          key={p.id}
-          className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 font-medium text-brand"
-        >
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
-          {p.regionLabel}
-        </li>
-      ))}
-      <li className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 font-medium text-brand">
-        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
-        Markets in the property database
-      </li>
-      {COVERAGE_DISCOVERY.map((p) => (
-        <li
-          key={p.id}
-          className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 text-muted"
-          title="Being wired: not read yet"
-        >
-          {p.regionLabel} · being wired
-        </li>
-      ))}
-    </ul>
   );
 }

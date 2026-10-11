@@ -10,6 +10,8 @@ import { CompsResultView } from "../app/(app)/comps/result-view";
 import type { RecordComp, RecordCompsResult } from "./public-comps/core";
 import { compStats } from "./public-comps/core";
 import type { SubjectForCall } from "./public-comps/vs-median";
+import { DB_MARKETS, marketNames } from "./public-comps/db-markets";
+import { CoverageChips } from "../app/(app)/comps/coverage-chips";
 import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 const sale = (i: number, over: Partial<RecordComp> = {}): RecordComp => ({
@@ -152,6 +154,25 @@ describe("the comps readout as pictures", () => {
     ).replace(/\s+/g, " ");
     expect(db).toContain("Sales by quarter, to Aug 31, 2026");
     expect(db).toContain("its records last ingested Aug 31, 2026");
+  });
+
+  it("names only the property database's markets that hold sales, on the chips and in the no-source line", () => {
+    const none = renderToStaticMarkup(React.createElement(CoverageChips, { dbMarkets: [] }));
+    expect(visibleText(none)).not.toContain("property database");
+    const held = DB_MARKETS.filter((m) => m.metroId === "nyc" || m.metroId === "boston");
+    const two = renderToStaticMarkup(React.createElement(CoverageChips, { dbMarkets: held }));
+    expect(two.split('data-qa="coverage-db"').length - 1).toBe(2);
+    expect(visibleText(two)).toContain("New York City · property database");
+    expect(a11yIssues(two)).toEqual([]);
+    const line = marketNames(held);
+    expect(line).toBe("New York City and Boston");
+    const html = renderToStaticMarkup(
+      React.createElement(CompsResultView, {
+        result: { status: "no_provider", comps: [], retrievedAt: "2026-10-08T12:00:00Z", note: "Public records." },
+        dbMarketsLine: line,
+      }),
+    );
+    expect(visibleText(html)).toContain("; in the property database: New York City and Boston");
   });
 
   it("numbers the rows as their pins and folds the sales past twelve", () => {
