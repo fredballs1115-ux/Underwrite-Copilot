@@ -81,7 +81,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Your data stays yours",
     body: [
-      "Documents are private to your account and, if you create one, your team. The market data built from your past screens is private to you alone.",
+      "Documents are private to your account and, if you create or join one, your team. The market data built from your past screens is private to you alone.",
       "Nothing you upload is used to train AI models. The security page has the full detail.",
     ],
   },
