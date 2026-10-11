@@ -219,6 +219,52 @@ export function basisScale(
   };
 }
 
+/** Every comp on the track of the basis it states: a comp stating a price a
+ *  unit on the per-unit track, one stating only a price a foot on the
+ *  per-SF track, each track with the subject's tick where the subject has
+ *  that basis. `basisScale` puts the set on ONE track and drops a comp that
+ *  states only the other yardstick (the comps research pass's M14); the
+ *  deal page's bars draw from this so no comp that states a basis goes
+ *  undrawn. Null where no comp states a basis. */
+export interface BasisTracks {
+  /** one scale a yardstick some comp states, per unit first */
+  tracks: BasisScale[];
+  /** each comp's track (an index into `tracks`), null where it states none */
+  trackOf: (number | null)[];
+  /** how many comps each track draws */
+  counts: number[];
+}
+
+export function basisTracks(
+  comps: ReadonlyArray<{ detail?: string | null }>,
+  subject: SubjectBasis | null,
+  noun = "unit",
+): BasisTracks | null {
+  const figures = comps.map((c) => compFigures(c.detail));
+  const unitOf = figures.map((f): "unit" | "sf" | null => (f.perUnit != null ? "unit" : f.perSf != null ? "sf" : null));
+  const tracks: BasisScale[] = [];
+  const counts: number[] = [];
+  for (const unit of ["unit", "sf"] as const) {
+    const values = figures.map((f, i) => (unitOf[i] === unit ? (unit === "unit" ? f.perUnit : f.perSf) : null));
+    const drawn = values.filter((v) => v != null).length;
+    if (drawn === 0) continue;
+    const subjectValue = subject ? (unit === "unit" ? subject.perUnit : subject.perSf) : null;
+    const max = Math.max(...values.map((v) => v ?? 0), subjectValue ?? 0);
+    if (max <= 0) continue;
+    tracks.push({
+      unit,
+      noun,
+      max,
+      shares: values.map((v) => (v != null ? Math.min(1, v / max) : null)),
+      subjectShare: subjectValue != null ? Math.min(1, subjectValue / max) : null,
+      subjectValue,
+    });
+    counts.push(drawn);
+  }
+  if (tracks.length === 0) return null;
+  return { tracks, trackOf: unitOf.map((u) => (u ? tracks.findIndex((t) => t.unit === u) : null)).map((i) => (i != null && i >= 0 ? i : null)), counts };
+}
+
 /** "$274k/unit", "$410/SF" or, given the class's noun, "$274k/key" — the
  *  caption a bar's tooltip uses. */
 export function fmtBasis(value: number, unit: "unit" | "sf", noun = "unit"): string {

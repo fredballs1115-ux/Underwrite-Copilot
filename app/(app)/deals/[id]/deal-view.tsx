@@ -2018,7 +2018,11 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
             <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
               <th className="py-1.5 pr-3 font-medium">Deal</th>
               <th className="py-1.5 pr-3 font-medium">Screened</th>
-              <th className="py-1.5 pr-3 text-right font-medium">Price</th>
+              {/* Each figure is a memorandum's asking price, never a price
+                  anyone paid (the deal page's "at the ask" rule). */}
+              <th className="py-1.5 pr-3 text-right font-medium" title="The memorandum's asking price, not a sale price">
+                Ask
+              </th>
               <th className="py-1.5 pr-3 text-right font-medium">Cap</th>
               <th className="py-1.5 pr-3 text-right font-medium">Basis</th>
               <th className="py-1.5 text-right font-medium">Call</th>

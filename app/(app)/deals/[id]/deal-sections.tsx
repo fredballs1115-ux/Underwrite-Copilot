@@ -21,7 +21,8 @@ import { CompsMap, type MapComp } from "./comps-map";
 import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
-import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
+import { basisTracks, fmtBasis, type BasisTracks, type SubjectBasis } from "@/lib/comp-detail";
+import { LISTING_NOT_SALE, saysListing } from "@/lib/web-comp-read";
 import { gapDisagreementLine, gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { basePosition, firstNumber, rangeInOrder } from "@/lib/verdict-range";
@@ -1031,6 +1032,9 @@ export function BrokerComps({
           market={mapContext.market}
           comps={mapComps}
           subjectPoint={mapContext.subjectPoint ?? null}
+          // The OM's sale comps are listed once, in the table below with
+          // their pins; the map's own table lists the public-web comps.
+          tableKinds={["web"]}
         />
       )}
       {redFlags.length > 0 && (
@@ -1055,7 +1059,14 @@ export function BrokerComps({
         </div>
       )}
       {saleComps.length > 0 && (
-        <CompTable title="Sale comps" comps={saleComps} subject={subject ?? null} noun={noun} />
+        <CompTable
+          title="Sale comps"
+          comps={saleComps}
+          subject={subject ?? null}
+          noun={noun}
+          pins={!!mapContext && mapComps.length > 0}
+          cite={mapContext ? { omUrl: mapContext.omUrl, totalPages: mapContext.totalPages } : null}
+        />
       )}
       {leaseComps.length > 0 && (
         <CompTable title="Lease comps" comps={leaseComps} />
@@ -1081,6 +1092,14 @@ export function BrokerComps({
       />
     </section>
   );
+}
+
+/** The day a public-web search ran, "Oct 8, 2026" (UTC), or "". */
+function searchedDay(iso: string | null | undefined): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(t)
+    ? new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : "";
 }
 
 function PublicWebComps({
@@ -1147,6 +1166,7 @@ function PublicWebComps({
         <div className="mt-3">
           <p className="text-xs leading-relaxed text-muted">
             {compSearch.summary}
+            {searchedDay(compSearch.searchedAt) ? ` Searched ${searchedDay(compSearch.searchedAt)}.` : ""}
           </p>
           {compSearch.candidates.length > 0 && (
             <div className="mt-2 space-y-2">
@@ -1178,6 +1198,11 @@ function PublicWebComps({
                   {c.note && (
                     <p className="mt-1 text-xs leading-relaxed text-muted">
                       {c.note}
+                    </p>
+                  )}
+                  {saysListing(c) && (
+                    <p className="mt-1 text-xs leading-relaxed text-caution" data-qa="web-comp-listing">
+                      {LISTING_NOT_SALE}
                     </p>
                   )}
                   {/* A source becomes a link only where it is a page the
@@ -1214,12 +1239,47 @@ function PublicWebComps({
   );
 }
 
+/** A comp's pin on the map above, its number the map's. */
+function PinBadge({ n }: { n: number }) {
+  return (
+    <span
+      className="mr-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 align-[1px] text-[10px] font-bold text-white"
+      title={`Pin ${n} on the map`}
+    >
+      <span className="sr-only">Pin </span>
+      {n}
+    </span>
+  );
+}
+
+/** "OM p. 14", linked to the page where the memorandum opens. */
+function PageCite({ page }: { page: { n: number; href: string | null } | null }) {
+  if (!page) return null;
+  return page.href ? (
+    <a
+      href={page.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-0.5 inline-block text-[11px] font-medium text-brand hover:text-brand-strong"
+      data-qa="comp-page"
+    >
+      {`OM p. ${page.n}`}
+    </a>
+  ) : (
+    <span className="mt-0.5 inline-block text-[11px] text-muted" data-qa="comp-page">
+      {`OM p. ${page.n}`}
+    </span>
+  );
+}
+
 /** A comp's stated basis on the set's track with the subject's tick — the
  *  same picture in the table cell and the phone card. The words a screen
  *  reader gets are in the span; the tooltip repeats them for a pointer. */
-function CompBasisBar({ scale, index }: { scale: BasisScale; index: number }) {
-  const share = scale.shares[index];
-  if (share == null) return null;
+function CompBasisBar({ tracks, index }: { tracks: BasisTracks; index: number }) {
+  const t = tracks.trackOf[index];
+  const scale = t != null ? tracks.tracks[t] : null;
+  const share = scale ? scale.shares[index] : null;
+  if (!scale || share == null) return null;
   const own = fmtBasis(share * scale.max, scale.unit, scale.noun);
   const words =
     scale.subjectValue != null
@@ -1250,9 +1310,17 @@ function CompTable({
   comps,
   subject,
   noun = "unit",
+  pins = false,
+  cite = null,
 }: {
   title: string;
   comps: BrokerComp[];
+  /** the comps map above draws these comps as numbered pins: each row wears
+   *  its pin's number, so the map and this one table read together */
+  pins?: boolean;
+  /** where a comp states the memorandum's page, the row cites it — linked
+   *  where the OM opens (its route signs on click) */
+  cite?: { omUrl: string | null; totalPages?: number | null } | null;
   /** what a unit is called on this deal — the bars' captions say "/key" */
   noun?: string;
   /** sale comps carry the subject (null when it has no basis) and draw their
@@ -1261,16 +1329,23 @@ function CompTable({
 }) {
   const INITIAL = 4;
   const [open, setOpen] = useState(false);
-  // Risk first — a stretched comp must never hide behind "Show all".
-  const ordered = [...comps].sort(
-    (a, b) =>
-      (COMP_RATING[a.support]?.rank ?? 1) - (COMP_RATING[b.support]?.rank ?? 1),
-  );
+  // Risk first — a stretched comp must never hide behind "Show all". Each
+  // keeps its place in the memorandum's list, which is its pin's number.
+  const orderedAt = comps
+    .map((c, at) => ({ c, at }))
+    .sort((a, b) => (COMP_RATING[a.c.support]?.rank ?? 1) - (COMP_RATING[b.c.support]?.rank ?? 1));
+  const ordered = orderedAt.map((o) => o.c);
   const shown = open ? ordered : ordered.slice(0, INITIAL);
   // Every comp's stated basis on one track, the subject's as a tick — read
   // once from the detail lines (lib/comp-detail), never inferred. Indexed
   // against `ordered`, of which `shown` is a prefix.
-  const scale = subject === undefined ? null : basisScale(ordered, subject, noun);
+  const scale = subject === undefined ? null : basisTracks(ordered, subject, noun);
+  /** The pin and the page a row carries, by its place in `ordered`. */
+  const pinOf = (i: number) => (pins ? orderedAt[i].at + 1 : null);
+  const pageOf = (c: BrokerComp) => {
+    const n = cite ? locatedPage(c.page, cite.totalPages) : null;
+    return n ? { n, href: cite?.omUrl ? `${cite.omUrl}#page=${n}` : null } : null;
+  };
   const counts = { stretched: 0, favorable: 0, supports: 0 };
   for (const c of comps) counts[c.support] = (counts[c.support] ?? 0) + 1;
   return (
@@ -1296,7 +1371,10 @@ function CompTable({
           return (
             <li key={i} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <p className="min-w-0 break-words text-sm font-medium">{c.name}</p>
+                <p className="min-w-0 break-words text-sm font-medium">
+                  {pinOf(i) != null && <PinBadge n={pinOf(i)!} />}
+                  {c.name}
+                </p>
                 <span
                   className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
                 >
@@ -1306,8 +1384,9 @@ function CompTable({
               {c.note && <p className="mt-1 text-xs leading-relaxed text-muted">{c.note}</p>}
               <p className="mt-1.5 break-words font-mono text-xs leading-relaxed tabular-nums text-muted">
                 {c.detail}
-                {scale && <CompBasisBar scale={scale} index={i} />}
+                {scale && <CompBasisBar tracks={scale} index={i} />}
               </p>
+              <PageCite page={pageOf(c)} />
             </li>
           );
         })}
@@ -1330,16 +1409,20 @@ function CompTable({
                   className="border-b border-line align-top transition-colors last:border-0 hover:bg-faint/60"
                 >
                   <td className="min-w-[14rem] px-4 py-3">
-                    <p className="break-words font-medium">{c.name}</p>
+                    <p className="break-words font-medium">
+                      {pinOf(i) != null && <PinBadge n={pinOf(i)!} />}
+                      {c.name}
+                    </p>
                     {c.note && (
                       <p className="mt-0.5 text-xs leading-relaxed text-muted">
                         {c.note}
                       </p>
                     )}
+                    <PageCite page={pageOf(c)} />
                   </td>
                   <td className="min-w-[9rem] max-w-[16rem] break-words px-4 py-3 font-mono text-xs leading-relaxed tabular-nums text-muted">
                     {c.detail}
-                    {scale && <CompBasisBar scale={scale} index={i} />}
+                    {scale && <CompBasisBar tracks={scale} index={i} />}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
@@ -1355,12 +1438,22 @@ function CompTable({
         </table>
       </div>
       {scale && (
-        // The legend for the bars: one line, so the tick needs no guessing.
-        <p className="mt-1.5 text-[11px] text-muted">
-          {scale.subjectValue != null
-            ? `Bars: each comp's basis per ${scale.unit === "unit" ? scale.noun : "SF"}; the tick is the subject at ${fmtBasis(scale.subjectValue, scale.unit, scale.noun)}.`
-            : `Bars: each comp's basis per ${scale.unit === "unit" ? scale.noun : "SF"}, scaled to the widest in the set.`}
-        </p>
+        // The legend for the bars: a line a yardstick, each saying how many
+        // comps it draws, so the tick needs no guessing and no comp that
+        // states a basis goes undrawn.
+        <div className="mt-1.5 space-y-0.5 text-[11px] text-muted">
+          {scale.tracks.map((t, k) => {
+            const per = t.unit === "unit" ? t.noun : "SF";
+            const drawn = `${scale.counts[k]} ${scale.counts[k] === 1 ? "comp" : "comps"}`;
+            return (
+              <p key={t.unit}>
+                {t.subjectValue != null
+                  ? `Bars per ${per} (${drawn}): each comp's stated basis; the tick is the subject at ${fmtBasis(t.subjectValue, t.unit, t.noun)}.`
+                  : `Bars per ${per} (${drawn}): each comp's stated basis, scaled to the widest of them.`}
+              </p>
+            );
+          })}
+        </div>
       )}
       {comps.length > INITIAL && (
         <button

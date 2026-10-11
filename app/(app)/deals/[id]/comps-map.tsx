@@ -89,6 +89,9 @@ async function geocode(q: string): Promise<Hit | null> {
 
 type SortKey = "distance" | "name" | "kind";
 
+/** Every kind of comp, listed in the card's own table by default. */
+const ALL_KINDS: readonly MapComp["kind"][] = ["om", "web"];
+
 const PIN_COLOR: Record<MapComp["kind"], string> = {
   om: "#114e54",
   web: "#a05a1c",
@@ -132,6 +135,7 @@ export function CompsMap({
   market,
   comps,
   subjectPoint = null,
+  tableKinds = ALL_KINDS,
 }: {
   /** the subject's street address, or "" — never the market's name, whose
    *  centre is no building */
@@ -145,6 +149,9 @@ export function CompsMap({
    *  pictures are drawn around; the map geocodes the address only where the
    *  page has none */
   subjectPoint?: SubjectPoint | null;
+  /** the kinds of comp this card's table lists: the deal page lists the OM's
+   *  own comps once, in their table with the pins, and this one the rest */
+  tableKinds?: readonly MapComp["kind"][];
 }) {
   const [placed, setPlaced] = useState<Placed[] | null>(null);
   const [subjectPos, setSubjectPos] = useState<LatLng | null>(null);
@@ -388,8 +395,12 @@ export function CompsMap({
       const db = b.distanceKm ?? Infinity;
       return da - db || a.name.localeCompare(b.name);
     });
-    return list;
-  }, [placed, comps, sortKey]);
+    return list.filter((c) => tableKinds.includes(c.kind));
+  }, [placed, comps, sortKey, tableKinds]);
+  // The OM comps' pins, where another table lists them: said once, so a pin
+  // with no row here is never a mystery.
+  const omPins = comps.filter((c) => c.kind === "om").length;
+  const omElsewhere = omPins > 0 && !tableKinds.includes("om");
 
   const placedCount = placed?.filter((c) => c.pos).length ?? 0;
 
@@ -474,6 +485,15 @@ export function CompsMap({
         </div>
       )}
 
+      {omElsewhere && (
+        <p className="mt-2 text-[11px] text-muted" data-qa="map-om-pins">
+          {omPins === 1
+            ? "Pin 1 is the sale comp in the table below."
+            : `Pins 1–${omPins} are the sale comps in the table below, by the same numbers.`}
+        </p>
+      )}
+
+      {rows.length > 0 && (
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -547,6 +567,7 @@ export function CompsMap({
           </tbody>
         </table>
       </div>
+      )}
 
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
         Pins are approximate, geocoded from stated addresses; a comp that
