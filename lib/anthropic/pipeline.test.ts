@@ -909,7 +909,7 @@ describe("runAnalysis — the happy path", () => {
     // as the chip's does.
     const { scoreMandateFit } = await import("@/lib/mandate");
     expect(input.buyBoxChecks?.mandate).toEqual(scoreMandateFit("multifamily", dealCheckSource(EXTRACTION, signal, null), box));
-    expect(input.buyBoxChecks?.mandate?.dealbreakerCriteria).toEqual([{ label: "Price dealbreaker", checked: true, onPrice: true }]);
+    expect(input.buyBoxChecks?.mandate?.dealbreakerCriteria).toEqual([{ label: "Price dealbreaker", checked: true, onPrice: true, tripped: true }]);
 
     // A read of the checks that fails (here, a first signal stored without
     // its going-in cap) leaves the criteria in the brief, as before.
