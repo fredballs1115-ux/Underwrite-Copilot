@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
-import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
+import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFit } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { ScrollProgress } from "./scroll-progress";
 import type { Metadata } from "next";
@@ -28,7 +28,7 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
-import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
+import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
 import { ruleCounts } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
@@ -272,6 +272,22 @@ const XLSX_PREVIEW_ROWS: [string, string, string][] = sampleWorkbookPreview();
 // The stress bench's base: the same derivation, run here so the browser
 // gets the inputs and never the derivation (its readers hold data tables).
 const BENCH = sampleDerivedInputs();
+
+// The sample against its demo buy box, read the way the deal page's header
+// reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, a criterion the
+// box misses outright winning the chip, and every criterion the count
+// counts — so no surface here says what the product's own header would not.
+const SAMPLE_READ = buyBoxRead(
+  SAMPLE_DEAL.asset_class,
+  dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
+  SAMPLE_DEMO_BOX,
+);
+const SAMPLE_FIT: SampleFit = {
+  label: SAMPLE_READ.chip.label,
+  cls: BUY_BOX_CHIP_CLS[SAMPLE_READ.chip.tone],
+  ...(SAMPLE_READ.chip.note ? { note: SAMPLE_READ.chip.note } : {}),
+  criteria: boxCriteria(SAMPLE_READ.checks, SAMPLE_READ.mandate),
+};
 
 // The plan cards' lists are the billing page's too (lib/marketing-constants
 // FREE_PLAN, PRO_PLAN_LINES), each Pro line held to the gate that makes it
@@ -829,7 +845,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={legal} />
+              <DemoTabs legal={legal} fit={SAMPLE_FIT} />
             </Reveal>
           </div>
         </section>
@@ -1020,25 +1036,10 @@ export default function Home() {
                 {/* Buy box */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <h3 className="text-sm font-semibold">Your buy box, checked in code</h3>
-                  <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-medium">
-                    {(
-                      [
-                        // The sample deal's own checks against its demo buy box
-                        // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
-                        ["✓", "Asset class", "text-pass border-line"],
-                        ["✓", "Units", "text-pass border-line"],
-                        ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
-                        ["—", "Target return", "text-muted border-line"],
-                      ] as const
-                    ).map(([mark, label, cls]) => (
-                      <span
-                        key={label}
-                        className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}
-                      >
-                        <span aria-hidden>{mark}</span>
-                        <span className="text-ink">{label}</span>
-                      </span>
-                    ))}
+                  {/* The sample deal's own checks against its demo buy box
+                      (lib/sample-deal SAMPLE_DEMO_BOX), every one the count counts. */}
+                  <div className="mt-4">
+                    <CriteriaChips criteria={SAMPLE_FIT.criteria} />
                   </div>
                 </div>
               </div>
@@ -1365,21 +1366,6 @@ function DealPreview() {
       : SAMPLE_DEAL.verdict.verdict === "pass_on"
         ? "No-go"
         : "Caution";
-  // The sample against its demo buy box, read the way the deal page's
-  // header reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, and a
-  // criterion the box misses outright winning the chip — so the card never
-  // says what the product's own header would not.
-  const fitChip = buyBoxRead(
-    SAMPLE_DEAL.asset_class,
-    dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
-    SAMPLE_DEMO_BOX,
-  ).chip;
-  const FIT_TONE: Record<BuyBoxChipTone, string> = {
-    pass: "bg-pass/10 text-pass",
-    caution: "bg-caution/10 text-caution",
-    kill: "bg-kill/10 text-kill",
-    muted: "bg-faint text-muted",
-  };
   return (
     <div className="relative">
       {/* Glow + a second sheet behind, so the card reads as a stack. */}
@@ -1398,9 +1384,9 @@ function DealPreview() {
             <span className="sr-only">Verdict: </span>
             {verdictWord}
           </span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FIT_TONE[fitChip.tone]}`}>
+          <span title={SAMPLE_FIT.note} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${SAMPLE_FIT.cls}`}>
             <span className="sr-only">Buy-box </span>
-            {fitChip.label}
+            {SAMPLE_FIT.label}
           </span>
         </div>
         <p className="mt-0.5 text-xs text-muted">

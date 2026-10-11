@@ -15,6 +15,7 @@ import {
   foldBuyBoxChecks,
   type BuyBox,
   type BuyBoxCheck,
+  type BuyBoxStatus,
   type SourceReads,
 } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore } from "@/lib/mandate";
@@ -116,6 +117,32 @@ export interface BuyBoxRead {
   mandate: MandateScore | null;
   /** the call as one chip */
   chip: BuyBoxChip;
+}
+
+/** One criterion of the box as a row of chips draws it. */
+export interface BoxCriterion {
+  label: string;
+  status: BuyBoxStatus;
+}
+
+const DIMENSION_STATUS = { pass: "pass", partial: "near", miss: "miss", unknown: "unknown" } as const;
+
+/**
+ * Every criterion the box sets, as the fit's coverage counts them
+ * (lib/criteria `buyBoxCoverage`): each check, then the cash-on-cash floor
+ * the score judges and no check lists, then each red line. A row of chips
+ * drawn from it counts what the chip's "N of M checked" counts: the
+ * homepage had drawn four of the sample box's five (research pass 43).
+ */
+export function boxCriteria(checks: BuyBoxCheck[], mandate: MandateScore | null): BoxCriterion[] {
+  const rows: BoxCriterion[] = checks.map((c) => ({ label: c.label, status: c.status }));
+  for (const d of mandate?.dimensions ?? []) {
+    if (d.key === "coc") rows.push({ label: d.label, status: DIMENSION_STATUS[d.status] });
+  }
+  for (const red of mandate?.dealbreakerCriteria ?? []) {
+    rows.push({ label: red.label, status: !red.checked ? "unknown" : red.tripped ? "miss" : "pass" });
+  }
+  return rows;
 }
 
 /** The deal's checks, its mandate-fit score and the one chip they fold to. */

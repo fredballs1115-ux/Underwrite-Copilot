@@ -112,6 +112,9 @@ export interface DealbreakerCriterion {
   /** whether the price decides it — the price ceiling, the cap floor, the
    *  basis ceiling — so a fit judged without it is no green light */
   onPrice: boolean;
+  /** whether this red line is the one the deal crosses (checked and
+   *  tripped), so a chip can mark it apart from the clear ones */
+  tripped?: boolean;
 }
 
 /** Each red line's name, as the coverage says it, and whether the price
@@ -275,7 +278,14 @@ export function evalDealbreakers(
   const clear: string[] = [];
   const unknown: string[] = [];
   const criteria: DealbreakerCriterion[] = [];
-  const judged = (name: keyof typeof RED_LINE, checked: boolean) => criteria.push({ ...RED_LINE[name], checked });
+  // Each block below files its red line under exactly one of tripped, clear
+  // or unknown, then calls `judged`: a longer tripped list is this one's.
+  let trippedSeen = 0;
+  const judged = (name: keyof typeof RED_LINE, checked: boolean) => {
+    const crossed = tripped.length > trippedSeen;
+    trippedSeen = tripped.length;
+    criteria.push({ ...RED_LINE[name], checked, tripped: crossed });
+  };
 
   // Asset class must be in the mandate list (needs a mandate list to mean
   // anything — inert without one).

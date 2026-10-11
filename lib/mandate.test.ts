@@ -197,8 +197,8 @@ describe("scoreMandateFit — unknowns never fake a pass or a fail", () => {
     expect(r.unresolvedDealbreakers).toBe(1);
     // Each red line, as the fit's coverage counts it.
     expect(r.dealbreakerCriteria).toEqual([
-      { label: "Asset-class dealbreaker", checked: true, onPrice: false },
-      { label: "Cap-rate dealbreaker", checked: false, onPrice: true },
+      { label: "Asset-class dealbreaker", checked: true, onPrice: false, tripped: false },
+      { label: "Cap-rate dealbreaker", checked: false, onPrice: true, tripped: false },
     ]);
     // With the cap stated, both are checked and the dimension passes whole.
     const stated = scoreMandateFit("multifamily", ex([["Going-in cap rate", "6.50%"]], { assetClass: "multifamily" }), box);

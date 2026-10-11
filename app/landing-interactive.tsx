@@ -12,6 +12,46 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { computeModel } from "@/lib/model/compute";
 import type { SampleLegal } from "@/lib/sample-legal";
 import { compactUsd } from "@/lib/money";
+import type { BoxCriterion } from "@/lib/buy-box-chip";
+
+/** The sample's fit against its demo buy box, read on the server through
+ *  the deal header's own reader (lib/buy-box-chip `buyBoxRead`), so the
+ *  walkthrough's call is the header's, never a word typed here. */
+export interface SampleFit {
+  label: string;
+  /** the chip's colours, the header's (`BUY_BOX_CHIP_CLS`) */
+  cls: string;
+  /** which criteria could not be checked, as the chip's tooltip says it */
+  note?: string;
+  /** every criterion the box sets (`boxCriteria`), as the count counts them */
+  criteria: BoxCriterion[];
+}
+
+const CRITERION_MARK: Record<BoxCriterion["status"], [string, string, string]> = {
+  pass: ["✓", "text-pass border-line", "met"],
+  near: ["~", "text-caution border-caution/30", "just short"],
+  miss: ["✕", "text-kill border-kill/30 bg-kill/[0.04]", "missed"],
+  unknown: ["—", "text-muted border-line", "not checked"],
+};
+
+/** The box's criteria as a row of chips: each one's mark, its name, and
+ *  for a screen reader what the mark says. */
+export function CriteriaChips({ criteria }: { criteria: BoxCriterion[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 text-[10px] font-medium">
+      {criteria.map(({ label, status }) => {
+        const [mark, cls, said] = CRITERION_MARK[status];
+        return (
+          <span key={label} className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}>
+            <span aria-hidden>{mark}</span>
+            <span className="text-ink">{label}</span>
+            <span className="sr-only">{`: ${said}`}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 function prefersReducedMotion(): boolean {
   return (
@@ -333,7 +373,7 @@ function LegalBlock({ legal }: { legal: SampleLegal }) {
 
 /** One tab's panel (exported for the homepage's render test, which holds
  *  the Financials tab to the deal page's first-draft card). */
-export function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
+export function DemoPanel({ tab, legal, fit }: { tab: Tab; legal: SampleLegal; fit: SampleFit }) {
   switch (tab) {
     case "Overview":
       return (
@@ -400,10 +440,10 @@ export function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
       return (
         <div className="space-y-3">
           <div className="rounded-lg border border-line p-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium">Mandate fit</p>
-              <span className="rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution">
-                WATCH
+              <span title={fit.note} className={`rounded-full px-2.5 py-0.5 text-right text-xs font-semibold ${fit.cls}`}>
+                {fit.label}
               </span>
             </div>
             <p className="mt-1.5 text-xs leading-relaxed text-muted">
@@ -411,26 +451,9 @@ export function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
               return targets, geographies, hard dealbreakers.
             </p>
           </div>
-          <div className="flex flex-wrap gap-1.5 text-[10px] font-medium">
-            {(
-              [
-                // The sample deal's own checks against its demo buy box
-                // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
-                ["✓", "Asset class", "text-pass border-line"],
-                ["✓", "Units", "text-pass border-line"],
-                ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
-                ["—", "Target return", "text-muted border-line"],
-              ] as const
-            ).map(([mark, label, cls]) => (
-              <span
-                key={label}
-                className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}
-              >
-                <span aria-hidden>{mark}</span>
-                <span className="text-ink">{label}</span>
-              </span>
-            ))}
-          </div>
+          {/* The sample deal's own checks against its demo buy box
+              (lib/sample-deal SAMPLE_DEMO_BOX), every one the count counts. */}
+          <CriteriaChips criteria={fit.criteria} />
           <p className="text-[10px] leading-relaxed text-muted">
             A deal can be well-underwritten and still be outside the box — it
             says so, from the first signal onward, and the verdict judges the
@@ -509,7 +532,7 @@ export function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
 }
 
 /** Tabbed walkthrough mirroring the real deal page's sections — sample data. */
-export function DemoTabs({ legal }: { legal: SampleLegal }) {
+export function DemoTabs({ legal, fit }: { legal: SampleLegal; fit: SampleFit }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
   function onKeys(e: KeyboardEvent<HTMLDivElement>) {
@@ -558,7 +581,7 @@ export function DemoTabs({ legal }: { legal: SampleLegal }) {
       {/* min-h pinned to the tallest panel so switching tabs never reflows
           the section — clicking around must feel solid, not jumpy. */}
       <div role="tabpanel" className="animate-fade min-h-[24rem] p-4" key={tab}>
-        <DemoPanel tab={tab} legal={legal} />
+        <DemoPanel tab={tab} legal={legal} fit={fit} />
       </div>
     </div>
   );

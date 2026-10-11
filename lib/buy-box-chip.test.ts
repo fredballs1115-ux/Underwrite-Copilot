@@ -28,7 +28,7 @@ vi.mock("@/lib/deal-picture", () => ({
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { BUY_BOX_NOT_READ, notifyAnalysisReady } from "./email";
-import { buyBoxChip, buyBoxChipText, buyBoxRead, dealCheckSource, sourceReadsOf } from "./buy-box-chip";
+import { boxCriteria, buyBoxChip, buyBoxChipText, buyBoxRead, dealCheckSource, sourceReadsOf } from "./buy-box-chip";
 import { FOLD_WORD, fitCellText, fitScoreLabel } from "./fit-label";
 import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox } from "./criteria";
 import { evalDealbreakers } from "./mandate";
@@ -770,5 +770,32 @@ describe("the box holds a deal only to the figures its price buys", () => {
       expect(detail, label).not.toMatch(/grossed up is|this interest|its entity/);
     }
     expect(checkOf(ra, "Target return")?.detail).toContain("not read as these interests' return");
+  });
+});
+
+describe("the box's criteria, as a row of chips counts them (research pass 43)", () => {
+  it("lists every criterion the chip's count counts: the checks, the cash-on-cash floor and each red line", () => {
+    const sample = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
+    const rows = boxCriteria(sample.checks, sample.mandate);
+    const coverage = buyBoxCoverage(sample.checks, sample.mandate);
+    expect(rows).toHaveLength(coverage.total);
+    expect(rows.filter((r) => r.status !== "unknown")).toHaveLength(coverage.checked);
+    expect(rows.find((r) => r.label === "Cash-on-cash")?.status).toBe("unknown");
+
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 2", basis: "na" as const });
+    const ex = {
+      dealName: "Main Street Flats",
+      assetClass: "multifamily",
+      market: "Dallas, TX",
+      metrics: [row("Asking price", "$80,000,000"), row("Going-in cap rate", "6.50%"), row("Price per unit", "$400,000"), row("Units", "200")],
+    } as unknown as ExtractionResult;
+    const box: BuyBox = { assetClasses: ["multifamily"], dealbreakers: { minCapPct: 6, maxPerUnitK: 300 } };
+    const r = buyBoxRead("multifamily", dealCheckSource(ex, null, null), box);
+    const red = boxCriteria(r.checks, r.mandate).filter((c) => /dealbreaker/.test(c.label));
+    expect(red).toEqual([
+      { label: "Cap-rate dealbreaker", status: "pass" },
+      { label: "Basis dealbreaker", status: "miss" },
+    ]);
+    expect(boxCriteria(r.checks, r.mandate)).toHaveLength(buyBoxCoverage(r.checks, r.mandate).total);
   });
 });

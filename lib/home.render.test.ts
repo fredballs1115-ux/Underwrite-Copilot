@@ -13,7 +13,8 @@ import type { SampleLegal } from "./sample-legal";
 import { DemoPanel } from "@/app/landing-interactive";
 import { StressBench } from "@/app/landing-stress";
 import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
-import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
+import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "./buy-box-chip";
+import { buyBoxCoverage } from "./criteria";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { SKYLINES, commonsPage } from "./skyline";
 import { METRO_VIEWS } from "./metro-imagery";
@@ -137,6 +138,42 @@ describe("the homepage, as a screen reader hears it", () => {
 // saying which — the Excel tile ran the first-draft model beside a link to
 // a workbook that runs the screening model, and the miniature of the deal
 // page printed "8.7%" where the page's own card says "8.72%".
+// The sample's fit as the page builds it (app/page.tsx SAMPLE_FIT).
+function sampleFit() {
+  const read = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
+  return {
+    label: read.chip.label,
+    cls: BUY_BOX_CHIP_CLS[read.chip.tone],
+    note: read.chip.note,
+    criteria: boxCriteria(read.checks, read.mandate),
+  };
+}
+
+// Research pass 43, L2: the walkthrough's Buy box tab printed a typed
+// "WATCH" beside the hero card's "Fit 63 · Outside box · 3 of 5 checked",
+// and both rows of chips drew four of the box's five criteria.
+describe("the homepage's buy box is the deal header's read", () => {
+  it("the Buy box tab prints the header's chip and every criterion its count counts", () => {
+    const fit = sampleFit();
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", legal: {} as SampleLegal, fit }));
+    expect(html).not.toContain("WATCH");
+    expect(html).toContain(`>${fit.label}</span>`);
+    const read = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
+    const total = buyBoxCoverage(read.checks, read.mandate).total;
+    expect(fit.label).toContain(`of ${total} checked`);
+    for (const c of fit.criteria) expect(html).toContain(`<span class="text-ink">${c.label}</span>`);
+    expect(html.match(/<span class="text-ink">/g)).toHaveLength(total);
+  });
+
+  it("the page's card of criteria draws the same five", async () => {
+    const html = await renderHome();
+    const at = html.indexOf("Your buy box, checked in code");
+    expect(at).toBeGreaterThan(-1);
+    const card = html.slice(at, html.indexOf("</div></div>", at));
+    for (const c of sampleFit().criteria) expect(card).toContain(`<span class="text-ink">${c.label}</span>`);
+  }, 60_000);
+});
+
 describe("the homepage's sample figures are the surfaces' own", () => {
   const words = (html: string) =>
     html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
@@ -175,7 +212,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
   }, 60_000);
 
   it("the miniature's Financials tab is the deal page's first-draft card: its figures, to its places, and its model's name", () => {
-    const panel = words(renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", legal: {} as SampleLegal })));
+    const panel = words(renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", legal: {} as SampleLegal, fit: sampleFit() })));
     const card = words(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model })));
     expect(card).toContain("Projected returns · first-draft model");
     expect(panel).toContain("Projected returns · first-draft model");
