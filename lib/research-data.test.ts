@@ -318,6 +318,19 @@ describe("HUD's fair market rents — the year in the data, the newest year only
     expect(merged).toEqual([pulled]);
   });
 
+  // Research pass 43, L7: the /demo card's "verified vs statute" and its
+  // statute link were typed, so the card would never go stale beside the
+  // rules panel that marks the same rule. It reads the rule from the file.
+  it("the demo's § 9-811 card reads its rule's status, date and source from the file, and ages by the research rule", () => {
+    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
+    const rule = seedRules().find((r) => r.id === "pa-philadelphia-eviction-diversion");
+    expect(rule).toBeTruthy();
+    expect(demo).toContain('seedRules().find((r) => r.id === "pa-philadelphia-eviction-diversion")');
+    expect(demo).toContain("staleMark(researchAge(evictionRule.as_of, today))");
+    expect(demo).toContain("href={evictionRule.source}");
+    expect(demo).not.toContain(`href="${rule!.source}"`);
+  });
+
   it("the demo prints Philadelphia's from the file, never a figure or a year typed", () => {
     const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
     expect(demo).toContain('metroFmr("philadelphia")');

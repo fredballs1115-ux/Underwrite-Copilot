@@ -9,7 +9,7 @@ import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct, screenYearOf }
 import { benchmark30, datedLong } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
-import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
+import { metroFmr, seedBenchmarks, seedRules, twoToFourMedian } from "@/lib/research-data";
 import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { rankLabel } from "@/lib/rank";
@@ -188,6 +188,11 @@ export default async function DemoPage() {
   // Past the research rule's limit from its month's last day, the month
   // keeps its place with its age and the stale mark (lib/research-age).
   const phillyMedianStale = phillyMedian ? staleMark(researchAge(phillyMedian.asOf, today)) : null;
+  // The § 9-811 card's rule, read from the rules file rather than typed: its
+  // status and its date are the file's, and past the research rule's limit
+  // the date carries its age and the stale mark (research pass 43, L7).
+  const evictionRule = seedRules().find((r) => r.id === "pa-philadelphia-eviction-diversion") ?? null;
+  const evictionStale = evictionRule ? staleMark(researchAge(evictionRule.as_of, today)) : null;
   // HUD's two-bedroom fair market rent with the fiscal year its research
   // block names (lib/fmr), never a figure or a year typed on the page.
   const phillyFmr = metroFmr("philadelphia");
@@ -447,6 +452,7 @@ export default async function DemoPage() {
             A real submarket, real rules.
           </h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {evictionRule && (
             <div className="rounded-xl border border-line bg-surface p-4">
               <div className="flex flex-wrap items-center gap-2">
                 {/* Dormant, as the rules panel below evaluates it: the rule
@@ -457,22 +463,33 @@ export default async function DemoPage() {
                 <span className="text-[11px] uppercase tracking-wide text-muted">
                   eviction procedure · Philadelphia
                 </span>
-                <span className="rounded bg-pass/10 px-1.5 py-px text-[10px] font-medium text-pass">
-                  verified vs statute
+                <span
+                  className={`rounded px-1.5 py-px text-[10px] font-medium ${evictionRule.status === "verified" ? "bg-pass/10 text-pass" : "bg-faint text-muted"}`}
+                >
+                  {evictionRule.status === "verified" ? "verified vs statute" : evictionRule.status.replace(/_/g, " ")}
+                </span>
+                <span className="text-[10px] text-muted">
+                  {`as of ${datedLong(evictionRule.as_of)}`}
+                  {evictionStale && (
+                    <span className="text-caution" data-qa="research-stale">{` (${evictionStale})`}</span>
+                  )}
                 </span>
               </div>
               <p className="mt-2 text-sm leading-relaxed">
                 Philadelphia Code § 9-811: 30 days in the Eviction Diversion Program before any filing — a month to add to any eviction the owner files.
               </p>
-              <a
-                href="https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1.5 inline-block text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-              >
-                read the statute
-              </a>
+              {evictionRule.source && (
+                <a
+                  href={evictionRule.source}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1.5 inline-block text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  read the statute
+                </a>
+              )}
             </div>
+            )}
             <div className="rounded-xl border border-line bg-surface p-4">
               <p className="text-[11px] uppercase tracking-wide text-muted">
                 Published benchmarks · wider than the submarket
