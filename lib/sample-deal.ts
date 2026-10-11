@@ -440,7 +440,7 @@ const verdict: VerdictResult = {
   ],
   nextSteps: [
     "Pull three renovated-comp leases to test the rent premium.",
-    "Re-run returns at a flat 5.5% exit and real in-place vacancy.",
+    "Re-run returns at a 5.50% exit, 5 bps over the 5.45% going-in, and real in-place vacancy.",
   ],
   screen: {
     ranges: [
@@ -490,7 +490,7 @@ const verdict: VerdictResult = {
       {
         lever: "exit",
         read: "Underwritten at a 5.25% exit, inside going-in.",
-        risk: `A flat 5.5% exit knocks roughly ${bpsFrom(irrWith({ exitCapPct: 5.25 }))} off the IRR.`,
+        risk: `A 5.50% exit, 5 bps over going-in, knocks roughly ${bpsFrom(irrWith({ exitCapPct: 5.25 }))} off the IRR.`,
       },
       {
         lever: "debt",

@@ -1281,9 +1281,9 @@ describe("MemoDocument (redesigned)", () => {
       React.createElement(MemoDocument, { data: buildMemoData(deal, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
-    // The sample's exit killer: "A flat 5.5% exit knocks roughly N bps off
+    // The sample's exit killer: "A 5.50% exit, 5 bps over going-in, knocks roughly N bps off
     // the IRR" — the verdict step's estimate, computed by no engine.
-    expect(text).toMatch(/Breaks if \(screen's estimate\): A flat 5\.5% exit knocks roughly \d+ bps off the IRR\./);
+    expect(text).toMatch(/Breaks if \(screen's estimate\): A 5\.50% exit, 5 bps over going-in, knocks roughly \d+ bps off the IRR\./);
     expect(text).not.toContain("Breaks if: ");
     expect(text).toContain("WHERE THE CALL FLIPS — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
   }, 30000);
