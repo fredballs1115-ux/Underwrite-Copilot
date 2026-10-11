@@ -15,6 +15,7 @@ import {
   evidenceNote,
   medianLabel,
   dayText,
+  failureSentence,
   noSalesSentence,
   perSqftPhrase,
   salesPhrase,
@@ -41,6 +42,7 @@ export function CompsResultView({
   subject = null,
   showMap = false,
   dbMarketsLine = "",
+  onDeal = false,
 }: {
   result: RecordCompsResult;
   /** the deal the sales are read for, where there is one: its building
@@ -53,6 +55,9 @@ export function CompsResultView({
    *  name ("New York City and Boston"; lib/public-comps/db-coverage), "" for
    *  none or unread — named beside the live sources where no source reaches */
   dbMarketsLine?: string;
+  /** the readout sits on a deal (its panel refreshes the pull) rather than
+   *  on /comps, where the reader pulls again */
+  onDeal?: boolean;
 }) {
   if (result.status === "no_provider") {
     return (
@@ -71,13 +76,12 @@ export function CompsResultView({
     );
   }
 
+  // One sentence, never the source's own words (they go to the server log),
+  // and no pointer at the operator's health route.
   if (result.status === "geocode_failed" || result.status === "provider_error") {
     return (
-      <p className="mt-2 text-sm text-muted">
-        Couldn&apos;t pull recorded sales:{" "}
-        <span className="text-caution">{result.error ?? "unknown error"}</span>
-        {" — "}try again; if it persists, /api/comps/health shows what the
-        data source reported.
+      <p className="mt-2 text-sm text-caution" data-qa="comps-failed">
+        {failureSentence(result.status, onDeal)}
       </p>
     );
   }
@@ -96,6 +100,7 @@ export function CompsResultView({
       <p className="mt-2 text-sm text-muted" data-qa="comps-none">
         {noSalesSentence(result)} Thin comp evidence is itself a finding —
         treat pricing here as low-confidence.
+        {!onDeal && result.params?.classKey ? " Set the class to all recorded sales to see every sale here." : ""}
         {placement ? ` ${placement}` : ""}
       </p>
     );

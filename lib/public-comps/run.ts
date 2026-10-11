@@ -6,6 +6,7 @@ import {
   compStats,
   finalizeComps,
   HONESTY_NOTE,
+  lastGoodOf,
   providerFor,
   STORED_COMPS,
   type RecordComp,
@@ -43,16 +44,12 @@ const PENDING_STALE_MS = 10 * 60 * 1000;
  *  this caller won and should schedule runRecordComps. */
 export async function claimRecordComps(dealId: string, force = false): Promise<boolean> {
   const admin = createSupabaseAdminClient();
-  const sentinel = {
+  const sentinel: RecordCompsResult = {
     status: "pending",
     comps: [],
     retrievedAt: new Date().toISOString(),
     note: HONESTY_NOTE,
   };
-  if (force) {
-    await admin.from("deals").update({ public_comps: sentinel }).eq("id", dealId);
-    return true;
-  }
   const { data: deal } = await admin
     .from("deals")
     .select("id, public_comps")
@@ -60,6 +57,14 @@ export async function claimRecordComps(dealId: string, force = false): Promise<b
     .maybeSingle();
   if (!deal) return false;
   const existing = deal.public_comps as RecordCompsResult | null;
+  // The last set that answered rides on the sentinel, so a refresh in flight
+  // — or one that fails — never loses the deal its sales.
+  const previous = lastGoodOf(existing);
+  if (previous) sentinel.previous = previous;
+  if (force) {
+    await admin.from("deals").update({ public_comps: sentinel }).eq("id", dealId);
+    return true;
+  }
   if (existing) {
     const stalePending =
       existing.status === "pending" &&
@@ -363,7 +368,9 @@ export async function computeRecordComps(input: {
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) {
-      throw new Error(`${provider.id}: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`);
+      // The source's own words go to the server log, never the page.
+      console.error(`recorded sales: ${provider.id} answered HTTP ${res.status}:`, (await res.text()).slice(0, 300));
+      throw new Error(`${provider.id}: HTTP ${res.status}`);
     }
     const json = await res.json();
     // How many rows came back, parsed or not: a full answer is a source that
@@ -406,7 +413,8 @@ export async function computeRecordComps(input: {
       found: comps.length,
     };
   } catch (err) {
-    return { ...base, status: "provider_error", error: String(err).slice(0, 500) };
+    console.error("recorded sales: the live provider failed:", String(err).slice(0, 500));
+    return { ...base, status: "provider_error", error: `${provider.id}: no answer` };
   }
 }
 
@@ -415,8 +423,15 @@ export async function computeRecordComps(input: {
  *  tool), store the result on the deal. */
 export async function runRecordComps(dealId: string): Promise<void> {
   const admin = createSupabaseAdminClient();
+  // The last set that answered, read before the pull: a refresh that fails
+  // stores it back, said as the earlier pull's, rather than a failure over
+  // sales the deal already had (the comps research pass's M3).
+  let previous: RecordCompsResult | null = null;
   const store = async (result: RecordCompsResult) => {
-    await admin.from("deals").update({ public_comps: result }).eq("id", dealId);
+    const failed = result.status === "provider_error" || result.status === "geocode_failed";
+    const kept: RecordCompsResult =
+      failed && previous ? { ...previous, refreshFailed: { at: result.retrievedAt, status: result.status } } : result;
+    await admin.from("deals").update({ public_comps: kept }).eq("id", dealId);
   };
   const base = {
     comps: [],
@@ -427,11 +442,12 @@ export async function runRecordComps(dealId: string): Promise<void> {
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("id, address, asset_class, photo, extraction")
+      .select("id, address, asset_class, photo, extraction, public_comps")
       .eq("id", dealId)
       .maybeSingle();
     const address = (deal?.address as StructuredAddress | null) ?? null;
     if (!deal) return;
+    previous = lastGoodOf(deal.public_comps as RecordCompsResult | null);
     if (!address?.label) {
       // Claimed but the address vanished — record why instead of a stuck
       // pending sentinel.
@@ -467,10 +483,11 @@ export async function runRecordComps(dealId: string): Promise<void> {
       })
     );
   } catch (err) {
+    console.error("recorded sales: the pull failed:", String(err).slice(0, 500));
     await store({
       ...base,
       status: "provider_error",
-      error: String(err).slice(0, 500),
+      error: "the pull failed",
     });
   }
 }

@@ -175,6 +175,21 @@ describe("the comps readout as pictures", () => {
     expect(visibleText(html)).toContain("; in the property database: New York City and Boston");
   });
 
+  it("says a failed pull in its own words, never the source's or the operator's route", () => {
+    const html = draw({
+      status: "provider_error",
+      error: "philly_opa: HTTP 502 — <html>trace</html>",
+      comps: [],
+      retrievedAt: "2026-10-08T12:00:00Z",
+      note: "Public records.",
+    });
+    const text = visibleText(html);
+    expect(text).toContain("did not answer this pull");
+    expect(text).not.toMatch(/trace|HTTP 502|\/api\/comps\/health/);
+    const none = visibleText(draw({ ...result([]), status: "no_sales", stats: undefined }));
+    expect(none).not.toMatch(/widen|retrying later/);
+  });
+
   it("numbers the rows as their pins and folds the sales past twelve", () => {
     const comps = Array.from({ length: 15 }, (_, i) => sale(i));
     const text = visibleText(draw(result(comps)));

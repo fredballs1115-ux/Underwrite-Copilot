@@ -97,6 +97,52 @@ export interface RecordCompsResult {
    *  of the search. Absent on a live provider's result and on one stored
    *  before it was recorded. */
   ingestedThrough?: string;
+  /** on a pending pull: the last set that answered, kept while a refresh
+   *  runs so the deal never loses its sales to a pull in flight */
+  previous?: RecordCompsResult;
+  /** on a set kept after a refresh failed: when it failed and how. The set
+   *  is the earlier pull's, said as such — a failed refresh never replaces
+   *  sales that answered. */
+  refreshFailed?: { at: string; status: RecordCompsStatus };
+}
+
+/**
+ * The last set of sales a deal's pull answered with, or null: an "ok" result
+ * itself (less any set it carries), else the set a pending pull kept. A
+ * refresh that fails stores this back with `refreshFailed`.
+ */
+export function lastGoodOf(r: RecordCompsResult | null | undefined): RecordCompsResult | null {
+  if (!r) return null;
+  if (r.status === "ok") {
+    const own: RecordCompsResult = { ...r };
+    delete own.previous;
+    return own;
+  }
+  return r.previous && r.previous.status === "ok" ? lastGoodOf(r.previous) : null;
+}
+
+/** A kept set's line after a refresh failed: "The refresh on Oct 11, 2026
+ *  did not answer; these are the sales pulled Oct 1, 2026." "" otherwise. */
+export function refreshFailedLine(r: Pick<RecordCompsResult, "refreshFailed" | "retrievedAt">): string {
+  if (!r.refreshFailed) return "";
+  const why = r.refreshFailed.status === "geocode_failed" ? "could not place the address" : "did not answer";
+  return `The refresh on ${dayText(r.refreshFailed.at)} ${why}; these are the sales pulled ${dayText(r.retrievedAt)}.`;
+}
+
+/**
+ * The one sentence a failed pull says, never the source's own words (they
+ * go to the server log): what did not happen and what to do. `deal` says it
+ * for a deal's stored address, else for the address typed on /comps.
+ */
+export function failureSentence(status: RecordCompsStatus, deal: boolean): string {
+  if (status === "geocode_failed") {
+    return deal
+      ? "The deal's address could not be placed on a map, so no recorded sales were searched — check the address, then refresh."
+      : "The address could not be placed on a map, so no recorded sales were searched — pick it from the suggestions, or check the spelling.";
+  }
+  return deal
+    ? "The public-records source did not answer this pull, so no sales are shown — refresh to ask again."
+    : "The public-records source did not answer this pull, so no sales are shown — pull again to ask again.";
 }
 
 export const HONESTY_NOTE =

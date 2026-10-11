@@ -5,7 +5,7 @@
 // this panel is the pricing read.
 
 import { CompsResultView } from "@/app/(app)/comps/result-view";
-import { pulledLine, type RecordCompsResult } from "@/lib/public-comps/core";
+import { pulledLine, refreshFailedLine, type RecordCompsResult } from "@/lib/public-comps/core";
 import type { SubjectForCall } from "@/lib/public-comps/vs-median";
 import { refreshRecordComps } from "./comps-actions";
 
@@ -63,16 +63,29 @@ export function PublicCompsPanel({
         <h2 className="text-sm font-semibold">Recorded sales nearby</h2>
         <RefreshButton dealId={dealId} />
       </div>
-      {!result || result.status === "pending" ? (
+      {!result || (result.status === "pending" && !result.previous) ? (
         <p className="mt-2 text-sm text-muted">
-          Pulling recorded sales from the public record for this address… this
-          runs automatically and usually lands within a minute. Refresh the
-          page to check.
+          Pulling recorded sales from the public record for this address… it
+          runs in the background. Reload the page to check.
         </p>
+      ) : result.status === "pending" && result.previous ? (
+        // A refresh in flight keeps the last set on the page, said as such.
+        <>
+          <p className="mt-1 text-[11px] text-muted" data-qa="comps-refreshing">
+            Refreshing — reload the page to check. Until then, the last pull:
+          </p>
+          <PulledOn retrievedAt={result.previous.retrievedAt} today={today} />
+          <CompsResultView result={result.previous} subject={subject} dbMarketsLine={dbMarketsLine} onDeal />
+        </>
       ) : (
         <>
+          {result.refreshFailed && (
+            <p className="mt-1 text-[11px] text-caution" data-qa="comps-refresh-failed">
+              {refreshFailedLine(result)}
+            </p>
+          )}
           <PulledOn retrievedAt={result.retrievedAt} today={today} />
-          <CompsResultView result={result} subject={subject} dbMarketsLine={dbMarketsLine} />
+          <CompsResultView result={result} subject={subject} dbMarketsLine={dbMarketsLine} onDeal />
         </>
       )}
     </section>
