@@ -1515,12 +1515,12 @@ async function FooterTrustLine() {
           ({fmt(`${latest.date}T00:00:00Z`)})
         </>
       )}
-      {verifiedAt && !overdue && <> · data last verified {fmt(verifiedAt)} by the nightly steward</>}
+      {verifiedAt && !overdue && <> · research data last verified {fmt(verifiedAt)} by the nightly steward</>}
       {verifiedAt && overdue && (
         <>
           {" · "}
           <span className="text-caution">
-            data verification overdue (last ran {fmt(verifiedAt)})
+            research data verification overdue (last ran {fmt(verifiedAt)})
           </span>
         </>
       )}
