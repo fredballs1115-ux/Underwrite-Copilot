@@ -437,7 +437,7 @@ const TRUST: { label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Delete it all, self-serve",
+    label: "Delete it all, self-serve (a team owner, by email)",
     icon: (
       <Icon>
         <path d="M4 7h16M10 11v6M14 11v6" />
