@@ -52,10 +52,14 @@ import { compactUsd } from "@/lib/money";
 // (Server component only: these pull the research JSONs, which must not ride
 // into client bundles via marketing-constants.)
 const RULES = ruleCounts();
-// "29 rules, 28 source-linked" — a rule filed without a source is never
-// counted as linked (the pre-ship audit of 2026-09-30).
+// "29 rules across the markets, 28 of them source-linked" — a rule filed
+// without a source is never counted as linked (the pre-ship audit of
+// 2026-09-30), and the count is the file's whole, never one market's
+// (research pass 43, L11).
 const RULES_PHRASE =
-  RULES.sourced === RULES.all ? `${RULES.all} source-linked` : `${RULES.all}, ${RULES.sourced} of them source-linked`;
+  RULES.sourced === RULES.all
+    ? `${RULES.all} across the markets, each source-linked`
+    : `${RULES.all} across the markets, ${RULES.sourced} of them source-linked`;
 // The sample deal's legal read through the REAL rules engine — feeds the
 // walkthrough widget's Regulation block. Read for the day the page renders
 // (the page is ISR), since a rule's date is marked stale past the research
