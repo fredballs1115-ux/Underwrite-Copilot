@@ -12,6 +12,10 @@ import {
   type RecordCompsResult,
 } from "./core";
 import { dbMarketForAddress } from "./db-markets";
+import type { SubjectPoint } from "./subject-point";
+import { photonPrecision } from "@/lib/geocode";
+import type { LocationPrecision } from "@/lib/imagery-plan";
+import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 
 // The background half of public-record comps: geocode the subject (Photon —
 // the same free OSM service the address autocomplete uses), pick the
@@ -74,13 +78,21 @@ export async function claimRecordComps(dealId: string, force = false): Promise<b
   return (data?.length ?? 0) > 0;
 }
 
-/** Exported for lib/site-flags/run.ts — same Photon geocode, one behavior. */
-export async function geocode(label: string): Promise<{
+/** Exported for lib/site-flags/run.ts — same Photon geocode, one behavior.
+ *  `precision` is read off what Photon matched (lib/geocode's
+ *  `photonPrecision`): a house is the building's point, a street its
+ *  centreline, anything else an area — and an address that names no street
+ *  is an area whatever matched. */
+export async function geocode(
+  label: string,
+  hasStreet = true,
+): Promise<{
   lat: number;
   lng: number;
   state: string;
   city: string;
   county: string;
+  precision: LocationPrecision;
 } | null> {
   try {
     const res = await fetch(
@@ -91,7 +103,7 @@ export async function geocode(label: string): Promise<{
     const body = (await res.json()) as {
       features?: {
         geometry?: { coordinates?: [number, number] };
-        properties?: { state?: string; city?: string; county?: string };
+        properties?: { state?: string; city?: string; county?: string; type?: string };
       }[];
     };
     const f = body.features?.[0];
@@ -106,6 +118,7 @@ export async function geocode(label: string): Promise<{
       state: abbrevState(f?.properties?.state ?? ""),
       city: f?.properties?.city ?? "",
       county: f?.properties?.county ?? "",
+      precision: hasStreet ? photonPrecision(f?.properties?.type) : "area",
     };
   } catch {
     return null;
@@ -175,15 +188,36 @@ export async function computeRecordComps(input: {
   city?: string;
   county?: string;
   assetClass?: string;
+  /** the deal's resolved location (lib/deal-location), the point its
+   *  pictures are drawn around: the search is measured from it where the
+   *  caller has one, and Photon is asked only for the jurisdiction the
+   *  structured address leaves blank */
+  point?: SubjectPoint | null;
+  /** whether the address names a street: without one, any point is the
+   *  area's, never the building's */
+  hasStreet?: boolean;
 }): Promise<RecordCompsResult> {
   const admin = createSupabaseAdminClient();
   const base = { comps: [], retrievedAt: new Date().toISOString(), note: HONESTY_NOTE };
   const assetClass = (input.assetClass ?? "").toLowerCase();
+  const hasStreet = input.hasStreet ?? true;
 
-  const subject = await geocode(input.label);
+  const point = input.point ?? null;
+  const placed = point && !input.state ? await geocode(input.label, hasStreet) : null;
+  const subject = point
+    ? {
+        lat: point.lat,
+        lng: point.lng,
+        precision: point.precision,
+        state: placed?.state ?? "",
+        city: placed?.city ?? "",
+        county: placed?.county ?? "",
+      }
+    : await geocode(input.label, hasStreet);
   if (!subject) {
     return { ...base, status: "geocode_failed", error: "Address did not geocode (Photon)." };
   }
+  const subjectOut = { lat: subject.lat, lng: subject.lng, label: input.label, precision: subject.precision };
 
   // 1) Ingested deed records (works in ANY ingested market, national included)
   let radiusKm = RADIUS_KM;
@@ -208,7 +242,7 @@ export async function computeRecordComps(input: {
       providerId: "ingested_db",
       providerName: DB_PROVIDER_NAME,
       datasetUrl: stored[0]?.sourceUrl ?? "",
-      subject: { lat: subject.lat, lng: subject.lng, label: input.label },
+      subject: subjectOut,
       params: {
         radiusKm,
         monthsBack,
@@ -253,7 +287,7 @@ export async function computeRecordComps(input: {
         providerId: "ingested_db",
         providerName: DB_PROVIDER_NAME,
         datasetUrl: "",
-        subject: { lat: subject.lat, lng: subject.lng, label: input.label },
+        subject: subjectOut,
         params: {
           radiusKm,
           monthsBack,
@@ -310,7 +344,7 @@ export async function computeRecordComps(input: {
       providerId: provider.id,
       providerName: provider.name,
       datasetUrl: provider.datasetUrl,
-      subject: { lat: subject.lat, lng: subject.lng, label: input.label },
+      subject: subjectOut,
       params: {
         radiusKm: rKm,
         monthsBack: mBack,
@@ -344,7 +378,7 @@ export async function runRecordComps(dealId: string): Promise<void> {
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("id, address, asset_class")
+      .select("id, address, asset_class, photo")
       .eq("id", dealId)
       .maybeSingle();
     const address = (deal?.address as StructuredAddress | null) ?? null;
@@ -355,6 +389,17 @@ export async function runRecordComps(dealId: string): Promise<void> {
       await store({ ...base, status: "no_provider", error: "Deal has no address." });
       return;
     }
+    // The deal's one point (lib/deal-location): the one its aerial, flood map
+    // and site flags are drawn around, so the sales are measured from where
+    // the page says the building is. Where it cannot be resolved the pull
+    // places the address itself, its precision read off the answer.
+    let point: SubjectPoint | null = null;
+    try {
+      const loc = await resolveDealLocation(admin, dealId, address, (deal.photo as DealVisualCache | null) ?? null);
+      if (loc) point = { lat: loc.lat, lng: loc.lng, precision: loc.precision };
+    } catch {
+      point = null;
+    }
     await store(
       await computeRecordComps({
         label: address.label,
@@ -362,6 +407,8 @@ export async function runRecordComps(dealId: string): Promise<void> {
         city: address.city,
         county: address.county,
         assetClass: (deal.asset_class as string) ?? "",
+        point,
+        hasStreet: !!address.street?.trim(),
       })
     );
   } catch (err) {

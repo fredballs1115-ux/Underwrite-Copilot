@@ -82,6 +82,14 @@ describe("the comps readout as pictures", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 
+  it("says a search measured from an area's centre as that", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const r = result(comps);
+    const html = draw({ ...r, subject: { ...r.subject!, precision: "area" } });
+    expect(visibleText(html)).toContain("placed only at the centre of the area it names, not at the building");
+    expect(visibleText(draw(r))).not.toContain("not at the building");
+  });
+
   it("numbers the rows as their pins and folds the sales past twelve", () => {
     const comps = Array.from({ length: 15 }, (_, i) => sale(i));
     const text = visibleText(draw(result(comps)));

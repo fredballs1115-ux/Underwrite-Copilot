@@ -18,6 +18,7 @@ import {
 import { searchPublicComps } from "./comps-actions";
 import { SourceChip } from "./source-chip";
 import { CompsMap, type MapComp } from "./comps-map";
+import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
@@ -948,7 +949,15 @@ export function BrokerComps({
   /** rendered on the public /demo page — Pro gates point to signup, not billing */
   publicDemo?: boolean;
   /** subject location for the comps map (Feature 4); null hides the map */
-  mapContext?: { subjectLabel: string; market: string; omUrl: string | null; totalPages?: number | null } | null;
+  mapContext?: {
+    subjectLabel: string;
+    market: string;
+    omUrl: string | null;
+    totalPages?: number | null;
+    /** the deal's resolved location (lib/deal-location), where the page has
+     *  one: the map measures from it rather than geocoding again */
+    subjectPoint?: SubjectPoint | null;
+  } | null;
   /** the subject's own basis (lib/comp-detail's subjectBasis), the tick the
    *  sale comps' bars are drawn against; null draws the bars with no tick */
   subject?: SubjectBasis | null;
@@ -1021,6 +1030,7 @@ export function BrokerComps({
           subjectLabel={mapContext.subjectLabel}
           market={mapContext.market}
           comps={mapComps}
+          subjectPoint={mapContext.subjectPoint ?? null}
         />
       )}
       {redFlags.length > 0 && (

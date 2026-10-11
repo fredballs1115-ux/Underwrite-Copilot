@@ -19,6 +19,7 @@ import {
   salesPhrase,
   type RecordCompsResult,
 } from "@/lib/public-comps/core";
+import { placementNote } from "@/lib/public-comps/subject-point";
 import { compsTableText, perSqftOf, priceTrack, salesByQuarter } from "@/lib/public-comps/picture";
 import { CopySalesButton, RecordSalesMap, type MapSale } from "./record-sales-map";
 
@@ -76,12 +77,16 @@ export function CompsResultView({
   // result left out, said under the readout (`compsCutNote`).
   const scope = compsScope(result);
   const cutNote = compsCutNote(result);
+  // Where the search was measured from, said where it is not the building
+  // (lib/public-comps/subject-point): a street's centreline or an area's.
+  const placement = placementNote(result.subject?.precision);
 
   if (result.status === "no_sales" || !result.stats) {
     return (
       <p className="mt-2 text-sm text-muted" data-qa="comps-none">
         {noSalesSentence(result)} Thin comp evidence is itself a finding —
         treat pricing here as low-confidence.
+        {placement ? ` ${placement}` : ""}
       </p>
     );
   }
@@ -146,6 +151,12 @@ export function CompsResultView({
         )}
       </p>
 
+      {placement && (
+        <p className="mt-1.5 text-xs leading-relaxed text-muted" data-qa="comps-placement">
+          {placement}
+        </p>
+      )}
+
       {cutNote && (
         <p className="mt-1.5 text-xs leading-relaxed text-caution" data-qa="comps-cut">
           {cutNote}
@@ -161,6 +172,7 @@ export function CompsResultView({
       {showMap && result.subject && (
         <RecordSalesMap
           subject={result.subject}
+          precision={result.subject.precision ?? null}
           radiusKm={result.params?.radiusKm ?? null}
           sales={result.comps.map(
             (c, i): MapSale => ({

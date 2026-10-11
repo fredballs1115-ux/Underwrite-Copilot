@@ -94,6 +94,22 @@ describe("an empty answer from the property database", () => {
     expect(r.status).toBe("no_provider");
   });
 
+  it("measures from the deal's resolved point where the caller has one, and says its precision", async () => {
+    const admin = fakeAdmin([[], []], [{ market: "nyc" }]);
+    const r = await computeRecordComps({ ...brooklyn, point: { lat: 40.7, lng: -73.98, precision: "block" } });
+    expect(admin.calls[0]).toMatchObject({ in_lat: 40.7, in_lng: -73.98 });
+    expect(r.subject).toMatchObject({ lat: 40.7, lng: -73.98, precision: "block" });
+    // the structured address states its state, so Photon is not asked
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("reads Photon's precision where it places the address itself", async () => {
+    photonAt(40.69, -73.99, { state: "New York", city: "New York", type: "city" });
+    fakeAdmin([[], []], [{ market: "nyc" }]);
+    const r = await computeRecordComps(brooklyn);
+    expect(r.subject?.precision).toBe("area");
+  });
+
   it("keeps the sales a widened search found", async () => {
     const sale = (i: number): Row => ({
       address: `${i} Court St`,

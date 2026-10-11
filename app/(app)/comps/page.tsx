@@ -42,6 +42,9 @@ export default async function PullCompsPage({
         city: picked?.city,
         county: picked?.county,
         assetClass: cls,
+        // A pick names its street or does not; typed text is read by what
+        // Photon matched (a house, a street, or an area).
+        hasStreet: picked ? !!picked.street?.trim() : true,
       })
     : null;
   // Same chip the deal page shows: one click from a comps pull to the

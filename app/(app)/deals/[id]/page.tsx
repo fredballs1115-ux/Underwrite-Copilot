@@ -67,7 +67,8 @@ import { PICTURE_CREDIT, ensureDealPicture, galleryPage, memorandumPhotoCredit }
 import { assetClassLabel } from "@/lib/asset-class";
 import { countNoun } from "@/lib/asset-words";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
-import { cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
+import type { SubjectPoint } from "@/lib/public-comps/subject-point";
+import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
@@ -1160,6 +1161,13 @@ export default async function DealPage({
   const visualCache = (deal.photo as DealVisualCache | null) ?? null;
   const knownPoint = knownPointOf(visualCache, dealAddress);
   const floodArea = !!knownPoint && visualCache?.geoPrecision === "area";
+  // The same point for the comps (the research pass's H2): the OM comps map
+  // and the parcel card measure from where the deal's pictures say the
+  // building is, its precision said, never a second geocode of the line.
+  const compsSubjectPoint: SubjectPoint | null =
+    knownPoint && visualCache?.geoMiss !== true
+      ? { ...knownPoint, precision: visualCache?.geoPrecision ?? addressPrecision(dealAddress) }
+      : null;
   const floodFrame = knownPoint && floodFrameCurrent(visualCache?.floodFrame, knownPoint) ? visualCache?.floodFrame ?? null : null;
   if (floodStreet && !floodArea && !floodFrame) {
     after(async () => {
@@ -1843,6 +1851,7 @@ export default async function DealPage({
         tasks={dealTasks}
         taskAssignees={taskAssignees}
         todayIso={todayIso}
+        compsSubjectPoint={compsSubjectPoint}
       />
 
       <div className="mt-6 space-y-4">
@@ -1856,7 +1865,16 @@ export default async function DealPage({
         <PublicRecordCard
           address={dealAddress}
           market={placement.briefed}
-          subject={publicComps?.subject ?? siteFlags?.subject ?? null}
+          // The nearest parcel within 120 m is the building's only from a
+          // point placed at the building: never a street's centreline or an
+          // area's centre, where the nearest parcel is somebody else's.
+          subject={
+            pointIsBuilding(visualCache, dealAddress)
+              ? knownPoint
+              : publicComps?.subject && (publicComps.subject.precision ?? "street") === "street"
+                ? publicComps.subject
+                : (siteFlags?.subject ?? null)
+          }
         />
         {/* Anchor target for the Regulation panel's "answer in Deal facts"
             links; scroll-mt keeps the jump clear of the sticky header. */}

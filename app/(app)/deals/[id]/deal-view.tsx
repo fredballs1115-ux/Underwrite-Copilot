@@ -93,6 +93,7 @@ import { needsOperator } from "@/lib/anthropic/operator-failures";
 import { documentFailure } from "@/lib/anthropic/document-failures";
 import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
+import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
 
@@ -382,6 +383,7 @@ export function DealView({
   loi = null,
   askerNames = null,
   modelInterest = null,
+  compsSubjectPoint = null,
 }: {
   dealId: string;
   dealName: string;
@@ -433,6 +435,9 @@ export function DealView({
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
+  /** the deal's resolved location (lib/deal-location), the point its
+   *  pictures are drawn around; the comps map measures from it */
+  compsSubjectPoint?: SubjectPoint | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -1048,6 +1053,7 @@ export function DealView({
             isSample={isSample}
             staleVerdict={staleResults.includes("verdict")}
             staleWhy={staleWhy}
+            compsSubjectPoint={compsSubjectPoint}
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
               inferStrategy(results.extraction, firstSignal).kind,
@@ -1521,6 +1527,7 @@ function AnalysesPanel({
   staleVerdict = false,
   staleWhy = "failed",
   compSubject = null,
+  compsSubjectPoint = null,
   marketSince = null,
   metroDemand = null,
   isSample = false,
@@ -1552,6 +1559,8 @@ function AnalysesPanel({
   /** the subject's own basis, read where the first signal is in scope, so
    *  the comps table's tick and the deal header agree on the deal's kind */
   compSubject?: SubjectBasis | null;
+  /** the deal's resolved location, which the comps map measures from */
+  compsSubjectPoint?: SubjectPoint | null;
   /** what moved since the market check read its figures (lib/brief-delta) */
   marketSince?: BriefDelta | null;
   /** the metro area's payrolls by sector today (lib/metro-demand) */
@@ -1638,11 +1647,13 @@ function AnalysesPanel({
           subject={compSubject}
           noun={assetWords(results.extraction?.assetClass).noun?.one}
           mapContext={{
-            subjectLabel:
-              results.extraction?.address || results.extraction?.market || "",
+            // The street address only: a market's name geocodes to a
+            // city's centre, which the map must never star as the subject.
+            subjectLabel: results.extraction?.address || "",
             market: results.extraction?.market ?? "",
             omUrl,
             totalPages: results.extraction?.totalPages ?? null,
+            subjectPoint: compsSubjectPoint,
           }}
         />
       ) : (

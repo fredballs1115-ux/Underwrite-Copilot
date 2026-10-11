@@ -13,6 +13,7 @@
 
 import { fmtMiles, haversineKm, kmToMiles, type LatLng } from "@/lib/geo";
 import { RECORDED_SALES } from "@/lib/public-record-asks";
+import type { LocationPrecision } from "@/lib/imagery-plan";
 
 /** The most sales a search keeps, the nearest first (lib/public-comps/run):
  *  a source answers up to RECORDED_SALES.limit, and the stored set is cut to
@@ -54,7 +55,11 @@ export interface RecordCompsResult {
   providerId?: string;
   providerName?: string;
   datasetUrl?: string;
-  subject?: { lat: number; lng: number; label: string };
+  /** the point the search was measured from, and how finely it was placed
+   *  (lib/public-comps/subject-point): the building, its street, or only
+   *  the area the address names. No precision on a result stored before it
+   *  was recorded. */
+  subject?: { lat: number; lng: number; label: string; precision?: LocationPrecision };
   params?: { radiusKm: number; monthsBack: number; classFilter: string };
   comps: RecordComp[];
   stats?: RecordCompsStats;

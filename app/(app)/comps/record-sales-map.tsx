@@ -12,6 +12,7 @@ import {
   type BasemapId,
 } from "@/lib/basemaps";
 import { safeHttpUrl } from "@/lib/safe-url";
+import { distanceFrom, pointIsSubject, subjectPinLabel, type LocationPrecision } from "@/lib/public-comps/subject-point";
 
 /** One recorded sale on the map: its pin number is its row in the table. */
 export interface MapSale {
@@ -65,10 +66,14 @@ export function RecordSalesMap({
   subject,
   sales,
   radiusKm,
+  precision = null,
 }: {
   subject: { lat: number; lng: number; label: string };
   sales: MapSale[];
   radiusKm: number | null;
+  /** how finely the address was placed: a point no finer than its street
+   *  or its area is drawn as a plain ring and said as that, never the star */
+  precision?: LocationPrecision | null;
 }) {
   const divRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
@@ -109,13 +114,19 @@ export function RecordSalesMap({
             interactive: false,
           }).addTo(map);
         }
-        L.marker(center, {
-          icon: L.divIcon({ className: "", html: subjectPinHtml(), iconSize: [36, 48], iconAnchor: [18, 47], tooltipAnchor: [0, -40] }),
-          title: "The address searched",
-          zIndexOffset: 1000,
-        })
-          .addTo(map)
-          .bindTooltip(escapeHtml(subject.label));
+        if (pointIsSubject(precision)) {
+          L.marker(center, {
+            icon: L.divIcon({ className: "", html: subjectPinHtml(), iconSize: [36, 48], iconAnchor: [18, 47], tooltipAnchor: [0, -40] }),
+            title: "The address searched",
+            zIndexOffset: 1000,
+          })
+            .addTo(map)
+            .bindTooltip(escapeHtml(subject.label));
+        } else {
+          L.circleMarker(center, { radius: 7, color: "#18211f", weight: 2, fillColor: "#ffffff", fillOpacity: 0.9 })
+            .addTo(map)
+            .bindTooltip(escapeHtml(`${subjectPinLabel(precision, "The address searched")}: ${subject.label}`));
+        }
 
         const pts: [number, number][] = [center];
         for (const s of sales) {
@@ -130,7 +141,7 @@ export function RecordSalesMap({
             .bindPopup(
               `<div style="max-width:240px"><strong>${escapeHtml(`${s.n}. ${s.address}`)}</strong>` +
                 `<div style="margin-top:3px;font-variant-numeric:tabular-nums">${escapeHtml(`${s.priceText} · sold ${s.soldText}`)}</div>` +
-                `<div style="margin-top:3px;color:#5f6b69;font-variant-numeric:tabular-nums">${escapeHtml(`${fmtMiles(s.distanceKm)} from the address`)}</div>` +
+                `<div style="margin-top:3px;color:#5f6b69;font-variant-numeric:tabular-nums">${escapeHtml(`${fmtMiles(s.distanceKm)} ${distanceFrom(precision, "the address")}`)}</div>` +
                 (href ? `<div style="margin-top:4px"><a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">The record</a></div>` : "") +
                 `</div>`,
             );
@@ -154,7 +165,7 @@ export function RecordSalesMap({
       baseRef.current = null;
       leafletRef.current = null;
     };
-  }, [subject, sales, radiusKm]);
+  }, [subject, sales, radiusKm, precision]);
 
   useEffect(() => {
     const L = leafletRef.current;
