@@ -166,11 +166,26 @@ async function tryDbComps(
       propertyType: String(r.asset_class ?? "recorded sale"),
       sourceUrl: String(r.source_url ?? ""),
       ingestedAt: typeof r.ingested_at === "string" ? r.ingested_at.slice(0, 10) : "",
+      // What the record states beyond the price, as the ingest wrote it; a
+      // blank is null, never zero or "unknown".
+      units: wholeCount(r.units),
+      buyer: statedText(r.buyer),
+      seller: statedText(r.seller),
+      deedType: statedText(r.deed_type),
     }));
   } catch {
     return null;
   }
 }
+
+/** A count the record states (a positive whole number), else null. */
+const wholeCount = (v: unknown): number | null => {
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+/** Words the record states, trimmed, else null. */
+const statedText = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 /** A database row as read: a sale, and the day the ingest wrote it. */
 type DbRow = Omit<RecordComp, "distanceKm"> & { ingestedAt: string };

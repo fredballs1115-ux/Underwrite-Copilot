@@ -32,6 +32,15 @@ export interface RecordComp {
   propertyType: string;
   distanceKm: number;
   sourceUrl: string;
+  /** what the record states of the sale beyond its price, each as the
+   *  source wrote it and absent or null where it states none — read from the
+   *  property database's rows (migration 0028) where the ingest filled them:
+   *  the units (New York's rows carry them), the parties, and the deed's
+   *  type in the source's own code, never read for a meaning */
+  units?: number | null;
+  buyer?: string | null;
+  seller?: string | null;
+  deedType?: string | null;
 }
 
 export interface RecordCompsStats {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compsTableText, evidenceThrough, perSqftOf, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
+import { compsTableText, evidenceThrough, perSqftOf, perUnitOf, sharedDeedCounts, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
 import { pulledLine, type RecordComp } from "./core";
 
 const comp = (over: Partial<RecordComp>): RecordComp => ({
@@ -115,20 +115,44 @@ describe("a stored pull's day", () => {
   });
 });
 
+describe("what a record states beyond its price", () => {
+  it("gives a price a unit only past one unit", () => {
+    expect(perUnitOf({ price: 1_200_000, units: 12 })).toBe(100_000);
+    expect(perUnitOf({ price: 1_200_000, units: 1 })).toBeNull();
+    expect(perUnitOf({ price: 1_200_000 })).toBeNull();
+  });
+
+  it("flags rows of one day, buyer and price, exactly, and nothing else", () => {
+    const rows = [
+      { saleDate: "2026-03-01", buyer: "Acme LLC", price: 9_000_000 },
+      { saleDate: "2026-03-01", buyer: "ACME LLC ", price: 9_000_000 },
+      { saleDate: "2026-03-01", buyer: "Acme LLC", price: 9_000_001 },
+      { saleDate: "2026-03-01", buyer: null, price: 9_000_000 },
+      { saleDate: "2026-03-01", buyer: null, price: 9_000_000 },
+    ];
+    expect(sharedDeedCounts(rows)).toEqual([2, 2, 0, 0, 0]);
+  });
+});
+
 describe("compsTableText", () => {
   it("writes a header and one tab-delimited row a sale, the numbers raw", () => {
     const text = compsTableText({
       comps: [comp({ address: "12 Oak\tSt", price: 1_250_000, sqft: 5_000, distanceKm: 1.609344 })],
     });
     const [head, row] = text.split("\n");
-    expect(head.split("\t")).toEqual(["#", "Sold", "Address", "Price", "$/SF", "Type", "Miles", "Source"]);
+    expect(head.split("\t")).toEqual(["#", "Sold", "Address", "Price", "$/SF", "Units", "$/unit", "Type", "Buyer", "Seller", "Deed type", "Miles", "Source"]);
     expect(row.split("\t")).toEqual([
       "1",
       "2026-05-01",
       "12 Oak St",
       "1250000",
       "250",
+      "",
+      "",
       "RESIDENTIAL",
+      "",
+      "",
+      "",
       "1.00",
       "https://example.gov/1",
     ]);

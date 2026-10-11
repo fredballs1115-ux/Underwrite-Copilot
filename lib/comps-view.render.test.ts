@@ -190,6 +190,28 @@ describe("the comps readout as pictures", () => {
     expect(none).not.toMatch(/widen|retrying later/);
   });
 
+  it("shows the units, a price a unit and the parties where the record states them, and flags one day's buyer and price", () => {
+    const comps = [
+      sale(0, { units: 12, price: 2_400_000, buyer: "Acme LLC", seller: "Old Owner", deedType: "WD" }),
+      sale(1, { units: 12, price: 2_400_000, buyer: "Acme LLC", saleDate: "2026-01-15" }),
+      sale(2, { saleDate: "2026-01-15", buyer: "Acme LLC", price: 2_400_000 }),
+      sale(3),
+    ];
+    comps[0].saleDate = "2026-01-15";
+    const html = draw(result(comps));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toContain("$/unit");
+    expect(text).toContain("$200,000");
+    expect(text).toContain("Buyer Acme LLC · seller Old Owner · deed type WD, as recorded");
+    expect(html.split('data-qa="comps-shared-deed"').length - 1).toBe(3);
+    expect(text).toContain("possibly one deed across 3 parcels");
+    expect(text).not.toMatch(/arm's-length transfer|non-arm/i);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    // no units stated: no units column
+    expect(visibleText(draw(result([sale(0), sale(1), sale(2)])))).not.toContain("$/unit");
+  });
+
   it("numbers the rows as their pins and folds the sales past twelve", () => {
     const comps = Array.from({ length: 15 }, (_, i) => sale(i));
     const text = visibleText(draw(result(comps)));

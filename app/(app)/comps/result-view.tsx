@@ -23,7 +23,15 @@ import {
 } from "@/lib/public-comps/core";
 import { vsMedianRead, vsMedianSentence, type SubjectForCall } from "@/lib/public-comps/vs-median";
 import { placementNote } from "@/lib/public-comps/subject-point";
-import { compsTableText, evidenceThrough, perSqftOf, priceTrack, salesByQuarter } from "@/lib/public-comps/picture";
+import {
+  compsTableText,
+  evidenceThrough,
+  perSqftOf,
+  perUnitOf,
+  priceTrack,
+  salesByQuarter,
+  sharedDeedCounts,
+} from "@/lib/public-comps/picture";
 import { CopySalesButton, RecordSalesMap, type MapSale } from "./record-sales-map";
 
 const fmtMoney = (n: number) => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
@@ -122,6 +130,11 @@ export function CompsResultView({
       : null;
   const subjectPrice = call && subject ? subject.price : null;
   const note = evidenceNote(s.count);
+  // Rows of one day, buyer and price (lib/public-comps/picture
+  // `sharedDeedCounts`): flagged, never merged. And the units column only
+  // where some record states units.
+  const shared = sharedDeedCounts(result.comps);
+  const showUnits = result.comps.some((c) => c.units != null);
   // The $/SF middle rests only on the sales that state an area, so it is
   // said with that count, under the same floors (lib/public-comps/core).
   const sfPhrase = perSqftPhrase(s, result.comps.filter((c) => perSqftOf(c) !== null).length);
@@ -211,13 +224,13 @@ export function CompsResultView({
         </h3>
         <CopySalesButton text={compsTableText(result)} />
       </div>
-      <SalesTable comps={result.comps.slice(0, SHOWN)} start={1} />
+      <SalesTable comps={result.comps.slice(0, SHOWN)} start={1} shared={shared} showUnits={showUnits} />
       {result.comps.length > SHOWN && (
         <details className="group mt-1.5">
           <summary className="cursor-pointer text-xs font-medium text-brand hover:text-brand-strong">
             Show all {result.comps.length}
           </summary>
-          <SalesTable comps={result.comps.slice(SHOWN)} start={SHOWN + 1} />
+          <SalesTable comps={result.comps.slice(SHOWN)} start={SHOWN + 1} shared={shared} showUnits={showUnits} />
         </details>
       )}
 
@@ -244,7 +257,19 @@ export function CompsResultView({
 /** The table shows this many nearest sales; the rest fold behind "Show all". */
 const SHOWN = 12;
 
-function SalesTable({ comps, start }: { comps: RecordCompsResult["comps"]; start: number }) {
+function SalesTable({
+  comps,
+  start,
+  shared,
+  showUnits,
+}: {
+  comps: RecordCompsResult["comps"];
+  start: number;
+  /** for each sale of the whole set (indexed from 1 as `start` counts), how
+   *  many rows share its day, buyer and price, or 0 */
+  shared: number[];
+  showUnits: boolean;
+}) {
   return (
     <div className="mt-1.5 overflow-x-auto">
       <table className="w-full min-w-[600px] text-left text-sm">
@@ -257,6 +282,12 @@ function SalesTable({ comps, start }: { comps: RecordCompsResult["comps"]; start
             <th className="py-1.5 pr-3 font-medium">Address</th>
             <th className="py-1.5 pr-3 text-right font-medium">Price</th>
             <th className="py-1.5 pr-3 text-right font-medium">$/SF</th>
+            {showUnits && (
+              <>
+                <th className="py-1.5 pr-3 text-right font-medium">Units</th>
+                <th className="py-1.5 pr-3 text-right font-medium">$/unit</th>
+              </>
+            )}
             <th className="py-1.5 pr-3 font-medium">Type</th>
             <th className="py-1.5 text-right font-medium">Dist.</th>
           </tr>
@@ -264,6 +295,13 @@ function SalesTable({ comps, start }: { comps: RecordCompsResult["comps"]; start
         <tbody>
           {comps.map((c, i) => {
             const psf = perSqftOf(c);
+            const perUnit = perUnitOf(c);
+            const group = shared[start + i - 1] ?? 0;
+            const parties = [
+              c.buyer ? `Buyer ${c.buyer}` : "",
+              c.seller ? `seller ${c.seller}` : "",
+              c.deedType ? `deed type ${c.deedType}, as recorded` : "",
+            ].filter(Boolean);
             return (
               <tr key={`${c.address}|${c.saleDate}`} className="border-b border-line/60">
                 <td className="py-1.5 pr-2">
@@ -284,9 +322,25 @@ function SalesTable({ comps, start }: { comps: RecordCompsResult["comps"]; start
                   >
                     {c.address}
                   </a>
+                  {parties.length > 0 && (
+                    <span className="mt-0.5 block text-[11px] text-muted" data-qa="comps-parties">
+                      {parties.join(" · ")}
+                    </span>
+                  )}
+                  {group >= 2 && (
+                    <span className="mt-0.5 block text-[11px] text-caution" data-qa="comps-shared-deed">
+                      {`Same day, buyer and price as ${group - 1} other ${group - 1 === 1 ? "row" : "rows"} — possibly one deed across ${group} parcels, each at its whole price.`}
+                    </span>
+                  )}
                 </td>
                 <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{fmtMoney(c.price)}</td>
                 <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{psf ? `$${psf.toLocaleString("en-US")}` : "—"}</td>
+                {showUnits && (
+                  <>
+                    <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{c.units != null ? c.units.toLocaleString("en-US") : "—"}</td>
+                    <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{perUnit != null ? fmtMoney(perUnit) : "—"}</td>
+                  </>
+                )}
                 <td className="py-1.5 pr-3 text-xs text-muted">{c.propertyType.toLowerCase()}</td>
                 <td className="py-1.5 text-right font-mono text-xs tabular-nums text-muted">{fmtMiles(c.distanceKm)}</td>
               </tr>

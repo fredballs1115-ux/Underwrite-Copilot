@@ -158,6 +158,35 @@ export function perSqftOf(c: Pick<RecordComp, "price" | "sqft">): number | null 
   return c.sqft && c.sqft > 200 ? Math.round(c.price / c.sqft) : null;
 }
 
+/** A sale's price a unit, where the record states more than one unit,
+ *  else null: a one-unit record's price is its whole price already. */
+export function perUnitOf(c: Pick<RecordComp, "price" | "units">): number | null {
+  return c.units != null && c.units > 1 ? Math.round(c.price / c.units) : null;
+}
+
+/**
+ * For each sale, how many rows share its exact day, buyer and price — two or
+ * more is a deed that may have been recorded once a parcel, each row at the
+ * deed's whole price — or 0. Exact grouping only: a buyer the record leaves
+ * blank groups with nothing, and nothing is merged or dropped; the rows are
+ * flagged, never deduplicated. Display only: it says nothing of whether a
+ * sale was at arm's length.
+ */
+export function sharedDeedCounts(comps: Pick<RecordComp, "saleDate" | "buyer" | "price">[]): number[] {
+  const key = (c: Pick<RecordComp, "saleDate" | "buyer" | "price">) =>
+    c.buyer && c.buyer.trim() && c.saleDate ? `${c.saleDate}|${c.buyer.trim().toUpperCase()}|${c.price}` : null;
+  const counts = new Map<string, number>();
+  for (const c of comps) {
+    const k = key(c);
+    if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return comps.map((c) => {
+    const k = key(c);
+    const n = k ? (counts.get(k) ?? 0) : 0;
+    return n >= 2 ? n : 0;
+  });
+}
+
 /** Tabs and line breaks out of a cell, so a pasted row stays one row. */
 const cell = (v: string) => v.replace(/[\t\r\n]+/g, " ").trim();
 
@@ -167,7 +196,7 @@ const cell = (v: string) => v.replace(/[\t\r\n]+/g, " ").trim();
  * places) so they paste as numbers, never "$1.2M".
  */
 export function compsTableText(r: Pick<RecordCompsResult, "comps">): string {
-  const head = ["#", "Sold", "Address", "Price", "$/SF", "Type", "Miles", "Source"].join("\t");
+  const head = ["#", "Sold", "Address", "Price", "$/SF", "Units", "$/unit", "Type", "Buyer", "Seller", "Deed type", "Miles", "Source"].join("\t");
   const rows = r.comps.map((c, i) =>
     [
       String(i + 1),
@@ -175,7 +204,12 @@ export function compsTableText(r: Pick<RecordCompsResult, "comps">): string {
       cell(c.address),
       String(Math.round(c.price)),
       String(perSqftOf(c) ?? ""),
+      String(c.units ?? ""),
+      String(perUnitOf(c) ?? ""),
       cell(c.propertyType),
+      cell(c.buyer ?? ""),
+      cell(c.seller ?? ""),
+      cell(c.deedType ?? ""),
       (c.distanceKm / 1.609344).toFixed(2),
       cell(c.sourceUrl),
     ].join("\t"),

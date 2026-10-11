@@ -123,6 +123,10 @@ describe("an empty answer from the property database", () => {
       asset_class: "multifamily",
       source_url: "https://example.org/",
       ingested_at: `2026-09-2${i}T00:00:00Z`,
+      units: i === 1 ? 24 : null,
+      buyer: i === 1 ? " Acme LLC " : "",
+      seller: null,
+      deed_type: i === 1 ? "WD" : null,
     });
     fakeAdmin([[], [sale(1), sale(2), sale(3)]], [{ market: "nyc" }]);
     const r = await computeRecordComps(brooklyn);
@@ -131,6 +135,11 @@ describe("an empty answer from the property database", () => {
     expect(r.params?.radiusKm).toBe(4.8);
     expect(r.ingestedThrough).toBe("2026-09-23");
     expect(r.comps[0]).not.toHaveProperty("ingestedAt");
+    // what the record states beyond the price, a blank null
+    const first = r.comps.find((c) => c.address === "1 Court St")!;
+    expect(first).toMatchObject({ units: 24, buyer: "Acme LLC", seller: null, deedType: "WD" });
+    const second = r.comps.find((c) => c.address === "2 Court St")!;
+    expect(second).toMatchObject({ units: null, buyer: null, deedType: null });
   });
 });
 
