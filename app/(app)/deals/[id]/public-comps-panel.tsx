@@ -6,6 +6,7 @@
 
 import { CompsResultView } from "@/app/(app)/comps/result-view";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
+import type { SubjectForCall } from "@/lib/public-comps/vs-median";
 import { refreshRecordComps } from "./comps-actions";
 
 function RefreshButton({ dealId }: { dealId: string }) {
@@ -26,13 +27,13 @@ export function PublicCompsPanel({
   dealId,
   result,
   hasAddress,
-  subjectPrice,
+  subject,
 }: {
   dealId: string;
   result: RecordCompsResult | null;
   hasAddress: boolean;
-  /** parsed asking/purchase price of the subject, when known */
-  subjectPrice: number | null;
+  /** the deal the sales are read for (lib/public-comps/vs-median) */
+  subject: SubjectForCall | null;
 }) {
   if (!hasAddress) return null; // the research panel already asks for an address
 
@@ -49,7 +50,7 @@ export function PublicCompsPanel({
           page to check.
         </p>
       ) : (
-        <CompsResultView result={result} subjectPrice={subjectPrice} />
+        <CompsResultView result={result} subject={subject} />
       )}
     </section>
   );

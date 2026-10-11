@@ -142,7 +142,7 @@ export default async function PullCompsPage({
               </Link>
             </p>
           ) : null}
-          <CompsResultView result={result} subjectPrice={null} showMap />
+          <CompsResultView result={result} showMap />
         </section>
       ) : (
         <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">

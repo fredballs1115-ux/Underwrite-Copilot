@@ -10,7 +10,6 @@ import { fmtMiles } from "@/lib/geo";
 import {
   COVERAGE_DISCOVERY,
   COVERAGE_SUMMARY,
-  compEvidence,
   compsCutNote,
   compsScope,
   evidenceNote,
@@ -19,6 +18,7 @@ import {
   salesPhrase,
   type RecordCompsResult,
 } from "@/lib/public-comps/core";
+import { vsMedianRead, vsMedianSentence, type SubjectForCall } from "@/lib/public-comps/vs-median";
 import { placementNote } from "@/lib/public-comps/subject-point";
 import { compsTableText, perSqftOf, priceTrack, salesByQuarter } from "@/lib/public-comps/picture";
 import { CopySalesButton, RecordSalesMap, type MapSale } from "./record-sales-map";
@@ -36,12 +36,14 @@ const fmtDate = (iso: string) => {
  *  chrome, heading, and any refresh affordance. */
 export function CompsResultView({
   result,
-  subjectPrice,
+  subject = null,
   showMap = false,
 }: {
   result: RecordCompsResult;
-  /** parsed asking/purchase price of the subject, when known */
-  subjectPrice: number | null;
+  /** the deal the sales are read for, where there is one: its building
+   *  price and price a square foot, its class and whether it is a portfolio
+   *  or a plan (lib/public-comps/vs-median). The /comps page has none. */
+  subject?: SubjectForCall | null;
   /** draw the sales on a map (the comps page; the deal page has its own) */
   showMap?: boolean;
 }) {
@@ -92,20 +94,20 @@ export function CompsResultView({
   }
 
   const s = result.stats;
-  // The vs-median line only makes sense when the subject and the surrounding
-  // recorded stock are the same kind of thing. A $68M asset against rowhouse
-  // sales would read "20,000% above market" — suppress outside a plausible
-  // band instead of rendering a meaningless verdict.
-  const ratio = subjectPrice && s.medianPrice > 0 ? subjectPrice / s.medianPrice : null;
-  const inBand = ratio !== null && ratio >= 0.25 && ratio <= 4;
-  // …and it is a CALL, not a figure. A call needs a middle to be measured
-  // against, so below the floor it is withheld even when the arithmetic
-  // would happily produce a percentage: "43% above the recorded median" off
-  // a single sale is the most confident-sounding and least supported
-  // sentence this page can print.
-  const enough = compEvidence(s.count) !== "individual";
-  const vsMedian = inBand && enough ? Math.round((ratio - 1) * 100) : null;
-  const scaleMismatch = ratio !== null && !inBand;
+  // The call against the middle (lib/public-comps/vs-median): made only
+  // where the sales are the deal's own kind, the deal is one building and
+  // its price a building's, per square foot where both state an area, and
+  // said in a neutral tone — a distance from the middle, never a verdict.
+  const read = vsMedianRead(s, result.params?.classFilter, subject);
+  const call = read?.kind === "call" ? read : null;
+  const callText =
+    call && subject
+      ? vsMedianSentence(
+          call,
+          call.on === "per_sf" ? `$${(subject.perSf ?? 0).toLocaleString("en-US")}/SF` : `price of ${fmtMoney(subject.price ?? 0)}`,
+        )
+      : null;
+  const subjectPrice = call && subject ? subject.price : null;
   const note = evidenceNote(s.count);
 
   return (
@@ -128,24 +130,20 @@ export function CompsResultView({
             </span>
           </>
         )}
-        {vsMedian !== null && (
+        {"."}
+        {callText && (
           <>
-            {". "}
-            <span
-              className={vsMedian > 10 ? "text-kill" : vsMedian < -10 ? "text-pass" : "text-muted"}
-            >
-              This deal is {Math.abs(vsMedian)}% {vsMedian >= 0 ? "above" : "below"} the
-              recorded {medianLabel(s.count)}
-              {compEvidence(s.count) === "thin" ? `, on ${s.count} sales` : ""}.
+            {" "}
+            <span className="text-ink" data-qa="comps-call">
+              {callText}
             </span>
           </>
         )}
-        {scaleMismatch && (
+        {read?.kind === "withheld" && (
           <>
-            {". "}
-            <span className="text-muted">
-              The subject&apos;s scale differs from the surrounding recorded
-              stock, so a whole-price comparison isn&apos;t meaningful here.
+            {" "}
+            <span className="text-muted" data-qa="comps-call-withheld">
+              {read.reason}
             </span>
           </>
         )}

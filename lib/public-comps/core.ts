@@ -38,6 +38,10 @@ export interface RecordCompsStats {
   count: number;
   medianPrice: number;
   medianPerSqft: number | null;
+  /** the sales the $/SF median is taken over: those stating an area a
+   *  building could have (over 200 SF). Absent on a result stored before
+   *  it was recorded. */
+  perSqftCount?: number;
   low: number;
   high: number;
 }
@@ -692,6 +696,7 @@ export function compStats(comps: RecordComp[]): RecordCompsStats | undefined {
     count: comps.length,
     medianPrice: Math.round(median(prices)),
     medianPerSqft: perSqft.length >= MEDIAN_FLOOR ? Math.round(median(perSqft)) : null,
+    perSqftCount: perSqft.length,
     low: Math.min(...prices),
     high: Math.max(...prices),
   };

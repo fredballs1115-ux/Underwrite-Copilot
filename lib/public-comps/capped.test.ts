@@ -101,7 +101,7 @@ describe("a live provider's newest 80", () => {
     expect(compsCutNote(r)).toBe(
       "The source returns its 80 newest sales a search and returned 80: older sales within 1 mi and the last 24 months were not read; the 40 nearest of the 80 found are kept.",
     );
-    const text = visibleText(renderToStaticMarkup(React.createElement(CompsResultView, { result: r, subjectPrice: null }))).replace(/\s+/g, " ");
+    const text = visibleText(renderToStaticMarkup(React.createElement(CompsResultView, { result: r }))).replace(/\s+/g, " ");
     expect(text).toContain(`40 recorded sales within 1 mi · sold since ${said} · multifamily/mixed — median`);
     expect(text).not.toContain("40 recorded sales within 1 mi · last 24 months");
     expect(text).toContain("older sales within 1 mi and the last 24 months were not read");
@@ -121,7 +121,7 @@ describe("a live provider's newest 80", () => {
     const r = await computeRecordComps(ASK);
     expect(r.capped).toBe(false);
     expect(compsCutNote(r)).toBe("");
-    const text = visibleText(renderToStaticMarkup(React.createElement(CompsResultView, { result: r, subjectPrice: null }))).replace(/\s+/g, " ");
+    const text = visibleText(renderToStaticMarkup(React.createElement(CompsResultView, { result: r }))).replace(/\s+/g, " ");
     expect(text).toContain("12 recorded sales within 1 mi · last 24 months · multifamily/mixed");
   });
 });

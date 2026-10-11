@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CompsResultView } from "../app/(app)/comps/result-view";
 import type { RecordComp, RecordCompsResult } from "./public-comps/core";
 import { compStats } from "./public-comps/core";
+import type { SubjectForCall } from "./public-comps/vs-median";
 import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 const sale = (i: number, over: Partial<RecordComp> = {}): RecordComp => ({
@@ -30,15 +31,32 @@ const result = (comps: RecordComp[]): RecordCompsResult => ({
   providerName: "Philadelphia OPA",
   datasetUrl: "https://opendataphilly.org/",
   subject: { lat: 39.95, lng: -75.16, label: "1500 Walnut St, Philadelphia, PA" },
-  params: { radiusKm: 1.6, monthsBack: 24, classFilter: "all sales" },
+  params: { radiusKm: 1.6, monthsBack: 24, classFilter: "multifamily" },
   comps,
   stats: compStats(comps),
   retrievedAt: "2026-10-08T12:00:00Z",
   note: "Public records.",
 });
 
-const draw = (r: RecordCompsResult, subjectPrice: number | null = null) =>
-  renderToStaticMarkup(React.createElement(CompsResultView, { result: r, subjectPrice }));
+/** An apartment building priced at `price`, one building at a building's
+ *  price — the deal the call may be made for. */
+const apartments = (price: number | null, over: Partial<SubjectForCall> = {}): SubjectForCall => ({
+  price,
+  perSf: null,
+  classKey: "multifamily",
+  classLabel: "Multifamily",
+  portfolio: false,
+  planOrLand: false,
+  ...over,
+});
+
+const draw = (r: RecordCompsResult, subject: number | SubjectForCall | null = null) =>
+  renderToStaticMarkup(
+    React.createElement(CompsResultView, {
+      result: r,
+      subject: typeof subject === "number" ? apartments(subject) : subject,
+    }),
+  );
 
 const count = (html: string, bar: string) => html.split(`data-bar="${bar}"`).length - 1;
 
@@ -88,6 +106,28 @@ describe("the comps readout as pictures", () => {
     const html = draw({ ...r, subject: { ...r.subject!, precision: "area" } });
     expect(visibleText(html)).toContain("placed only at the centre of the area it names, not at the building");
     expect(visibleText(draw(r))).not.toContain("not at the building");
+  });
+
+  it("makes the call in a neutral tone only for the deal's own kind, one building at a building's price", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const ok = draw(result(comps), 500_000);
+    expect(visibleText(ok)).toMatch(/This deal's price of \$500,000 is \d+% (above|below) the median of the 6 recorded sales\./);
+    expect(ok).not.toMatch(/text-kill|text-pass/);
+    const office = visibleText(draw(result(comps), apartments(500_000, { classKey: "office", classLabel: "Office" })));
+    expect(office).not.toContain("This deal's");
+    expect(office).toContain("filed as multifamily, not office");
+    const all = visibleText(draw({ ...result(comps), params: { radiusKm: 1.6, monthsBack: 24, classFilter: "all sales" } }, 500_000));
+    expect(all).toContain("These are all recorded sales here");
+    expect(visibleText(draw(result(comps), apartments(500_000, { portfolio: true })))).toContain("portfolio");
+    expect(visibleText(draw(result(comps), apartments(500_000, { planOrLand: true })))).toContain("a plan's or land's");
+    expect(count(draw(result(comps), apartments(500_000, { portfolio: true })), "comps-subject")).toBe(0);
+  });
+
+  it("compares price a square foot with its own count where both state one", () => {
+    // sales 1, 3, 5 state 1,800 SF: three sales behind the $/SF median
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const text = visibleText(draw(result(comps), apartments(500_000, { perSf: 250 })));
+    expect(text).toMatch(/This deal's \$250\/SF is \d+% (above|below) the median of the 3 sales that state an area\./);
   });
 
   it("numbers the rows as their pins and folds the sales past twelve", () => {

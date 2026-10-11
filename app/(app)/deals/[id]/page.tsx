@@ -55,7 +55,10 @@ import { readTaxAbatement } from "@/lib/tax-abatement";
 import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
-import { dealTypeLabel, interestTag, isTenancyInCommon, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestOf, interestTag, isTenancyInCommon, readInterest } from "@/lib/interest";
+import { subjectBasis } from "@/lib/comp-detail";
+import { condoUnitsOffered } from "@/lib/condo-units";
+import type { SubjectForCall } from "@/lib/public-comps/vs-median";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { capSlotWithheld, goingInCapFigure, modelReturnsRead } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -65,7 +68,7 @@ import { readPortfolio } from "@/lib/portfolio";
 import { loiTermsFor } from "@/lib/loi-terms";
 import { PICTURE_CREDIT, ensureDealPicture, galleryPage, memorandumPhotoCredit } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
-import { countNoun } from "@/lib/asset-words";
+import { countNoun, dealClassKey } from "@/lib/asset-words";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
@@ -1139,6 +1142,26 @@ export default async function DealPage({
   // on the reader's day, as the cap slot beside it reads its dates.
   const priceTag = interestTag(extraction, readerNoon);
   const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parsePrice(summaryPrice) : null);
+  // What the recorded sales may be set against (lib/public-comps/vs-median):
+  // the building's price and its price a square foot (the comps tab's own
+  // reader, so the two never name different figures), the class the deal
+  // shows, and whether it is one building at a building's price.
+  const compsClassKey = dealClassKey(deal.asset_class as string | null, extraction);
+  const compsCallSubject: SubjectForCall = {
+    price: subjectPriceNumber,
+    perSf: subjectBasis(
+      extraction?.metrics ?? [],
+      strategy.kind,
+      screenYearOf(extraction),
+      interestOf(extraction),
+      extraction?.assetClass,
+      condoUnitsOffered(extraction),
+    ).perSf,
+    classKey: compsClassKey,
+    classLabel: assetClassLabel(shownAssetClass(deal.asset_class as string | null, extraction)),
+    portfolio: readPortfolio(extraction) !== null,
+    planOrLand: strategy.kind === "development" || strategy.kind === "conversion" || compsClassKey === "land_infill",
+  };
   // Also re-kick a lingering "pending" sentinel: a deploy can kill the
   // after() worker between claim and result, and claimRecordComps's
   // stale-pending reclaim (10-min threshold) is only reachable if someone
@@ -1859,7 +1882,7 @@ export default async function DealPage({
           dealId={id}
           result={publicComps}
           hasAddress={!!dealAddress?.label}
-          subjectPrice={subjectPriceNumber}
+          subject={compsCallSubject}
         />
         <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} today={todayIso} />
         <PublicRecordCard

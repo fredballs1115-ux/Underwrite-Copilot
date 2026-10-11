@@ -14,6 +14,7 @@ import {
 import { dbMarketForAddress } from "./db-markets";
 import type { SubjectPoint } from "./subject-point";
 import { photonPrecision } from "@/lib/geocode";
+import { dealClassKey } from "@/lib/asset-words";
 import type { LocationPrecision } from "@/lib/imagery-plan";
 import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 
@@ -378,7 +379,7 @@ export async function runRecordComps(dealId: string): Promise<void> {
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("id, address, asset_class, photo")
+      .select("id, address, asset_class, photo, extraction")
       .eq("id", dealId)
       .maybeSingle();
     const address = (deal?.address as StructuredAddress | null) ?? null;
@@ -406,7 +407,13 @@ export async function runRecordComps(dealId: string): Promise<void> {
         state: address.state,
         city: address.city,
         county: address.county,
-        assetClass: (deal.asset_class as string) ?? "",
+        // The deal's one class (lib/asset-words `dealClassKey`): the class
+        // the analyst filed, else the deck's where they left "auto" — the
+        // class the readout's call is held to.
+        assetClass: dealClassKey(
+          deal.asset_class as string | null,
+          (deal.extraction as { assetClass?: string | null } | null) ?? null,
+        ),
         point,
         hasStreet: !!address.street?.trim(),
       })
