@@ -212,6 +212,15 @@ describe("the comps readout as pictures", () => {
     expect(visibleText(draw(result([sale(0), sale(1), sale(2)])))).not.toContain("$/unit");
   });
 
+  it("hands the sales that state an area to the comp grid from /comps, not from a deal", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const html = draw(result(comps));
+    expect(visibleText(html)).toContain("Open the 3 nearest sales that state an area in the comp grid");
+    expect(html).toMatch(/href="\/tools\?cgr=[^"]+#comp-grid"/);
+    const onDeal = renderToStaticMarkup(React.createElement(CompsResultView, { result: result(comps), onDeal: true }));
+    expect(onDeal).not.toContain("comp-grid");
+  });
+
   it("numbers the rows as their pins and folds the sales past twelve", () => {
     const comps = Array.from({ length: 15 }, (_, i) => sale(i));
     const text = visibleText(draw(result(comps)));

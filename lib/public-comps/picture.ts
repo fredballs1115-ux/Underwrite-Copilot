@@ -14,7 +14,8 @@
 //     but the largest into its first tenth.
 
 import { compactUsd } from "@/lib/money";
-import { compEvidence, type RecordComp, type RecordCompsResult } from "./core";
+import { MAX_COMPS } from "@/lib/tools/comp-grid";
+import { compEvidence, MEDIAN_FLOOR, type RecordComp, type RecordCompsResult } from "./core";
 
 /** The readout's own band for comparing the subject with the middle. */
 export const SUBJECT_BAND: Readonly<{ low: number; high: number }> = { low: 0.25, high: 4 };
@@ -185,6 +186,45 @@ export function sharedDeedCounts(comps: Pick<RecordComp, "saleDate" | "buyer" | 
     const n = k ? (counts.get(k) ?? 0) : 0;
     return n >= 2 ? n : 0;
   });
+}
+
+/** Whole months from a sale's day to the search's, never below zero. */
+function monthsBetween(fromIso: string, toIso: string): number | null {
+  const a = /^(\d{4})-(\d{2})-(\d{2})/.exec(fromIso);
+  const b = /^(\d{4})-(\d{2})-(\d{2})/.exec(toIso);
+  if (!a || !b) return null;
+  const m = (Number(b[1]) - Number(a[1])) * 12 + (Number(b[2]) - Number(a[2])) - (Number(b[3]) < Number(a[3]) ? 1 : 0);
+  return Math.max(0, m);
+}
+
+/**
+ * The sales that state an area, as /tools' comp grid takes them through its
+ * own link (app/tools: `cgr` the rows — name, price, size, months ago, then
+ * the grid's three adjustments — `cgs` the subject's size, `cga` the ask,
+ * `cgg` the market growth, `cgu` what a unit is called): each sale's
+ * address, its price, its square feet and the months from its sale to the
+ * search's day, every adjustment at 0 and the growth that times them at 0,
+ * so the grid starts from the record and the judgement is the reader's.
+ * The subject's size and ask are left blank: the search has neither. The
+ * nearest MAX_COMPS of them, the most the card adjusts (it refuses more as
+ * "a paste rather than a grid"). Null where fewer than MEDIAN_FLOOR sales
+ * state an area — under three is not a grid.
+ */
+export function compGridHref(r: Pick<RecordCompsResult, "comps" | "retrievedAt">): string | null {
+  const day = (r.retrievedAt ?? "").slice(0, 10);
+  const rows = r.comps
+    .filter((c) => perSqftOf(c) !== null)
+    .map((c) => {
+      const months = monthsBetween(c.saleDate, day);
+      return months === null
+        ? null
+        : [cell(c.address), String(Math.round(c.price)), String(Math.round(c.sqft as number)), String(months), "0", "0", "0"].join("\t");
+    })
+    .filter((row): row is string => row !== null)
+    .slice(0, MAX_COMPS);
+  if (rows.length < MEDIAN_FLOOR) return null;
+  const q = new URLSearchParams({ cgr: rows.join("\n"), cgs: "", cga: "", cgg: "0", cgu: "SF" });
+  return `/tools?${q.toString()}#comp-grid`;
 }
 
 /** Tabs and line breaks out of a cell, so a pasted row stays one row. */

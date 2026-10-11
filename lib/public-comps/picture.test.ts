@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { compsTableText, evidenceThrough, perSqftOf, perUnitOf, sharedDeedCounts, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
 import { pulledLine, type RecordComp } from "./core";
+import { compGridHref } from "./picture";
+import { MAX_COMPS, readGrid, readGridText } from "@/lib/tools/comp-grid";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const comp = (over: Partial<RecordComp>): RecordComp => ({
   address: "1 Main St",
@@ -131,6 +135,57 @@ describe("what a record states beyond its price", () => {
       { saleDate: "2026-03-01", buyer: null, price: 9_000_000 },
     ];
     expect(sharedDeedCounts(rows)).toEqual([2, 2, 0, 0, 0]);
+  });
+});
+
+describe("the hand-off to /tools' comp grid", () => {
+  const sales = [
+    comp({ address: "1 A St", price: 2_000_000, sqft: 10_000, saleDate: "2026-04-20" }),
+    comp({ address: "2 B St", price: 3_000_000, sqft: 12_000, saleDate: "2025-10-08" }),
+    comp({ address: "3 C St", price: 900_000, sqft: null, saleDate: "2026-01-01" }),
+    comp({ address: "4 D St", price: 1_500_000, sqft: 6_000, saleDate: "2026-09-30" }),
+  ];
+
+  it("carries the sales that state an area through the card's own keys, every adjustment at 0", () => {
+    const href = compGridHref({ comps: sales, retrievedAt: "2026-10-08T12:00:00Z" })!;
+    expect(href.startsWith("/tools?")).toBe(true);
+    expect(href.endsWith("#comp-grid")).toBe(true);
+    const q = new URLSearchParams(href.slice("/tools?".length, href.indexOf("#")));
+    expect(q.get("cgu")).toBe("SF");
+    expect(q.get("cgg")).toBe("0");
+    expect(q.get("cgs")).toBe("");
+    expect(q.get("cga")).toBe("");
+    const parsed = readGridText(q.get("cgr")!, ["Location", "Size", "Condition"]);
+    expect(parsed.unreadable).toEqual([]);
+    expect(parsed.comps.map((c) => [c.name, c.price, c.size, c.monthsAgo])).toEqual([
+      ["1 A St", 2_000_000, 10_000, 5],
+      ["2 B St", 3_000_000, 12_000, 12],
+      ["4 D St", 1_500_000, 6_000, 0],
+    ]);
+    expect(parsed.comps.every((c) => c.adjustments.every((a) => a.pct === 0))).toBe(true);
+  });
+
+  it("reads keys the card itself reads", () => {
+    const tools = readFileSync(join(__dirname, "..", "..", "app", "tools", "deal-math-tools.tsx"), "utf8");
+    for (const key of ["cgr", "cgs", "cga", "cgg", "cgu"]) expect(tools).toContain(`"${key}"`);
+    expect(tools).toContain('id="comp-grid"');
+  });
+
+  it("carries no more than the card adjusts, the nearest first", () => {
+    const many = Array.from({ length: 20 }, (_, i) =>
+      comp({ address: `${i} E St`, price: 1_000_000 + i, sqft: 5_000, saleDate: "2026-05-01" }),
+    );
+    const href = compGridHref({ comps: many, retrievedAt: "2026-10-08T12:00:00Z" })!;
+    const q = new URLSearchParams(href.slice("/tools?".length, href.indexOf("#")));
+    const parsed = readGridText(q.get("cgr")!);
+    expect(parsed.comps).toHaveLength(MAX_COMPS);
+    expect(parsed.comps[0].name).toBe("0 E St");
+    const read = readGrid({ subjectSize: null, unitLabel: "SF", marketGrowthPct: 0, askingPrice: null, comps: parsed.comps });
+    expect(read.indicatedBasis).toBe(200);
+  });
+
+  it("offers nothing under three sales that state an area", () => {
+    expect(compGridHref({ comps: sales.slice(0, 3), retrievedAt: "2026-10-08T12:00:00Z" })).toBeNull();
   });
 });
 

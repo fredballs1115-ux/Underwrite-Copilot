@@ -24,6 +24,7 @@ import {
 import { vsMedianRead, vsMedianSentence, type SubjectForCall } from "@/lib/public-comps/vs-median";
 import { placementNote } from "@/lib/public-comps/subject-point";
 import {
+  compGridHref,
   compsTableText,
   evidenceThrough,
   perSqftOf,
@@ -32,6 +33,7 @@ import {
   salesByQuarter,
   sharedDeedCounts,
 } from "@/lib/public-comps/picture";
+import { MAX_COMPS } from "@/lib/tools/comp-grid";
 import { CopySalesButton, RecordSalesMap, type MapSale } from "./record-sales-map";
 
 const fmtMoney = (n: number) => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
@@ -135,6 +137,11 @@ export function CompsResultView({
   // where some record states units.
   const shared = sharedDeedCounts(result.comps);
   const showUnits = result.comps.some((c) => c.units != null);
+  // /comps' hand-off to /tools' comp grid, through that card's own link
+  // (lib/public-comps/picture `compGridHref`); a deal's panel has its own
+  // tab of comps and offers none.
+  const gridHref = onDeal ? null : compGridHref(result);
+  const gridCount = Math.min(MAX_COMPS, result.comps.filter((c) => perSqftOf(c) !== null).length);
   // The $/SF middle rests only on the sales that state an area, so it is
   // said with that count, under the same floors (lib/public-comps/core).
   const sfPhrase = perSqftPhrase(s, result.comps.filter((c) => perSqftOf(c) !== null).length);
@@ -224,6 +231,19 @@ export function CompsResultView({
         </h3>
         <CopySalesButton text={compsTableText(result)} />
       </div>
+      {gridHref && (
+        // A plain link, a whole page load: /tools reads its fields from the
+        // address once a visit, so a client hop could keep an earlier grid.
+        <p className="mt-1 text-xs text-muted" data-qa="comps-grid-link">
+          <a
+            href={gridHref}
+            className="font-medium text-brand underline decoration-dotted underline-offset-2 hover:text-brand-strong"
+          >
+            {`Open the ${gridCount} nearest sales that state an area in the comp grid`}
+          </a>
+          {" — every adjustment, time included, starts at 0, and the subject's size and ask are left for you."}
+        </p>
+      )}
       <SalesTable comps={result.comps.slice(0, SHOWN)} start={1} shared={shared} showUnits={showUnits} />
       {result.comps.length > SHOWN && (
         <details className="group mt-1.5">
