@@ -66,7 +66,9 @@ jobs:
           grep -c "The ground layer" body.html && echo "GROUND LAYER TEXT: STILL PRESENT (pre-#240 build)" || echo "GROUND LAYER TEXT: gone (correct after #240)"
           grep -c "pulse-tile" body.html && echo "MARKET PULSE BOARD: STILL PRESENT (pre-#240 build)" || echo "MARKET PULSE BOARD: gone (correct after #240)"
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
-          live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
+          # The footer no longer links the commit; the uc-build meta carries the
+          # same seven characters (RENDER_GIT_COMMIT, app/layout.tsx).
+          live=$(grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 | sed 's/.*content="//;s/"//')
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
           # The one comparison that matters, spelled out so nobody eyeballs two
           # shas: a push-triggered run lands minutes before the deploy does
