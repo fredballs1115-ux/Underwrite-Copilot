@@ -29,6 +29,20 @@ export const RECORDED_SALES: Readonly<{
   limit: 80,
 };
 
+/** The radii a reader may set on /comps, in miles beside the kilometres the
+ *  search asks: the pull's own two, a mile and three. Five miles is past
+ *  the widest radius migration 0037 lets nearby_sales answer (4,800 m), so
+ *  it is not offered: an ask the database would cut short is never said as
+ *  asked. */
+export const RECORDED_SALES_RADIUS_CHOICES: readonly { miles: number; km: number }[] = [
+  { miles: 1, km: RECORDED_SALES.radiusKm },
+  { miles: 3, km: RECORDED_SALES.wideRadiusKm },
+];
+
+/** The windows a reader may set on /comps, in months back from the search's
+ *  day. The lookup holds no cap on months; these are the choices offered. */
+export const RECORDED_SALES_MONTH_CHOICES: readonly number[] = [12, 24, 36];
+
 /** The largest radius, in whole metres, the comps pull asks nearby_sales for
  *  (it rounds each ask to the metre). */
 export const RECORDED_SALES_MAX_RADIUS_M = Math.round(RECORDED_SALES.wideRadiusKm * 1000);

@@ -64,7 +64,11 @@ export interface RecordCompsResult {
    *  the area the address names. No precision on a result stored before it
    *  was recorded. */
   subject?: { lat: number; lng: number; label: string; precision?: LocationPrecision };
-  params?: { radiusKm: number; monthsBack: number; classFilter: string };
+  /** what the search asked: its radius and window, and the class it held
+   *  the sales to — `classFilter` as the scope line says it, `classKey` the
+   *  site's class key (lib/public-comps/classes) where a class was applied,
+   *  absent for every sale and on a result stored before it was recorded */
+  params?: { radiusKm: number; monthsBack: number; classFilter: string; classKey?: string };
   comps: RecordComp[];
   stats?: RecordCompsStats;
   retrievedAt: string;
@@ -126,6 +130,10 @@ export interface ProviderConfig {
   /** which rows the query asks for when more match than it returns: the
    *  newest (ordered by sale date), or null where it states no order */
   order: "newest" | null;
+  /** the classes (lib/public-comps/classes keys) the query holds its sales
+   *  to when asked; a class not listed is not applied, and the result says
+   *  "all sales" */
+  classFilters?: readonly string[];
   /** probe URL for /api/comps/health — cheap, 1-row or metadata */
   healthUrl: string;
   /** true when endpoint/fields could not be verified from the build env */
@@ -212,6 +220,7 @@ const philadelphia: ProviderConfig = {
   },
   rowCount: (json) => ((json as { rows?: unknown[] })?.rows ?? []).length,
   order: "newest",
+  classFilters: ["multifamily"],
   healthUrl:
     "https://phl.carto.com/api/v2/sql?q=" +
     encodeURIComponent(

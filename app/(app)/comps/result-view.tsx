@@ -106,7 +106,7 @@ export function CompsResultView({
   // where the sales are the deal's own kind, the deal is one building and
   // its price a building's, per square foot where both state an area, and
   // said in a neutral tone — a distance from the middle, never a verdict.
-  const read = vsMedianRead(s, result.params?.classFilter, subject);
+  const read = vsMedianRead(s, result.params, subject);
   const call = read?.kind === "call" ? read : null;
   const callText =
     call && subject

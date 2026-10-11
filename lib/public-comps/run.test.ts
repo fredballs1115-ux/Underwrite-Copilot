@@ -133,3 +133,19 @@ describe("an empty answer from the property database", () => {
     expect(r.comps[0]).not.toHaveProperty("ingestedAt");
   });
 });
+
+describe("a search the reader set", () => {
+  it("asks exactly the radius and window set, never widened, held to the class the database files", async () => {
+    const admin = fakeAdmin([[]], [{ market: "nyc" }]);
+    const r = await computeRecordComps({ ...brooklyn, assetClass: "retail", ask: { radiusKm: 4.8, monthsBack: 12 } });
+    expect(admin.calls).toHaveLength(1);
+    expect(admin.calls[0]).toMatchObject({ in_radius_m: 4800, in_months: 12, in_asset_class: "commercial_retail" });
+    expect(r.params).toMatchObject({ radiusKm: 4.8, monthsBack: 12, classFilter: "retail", classKey: "retail" });
+  });
+
+  it("holds a radius past the database's cap to the cap", async () => {
+    const admin = fakeAdmin([[]], [{ market: "nyc" }]);
+    await computeRecordComps({ ...brooklyn, ask: { radiusKm: 8 } });
+    expect(admin.calls[0].in_radius_m).toBe(4800);
+  });
+});

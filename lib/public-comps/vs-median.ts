@@ -20,6 +20,7 @@
 
 import { compEvidence, MEDIAN_FLOOR, type RecordCompsStats } from "./core";
 import { SUBJECT_BAND } from "./picture";
+import { classFilterText } from "./classes";
 
 /** What the deal brings to the comparison. */
 export interface SubjectForCall {
@@ -64,7 +65,9 @@ export function filterClassKey(classFilter: string | null | undefined): string |
  */
 export function vsMedianRead(
   stats: RecordCompsStats | undefined,
-  classFilter: string | null | undefined,
+  /** the search's class filter as stored: its key where it records one,
+   *  else the scope line's words */
+  classFilter: string | { classFilter: string; classKey?: string } | null | undefined,
   subject: SubjectForCall | null,
 ): VsMedianRead | null {
   if (!stats || !subject || (subject.price == null && subject.perSf == null)) return null;
@@ -74,13 +77,16 @@ export function vsMedianRead(
   if (subject.planOrLand) {
     return { kind: "withheld", reason: "The deal's price is a plan's or land's, not a standing building's, so it is not set against these sales' middle." };
   }
-  const filtered = filterClassKey(classFilter);
+  const filtered =
+    typeof classFilter === "object" && classFilter
+      ? (classFilter.classKey ?? filterClassKey(classFilter.classFilter))
+      : filterClassKey(classFilter);
   if (!subject.classKey || filtered !== subject.classKey) {
     const kind = subject.classLabel ? subject.classLabel.toLowerCase() : "the deal's kind of building";
     return {
       kind: "withheld",
       reason: filtered
-        ? `These sales are filed as ${filtered.replace(/_/g, " ")}, not ${kind}, so the deal's price is not set against their middle.`
+        ? `These sales are filed as ${classFilterText(filtered)}, not ${kind}, so the deal's price is not set against their middle.`
         : `These are all recorded sales here, not ${kind} alone, so the deal's price is not set against their middle.`,
     };
   }

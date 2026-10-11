@@ -12,6 +12,7 @@ import {
   type RecordCompsResult,
 } from "./core";
 import { dbMarketForAddress } from "./db-markets";
+import { classFilterText, compsClassKey, DB_CLASS_FOR } from "./classes";
 import type { SubjectPoint } from "./subject-point";
 import { photonPrecision } from "@/lib/geocode";
 import { dealClassKey } from "@/lib/asset-words";
@@ -134,7 +135,9 @@ export async function geocode(
 async function tryDbComps(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   subject: { lat: number; lng: number },
-  assetClass: string,
+  /** the class the database files the sales under (lib/public-comps/
+   *  classes `DB_CLASS_FOR`), or null for every sale */
+  dbClass: string | null,
   radiusKm: number,
   monthsBack: number
 ): Promise<DbRow[] | null> {
@@ -143,7 +146,7 @@ async function tryDbComps(
       in_lat: subject.lat,
       in_lng: subject.lng,
       in_radius_m: Math.round(radiusKm * 1000),
-      in_asset_class: assetClass.includes("multifamily") ? "multifamily" : null,
+      in_asset_class: dbClass,
       in_months: monthsBack,
       in_limit: RECORDED_SALES.limit,
     });
@@ -213,11 +216,22 @@ export async function computeRecordComps(input: {
   /** whether the address names a street: without one, any point is the
    *  area's, never the building's */
   hasStreet?: boolean;
+  /** a radius or window the reader set (/comps): the search asks exactly
+   *  that, never widened. Absent — the deal panel's fixed ask — a thin set
+   *  is widened once to the wide radius and window. Each is held to
+   *  lib/public-record-asks' choices by the caller. */
+  ask?: { radiusKm?: number; monthsBack?: number } | null;
 }): Promise<RecordCompsResult> {
   const admin = createSupabaseAdminClient();
   const base = { comps: [], retrievedAt: new Date().toISOString(), note: HONESTY_NOTE };
-  const assetClass = (input.assetClass ?? "").toLowerCase();
+  // The class the search is held to, in the site's own key ("" for every
+  // sale), and the database's name for it (lib/public-comps/classes).
+  const cls = compsClassKey(input.assetClass);
+  const dbClass = cls ? DB_CLASS_FOR[cls] : null;
   const hasStreet = input.hasStreet ?? true;
+  const asked = !!(input.ask && (input.ask.radiusKm || input.ask.monthsBack));
+  const firstRadiusKm = Math.min(input.ask?.radiusKm || RADIUS_KM, WIDE_RADIUS_KM);
+  const firstMonthsBack = input.ask?.monthsBack || MONTHS_BACK;
 
   const point = input.point ?? null;
   const placed = point && !input.state ? await geocode(input.label, hasStreet) : null;
@@ -237,11 +251,11 @@ export async function computeRecordComps(input: {
   const subjectOut = { lat: subject.lat, lng: subject.lng, label: input.label, precision: subject.precision };
 
   // 1) Ingested deed records (works in ANY ingested market, national included)
-  let radiusKm = RADIUS_KM;
-  let monthsBack = MONTHS_BACK;
-  let db = await tryDbComps(admin, subject, assetClass, radiusKm, monthsBack);
-  if (db && db.length < MIN_COMPS_BEFORE_WIDENING) {
-    const wide = await tryDbComps(admin, subject, assetClass, WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
+  let radiusKm = firstRadiusKm;
+  let monthsBack = firstMonthsBack;
+  let db = await tryDbComps(admin, subject, dbClass, radiusKm, monthsBack);
+  if (db && db.length < MIN_COMPS_BEFORE_WIDENING && !asked) {
+    const wide = await tryDbComps(admin, subject, dbClass, WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
     // A widened answer is kept where it found more — or where both found
     // none, so a search that came back empty says the widest it asked.
     if (wide && (wide.length > db.length || (db.length === 0 && wide.length === 0))) {
@@ -272,7 +286,8 @@ export async function computeRecordComps(input: {
       params: {
         radiusKm,
         monthsBack,
-        classFilter: assetClass.includes("multifamily") ? "multifamily" : "all sales",
+        classFilter: cls ? classFilterText(cls) : "all sales",
+        ...(cls ? { classKey: cls } : {}),
       },
       comps: stored,
       stats: compStats(stored),
@@ -319,7 +334,8 @@ export async function computeRecordComps(input: {
         params: {
           radiusKm,
           monthsBack,
-          classFilter: assetClass.includes("multifamily") ? "multifamily" : "all sales",
+          classFilter: cls ? classFilterText(cls) : "all sales",
+        ...(cls ? { classKey: cls } : {}),
         },
         comps: [],
         found: 0,
@@ -330,13 +346,16 @@ export async function computeRecordComps(input: {
     return { ...base, status: "no_provider" };
   }
   const nowIso = new Date().toISOString();
+  const filtersClass = !!cls && (provider.classFilters ?? []).includes(cls);
   const attempt = async (rKm: number, mBack: number) => {
     const url2 = provider.buildUrl({
       lat: subject.lat,
       lng: subject.lng,
       radiusKm: rKm,
       monthsBack: mBack,
-      assetClass,
+      // A provider's query is held to a class only where it filters by it
+      // (ProviderConfig `classFilters`); the result says which.
+      assetClass: filtersClass ? cls : "",
       nowIso,
     });
     const res = await fetch(url2, {
@@ -352,10 +371,10 @@ export async function computeRecordComps(input: {
     return { comps: finalizeComps(provider.parse(json), subject, rKm), returned: provider.rowCount(json) };
   };
   try {
-    let rKm = RADIUS_KM;
-    let mBack = MONTHS_BACK;
+    let rKm = firstRadiusKm;
+    let mBack = firstMonthsBack;
     let { comps, returned } = await attempt(rKm, mBack);
-    if (comps.length < MIN_COMPS_BEFORE_WIDENING) {
+    if (comps.length < MIN_COMPS_BEFORE_WIDENING && !asked) {
       try {
         const widened = await attempt(WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
         rKm = WIDE_RADIUS_KM;
@@ -377,7 +396,8 @@ export async function computeRecordComps(input: {
       params: {
         radiusKm: rKm,
         monthsBack: mBack,
-        classFilter: assetClass.includes("multifamily") ? "multifamily/mixed" : "all sales",
+        classFilter: filtersClass ? (cls === "multifamily" ? "multifamily/mixed" : classFilterText(cls)) : "all sales",
+        ...(filtersClass ? { classKey: cls } : {}),
       },
       comps: stored,
       stats: compStats(stored),

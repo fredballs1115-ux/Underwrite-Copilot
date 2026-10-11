@@ -10,6 +10,9 @@ import { CompsResultView } from "./result-view";
 import { CoverageChips } from "./coverage-chips";
 import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
 import { marketNames } from "@/lib/public-comps/db-markets";
+import { COMPS_CLASS_OPTIONS } from "@/lib/public-comps/classes";
+import { askOf, readCompsQuery } from "@/lib/public-comps/comps-query";
+import { RECORDED_SALES_MONTH_CHOICES, RECORDED_SALES_RADIUS_CHOICES } from "@/lib/public-record-asks";
 
 export const metadata: Metadata = { title: "Pull comps" };
 // Every render with an address hits the geocoder + the property DB / live
@@ -26,7 +29,7 @@ export const dynamic = "force-dynamic";
 export default async function PullCompsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; addr?: string; cls?: string }>;
+  searchParams: Promise<{ q?: string; addr?: string; cls?: string; r?: string; m?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/comps");
@@ -36,7 +39,11 @@ export default async function PullCompsPage({
   // the degraded fallback when the geocoder was unreachable while typing.
   const picked = parseStructuredAddress(params.addr ?? "");
   const q = picked?.label ?? (params.q ?? "").trim().slice(0, 160);
-  const cls = params.cls === "multifamily" ? "multifamily" : "";
+  // The radius, window and class the reader set, each held to the choices
+  // offered (lib/public-comps/comps-query); the query string carries them,
+  // so a search is a link.
+  const query = readCompsQuery(params);
+  const cls = query.cls;
   const result = q
     ? await computeRecordComps({
         label: q,
@@ -47,6 +54,7 @@ export default async function PullCompsPage({
         // A pick names its street or does not; typed text is read by what
         // Photon matched (a house, a street, or an area).
         hasStreet: picked ? !!picked.street?.trim() : true,
+        ask: askOf(query),
       })
     : null;
   // The property database's markets that hold recorded sales today (the
@@ -79,14 +87,44 @@ export default async function PullCompsPage({
           />
         </label>
         <label>
-          <span className="mb-1 block text-xs font-medium text-muted">Filter</span>
+          <span className="mb-1 block text-xs font-medium text-muted">Radius</span>
+          <select
+            name="r"
+            defaultValue={query.radiusMiles ?? ""}
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
+          >
+            <option value="">1 mi, 3 if thin</option>
+            {RECORDED_SALES_RADIUS_CHOICES.map((c) => (
+              <option key={c.miles} value={c.miles}>{`${c.miles} mi`}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="mb-1 block text-xs font-medium text-muted">Window</span>
+          <select
+            name="m"
+            defaultValue={query.monthsBack ?? ""}
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
+          >
+            <option value="">24 months, 36 if thin</option>
+            {RECORDED_SALES_MONTH_CHOICES.map((m) => (
+              <option key={m} value={m}>{`${m} months`}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="mb-1 block text-xs font-medium text-muted">Class</span>
           <select
             name="cls"
             defaultValue={cls}
             className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
           >
             <option value="">All recorded sales</option>
-            <option value="multifamily">Multifamily / mixed only</option>
+            {COMPS_CLASS_OPTIONS.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         <button
