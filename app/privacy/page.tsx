@@ -22,7 +22,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "How your documents are used",
     body: [
-      "Documents exist to produce your analysis and for no other purpose. They're stored in private storage with isolation enforced at the database level — no one outside your account (or your team, if you join one) can query or access them.",
+      "Documents exist to produce your analysis and for no other purpose. They're stored in private storage behind the database's row-level security and a server check on every file — no one outside your account (or your team, if you join one) can query or access them.",
       "To generate the analysis, document contents are sent to Anthropic's Claude API. Under Anthropic's commercial API terms, that data is not used to train models. We don't use your documents to train anything either.",
     ],
   },
