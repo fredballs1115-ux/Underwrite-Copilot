@@ -61,6 +61,27 @@ describe("the comps readout as pictures", () => {
     expect(count(html, "comps-subject")).toBe(0);
   });
 
+  it("says an empty answer from the property database as none found there, never no source", () => {
+    const html = draw({
+      status: "no_sales",
+      providerId: "ingested_db",
+      providerName: "Ingested public deed records (property database)",
+      datasetUrl: "",
+      subject: { lat: 40.69, lng: -73.99, label: "100 Court St, Brooklyn, NY" },
+      params: { radiusKm: 4.8, monthsBack: 36, classFilter: "all sales" },
+      comps: [],
+      found: 0,
+      dbMarket: "New York City",
+      retrievedAt: "2026-10-08T12:00:00Z",
+      note: "Public records.",
+    });
+    const text = visibleText(html);
+    expect(text).toContain("No recorded sales within 3 mi of the address in the last 36 months, in the property database's New York City records.");
+    expect(text).not.toContain("wired");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
   it("numbers the rows as their pins and folds the sales past twelve", () => {
     const comps = Array.from({ length: 15 }, (_, i) => sale(i));
     const text = visibleText(draw(result(comps)));

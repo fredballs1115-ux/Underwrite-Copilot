@@ -15,6 +15,7 @@ import {
   compsScope,
   evidenceNote,
   medianLabel,
+  noSalesSentence,
   salesPhrase,
   type RecordCompsResult,
 } from "@/lib/public-comps/core";
@@ -78,9 +79,8 @@ export function CompsResultView({
 
   if (result.status === "no_sales" || !result.stats) {
     return (
-      <p className="mt-2 text-sm text-muted">
-        Zero recorded sales {scope} in {result.providerName}. Thin comp
-        evidence is itself a finding — widen the search by retrying later or
+      <p className="mt-2 text-sm text-muted" data-qa="comps-none">
+        {noSalesSentence(result)} Thin comp evidence is itself a finding —
         treat pricing here as low-confidence.
       </p>
     );

@@ -74,6 +74,11 @@ export interface RecordCompsResult {
   /** the recorded sales the search found inside the radius, before the
    *  stored set was cut to the nearest STORED_COMPS */
   found?: number;
+  /** the property database's market (lib/public-comps/db-markets) where it
+   *  answered a search with no sales, by its research name: the database
+   *  holds that market's sales, so none found is a finding about the
+   *  address, never "no source" */
+  dbMarket?: string;
 }
 
 export const HONESTY_NOTE =
@@ -787,6 +792,27 @@ export function compsScope(r: Pick<RecordCompsResult, "params" | "capped" | "sou
   const window =
     r.capped && r.sourceOrder === "newest" && dates.length > 0 ? `sold since ${saleDay(dates[0])}` : `last ${monthsBack} months`;
   return `${within} · ${window} · ${classFilter}`;
+}
+
+/**
+ * A search that answered with no sales, said as what it asked: "No recorded
+ * sales within 3 mi of the address in the last 36 months, in the property
+ * database's New York City records." Where the source answered nothing at
+ * all the readout says so instead (status `no_provider`).
+ */
+export function noSalesSentence(
+  r: Pick<RecordCompsResult, "params" | "providerName" | "providerId" | "dbMarket">,
+): string {
+  const within = r.params ? `within ${radiusText(r.params.radiusKm)} of the address` : "near the address";
+  const window = r.params ? ` in the last ${r.params.monthsBack} months` : "";
+  const cls = r.params && r.params.classFilter !== "all sales" ? ` (${r.params.classFilter})` : "";
+  const where =
+    r.providerId === "ingested_db"
+      ? r.dbMarket
+        ? `the property database's ${r.dbMarket} records`
+        : "the property database"
+      : (r.providerName ?? "the source");
+  return `No recorded sales${cls} ${within}${window}, in ${where}.`;
 }
 
 /**

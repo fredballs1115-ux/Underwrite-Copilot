@@ -11,6 +11,7 @@ import {
   type RecordComp,
   type RecordCompsResult,
 } from "./core";
+import { dbMarketForAddress } from "./db-markets";
 
 // The background half of public-record comps: geocode the subject (Photon —
 // the same free OSM service the address autocomplete uses), pick the
@@ -112,8 +113,10 @@ export async function geocode(label: string): Promise<{
 }
 
 /** DB-first comps: ingested deed records (migration 0028, nearby_sales RPC).
- *  Returns null when the table/RPC is absent or empty here — callers fall
- *  through to the live provider APIs. */
+ *  Returns null when the table or the lookup is absent or failed, and an
+ *  empty list when it answered with no sales — an answer, which the caller
+ *  widens once and, where the database holds the address's market, reports
+ *  as none found rather than as no source. */
 async function tryDbComps(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   subject: { lat: number; lng: number },
@@ -130,7 +133,7 @@ async function tryDbComps(
       in_months: monthsBack,
       in_limit: RECORDED_SALES.limit,
     });
-    if (error || !Array.isArray(data) || data.length === 0) return null;
+    if (error || !Array.isArray(data)) return null;
     return (data as Record<string, unknown>[]).map((r) => ({
       address: String(r.address ?? r.parcel_id ?? "unknown"),
       lat: Number(r.lat),
@@ -143,6 +146,23 @@ async function tryDbComps(
     }));
   } catch {
     return null;
+  }
+}
+
+const DB_PROVIDER_NAME = "Ingested public deed records (property database)";
+
+/** Whether the property database holds any recorded sale filed under a
+ *  market — an existence read, one row. False on a failed read: coverage is
+ *  never claimed on a read that did not answer. */
+async function dbHoldsMarket(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  ingestMarket: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await admin.from("recorded_sales").select("id").eq("market", ingestMarket).limit(1);
+    return !error && Array.isArray(data) && data.length > 0;
+  } catch {
+    return false;
   }
 }
 
@@ -171,7 +191,9 @@ export async function computeRecordComps(input: {
   let db = await tryDbComps(admin, subject, assetClass, radiusKm, monthsBack);
   if (db && db.length < MIN_COMPS_BEFORE_WIDENING) {
     const wide = await tryDbComps(admin, subject, assetClass, WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
-    if (wide && wide.length > db.length) {
+    // A widened answer is kept where it found more — or where both found
+    // none, so a search that came back empty says the widest it asked.
+    if (wide && (wide.length > db.length || (db.length === 0 && wide.length === 0))) {
       db = wide;
       radiusKm = WIDE_RADIUS_KM;
       monthsBack = WIDE_MONTHS_BACK;
@@ -184,7 +206,7 @@ export async function computeRecordComps(input: {
       ...base,
       status: stored.length ? "ok" : "no_sales",
       providerId: "ingested_db",
-      providerName: "Ingested public deed records (property database)",
+      providerName: DB_PROVIDER_NAME,
       datasetUrl: stored[0]?.sourceUrl ?? "",
       subject: { lat: subject.lat, lng: subject.lng, label: input.label },
       params: {
@@ -211,7 +233,39 @@ export async function computeRecordComps(input: {
     city: input.city || subject.city,
     county: input.county || subject.county,
   });
-  if (!provider) return { ...base, status: "no_provider" };
+  if (!provider) {
+    // The database answered and found nothing: where it holds recorded sales
+    // for the address's market, that is a finding about this address — no
+    // sales within the widest search — never "no source wired".
+    const market =
+      db !== null
+        ? dbMarketForAddress({
+            state: input.state || subject.state,
+            city: input.city || subject.city,
+            county: input.county || subject.county,
+            label: input.label,
+          })
+        : null;
+    if (market && (await dbHoldsMarket(admin, market.ingestMarket))) {
+      return {
+        ...base,
+        status: "no_sales",
+        providerId: "ingested_db",
+        providerName: DB_PROVIDER_NAME,
+        datasetUrl: "",
+        subject: { lat: subject.lat, lng: subject.lng, label: input.label },
+        params: {
+          radiusKm,
+          monthsBack,
+          classFilter: assetClass.includes("multifamily") ? "multifamily" : "all sales",
+        },
+        comps: [],
+        found: 0,
+        dbMarket: market.name,
+      };
+    }
+    return { ...base, status: "no_provider" };
+  }
   const nowIso = new Date().toISOString();
   const attempt = async (rKm: number, mBack: number) => {
     const url2 = provider.buildUrl({
