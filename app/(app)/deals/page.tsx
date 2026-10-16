@@ -13,6 +13,7 @@ import { WhatsNewCard } from "./whats-new";
 import { NewsStrip, type NewsStripItem } from "./news-strip";
 import { BrokerageFilter, type BrokerageOption } from "./brokerage-filter";
 import { brokerageOptions, dealFirms } from "@/lib/brokerage";
+import { PRIOR_PRICE_COLUMNS, priorScreenOfColumns, type PriorPriceColumns } from "@/lib/price-change";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
@@ -101,8 +102,7 @@ export default async function DealsPage({
     site_flags?: SiteFlagsResult | null;
     photo?: DealVisualCache | null;
     om_storage_path?: string | null;
-    prior_screen?: unknown;
-  };
+  } & PriorPriceColumns;
 
   // Billing state, the deal list, its count and the personal buy box are
   // independent — fetch them together. Every deal the reader can see, a page
@@ -117,7 +117,7 @@ export default async function DealsPage({
       supabase
         .from("deals")
         .select(
-          "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path, prior_screen",
+          `id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path, ${PRIOR_PRICE_COLUMNS}`,
         )
         .order("created_at", { ascending: false })
         .order("id")
@@ -172,7 +172,9 @@ export default async function DealsPage({
   // request line carries, and the jobs' one read past the project's max rows
   // (research pass 42). A read that fails is said over the list
   // (lib/pipeline-read-note), never shown as no screen running, no deadline.
-  const rows = (data ?? []) as Row[];
+  // The previous screen rebuilt from its narrow columns (lib/price-change
+  // `PRIOR_PRICE_COLUMNS`), as the card's price badge reads it.
+  const rows = ((data ?? []) as Row[]).map((d) => ({ ...d, prior_screen: priorScreenOfColumns(d) }));
   const ids = rows.map((d) => d.id);
   const teammateIds = Array.from(
     new Set(

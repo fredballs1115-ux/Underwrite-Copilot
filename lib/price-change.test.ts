@@ -1,8 +1,10 @@
 // A reissued memorandum's new ask on the pipeline (research pass 24, B14).
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { priceChangeOf, priceChangePct, priceChangeWords } from "./price-change";
+import { PRIOR_PRICE_COLUMNS, priceChangeOf, priceChangePct, priceChangeWords, priorScreenOfColumns } from "./price-change";
 import { PriceChangeBadge } from "@/app/(app)/deals/price-change-badge";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -88,6 +90,32 @@ describe("the badge dates the earlier screen by its own call", () => {
     )!;
     expect(undated.since).toBeNull();
     expect(priceChangeWords(undated)).toBe("Price cut 4.4% since the last screen: $68,000,000 to $65,000,000");
+  });
+});
+
+// Audit C8, L10: the pipeline selected each deal's whole previous screen to
+// read one price.
+describe("the pipeline reads the previous screen's price fields alone", () => {
+  it("selects JSON paths, never the snapshot, and the badge reads the same from them", () => {
+    expect(PRIOR_PRICE_COLUMNS).not.toMatch(/(^|,\s*)prior_screen(\s*,|$)/);
+    expect(PRIOR_PRICE_COLUMNS).toContain("prior_screen->extraction->metrics");
+    expect(PRIOR_PRICE_COLUMNS).toContain("prior_screen->extraction->interest");
+    expect(PRIOR_PRICE_COLUMNS).toContain("prior_screen->verdict->>generatedAt");
+    const page = readFileSync(join(process.cwd(), "app/(app)/deals/page.tsx"), "utf8");
+    expect(page).not.toMatch(/om_storage_path, prior_screen"/);
+    expect(page).toContain("${PRIOR_PRICE_COLUMNS}");
+
+    const whole = prior([m("Asking price", "$68,000,000")]);
+    const narrow = priorScreenOfColumns({
+      prior_at: whole.at,
+      prior_metrics: whole.extraction.metrics,
+      prior_interest: null,
+      prior_screened_on: null,
+      prior_generated_at: whole.verdict.generatedAt,
+    });
+    const now = { metrics: [m("Asking price", "$65,000,000")] };
+    expect(priceChangeOf(narrow, now)).toEqual(priceChangeOf(whole, now));
+    expect(priorScreenOfColumns({ prior_at: null, prior_metrics: null })).toBeNull();
   });
 });
 

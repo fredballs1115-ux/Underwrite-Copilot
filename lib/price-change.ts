@@ -76,6 +76,43 @@ function priorScreenDay(prior: PriorScreen): string | null {
   return typeof g === "string" && screenedOn(g) ? g : null;
 }
 
+/**
+ * The pipeline's read of the previous screen: only what the badge reads —
+ * the snapshot's stamp, the earlier extraction's rows, its interest and the
+ * day it was read, and the earlier call's day — never the whole earlier
+ * extraction and verdict, which the page had selected for every deal to
+ * read one price (audit C8, L10). PostgREST's JSON paths, each aliased.
+ */
+export const PRIOR_PRICE_COLUMNS =
+  "prior_at:prior_screen->>at, prior_metrics:prior_screen->extraction->metrics, prior_interest:prior_screen->extraction->interest, prior_screened_on:prior_screen->extraction->>screenedOn, prior_generated_at:prior_screen->verdict->>generatedAt";
+
+/** A row's `PRIOR_PRICE_COLUMNS`, as PostgREST returns them. */
+export interface PriorPriceColumns {
+  prior_at?: string | null;
+  prior_metrics?: unknown;
+  prior_interest?: unknown;
+  prior_screened_on?: string | null;
+  prior_generated_at?: string | null;
+}
+
+/** The previous screen as `priceChangeOf` reads it, rebuilt from the
+ *  narrow columns; null where the deal has none. */
+export function priorScreenOfColumns(r: PriorPriceColumns): PriorScreen | null {
+  if (!r.prior_at && !Array.isArray(r.prior_metrics)) return null;
+  const extraction = Array.isArray(r.prior_metrics)
+    ? {
+        metrics: r.prior_metrics as { label: string; value: string; basis?: string }[],
+        screenedOn: r.prior_screened_on ?? null,
+        ...(r.prior_interest && typeof r.prior_interest === "object" ? { interest: r.prior_interest } : {}),
+      }
+    : null;
+  return {
+    at: r.prior_at ?? "",
+    extraction,
+    verdict: r.prior_generated_at ? ({ generatedAt: r.prior_generated_at } as PriorScreen["verdict"]) : null,
+  };
+}
+
 /** "4.4%" — one decimal under 10%, whole above. */
 export function priceChangePct(c: Pick<PriceChange, "pct">): string {
   const p = c.pct * 100;
