@@ -52,11 +52,15 @@ describe("the sample deal's card outside the pipeline", () => {
     expect(html).not.toContain('data-flip="photos"');
   });
 
-  it("submits an action in place of a link where one is given", () => {
-    const action = async () => {};
-    const html = render(React.createElement(DealTilePreview, { d: card, action, title: "Add the sample deal", note: "Sample deal", todayIso: TODAY }));
+  it("is a still card where no page is given: no button, no form, no link round the card (audit C7, L7)", () => {
+    // A button round the card was invalid (its picture, name and figures are
+    // block content) and read the whole card as its accessible name.
+    const html = render(React.createElement(DealTilePreview, { d: card, note: "Sample deal", todayIso: TODAY }));
     expect(a11yIssues(html)).toEqual([]);
-    expect(html).toMatch(/<form[^>]*>\s*<button type="submit" title="Add the sample deal"/);
+    expect(html).toContain('data-qa="tile-still"');
+    expect(html).not.toMatch(/<button|<form|<a [^>]*href="\/(?:demo|deals)/);
+    // Nothing to click, so nothing lifts on hover.
+    expect(html).not.toContain("hover:-translate-y-0.5");
     expect(visibleText(html)).toContain("Sample deal");
   });
 });
@@ -81,6 +85,12 @@ describe("the empty pipeline", () => {
     expect(text).toContain("Start your pipeline");
     expect(text).toContain("Try a sample deal");
     expect(text).toContain("Browse the covered markets");
+    // One control adds the sample: the PendingButton beside the card, its
+    // name short and its pending words said (app/(app)/pending-button). The
+    // card is still, never a second button with the card's text as its name.
+    const buttons = [...html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)].map((m) => visibleText(m[1]).trim());
+    expect(buttons.filter((b) => /sample/i.test(b))).toEqual(["Try a sample deal"]);
+    expect(html).toContain('data-qa="tile-still"');
     // No buy box, no fit: the card the reader's sample would show them.
     expect(html).not.toContain('data-qa="fit-checked"');
   });

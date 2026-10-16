@@ -1125,12 +1125,11 @@ export function Pipeline({
         >
           {/* The sample's own card, as the pipeline draws it the moment the
               reader adds it (lib/pipeline-card): its market's photograph,
-              the call on it, the figures. A click adds it and opens it. */}
+              the call on it, the figures. A still picture: "Try a sample
+              deal" beside it adds it and opens it. */}
           {sampleCard ? (
             <DealTilePreview
               d={sampleCard}
-              action={createSampleDeal}
-              title="Add the sample deal to your pipeline and open it"
               note="Sample deal"
               todayIso={todayIso}
               className="grid max-w-[19rem]"

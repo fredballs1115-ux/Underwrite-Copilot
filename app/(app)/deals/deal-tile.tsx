@@ -153,8 +153,9 @@ export const DealTile = memo(function DealTile({
   /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
   todayIso: string;
   /** the card shown outside the reader's pipeline (`DealTilePreview`): it
-   *  opens `href`, or submits `action`, in place of the deal's page, and
-   *  its footer names the stage rather than offering a change to it */
+   *  opens `href` in place of the deal's page, or is a still picture of
+   *  the card with none, and its footer names the stage rather than
+   *  offering a change to it */
   preview?: TilePreviewTarget;
 }) {
   const dealId = d.id;
@@ -438,22 +439,26 @@ export const DealTile = memo(function DealTile({
       // Five rows of the grid's own (the picture, the name and place, the
       // figures, the tags under them, the footer), so every card in a row
       // of the grid shares their heights.
-      className={`group relative row-span-5 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+      className={`group relative row-span-5 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 ${
+        preview && !preview.href ? "" : "hover:-translate-y-0.5 hover:shadow-lg"
+      } ${
         checked ? "border-brand ring-2 ring-brand/40" : "border-line"
       } ${isDead ? "grayscale" : ""}`}
     >
       {preview ? (
         <>
-          {preview.action ? (
-            <form action={preview.action} className="row-span-4 grid grid-rows-subgrid">
-              <button type="submit" title={preview.title} className="row-span-4 grid grid-rows-subgrid text-left">
-                {inner}
-              </button>
-            </form>
-          ) : (
-            <Link href={preview.href ?? "/demo"} title={preview.title} className="row-span-4 grid grid-rows-subgrid">
+          {preview.href ? (
+            <Link href={preview.href} title={preview.title} className="row-span-4 grid grid-rows-subgrid">
               {inner}
             </Link>
+          ) : (
+            // A still card: the page beside it holds the one control that
+            // acts (the empty pipeline's "Try a sample deal"). A button
+            // round the card was invalid — its picture, name and figures are
+            // block content — and read the whole card as its name.
+            <div className="row-span-4 grid grid-rows-subgrid" data-qa="tile-still">
+              {inner}
+            </div>
           )}
           {/* The stage the card is filed under, as words: a change to it is
               the reader's own pipeline's, never a preview's. */}
@@ -506,11 +511,10 @@ export const DealTile = memo(function DealTile({
 
 /** Where a card shown outside the reader's pipeline goes (`DealTilePreview`). */
 type TilePreviewTarget = {
-  /** a page the card opens — the public sample's, /demo */
+  /** a page the card opens — the public sample's, /demo; with none the
+   *  card is still, and the control that acts sits beside it (the empty
+   *  pipeline's "Try a sample deal", a PendingButton) */
   href?: string;
-  /** a server action the card submits instead — the empty pipeline's
-   *  "Try a sample deal", which adds the sample and opens it */
-  action?: (formData: FormData) => void | Promise<void>;
   /** the card's tooltip: where it goes */
   title?: string;
   /** a word for the card's footer, before its stage */
@@ -522,7 +526,8 @@ type TilePreviewTarget = {
  * pipeline, a public page): `DealTile` itself on a card built by lib/
  * pipeline-card, so it is the very card the pipeline shows — the picture
  * and its caption, the call on it, the name, the place, the three figures —
- * opening `href` or submitting `action` instead of the deal's page, with no
+ * opening `href` instead of the deal's page, or still where none is given
+ * (the control that acts sits beside it, never round it), with no
  * stage control and no photographs to flip. Under it, the one credit line
  * the pipeline prints under its cards, for the market photograph the card
  * settled on.
@@ -530,7 +535,6 @@ type TilePreviewTarget = {
 export function DealTilePreview({
   d,
   href,
-  action,
   title,
   note,
   todayIso,
@@ -559,7 +563,7 @@ export function DealTilePreview({
           onToggle={noop}
           onMarket={onMarket}
           todayIso={todayIso}
-          preview={{ href, action, title, note }}
+          preview={{ href, title, note }}
         />
       </ul>
       {credits.length > 0 ? (
