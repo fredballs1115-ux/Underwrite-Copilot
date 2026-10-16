@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import AppError from "../app/(app)/error";
+import AppNotFound from "../app/(app)/not-found";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { SUPPORT_EMAIL, pageErrorMailto } from "./support-link";
 
@@ -47,5 +48,24 @@ describe("pageErrorMailto", () => {
     expect(href).toContain("subject=A page failed to load&");
     expect(href).not.toContain("Page:");
     expect(href).not.toContain("Error ID:");
+  });
+});
+
+describe("the signed-in not-found page", () => {
+  const html = renderToStaticMarkup(React.createElement(AppNotFound));
+  const text = visibleText(html);
+
+  it("draws the covers' own empty lot, says what is known and leads back to the pipeline", () => {
+    expect(html).toContain('data-deal-cover="land"');
+    expect(text).toContain("Nothing at this link.");
+    // Row-level security answers someone else's deal as one that is gone:
+    // the page names both and claims neither.
+    expect(text).toMatch(/deleted, or it may belong to someone else/);
+    expect(html).toContain('href="/deals"');
+  });
+
+  it("lints clean", () => {
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 });
