@@ -90,6 +90,7 @@ import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 // The buy box tab lives in buy-box-panel.tsx, which /demo draws on the
 // sample without this module.
 import { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
+import { StatGridSkeleton, CardListSkeleton, TableSkeleton, VerdictSkeleton } from "./skeletons";
 export { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
 import { MAX_OM_PAGES } from "@/lib/pdf";
 import { needsOperator } from "@/lib/anthropic/operator-failures";
@@ -2107,77 +2108,4 @@ function ProgressRail({
  *  said while the step changed underneath). */
 function Spinner() {
   return <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand" />;
-}
-
-/* ------------------------------------------------------------------ */
-/* Skeletons                                                           */
-/* ------------------------------------------------------------------ */
-
-function StatGridSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-line bg-surface p-4">
-          <div className="skeleton h-2.5 w-16 rounded" />
-          <div className="skeleton mt-3 h-5 w-20 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CardListSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-line bg-surface p-4">
-          <div className="skeleton h-3 w-40 rounded" />
-          <div className="skeleton mt-3 h-2.5 w-full rounded" />
-          <div className="skeleton mt-2 h-2.5 w-4/5 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TableSkeleton() {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex gap-4 py-2.5">
-          <div className="skeleton h-3 w-1/4 rounded" />
-          <div className="skeleton h-3 w-1/5 rounded" />
-          <div className="skeleton h-3 w-1/5 rounded" />
-          <div className="skeleton h-3 flex-1 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function VerdictSkeleton() {
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-        <div className="p-6">
-          <div className="skeleton h-2.5 w-16 rounded" />
-          <div className="mt-4 flex items-center gap-3">
-            <div className="skeleton h-11 w-11 rounded-full" />
-            <div className="skeleton h-7 w-40 rounded" />
-          </div>
-          <div className="skeleton mt-5 h-2.5 w-full rounded" />
-          <div className="skeleton mt-2 h-2.5 w-3/4 rounded" />
-        </div>
-        <div className="grid gap-px bg-line sm:grid-cols-2">
-          {[0, 1].map((i) => (
-            <div key={i} className="bg-surface p-5">
-              <div className="skeleton h-2.5 w-20 rounded" />
-              <div className="skeleton mt-3 h-2.5 w-full rounded" />
-              <div className="skeleton mt-2 h-2.5 w-5/6 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
 }

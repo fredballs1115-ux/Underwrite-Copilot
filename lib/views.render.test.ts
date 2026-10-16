@@ -56,6 +56,7 @@ import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { DemoSections } from "@/app/demo/sections";
+import { loadWalkthrough } from "@/app/landing-interactive";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
@@ -1298,7 +1299,11 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(a11yIssues(html)).toEqual([]);
     });
 
-    it("draws the Analyses tab as the walkthrough's panel, the challenger by the deal's own name, its broker questions after it", () => {
+    it("draws the Analyses tab as the walkthrough's panel, the challenger by the deal's own name, its broker questions after it", async () => {
+      // The walkthrough's views arrive in a chunk of their own, which a page
+      // asks for when the tab opens (lib/walkthrough-loading.render.test.ts
+      // draws the shape it shows until then); here, landed.
+      await loadWalkthrough();
       const verdict = visibleText(section("analyses"));
       expect(verdict).toContain("Caution");
       const html = section("analyses", "challenger");

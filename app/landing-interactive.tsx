@@ -11,6 +11,12 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { SampleLegal } from "@/lib/sample-legal";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
+import {
+  CardListSkeleton,
+  StatGridSkeleton,
+  TableSkeleton,
+  VerdictSkeleton,
+} from "./(app)/deals/[id]/skeletons";
 
 // The tabs past the Overview — the deal page's other sections and the
 // model's returns (deal-sections-view, returns-headline), with the comps'
@@ -27,6 +33,57 @@ export function loadWalkthrough(): Promise<Walkthrough> {
   walkthroughLoad ??= import("./walkthrough-tabs").then((m) => (walkthrough = m));
   return walkthroughLoad;
 }
+
+/** The tabs past the Overview, once their chunk has landed: a panel that
+ *  draws them asks for the chunk itself (the homepage asks earlier, as the
+ *  walkthrough nears the screen; /demo asks when a tab opens) and draws
+ *  again when it arrives. */
+function useWalkthrough(): Walkthrough | null {
+  const [w, setW] = useState<Walkthrough | null>(walkthrough);
+  useEffect(() => {
+    if (w) return;
+    let live = true;
+    void loadWalkthrough().then((m) => {
+      if (live) setW(m);
+    });
+    return () => {
+      live = false;
+    };
+  }, [w]);
+  return w;
+}
+
+/** A tab opened before its chunk has landed: the shape of the panel it
+ *  opens, in the deal page's own skeletons (./(app)/deals/[id]/skeletons),
+ *  never an empty panel, and a polite word for a screen reader. The word is
+ *  set after the region mounts, so a reader that announces only a change in
+ *  a live region hears it. */
+function TabLoading({ what, children }: { what: string; children: ReactNode }) {
+  const [said, setSaid] = useState("");
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setSaid(`Loading ${what}…`));
+    return () => cancelAnimationFrame(id);
+  }, [what]);
+  return (
+    <div aria-busy="true" data-qa="walkthrough-loading">
+      <p role="status" className="sr-only">
+        {said}
+      </p>
+      <div aria-hidden>{children}</div>
+    </div>
+  );
+}
+
+/** The skeleton each analysis draws while the deal page's screen runs it
+ *  (deal-view's AnalysesPanel: the verdict's hero, a list of cards), and
+ *  a table for the two whose views are tables. */
+const ANALYSIS_SKELETON: Record<AnalysisKey, () => ReactNode> = {
+  verdict: () => <VerdictSkeleton />,
+  challenger: () => <CardListSkeleton />,
+  comps: () => <TableSkeleton />,
+  market: () => <CardListSkeleton />,
+  reconciler: () => <TableSkeleton />,
+};
 
 /** The sample's fit against its demo buy box, read on the server through
  *  the deal header's own reader (lib/buy-box-chip `buyBoxRead`), so the
@@ -225,7 +282,8 @@ function AnalysesView({
   onSelect: (key: AnalysisKey) => void;
 }) {
   // The sections, once their chunk has loaded (`loadWalkthrough`).
-  const w = walkthrough;
+  const w = useWalkthrough();
+  const label = ANALYSES.find((a) => a.key === analysis)!.label;
   return (
     <div className="flex flex-col gap-5">
       <div
@@ -278,6 +336,7 @@ function AnalysesView({
         aria-labelledby={`demo-analysis-tab-${analysis}`}
         className="animate-fade flex flex-col gap-6"
       >
+        {!w && <TabLoading what={`the ${label.toLowerCase()}`}>{ANALYSIS_SKELETON[analysis]()}</TabLoading>}
         {w && analysis === "verdict" && <w.VerdictView result={RESULTS.verdict} />}
         {w && analysis === "challenger" && (
           <w.ChallengerView
@@ -309,6 +368,45 @@ function AnalysesView({
   );
 }
 
+/** The deal page's Financials tab on the sample: the extracted terms,
+ *  then the first-draft model's returns, the card's own figures. Its
+ *  tiles' grids are held to three across: four of them in this column left
+ *  "$68,000,000" wider than its tile. Drawn once its chunk has loaded
+ *  (`useWalkthrough`), its shape until then. */
+function FinancialsView({ returns }: { returns: SampleReturns }) {
+  const w = useWalkthrough();
+  if (!w) {
+    return (
+      <TabLoading what="the financials">
+        <div className="flex flex-col gap-6">
+          <StatGridSkeleton />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-xl border border-line bg-surface p-4">
+                <div className="skeleton h-2.5 w-16 rounded" />
+                <div className="skeleton mt-3 h-6 w-24 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </TabLoading>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-6 [&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
+      <w.TermsView result={RESULTS.extraction} />
+      <div className="flex flex-col gap-1.5">
+        <w.ReturnsHeadline model={SAMPLE_DEAL.model} />
+        {/* Two models, said as two, as the deal page and /demo say it:
+            the workbook runs the screening model on its own base case. */}
+        <p className="text-xs text-muted" data-qa="home-two-models">
+          {`The Excel workbook is a separate model: its levered IRR is ${returns.irr}.`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** One tab's panel (exported for the homepage's render test). The
  *  Overview's jump links move the walkthrough as they move the deal page. */
 export function DemoPanel({
@@ -334,28 +432,8 @@ export function DemoPanel({
   switch (tab) {
     case "Overview":
       return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} />;
-    case "Financials": {
-      // The deal page's Financials tab on the sample: the extracted terms,
-      // then the first-draft model's returns, the card's own figures. Its
-      // tiles' grids are held to three across: four of them in this column
-      // left "$68,000,000" wider than its tile. Drawn once its chunk has
-      // loaded (`loadWalkthrough`).
-      const w = walkthrough;
-      if (!w) return null;
-      return (
-        <div className="flex flex-col gap-6 [&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
-          <w.TermsView result={RESULTS.extraction} />
-          <div className="flex flex-col gap-1.5">
-            <w.ReturnsHeadline model={SAMPLE_DEAL.model} />
-            {/* Two models, said as two, as the deal page and /demo say it:
-                the workbook runs the screening model on its own base case. */}
-            <p className="text-xs text-muted" data-qa="home-two-models">
-              {`The Excel workbook is a separate model: its levered IRR is ${returns.irr}.`}
-            </p>
-          </div>
-        </div>
-      );
-    }
+    case "Financials":
+      return <FinancialsView returns={returns} />;
     case "Buy box":
       return (
         <div className="space-y-3">
@@ -429,16 +507,16 @@ export function DemoTabs({ fit, returns }: { legal?: SampleLegal; fit: SampleFit
 
   // The tabs past the Overview arrive in a chunk of their own: asked for
   // once the walkthrough nears the screen, or a tab is reached for, and drawn
-  // when they land (a tab opened before then draws as they do).
+  // by the panel that shows them when they land (`useWalkthrough`; a tab
+  // opened before then draws its shape, `TabLoading`).
   const box = useRef<HTMLDivElement>(null);
-  const [, setLoaded] = useState(walkthrough != null);
   const want = () => {
-    if (!walkthrough) void loadWalkthrough().then(() => setLoaded(true));
+    if (!walkthrough) void loadWalkthrough();
   };
   useEffect(() => {
     if (walkthrough) return;
     const el = box.current;
-    const load = () => void loadWalkthrough().then(() => setLoaded(true));
+    const load = () => void loadWalkthrough();
     if (!el || typeof IntersectionObserver === "undefined") {
       load();
       return;
