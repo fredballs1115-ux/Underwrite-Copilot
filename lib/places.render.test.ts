@@ -58,3 +58,59 @@ describe("MarketMemoryCards — /market's own cards open on their market's photo
     expect(visibleText(html)).not.toContain("Photographs by");
   });
 });
+
+// ── The analytics page's market table ───────────────────────────────────────
+import { MarketTable } from "@/app/(app)/analytics/market-table";
+import { deriveAnalytics, marketRows, type AnalyticsRow } from "@/lib/analytics";
+
+const analyticsRow = (id: string, market: string, verdict = "pass"): AnalyticsRow => ({
+  id,
+  name: `Deal ${id}`,
+  asset_class: "multifamily",
+  created_at: `2026-09-${(10 + Number(id)).toString()}T12:00:00Z`,
+  is_sample: false,
+  stage: "screening",
+  verdict: { verdict },
+  extraction: {
+    dealName: `Deal ${id}`,
+    assetClass: "multifamily",
+    market,
+    address: "",
+    metrics: [
+      { label: "Asking price", value: "$40,000,000", flagged: false, page: "p. 2" },
+      { label: "Going-in cap rate", value: `5.${id}0%`, flagged: false, page: "p. 2" },
+      { label: "Units", value: "200", flagged: false, page: "p. 2" },
+    ],
+  },
+});
+
+describe("MarketTable — /analytics' markets, grouped as /market groups them, each pictured where it names a market", () => {
+  const deals = deriveAnalytics([
+    analyticsRow("1", "Richmond, VA"),
+    analyticsRow("2", "Richmond VA", "caution"),
+    analyticsRow("3", "richmond, va"),
+    analyticsRow("4", "Portland"),
+  ]);
+
+  it("draws one row for one market's spellings, its picture and brief link, and one credit line under the table", () => {
+    const html = render(React.createElement(MarketTable, { rows: marketRows(deals), planNote: false }));
+    expect(a11yIssues(html), "a11y analytics market table").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html.match(/<tbody>[\s\S]*<\/tbody>/)?.[0].match(/<tr /g)?.length).toBe(2);
+    expect(html.match(/data-picture="analytics-market"/g)?.length).toBe(1);
+    expect(html).toContain('href="/market?metro=richmond"');
+    expect(text).toContain("Richmond VA brief");
+    // Three deals make a median: 5.20% of 5.10, 5.20 and 5.30.
+    expect(text).toContain("5.20%");
+    const credit = galleryCredit(["richmond"]);
+    expect(text.replace(/\n/g, "")).toContain(credit);
+  });
+
+  it("no market named, no picture and no credit owed", () => {
+    const html = render(React.createElement(MarketTable, { rows: marketRows(deals.slice(3)), planNote: true }));
+    expect(html).not.toContain('data-picture="analytics-market"');
+    expect(html).not.toContain('data-qa="market-credit"');
+    expect(visibleText(html)).toContain("Plan deals are judged on yield on total cost");
+  });
+});

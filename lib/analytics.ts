@@ -13,6 +13,7 @@ import { interestOf } from "@/lib/interest";
 import { priceUnitCount } from "@/lib/condo-units";
 import { statedCapRead } from "@/lib/compare-interest";
 import { dealClassKey } from "@/lib/asset-words";
+import { normalizeMarketKey } from "@/lib/market-memory";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
@@ -254,3 +255,37 @@ export function parsedPhrase(n: number): string {
 }
 
 export const fmtUsdCompact = (dollars: number): string => compactUsd(dollars);
+
+/** One row of the analytics page's market table: the deals filed under one
+ *  market, and the label it is shown under. */
+export interface MarketRow {
+  /** the grouping key (lib/market-memory `normalizeMarketKey`), "" for none */
+  key: string;
+  /** the most specific label among the deals (the longest), as /market's
+   *  memory names a group; "Unlabeled" where no deal names its market */
+  market: string;
+  deals: AnalyticsDeal[];
+}
+
+/**
+ * The deals grouped by market as /market's own memory groups them — by
+ * `normalizeMarketKey`, so "Philadelphia, PA" and "Philadelphia PA" are one
+ * market on both pages (the analytics had keyed on the trimmed label, and
+ * counted the two apart where /market counted them together) — most deals
+ * first, ties by the label.
+ */
+export function marketRows(deals: readonly AnalyticsDeal[], limit = 6): MarketRow[] {
+  const groups = new Map<string, AnalyticsDeal[]>();
+  for (const d of deals) {
+    const key = normalizeMarketKey(d.market);
+    groups.set(key, [...(groups.get(key) ?? []), d]);
+  }
+  return [...groups.entries()]
+    .map(([key, list]) => ({
+      key,
+      market: list.reduce((best, d) => (d.market.trim().length > best.length ? d.market.trim() : best), "") || "Unlabeled",
+      deals: list,
+    }))
+    .sort((a, b) => b.deals.length - a.deals.length || a.market.localeCompare(b.market))
+    .slice(0, limit);
+}

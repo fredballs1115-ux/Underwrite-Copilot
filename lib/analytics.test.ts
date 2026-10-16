@@ -3,6 +3,7 @@ import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import {
   deriveAnalytics,
   fmtUsdCompact,
+  marketRows,
   median,
   middleRead,
   middleText,
@@ -265,5 +266,37 @@ describe("stageCounts — a closed deal is neither live nor dead", () => {
     expect(page).toContain("stageCountLine(counts)");
     expect(page).toContain("stageCounts(deals)");
     expect(page).not.toMatch(/stage\s*!==\s*"dead"/);
+  });
+});
+
+describe("marketRows — the analytics' markets grouped as /market's memory groups them", () => {
+  const at = (id: string, market: string) =>
+    row(id, `Deal ${id}`, { ...STABILIZED, dealName: `Deal ${id}`, market });
+  const deals = deriveAnalytics([
+    at("1", "Philadelphia, PA"),
+    at("2", "Philadelphia PA"),
+    at("3", "philadelphia, pa"),
+    at("4", "Dallas, TX"),
+    at("5", ""),
+  ]);
+
+  it("files one market's spellings under one row, named by its most specific label", () => {
+    const rows = marketRows(deals);
+    expect(rows.map((r) => [r.market, r.deals.length])).toEqual([
+      ["Philadelphia, PA", 3],
+      ["Dallas, TX", 1],
+      ["Unlabeled", 1],
+    ]);
+    expect(rows[0].key).toBe("philadelphia pa");
+  });
+
+  it("keeps the most-screened markets, as many as asked", () => {
+    expect(marketRows(deals, 1).map((r) => r.market)).toEqual(["Philadelphia, PA"]);
+  });
+
+  it("the page groups through it, never by the label alone", () => {
+    const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
+    expect(page).toContain("marketRows(deals)");
+    expect(page).not.toMatch(/d\.market\.trim\(\)/);
   });
 });

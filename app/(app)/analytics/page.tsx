@@ -11,8 +11,8 @@ import {
   parsedPhrase,
   stageCountLine,
   stageCounts,
+  marketRows,
   type AnalyticsRow,
-  type MiddleRead,
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage, parseStageHistory } from "@/lib/stages";
 import { deathReasons } from "@/lib/deal-outcome";
@@ -26,6 +26,7 @@ import { getTeam } from "@/lib/teams";
 import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
+import { MarketTable } from "./market-table";
 import { readAllResult } from "@/lib/read-all";
 import { typedByHand } from "@/lib/manual-deal";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -125,22 +126,10 @@ export default async function AnalyticsPage() {
     }))
     .filter((r) => r.count > 0);
 
-  // Markets table — the durable "table view" behind the charts.
-  const byMarket = new Map<string, typeof deals>();
-  for (const d of deals) {
-    const key = d.market.trim() || "Unlabeled";
-    byMarket.set(key, [...(byMarket.get(key) ?? []), d]);
-  }
-  const markets = [...byMarket.entries()]
-    .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 6)
-    .map(([market, list]) => ({
-      market,
-      n: list.length,
-      cap: middleRead(list.map((d) => d.capPct).filter((v): v is number => v != null)),
-      unit: middleRead(list.map((d) => d.perUnit).filter((v): v is number => v != null)),
-      go: list.filter((d) => d.verdict === "pass").length,
-    }));
+  // Markets table — the durable "table view" behind the charts — grouped as
+  // /market's own memory groups them (lib/analytics `marketRows`), so one
+  // market's spellings are one row on both pages.
+  const markets = marketRows(deals);
 
   const enough = deals.length >= 3;
 
@@ -379,65 +368,9 @@ export default async function AnalyticsPage() {
             </section>
           )}
 
-          {markets.length > 0 && (
-            <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight">By market</h2>
-              <div className="scroll-shadows-x mt-3 overflow-x-auto">
-                <table className="w-full min-w-[34rem] text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
-                      <th className="py-2 pr-3 font-medium">Market</th>
-                      <th className="py-2 pr-3 text-right font-medium">Screens</th>
-                      <th className="py-2 pr-3 text-right font-medium">Cap</th>
-                      <th className="py-2 pr-3 text-right font-medium">$/unit</th>
-                      <th className="py-2 text-right font-medium">Go calls</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {markets.map((m) => (
-                      <tr key={m.market} className="border-b border-line/60">
-                        <td className="max-w-[16rem] truncate py-2 pr-3 font-medium">
-                          {m.market}
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums">{m.n}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums">
-                          <MiddleCell read={m.cap} fmt={pct} />
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums">
-                          <MiddleCell read={m.unit} fmt={fmtUsdCompact} />
-                        </td>
-                        <td className="py-2 text-right tabular-nums">{m.go}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-2 text-xs text-muted">
-                Each figure is the market&rsquo;s median from three deals up; a
-                market with one or two shows those deals&rsquo; own, marked.
-                Deals whose figures didn&rsquo;t parse are counted in Screens
-                but not in the figures.
-                {planDeals.length > 0 &&
-                  " Plan deals are judged on yield on total cost and sit outside the cap figures."}
-              </p>
-            </section>
-          )}
+          {markets.length > 0 && <MarketTable rows={markets} planNote={planDeals.length > 0} />}
         </>
       )}
     </div>
-  );
-}
-
-/** A market's cap or $/unit cell: its median from three deals, and under
- *  that the deals' own figures, marked with how many there are. */
-function MiddleCell({ read, fmt }: { read: MiddleRead; fmt: (n: number) => string }) {
-  const text = middleText(read, fmt);
-  if (text == null) return <>—</>;
-  if (read.kind === "median") return <>{text}</>;
-  return (
-    <>
-      {text}{" "}
-      <span className="text-[11px] text-muted">{read.kind === "one" ? "1 deal" : "2 deals"}</span>
-    </>
   );
 }
