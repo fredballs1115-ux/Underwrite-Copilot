@@ -69,6 +69,7 @@ import {
 import { ModelView } from "./model-view";
 import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
+import { SourceDocumentsView } from "./source-documents";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy, type DealStrategy } from "@/lib/deal-strategy";
@@ -78,10 +79,7 @@ import { LOI_REFUSAL_BANNERS } from "@/lib/loi-refusal";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { condoUnitsOffered } from "@/lib/condo-units";
 import { interestOf } from "@/lib/interest";
-import { dealFileLinkFor } from "@/lib/deal-file-link";
-import { servedInline } from "@/lib/inline-types";
 import { sampleExportsFree } from "@/lib/sample-exports";
-import { fileKindOf, FILE_KIND_WORDS, type FileKind } from "@/lib/file-kind";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import { longerThanUsual, longerThanUsualLine } from "@/lib/screen-duration";
 import { supportMailto } from "@/lib/support-link";
@@ -89,7 +87,7 @@ import { revealScrollLeft } from "@/lib/tab-strip";
 import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
-import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
+import type { DealDocument } from "@/lib/documents";
 // The buy box tab lives in buy-box-panel.tsx, which /demo draws on the
 // sample without this module.
 import { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
@@ -1102,6 +1100,10 @@ export function DealView({
                   ? factsFromExtraction(results.extraction, dealName)
                   : null
               }
+              // The sample's rent roll and T-12, as the Overview's actuals
+              // card reads them: listed here too, with no file to open.
+              isSample={isSample}
+              actuals={actuals}
             />
             {!isSample && (
               <LoiPanel
@@ -1556,54 +1558,6 @@ function AnalysesPanel({
   );
 }
 
-/** A stored file's kind as a picture: a page with its kind drawn on
- *  it — a PDF's band, a spreadsheet's grid, an image's hills, a document's
- *  lines — in the slot the memorandum's avatar takes, so the names start at
- *  one x. Hidden from a screen reader, which hears the file's own name and
- *  the row's kind word (Rent roll, BOV…) beside it. */
-function FileKindIcon({ kind }: { kind: FileKind }) {
-  const tone =
-    kind === "pdf"
-      ? "text-kill"
-      : kind === "sheet"
-        ? "text-pass"
-        : kind === "image"
-          ? "text-asset-office"
-          : kind === "doc"
-            ? "text-brand"
-            : "text-muted";
-  return (
-    <span
-      aria-hidden
-      data-file-kind={kind}
-      title={FILE_KIND_WORDS[kind]}
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-faint ${tone}`}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-6 w-6"
-      >
-        <path d="M6 2.75h8.5L19 7.25v14H6z" />
-        <path d="M14.5 2.75v4.5H19" />
-        {kind === "pdf" && <rect x="8" y="12" width="9" height="5" rx="1" fill="currentColor" stroke="none" />}
-        {kind === "sheet" && <path d="M8.5 11h8v7h-8zM8.5 13.33h8M8.5 15.67h8M11.17 11v7M13.83 11v7" />}
-        {kind === "image" && (
-          <>
-            <circle cx="10.5" cy="11.5" r="1.25" />
-            <path d="M8.5 18l3-3.5 2 2 1.5-1.5 1.5 3" />
-          </>
-        )}
-        {(kind === "doc" || kind === "text") && <path d="M8.5 11h8M8.5 13.5h8M8.5 16h5" />}
-      </svg>
-    </span>
-  );
-}
-
 /** Documents: the OM itself, the memo export, uploaded documents, and every
  *  note/file added along the way — one home for all of it. For a manual deal
  *  the typed facts ARE the source document, so this is also where they're
@@ -1618,6 +1572,8 @@ function DocumentsPanel({
   supplements,
   active,
   manualFacts,
+  isSample = false,
+  actuals = null,
 }: {
   dealId: string;
   hasOm: boolean;
@@ -1630,16 +1586,11 @@ function DocumentsPanel({
   /** set only for a typed-facts deal (no OM, not the sample) — enables the
    *  attach-OM button and the edit-facts panel */
   manualFacts: ManualDealFacts | null;
+  /** the sample deal: its rent roll and T-12 are listed as the Overview's
+   *  actuals card reads them, with no file to open */
+  isSample?: boolean;
+  actuals?: Pick<ActualsData, "rentRoll" | "t12"> | null;
 }) {
-  const KIND_LABEL: Record<string, string> = {
-    om: "Offering memorandum",
-    rent_roll: "Rent roll",
-    t12: "T-12",
-    financials: "Financials",
-    loan_terms: "Loan terms",
-    bov: "BOV",
-    other: "Document",
-  };
   const SUPP_LABEL: Record<string, string> = {
     terms: "Financials",
     challenger: "Challenger",
@@ -1655,105 +1606,29 @@ function DocumentsPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
-        <h2 className="text-sm font-semibold tracking-tight">Source documents</h2>
-        <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
-          <li
-            data-doc-row="om"
-            className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
-          >
-            {/* The memorandum wears the deal's own picture (its photograph,
-                else its drawn cover), the way a deal room shows the deck. */}
-            <DealAvatar dealId={dealId} size="md" />
-            <span className="min-w-0 flex-1 truncate font-medium">
-              Offering memorandum
-            </span>
-            {omUrl && (
-              <a
-                href={omUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Opens the uploaded OM"
-                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-              >
-                View
-              </a>
-            )}
+      <SourceDocumentsView
+        data={{
+          dealId,
+          hasOm,
+          omUrl,
+          sample: isSample,
+          typedFacts: !!manualFacts,
+          documents,
+          sampleActuals: isSample ? actuals : null,
+          memo: !hasVerdict ? null : canMemo ? { href: `/api/deals/${dealId}/memo` } : { upsell: "/billing" },
+        }}
+        omPicture={<DealAvatar dealId={dealId} size="md" />}
+        omActions={
+          <>
             {hasOm && <ReplaceOm dealId={dealId} disabled={active} />}
             {!hasOm && manualFacts && (
               // A manual deal — the OM can arrive later and upgrades the
               // screen to the full document analysis.
               <ReplaceOm dealId={dealId} disabled={active} attach />
             )}
-            {!hasOm && !manualFacts && (
-              <span className="text-xs text-muted">none uploaded</span>
-            )}
-          </li>
-          {manualFacts && (
-            <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
-              <FileKindIcon kind="text" />
-              <span className="min-w-0 flex-1 truncate font-medium">
-                Typed deal facts
-              </span>
-              <span className="text-xs text-muted">
-                entered by hand — the screen runs on these
-              </span>
-            </li>
-          )}
-          {documents.map((d) => {
-            // Signed when it is clicked (app/api/deals/[id]/file), so a page
-            // left open never hands over an expired link.
-            const href = dealFileLinkFor(dealId, d.storage_path);
-            // A PDF or an image opens in the browser; anything else — a rent
-            // roll's spreadsheet — is stored to download (lib/inline-types).
-            const opens = d.content_type
-              ? servedInline(d.content_type)
-              : /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.filename);
-            return (
-              <li
-                key={d.id}
-                className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
-              >
-                <FileKindIcon kind={fileKindOf(d.filename, d.content_type)} />
-                <span className="min-w-0 flex-1 truncate">{d.filename}</span>
-                <span className="shrink-0 text-xs text-muted">
-                  {KIND_LABEL[d.kind] ?? DOC_KIND_LABEL[d.kind] ?? d.kind}
-                </span>
-                {href && (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={opens ? `Opens ${d.filename}` : `Downloads ${d.filename}`}
-                    aria-label={`${opens ? "View" : "Download"} ${d.filename}`}
-                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-                  >
-                    {opens ? "View" : "Download"}
-                  </a>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        {hasVerdict && (
-          <div className="mt-3">
-            {canMemo ? (
-              <a
-                href={`/api/deals/${dealId}/memo`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-              >
-                Download the IC memo (PDF)
-              </a>
-            ) : (
-              <Link
-                href="/billing"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-3 py-1.5 text-xs font-medium text-caution transition-colors hover:bg-caution/10"
-              >
-                Upgrade for the PDF memo
-              </Link>
-            )}
-          </div>
-        )}
+          </>
+        }
+      >
         {manualFacts && (
           <details className="group mt-3 rounded-lg border border-line">
             <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-medium transition-colors hover:bg-faint">
@@ -1772,7 +1647,7 @@ function DocumentsPanel({
             </div>
           </details>
         )}
-      </section>
+      </SourceDocumentsView>
 
       {suppEntries.length > 0 && (
         <section className="flex flex-col gap-4">

@@ -25,6 +25,12 @@ import { inferStrategy } from "@/lib/deal-strategy";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
 import {
+  SAMPLE_ACTUALS_WORDS,
+  SAMPLE_OM_WORDS,
+  SourceDocumentsView,
+} from "@/app/(app)/deals/[id]/source-documents";
+import { rentRollDateWords, t12DateWords } from "@/lib/actuals/actuals-read";
+import {
   SensitivityPlayground,
   playgroundFitLine,
   withScenarioReturns,
@@ -1483,7 +1489,13 @@ describe("the Documents tab opens each source document", () => {
       storage_path: `documents/${dealId}/5b2e-cbre_bov.pdf`,
       content_type: "application/pdf",
     };
-    const html = render({ ...base, dealId, documents: [doc, stray, bov] } as Props);
+    // No actuals of the sample's own here: the rows counted are the files'.
+    const html = render({
+      ...base,
+      dealId,
+      documents: [doc, stray, bov],
+      actuals: { rentRoll: null, t12: null, noiComparison: null },
+    } as Props);
     dumpView("deal-documents", html);
     expect(a11yIssues(html)).toEqual([]);
     const href = `/api/deals/${dealId}/file?p=${encodeURIComponent(doc.storage_path)}`;
@@ -1984,6 +1996,70 @@ describe("DealView — Ask's thread on a team deal", () => {
     expect(text).toMatch(/What is the coupon\?\s*Sep 1 · asked by Jordan Lee/);
     expect(text).toMatch(/Who is the seller\?\s*Sep 2 · asked by you/);
     expect(html).toContain('href="/api/deals/d1/om#page=12"');
+  });
+});
+
+describe("the sample's Documents tab says what the sample holds, as the Overview does", () => {
+  const rentRollWords = rentRollDateWords({ asOf: SAMPLE_DEAL.rentRoll.as_of_date, summary: SAMPLE_DEAL.rentRoll.summary });
+  const t12Words = t12DateWords({ periodEnd: SAMPLE_DEAL.t12.period_end_date, summary: SAMPLE_DEAL.t12.summary });
+
+  it("lists the rent roll and the T-12 the Overview shows, dated as it dates them, with no file to open", () => {
+    const overview = textOf(render(sampleProps("overview")));
+    expect(overview).toContain("From the deal's rent roll and T-12");
+    expect(overview).toContain(rentRollWords!);
+    expect(overview).toContain(t12Words!);
+
+    const html = render(sampleProps("documents"));
+    const text = textOf(html);
+    expect(html).toContain('data-doc-row="rent_roll"');
+    expect(html).toContain('data-doc-row="t12"');
+    expect(text).toContain(rentRollWords!);
+    expect(text).toContain(t12Words!);
+    expect(text.split(SAMPLE_ACTUALS_WORDS).length - 1).toBe(2);
+    expect(text).toContain(SAMPLE_OM_WORDS);
+    expect(text).not.toContain("none uploaded");
+    // Never a file that cannot be opened: no link on either row.
+    for (const row of ["rent_roll", "t12"]) {
+      const li = html.slice(html.indexOf(`data-doc-row="${row}"`));
+      expect(li.slice(0, li.indexOf("</li>"))).not.toMatch(/<a /);
+    }
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("lists no actuals row on a deal of the reader's own, whose documents are its files", () => {
+    const own = { ...sampleProps("documents"), isSample: false, hasOm: true, omUrl: "/api/deals/sample/om" } as Props;
+    const html = render(own);
+    expect(html).not.toContain('data-doc-row="rent_roll"');
+    expect(textOf(html)).not.toContain(SAMPLE_ACTUALS_WORDS);
+  });
+
+  it("draws the same card with no session or action (SourceDocumentsView)", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SourceDocumentsView, {
+        data: {
+          dealId: "sample",
+          hasOm: false,
+          omUrl: null,
+          sample: true,
+          typedFacts: false,
+          documents: [],
+          sampleActuals: {
+            rentRoll: { asOf: SAMPLE_DEAL.rentRoll.as_of_date, summary: SAMPLE_DEAL.rentRoll.summary },
+            t12: { periodEnd: SAMPLE_DEAL.t12.period_end_date, summary: SAMPLE_DEAL.t12.summary },
+          },
+          memo: { href: "/api/deals/sample/memo" },
+        },
+      }),
+    );
+    const text = textOf(html);
+    expect(text).toMatch(/^Source documents\s*Offering memorandum/);
+    expect(text).toContain(rentRollWords!);
+    expect(text).toContain(t12Words!);
+    expect(text).toContain("Download the IC memo (PDF)");
+    expect(html).not.toMatch(/<form|<button/);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 });
 
