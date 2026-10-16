@@ -805,6 +805,74 @@ export async function renameDeal(formData: FormData) {
 }
 
 /**
+ * Move a deal between the reader's own pipeline and their team's — "Share
+ * with team" and "Make personal" on the deal's menu (lib/personal-deal). The
+ * creator's alone: migration 0007's protect_deal_identity refuses anyone but
+ * the creator or the team's owner a change of team, and a team owner taking
+ * a member's deal out of the pipeline would hand it to someone else's own
+ * pipeline, so the menu and this action offer it to the creator only. The
+ * sample stays where it is. The move is counted against the cap of the
+ * pipeline it lands in, as an insert there would be: the allowance is read
+ * first (lib/billing, the create actions' own rule), and migration 0036's
+ * update trigger refuses one the read let through, said in the same words.
+ */
+export async function moveDeal(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  const to = String(formData.get("to") ?? "");
+  if (!dealId) redirect("/deals");
+  const back = `/deals/${dealId}`;
+  if (to !== "team" && to !== "personal") redirect(back);
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, user_id, team_id, is_sample")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) redirect("/deals");
+  const row = deal as { user_id: string; team_id: string | null; is_sample?: boolean };
+  if (row.is_sample) redirect(back);
+  if (row.user_id !== user!.id) redirect(`${back}?error=movepermission`);
+  // Already where it was asked to go: nothing to do, nothing to say.
+  if ((to === "team") === !!row.team_id) redirect(back);
+
+  const billing = await getBilling(supabase, user!.id);
+  let teamId: string | null = null;
+  if (to === "team") {
+    if (!billing.team) redirect(`${back}?error=movenoteam`);
+    if (!(billing.team!.active || billing.team!.dealCount < TEAM_TRIAL_DEALS)) {
+      redirect(`${back}?error=moveteamlimit`);
+    }
+    teamId = billing.team!.id;
+  } else if (!(billing.plan === "pro" || billing.dealCount < billing.dealLimit)) {
+    redirect(`${back}?error=movelimit`);
+  }
+
+  // `.select` so a write row-level security matched nothing for — 204 and
+  // no error, as PostgREST answers — reads as the failure it is.
+  const { data: moved, error } = await supabase
+    .from("deals")
+    .update({ team_id: teamId, updated_at: new Date().toISOString() })
+    .eq("id", dealId)
+    .select("id");
+  if (error) {
+    const refusal = capRefusalOf(error);
+    redirect(
+      `${back}?error=${refusal === "teamlimit" ? "moveteamlimit" : refusal === "limit" ? "movelimit" : "movefail"}`,
+    );
+  }
+  if (!moved || moved.length === 0) redirect(`${back}?error=movefail`);
+  revalidatePath(back);
+  revalidatePath("/deals");
+  redirect(`${back}?moved=${to}`);
+}
+
+/**
  * Delete a deal: sweep its Storage files (OM, documents, supplements), then
  * delete the row — analysis_jobs and deal_documents cascade in the DB. RLS
  * scopes every read/write to the caller's own deal.

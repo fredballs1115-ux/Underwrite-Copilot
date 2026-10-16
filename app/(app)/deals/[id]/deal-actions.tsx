@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { renameDeal, deleteDeal } from "../actions";
+import { renameDeal, deleteDeal, moveDeal } from "../actions";
 import { DEAL_NAME_MAX } from "@/lib/deal-name";
+import { MOVE_ITEM, moveQuestion, type MoveTarget } from "@/lib/personal-deal";
 
 const itemCls =
   "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors";
@@ -12,6 +13,8 @@ export function DealActions({
   dealName,
   canDelete = true,
   canRename = true,
+  moveTo = null,
+  teamName = null,
 }: {
   dealId: string;
   dealName: string;
@@ -21,9 +24,15 @@ export function DealActions({
   /** The sample keeps its name — the name is what marks it as the sample
    *  on every list — so it offers no Rename (renameDeal refuses it too). */
   canRename?: boolean;
+  /** The move the deal's creator may make between their own pipeline and
+   *  their team's (lib/personal-deal, `moveDeal`): into the team where it is
+   *  in no team's pipeline, out where it is in one; null offers none. */
+  moveTo?: MoveTarget | null;
+  /** The team's name, where it is the reader's own team. */
+  teamName?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"menu" | "rename" | "delete">("menu");
+  const [mode, setMode] = useState<"menu" | "rename" | "delete" | "move">("menu");
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   function close() {
@@ -44,7 +53,7 @@ export function DealActions({
   }, [open]);
 
   // Nothing to offer is no menu, never an empty one.
-  if (!canRename && !canDelete) return null;
+  if (!canRename && !canDelete && !moveTo) return null;
 
   // On a phone the button sits in the deal header's scrolling row of
   // controls, so the menu's containing block is that row (DealHero's
@@ -91,6 +100,16 @@ export function DealActions({
                     Rename
                   </button>
                 )}
+                {moveTo && (
+                  <button
+                    type="button"
+                    data-qa="move-deal"
+                    onClick={() => setMode("move")}
+                    className={`${itemCls} hover:bg-faint`}
+                  >
+                    {MOVE_ITEM[moveTo]}
+                  </button>
+                )}
                 {canDelete && (
                   <button
                     type="button"
@@ -131,6 +150,36 @@ export function DealActions({
                   </button>
                 </div>
               </form>
+            )}
+
+            {/* A move is confirmed before it is made: it changes who sees
+                the deal. Focus lands on Cancel, as the delete's does. */}
+            {mode === "move" && moveTo && (
+              <div role="group" aria-labelledby={`${dealId}-move-q`} className="space-y-2.5 p-1.5">
+                <p id={`${dealId}-move-q`} className="text-sm leading-relaxed">
+                  {moveQuestion(moveTo, teamName)}
+                </p>
+                <div className="flex gap-2">
+                  <form action={moveDeal}>
+                    <input type="hidden" name="dealId" value={dealId} />
+                    <input type="hidden" name="to" value={moveTo} />
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                    >
+                      {MOVE_ITEM[moveTo]}
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    onClick={close}
+                    autoFocus
+                    className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* The question is the group's name, and focus lands on Cancel —

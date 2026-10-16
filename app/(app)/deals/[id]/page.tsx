@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { addressUpgrade } from "@/lib/address";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { FILED_PERSONAL, filedPersonalNotice } from "@/lib/personal-deal";
+import { FILED_PERSONAL, filedPersonalNotice, isMoveRefusal, moveNotice, type MoveTarget } from "@/lib/personal-deal";
+import { FREE_DEALS } from "@/lib/marketing-constants";
 import { notFound } from "next/navigation";
 import { ResearchPanel } from "./research-panel";
 import { SectorFieldsForm } from "./sector-fields-form";
@@ -231,10 +232,10 @@ export default async function DealPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; tab?: string; a?: string; filed?: string }>;
+  searchParams: Promise<{ error?: string; tab?: string; a?: string; filed?: string; moved?: string }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, tab, a: analysisParam, filed } = await searchParams;
+  const { error: errorCode, tab, a: analysisParam, filed, moved } = await searchParams;
 
   const supabase = await createSupabaseServerClient();
   // Request-cached: shares the layout's auth call instead of a second hop.
@@ -602,10 +603,40 @@ export default async function DealPage({
   // (`?filed=personal`, lib/personal-deal): said where they land, since the
   // pipeline they share will not show it. Only while it is still so — the
   // reader's own deal, in no team's pipeline, and the reader on a team.
-  const filedPersonal =
-    filed === FILED_PERSONAL && !!user && ownership.user_id === user.id && !ownership.team_id
-      ? !!(await supabase.from("team_members").select("team_id").eq("user_id", user.id).maybeSingle()).data
-      : false;
+  // The reader's team, read once for that notice and for the deal's menu's
+  // move between the reader's own pipeline and the team's (lib/personal-deal):
+  // offered to the deal's creator alone, never on the sample.
+  const isCreator = !!user && ownership.user_id === user.id;
+  const isSampleDeal = !!(deal as { is_sample?: boolean }).is_sample;
+  const readerTeam =
+    isCreator && !isSampleDeal
+      ? (
+          await supabase
+            .from("team_members")
+            .select("team_id, teams(name)")
+            .eq("user_id", user!.id)
+            .maybeSingle()
+        ).data as { team_id: string; teams: { name: string | null } | { name: string | null }[] | null } | null
+      : null;
+  const readerTeamName = (() => {
+    const t = readerTeam?.teams;
+    const one = Array.isArray(t) ? t[0] : t;
+    return one?.name?.trim() || null;
+  })();
+  const filedPersonal = filed === FILED_PERSONAL && isCreator && !ownership.team_id && !!readerTeam;
+  // Share it into the reader's team where it is in no team's pipeline; make
+  // it personal where it is in one. The team's name only where it is the
+  // reader's own team.
+  const moveTo: MoveTarget | null =
+    !isCreator || isSampleDeal ? null : ownership.team_id ? "personal" : readerTeam ? "team" : null;
+  const moveTeamName =
+    moveTo === "team" || (ownership.team_id && readerTeam?.team_id === ownership.team_id) ? readerTeamName : null;
+  const moveBanner =
+    moved === "team" || moved === "personal"
+      ? moveNotice({ moved, teamName: readerTeamName }, { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS })
+      : isMoveRefusal(errorCode)
+        ? moveNotice({ refused: errorCode }, { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS })
+        : null;
 
   // Delete is the creator's or the team owner's (the RLS delete policy); a
   // teammate is not offered it rather than refused after the fact.
@@ -1280,6 +1311,16 @@ export default async function DealPage({
         ← All deals
       </Link>
 
+      {moveBanner && (
+        <p
+          role="status"
+          data-qa="deal-moved"
+          className={`rounded-lg px-3 py-2 text-sm ${moveBanner.tone === "ok" ? "bg-brand/10 text-brand-strong" : "bg-caution/10 text-caution"}`}
+        >
+          {moveBanner.text}
+        </p>
+      )}
+
       {filedPersonal && (
         <p role="status" data-qa="filed-personal" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
           {filedPersonalNotice(TEAM_TRIAL_DEALS)}
@@ -1612,6 +1653,8 @@ export default async function DealPage({
               dealName={deal.name}
               canDelete={canDelete}
               canRename={!(deal as { is_sample?: boolean }).is_sample}
+              moveTo={moveTo}
+              teamName={moveTeamName}
             />
           </>
         }
