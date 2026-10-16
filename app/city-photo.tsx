@@ -65,6 +65,7 @@ export function CityPhoto({
   // pointer-events-auto: the credit's links sit inside a backdrop that
   // lets clicks through to the band's own words
   creditClassName = "pointer-events-auto absolute bottom-3 right-4 z-10 text-[10px] text-white/75",
+  creditLinkClassName = "underline decoration-dotted underline-offset-2 hover:text-white",
   alt,
   describe = false,
   eager = false,
@@ -83,6 +84,9 @@ export function CityPhoto({
   className?: string;
   /** where the obligatory credit sits; the default suits a dark band */
   creditClassName?: string;
+  /** the credit's links; the default suits a dark band, and a credit on a
+   *  light surface names its own hover colour */
+  creditLinkClassName?: string;
   /** empty for a decorative backdrop, descriptive when the picture is content */
   alt?: string;
   /** the alt text says what the picture on screen shows — the photograph's
@@ -153,6 +157,7 @@ export function CityPhoto({
       height={height}
       className={className}
       creditClassName={creditClassName}
+      creditLinkClassName={creditLinkClassName}
       alt={alt}
       describe={describe}
       eager={eager}

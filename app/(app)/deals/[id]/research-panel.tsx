@@ -50,6 +50,7 @@ import {
 } from "@/lib/debt-index";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import Link from "next/link";
+import { MarketBriefCard } from "@/app/market/market-brief-card";
 import type { StructuredAddress } from "@/lib/address";
 import type { DealPlacement } from "@/lib/market-county";
 
@@ -436,17 +437,12 @@ export function ResearchPanelView({
         </span>
       </div>
 
-      {/* Covered-market chip: one click from the deal to its market brief —
-          rules, rents, and data coverage in one place. Outside the covered
-          list the honest sentence renders instead. */}
+      {/* Covered-market card: the market's photograph and one click from
+          the deal to its brief — rules, rents, and data coverage in one
+          place. Outside the covered list the honest sentence renders
+          instead. */}
       {metro ? (
-        <Link
-          href={`/market?metro=${metro.id}`}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand outline-none transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40"
-        >
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
-          Covered market: {metro.name} — open the market brief →
-        </Link>
+        <MarketBriefCard metro={metro} />
       ) : dataMetro ? (
         // A metro the site reads but does not brief — Pittsburgh, Phoenix,
         // Houston: the market check reads its published figures (jobs,
