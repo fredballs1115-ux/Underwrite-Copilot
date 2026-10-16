@@ -18,6 +18,7 @@ import { yearOneCapitalLine } from "./cost-note";
 import { noIrrText } from "./no-irr";
 import type { PlausibilityFinding } from "@/lib/deal-strategy";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
+import { FLAG_RULE, SOURCE_NOT_LOCATED, type OmFacts } from "./om-facts";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -211,6 +212,10 @@ export async function buildUnderwriteWorkbook(
    *  where the caller dates the cover on another day (the reader's: the
    *  route passes noon on it, which is no moment anyone exported the file) */
   exportedAt: Date = builtAt,
+  /** every figure the screen read out of the memorandum (./om-facts
+   *  `readOmFacts`) — a data tab of its own beside the Market Read; no tab
+   *  at all where the extraction read none */
+  omFacts?: OmFacts | null,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
@@ -237,6 +242,10 @@ export async function buildUnderwriteWorkbook(
     marketRead && marketRead.checks.length > 0
       ? wb.addWorksheet("Market Read", { views: [{ showGridLines: false }] })
       : null;
+  const wsFacts =
+    omFacts && omFacts.rows.length > 0
+      ? wb.addWorksheet("OM Facts", { views: [{ state: "frozen", ySplit: OM_FACTS_HEAD_ROW, showGridLines: false }] })
+      : null;
   const wsCf = wb.addWorksheet("Cash Flow", {
     views: [{ state: "frozen", xSplit: 1, ySplit: 2, showGridLines: false }],
   });
@@ -256,10 +265,11 @@ export async function buildUnderwriteWorkbook(
   wsSummary.properties.tabColor = { argb: HEADFILL };
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
-  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead }, builtAt);
+  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead, omFacts: !!wsFacts }, builtAt);
   buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy, model.meta.interest);
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
+  if (wsFacts && omFacts) buildOmFacts(wsFacts, omFacts);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
   buildDealSummary(wsSummary, model, cf, holdYears, withheld);
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
@@ -273,6 +283,7 @@ export async function buildUnderwriteWorkbook(
     ...(wsPortfolio ? [wsPortfolio] : []),
     wsAssum,
     ...(wsRead ? [wsRead] : []),
+    ...(wsFacts ? [wsFacts] : []),
     wsCf,
     wsMonthly,
     wsDebt,
@@ -305,7 +316,7 @@ function buildCover(
   model: DerivedModel,
   branding?: ExportBranding | null,
   /** which of the optional tabs this workbook carries, for the Contents */
-  optional: { portfolio: boolean; marketRead: boolean } = { portfolio: false, marketRead: false },
+  optional: { portfolio: boolean; marketRead: boolean; omFacts?: boolean } = { portfolio: false, marketRead: false },
   /** when it was built: the day "years from today" on this cover counts from */
   builtAt: Date = new Date(),
 ) {
@@ -778,6 +789,9 @@ function buildCover(
     ["Assumptions", "Every input with its source (OM page, derived, or assumption)"],
     ...(optional.marketRead
       ? ([["Market Read", "The model's assumptions against the published figures, as read the day this was built"]] as [string, string][])
+      : []),
+    ...(optional.omFacts
+      ? ([["OM Facts", "Every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged"]] as [string, string][])
       : []),
     ["Cash Flow", "Annual property and investment cash flow through exit"],
     ["Monthly Cash Flow", "Monthly operating detail with per-year ties to the annual tab"],
@@ -1282,6 +1296,85 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
   r++;
   for (const n of documentNotices(read.checks.flatMap((c) => c.published.map((p) => p.publisher)))) {
     across(r, n, { color: MUTED, size: 9 });
+    r++;
+  }
+}
+
+/** The OM Facts tab's header row, frozen under its title and notes. */
+export const OM_FACTS_HEAD_ROW = 5;
+
+/**
+ * The OM Facts tab — every figure the screen read out of the memorandum, a
+ * row each in the memorandum's order: the label and the value as stated,
+ * the page (only where it passes lib/facts' rule, else "source not
+ * located"), the basis the extraction read, and the screen's flag with its
+ * reason. Data only, no formulas: the Assumptions tab is the live model,
+ * and says which of these figures it took.
+ */
+function buildOmFacts(ws: ExcelJS.Worksheet, facts: OmFacts) {
+  const widths = [36, 30, 10, 11, 9, 46];
+  widths.forEach((w, i) => {
+    ws.getColumn(i + 1).width = w;
+  });
+  const lastCol = widths.length;
+  const tabWidth = widths.reduce((s, w) => s + w, 0);
+  // Lines a text takes in a width (Arial, about 1.15 characters a column
+  // unit at 9 pt and 1.0 at 10 pt, on the safe side) — the Market Read's
+  // own measure.
+  const linesIn = (text: string, width: number, size: number) =>
+    Math.max(1, Math.ceil(text.length / Math.max(1, Math.floor(width * (size <= 9 ? 1.15 : 1.0)))));
+  const lineHeight = (size: number) => (size <= 9 ? 12 : 13);
+  const across = (row: number, text: string) => {
+    ws.mergeCells(row, 1, row, lastCol);
+    label(ws.getCell(row, 1), text, { color: MUTED, size: 9 });
+    ws.getCell(row, 1).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(row).height = linesIn(text, tabWidth, 9) * lineHeight(9) + 2;
+  };
+  titleRow(ws, "The memorandum's figures, as the screen read them");
+  const pages =
+    facts.totalPages != null
+      ? `A page is printed only where it falls within the memorandum's ${facts.totalPages} pages; any other is "${SOURCE_NOT_LOCATED}".`
+      : `The memorandum's length was not read, so no page can be checked against it and none is printed.`;
+  across(2, `${facts.rows.length} figures, ${facts.flaggedCount} flagged. Each value is the memorandum's own words. ${pages}`);
+  across(3, `${FLAG_RULE} The Assumptions tab says which of them the model runs on; change the model there.`);
+  const headers = ["Figure", "As stated", "OM page", "Basis", "Flagged", "Why flagged"];
+  sectionHeader(ws, OM_FACTS_HEAD_ROW, headers[0], 1, headers.length);
+  headers.forEach((h, i) => {
+    const c = ws.getCell(OM_FACTS_HEAD_ROW, i + 1);
+    if (i > 0) {
+      c.value = h.toUpperCase();
+      c.font = { name: ARIAL, size: 10, bold: true, color: WHITE };
+    }
+    c.alignment = { wrapText: true, vertical: "bottom" };
+  });
+  let r = OM_FACTS_HEAD_ROW + 1;
+  for (const f of facts.rows) {
+    let lines = Math.max(linesIn(f.label, widths[0], 10), linesIn(f.value, widths[1], 10));
+    label(ws.getCell(r, 1), f.label, { bold: f.flagged });
+    label(ws.getCell(r, 2), f.value);
+    const page = ws.getCell(r, 3);
+    if (f.page != null) {
+      // A number, so the column sorts.
+      page.value = f.page;
+      page.numFmt = "0";
+      page.font = { name: ARIAL, size: 10, color: INK };
+      page.alignment = { horizontal: "left", vertical: "top" };
+    } else {
+      label(page, SOURCE_NOT_LOCATED, { size: 9, color: MUTED });
+      lines = Math.max(lines, linesIn(SOURCE_NOT_LOCATED, widths[2], 9));
+    }
+    if (f.basis) label(ws.getCell(r, 4), f.basis, { size: 9 });
+    if (f.flagged) label(ws.getCell(r, 5), "Yes", { bold: true, size: 9, color: { argb: "FFA05A1C" } });
+    if (f.reason) {
+      label(ws.getCell(r, 6), f.reason, { size: 9, color: MUTED });
+      lines = Math.max(lines, linesIn(f.reason, widths[5], 9));
+    }
+    for (let c = 1; c <= lastCol; c++) {
+      const cell = ws.getCell(r, c);
+      cell.alignment = { ...cell.alignment, wrapText: true, vertical: "top" };
+    }
+    ws.getRow(r).height = lines * lineHeight(10) + 3;
+    bottomBorder(ws, r, 1, lastCol);
     r++;
   }
 }

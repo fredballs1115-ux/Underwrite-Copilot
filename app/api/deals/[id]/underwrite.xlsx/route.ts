@@ -23,6 +23,7 @@ import { regulationForDeal } from "@/lib/rent-regulation";
 import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import { screeningCompareModel } from "@/lib/underwrite/report-grid";
+import { readOmFacts } from "@/lib/underwrite/om-facts";
 
 export const runtime = "nodejs";
 
@@ -196,7 +197,10 @@ export async function GET(
     // "from today" lines count from (audit C6, LOW-2: it had printed the
     // server's UTC day, a Los Angeles reader at 8 pm reading tomorrow's);
     // the file's own created time is the moment it is made.
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date());
+    // Every figure the screen read out of the memorandum, with its page
+    // held to the memorandum's length (lib/facts' rule) — the OM Facts tab;
+    // none read, no tab.
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date(), readOmFacts(extraction));
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";
