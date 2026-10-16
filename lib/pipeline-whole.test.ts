@@ -74,6 +74,7 @@ function fakeClient() {
           return q;
         },
         limit: () => q,
+        eq: () => q,
         range: (from: number, to: number) => {
           range = [from, to];
           return q;
@@ -209,7 +210,9 @@ describe("the meeting workbook is the whole pipeline", () => {
 
   it("builds no workbook where a deadline or a screen's state could not be read", async () => {
     db.deals = Array.from({ length: 7 }, (_, i) => deal(i));
-    for (const fail of ["deals:ids", "analysis_jobs"]) {
+    // …nor where the open tasks behind each deal's next step could not be
+    // read (research pass 24, B1).
+    for (const fail of ["deals:ids", "analysis_jobs", "deal_tasks"]) {
       db.failRead = fail;
       const res = await GET(new Request("https://underwrite.example/api/pipeline/export"));
       expect(res.status).toBe(302);
