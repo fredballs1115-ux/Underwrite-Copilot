@@ -3,7 +3,14 @@ import { cookies } from "next/headers";
 import { addressUpgrade } from "@/lib/address";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { FILED_PERSONAL, filedPersonalNotice, isMoveRefusal, moveNotice, type MoveTarget } from "@/lib/personal-deal";
+import {
+  FILED_PERSONAL,
+  filedPersonalNotice,
+  isMoveRefusal,
+  moveNotice,
+  parseMoveBlock,
+  type MoveTarget,
+} from "@/lib/personal-deal";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 import { notFound } from "next/navigation";
 import { ResearchPanel } from "./research-panel";
@@ -234,10 +241,19 @@ export default async function DealPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; tab?: string; a?: string; filed?: string; moved?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    tab?: string;
+    a?: string;
+    filed?: string;
+    moved?: string;
+    others?: string;
+    unrecorded?: string;
+  }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, tab, a: analysisParam, filed, moved } = await searchParams;
+  const { error: errorCode, tab, a: analysisParam, filed, moved, others: moveOthers, unrecorded: moveUnrecorded } =
+    await searchParams;
 
   const supabase = await createSupabaseServerClient();
   // Request-cached: shares the layout's auth call instead of a second hop.
@@ -637,7 +653,15 @@ export default async function DealPage({
     moved === "team" || moved === "personal"
       ? moveNotice({ moved, teamName: readerTeamName }, { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS })
       : isMoveRefusal(errorCode)
-        ? moveNotice({ refused: errorCode }, { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS })
+        ? moveNotice(
+            {
+              refused: errorCode,
+              // what blocked a move that would carry someone else's work
+              block: parseMoveBlock(moveOthers, moveUnrecorded),
+              teamName: errorCode === "moveteamwork" ? readerTeamName : moveTeamName,
+            },
+            { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS },
+          )
         : null;
 
   // Delete is the creator's or the team owner's (the RLS delete policy); a

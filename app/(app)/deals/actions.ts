@@ -18,7 +18,7 @@ import { MAX_PICTURE_BYTES, clearOmPicture, picturePaths, storePicture } from "@
 import { floodFramePaths } from "@/lib/flood-frame-core";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { dealLanding } from "@/lib/personal-deal";
+import { dealLanding, moveBlock, moveBlockQuery, type DealWork } from "@/lib/personal-deal";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import {
   claimJob,
@@ -35,7 +35,7 @@ import {
   type Stage,
 } from "@/lib/stages";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { OM_REPLACED, parseDealNotes } from "@/lib/deals";
+import { OM_REPLACED, parseDealNotes, parseDealQa } from "@/lib/deals";
 import { omFingerprint } from "@/lib/om-fingerprint";
 import {
   factsFromForm,
@@ -831,11 +831,18 @@ export async function moveDeal(formData: FormData) {
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, user_id, team_id, is_sample")
+    .select("id, user_id, team_id, is_sample, notes, qa, supplements")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) redirect("/deals");
-  const row = deal as { user_id: string; team_id: string | null; is_sample?: boolean };
+  const row = deal as {
+    user_id: string;
+    team_id: string | null;
+    is_sample?: boolean;
+    notes?: unknown;
+    qa?: unknown;
+    supplements?: unknown;
+  };
   if (row.is_sample) redirect(back);
   if (row.user_id !== user!.id) redirect(`${back}?error=movepermission`);
   // Already where it was asked to go: nothing to do, nothing to say.
@@ -851,6 +858,29 @@ export async function moveDeal(formData: FormData) {
     teamId = billing.team!.id;
   } else if (!(billing.plan === "pro" || billing.dealCount < billing.dealLimit)) {
     redirect(`${back}?error=movelimit`);
+  }
+
+  // What the move carries (lib/personal-deal `moveBlock`): someone else's
+  // tasks, notes, files, Ask questions or source documents never cross into
+  // a pipeline that would show them to people who could not see them, or out
+  // of one that would hide them from the people who added them. Read with
+  // the reader's own session — the creator can read every one of these
+  // tables' rows for their deal, and the destination team's roster as its
+  // member. A read that fails refuses rather than moves blind.
+  const work = await readDealWork(supabase, dealId, row);
+  if (!work) redirect(`${back}?error=movefail`);
+  let members: Set<string> | undefined;
+  if (to === "team") {
+    const { data: roster, error: rosterErr } = await supabase
+      .from("team_members")
+      .select("user_id")
+      .eq("team_id", teamId!);
+    if (rosterErr || !roster) redirect(`${back}?error=movefail`);
+    members = new Set((roster as { user_id: string }[]).map((m) => m.user_id));
+  }
+  const block = moveBlock(to, work!, { creatorId: user!.id, creatorEmail: user!.email ?? null, members });
+  if (block) {
+    redirect(`${back}?error=${to === "team" ? "moveteamwork" : "movepersonalwork"}&${moveBlockQuery(block)}`);
   }
 
   // `.select` so a write row-level security matched nothing for — 204 and
@@ -870,6 +900,37 @@ export async function moveDeal(formData: FormData) {
   revalidatePath(back);
   revalidatePath("/deals");
   redirect(`${back}?moved=${to}`);
+}
+
+/** Everything on a deal a move carries, with who added each where that is
+ *  recorded (lib/personal-deal `DealWork`), or null where a read failed. */
+async function readDealWork(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  dealId: string,
+  row: { notes?: unknown; qa?: unknown; supplements?: unknown },
+): Promise<DealWork | null> {
+  const [tasks, documents] = await Promise.all([
+    supabase.from("deal_tasks").select("created_by, assignee_user_id").eq("deal_id", dealId),
+    supabase.from("deal_documents").select("id").eq("deal_id", dealId),
+  ]);
+  if (tasks.error || documents.error) return null;
+  const supp = (row.supplements && typeof row.supplements === "object" ? row.supplements : {}) as Record<
+    string,
+    { notes?: { byId?: unknown }[]; files?: { byId?: unknown }[] } | null
+  >;
+  const idOf = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+  const tabs = Object.values(supp).filter((t): t is NonNullable<typeof t> => !!t && typeof t === "object");
+  return {
+    tasks: ((tasks.data ?? []) as { created_by: string | null; assignee_user_id: string | null }[]).map((t) => ({
+      createdBy: t.created_by,
+      assignee: t.assignee_user_id,
+    })),
+    logNotes: parseDealNotes(row.notes),
+    tabNotes: tabs.flatMap((t) => (Array.isArray(t.notes) ? t.notes : []).map((n) => ({ byId: idOf(n?.byId) }))),
+    files: tabs.flatMap((t) => (Array.isArray(t.files) ? t.files : []).map((f) => ({ byId: idOf(f?.byId) }))),
+    ask: parseDealQa(row.qa).map((e) => ({ by: e.by })),
+    documents: (documents.data ?? []).length,
+  };
 }
 
 /**
