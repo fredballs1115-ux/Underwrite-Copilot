@@ -32,7 +32,25 @@ export function exportGateDealOf(
   return { isSample: row.is_sample === true, hasOm: !!row.om_storage_path };
 }
 
-/** "open" — serve the file; "upsell" — send a free reader to /billing. */
-export function exportGate(pro: boolean, deal: ExportGateDeal | null | undefined): "open" | "upsell" {
-  return pro || sampleExportsFree(deal) ? "open" : "upsell";
+/**
+ * "open" — serve the file built from the row (a Pro reader);
+ * "sample" — a free reader on the sample: serve the fixed public sample's
+ *   file (/api/demo/…), never one built from the row. The row is the
+ *   reader's own and writable through the database API, so a free reader
+ *   could paste a real deal's extraction and verdict onto their sample; the
+ *   promise is the sample's files, and the public routes build exactly those
+ *   (lib/sample-cover, held equal to the signed-in sample's by
+ *   lib/sample-documents.render.test);
+ * "upsell" — send a free reader to /billing.
+ */
+export function exportGate(pro: boolean, deal: ExportGateDeal | null | undefined): "open" | "sample" | "upsell" {
+  if (pro) return "open";
+  return sampleExportsFree(deal) ? "sample" : "upsell";
 }
+
+/** The public sample's own file for each export a free reader of the sample asks for. */
+export const SAMPLE_EXPORT_PATH = {
+  memo: "/api/demo/memo",
+  report: "/api/demo/report",
+  underwrite: "/api/demo/underwrite.xlsx",
+} as const;

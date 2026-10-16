@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
-import { exportGate, exportGateDealOf, sampleExportsFree } from "@/lib/sample-exports";
+import { SAMPLE_EXPORT_PATH, exportGate, exportGateDealOf } from "@/lib/sample-exports";
 import { buildReportData, renderReportPdf, withActuals } from "@/lib/memo/report-document";
 import { actualsFromRows, type ActualsRead } from "@/lib/actuals/actuals-read";
 import { shownAssetClass } from "@/lib/asset-class";
@@ -79,18 +79,22 @@ export async function GET(
   // public pages promise free (lib/sample-exports).
   const gateDeal = exportGateDealOf(data as { is_sample?: boolean | null; om_storage_path?: string | null });
   let pro = false;
-  if (!sampleExportsFree(gateDeal)) {
-    try {
-      pro = await isPro(supabase, user.id);
-    } catch (err) {
-      console.error(`report isPro check failed for deal ${id}:`, err);
-      return Response.redirect(
-        new URL(`/deals/${id}?error=exportfail`, req.url),
-        302,
-      );
-    }
+  try {
+    pro = await isPro(supabase, user.id);
+  } catch (err) {
+    console.error(`report isPro check failed for deal ${id}:`, err);
+    return Response.redirect(
+      new URL(`/deals/${id}?error=exportfail`, req.url),
+      302,
+    );
   }
-  if (exportGate(pro, gateDeal) === "upsell") {
+  const gate = exportGate(pro, gateDeal);
+  // A free reader on the sample gets the public sample's own file, never one
+  // built from the row, which the reader can write (lib/sample-exports).
+  if (gate === "sample") {
+    return Response.redirect(new URL(SAMPLE_EXPORT_PATH.report, req.url), 302);
+  }
+  if (gate === "upsell") {
     return Response.redirect(
       new URL(`/billing?upsell=report`, req.url),
       302,
