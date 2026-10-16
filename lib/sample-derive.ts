@@ -10,6 +10,7 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { deriveUnderwriteInputs, type DealForModel } from "@/lib/underwrite/inputs";
 import { buildSensitivityGrids, type SensCell } from "@/lib/underwrite/sensitivity";
 import { runScenario } from "@/lib/underwrite/playground";
+import { compactUsd } from "@/lib/money";
 
 /** The sample's actuals, in the shape deriveUnderwriteInputs takes. */
 export const SAMPLE_ACTUALS = {
@@ -64,7 +65,7 @@ export function sampleWorkbookPreview(): [string, string, string][] {
   const p = grid.rowAxis.baseIndex;
   const c = grid.colAxis.baseIndex;
   const irr = (cell: SensCell) => (cell.irrPct == null ? "—" : `IRR ${(cell.irrPct * 100).toFixed(1)}%`);
-  const money = (n: number) => `$${Number((n / 1e6).toFixed(1))}M`;
+  const money = (n: number) => compactUsd(n, { trim: true });
   const cap = (d: number) => `${(d * 100).toFixed(2)}%`;
   return [
     ["Purchase price", money(inputs.purchasePrice), irr(grid.cells[p][c])],

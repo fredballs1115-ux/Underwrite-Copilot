@@ -538,6 +538,8 @@ describe("a compact figure is rounded one way on every surface (finding 14)", ()
     const handWritten = [
       // a float's toFixed on millions: (5_550_000 / 1e6).toFixed(1) is "5.5"
       new RegExp(String.raw`${lead}\(\s*[\w.!?]+\s*\/\s*(?:1e6|1_000_000)\s*\)\s*\.toFixed\(`),
+      // the same, its trailing zeros dropped through Number(): "$68M"
+      new RegExp(String.raw`${lead}Number\(\s*\(\s*[\w.!?]+\s*\/\s*(?:1e6|1_000_000)\s*\)\s*\.toFixed\(`),
       // a second writer of tenths of a million
       new RegExp(String.raw`${lead}\(\s*Math\.round\(\s*[\w.!?]+\s*\/\s*1e5\s*\)\s*\/\s*10\s*\)`),
       // a second writer of thousands
