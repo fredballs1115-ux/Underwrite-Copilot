@@ -408,6 +408,12 @@ describe("explorerLeads — /market opens on the covered markets for a reader wi
   it("a visitor signed out has no memory above it to move past", () => {
     expect(explorerLeads({ ...base, signedIn: false })).toBe(false);
   });
+  it("a link that names a market lands on its brief, whatever the reader has on file", () => {
+    expect(explorerLeads({ ...base, groups: 4, submarkets: 2, metroAsked: true })).toBe(true);
+    expect(explorerLeads({ ...base, memoryFailed: true, metroAsked: true })).toBe(true);
+    expect(explorerLeads({ ...base, groups: 4, metroAsked: false })).toBe(false);
+    expect(explorerLeads({ ...base, signedIn: false, metroAsked: true })).toBe(false);
+  });
 });
 
 describe("marketsIn — /market's 'N screens across M markets' counts markets, not cards", () => {

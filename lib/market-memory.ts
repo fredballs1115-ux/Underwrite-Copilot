@@ -317,13 +317,22 @@ function groupNoun(assetClass: string, withBasis: readonly MarketComp[]): string
  *  pipeline's "Browse the covered markets →" lands here — and found two
  *  empty states and an open form above them, the markets below the fold;
  *  for that reader the explorer leads. A memory that failed to load says
- *  nothing about the reader, and keeps the usual order. */
+ *  nothing about the reader, and keeps the usual order.
+ *
+ *  A link that names a market (`?metro=`, every "open the market brief"
+ *  link: the deal's research panel, the comps page, ⌘K, a submarket's page,
+ *  the portfolio card) asked for that market's brief, so the brief leads
+ *  whatever the reader has on file: it had landed on the reader's own cap
+ *  cards, the brief a scroll below them. */
 export function explorerLeads(r: {
   signedIn: boolean;
   memoryFailed: boolean;
   groups: number;
   submarkets: number;
+  /** the link named a market the page has (`marketPageFor`) */
+  metroAsked?: boolean;
 }): boolean {
+  if (r.signedIn && r.metroAsked) return true;
   return r.signedIn && !r.memoryFailed && r.groups === 0 && r.submarkets === 0;
 }
 

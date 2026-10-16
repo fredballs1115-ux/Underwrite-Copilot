@@ -273,23 +273,39 @@ export default async function MarketDataPage({
   // A reader with no screens on file and no submarkets came for the covered
   // markets ("Browse the covered markets →"): the explorer leads, and the
   // two empty states follow it rather than pushing it below the fold.
+  // A link that names a market ("open the market brief", from the deal's
+  // research panel, the comps page, ⌘K, a submarket or the portfolio card)
+  // lands on that market's brief: it leads, under the market's own title,
+  // and the reader's own cards follow it under a heading of their own.
+  const metroLeads = !!user && !!pageMetro;
   const explorerFirst = explorerLeads({
     signedIn: !!user,
     memoryFailed: !!error,
     groups: groups.length,
     submarkets: submarkets.length,
+    metroAsked: !!pageMetro,
   });
   const explorer = <MetroExplorer selected={metroParam} signedIn={!!user} />;
+  const ownIntro = (
+    <p className="mt-1 max-w-2xl text-sm text-muted">
+      Going-in caps and basis from your own screens, by market and asset
+      class. Private to you.
+    </p>
+  );
 
   return (
     <div className="space-y-6">
-      {user ? (
+      {metroLeads ? (
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">{marketHeading(pageMetro)}</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            The market&apos;s brief first; your own market data follows it.
+          </p>
+        </div>
+      ) : user ? (
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Your market data</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Going-in caps and basis from your own screens, by market and asset
-            class. Private to you.
-          </p>
+          {ownIntro}
         </div>
       ) : (
         // Anonymous visitors land here from the homepage/why/demo marquee —
@@ -313,6 +329,13 @@ export default async function MarketDataPage({
       )}
 
       {explorerFirst ? explorer : null}
+
+      {metroLeads ? (
+        <div id="your-market-data" className="scroll-mt-6">
+          <h2 className="text-xl font-semibold tracking-tight">Your market data</h2>
+          {ownIntro}
+        </div>
+      ) : null}
 
       {!user ? null : error && /relation|does not exist|schema/i.test(error.message) ? (
         <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">

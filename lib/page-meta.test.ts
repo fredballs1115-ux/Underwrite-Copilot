@@ -140,9 +140,10 @@ describe("each public page states its own canonical and link preview", () => {
     const src = read("app/market/page.tsx");
     expect(src).toContain("const pageMetro = marketPageFor(metroParam);");
     expect(src).toMatch(/<h1[^>]*>\s*\{marketHeading\(pageMetro\)\}\s*<\/h1>/);
-    // One h1 a page: the signed-in reader's and everyone else's are the two
-    // arms of one choice, and the metro's band keeps its section heading.
-    expect(src.match(/<h1\b/g)?.length).toBe(2);
+    // One h1 a page: a signed-in reader sent to a market, the signed-in
+    // reader and everyone else are the three arms of one choice, and the
+    // metro's band keeps its section heading.
+    expect(src.match(/<h1\b/g)?.length).toBe(3);
     for (const f of ["app/market/page.tsx", "app/market/read-only-metro.tsx"]) {
       expect(read(f), f).not.toMatch(/<MarketBand[^>]*as="h1"/);
     }
