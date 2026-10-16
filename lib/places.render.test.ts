@@ -166,6 +166,53 @@ describe("DotTimeline — readable at 390px, and every dot opens its deal (no ho
   });
 });
 
+// ── A grid's credit line follows the pictures shown (audit C9, L3) ──────────
+import { shownCredit, firstMode, type ShownMode } from "@/lib/shown-credit";
+import { gridPictures } from "@/app/market/grid-credit";
+import { OVERHEAD_GRID_CREDIT, hasSkyline, skylineCredit, skylineFor } from "@/lib/skyline";
+
+describe("the market grids' one credit line names the picture each tile settled on", () => {
+  const [richmond, moco] = gridPictures(["richmond", "montgomery_county"]);
+
+  it("reads each market's photograph and overhead from the tables", () => {
+    expect(hasSkyline("richmond")).toBe(true);
+    expect(richmond.skyline).toEqual(skylineCredit(skylineFor("richmond")!));
+    // Montgomery County is pictured by its overhead alone (CLAUDE.md).
+    expect(moco.skyline).toBeNull();
+    expect(moco.overhead).toBe(true);
+    expect(firstMode(richmond)).toBe("skyline");
+    expect(firstMode(moco)).toBe("aerial");
+  });
+
+  it("before any tile reports, credits each tile's first picture; a failed photograph's credit leaves with it", () => {
+    const none = new Map<string, ShownMode[]>();
+    expect(shownCredit([richmond], none)).toEqual({ photos: [richmond.skyline], overhead: false });
+    expect(shownCredit([richmond, moco], none)).toEqual({ photos: [richmond.skyline], overhead: true });
+    // Richmond's photograph failed and its tile shows the overhead.
+    expect(shownCredit([richmond], new Map([["richmond", ["aerial"]]]))).toEqual({ photos: [], overhead: true });
+    // Two tiles of one market, one failed: both pictures are on screen.
+    expect(shownCredit([richmond], new Map([["richmond", ["skyline", "aerial"]]]))).toEqual({
+      photos: [richmond.skyline],
+      overhead: true,
+    });
+    // Both pictures failed: nothing to credit.
+    expect(shownCredit([richmond], new Map([["richmond", ["none"]]]))).toEqual({ photos: [], overhead: false });
+  });
+
+  it("the server's render prints the overhead line for an overhead-only market and keeps the tiles bare", () => {
+    const html = render(
+      React.createElement(MarketMemoryCards, { groups: [group({ market: "Montgomery County MD", marketKey: "montgomery county md" })] }),
+    );
+    const text = visibleText(html);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('data-picture="memory"');
+    expect(html).toContain('data-qa="memory-credit"');
+    expect(text).toContain(OVERHEAD_GRID_CREDIT);
+    expect(text).not.toContain("Photographs by");
+  });
+});
+
 // ── A metro area read without a brief promises no brief (audit C9, M2) ──────
 import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
 import { marketLeadLine, marketPageWord } from "@/app/market/market-lead";

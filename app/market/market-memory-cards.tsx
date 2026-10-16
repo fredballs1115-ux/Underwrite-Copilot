@@ -7,10 +7,11 @@ import {
   fmtCapRange,
   type MarketGroup,
 } from "@/lib/market-memory";
-import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
+import { OVERHEAD_GRID_CREDIT } from "@/lib/skyline";
 import { marketPath } from "@/lib/public-pages";
-import { GalleryCreditText } from "@/app/photo-credit";
 import { CityPhoto } from "@/app/city-photo";
+import { ShownCreditGrid } from "@/app/shown-credit";
+import { gridPictures } from "@/app/market/grid-credit";
 import { marketPageWord } from "@/app/market/market-lead";
 
 const CALL_META: Record<string, { label: string; cls: string }> = {
@@ -26,8 +27,9 @@ const CALL_META: Record<string, { label: string; cls: string }> = {
  * submarket cards use: the site's own name for a market, or a city with its
  * state — nothing guessed). The strip wears the market's name, since the
  * picture is the metro's and not the deal's submarket, and links to the
- * market's page (its brief, or its figures where it has none). One credit line under the grid names every photographer
- * shown, as the submarket cards' does (`galleryCredit`).
+ * market's page (its brief, or its figures where it has none). One credit
+ * line under the grid names the pictures the strips actually show
+ * (app/shown-credit): a photograph that fails takes its photographer off it.
  *
  * Pure: the page reads the memory and hands the groups in, so the render
  * test draws this on a fixture.
@@ -35,26 +37,20 @@ const CALL_META: Record<string, { label: string; cls: string }> = {
 export function MarketMemoryCards({ groups }: { groups: readonly MarketGroup[] }) {
   const cards = groups.map((g) => ({ g, market: metroForName(g.market) }));
   const pictured = [...new Set(cards.flatMap((c) => (c.market ? [c.market.id] : [])))];
-  const credit = galleryCredit(pictured);
-  const anyOverhead = pictured.some((id) => !hasSkyline(id));
   return (
-    <>
+    <ShownCreditGrid
+      pictures={gridPictures(pictured)}
+      overheadLine={OVERHEAD_GRID_CREDIT}
+      qa="memory-credit"
+      className="text-[11px] leading-relaxed text-muted"
+      linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink"
+    >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map(({ g, market }) => (
           <MarketCard key={`${g.assetClass}|${g.marketKey}`} g={g} market={market} />
         ))}
       </div>
-      {credit || anyOverhead ? (
-        <p className="text-[11px] leading-relaxed text-muted" data-qa="memory-credit">
-          {credit ? (
-            <>
-              <GalleryCreditText ids={pictured} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />{" "}
-            </>
-          ) : null}
-          {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
-        </p>
-      ) : null}
-    </>
+    </ShownCreditGrid>
   );
 }
 
@@ -84,6 +80,7 @@ function MarketCard({ g, market }: { g: MarketGroup; market: { id: string; name:
             height={192}
             sizes="(min-width: 1024px) 360px, (min-width: 640px) 47vw, 92vw"
             showCredit={false}
+            reportShown
             className="h-full w-full object-cover object-[50%_42%] transition-transform duration-300 motion-safe:group-hover:scale-[1.03]"
           />
           <span className="absolute bottom-1.5 left-2 rounded bg-black/60 px-1.5 py-px text-[10px] font-medium text-white">

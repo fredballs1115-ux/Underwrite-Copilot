@@ -75,10 +75,15 @@ export function CityPhoto({
   layer,
   creditLayer,
   overlay,
+  reportShown = false,
   children,
 }: {
   /** a metro id from data/research/metros.json */
   metro: string;
+  /** a tile in a grid credited by one line (app/shown-credit
+   *  `ShownCreditGrid`): it says which picture it settled on, so the line
+   *  follows the fallback as a tile's own credit would */
+  reportShown?: boolean;
   width: number;
   height: number;
   className?: string;
@@ -166,6 +171,7 @@ export function CityPhoto({
       layer={layer}
       creditLayer={creditLayer}
       overlay={overlay}
+      reportAs={reportShown ? metro : undefined}
     >
       {children}
     </CityPhotoView>

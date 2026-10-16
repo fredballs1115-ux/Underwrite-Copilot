@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { CreditPart } from "@/lib/credit-parts";
 import { CreditPartsText } from "./credit-parts";
+import { ShownPicturesContext } from "./shown-credit";
 
 /** One picture a market band may show, resolved on the server by
  *  `CityPhoto` (app/city-photo): its address, its widths, what it shows and
@@ -44,8 +45,13 @@ export function CityPhotoView({
   layer,
   creditLayer,
   overlay,
+  reportAs,
   children,
 }: {
+  /** the market id this tile reports what it settled on under, to the grid
+   *  around it that credits its tiles in one line (app/shown-credit
+   *  `ShownCreditGrid`); unset, or outside such a grid, it reports nothing */
+  reportAs?: string;
   /** the market's photograph, or null where it has none */
   skyline: CityPicture<CreditPart[]> | null;
   /** the market's overhead frame, or null where it has none */
@@ -97,6 +103,18 @@ export function CityPhotoView({
     if (!img?.complete || img.naturalWidth > 0) return;
     setMode((m) => (m === "skyline" && hasAerial ? "aerial" : "none"));
   }, [mode, hasAerial]);
+  // In a grid credited by one line, say what this tile shows now, so the
+  // line names the picture on screen and never one that failed.
+  const shownTo = useContext(ShownPicturesContext);
+  const tileKey = useId();
+  useEffect(() => {
+    if (!shownTo || !reportAs) return;
+    shownTo.report(tileKey, reportAs, mode);
+  }, [shownTo, reportAs, tileKey, mode]);
+  useEffect(() => {
+    if (!shownTo || !reportAs) return;
+    return () => shownTo.forget(tileKey);
+  }, [shownTo, reportAs, tileKey]);
 
   // Neither picture (`shown` null): the band's own colour carries on under
   // its scrim, and its words with it. The tree keeps the same slots either

@@ -2,10 +2,11 @@ import Link from "next/link";
 import { fmtUsdCompact, middleRead, middleText, type MarketRow, type MiddleRead } from "@/lib/analytics";
 import { metroForName } from "@/lib/market-match";
 import { marketPath } from "@/lib/public-pages";
-import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
+import { OVERHEAD_GRID_CREDIT } from "@/lib/skyline";
 import { pctText } from "@/lib/plan-facts";
-import { GalleryCreditText } from "@/app/photo-credit";
 import { CityPhoto } from "@/app/city-photo";
+import { ShownCreditGrid } from "@/app/shown-credit";
+import { gridPictures } from "@/app/market/grid-credit";
 import { marketPageWord } from "@/app/market/market-lead";
 
 /**
@@ -15,7 +16,7 @@ import { marketPageWord } from "@/app/market/market-lead";
  * (`metroForName`, the reader /market's cards use — nothing guessed), its
  * name linked to the market's page (its brief, or its figures where the site
  * reads the metro area without one), and one credit line under the table
- * naming every photographer shown, as the submarket cards' does.
+ * naming the pictures the tiles actually show (app/shown-credit).
  *
  * Pure: the page groups the deals and hands the rows in, so the render test
  * draws this on a fixture.
@@ -29,10 +30,18 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
     go: r.deals.filter((d) => d.verdict === "pass").length,
   }));
   const pictured = [...new Set(shown.flatMap((s) => (s.place ? [s.place.id] : [])))];
-  const credit = galleryCredit(pictured);
-  const anyOverhead = pictured.some((id) => !hasSkyline(id));
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="by-market">
+      {/* One credit line under the table, naming the pictures the tiles
+          actually show (a photograph that fails hands its tile, and its
+          place on the line, to the overhead). */}
+      <ShownCreditGrid
+        pictures={gridPictures(pictured)}
+        overheadLine={OVERHEAD_GRID_CREDIT}
+        qa="market-credit"
+        className="mt-1 text-[11px] leading-relaxed text-muted"
+        linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink"
+      >
       <h2 className="text-sm font-semibold tracking-tight">By market</h2>
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-[34rem] text-sm">
@@ -57,6 +66,7 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
                           width={480}
                           height={360}
                           showCredit={false}
+                          reportShown
                           className="h-full w-full object-cover object-[50%_42%]"
                         />
                       </span>
@@ -96,16 +106,7 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
         but not in the figures.
         {planNote && " Plan deals are judged on yield on total cost and sit outside the cap figures."}
       </p>
-      {credit || anyOverhead ? (
-        <p className="mt-1 text-[11px] leading-relaxed text-muted" data-qa="market-credit">
-          {credit ? (
-            <>
-              <GalleryCreditText ids={pictured} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />{" "}
-            </>
-          ) : null}
-          {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
-        </p>
-      ) : null}
+      </ShownCreditGrid>
     </section>
   );
 }
