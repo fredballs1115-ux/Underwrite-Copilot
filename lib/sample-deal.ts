@@ -22,6 +22,7 @@ import type {
 import type { BuyBox } from "@/lib/criteria";
 import type { AskEntry, DealNote } from "@/lib/deals";
 import { normalizeTaskTitle } from "@/lib/deal-tasks";
+import { withArticle } from "@/lib/article";
 
 /** The hypothetical mandate the PUBLIC sample is judged against — the
  *  homepage's chip, /demo's buy-box tab, and the public memo and full
@@ -651,7 +652,7 @@ function sampleAsk(at: string): AskEntry[] {
   const compPage = comps.saleComps[0].page ?? "";
   const compWords = comps.saleComps.map((c) => {
     const [basis, cap, when] = c.detail.split(" · ");
-    return `${c.name.split(" — ")[0]} at ${basis} and a ${cap} (${when})`;
+    return `${c.name.split(" — ")[0]} at ${basis} and ${withArticle(cap)} (${when})`;
   });
 
   return [
@@ -659,8 +660,8 @@ function sampleAsk(at: string): AskEntry[] {
       at,
       q: "What exit cap does the memorandum sell at, against the cap it buys at?",
       answer:
-        `The sample's fictional memorandum sells at a ${exit.value} exit cap (${exit.page}) and buys at a ` +
-        `${entry.value} going-in cap (${entry.page}): it sells ${tighterBps} bps tighter than it buys, ` +
+        `The sample's fictional memorandum sells at ${withArticle(exit.value)} exit cap (${exit.page}) and buys at ` +
+        `${withArticle(entry.value)} going-in cap (${entry.page}): it sells ${tighterBps} bps tighter than it buys, ` +
         "and states no reason for the compression.",
       cites: [
         { page: exit.page, note: "Exit cap" },
