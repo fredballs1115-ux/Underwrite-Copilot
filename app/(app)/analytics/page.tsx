@@ -83,10 +83,10 @@ export default async function AnalyticsPage() {
   const typed = pooled.filter((r) => typedByHand(r.extraction as ExtractionResult | null)).length;
   const capPoints = deals
     .filter((d) => d.capPct != null)
-    .map((d) => ({ at: d.at, value: d.capPct!, name: d.name }));
+    .map((d) => ({ at: d.at, value: d.capPct!, name: d.name, id: d.id }));
   const unitPoints = deals
     .filter((d) => d.perUnit != null)
-    .map((d) => ({ at: d.at, value: d.perUnit!, name: d.name }));
+    .map((d) => ({ at: d.at, value: d.perUnit!, name: d.name, id: d.id }));
   // Plan deals have no going-in cap — their stabilized figure is the finished
   // project's, judged on yield on total cost — so they sit outside the cap
   // series and are counted, and read, on their own.
@@ -243,7 +243,7 @@ export default async function AnalyticsPage() {
                   Going-in cap rate, by screen date
                 </h2>
                 <p className="mb-2 mt-0.5 text-xs text-muted">
-                  One dot per deal — hover for the name.
+                  One dot per deal; each opens its deal.
                   {planDeals.length > 0 &&
                     " Plan deals are judged on yield on total cost and are not plotted."}
                 </p>

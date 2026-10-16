@@ -114,3 +114,54 @@ describe("MarketTable — /analytics' markets, grouped as /market groups them, e
     expect(visibleText(html)).toContain("Plan deals are judged on yield on total cost");
   });
 });
+
+// ── The analytics page's timelines on a phone ───────────────────────────────
+import { DotTimeline } from "@/app/(app)/analytics/charts";
+
+describe("DotTimeline — readable at 390px, and every dot opens its deal (no hover on a phone)", () => {
+  const pct = (v: number) => `${v.toFixed(2)}%`;
+  const points = [
+    { at: "2026-08-11T12:00:00Z", value: 5.45, name: "The Maddox", id: "d1" },
+    { at: "2026-08-20T12:00:00Z", value: 5.9, name: "Harbor View", id: "d2" },
+    { at: "2026-09-02T12:00:00Z", value: 8.1, name: "Tysons Plaza", id: "d3" },
+  ];
+
+  it("draws a wide frame from sm up and a phone frame below it, whose type is the larger", () => {
+    const html = render(React.createElement(DotTimeline, { points, format: pct, medianLabel: "median" }));
+    const svgs = html.match(/<svg[^>]*>/g) ?? [];
+    expect(svgs).toHaveLength(2);
+    expect(svgs[0]).toContain('viewBox="0 0 560 190"');
+    expect(svgs[0]).toContain('class="hidden sm:block"');
+    expect(svgs[1]).toContain('viewBox="0 0 320 210"');
+    expect(svgs[1]).toContain('class="sm:hidden"');
+    // 12 units in a 320-wide frame draw at about 12px on a 390px screen's
+    // ~318px card; the wide frame's 9.5 units had drawn at about 5.5px.
+    expect(html).toContain('font-size="12"');
+    expect(html).not.toContain('font-size="9.5"');
+  });
+
+  it("makes each dot a link to its deal, named for a screen reader, in a group rather than an image", () => {
+    const html = render(React.createElement(DotTimeline, { points, format: pct, medianLabel: "median" }));
+    expect(a11yIssues(html), "a11y timeline").toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    for (const p of points) {
+      // Once in each frame, once in the phone's list.
+      expect(html.match(new RegExp(`href="/deals/${p.id}"`, "g"))?.length).toBe(3);
+    }
+    expect(html).toContain('aria-label="The Maddox — 5.45% · Aug 11"');
+    expect(html).toContain('role="group"');
+    expect(html).not.toContain('role="img"');
+    // The phone's list of the deals, newest first.
+    expect(html).toContain('data-qa="timeline-list"');
+    expect(visibleText(html)).toContain("List the 3 deals");
+    expect(html.indexOf("Tysons Plaza</span>")).toBeLessThan(html.indexOf("The Maddox</span>"));
+  });
+
+  it("points without an id draw as before: an image, no links, no list", () => {
+    const bare = points.map(({ at, value, name }) => ({ at, value, name }));
+    const html = render(React.createElement(DotTimeline, { points: bare, format: pct, medianLabel: "median" }));
+    expect(html).not.toContain("<a ");
+    expect(html).toContain('role="img"');
+    expect(html).not.toContain('data-qa="timeline-list"');
+  });
+});

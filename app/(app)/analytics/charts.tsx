@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { AnalyticsDeal } from "@/lib/analytics";
 import { median } from "@/lib/analytics";
 
@@ -13,7 +14,9 @@ import { median } from "@/lib/analytics";
  *   kill↔caution CVD distance sits in the floor band, which is acceptable
  *   only because identity never rides on color alone here;
  * - text wears text tokens (ink/muted), never the series color;
- * - native <title> tooltips give every mark a hover readout.
+ * - native <title> tooltips give every mark a hover readout, and a dot with
+ *   an id opens its deal: a phone cannot hover, so it draws a narrower frame
+ *   whose type reads at its own size and lists the deals under the chart.
  */
 
 const C = {
@@ -66,19 +69,83 @@ function niceBounds(lo: number, hi: number): [number, number] {
   return [lo - pad, hi + pad];
 }
 
-/** Discrete deals over time: one dot per deal, a dashed median reference. */
+/** One deal on a timeline: its screen date, its figure, its name, and —
+ *  where the page has it — its id, so the dot opens the deal. */
+export interface TimelinePoint {
+  at: string;
+  value: number;
+  name: string;
+  id?: string;
+}
+
+/** A timeline's frame: the viewBox, its padding, the type and the dot. The
+ *  wide frame draws from `sm` up; the phone's is narrower, so the same type
+ *  reads at about its own size on a 390px screen (the wide frame's 9.5 units
+ *  drew at about 5.5px there) and each dot carries a hit area a finger can
+ *  find. */
+const WIDE = { W: 560, H: 190, pad: { l: 52, r: 16, t: 14, b: 26 }, font: 11, r: 4.5, hit: 9 } as const;
+const PHONE = { W: 320, H: 210, pad: { l: 50, r: 12, t: 16, b: 30 }, font: 12, r: 5.5, hit: 13 } as const;
+type Frame = { W: number; H: number; pad: { l: number; r: number; t: number; b: number }; font: number; r: number; hit: number };
+
+/** A dot's words: its deal, its figure and its screen date. */
+const dotWords = (p: TimelinePoint, format: (v: number) => string) =>
+  `${p.name} — ${format(p.value)} · ${DATE_FMT.format(new Date(p.at))}`;
+
+/** Discrete deals over time: one dot per deal, a dashed median reference.
+ *  A dot with an id links to its deal (a phone cannot hover for a title),
+ *  and on a phone the deals are listed under the chart too, each a link —
+ *  the names a tap on a crowded scatter cannot give. */
 export function DotTimeline({
   points,
   format,
   medianLabel,
 }: {
-  points: { at: string; value: number; name: string }[];
+  points: TimelinePoint[];
   format: (v: number) => string;
   medianLabel: string;
 }) {
-  const W = 560;
-  const H = 190;
-  const PAD = { l: 52, r: 16, t: 14, b: 26 };
+  const listed = points
+    .filter((p): p is TimelinePoint & { id: string } => !!p.id)
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return (
+    <div>
+      <Scatter frame={WIDE} points={points} format={format} medianLabel={medianLabel} className="hidden sm:block" />
+      <Scatter frame={PHONE} points={points} format={format} medianLabel={medianLabel} className="sm:hidden" />
+      {listed.length > 0 ? (
+        <details className="mt-2 text-xs sm:hidden" data-qa="timeline-list">
+          <summary className="cursor-pointer py-2 text-muted">{`List the ${listed.length} deal${listed.length === 1 ? "" : "s"}`}</summary>
+          <ul className="divide-y divide-line/60">
+            {listed.map((p) => (
+              <li key={p.id}>
+                <Link href={`/deals/${encodeURIComponent(p.id)}`} className="flex items-baseline justify-between gap-3 py-2.5">
+                  <span className="min-w-0 truncate font-medium text-brand">{p.name}</span>
+                  <span className="shrink-0 font-mono tabular-nums text-muted">
+                    {`${format(p.value)} · ${DATE_FMT.format(new Date(p.at))}`}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function Scatter({
+  frame,
+  points,
+  format,
+  medianLabel,
+  className,
+}: {
+  frame: Frame;
+  points: TimelinePoint[];
+  format: (v: number) => string;
+  medianLabel: string;
+  className: string;
+}) {
+  const { W, H, pad: PAD, font, r, hit } = frame;
 
   const times = points.map((p) => new Date(p.at).getTime());
   const values = points.map((p) => p.value);
@@ -92,13 +159,17 @@ export function DotTimeline({
 
   const med = median(values)!;
   const ticks = [v0 + (v1 - v0) * 0.15, (v0 + v1) / 2, v1 - (v1 - v0) * 0.15];
+  // Dots that open their deals are links, so the chart is a group of them
+  // under its name: an image's children are hidden from a screen reader.
+  const links = points.some((p) => p.id);
 
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       width="100%"
-      role="img"
+      role={links ? "group" : "img"}
       aria-label={timelineName(points, format)}
+      className={className}
     >
       {ticks.map((tv, i) => (
         <g key={i}>
@@ -112,9 +183,9 @@ export function DotTimeline({
           />
           <text
             x={PAD.l - 8}
-            y={y(tv) + 3}
+            y={y(tv) + font * 0.35}
             textAnchor="end"
-            fontSize={9.5}
+            fontSize={font}
             fill={C.muted}
           >
             {format(tv)}
@@ -136,32 +207,35 @@ export function DotTimeline({
         x={W - PAD.r}
         y={y(med) - 4}
         textAnchor="end"
-        fontSize={9.5}
+        fontSize={font}
         fill={C.muted}
       >
         {medianLabel} {format(med)}
       </text>
 
-      {points.map((p, i) => (
-        <circle
-          key={i}
-          cx={x(new Date(p.at).getTime())}
-          cy={y(p.value)}
-          r={4.5}
-          fill={C.brand}
-          stroke="#ffffff"
-          strokeWidth={2}
-        >
-          <title>
-            {`${p.name} — ${format(p.value)} · ${DATE_FMT.format(new Date(p.at))}`}
-          </title>
-        </circle>
-      ))}
+      {points.map((p, i) => {
+        const cx = x(new Date(p.at).getTime());
+        const cy = y(p.value);
+        const dot = (
+          <circle cx={cx} cy={cy} r={r} fill={C.brand} stroke="#ffffff" strokeWidth={2}>
+            <title>{dotWords(p, format)}</title>
+          </circle>
+        );
+        return p.id ? (
+          <a key={i} href={`/deals/${encodeURIComponent(p.id)}`} aria-label={dotWords(p, format)}>
+            {/* the hit area a finger can find, drawn clear */}
+            <circle cx={cx} cy={cy} r={hit} fill="transparent" />
+            {dot}
+          </a>
+        ) : (
+          <g key={i}>{dot}</g>
+        );
+      })}
 
-      <text x={PAD.l} y={H - 8} fontSize={9.5} fill={C.muted}>
+      <text x={PAD.l} y={H - 8} fontSize={font} fill={C.muted}>
         {MONTH_FMT.format(new Date(t0))}
       </text>
-      <text x={W - PAD.r} y={H - 8} textAnchor="end" fontSize={9.5} fill={C.muted}>
+      <text x={W - PAD.r} y={H - 8} textAnchor="end" fontSize={font} fill={C.muted}>
         {MONTH_FMT.format(new Date(t1))}
       </text>
     </svg>
