@@ -274,7 +274,8 @@ describe("ReportDocument (full report)", () => {
   });
 
   it("prints the demo report's pages, and its debt sentence says what its model runs (research pass 35)", async () => {
-    // The demo report route's own chain (app/api/demo/report).
+    // The demo report route's chain on a hand-built sample row (the route's
+    // own row, with its address and is_sample, is lib/sample-cover's).
     const deal = {
       name: SAMPLE_DEAL.name,
       asset_class: SAMPLE_DEAL.asset_class,

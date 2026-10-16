@@ -993,10 +993,11 @@ function CallInFullPage({
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
-  /** the sample deal, where the row cannot say so (the public demo builds
-   *  its row by hand): its stress test is the first-draft model's run, and
-   *  the challenger page's heading says so (lib/stress-test-title). A row
-   *  marked `is_sample` says it too. */
+  /** the sample deal, where the caller's row does not carry `is_sample`
+   *  (a hand-built test row; the public demo's row, lib/sample-cover
+   *  `sampleDocumentRow`, carries it): its stress test is the first-draft
+   *  model's run, and the challenger page's heading says so
+   *  (lib/stress-test-title). A row marked `is_sample` says it too. */
   sample?: boolean;
   /** the sensitivity page's data (Feature 5): both grids, the buyer-hurdle
    *  color scale, the takeaway, and the max bid; null when the deal has no

@@ -1,7 +1,8 @@
 // Render smoke test for the redesigned IC memo: react-pdf style mistakes
 // (an unsupported prop, a bad style shape) only surface at RENDER time, not
 // compile time — so this test renders the real sample memo to real PDF
-// bytes, exactly the way the public /api/demo/memo route does. If the memo
+// bytes from a hand-built sample row (the public /api/demo/memo route's own
+// row is lib/sample-cover `sampleDocumentRow`, tested there). If the memo
 // design breaks, this fails in CI instead of at a user's download click.
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import React from "react";
