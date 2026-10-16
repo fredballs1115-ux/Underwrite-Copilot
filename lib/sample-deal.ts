@@ -20,6 +20,8 @@ import type {
   T12Summary,
 } from "@/lib/actuals/types";
 import type { BuyBox } from "@/lib/criteria";
+import type { AskEntry, DealNote } from "@/lib/deals";
+import { normalizeTaskTitle } from "@/lib/deal-tasks";
 
 /** The hypothetical mandate the PUBLIC sample is judged against — the
  *  homepage's chip, /demo's buy-box tab, and the public memo and full
@@ -601,6 +603,114 @@ const t12Summary: T12Summary = {
   noi: 3_706_500,
   noiDerived: false,
 };
+
+// ---- The sample's lower half: Ask, tasks and a note ------------------------
+// A new reader opened the sample onto a row of empty states — no tasks, no
+// questions, nothing logged (signed-in gaps, H7) — so the panels a deal
+// grows into never showed. These are seeded beside the row, and every word
+// of them is read off the fixture above: each Ask answer quotes the
+// fictional memorandum's own facts and cites only the pages those facts
+// carry (inside its `totalPages`), each figure it works out is worked out
+// here from them, and each answer says it is the sample memorandum's. None
+// carries a person: no asker, no author id, no creator — they are the
+// sample's, and lib/sample-deal.test.ts holds them to all of it.
+
+/** Who the seeded note is by: the sample, never a person. */
+export const SAMPLE_AUTHOR = "Sample deal";
+
+/** One of the memorandum's stated facts, by its label: its value and page. */
+function memoFact(label: string): { value: string; page: string } {
+  const m = extraction.metrics.find((x) => x.label === label);
+  if (!m?.page) throw new Error(`sample fixture: no "${label}" with a page`);
+  return { value: m.value, page: m.page };
+}
+
+/** The first number in a fact's value ("$2,400/mo" → 2400, "5.45%" → 5.45). */
+function numberOf(value: string): number {
+  const m = value.replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+  if (!m) throw new Error(`sample fixture: no figure in "${value}"`);
+  return Number(m[0]);
+}
+
+/** The sample's three questions of its fictional memorandum, each answered
+ *  from the facts it states and citing the pages it states them on. */
+function sampleAsk(at: string): AskEntry[] {
+  const exit = memoFact("Exit cap");
+  const entry = memoFact("Going-in cap");
+  const tighterBps = Math.round((numberOf(entry.value) - numberOf(exit.value)) * 100);
+
+  const inPlace = memoFact("Avg in-place rent");
+  const proForma = memoFact("Pro forma rent");
+  const growth = memoFact("Rent growth");
+  const premium = numberOf(proForma.value) - numberOf(inPlace.value);
+  const premiumPct = ((premium / numberOf(inPlace.value)) * 100).toFixed(1);
+
+  const price = memoFact("Asking price");
+  const units = memoFact("Units");
+  const perUnit = compactUsd(numberOf(price.value) / numberOf(units.value));
+  const compPage = comps.saleComps[0].page ?? "";
+  const compWords = comps.saleComps.map((c) => {
+    const [basis, cap, when] = c.detail.split(" · ");
+    return `${c.name.split(" — ")[0]} at ${basis} and a ${cap} (${when})`;
+  });
+
+  return [
+    {
+      at,
+      q: "What exit cap does the memorandum sell at, against the cap it buys at?",
+      answer:
+        `The sample's fictional memorandum sells at a ${exit.value} exit cap (${exit.page}) and buys at a ` +
+        `${entry.value} going-in cap (${entry.page}): it sells ${tighterBps} bps tighter than it buys, ` +
+        "and states no reason for the compression.",
+      cites: [
+        { page: exit.page, note: "Exit cap" },
+        { page: entry.page, note: "Going-in cap" },
+      ],
+    },
+    {
+      at,
+      q: "How far above the in-place rents are the pro forma rents?",
+      answer:
+        `The sample's fictional memorandum states an average in-place rent of ${inPlace.value} and a pro forma ` +
+        `rent of ${proForma.value} (${proForma.page}): a $${premium.toLocaleString("en-US")} premium a month, ` +
+        `${premiumPct}% over in-place. It then grows rents ${growth.value} (${growth.page}).`,
+      cites: [
+        { page: proForma.page, note: "In-place and pro forma rents" },
+        { page: growth.page, note: "Rent growth" },
+      ],
+    },
+    {
+      at,
+      q: "Which sale comps does the memorandum cite, and what is the ask a unit?",
+      answer:
+        `The sample's fictional memorandum cites three sale comps (${compPage}): ${compWords[0]}, ${compWords[1]}, ` +
+        `and ${compWords[2]}. Its ${price.value} ask for ${units.value} units (${price.page}) is ${perUnit} a unit.`,
+      cites: [
+        { page: compPage, note: "Sale comps" },
+        { page: price.page, note: "Asking price and units" },
+      ],
+    },
+  ];
+}
+
+/**
+ * What the sample deal's lower half is seeded with when the reader adds it
+ * (deals/actions `createSampleDeal`), stamped at `at`, the moment it is
+ * added: the three Ask answers, the verdict's next steps as tasks (marked
+ * from the verdict, created by no one, assigned to no one) and one note in
+ * the decision log, by the sample.
+ */
+export function sampleWork(at: string): {
+  qa: AskEntry[];
+  notes: DealNote[];
+  tasks: { title: string; source: "verdict" }[];
+} {
+  return {
+    qa: sampleAsk(at),
+    notes: [{ at, by: SAMPLE_AUTHOR, text: `Held at Caution. ${verdict.reason}` }],
+    tasks: verdict.nextSteps.map((s) => ({ title: normalizeTaskTitle(s), source: "verdict" as const })),
+  };
+}
 
 /** The full seed payload for a sample deal row. */
 export const SAMPLE_DEAL = {

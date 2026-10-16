@@ -34,7 +34,7 @@ import {
   parseStageHistory,
   type Stage,
 } from "@/lib/stages";
-import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { SAMPLE_DEAL, sampleWork } from "@/lib/sample-deal";
 import { OM_REPLACED, parseDealNotes, parseDealQa } from "@/lib/deals";
 import { omFingerprint } from "@/lib/om-fingerprint";
 import {
@@ -610,6 +610,7 @@ export async function createSampleDeal() {
       // pre-0011 schema — carry on
     }
     await seedSampleActuals(existing.id as string);
+    await seedSampleWork(existing.id as string);
     redirect(`/deals/${existing.id}`);
   }
 
@@ -649,6 +650,7 @@ export async function createSampleDeal() {
   }
 
   await seedSampleActuals(deal.id as string);
+  await seedSampleWork(deal.id as string);
 
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);
@@ -695,6 +697,51 @@ async function seedSampleActuals(dealId: string): Promise<void> {
     }
   } catch {
     // sample still works OM-only
+  }
+}
+
+/**
+ * The sample's lower half (signed-in gaps, H7): three Ask answers from its
+ * fictional memorandum, the verdict's next steps as tasks and one note in
+ * the decision log (lib/sample-deal `sampleWork`), so the panels a deal
+ * grows into are not a row of empty states on the deal a new reader learns
+ * the product on. Each is the sample's, never a person's: the answers name
+ * no asker, the note is by the sample with no author id, and the tasks were
+ * created by no one and are assigned to no one — so they are written with
+ * the service role (a task's insert policy asks for the writer as its
+ * creator). Once only: the sample cannot be asked (it has no PDF), so an Ask
+ * thread on it is this seed's, and a sample that has one is left alone —
+ * a task or a note the reader removed is never put back. The notes and the
+ * tasks are each added only where the deal has none. Best-effort, like the
+ * actuals: a failed read writes nothing and the next open tries again.
+ */
+async function seedSampleWork(dealId: string): Promise<void> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const [row, tasks] = await Promise.all([
+      admin.from("deals").select("qa, notes, is_sample").eq("id", dealId).maybeSingle(),
+      admin.from("deal_tasks").select("id", { count: "exact", head: true }).eq("deal_id", dealId),
+    ]);
+    const deal = row.data as { qa?: unknown; notes?: unknown; is_sample?: boolean } | null;
+    if (row.error || tasks.error || !deal?.is_sample) return;
+    if (Array.isArray(deal.qa) && deal.qa.length > 0) return;
+    const work = sampleWork(new Date().toISOString());
+    // The tasks first, the thread last: the thread is what says the seed
+    // ran, so a write that fails before it leaves the next open to try.
+    if ((tasks.count ?? 0) === 0) {
+      const { error } = await admin.from("deal_tasks").insert(
+        work.tasks.map((t) => ({ deal_id: dealId, title: t.title, source: t.source, created_by: null })),
+      );
+      if (error) return;
+    }
+    const notes = parseDealNotes(deal.notes);
+    await admin
+      .from("deals")
+      .update({ qa: work.qa, ...(notes.length === 0 ? { notes: work.notes } : {}) })
+      .eq("id", dealId)
+      .eq("is_sample", true);
+  } catch {
+    // the sample still opens; its panels show their empty states
   }
 }
 
