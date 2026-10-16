@@ -1,9 +1,16 @@
 import "server-only";
 // The sample deal's two public documents — /api/demo/memo and
-// /api/demo/report — draw their cover from here, so the two print one
-// picture. The full report had printed no cover at all while the memo beside
-// it printed the aerial (home-demo-gap M7), and the signed-in sample's report
-// opens on its picture, as every report's first page is its memo.
+// /api/demo/report — draw their cover, their deal row and their buy-box
+// checks from here, so the two cannot disagree with each other or with the
+// documents a signed-in reader downloads for the sample. The full report had
+// printed no cover at all while the memo beside it printed the aerial
+// (home-demo-gap M7): the signed-in sample's report opens on its picture.
+import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import type { DealRow } from "@/lib/deals";
+import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { StructuredAddress } from "@/lib/address";
 import { COVER_SIZE, coverFrom } from "@/lib/memo/cover-aerial";
 import type { MemoCover } from "@/lib/memo/memo-document";
 import { fetchAerialImage } from "@/lib/imagery";
@@ -48,4 +55,49 @@ export function sampleCover(day: string): Promise<MemoCover | null> {
 /** Test tooling: forget the held cover. */
 export function forgetSampleCover(): void {
   held = null;
+}
+
+/**
+ * The sample's row as the signed-in sample's documents read it: the columns
+ * the "Try a sample deal" action seeds (app/(app)/deals/actions.ts), the
+ * neighbourhood address and `is_sample` included — the memo and the report
+ * read the address as stored on the sample and the stress-test heading off
+ * the flag. No first signal: the seeded row has none. Built by hand only
+ * because the public documents have no row to read.
+ */
+export function sampleDocumentRow(): DealRow {
+  return {
+    name: SAMPLE_DEAL.name,
+    asset_class: SAMPLE_DEAL.asset_class,
+    is_sample: true,
+    address: SAMPLE_DEAL.address,
+    extraction: SAMPLE_DEAL.extraction,
+    challenges: SAMPLE_DEAL.challenges,
+    comps: SAMPLE_DEAL.comps,
+    market: SAMPLE_DEAL.market,
+    reconciliation: SAMPLE_DEAL.reconciliation,
+    verdict: SAMPLE_DEAL.verdict,
+    first_signal: null,
+    prior_screen: null,
+  } as unknown as DealRow;
+}
+
+/**
+ * The sample against the demo mandate, judged on the source the deal page,
+ * the signed-in memo and report and the homepage's chip all judge
+ * (lib/buy-box-chip `dealCheckSource`: the extraction with the first signal
+ * and the structured address folded in). The mandate is the public demo's
+ * (`SAMPLE_DEMO_BOX`), where a signed-in reader's documents judge the
+ * reader's own box — a deliberate difference: a visitor has none.
+ */
+export function sampleDocumentChecks(): BuyBoxCheck[] {
+  return evaluateBuyBox(
+    SAMPLE_DEAL.asset_class,
+    dealCheckSource(
+      SAMPLE_DEAL.extraction as ExtractionResult,
+      null,
+      SAMPLE_DEAL.address as unknown as StructuredAddress,
+    ),
+    SAMPLE_DEMO_BOX,
+  );
 }

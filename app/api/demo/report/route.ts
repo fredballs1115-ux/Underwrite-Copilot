@@ -1,82 +1,171 @@
 import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
+import type { MemoCover, MemoData } from "@/lib/memo/memo-document";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { evaluateBuyBox } from "@/lib/criteria";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { buildSensitivityData } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { bidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
-import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { sampleCover } from "@/lib/sample-cover";
+import type { StructuredAddress } from "@/lib/address";
+import type { FloodMapView } from "@/lib/site-flags/core";
+import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
+import { modelReturnsRead } from "@/lib/compare-interest";
+import { countyOf, placeDeal } from "@/lib/market-county";
+import { todayReads } from "@/lib/model-vs-market-read";
+import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { assumableView, readAssumable } from "@/lib/assumable-debt";
+import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
+import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
+import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
+import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
+import { readerDateLong, readerToday } from "@/lib/reader-day";
+import { sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
 
 // Same once-per-day render cache as the sample memo route: public route,
-// pure fixture, and the full report is ~7 pages of @react-pdf work — cache
+// pure fixture, and the full report is many pages of @react-pdf work — cache
 // the promise so concurrent first hits share one render, clear on failure.
-let cachedRender: { dateStr: string; pdf: Promise<Buffer> } | null = null;
+let cachedRender: { day: string; pdf: Promise<Buffer> } | null = null;
 
-function getSampleReport(dateStr: string): Promise<Buffer> {
-  if (cachedRender && cachedRender.dateStr === dateStr) return cachedRender.pdf;
+/**
+ * The full report the signed-in route (app/api/deals/[id]/report) builds for
+ * the sample, call for call: the same row, the same model reads off the same
+ * derivation, the same arguments to `buildReportData` in the same order (a
+ * test holds the two argument lists equal). What a visitor's copy cannot
+ * have, and why, is said where each is set below.
+ */
+async function renderSampleReport(dateStr: string, readerDay: string): Promise<Buffer> {
+  const deal = sampleDocumentRow();
+  const extraction = SAMPLE_DEAL.extraction as ExtractionResult;
+  const address = SAMPLE_DEAL.address as unknown as StructuredAddress;
+  // Its noon, the day every dated reader of the model reads on.
+  const readerNoon = new Date(`${readerDay}T12:00:00Z`);
 
-  const deal = {
-    name: SAMPLE_DEAL.name,
-    asset_class: SAMPLE_DEAL.asset_class,
-    extraction: SAMPLE_DEAL.extraction,
-    challenges: SAMPLE_DEAL.challenges,
-    comps: SAMPLE_DEAL.comps,
-    market: SAMPLE_DEAL.market,
-    reconciliation: SAMPLE_DEAL.reconciliation,
-    verdict: SAMPLE_DEAL.verdict,
-    prior_screen: null,
-  } as unknown as DealRow;
+  // The demo mandate, where a signed-in reader's report judges the reader's
+  // own box: a visitor has none (lib/sample-cover `sampleDocumentChecks`).
+  const buyBoxChecks = sampleDocumentChecks();
+  const hurdlePct = SAMPLE_DEMO_BOX.minIrrPct ?? null;
+  const floors = bidFloors(SAMPLE_DEMO_BOX);
 
-  const checks = evaluateBuyBox(
-    SAMPLE_DEAL.asset_class,
-    {
-      assetClass: SAMPLE_DEAL.extraction.assetClass,
-      market: SAMPLE_DEAL.extraction.market,
-      metrics: SAMPLE_DEAL.extraction.metrics,
-    },
-    SAMPLE_DEMO_BOX,
+  // The rent rules, read as the signed-in route reads them — the sample's
+  // stored address, on the day the report is dated. The sample's row stores
+  // no site flags here: those are a lookup made on the signed-in deal's
+  // first view, and a public document makes none.
+  const regulationRead = regulationForDeal(
+    { extraction, address, siteFlags: null, assetClass: SAMPLE_DEAL.asset_class },
+    readerDay,
   );
+  let regulation: { line: string; read: string } | null = regulationRead
+    ? { line: regulationShortLine(regulationRead), read: "" }
+    : null;
 
   // The real report route's derivation chain, actuals included — the same
   // derivation the demo page and the demo workbook run (lib/sample-derive),
-  // so the report's grids, max bid and hurdle verdict are the page's:
-  // extraction + rent roll + T-12 → model inputs → both heat grids, graded
-  // against the demo mandate's IRR target.
+  // so the report's grids, max bid and hurdle verdict are the page's. The
+  // sample is never seeded from today's rates (lib/model-market), so the
+  // signed-in derivation is this one too.
   const derived = sampleDerivedInputs();
   // The max bid on the demo mandate's floors, as the demo page's
-  // playground solves it — the two print one bid.
-  const sensitivity = buildSensitivityData(
-    derived.inputs,
-    SAMPLE_DEMO_BOX.minIrrPct ?? null,
-    { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) },
-  );
+  // playground solves it — the two print one bid — with every gate the
+  // signed-in route passes.
+  const sensitivity = buildSensitivityData(derived.inputs, hurdlePct, {
+    sources: derived.sources,
+    floors,
+    termRead: termReadFor(extraction),
+    occupancyPct: derived.meta.occupancyPct ?? null,
+    interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs)),
+    findings: assessPlausibility(extraction, inferStrategy(extraction, null)),
+  });
   // Null for the stabilized sample — the plan page only exists on a deal
   // with a plan — but the same call the real route makes.
-  const plan = buildPlanReport(SAMPLE_DEAL.extraction as ExtractionResult, {
-    pct: derived.inputs.exitCapPct,
-    provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
-  });
+  const plan = buildPlanReport(
+    extraction,
+    {
+      pct: derived.inputs.exitCapPct,
+      provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
+    },
+    null,
+  );
+  // Each read the signed-in route makes off the model — none of them
+  // reaches the stabilized fee-simple sample today, every one of them would
+  // print here as it prints there.
+  const assumableRead = readAssumable(extraction, derived.inputs, readerNoon);
+  const assumable = assumableRead
+    ? assumableView(assumableRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed)
+    : null;
+  const sellerRead = readSellerFinancing(extraction, derived.inputs);
+  const sellerNote = sellerRead
+    ? sellerFinancingView(sellerRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed)
+    : null;
+  const leaseholdRead = readLeaseholdExit(extraction, derived.inputs, readerNoon);
+  const leasehold = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
+  const singleTenant = derived.meta.singleTenant ?? null;
+  const hotel = derived.meta.hotel ?? null;
+  const roster = derived.meta.roster ?? null;
+  const valueAdd = derived.meta.valueAdd ?? null;
+  const taxAbatement = derived.meta.taxAbatement ?? null;
+  const siteReports = derived.meta.siteReports ?? null;
+  const student = derived.meta.student ?? null;
+  const mh = derived.meta.mh ?? null;
+  const storage = derived.meta.storage ?? null;
+  const forward = derived.meta.forward ?? null;
+  const mixedUse = derived.meta.mixedUse ?? null;
+  const goingConcern = derived.meta.goingConcern ?? null;
+  const condo = derived.meta.condo ?? null;
+  const sandwich = derived.meta.sandwich ?? null;
+  regulation = derived.meta.regulation ?? regulation;
+  const sale = derived.meta.sale
+    ? { line: derived.meta.sale.line, read: saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT, readerNoon) }
+    : null;
 
-  const render = async () => {
-    // Its first page is the memo, cover and all, as the signed-in sample's
-    // report opens on its picture: the aerial the sample memo prints, through
-    // the one bounded, validated helper (lib/sample-cover).
-    const cover = await sampleCover(new Date().toISOString().slice(0, 10));
-    // The sample: its stress test is the first-draft model's run, which the
-    // challenger page's heading says (lib/stress-test-title).
-    const input = {
-      ...buildReportData(deal, dateStr, checks, sensitivity, undefined, plan, undefined, cover),
-      sample: true,
-    };
-    return renderReportPdf(input);
-  };
+  // The model's assumptions against the published figures, read today for
+  // the market the sample sits in — the signed-in sample's report prints
+  // this block, so the visitor's does too. Its own try, as there: a failed
+  // live read leaves the grids in place and the block out.
+  let assumptions: ModelVsMarket | null = null;
+  try {
+    const metro = placeDeal(address, countyOf(address, null)).live;
+    assumptions = modelVsMarketFor({
+      derived,
+      extraction,
+      firstSignal: null,
+      storedAssetClass: SAMPLE_DEAL.asset_class,
+      metro,
+      reads: await todayReads(metro),
+      regulation: regulationRead,
+    });
+  } catch (err) {
+    console.warn("sample report assumptions read failed:", err instanceof Error ? err.message : err);
+    assumptions = null;
+  }
+
+  // What a visitor's copy has none of, by design: no firm's branding (a
+  // visitor has no account to brand it), no dismissed submarket checks (the
+  // reader's own rows), and no flood page or photographs page — the sample
+  // has no street address to draw FEMA's map at (lib/sample-deal: never one)
+  // and no photographs, so the signed-in sample's report has neither page.
+  const branding: MemoData["branding"] = null;
+  const overrides: string[] | null = null;
+  const floodMap: FloodMapView | null = null;
+  const photos: MemoCover[] | null = null;
+  // Its first page is the memo, cover and all, as the signed-in sample's
+  // report opens on its picture: the aerial the sample memo prints, through
+  // the one bounded, validated helper (lib/sample-cover).
+  const cover = await sampleCover(readerDay);
+
+  const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay);
+  // The sample: its stress test is the first-draft model's run, which the
+  // challenger page's heading says (lib/stress-test-title) — the row's
+  // `is_sample` says so too.
+  return renderReportPdf({ ...input, sample: true });
+}
+
+function getSampleReport(dateStr: string, readerDay: string): Promise<Buffer> {
+  if (cachedRender && cachedRender.day === readerDay) return cachedRender.pdf;
   const next = {
-    dateStr,
-    pdf: render().catch((err) => {
+    day: readerDay,
+    pdf: renderSampleReport(dateStr, readerDay).catch((err) => {
       if (cachedRender === next) cachedRender = null;
       throw err;
     }),
@@ -93,19 +182,19 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
  * data rendered by the same document code the product ships.
  */
 export async function GET() {
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // Dated as the signed-in route dates a reader whose browser has not told
+  // it a time zone (lib/reader-day), the day its dated lines read on too.
+  const now = new Date();
+  const dateStr = readerDateLong(null, now);
+  const readerDay = readerToday(null, now);
 
   try {
-    const buffer = await getSampleReport(dateStr);
+    const buffer = await getSampleReport(dateStr, readerDay);
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="sample-full-report.pdf"',
-        // Fixture-only output — safe to cache at the edge for a day.
+        // Sample-only output — safe to cache at the edge for a day.
         "Cache-Control": "public, max-age=86400",
       },
     });
