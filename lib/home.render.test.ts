@@ -3,6 +3,8 @@
 // which renderToStaticMarkup cannot wait for, so this renders through
 // React's static prerender; the database that part reads is stubbed, so
 // the test never reaches for a network.
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
@@ -152,6 +154,39 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(terms.length).toBeGreaterThan(0);
     expect(values.length).toBe(terms.length);
     for (const t of terms) expect(strip.split(t).length - 1, t).toBe(1);
+  }, 60_000);
+});
+
+// The homepage and /demo against the signed-in product, M10: "Also in the
+// box" left out most of what the product does, and its tasks tile opened
+// /demo, which shows no tasks.
+describe("the homepage's toolkit says what the product has", () => {
+  it("names each kind of deal as its panel on the deal page names it", async () => {
+    const html = await renderHome();
+    const at = html.indexOf('aria-label="The deal types the screen reads"');
+    expect(at).toBeGreaterThan(-1);
+    const kinds = [...html.slice(at, html.indexOf("</ul>", at)).matchAll(/<li[^>]*>([^<]+)<\/li>/g)].map((m) => m[1].replace(/&#x27;/g, "'"));
+    expect(kinds.length).toBeGreaterThan(10);
+    const panels = readdirSync(join(__dirname, "..", "app"))
+      .filter((f) => f.endsWith("-panel.tsx"))
+      .map((f) => readFileSync(join(__dirname, "..", "app", f), "utf8"))
+      .filter((src) => src.includes("<PanelHead"));
+    for (const k of kinds) {
+      // The heading itself, or the words a panel hands its heading.
+      expect(panels.some((src) => src.includes(`<PanelHead title="${k}"`) || src.includes(`"${k}"`)), k).toBe(true);
+    }
+  }, 60_000);
+
+  it("links a tile only to a page that shows it working", async () => {
+    const html = await renderHome();
+    const at = html.indexOf('class="feature-grid');
+    const grid = html.slice(at, html.indexOf("</ul>", at));
+    const tasks = grid.split("<li").find((li) => li.includes("assigned tasks"));
+    expect(tasks).toBeTruthy();
+    expect(tasks).not.toContain("href=");
+    for (const label of ["Ask this deal", "flood map", "Compare deals", "Share the screen", "LOI", "pipeline meeting"]) {
+      expect(grid, label).toContain(label);
+    }
   }, 60_000);
 });
 

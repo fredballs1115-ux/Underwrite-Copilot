@@ -166,9 +166,13 @@ const RECONCILE_ICON = (
   </Icon>
 );
 
-// Everything else the product does, as an icon and a few words. Each tile
-// opens the surface that shows it working.
-const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
+// Everything else the product does, as an icon and a few words. A tile
+// opens the public surface that shows it working where there is one (the
+// sample screen, the stress bench, the market pages); one that works only
+// on a deal of your own is a tile with no link, never a link to a page
+// that does not show it (the tasks tile had opened /demo, which shows no
+// tasks).
+const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   {
     label: "OM + rent roll + T-12, one model",
     href: "/demo",
@@ -221,16 +225,6 @@ const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Verdict → assigned tasks",
-    href: "/demo",
-    icon: (
-      <Icon>
-        <path d="M10 6h11M10 12h11M10 18h11" />
-        <path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
-      </Icon>
-    ),
-  },
-  {
     label: "Rent control, checked at the address",
     href: "/market",
     icon: (
@@ -250,6 +244,118 @@ const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
       </Icon>
     ),
   },
+  {
+    label: "Ask this deal, answered with the page",
+    icon: (
+      <Icon>
+        <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
+        <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5h.01" />
+      </Icon>
+    ),
+  },
+  {
+    label: "FEMA's flood map over the building",
+    icon: (
+      <Icon>
+        <path d="M2 15c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5" />
+        <path d="M2 19.5c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5" />
+        <path d="m5 10 7-6 7 6M7 9v3M17 9v3" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Your pipeline as photo cards, a list or a map",
+    icon: (
+      <Icon>
+        <rect x="3" y="3" width="8" height="8" rx="1.5" />
+        <rect x="13" y="3" width="8" height="8" rx="1.5" />
+        <rect x="3" y="13" width="8" height="8" rx="1.5" />
+        <path d="M17 21s3-2.7 3-5a3 3 0 0 0-6 0c0 2.3 3 5 3 5z" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Compare deals side by side",
+    icon: (
+      <Icon>
+        <rect x="3" y="4" width="7" height="16" rx="1.5" />
+        <rect x="14" y="4" width="7" height="16" rx="1.5" />
+        <path d="M5.5 9h2M16.5 9h2M5.5 13h2M16.5 13h2" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Share the screen by link, never your files",
+    icon: (
+      <Icon>
+        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+      </Icon>
+    ),
+  },
+  {
+    label: "An LOI drafted from the screen",
+    icon: (
+      <Icon>
+        <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+        <path d="M14 3v6h6" />
+        <path d="m9 16 1.5-3.5L16 7l1.5 1.5L12 14z" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Two BOVs, the gap taken apart",
+    icon: (
+      <Icon>
+        <path d="M12 3v18M5 8l7-5 7 5" />
+        <path d="M3 12h6l-3 6-3-6zM15 12h6l-3 6-3-6z" />
+      </Icon>
+    ),
+  },
+  {
+    label: "The pipeline meeting's workbook",
+    icon: (
+      <Icon>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 9h18M9 3v18" />
+        <path d="M12 13h5M12 17h3" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Verdict → assigned tasks",
+    icon: (
+      <Icon>
+        <path d="M10 6h11M10 12h11M10 18h11" />
+        <path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
+      </Icon>
+    ),
+  },
+];
+
+// Every kind of deal the screen reads for what it is: each the heading its
+// panel on the deal page wears (app/*-panel.tsx `PanelHead`, held to the
+// panels' sources by lib/home.render.test.ts), so the row names nothing the
+// product does not draw.
+const DEAL_KINDS: string[] = [
+  "What is being sold",
+  "Rent regulation",
+  "Affordable housing",
+  "Single tenant",
+  "Tenants",
+  "Hotel",
+  "How it is sold",
+  "Value-add program",
+  "Tax abatement",
+  "Third-party reports",
+  "Student housing",
+  "Manufactured housing",
+  "Self-storage",
+  "Mixed-use",
+  "Operating business",
+  "Condominium",
+  "Sandwich position",
+  "Forward purchase",
 ];
 
 const STATS: { value: number; suffix: string; label: string }[] = [
@@ -1066,20 +1172,42 @@ export default function Home() {
             </Reveal>
             <Reveal delay={80}>
               <ul className="feature-grid mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {FEATURES.map((f) => (
-                  <li key={f.label}>
-                    <Link
-                      href={f.href}
-                      className="hover-lift flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-brand/30"
-                    >
+                {FEATURES.map((f) => {
+                  const face = (
+                    <>
                       <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
                         {f.icon}
                       </span>
                       <span className="text-sm font-medium leading-snug">{f.label}</span>
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  );
+                  const tile = "flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface p-4 shadow-card";
+                  return (
+                    <li key={f.label}>
+                      {f.href ? (
+                        <Link href={f.href} className={`hover-lift ${tile} transition-colors hover:border-brand/30`}>
+                          {face}
+                        </Link>
+                      ) : (
+                        <div className={tile}>{face}</div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
+              {/* The deal-type readers, each named as its panel is. */}
+              <div className="mt-6">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
+                  Every kind of deal, read for what it is
+                </p>
+                <ul aria-label="The deal types the screen reads" className="mt-3 flex flex-wrap gap-1.5">
+                  {DEAL_KINDS.map((k) => (
+                    <li key={k} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-medium">
+                      {k}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </Reveal>
           </div>
         </section>
