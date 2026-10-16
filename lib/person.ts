@@ -67,7 +67,10 @@ export function personInitials(nameOrEmail: string | null | undefined): string {
   const email = looksLikeEmail(raw);
   const text = email ? emailLocalPart(raw) : raw.replace(/\s*[,(].*$/, "");
   const words = text
-    .split(email ? /[^\p{L}]+/u : /[\s._\-–—/]+/u)
+    // A name breaks where an email's local part does, an apostrophe aside
+    // ("O'Brien" is one word), so "jordan.lee" shown as a name and
+    // "jordan.lee@firm.com" wear the same initials.
+    .split(email ? /[^\p{L}]+/u : /[\s._\-–—/\d+]+/u)
     .map((w) => w.replace(/[^\p{L}]/gu, ""))
     .filter(Boolean);
   if (!words.length) {

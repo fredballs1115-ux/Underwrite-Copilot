@@ -15,6 +15,7 @@ import {
 import { getBilling } from "@/lib/billing";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
+import { PersonBadge } from "../person-badge";
 
 export const metadata: Metadata = { title: "Team" };
 
@@ -227,9 +228,7 @@ export default async function TeamPage({
                   className="flex items-center justify-between gap-3 py-2.5"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-semibold uppercase text-brand">
-                      {memberLabel(m).charAt(0)}
-                    </span>
+                    <PersonBadge name={memberLabel(m)} id={m.userId} size="md" decorative />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
                         {memberLabel(m)}

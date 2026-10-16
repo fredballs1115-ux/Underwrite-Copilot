@@ -21,6 +21,7 @@ import {
   importDdChecklist,
 } from "./task-actions";
 import { unaddedChecklist } from "@/lib/dd-checklist";
+import { PersonBadge } from "../../person-badge";
 
 function AddButton() {
   const { pending } = useFormStatus();
@@ -241,7 +242,12 @@ export function DealTasks({
                     {t.title}
                   </p>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-                    {who && <span className="truncate">{who}</span>}
+                    {who && (
+                      <span className="inline-flex min-w-0 items-center gap-1.5">
+                        <PersonBadge name={who} id={t.assigneeUserId} size="xs" decorative />
+                        <span className="truncate">{who}</span>
+                      </span>
+                    )}
                     {who && t.dueDate && <span aria-hidden>·</span>}
                     {t.dueDate && (
                       <span

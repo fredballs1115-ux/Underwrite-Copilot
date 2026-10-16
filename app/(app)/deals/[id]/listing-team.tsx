@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { initialsOf, type ListingBroker, type OffersDueRead } from "@/lib/offering";
+import type { ListingBroker, OffersDueRead } from "@/lib/offering";
+import { PersonBadge } from "../../person-badge";
 
 /** A clock time and the zone written after it — "5:00 PM ET", "3 p.m.
  *  Eastern Time", "17:00 CET", "12:00 noon (EST)" — read only where the
@@ -69,9 +70,7 @@ export function ListingTeam({
         <ul className="mt-2 grid gap-3 sm:grid-cols-2" data-qa="listing-brokers">
           {team.map((b) => (
             <li key={b.name} className="flex min-w-0 items-start gap-2.5">
-              <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand/10 text-xs font-semibold text-brand">
-                {initialsOf(b.name)}
-              </span>
+              <PersonBadge name={b.name} size="md" decorative />
               <span className="min-w-0">
                 <span className="block text-sm font-semibold leading-tight">{b.name}</span>
                 {(b.title || b.firm) && (

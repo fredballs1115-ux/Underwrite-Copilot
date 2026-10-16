@@ -9,6 +9,8 @@ import { DataNotices } from "@/app/data-notices";
 import { ToastProvider } from "./toaster";
 import { CommandPalette } from "./command-palette";
 import type { MarketNavEntry } from "@/lib/market-match";
+import { personName } from "@/lib/person";
+import { PersonBadge } from "./person-badge";
 
 function NavIcon({
   className,
@@ -115,10 +117,17 @@ const IconNews = (p: { className?: string }) => (
 /** The signed-in app chrome: a dark navy sidebar on desktop, a top bar on mobile. */
 export function AppShell({
   userEmail,
+  userId = null,
+  userName = null,
   markets = [],
   children,
 }: {
   userEmail: string;
+  /** what the reader's badge tone is keyed on, as on every other surface */
+  userId?: string | null;
+  /** the name the reader set on the account page (lib/person `viewerName`),
+   *  else their email's local part */
+  userName?: string | null;
   /** slim covered-market list for the ⌘K palette (built server-side) */
   markets?: MarketNavEntry[];
   children: ReactNode;
@@ -141,6 +150,9 @@ export function AppShell({
   // scrolls away (#437), so the footer below the page clears it too.
   const onDealPage = /^\/deals\/[^/]+$/.test(pathname) && pathname !== "/deals/compare";
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // The reader as every teammate sees them: their name, else the email's
+  // local part (lib/person), never the address as a name.
+  const shownName = (userName ?? "").trim() || personName(null, userEmail, "You");
 
   return (
     <ToastProvider>
@@ -234,17 +246,18 @@ export function AppShell({
           >
             What&apos;s new
           </Link>
-          <div className="flex items-center gap-2.5 px-2">
-            <span
-              aria-hidden
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold uppercase text-accent ring-1 ring-white/15"
-            >
-              {userEmail.charAt(0)}
+          <Link
+            href="/account"
+            className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10"
+          >
+            <PersonBadge name={shownName} id={userId} size="md" decorative className="ring-1 ring-white/20" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium text-white/90">{shownName}</span>
+              <span title={userEmail} className="block truncate text-xs text-white/60">
+                {userEmail}
+              </span>
             </span>
-            <p title={userEmail} className="min-w-0 truncate text-xs text-white/60">
-              {userEmail}
-            </p>
-          </div>
+          </Link>
           <form action={signOut} className="mt-2">
             <button
               type="submit"

@@ -1068,7 +1068,8 @@ export default async function DealPage({
   // Teammate emails read under the "teammates read profiles" policy (0007).
   const taskAssignees: TaskAssignee[] = [];
   // Who asked each of Ask's questions on a team deal, named the way the
-  // pipeline names who added a deal (`full_name`, else the email) — from
+  // pipeline names who added a deal (`full_name`, else the email's local
+  // part, lib/person) — from
   // the same profile rows, so it costs no query of its own. Null on a
   // personal deal, whose thread names no one.
   const askerNames: Record<string, string> | null = ownership.team_id ? {} : null;
@@ -1079,6 +1080,9 @@ export default async function DealPage({
       userId: user.id,
       label: `${viewerName(user, "You")} (you)`,
     });
+    // The reader by name too, for the badge on their own questions; the
+    // words still say "you" (AskPanel reads `me` first).
+    if (askerNames) askerNames[user.id] = viewerName(user);
     if (ownership.team_id) {
       const otherIds = ((memberRes.data ?? []) as { user_id: string }[])
         .map((m) => m.user_id)

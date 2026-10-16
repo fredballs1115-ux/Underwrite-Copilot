@@ -39,8 +39,9 @@ import {
   callTitle,
   compactPrice,
   fmtDate,
-  initials,
 } from "./deal-card-parts";
+import { PersonBadge } from "../person-badge";
+import { displayName } from "@/lib/person";
 import type { DealCard } from "./pipeline";
 
 /** Drawn at the picture widths a mask names — one digit a tier of
@@ -500,11 +501,9 @@ export const DealTile = memo(function DealTile({
               <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
             )}
             {d.addedBy ? (
-              <span className="inline-flex items-center" title={`Added by ${d.addedBy}`}>
-                <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 text-[9px] font-semibold text-brand">
-                  {initials(d.addedBy)}
-                </span>
-                <span className="sr-only">added by {d.addedBy}</span>
+              <span className="inline-flex items-center" title={`Added by ${displayName(d.addedBy)}`}>
+                <PersonBadge name={d.addedBy} size="xs" decorative />
+                <span className="sr-only">added by {displayName(d.addedBy)}</span>
               </span>
             ) : null}
             <span className="ml-auto">{stageControl?.(d)}</span>

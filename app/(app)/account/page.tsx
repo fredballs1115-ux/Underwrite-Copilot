@@ -15,6 +15,7 @@ import { analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
 import { deletionStopNotice, doneFromQuery } from "@/lib/account-deletion";
 import { FULL_NAME_MAX, personName } from "@/lib/person";
 import { PendingButton } from "../pending-button";
+import { PersonBadge } from "../person-badge";
 import { saveFullName } from "./actions";
 
 export const metadata: Metadata = { title: "Account" };
@@ -129,12 +130,17 @@ export default async function AccountPage({
       {/* Profile */}
       <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              Signed in as
-            </p>
-            <p className="mt-1 font-medium">{user?.email ?? "—"}</p>
-            {allowance?.line && <p className="mt-1 text-xs text-muted">{allowance.line}</p>}
+          <div className="flex min-w-0 items-center gap-3">
+            {/* The badge every teammate sees beside the reader's work. */}
+            {user && <PersonBadge name={fullName ?? user.email} id={user.id} size="md" decorative />}
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Signed in as
+              </p>
+              {fullName && <p className="mt-1 truncate font-medium">{fullName}</p>}
+              <p className={`truncate ${fullName ? "text-sm text-muted" : "mt-1 font-medium"}`}>{user?.email ?? "—"}</p>
+              {allowance?.line && <p className="mt-1 text-xs text-muted">{allowance.line}</p>}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span

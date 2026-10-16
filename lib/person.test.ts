@@ -40,6 +40,13 @@ describe("a person's initials", () => {
     expect(personInitials("Madonna")).toBe("M");
     expect(personInitials("Émile Zola")).toBe("ÉZ");
     expect(personInitials("  Ana  Lima (Acquisitions) ")).toBe("AL");
+    expect(personInitials("Conan O'Brien")).toBe("CO");
+  });
+
+  it("wears the same initials for an email and its local part shown as a name", () => {
+    for (const email of ["fredballs1115@gmail.com", "jordan.lee@firm.com", "j2smith@x.com", "jordan_lee-smith@x.com"]) {
+      expect(personInitials(displayName(email)), email).toBe(personInitials(email));
+    }
   });
 
   it("is the pipeline's row and card badge's own rule", () => {

@@ -6,6 +6,7 @@ import { STAGE_LABEL, type StageChange } from "@/lib/stages";
 import { outcomeWords } from "@/lib/deal-outcome";
 import { addDealNote, deleteDealNote } from "../actions";
 import { displayName } from "@/lib/person";
+import { PersonBadge } from "../../person-badge";
 
 // Module-level cached formatter (creating one per render is measurable).
 // UTC-pinned, date-only: the server and the browser must render the SAME
@@ -117,12 +118,21 @@ export function DecisionLog({
         <ol className="mt-4 space-y-3">
           {entries.map((e, i) => (
             <li key={`${e.at}-${i}`} className="flex gap-3">
-              <span
-                aria-hidden
-                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                  e.kind === "note" ? "bg-brand" : "border border-brand/50 bg-surface"
-                }`}
-              />
+              {/* A note wears its author's badge; a stage move, which no
+                  one is recorded as making, keeps the timeline's hollow
+                  dot, centred in the badge's column so the words align. */}
+              {e.kind === "note" ? (
+                <PersonBadge
+                  name={(e.note.byId && names?.[e.note.byId]) || e.note.by}
+                  id={e.note.byId || e.note.by}
+                  size="sm"
+                  decorative
+                />
+              ) : (
+                <span aria-hidden className="flex w-6 shrink-0 justify-center pt-1.5">
+                  <span className="h-2 w-2 rounded-full border border-brand/50 bg-surface" />
+                </span>
+              )}
               <div className="min-w-0 flex-1">
                 {e.kind === "note" ? (
                   <>
