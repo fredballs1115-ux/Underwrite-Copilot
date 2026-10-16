@@ -100,6 +100,7 @@ vi.mock("@/lib/supabase/server", () => {
 
 import { moveDeal } from "@/app/(app)/deals/actions";
 import {
+  filedPersonalNotice,
   isMoveRefusal,
   MOVE_ITEM,
   movedLanding,
@@ -339,7 +340,10 @@ describe("the words (lib/personal-deal)", () => {
   it("says the team's cap in plain words", () => {
     const n = moveNotice({ refused: "moveteamlimit" }, caps);
     expect(n.tone).toBe("caution");
-    expect(n.text).toMatch(/^Your team’s free plan holds 3 deals/);
+    // the words filedPersonalNotice uses for the same allowance (audit C7, L3)
+    expect(n.text).toMatch(/^The team’s 3 trial deals are in use/);
+    expect(n.text).not.toMatch(/free plan/);
+    expect(filedPersonalNotice(3)).toMatch(/the team.s 3 trial deals/);
     expect(moveNotice({ refused: "movelimit" }, caps).text).toMatch(/^Your free plan holds 3 deals of your own/);
   });
   it("names the team where it is known, and says what a move changes", () => {

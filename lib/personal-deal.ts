@@ -252,7 +252,7 @@ export function moveNotice(
     case "moveteamlimit":
       return {
         tone: "caution",
-        text: `Your team’s free plan holds ${caps.trialDeals} deals, and they are in use — this deal stays in your own pipeline. Once the team’s owner starts the Team plan, it can be shared.`,
+        text: `The team’s ${caps.trialDeals} trial deals are in use, and it has no Team plan — this deal stays in your own pipeline. Once the team’s owner starts the Team plan, it can be shared.`,
       };
     case "movelimit":
       return {
