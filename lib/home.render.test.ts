@@ -166,6 +166,12 @@ describe("the homepage's buy box is the deal header's read", () => {
     expect(fit.label).toContain(`of ${total} checked`);
     for (const c of fit.criteria) expect(html).toContain(`<span class="text-ink">${c.label}</span>`);
     expect(html.match(/<span class="text-ink">/g)).toHaveLength(total);
+    // L6 (2026-10-16): it claimed the box checks "return targets", the two
+    // criteria the sample's chip says could not be checked. It says the
+    // chip's own sentence now.
+    expect(fit.note).toMatch(/could not be checked/);
+    expect(html).toContain(`>${fit.note!.replace(/'/g, "&#x27;")}</p>`);
+    expect(html).not.toContain("return targets");
   });
 
   it("the page's card of criteria draws the same five", async () => {

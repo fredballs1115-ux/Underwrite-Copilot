@@ -370,19 +370,19 @@ export function DemoPanel({
                 {fit.label}
               </span>
             </div>
+            {/* What the box judged, never more: on the sample the target
+                return and cash-on-cash cannot be checked, and the count on
+                the chip says so (lib/fit-label). */}
             <p className="mt-1.5 text-xs leading-relaxed text-muted">
-              Your saved criteria, checked in code on every screen — cap floor,
-              return targets, geographies, hard dealbreakers.
+              Your criteria, checked in code — as many as the documents let it judge.
             </p>
           </div>
           {/* The sample deal's own checks against its demo buy box
               (lib/sample-deal SAMPLE_DEMO_BOX), every one the count counts. */}
           <CriteriaChips criteria={fit.criteria} />
-          <p className="text-[10px] leading-relaxed text-muted">
-            A deal can be well-underwritten and still be outside the box — it
-            says so, from the first signal onward, and the verdict judges the
-            fit out loud.
-          </p>
+          {/* The chip's own sentence (lib/fit-label `checkedSentence`), the
+              one its tooltip and the verdict's brief say. */}
+          {fit.note && <p className="text-[10px] leading-relaxed text-muted">{fit.note}</p>}
         </div>
       );
     case "Analyses":
