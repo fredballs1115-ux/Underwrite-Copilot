@@ -262,7 +262,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     const at = html.indexOf("One-page IC memo");
     expect(at).toBeGreaterThan(-1);
     const tile = words(html.slice(at, html.indexOf("/api/demo/memo", at)));
-    const memo = sampleMemoData("October 16, 2026");
+    const memo = sampleMemoData();
     expect(tile).toContain(memo.name);
     expect(tile).toContain(`${memo.verdictWord} ${memo.verdictSub}`);
     expect(memo.verdictWord).toBe(sampleHeader().pill!.label);

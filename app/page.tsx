@@ -648,11 +648,9 @@ export default function Home() {
   const legal = legalToday();
   // The sample's header, read on the render's day (the page is ISR).
   const header = sampleHeader();
-  // The sample memo's own data, as its download draws it (the date is the
-  // download's, which names the day it is printed).
-  const memo = sampleMemoData(
-    new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-  );
+  // The sample memo's own data, as its download draws it, on the render's
+  // day (the download names the day it is printed).
+  const memo = sampleMemoData();
   return (
     <div className="flex flex-1 flex-col">
       <script

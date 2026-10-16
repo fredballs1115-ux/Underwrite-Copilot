@@ -174,6 +174,16 @@ describe("the sample's public documents are the signed-in sample's", () => {
     expect(JSON.stringify(captured.memo)).toContain(readerDateLong(null, new Date()));
   });
 
+  it("the homepage's memo tile is built from the download's own inputs, cover aside (audit C7, L4)", async () => {
+    fetchAerialImage.mockImplementation(async () => png(TINY_PNG));
+    await downloadBoth();
+    const { sampleMemoData } = await import("@/lib/sample-memo");
+    const preview = sampleMemoData(new Date());
+    expect(captured.memo).not.toBeNull();
+    expect({ ...preview, cover: null }).toEqual({ ...captured.memo!, cover: null });
+    expect(preview.cover ?? null).toBeNull();
+  });
+
   it("prints the model's read against today's published figures for the sample's market, as the signed-in report does", async () => {
     fetchAerialImage.mockImplementation(async () => null);
     const reads = { rates: [], zori: null, realtor: null, national: [], now: new Date() };
