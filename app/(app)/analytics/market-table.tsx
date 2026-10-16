@@ -6,13 +6,15 @@ import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
 import { pctText } from "@/lib/plan-facts";
 import { GalleryCreditText } from "@/app/photo-credit";
 import { CityPhoto } from "@/app/city-photo";
+import { marketPageWord } from "@/app/market/market-lead";
 
 /**
  * The analytics page's "By market" table: the markets grouped as /market's
  * memory groups them (lib/analytics `marketRows`), each row wearing a small
  * picture of its market where the label names one the site has a page for
  * (`metroForName`, the reader /market's cards use — nothing guessed), its
- * name linked to the market's brief, and one credit line under the table
+ * name linked to the market's page (its brief, or its figures where the site
+ * reads the metro area without one), and one credit line under the table
  * naming every photographer shown, as the submarket cards' does.
  *
  * Pure: the page groups the deals and hands the rows in, so the render test
@@ -68,7 +70,7 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
                           href={marketPath(place.id)}
                           className="block truncate text-[11px] text-brand hover:underline"
                         >
-                          {`${place.name} brief`}
+                          {`${place.name} ${marketPageWord(place.id)}`}
                         </Link>
                       ) : null}
                     </span>

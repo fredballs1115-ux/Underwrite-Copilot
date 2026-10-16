@@ -11,6 +11,7 @@ import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
 import { marketPath } from "@/lib/public-pages";
 import { GalleryCreditText } from "@/app/photo-credit";
 import { CityPhoto } from "@/app/city-photo";
+import { marketPageWord } from "@/app/market/market-lead";
 
 const CALL_META: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "text-pass" },
@@ -25,7 +26,7 @@ const CALL_META: Record<string, { label: string; cls: string }> = {
  * submarket cards use: the site's own name for a market, or a city with its
  * state — nothing guessed). The strip wears the market's name, since the
  * picture is the metro's and not the deal's submarket, and links to the
- * market's brief. One credit line under the grid names every photographer
+ * market's page (its brief, or its figures where it has none). One credit line under the grid names every photographer
  * shown, as the submarket cards' does (`galleryCredit`).
  *
  * Pure: the page reads the memory and hands the groups in, so the render
@@ -86,7 +87,9 @@ function MarketCard({ g, market }: { g: MarketGroup; market: { id: string; name:
             className="h-full w-full object-cover object-[50%_42%] transition-transform duration-300 motion-safe:group-hover:scale-[1.03]"
           />
           <span className="absolute bottom-1.5 left-2 rounded bg-black/60 px-1.5 py-px text-[10px] font-medium text-white">
-            <span className="sr-only">Open the market brief: </span>
+            <span className="sr-only">
+              {marketPageWord(market.id) === "brief" ? "Open the market brief: " : "Open the market page: "}
+            </span>
             {market.name}
           </span>
         </Link>

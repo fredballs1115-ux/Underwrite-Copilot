@@ -165,3 +165,69 @@ describe("DotTimeline — readable at 390px, and every dot opens its deal (no ho
     expect(html).not.toContain('data-qa="timeline-list"');
   });
 });
+
+// ── A metro area read without a brief promises no brief (audit C9, M2) ──────
+import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
+import { marketLeadLine, marketPageWord } from "@/app/market/market-lead";
+import { dataMetroForAddress, isDataMetro, metroForAddress, metroForName } from "@/lib/market-match";
+
+describe("a metro area the site reads without a brief is never called a brief", () => {
+  const pitt = metroForName("Pittsburgh PA")!;
+
+  it("Pittsburgh is one of them, by name and by address", () => {
+    expect(pitt.id).toBe("pittsburgh");
+    expect(isDataMetro(pitt.id)).toBe(true);
+    expect(marketPageWord(pitt.id)).toBe("figures");
+    expect(marketPageWord("richmond")).toBe("brief");
+    // The comps page and the research panel draw the "Covered market … Open
+    // the market brief" card off `metroForAddress`, which answers for the
+    // briefed markets alone.
+    const addr = { city: "Pittsburgh", state: "PA" };
+    expect(metroForAddress(addr)).toBeNull();
+    expect(dataMetroForAddress(addr)?.id).toBe("pittsburgh");
+  });
+
+  it("the memory card's strip opens the market page, not a brief", () => {
+    const html = render(
+      React.createElement(MarketMemoryCards, { groups: [group({ market: "Pittsburgh PA", marketKey: "pittsburgh pa" })] }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(html).toContain('href="/market?metro=pittsburgh"');
+    expect(html).toContain("Open the market page: ");
+    expect(html).not.toContain("market brief");
+  });
+
+  it("the analytics table links the metro's figures, not its brief", () => {
+    const html = render(
+      React.createElement(MarketTable, { rows: marketRows(deriveAnalytics([analyticsRow("5", "Pittsburgh PA")])), planNote: false }),
+    );
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Pittsburgh PA figures");
+    expect(text).not.toContain("brief");
+  });
+
+  it("the market page's lead line says what the page opens on", () => {
+    expect(marketLeadLine(true)).toContain("brief first");
+    expect(marketLeadLine(false)).toBe("The market’s published figures first; your own market data follows it.");
+  });
+
+  it("the research panel draws no covered-market card for a Pittsburgh address", () => {
+    const address = {
+      label: "100 Smithfield St, Pittsburgh, PA 15222",
+      street: "100 Smithfield St",
+      city: "Pittsburgh",
+      state: "PA",
+      zip: "15222",
+      county: "",
+      submarket: "",
+    };
+    const html = render(React.createElement(ResearchPanelView, { address, rules: [], benchmarks: [] }));
+    expect(html).not.toContain('data-picture="covered-market"');
+    expect(visibleText(html)).toContain("Pittsburgh PA is read, not briefed");
+    // A briefed market's address still gets its card.
+    const richmond = { ...address, label: "1 Main St, Richmond, VA", city: "Richmond", state: "VA", zip: "23219" };
+    const briefed = render(React.createElement(ResearchPanelView, { address: richmond, rules: [], benchmarks: [] }));
+    expect(briefed).toContain('data-picture="covered-market"');
+  });
+});

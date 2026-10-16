@@ -59,6 +59,7 @@ import { SourceRef } from "./source-ref";
 import { ExampleListings } from "./example-listings";
 import { examplesFor } from "@/lib/example-listings";
 import { FmrRow } from "./fmr-row";
+import { marketLeadLine } from "./market-lead";
 
 /** "By asset type" — the metro's sector fundamentals from the research
  *  layer's snapshot blocks: vacancy (a spread when trackers diverge — the
@@ -284,7 +285,7 @@ export default async function MarketDataPage({
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{marketHeading(pageMetro)}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            The market&apos;s brief first; your own market data follows it.
+            {marketLeadLine(pageMetro.briefed)}
           </p>
         </div>
       ) : user ? (
