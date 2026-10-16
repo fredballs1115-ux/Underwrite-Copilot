@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { OverviewView, TermsView } from "../(app)/deals/[id]/deal-sections";
+// The deal page's parts from the modules that carry no server action and
+// no comps map (deal-sections.tsx and deal-view.tsx carry both); /demo draws
+// no map. lib/home-bundle.test.ts holds this page to it.
+import { OverviewView } from "../(app)/deals/[id]/deal-sections-base";
+import { TermsView } from "../(app)/deals/[id]/deal-sections-view";
 import { PropertyActuals, type ActualsData } from "../(app)/deals/[id]/property-actuals";
-import { BuyBoxPanel, type BuyBoxPanelData } from "../(app)/deals/[id]/deal-view";
+import { BuyBoxPanel, type BuyBoxPanelData } from "../(app)/deals/[id]/buy-box-panel";
 import { SensitivityPlayground, type PlaygroundData } from "../(app)/deals/[id]/sensitivity-playground";
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import { ModelVsMarketCard } from "../(app)/deals/[id]/model-vs-market-card";

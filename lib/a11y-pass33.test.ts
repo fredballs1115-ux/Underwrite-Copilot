@@ -80,7 +80,7 @@ describe("a wide table a keyboard can scroll (research pass 33, item 18)", () =>
   // The containers the pass flagged (axe's scrollable-region-focusable), each
   // named for its table — and no other overflow container changed.
   const FLAGGED: [string, string[]][] = [
-    ["app/(app)/deals/[id]/model-view.tsx", ["Return sensitivity grid", "Assumptions", "Operating cash flow"]],
+    ["app/(app)/deals/[id]/model-panels.tsx", ["Return sensitivity grid", "Assumptions", "Operating cash flow"]],
     ["app/(app)/deals/[id]/rent-roll/dashboard.tsx", ["Rollover schedule"]],
     ["app/(app)/deals/[id]/valuations/valuations-view.tsx", ["Valuations compared", "Value gap by driver"]],
     ["app/(app)/deals/[id]/bridge/bridge-view.tsx", ["IRR change by assumption"]],

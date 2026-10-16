@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+// The card's views from the modules that hold no server action (model-view
+// itself carries the card's document and generate forms).
+import { ReturnsHeadline } from "../(app)/deals/[id]/returns-headline";
 import {
-  ReturnsHeadline,
   StressPanel,
   Sensitivity,
   Assumptions,
   Conflicts,
   CashFlow,
   CapexPanel,
-} from "../(app)/deals/[id]/model-view";
+} from "../(app)/deals/[id]/model-panels";
 import type { UnderwritingModel } from "@/lib/model/types";
 
 const SLIDE_MS = 7000;

@@ -98,10 +98,47 @@ describe("the homepage's walkthrough", () => {
   });
 
   it("is a walk that would find them: the deal page's modules reach both", () => {
+    expect(reach("app/(app)/deals/[id]/deal-view.tsx").serverActions.size).toBeGreaterThan(0);
     const page = reach("app/(app)/deals/[id]/deal-sections.tsx");
     expect([...page.serverActions].length).toBeGreaterThan(0);
     expect(page.files.has("app/(app)/deals/[id]/comps-map.tsx")).toBe(true);
     expect(page.packages.has("leaflet/dist/leaflet.css")).toBe(true);
     expect(reach("app/(app)/deals/[id]/model-view.tsx").serverActions.size).toBeGreaterThan(0);
+  });
+});
+
+// /demo draws the deal page's own parts on the sample (app/demo/sections.tsx:
+// the Overview, the terms, the debt sizer, the model card's views, the buy
+// box) and, past them, the walkthrough's panel. It had read them from
+// deal-sections.tsx, deal-view.tsx and model-view.tsx, which brought it the
+// comps map's Leaflet stylesheet and seven server-action modules, though it
+// draws no map and acts on nothing (work package AK, 2026-10-16). It reads
+// them from the modules that carry neither; this holds it there. The page is
+// a server component, so the walk from it reaches the server-only readers
+// too: none of them may reach a server action or Leaflet either.
+describe("/demo", () => {
+  const page = reach("app/demo/page.tsx");
+  const sections = reach("app/demo/sections.tsx");
+
+  it("draws the deal page's own parts, from the modules with no action and no map", () => {
+    for (const f of [
+      "app/(app)/deals/[id]/deal-sections-base.tsx",
+      "app/(app)/deals/[id]/deal-sections-view.tsx",
+      "app/(app)/deals/[id]/buy-box-panel.tsx",
+      "app/(app)/deals/[id]/model-panels.tsx",
+      "app/(app)/deals/[id]/returns-headline.tsx",
+    ]) {
+      expect(sections.files.has(f), f).toBe(true);
+    }
+  });
+
+  it("loads no server action, no comps map and no Leaflet", () => {
+    for (const graph of [page, sections]) {
+      expect([...graph.serverActions]).toEqual([]);
+      expect(
+        [...graph.files].filter((f) => /comps-map|deal-sections\.tsx$|deal-view\.tsx$|model-view\.tsx$/.test(f)),
+      ).toEqual([]);
+      expect([...graph.packages].filter((p) => /leaflet|\.css$/.test(p))).toEqual([]);
+    }
   });
 });
