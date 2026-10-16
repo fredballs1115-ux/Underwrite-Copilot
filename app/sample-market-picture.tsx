@@ -5,6 +5,20 @@ import type { CreditPart } from "@/lib/credit-parts";
 import { DEAL_AERIAL_VIEW } from "@/lib/image-frames";
 import { CreditPartsText } from "@/app/credit-parts";
 import { MarketCaption } from "@/app/(app)/deals/market-caption";
+import { skylineSrcSetOf } from "@/lib/skyline-srcset";
+
+/**
+ * The page band's own `sizes` (PlaceBackdrop with no boxes: the window's
+ * width). Offered the band's srcset at the band's sizes, the header's
+ * picture takes the very file the band behind it takes, so the homepage
+ * downloads Philadelphia once (audit C7, L14). Never soft: the header's
+ * picture is never wider than the window, and its frame (16:9, or 21:9) is
+ * wider than the photograph it draws, so the photograph covers it by its
+ * width — the band's file, at least the window's width in device pixels,
+ * is at least the frame's (lib/home.render.test.ts holds the
+ * sample's photograph to that shape).
+ */
+const BAND_SIZES = "100vw";
 
 /** The deal header's picture frame (property-visual's `FRAME`): 16:9 on a
  *  phone, a wider band where the header stacks at a tablet's width, and
@@ -58,6 +72,8 @@ export function SampleMarketPicture({
           <img
             ref={img}
             src={src}
+            srcSet={skylineSrcSetOf(src) ?? undefined}
+            sizes={skylineSrcSetOf(src) ? BAND_SIZES : undefined}
             alt={alt}
             width={DEAL_AERIAL_VIEW.w}
             height={DEAL_AERIAL_VIEW.h}

@@ -34,6 +34,7 @@ import {
   type CreditPart,
   type GalleryAuthor,
 } from "./credit-parts";
+import { SKYLINE_SRCSET } from "./skyline-srcset";
 
 /** One market's photograph, with everything its licence obliges us to show. */
 export interface SkylineShot {
@@ -2952,17 +2953,9 @@ export function skylineTag(id: string): string {
   return (h >>> 0).toString(36);
 }
 
-/**
- * The widths a skyline is offered at where a surface says how wide its slot
- * draws (#446), so the browser takes the smallest file that covers the slot
- * on its own screen: a dense screen gets the pixels it draws, a plain one
- * does not pay for them. A tile asked for at one fixed 480px was stretched
- * twice over on every phone and every laptop with a dense screen. 1600 is
- * the width the deploy probe measures every file at; 2400 (#451) is for a
- * page's full-width band on a dense laptop screen, 2,880 device pixels
- * across at 1440, which 1400 had stretched twice over.
- */
-export const SKYLINE_SRCSET = [480, 960, 1600, 2400] as const;
+// The widths a skyline is offered at live in lib/skyline-srcset (no
+// imports), so a client component can offer them without this table.
+export { SKYLINE_SRCSET } from "./skyline-srcset";
 
 /**
  * Every width the skyline route serves (the security review of 2026-09-30):

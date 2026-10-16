@@ -24,7 +24,8 @@ import { sampleHeader } from "./sample-header";
 import { sampleMemoData } from "./sample-memo";
 import { SAMPLE_DOWNLOAD_NOTE, SampleHeroTools } from "@/app/sample-hero";
 import { compRating, inCompOrder } from "./comp-rating";
-import { SKYLINES, commonsPage } from "./skyline";
+import { SKYLINES, commonsPage, coverWidth, skylineSrcSet } from "./skyline";
+import { skylineSrcSetOf } from "./skyline-srcset";
 import { METRO_VIEWS } from "./metro-imagery";
 import { sampleDealCard } from "./pipeline-card";
 
@@ -504,5 +505,41 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
       expect(a11yIssues(html), sub).toEqual([]);
       expect(gluedWords(visibleText(html)), sub).toEqual([]);
     }
+  });
+});
+
+// Audit C7, L14: the hero band drew Philadelphia through its srcset and the
+// sample's header picture in it at a fixed ?w=1600, two URLs wherever the
+// band took another width (a dense laptop, a 2x phone), so the first screen
+// downloaded the photograph twice. The header's picture is offered the
+// band's own srcset at the band's own sizes now, so the browser takes one
+// file for both.
+describe("the hero's photograph is downloaded once", () => {
+  const attr = (tag: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`, "i").exec(tag)?.[1] ?? null;
+
+  it("offers the header's picture the band's srcset at the band's sizes", async () => {
+    const html = await renderHome();
+    const imgs = (html.match(/<img\b[^>]*>/g) ?? []).filter((t) => t.includes("/api/imagery/skyline/philadelphia"));
+    const band = imgs.find((t) => attr(t, "srcSet") && !t.includes("No photograph of the building yet"));
+    const header = imgs.find((t) => t.includes("No photograph of the building yet") && !t.includes('loading="lazy"'));
+    expect(band, "the band").toBeTruthy();
+    expect(header, "the header's picture").toBeTruthy();
+    expect(attr(header!, "srcSet")).toBe(attr(band!, "srcSet"));
+    expect(attr(header!, "sizes")).toBe(attr(band!, "sizes"));
+    expect(attr(band!, "srcSet")!.replace(/&amp;/g, "&")).toBe(skylineSrcSet("philadelphia"));
+  }, 60_000);
+
+  it("is never soft: the header's frame is wider than the photograph, so the band's file covers it by width", () => {
+    // The frame is 16:9 at its squarest; a photograph no wider than that
+    // covers it by its width, so a file the window's width (the band's
+    // sizes) is at least the frame's, which is never wider than the window.
+    for (const w of [390, 768, 1280]) expect(coverWidth(SKYLINES.philadelphia, (w * 9) / 16)!).toBeLessThanOrEqual(w);
+  });
+
+  it("reads a skyline route's srcset off its URL, and nothing off another URL", () => {
+    const tag = skylineSrcSet("philadelphia").match(/v=([^ ]+) /)![1];
+    expect(skylineSrcSetOf(`/api/imagery/skyline/philadelphia?w=1600&v=${tag}`)).toBe(skylineSrcSet("philadelphia"));
+    expect(skylineSrcSetOf("/api/deals/abc/picture?size=card")).toBeNull();
+    expect(skylineSrcSetOf("https://example.com/api/imagery/skyline/philadelphia?w=1600&v=x")).toBeNull();
   });
 });
