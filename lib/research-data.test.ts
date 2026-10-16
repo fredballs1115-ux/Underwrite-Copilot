@@ -319,23 +319,22 @@ describe("HUD's fair market rents — the year in the data, the newest year only
   });
 
   // Research pass 43, L7: the /demo card's "verified vs statute" and its
-  // statute link were typed, so the card would never go stale beside the
-  // rules panel that marks the same rule. It reads the rule from the file.
-  it("the demo's § 9-811 card reads its rule's status, date and source from the file, and ages by the research rule", () => {
-    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
+  // statute link were typed. /demo now draws the deal page's research panel
+  // on the sample, its rules and rows the files' (app/demo/demo-data), so
+  // nothing about a rule, its date or its source is typed on the page.
+  it("the demo reads its rules and its fair market rents from the files, never a rule, a figure or a year typed", () => {
     const rule = seedRules().find((r) => r.id === "pa-philadelphia-eviction-diversion");
     expect(rule).toBeTruthy();
-    expect(demo).toContain('seedRules().find((r) => r.id === "pa-philadelphia-eviction-diversion")');
-    expect(demo).toContain("staleMark(researchAge(evictionRule.as_of, today))");
-    expect(demo).toContain("href={evictionRule.source}");
-    expect(demo).not.toContain(`href="${rule!.source}"`);
-  });
-
-  it("the demo prints Philadelphia's from the file, never a figure or a year typed", () => {
-    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
-    expect(demo).toContain('metroFmr("philadelphia")');
-    expect(demo).not.toContain("$1,810");
-    expect(demo).not.toContain("$1,860");
+    for (const p of ["app/demo/page.tsx", "app/demo/demo-data.ts", "app/demo/sections.tsx"]) {
+      const demo = readFileSync(join(process.cwd(), p), "utf8");
+      expect(demo, p).not.toContain(rule!.source!);
+      expect(demo, p).not.toContain("§ 9-811");
+      expect(demo, p).not.toContain("$1,810");
+      expect(demo, p).not.toContain("$1,860");
+    }
+    const data = readFileSync(join(process.cwd(), "app/demo/demo-data.ts"), "utf8");
+    expect(data).toContain("rules: seedRules()");
+    expect(data).toContain("benchmarks: seedBenchmarks()");
   });
 });
 
@@ -361,10 +360,14 @@ describe("twoToFourMedian — a sale median with its month, from the research fi
   });
 
   it("the demo prints the figure from the file, never a figure typed with no month", () => {
-    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
-    expect(demo).toContain('twoToFourMedian("philadelphia_pa")');
-    expect(demo).not.toContain("$363,500");
-    expect(demo).not.toContain("+6.9% YoY");
+    // The research panel's row, read from the file with its month (benchRowLabel).
+    const data = readFileSync(join(process.cwd(), "app/demo/demo-data.ts"), "utf8");
+    expect(data).toContain("benchmarks: seedBenchmarks()");
+    for (const p of ["app/demo/page.tsx", "app/demo/demo-data.ts", "app/demo/sections.tsx"]) {
+      const demo = readFileSync(join(process.cwd(), p), "utf8");
+      expect(demo, p).not.toContain("$363,500");
+      expect(demo, p).not.toContain("+6.9% YoY");
+    }
   });
 
   it("Redfin's page is read out of the file's own source, and only a redfin.com address is Redfin's", () => {
@@ -381,8 +384,11 @@ describe("twoToFourMedian — a sale median with its month, from the research fi
   });
 
   it("/demo and /market credit Redfin in words and link the page the file cites (research pass 31, C4)", () => {
-    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
-    expect(demo).toMatch(/href=\{phillyMedian\.sourceHref\}[^<]{0,400}>\s*Redfin public dataset\s*<\/a>/);
+    // /demo draws the deal page's research panel, whose source link names
+    // Redfin and links the address alone (lib/source-parts).
+    const panel = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/research-panel.tsx"), "utf8");
+    expect(panel).toContain('const linkText = redfinSourceHref(source) ? "Redfin public dataset" : "source";');
+    expect(panel).toContain("const { href, words } = sourceParts(source);");
     const market = readFileSync(join(process.cwd(), "app/market/page.tsx"), "utf8");
     expect(market).toContain("redfinSourceHref(priceRows[0].price!.source)");
     expect(market).toMatch(/href=\{redfinHref\}[^<]{0,400}>\s*Redfin public dataset\s*<\/a>/);

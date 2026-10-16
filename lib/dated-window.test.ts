@@ -6,13 +6,11 @@ import metrosSeed from "@/data/research/metros.json";
 import { datedNotes, lastStatedDay, readDatedText } from "./dated-window";
 import { evaluateRules, type RegulatoryRule } from "./research";
 import { buildSubject, seedRules } from "./research-data";
-import { sampleLegal } from "./sample-legal";
 import { RuleItem } from "@/app/market/rule-item";
 import { DatedNotes } from "@/app/dated-notes";
-import { LegalPanel } from "@/app/demo/legal-panel";
 import { MarketNote } from "@/app/market/market-note";
 import { snapshotReadOn } from "./tracker-read";
-import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { a11yIssues, visibleText } from "./render-lint";
 
 const rules = rulesSeed.rules as RegulatoryRule[];
 const rule = (id: string) => rules.find((r) => r.id === id)!;
@@ -261,16 +259,6 @@ describe("every surface that prints such a text reads it", () => {
     expect(text(html)).toContain("a window that ended on Jun 30, 2027: the figure needs checking.");
     expect(text(html)).toContain(note("montgomery_county"));
     expect(a11yIssues(html)).toEqual([]);
-  });
-
-  it("the demo's legal list draws its notes under the rule's text", () => {
-    const legal = sampleLegal("2026-10-04");
-    expect(legal.rules.every((r) => r.dated.length === 0)).toBe(true);
-    const withNote = { ...legal, rules: legal.rules.map((r, i) => (i === 0 ? { ...r, dated: datedNotes(rule("md-takoma-park-rent-stabilization").effect, "2027-07-01").map((n) => n.text) } : r)) };
-    const html = renderToStaticMarkup(React.createElement(LegalPanel, { legal: withNote }));
-    expect(text(html)).toContain("a window that ended on Jun 30, 2027: the figure needs checking.");
-    expect(html).toContain('data-qa="window-ended"');
-    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("draws nothing while nothing has ended", () => {

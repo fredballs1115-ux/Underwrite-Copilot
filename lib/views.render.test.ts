@@ -1316,7 +1316,8 @@ describe("ModelView — the sample model renders every panel", () => {
         const code = src(p);
         expect(code, p).not.toContain("The Maddox at Brewerytown");
         expect(code, p).not.toMatch(/>\s*Caution\s*</);
-        if (p !== "app/demo/page.tsx") expect(code, p).not.toContain("§ 9-811");
+        expect(code, p).not.toContain("§ 9-811");
+        expect(code, p).not.toContain("Eviction Diversion Program");
       }
     });
   });
@@ -6164,100 +6165,74 @@ describe("ShareView — a hotel development is spoken in keys", () => {
   });
 });
 
-// ── The sample screen's leverage check ──────────────────────────────────────
+// ── The sample screen's research panel: the deal page's own ─────────────────
 import { renderToString } from "react-dom/server";
-import { SampleLeverageCard } from "@/app/demo/leverage-card";
-import { benchmark30 } from "@/lib/debt-index";
-import { seedBenchmarks } from "@/lib/research-data";
+import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
+import { sampleDemoData } from "@/app/demo/demo-data";
+import { NO_DEBT_SEEDS, type DebtSeeds } from "@/lib/debt-index";
+import { buyBoxLines } from "@/lib/criteria";
 
-describe("SampleLeverageCard — the sample's cap against the week's survey and the latest 10-year", () => {
+describe("/demo's research panel — the deal page's ResearchPanel on the sample, the checked-in files its rows", () => {
   // The runner's own table (lib/live-rates.fixture): the survey at 6.95%
   // on Sep 17, the 10-year at 4.94% the same day; the sample's cap is 5.45%.
-  // Built by the read itself, so the source is the one the card is handed:
-  // Freddie Mac's survey, through FRED (research pass 31, C3).
-  const bench30 = benchmark30({ id: "MORTGAGE30US", pct: 6.95, asOf: "2026-09-17", fresh: true }, null)!;
-  const tenYear = { id: "DGS10", short: "10-yr Treasury", pct: 4.94, asOf: "2026-09-17", kind: "treasury" as const };
-  const html = render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2026-09-21" }));
-  const text = visibleText(html);
+  const debt: DebtSeeds = {
+    ...NO_DEBT_SEEDS,
+    survey30: { id: "MORTGAGE30US", pct: 6.95, asOf: "2026-09-17", fresh: true },
+    tenYear: { id: "DGS10", short: "10-yr Treasury", pct: 4.94, asOf: "2026-09-17", kind: "treasury" },
+  };
+  const at = (today: string, d: DebtSeeds = debt) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${today}T12:00:00Z`));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const { research } = sampleDemoData({ today, reads: null, debt: d });
+    return render(React.createElement(ResearchPanelView, research));
+  };
 
-  it("reads the cap against the survey one-sided, dated and named as the series", () => {
+  it("draws the deal page's panel: the covered market, the leverage check against the survey and the 10-year, the rules screened", () => {
+    const html = at("2026-09-21");
+    const text = visibleText(html);
+    expect(text).toContain("Regulation & benchmarks");
+    expect(text).toContain("Covered market: Philadelphia");
     expect(text).toContain("Negative leverage: going-in cap sits 150 bps below the 30-yr fixed");
-    expect(text).toContain("going-in cap 5.45% vs");
-    // The figure is its own styled span, so the visible text splits there.
-    expect(text).toContain("6.95%");
-    expect(text).toContain("30-yr fixed (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)");
-    expect(text).toContain("negative leverage");
-    expect(text).toContain("Leverage check — computed, not opined");
-  });
-
-  it("says the cap's spread over the 10-year as a fact with its date, and no verdict", () => {
+    expect(text).toContain("going-in cap 5.45% vs 6.95% (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)");
     expect(text).toContain("Against the latest curve: the cap is 51 bps over the 10-year Treasury (4.94% on Sep 17, 2026, FRED).");
     expect(text).not.toContain("today's curve");
+    // The sample's one rule keys off an eviction filing, never the purchase:
+    // the panel says it was screened and triggered nothing, as it does
+    // signed in, rather than printing its text.
+    expect(text).toMatch(/Screened: \d+ rules? on file for Philadelphia — none triggered by this deal's facts/);
+    expect(text).toContain("fair market rent");
+    // A source with a note after its address links the address alone, the
+    // note its title, and Redfin's rows credit Redfin in words.
+    expect(html).toContain('<a href="https://www.redfin.com/news/data-center/downloads/" title="redfin_metro_market_tracker');
+    expect(text).toContain("Redfin public dataset");
+    expect(html).not.toMatch(/href="[^"]* [^"]*"/);
+    // The sample is never seeded from today's rates: no seeded leverage line.
+    expect(text).not.toContain("the latest index plus the class spread");
+    expect(a11yIssues(html), "sample research panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 
   it("the phrase the live-verify marker greps is in the markup a curl receives", () => {
-    // The marker greps p_demo.html for "the 10-year Treasury (" — inside one
-    // template literal, so React's <!-- --> separator never lands in it.
-    const served = renderToString(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2026-09-21" }));
-    expect(served).toContain("the 10-year Treasury (");
+    vi.useFakeTimers({ now: new Date("2026-09-21T12:00:00Z"), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const { research } = sampleDemoData({ today: "2026-09-21", reads: null, debt });
+    expect(renderToString(React.createElement(ResearchPanelView, research))).toContain("the 10-year Treasury (");
   });
 
-  it("the snapshot is named as the snapshot, by its publisher, and no 10-year means no second line", () => {
-    // The research layer's own row, read the way the demo reads it: the file
-    // cites Freddie Mac's release, so the card never credits the week to FRED.
-    const snapshot = benchmark30(null, seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"))!;
-    expect(snapshot).toMatchObject({ value: 6.65, asOf: "2026-08-20", live: false });
-    const fallback = visibleText(render(React.createElement(SampleLeverageCard, {
-      capPct: 5.45,
-      bench30: snapshot,
-      tenYear: null,
-      today: "2026-09-21",
-    })));
+  it("with no survey the snapshot is named as the snapshot, by its publisher, and keeps its date with its age past the research rule", () => {
+    const none = { ...NO_DEBT_SEEDS };
+    const fallback = visibleText(at("2026-09-21", none));
     expect(fallback).toContain("Negative leverage: going-in cap sits 120 bps below the 30-yr fixed");
-    expect(fallback).toContain("30-yr fixed (Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20)");
-    expect(fallback).not.toContain("FRED");
+    expect(fallback).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20)");
     expect(fallback).not.toContain("10-year");
-    // The research rule (lib/research-age): the snapshot's week is current
-    // through its 180th day, Feb 16, 2027, and from Feb 17 it keeps its date
-    // with its age and the stale mark.
-    const card = (today: string) =>
-      visibleText(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30: snapshot, tenYear: null, today })));
-    expect(card("2027-02-16")).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20)");
-    expect(card("2027-02-17")).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
-    // A live survey keeps its own cadence's word, never the research rule's.
-    expect(visibleText(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2027-06-01" })))).toContain(
-      "30-yr fixed (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)",
-    );
-  });
-
-  it("a stale survey says so beside its date, and the tone follows the spread", () => {
-    const stale = visibleText(render(React.createElement(SampleLeverageCard, {
-      capPct: 7.9,
-      bench30: benchmark30({ id: "MORTGAGE30US", pct: 6.95, asOf: "2026-09-17", fresh: false }, null)!,
-      tenYear,
-      today: "2026-09-21",
-    })));
-    expect(stale).toContain("Positive leverage at the benchmark: 95 bps above the 30-yr fixed");
-    expect(stale).toContain("(Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, stale, as of 2026-09-17)");
-    expect(stale).toContain("positive at benchmark");
-    expect(stale).toContain("296 bps over the 10-year Treasury");
-  });
-
-  it("renders nothing with no cap or no benchmark", () => {
-    expect(render(React.createElement(SampleLeverageCard, { capPct: null, bench30, tenYear, today: "2026-09-21" }))).not.toContain("Leverage check");
-    expect(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30: null, tenYear, today: "2026-09-21" }))).not.toContain("Leverage check");
-  });
-
-  it("reads clean and names everything", () => {
-    expect(a11yIssues(html), "sample leverage card").toEqual([]);
-    expect(gluedWords(text)).toEqual([]);
+    expect(visibleText(at("2027-02-17", none))).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
   });
 });
-
-// ── The sample screen's demand side: the market check's own card ──────────
-import { sampleDemoData } from "@/app/demo/demo-data";
-import { NO_DEBT_SEEDS } from "@/lib/debt-index";
-import { buyBoxLines } from "@/lib/criteria";
 
 describe("/demo's market check — the demand card in the deal page's own markup", () => {
   // Philadelphia's rows as lib/metro-demand hands them over: all payrolls

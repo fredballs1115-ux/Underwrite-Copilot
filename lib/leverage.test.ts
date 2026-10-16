@@ -25,12 +25,11 @@ describe("leverageRead against a named benchmark", () => {
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/(^|[^:])\/\/.*$/gm, "$1");
     const panel = code("app/(app)/deals/[id]/research-panel.tsx");
-    const demo = code("app/demo/leverage-card.tsx");
+    // /demo draws this same panel (ResearchPanelView) on the sample.
+    expect(code("app/demo/page.tsx")).toContain("<ResearchPanelView {...research} />");
     expect(panel).toContain("leverageRead(capPct, rateSeed.pct, SEEDED_RATE_BENCHMARK)");
-    for (const src of [panel, demo]) {
-      expect(src).toContain("`Against the latest curve: the cap is ${capSpread.label}");
-      expect(src).not.toMatch(/today(?:'|’|&apos;)s (?:curve|index|10-year|Treasury|SOFR)/);
-    }
+    expect(panel).toContain("`Against the latest curve: the cap is ${capSpread.label}");
+    expect(panel).not.toMatch(/today(?:'|’|&apos;)s (?:curve|index|10-year|Treasury|SOFR)/);
   });
 });
 

@@ -37,7 +37,7 @@ vi.mock("@/data/research/capital_markets.json", async (orig) =>
 import { seedBenchmarks } from "./research-data";
 import { asOfLabel } from "./research";
 import { benchmark30 } from "./debt-index";
-import { SampleLeverageCard } from "@/app/demo/leverage-card";
+import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
 import { visibleText } from "./render-lint";
 
 describe("a research figure with no date in its file is undated, never given one", () => {
@@ -66,8 +66,19 @@ describe("a research figure with no date in its file is undated, never given one
   it("the leverage check reads an undated snapshot as undated, not 'as of' nothing", () => {
     const pmms = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed")!;
     const bench30 = benchmark30(null, pmms)!;
-    const text = visibleText(renderToStaticMarkup(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear: null, today: "2026-09-21" })));
-    expect(text).toContain("30-yr fixed (Freddie Mac PMMS, the checked-in snapshot, undated)");
+    expect(bench30.asOf).toBe("");
+    // The research panel the deal page and /demo draw, on the files alone.
+    const text = visibleText(
+      renderToStaticMarkup(
+        React.createElement(ResearchPanelView, {
+          address: { label: "Brewerytown, Philadelphia, PA", street: "", city: "Philadelphia", state: "PA", zip: "", county: "Philadelphia County", submarket: "" },
+          capText: "5.45%",
+          rules: [],
+          benchmarks: seedBenchmarks(),
+        }),
+      ),
+    );
+    expect(text).toContain("(Freddie Mac PMMS, the checked-in snapshot, undated)");
     expect(text).not.toMatch(/as of\s*\)/);
   });
 

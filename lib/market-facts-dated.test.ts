@@ -51,12 +51,13 @@ describe("the covered markets' research facts, each figure with its own period",
     );
   });
 
-  it("/demo's Philadelphia line puts each figure's house in its words, not its title alone", () => {
-    // The page is async and not rendered here; its helper is read, and the
+  it("/demo's Philadelphia figures are the research panel's rows, each with its house in its words", () => {
+    // /demo draws the deal page's research panel on the checked-in rows
+    // (app/demo/demo-data), whose tracker rows print their citation; the
     // houses it prints are the ones the same readers give.
-    const demo = readFileSync("app/demo/page.tsx", "utf8");
-    expect(demo).toMatch(/cited: \[houseShort\(fig\?\.read \?\? \{ house: null \}\)/);
-    expect(demo).not.toMatch(/credit\("[a-z]+", "(Vacancy|Rent)"\)\.period/);
+    const demo = readFileSync("app/demo/demo-data.ts", "utf8");
+    expect(demo).toContain("benchmarks: seedBenchmarks()");
+    expect(readFileSync("app/demo/page.tsx", "utf8")).toContain("<ResearchPanelView {...research} />");
     const snap = byId("philadelphia").sector_snapshot! as Record<string, unknown>;
     const house = (sector: string, label: string) =>
       houseShort(blockCitations(snap[sector]).find((f) => f.label === label)?.read ?? { house: null });
