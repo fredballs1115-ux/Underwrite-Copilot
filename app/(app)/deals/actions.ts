@@ -58,6 +58,9 @@ const MAX_BYTES = 32 * 1024 * 1024;
 // Accepted formats for the buyer's own underwriting model (Phase 5 reconciler).
 const MODEL_EXT = /\.(xlsx|xls|csv|pdf)$/i;
 
+/** A deal's id: the database's uuid, nothing else. */
+const DEAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Everything that can go wrong creating a deal, as codes the callers map to
  *  copy: the single form redirects with ?error=, the batch panel shows inline. */
 export type CreateDealError =
@@ -819,7 +822,9 @@ export async function renameDeal(formData: FormData) {
 export async function moveDeal(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const to = String(formData.get("to") ?? "");
-  if (!dealId) redirect("/deals");
+  // A deal's id is a UUID; anything else goes nowhere near a query or the
+  // redirect built from it (audit C7, L13).
+  if (!DEAL_ID.test(dealId)) redirect("/deals");
   const back = `/deals/${dealId}`;
   if (to !== "team" && to !== "personal") redirect(back);
 

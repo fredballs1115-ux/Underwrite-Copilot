@@ -207,6 +207,25 @@ describe("moveDeal — Share with team", () => {
   });
 });
 
+describe("moveDeal — the deal's id (audit C7, L13)", () => {
+  it("refuses anything but a uuid before any read or write", async () => {
+    for (const id of ["", "not-a-uuid", "../../evil", `${DEAL}?moved=team`, `${DEAL}/x`]) {
+      const fd = new FormData();
+      fd.set("dealId", id);
+      fd.set("to", "team");
+      let to = "(no redirect)";
+      try {
+        await moveDeal(fd);
+      } catch (e) {
+        if (e instanceof Redirect) to = e.to;
+        else throw e;
+      }
+      expect(to, id).toBe("/deals");
+    }
+    expect(db.updates).toEqual([]);
+  });
+});
+
 describe("moveDeal — Make personal", () => {
   beforeEach(() => {
     db.deal = { ...db.deal, team_id: TEAM };
