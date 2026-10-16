@@ -191,11 +191,13 @@ export function actualsShortLine(read: ActualsRead | null): string {
   const st = read.t12?.summary;
   if (st) {
     const when = t12DateWords(read.t12);
-    const noi = `T-12 NOI ${actualsUsd(st.noi)}${st.noiDerived ? " (derived)" : ""} (${when})`;
+    // One bracket, the derivation and the date in it (audit C8, L3): "(derived)
+    // (period not stated)" had read as two afterthoughts.
+    const noi = `T-12 NOI ${actualsUsd(st.noi)} (${st.noiDerived ? "derived; " : ""}${when})`;
     const c = read.noiComparison;
     parts.push(
       c
-        ? `${noi}: ${OM_NOI_LABEL[c.omBasis ?? "stabilized"]} ${c.direction === "in_line" ? "in line" : `${pct1(Math.abs(c.deltaPct))} ${c.direction === "above" ? "over" : "under"}`}${c.severity === "in_line" ? "" : `, ${c.severity === "red_flag" ? "a red flag" : "material"}`}.`
+        ? `${noi}: ${c.omBasis ? OM_NOI_LABEL[c.omBasis] : "OM NOI"} ${c.direction === "in_line" ? "in line" : `${pct1(Math.abs(c.deltaPct))} ${c.direction === "above" ? "over" : "under"}`}${c.severity === "in_line" ? "" : `, ${c.severity === "red_flag" ? "a red flag" : "material"}`}.`
         : `${noi}.`,
     );
   }

@@ -61,6 +61,26 @@ describe("readActuals", () => {
     );
   });
 
+  // Audit C8, L3: the line had written "(derived) (period not stated)", and
+  // called a comparison of no stated basis the "OM pro forma NOI", where the
+  // report says "OM NOI".
+  it("puts a derived NOI and its date in one bracket, and names an OM figure of no stated basis as the report does", () => {
+    const derived = readActuals({
+      metrics: [],
+      strategy: { kind: "stabilized", label: "Stabilized" },
+      rentRoll: null,
+      t12: { periodEnd: null, summary: { ...T12, noiDerived: true } },
+    })!;
+    expect(actualsShortLine(derived)).toBe("T-12 NOI $2.40M (derived; period not stated).");
+    const dated = { ...derived, t12: { periodEnd: "2026-05-31", summary: { ...T12, noiDerived: true } } };
+    expect(actualsShortLine(dated)).toBe("T-12 NOI $2.40M (derived; TTM to May 31, 2026).");
+    const noBasis = {
+      ...dated,
+      noiComparison: { omNoi: 2_616_000, t12Noi: 2_400_000, deltaPct: 0.09, direction: "above" as const, severity: "material" as const },
+    } as unknown as Parameters<typeof actualsShortLine>[0];
+    expect(actualsShortLine(noBasis)).toBe("T-12 NOI $2.40M (derived; TTM to May 31, 2026): OM NOI 9.0% over, material.");
+  });
+
   it("on a plan deal holds the T-12 against the in-place figure, never the finished project's, and says so", () => {
     const read = readActuals({
       metrics: [{ label: "NOI (stabilized, pro forma)", value: "$4,000,000" }],
