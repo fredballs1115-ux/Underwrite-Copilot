@@ -5447,7 +5447,8 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     const pipelineMap = readSource(joinPath(process.cwd(), "app/(app)/deals/pipeline-map.tsx"), "utf8");
     expect(pipelineMap).toContain("const osmPins = osmPlacedAny(points);");
     expect(pipelineMap).toContain("if (osmPins) map.attributionControl?.addAttribution(OSM_ATTRIBUTION);");
-    expect(readSource(joinPath(process.cwd(), "app/(app)/deals/page.tsx"), "utf8")).toContain(
+    // The pipeline page builds its cards through lib/pipeline-card.
+    expect(readSource(joinPath(process.cwd(), "lib/pipeline-card.ts"), "utf8")).toContain(
       "...(cache.geoSource ? { source: cache.geoSource } : {}),",
     );
   });

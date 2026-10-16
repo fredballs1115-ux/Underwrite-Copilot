@@ -142,7 +142,8 @@ describe("the pipeline's card, list and CSV", () => {
     const src = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
     expect(src).toContain('"Status", "Screened", "Stage"');
     expect(src).toContain('d.screened?.day ?? "",');
-    const page = readFileSync("app/(app)/deals/page.tsx", "utf8");
+    // The page builds its cards through lib/pipeline-card.
+    const page = readFileSync("lib/pipeline-card.ts", "utf8");
     expect(page).toMatch(/const at = verdict\?\.verdict \? \(d\.verdict as \{ generatedAt\?: string \} \| null\)\?\.generatedAt : null;/);
   });
 });

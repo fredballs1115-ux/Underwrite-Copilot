@@ -52,7 +52,10 @@ describe("a team member's own deal, said as one", () => {
 
   it("the pipeline page marks a deal no team holds as personal only for a reader on a team", () => {
     const page = read("app/(app)/deals/page.tsx");
-    expect(page).toContain("personal: !!billing?.team && !d.team_id,");
+    // The page hands its team to the card builder (lib/pipeline-card), and
+    // the list beside it.
+    expect(page).toContain("onTeam: !!billing?.team,");
+    expect(read("lib/pipeline-card.ts")).toContain("personal: ctx.onTeam && !d.team_id,");
     expect(page).toContain("onTeam={!!billing?.team}");
   });
 

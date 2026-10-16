@@ -367,7 +367,9 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     // source, the way the compare page's class is above: it skipped
     // pickSlots until the extraction landed, and the promise above never
     // reached a card.
-    const src = readFileSync("app/(app)/deals/page.tsx", "utf8");
+    // …through lib/pipeline-card, the builder the page calls a deal at a time.
+    const src = readFileSync("lib/pipeline-card.ts", "utf8");
+    expect(readFileSync("app/(app)/deals/page.tsx", "utf8")).toMatch(/pipelineCard\(d, \{/);
     expect(src).toMatch(/slots: pickSlots\(extraction, /);
     expect(src).not.toMatch(/slots: extraction\s*\?/);
     // …and it marks a fit judged on the first signal the deal page's way.
