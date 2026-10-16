@@ -21,12 +21,18 @@ import type {
 } from "@/lib/actuals/types";
 import type { BuyBox } from "@/lib/criteria";
 
-/** The hypothetical mandate the PUBLIC sample screen judges the deal
- *  against — chosen so the fit lands WATCH beside the Caution verdict (a
- *  consistent story: in scope and the right size, but short of the return
- *  floors — the count band passes at 248 units and the cap misses its
- *  floor, 25 of 40 points, still WATCH). Logged-in users see their OWN box
- *  here instead. */
+/** The hypothetical mandate the PUBLIC sample is judged against — the
+ *  homepage's chip, /demo's buy-box tab, and the public memo and full
+ *  report (lib/sample-cover `sampleDocumentChecks`). It tells one story
+ *  beside the Caution verdict: in scope and the right size (the class
+ *  passes, and the count band at 248 units), short of the return floors.
+ *  The going-in cap misses its floor outright, so the header's chip reads
+ *  "Outside box" whatever the score (lib/fit-label `fitScoreLabel`), in
+ *  the kill tone, with the count of criteria checked beside the score —
+ *  the target return and the cash-on-cash cannot be checked from the
+ *  documents, and lib/buy-box-chip's `buyBoxRead` says so in the chip's
+ *  note. A signed-in reader's sample is judged against the reader's OWN
+ *  box instead. */
 export const SAMPLE_DEMO_BOX: BuyBox = {
   assetClasses: ["multifamily"],
   unitsMin: 100,
