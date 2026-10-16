@@ -46,6 +46,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 import { PhotoFlip, Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { DownloadRow, ModelBody } from "@/app/(app)/deals/[id]/model-body";
+import { MarketCheck } from "@/app/(app)/deals/[id]/deal-sections-view";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import { CompareTable, MODEL_ROWS_NOTE, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
@@ -6396,11 +6397,25 @@ describe("/demo's market check — the demand card in the deal page's own markup
   };
   const { data } = sampleDemoData({ today: "2026-09-21", reads: null, debt: NO_DEBT_SEEDS });
   const el = React.createElement(DemoSections, { data: { ...data, demand }, initialSection: "analyses", initialAnalysis: "market" });
-  const html = render(el);
-  const text = visibleText(html);
+  // The market check is the walkthrough's chunk, which the page asks for
+  // when the tab opens; here, landed.
+  let html = "";
+  let text = "";
+  beforeAll(async () => {
+    await loadWalkthrough();
+    html = render(el);
+    text = visibleText(html);
+  });
 
-  it("draws the payrolls by sector and the supply line under the market check, nothing singled out", () => {
+  it("draws the payrolls by sector and the supply line inside the market check, where the deal page draws it", () => {
     expect(html).toContain('data-qa="metro-demand"');
+    // The deal page's own MarketCheck with the demand handed in, markup for
+    // markup: after the check's summary, before its checks — never a copy
+    // drawn after the whole check.
+    const check = renderToStaticMarkup(React.createElement(MarketCheck, { result: data.market, demand }));
+    expect(html).toContain(check);
+    expect((html.match(/data-qa="metro-demand"/g) ?? []).length).toBe(1);
+    expect(html.indexOf("Market plausibility check")).toBeLessThan(html.indexOf('data-qa="metro-demand"'));
     expect(text).toContain("The demand side today — payrolls by sector, Philadelphia MSA");
     expect(text).toContain("Rental housing runs on all payrolls, drawn first");
     expect((html.match(/data-bar="demand"/g) ?? []).length).toBe(4);
@@ -6411,6 +6426,7 @@ describe("/demo's market check — the demand card in the deal page's own markup
 
   it("the phrases the live-verify markers grep are one string each in the served markup", () => {
     const served = renderToString(el);
+    expect(served).toContain('data-qa="metro-demand"');
     expect(served).toContain("payrolls by sector, Philadelphia MSA");
     expect(served).toContain("units in buildings of two or more, twelve months to");
   });

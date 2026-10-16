@@ -15,7 +15,6 @@ import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import { ModelVsMarketCard } from "../(app)/deals/[id]/model-vs-market-card";
 import { SampleGuide } from "../(app)/deals/[id]/sample-guide";
 import { DemoPanel, type AnalysisKey } from "../landing-interactive";
-import { DemandBars } from "@/app/demand-bars";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
@@ -282,20 +281,10 @@ export function DemoSections({
             <DemoPanel
               tab="Analyses"
               analysis={analysis}
+              demand={data.demand}
               onAnalysis={setAnalysis}
               onNavigate={navigate}
             />
-            {/* The market check's demand card in the deal page's own markup
-                (deal-sections' MetroDemandCard), which the deal page draws
-                inside the check and the walkthrough's panel does not take:
-                here it follows the check. */}
-            {analysis === "market" && data.demand && (
-              <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm" data-qa="metro-demand">
-                <p className="font-medium">{`The demand side today — payrolls by sector, ${data.demand.area}`}</p>
-                <p className="mt-0.5 text-xs text-muted">{data.demand.intro}</p>
-                <DemandBars demand={data.demand} />
-              </div>
-            )}
             {analysis === "challenger" && <BrokerQuestions />}
           </div>
         )}

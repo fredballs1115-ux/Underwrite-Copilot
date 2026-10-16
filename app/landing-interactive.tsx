@@ -16,6 +16,7 @@ import type { ModelSources } from "@/lib/underwrite/report-grid";
 import type { DealRateSeeds } from "@/lib/debt-index";
 import type { DealStrategy } from "@/lib/deal-strategy";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
+import type { MetroDemand } from "@/lib/metro-demand";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
 import {
   CardListSkeleton,
@@ -284,9 +285,13 @@ function TabDot({ done, active }: { done: boolean; active: boolean }) {
 function AnalysesView({
   analysis,
   onSelect,
+  demand = null,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
+  /** the metro area's payrolls by sector, read today, which the market
+   *  check draws where the deal page draws it; null where none was read */
+  demand?: MetroDemand | null;
 }) {
   // The sections, once their chunk has loaded (`loadWalkthrough`).
   const w = useWalkthrough();
@@ -368,7 +373,7 @@ function AnalysesView({
             noun={w.COMP_NOUN}
           />
         )}
-        {w && analysis === "market" && <w.MarketCheck result={RESULTS.market} />}
+        {w && analysis === "market" && <w.MarketCheck result={RESULTS.market} demand={demand} />}
         {w && analysis === "reconciler" && <w.Reconciliation result={RESULTS.reconciliation} />}
       </div>
     </div>
@@ -443,6 +448,7 @@ export function DemoPanel({
   tab,
   buyBox,
   financials,
+  demand = null,
   analysis = "verdict",
   onAnalysis = () => {},
   onNavigate = () => {},
@@ -455,6 +461,9 @@ export function DemoPanel({
   buyBox?: SampleBuyBoxData;
   /** the Financials tab's server reads */
   financials?: SampleFinancials;
+  /** the market check's demand card's rows, read today (/demo reads them;
+   *  the homepage reads none) */
+  demand?: MetroDemand | null;
   /** the Analyses tab's open sub-tab */
   analysis?: AnalysisKey;
   onAnalysis?: (key: AnalysisKey) => void;
@@ -471,7 +480,7 @@ export function DemoPanel({
       // said so over it (app/sample-buy-box).
       return <BuyBoxTab data={buyBox} />;
     case "Analyses":
-      return <AnalysesView analysis={analysis} onSelect={onAnalysis} />;
+      return <AnalysesView analysis={analysis} onSelect={onAnalysis} demand={demand} />;
     case "Documents":
       // What the deal page's Documents tab holds on the sample (deal-view's
       // DocumentsPanel): no memorandum was ever uploaded for it and no
