@@ -5224,7 +5224,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pipeline and any public page show the sample's real pipeline card
   (`lib/pipeline-card.ts`, `DealTilePreview`). The public memo and report are
   built the way the signed-in routes build them for the sample
-  (`lib/sample-cover.ts`: one row, one cover, the same arguments). `app/place-band.tsx` is the one piece behind
+  (`lib/sample-cover.ts`: one row, one cover, the same arguments). The Buy
+  box tab is the real `BuyBoxPanel` (`app/sample-buy-box.tsx`, captioned as
+  the sample's example box, its edit link a sign-up), the model card is the
+  deal page's `ModelBody` (`model-body.tsx`, `app/sample-model-card.tsx`),
+  and the Documents tab's rows are `SourceDocumentsView`
+  (`source-documents.tsx`). **The signed-in sample keeps the public pages'
+  promises**: its memo, report and workbook are free
+  (`lib/sample-exports.ts`: `is_sample` with no memorandum stored on it),
+  it carries no Pro mark, and because its building and comps are fictional
+  no parcel or owner is looked up for it (`lib/public-record-subject.ts`,
+  which on any deal takes only a point placed at a building), no comp is
+  geocoded or pinned, and no public-web comp search runs on it.
+  `app/place-band.tsx` is the one piece behind
   every public page's opening: `PlaceBackdrop` (the picture, its scrim,
   the credit — `AerialBackdrop` in `app/aerial-img.tsx` drops the credit
   with the picture on a 404) and `PlaceBand` (a dark section at the
