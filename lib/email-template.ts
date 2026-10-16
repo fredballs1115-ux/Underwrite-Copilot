@@ -120,6 +120,19 @@ function footerRow(inner: string): string {
         </tr>`;
 }
 
+/** The building across the card's top, linked to the deal (#464): the
+ *  screen-complete and the screen-stopped emails draw the one banner. */
+function bannerRow(picture: { url: string } | null | undefined, dealUrl: string, dealName: string): string {
+  return picture
+    ? `
+        <tr>
+          <td style="padding:0;line-height:0;font-size:0;background-color:${PICTURE_BOX};">
+            <a href="${esc(dealUrl)}" style="display:block;text-decoration:none;background-color:${PICTURE_BOX};"><img src="${esc(picture.url)}" width="520" height="260" alt="${esc(bannerAlt(dealName))}" style="display:block;width:100%;max-width:520px;height:auto;border:0;outline:none;text-decoration:none;background-color:${PICTURE_BOX};color:#114e54;font-size:15px;font-weight:600;line-height:1.4;text-align:center;" /></a>
+          </td>
+        </tr>`
+    : "";
+}
+
 export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
   subject: string;
   html: string;
@@ -144,14 +157,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
   // The call first, then why, then the box — what an inbox's preview shows.
   const preheader = `${input.verdictLabel}${input.reason ? ` — ${input.reason}` : "."} Buy box: ${input.buyBoxLabel}.`;
 
-  const pictureRow = input.picture
-    ? `
-        <tr>
-          <td style="padding:0;line-height:0;font-size:0;background-color:${PICTURE_BOX};">
-            <a href="${esc(input.dealUrl)}" style="display:block;text-decoration:none;background-color:${PICTURE_BOX};"><img src="${esc(input.picture.url)}" width="520" height="260" alt="${esc(bannerAlt(input.dealName))}" style="display:block;width:100%;max-width:520px;height:auto;border:0;outline:none;text-decoration:none;background-color:${PICTURE_BOX};color:#114e54;font-size:15px;font-weight:600;line-height:1.4;text-align:center;" /></a>
-          </td>
-        </tr>`
-    : "";
+  const pictureRow = bannerRow(input.picture, input.dealUrl, input.dealName);
 
   const html = emailDocument({
     title: subject,
@@ -204,6 +210,10 @@ export interface ScreenStoppedEmailInput {
    *  retry reads the same file the same way, so the email says the way on
    *  is replacing the OM on the deal page, as the page's banner offers */
   replaceOm?: boolean;
+  /** the building across the top, as on the screen-complete email (#464,
+   *  lib/email-picture): the signed route serves whatever is stored when
+   *  the email is opened, its photograph, else its cover */
+  picture?: { url: string } | null;
 }
 
 /** What a document's failure asks of the reader, said once in the email. */
@@ -259,7 +269,7 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
     title: subject,
     // Why it stopped, first; then the call that stands.
     preheader: [input.message, input.replaceOm ? REPLACE_OM_LINE : null, stands].filter(Boolean).join(" "),
-    rows: `
+    rows: `${bannerRow(input.picture, input.dealUrl, input.dealName)}
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#a8432f;">The screen stopped</p>

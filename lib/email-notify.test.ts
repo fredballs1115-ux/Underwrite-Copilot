@@ -163,6 +163,43 @@ describe("the screen-complete email's picture (#464)", () => {
     const token = /\/api\/email\/picture\/([^?"]+)\?s=banner/.exec(sent[0].html)![1];
     expect(readEmailPictureToken(token)).toEqual({ dealId: DEAL, recipient: BUYER });
   });
+
+  it("a stopped screen's email opens on the building too, signed for whoever asked, and never reads the memorandum for it", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM = "Underwrite Copilot <notify@underwrite.example>";
+    process.env.RESEND_BASE_URL = "https://resend.test";
+    const sent: { html: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { body: string }) => {
+        sent.push(JSON.parse(init.body));
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const row = { name: "The Maddox", user_id: BUYER, team_id: null, is_sample: false, verdict: null };
+    const chain = (data: unknown) => {
+      const q = {
+        select: () => q,
+        eq: () => q,
+        order: () => q,
+        limit: () => q,
+        maybeSingle: async () => ({ data, error: null }),
+      };
+      return q;
+    };
+    const fake = {
+      from: (table: string) =>
+        chain(table === "deals" ? row : table === "analysis_jobs" ? null : { email_on_analysis: true }),
+      auth: { admin: { getUserById: async () => ({ data: { user: { email: "buyer@example.com" } } }) } },
+    } as unknown as SupabaseClient;
+    await notifyAnalysisFailed(fake, DEAL, "We couldn't read any figures out of this PDF.");
+    expect(sent).toHaveLength(1);
+    expect(sent[0].html).toMatch(/<img src="https:\/\/underwrite\.example\/api\/email\/picture\/[^"]+\?s=banner" width="520" height="260" alt="The Maddox — open the deal"/);
+    const token = /\/api\/email\/picture\/([^?"]+)\?s=banner/.exec(sent[0].html)![1];
+    expect(readEmailPictureToken(token)).toEqual({ dealId: DEAL, recipient: BUYER });
+    // The run may have stopped on the memorandum: no search for its cover.
+    expect(pic.asked).toEqual([]);
+  });
 });
 
 // A send that timed out may have been taken: the key names the email and

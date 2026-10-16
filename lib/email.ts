@@ -274,6 +274,11 @@ export async function notifyAnalysisFailed(
       // A failure in the document: the deal page offers Replace OM, not a
       // retry that reads the same file the same way, and so does the email.
       replaceOm: documentFailure(message) === "replace",
+      // The building across the top, as the screen-complete email draws it,
+      // from the same signed route. The memorandum is not read for a cover
+      // here: the screen just stopped, often on that very file, and the
+      // route serves the deal's cover where no photograph is stored.
+      picture: stoppedEmailPicture(dealId, to.userId),
     });
     // The occasion is the run: its job row's created_at, restamped by every
     // claim (lib/jobs), so a run's one failure is one email.
@@ -358,6 +363,13 @@ async function latestJob(
   } catch {
     return null;
   }
+}
+
+/** The stopped-screen email's banner: the signed link alone, never a read
+ *  of the memorandum (the run may have stopped on it), for `recipient`. */
+export function stoppedEmailPicture(dealId: string, recipient: string): { url: string } | null {
+  const url = emailPictureUrl(appUrl(), dealId, "banner", recipient);
+  return url ? { url } : null;
 }
 
 /** How long the email waits for a turn to read the memorandum's cover. */

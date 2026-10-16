@@ -269,6 +269,22 @@ describe("a screen that stopped says so by email (pass 14, 2026-10-01)", () => {
     expect(screenStoppedEmail(input).text).not.toContain(REPLACE_OM_LINE);
   });
 
+  it("opens on the building, as the screen-complete email does, and stays as it was without a picture", () => {
+    const { html, text } = screenStoppedEmail({ ...input, picture: { url: BANNER } });
+    const img = /<a href="([^"]+)"[^>]*><img src="([^"]+)" width="520" height="260" alt="([^"]*)"/.exec(html);
+    expect(img).not.toBeNull();
+    expect(img![1]).toBe(input.dealUrl);
+    expect(img![2]).toBe(BANNER);
+    expect(img![3]).toBe(bannerAlt(escapeHtml(input.dealName)));
+    // Between the masthead and the words.
+    expect(html.indexOf("Underwrite Copilot</span>")).toBeLessThan(html.indexOf(BANNER));
+    expect(html.indexOf(BANNER)).toBeLessThan(html.indexOf("The screen stopped</p>"));
+    expect(text).toBe(screenStoppedEmail(input).text);
+    expect(screenStoppedEmail(input).html).not.toContain("<img");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
   it("names the deal, says the deal page's own sentence and links back", () => {
     const { subject, html, text } = screenStoppedEmail(input);
     expect(subject).toBe("The Maddox <Brewerytown> — the screen stopped");
