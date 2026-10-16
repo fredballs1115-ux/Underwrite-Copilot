@@ -6239,7 +6239,9 @@ describe("/demo's research panel — the deal page's ResearchPanel on the sample
     const html = at("2026-09-21");
     const text = visibleText(html);
     expect(text).toContain("Regulation & benchmarks");
-    expect(text).toContain("Covered market: Philadelphia");
+    // The covered market is a card with its photograph (app/market/market-brief-card).
+    expect(text).toMatch(/Covered market:\s+Philadelphia PA/);
+    expect(html).toContain('data-picture="covered-market"');
     expect(text).toContain("Negative leverage: going-in cap sits 150 bps below the 30-yr fixed");
     expect(text).toContain("going-in cap 5.45% vs 6.95% (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)");
     expect(text).toContain("Against the latest curve: the cap is 51 bps over the 10-year Treasury (4.94% on Sep 17, 2026, FRED).");

@@ -53,7 +53,7 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
                         <CityPhoto
                           metro={place.id}
                           width={480}
-                          height={288}
+                          height={360}
                           showCredit={false}
                           className="h-full w-full object-cover object-[50%_42%]"
                         />

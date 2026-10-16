@@ -33,9 +33,9 @@ export function MarketBriefCard({
       <CityPhoto
         metro={metro.id}
         width={480}
-        height={288}
+        height={360}
         // A 104 × 80 frame covered by a panorama's height draws it about
-        // 200 CSS px wide.
+        // 200 CSS px wide; 480 × 360 is a frame the overhead route draws.
         sizes="240px"
         describe
         showCredit
