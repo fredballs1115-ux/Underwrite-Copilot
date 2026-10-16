@@ -19,13 +19,8 @@ import {
   FREE_DEALS_LINE,
   FREE_PLAN,
   PRO_PLAN_LINES,
-  SAMPLE_COMP_PREMIUM_LINE,
 } from "@/lib/marketing-constants";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-// The Excel-preview rows are COMPUTED from the live engine on the sample
-// model at render time — hardcoded copies of these figures are exactly what
-// drifted (the page said 7.1% while the engine computed 6.9%).
-import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { fmtEm, fmtPct } from "@/lib/underwrite/playground";
@@ -45,7 +40,8 @@ import { MarketsGallery } from "./markets-gallery";
 import { HERO_STRIP, HERO_WORDS_TOP, PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
-import { compactUsd } from "@/lib/money";
+import { sampleHeader, type HeaderFacts } from "@/lib/sample-header";
+import { SampleDealHero } from "./sample-hero";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -548,6 +544,8 @@ function PeopleStrip({ photos }: { photos: PhotoSlot[] }) {
 export default function Home() {
   const photos = photosOnDisk();
   const legal = legalToday();
+  // The sample's header, read on the render's day (the page is ISR).
+  const header = sampleHeader();
   return (
     <div className="flex flex-1 flex-col">
       <script
@@ -728,7 +726,7 @@ export default function Home() {
 
                 {/* Product preview */}
                 <div>
-                  <DealPreview />
+                  <DealPreview header={header} />
                   <p className="mt-4 text-center text-[11px] text-white/55">
                     Illustrative sample deal ·{" "}
                     <Link
@@ -1367,96 +1365,21 @@ export default function Home() {
   );
 }
 
-/** A faithful miniature of the REAL deal page's summary bar — name + verdict
- *  + buy-box chips, the address line, exactly four figures, and the artifact
- *  row (IC memo / Full report / Underwrite model), plus the top deal-killer.
- *  Figures derive from the sample fixture through the live engine, so this
- *  card can never drift from what the product actually renders. */
-function DealPreview() {
-  const inputs = SAMPLE_DEAL.model.inputs;
-  const r = computeModel(inputs).returns;
-  const verdictWord =
-    SAMPLE_DEAL.verdict.verdict === "pass"
-      ? "Go"
-      : SAMPLE_DEAL.verdict.verdict === "pass_on"
-        ? "No-go"
-        : "Caution";
+/** The sample deal's header — the deal page's own `DealHero` on the facts
+ *  lib/sample-header reads through the deal page's readers (the name with
+ *  "Sample — ", the call, the buy-box fit, the four figures as stated,
+ *  Philadelphia's photograph, the tool row), so the card shows exactly
+ *  what the signed-in sample deal shows. Stacked on a second sheet, so it
+ *  reads as one deal of a pipeline; the name is an h2 under the hero's h1. */
+function DealPreview({ header }: { header: HeaderFacts }) {
   return (
-    <div className="relative">
-      {/* Glow + a second sheet behind, so the card reads as a stack. */}
+    <div className="relative text-ink">
       <div
         className="absolute inset-0 translate-x-3 translate-y-3 rounded-2xl border border-white/10 bg-white/[0.04]"
         aria-hidden
       />
-      <div className="shadow-float relative rounded-2xl border border-line bg-surface p-5 text-ink">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold tracking-tight">
-            The Maddox at Brewerytown
-          </p>
-          {/* Two chips, each named for a screen reader: the call, and the
-              buy-box fit, which says "Fit" on its face. */}
-          <span className="stamp-in rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution ring-1 ring-caution/30">
-            <span className="sr-only">Verdict: </span>
-            {verdictWord}
-          </span>
-          <span title={SAMPLE_FIT.note} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${SAMPLE_FIT.cls}`}>
-            <span className="sr-only">Buy-box </span>
-            {SAMPLE_FIT.label}
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-muted">
-          Brewerytown, Philadelphia · Multifamily · {inputs.units} units
-        </p>
-
-        <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 border-y border-line py-3">
-          {(
-            [
-              ["Price", compactUsd(inputs.purchasePrice, { wholeMillionsFrom: 0 })],
-              ["Size", `${inputs.units} units`],
-              ["Going-in cap", `${r.goingInCapPct.toFixed(2)}%`],
-              // The real deal header carries a fourth figure now — the deal's
-              // strategy — and the sample mirrors the real page or it lies.
-              ["Deal type", "Stabilized"],
-            ] as const
-          ).map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-[10px] uppercase tracking-wide text-muted">
-                {k}
-              </dt>
-              <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
-                {v}
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        {/* The real header's artifact row, in miniature. */}
-        <div className="mt-3 flex flex-wrap gap-1.5" aria-hidden>
-          {["IC memo", "Full report", "Underwrite model"].map((a) => (
-            <span
-              key={a}
-              className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-medium shadow-sm"
-            >
-              {a}{" "}
-              <span className="rounded-full bg-brand/10 px-1.5 py-px text-[9px] font-semibold text-brand">
-                Pro
-              </span>
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-3 rounded-lg border border-line border-l-4 border-l-kill bg-paper p-3">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs tabular-nums text-muted">1</span>
-            <span className="text-xs font-medium">Basis</span>
-            <span className="ml-auto rounded-full bg-kill/10 px-2 py-0.5 text-[10px] font-medium uppercase text-kill">
-              Deal-killer
-            </span>
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            {SAMPLE_COMP_PREMIUM_LINE}
-          </p>
-        </div>
+      <div className="relative">
+        <SampleDealHero header={header} titleAs="h2" stamp />
       </div>
     </div>
   );

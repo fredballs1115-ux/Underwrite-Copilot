@@ -19,6 +19,7 @@ import { StressBench } from "@/app/landing-stress";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { buyBoxCoverage } from "./criteria";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
+import { sampleHeader } from "./sample-header";
 import { SKYLINES, commonsPage } from "./skyline";
 import { METRO_VIEWS } from "./metro-imagery";
 
@@ -52,33 +53,48 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(text).not.toMatch(/formulasPro|memoPro/);
   }, 60_000);
 
-  it("names the hero card's two chips: the call, and the buy-box fit", async () => {
+  // The homepage and /demo against the signed-in product, H1: the card
+  // called itself "a faithful miniature" of the deal header and was not —
+  // no picture, "$68M" for the stated $68,000,000, the name without
+  // "Sample — ", a typed deal type and an invented "Deal-killer" box.
+  it("draws the deal page's own header on the sample: its chips, its figures and its market's photograph", async () => {
     const html = await renderHome();
-    const card = html.slice(html.indexOf("The Maddox at Brewerytown"));
-    // "Caution" and "WATCH" sat side by side with nothing saying which was
-    // the verdict and which the fit against the buy box.
-    expect(card).toMatch(/<span class="sr-only">Verdict: <\/span>(Go|Caution|No-go)<\/span>/);
-    // The fit's words, with how many of the box's criteria it stands on
-    // where the sample's memorandum leaves one unchecked (research pass 35:
-    // it states no IRR, so the box's target return is never judged).
-    expect(card).toMatch(
-      /<span class="sr-only">Buy-box <\/span>Fit \d+ · (Pursue|Watch|Pass|Outside box|\d+ of \d+ checked)( · \d+ of \d+ checked)?<\/span>/,
-    );
-    // And it is the deal header's own chip for the same deal and box, never
-    // a call only the homepage makes.
-    const chip = buyBoxRead(
-      SAMPLE_DEAL.asset_class,
-      dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
-      SAMPLE_DEMO_BOX,
-    ).chip.label;
-    expect(card).toContain(`<span class="sr-only">Buy-box </span>${chip}</span>`);
+    const at = html.indexOf("<header data-deal-hero");
+    expect(at).toBeGreaterThan(-1);
+    const card = html.slice(at, html.indexOf("</header>", at));
+    const h = sampleHeader();
+    // The name under the hero's own h1, so the page keeps one.
+    expect(card).toContain(`<h2 id="deal-title" tabindex="-1" title="${h.title}"`);
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    // The deal page's chips, class for class.
+    expect(card).toContain(`<span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${h.pill!.cls}">${h.pill!.label}</span>`);
+    expect(card).toContain(`class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${h.fit!.cls}"`);
+    expect(card).toContain(`>${h.fit!.label}</span>`);
+    const text = card.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    for (const f of h.figures) expect(text, f.label).toContain(`${f.label} ${f.value}`);
+    expect(text).toContain("$68,000,000");
+    expect(text).not.toMatch(/Deal-killer/i);
+    // The market's photograph as the deal page draws it, captioned and credited.
+    expect(card).toContain("data-hero-picture");
+    expect(card).toContain(`src="${h.market!.src.replace(/&/g, "&amp;")}"`);
+    expect(card).toContain('data-picture="market"');
+    expect(card).toContain(`href="${h.market!.author.url}"`);
+    // The tool row: the sample's three public downloads, then the two tools
+    // that work on a deal of your own.
+    for (const href of ["/api/demo/memo", "/api/demo/report", "/api/demo/underwrite.xlsx"]) expect(card).toContain(`href="${href}"`);
+    expect(text).toContain("Rent roll");
+    expect(text).toContain("Valuations");
   }, 60_000);
 
   it("reads the hero's words before its photograph's credit, so Tab reaches Get started free first", async () => {
     const html = await renderHome();
     const start = html.indexOf('<section class="band-dark relative overflow-hidden text-white">');
     expect(start).toBeGreaterThan(-1);
-    const hero = html.slice(start, html.indexOf("</section>", start));
+    const section = html.slice(start, html.indexOf("</section>", start));
+    // The sample's header carries its own picture's credit inside its card;
+    // the band's credit is the one that must follow the band's words.
+    const cardAt = section.indexOf("<header data-deal-hero");
+    const hero = cardAt < 0 ? section : section.slice(0, cardAt) + section.slice(section.indexOf("</header>", cardAt));
     // The credit is drawn at the band's foot; it sat first in the markup.
     const credits = [...hero.matchAll(/<a\b[^>]*href="https:\/\/(?:commons\.wikimedia\.org|creativecommons\.org)\/[^"]*"/g)].map((m) => m.index!);
     if (hero.includes("/api/imagery/skyline/")) expect(credits.length, "a market's photograph owes its credit").toBeGreaterThan(0);

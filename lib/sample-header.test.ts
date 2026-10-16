@@ -128,6 +128,7 @@ describe("the deal page still builds its header from the readers this module cal
       ['assetClassLabel(shownClass) || "Asset class not read yet"', 'assetClassLabel(shownClass) || "Asset class not read yet"'],
       ["extraction?.address || dealAddress?.label || extraction?.market || firstSignal?.market || null", "extraction?.address || input.address?.label || extraction?.market || firstSignal?.market || null"],
       ["marketPictureFor(dealAddress, extraction?.market ?? null,", "marketPictureFor(input.address, extraction?.market ?? null,"],
+      ["label={dealAddress?.label ?? (deal.name as string)}", "pictureLabel: input.address?.label ?? input.name"],
     ];
     for (const [page, own] of pairs) {
       expect(fold(PAGE), page).toContain(page);

@@ -60,6 +60,9 @@ export interface HeaderFacts {
   /** the photograph the deal's market is known by, which leads the picture
    *  where the building has none of its own (#439) */
   market: MarketPicture | null;
+  /** what the picture is of, for a screen reader (property-visual's
+   *  `label`): the address line, else the deal's name */
+  pictureLabel: string;
 }
 
 export interface HeaderInput {
@@ -149,6 +152,7 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
       { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
     ],
     market: marketPictureFor(input.address, extraction?.market ?? null, input.placed, input.county),
+    pictureLabel: input.address?.label ?? input.name,
   };
 }
 

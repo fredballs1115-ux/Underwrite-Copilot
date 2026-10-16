@@ -49,6 +49,7 @@ export function DealHero({
   controls,
   children,
   reading = false,
+  titleAs: Title = "h1",
 }: {
   title: string;
   /** the call and the buy-box fit, beside the name */
@@ -69,6 +70,10 @@ export function DealHero({
    *  a figure not read yet shimmers in place of the dash a finished screen
    *  gives a figure its memorandum does not state */
   reading?: boolean;
+  /** the name's heading level: the deal page's own heading, an h1; a page
+   *  that draws the header under a heading of its own (the homepage's
+   *  sample, lib/sample-header) keeps one h1 on the page */
+  titleAs?: "h1" | "h2";
 }) {
   return (
     // No overflow-hidden on the card: the share panel and the deal's menu open
@@ -88,9 +93,9 @@ export function DealHero({
                   anywhere it must — a URL pasted as the name had widened a
                   phone's page to 711px — and a long one stops at three
                   lines, the whole name in its title (research pass 42). */}
-              <h1 id="deal-title" tabIndex={-1} title={title} className={HERO_TITLE}>
+              <Title id="deal-title" tabIndex={-1} title={title} className={HERO_TITLE}>
                 {title}
-              </h1>
+              </Title>
               {chips}
             </div>
             <p className="mt-1 line-clamp-2 text-sm text-muted">{subtitle}</p>
