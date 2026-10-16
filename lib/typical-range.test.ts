@@ -65,7 +65,7 @@ describe("a market check's typical range, read one way on every surface", () => 
   });
 
   it("the deal page's position bar and the report read through it", () => {
-    const page = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections.tsx"), "utf8");
+    const page = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections-view.tsx"), "utf8");
     expect(page).toContain("readTypicalRange(typicalRange)");
     const report = readFileSync(join(process.cwd(), "lib/memo/report-document.tsx"), "utf8");
     expect(report).toContain("typicalRangeParts(typicalRange)");

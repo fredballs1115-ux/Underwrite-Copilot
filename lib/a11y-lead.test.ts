@@ -119,12 +119,14 @@ describe("the call chips and a range's base read at 4.5:1 (research pass 33, ite
 
   it("draws a range's base on an opaque tint, so the grid's line colour never shows through", () => {
     const opaque = /bg-\[color-mix\(in_oklab,var\(--color-brand\)_(?:5|10)%,var\(--color-surface\)\)\]/;
-    expect(readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections.tsx"), "utf8")).toMatch(opaque);
+    expect(readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections-view.tsx"), "utf8")).toMatch(opaque);
     expect(readFileSync(join(process.cwd(), "app/share/[token]/share-view.tsx"), "utf8")).toMatch(opaque);
     // The homepage walkthrough draws no range cell of its own any more: its
-    // ranges are the deal page's RangeCard, through VerdictView.
+    // ranges are the deal page's RangeCard, through VerdictView (read from
+    // deal-sections-view, the sections without the deal page's map and
+    // server actions, which deal-sections re-exports).
     const home = readFileSync(join(process.cwd(), "app/landing-interactive.tsx"), "utf8");
-    expect(home).toMatch(/\bVerdictView\b[^]*from "\.\/\(app\)\/deals\/\[id\]\/deal-sections"/);
+    expect(home).toMatch(/\bVerdictView\b[^]*from "\.\/\(app\)\/deals\/\[id\]\/deal-sections-view"/);
     expect(home).not.toMatch(/\bRangeRow\b/);
   });
 });
@@ -196,7 +198,7 @@ describe("tabs that are tabs, and states said in words (research pass 33, items 
     const view = src("app/(app)/deals/[id]/deal-view.tsx");
     expect((view.match(/<span className="sr-only">\{` finding\$\{/g) ?? []).length).toBe(2);
     expect(view).toContain('state === "running" ? <span className="sr-only">, running</span> : null');
-    expect(src("app/(app)/deals/[id]/deal-sections.tsx")).toMatch(/onClick=\{\(\) => setOpen\(!open\)\}\s*aria-expanded=\{open\}/);
+    expect(src("app/(app)/deals/[id]/deal-sections-base.tsx")).toMatch(/onClick=\{\(\) => setOpen\(!open\)\}\s*aria-expanded=\{open\}/);
     expect(src("app/(app)/deals/pipeline.tsx")).toMatch(/onClick=\{\(\) => setShowForm\(\(s\) => !s\)\}\s*aria-expanded=\{showForm\}/);
   });
 });

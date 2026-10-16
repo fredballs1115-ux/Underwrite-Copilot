@@ -24,8 +24,8 @@ import {
   Reconciliation,
   TermsView,
   VerdictView,
-} from "./(app)/deals/[id]/deal-sections";
-import { ReturnsHeadline } from "./(app)/deals/[id]/model-view";
+} from "./(app)/deals/[id]/deal-sections-view";
+import { ReturnsHeadline } from "./(app)/deals/[id]/returns-headline";
 
 /** The sample's fit against its demo buy box, read on the server through
  *  the deal header's own reader (lib/buy-box-chip `buyBoxRead`), so the

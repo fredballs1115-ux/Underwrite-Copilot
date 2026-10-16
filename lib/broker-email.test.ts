@@ -32,7 +32,7 @@ describe("the broker email cites only pages the memorandum has", () => {
   });
 
   it("the comps map's OM link reads the page through the same rule", () => {
-    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections.tsx"), "utf8");
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections-view.tsx"), "utf8");
     expect(src).toContain("const pageNum = locatedPage(c.page, mapContext.totalPages);");
     expect(src).not.toMatch(/c\.page\?\.match\(/);
   });

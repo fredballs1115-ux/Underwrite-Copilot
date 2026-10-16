@@ -84,7 +84,7 @@ describe("verdict ranges read in numeric order (research pass 18)", () => {
     // The deal page, the shared screen and the memo each kept a copy of the
     // number reader and the position, so a fix to one missed the others.
     for (const file of [
-      "app/(app)/deals/[id]/deal-sections.tsx",
+      "app/(app)/deals/[id]/deal-sections-view.tsx",
       "app/share/[token]/share-view.tsx",
       "lib/memo/memo-document.tsx",
       "lib/memo/report-document.tsx",
