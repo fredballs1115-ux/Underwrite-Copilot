@@ -26,7 +26,7 @@ import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { typedByHand } from "@/lib/manual-deal";
 import { parseStageHistory } from "@/lib/stages";
-import { currentOutcome, tradeWords } from "@/lib/deal-outcome";
+import { currentOutcome, tradePriceText, tradeWords } from "@/lib/deal-outcome";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -305,7 +305,7 @@ export function deriveInternalComps(
       // A reported trade, apart from the ask it never joins.
       ...(() => {
         const trade = currentOutcome(row.stage, parseStageHistory(row.stage_history))?.trade ?? null;
-        return trade ? { tradedLabel: fmtCompact(trade.price), tradedTitle: tradeWords(trade) } : {};
+        return trade ? { tradedLabel: tradePriceText(trade.price), tradedTitle: tradeWords(trade) } : {};
       })(),
     });
     if (comps.length >= limit) break;

@@ -114,11 +114,19 @@ const dayWords = (iso: string): string => {
 
 /** "Traded at $41.5M to Blackstone on Sep 30, 2026 — reported by Jane, Oct
  *  2, 2026": the trade as reported, never as a record. */
+/** A reported trade's price, the one way every surface writes it ("$41.25M"):
+ *  the decision log's sentence and the internal comps' label beside its
+ *  title had written one trade two ways, "$41.3M" beside "$41.25M" (audit
+ *  C8, L1). */
+export function tradePriceText(price: number): string {
+  return compactUsd(price, { millions: 2 });
+}
+
 export function tradeWords(trade: ReportedTrade): string {
   const to = trade.buyer ? ` to ${trade.buyer}` : "";
   const on = trade.date ? ` on ${dayWords(trade.date)}` : "";
   const by = trade.reportedBy ? `reported by ${trade.reportedBy}` : "reported";
-  return `Traded at ${compactUsd(trade.price, { millions: 2 })}${to}${on} — ${by}, ${dayWords(trade.reportedAt)}`;
+  return `Traded at ${tradePriceText(trade.price)}${to}${on} — ${by}, ${dayWords(trade.reportedAt)}`;
 }
 
 /** The outcome in one line, for the decision log and the card. */

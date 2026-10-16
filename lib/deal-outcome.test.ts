@@ -9,6 +9,7 @@ import {
   deathReasons,
   outcomeWords,
   readOutcomeForm,
+  tradePriceText,
   tradeWords,
   withOutcome,
 } from "./deal-outcome";
@@ -121,8 +122,32 @@ describe("the internal comps show a reported trade as its own figure, never as t
       },
     ]);
     expect(comps[0].priceLabel).toBe("$41.0M");
-    expect(comps[0].tradedLabel).toBe("$39.0M");
+    expect(comps[0].tradedLabel).toBe(tradePriceText(39_000_000));
     expect(comps[0].tradedTitle).toContain("reported by Jane");
+  });
+
+  // Audit C8, L1: the label wrote $41,250,000 "$41.3M" beside a title of
+  // "Traded at $41.25M" — one trade, two figures.
+  it("writes the trade one way, the label and its title alike", () => {
+    const history = withOutcome("dead", dead, {
+      reason: "lost_to_bidder",
+      trade: { price: 41_250_000, buyer: null, date: null, reportedBy: "Jane", reportedAt: NOW },
+    });
+    const comps = deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [
+      {
+        id: "lost",
+        name: "Lost deal",
+        asset_class: "multifamily",
+        created_at: "2026-08-01T00:00:00Z",
+        is_sample: false,
+        verdict: null,
+        extraction: { assetClass: "multifamily", metrics: [{ label: "Asking price", value: "$42,000,000" }] },
+        stage: "dead",
+        stage_history: history,
+      },
+    ]);
+    expect(comps[0].tradedLabel).toBe("$41.25M");
+    expect(comps[0].tradedTitle).toContain(`Traded at ${comps[0].tradedLabel}`);
   });
 });
 
