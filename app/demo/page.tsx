@@ -5,7 +5,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS_LINE, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct, screenYearOf } from "@/lib/criteria";
+import { evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
 import { benchmark30, datedLong } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
@@ -20,7 +20,9 @@ import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
 import { LegalPanel } from "./legal-panel";
 import { scoreMandateFit } from "@/lib/mandate";
-import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strategy";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { sampleHeader } from "@/lib/sample-header";
+import { SampleDealHero } from "@/app/sample-hero";
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
 import { BrokerQuestions } from "./broker-questions";
@@ -132,18 +134,6 @@ export default async function DemoPage() {
     underwrite: derived.inputs,
   };
   const metrics = data.extraction.metrics;
-  // The shared price reader, as the deal page uses it.
-  const price = findPriceMetric(metrics, inferStrategy(data.extraction).kind, screenYearOf(data.extraction))?.value ?? null;
-  const sfValue = buildingSfRow(metrics)?.value ?? null;
-  const unitValue = unitCountRow(metrics)?.value ?? null;
-  // A bare unit count ("248") reads wrong in a Size slot — say what it counts.
-  const size =
-    sfValue ??
-    (unitValue
-      ? /^[\d,]+$/.test(unitValue.trim())
-        ? `${unitValue.trim()} units`
-        : unitValue
-      : null);
   // The shared going-in cap reader, as the deal page and the buy box use it.
   const cap = findGoingInCap(metrics)?.value ?? null;
 
@@ -306,45 +296,11 @@ export default async function DemoPage() {
         </PlaceBand>
         <div className="mx-auto w-full max-w-5xl px-6 py-10">
 
-          {/* Summary bar — mirrors the in-app deal page. */}
-          <div className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-card">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-xl font-semibold tracking-tight">
-                The Maddox at Brewerytown
-              </h2>
-              <span className="rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-medium text-caution">
-                Caution
-              </span>
-              {/* The deal's kind, read from the sample's own extraction the way
-                  the real deal page reads it — never a hardcoded label. */}
-              <span
-                className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-medium text-brand"
-                title="The deal's kind is read first. A conversion or a development would show its plan here — stabilized NOI, budget, total cost, yield on cost — and be judged on yield on cost, never on a cap rate against the price."
-              >
-                {inferStrategy(SAMPLE_DEAL.extraction).label}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-muted">
-              {data.extraction.market || "Brewerytown, Philadelphia, PA"} ·{" "}
-              <span className="capitalize">multifamily</span>
-            </p>
-            <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-3">
-              {[
-                ["Price", price],
-                ["Size", size],
-                ["Going-in cap", cap],
-              ].map(([label, value]) => (
-                <div key={label} className="min-w-0">
-                  <dt className="text-[11px] uppercase tracking-wide text-muted">
-                    {label}
-                  </dt>
-                  <dd className="mt-1 truncate font-mono text-base font-semibold leading-none tabular-nums">
-                    {value ?? "—"}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          {/* The deal page's own header on the sample (lib/sample-header,
+              app/sample-hero): its market photograph, the name, the call,
+              the fit, the four figures and the tool row, as the homepage
+              draws it — read on the page's day. */}
+          <SampleDealHero header={sampleHeader(new Date(`${today}T12:00:00Z`))} titleAs="h2" />
 
           <div className="mt-8">
             <DemoSections data={data} />

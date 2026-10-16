@@ -1262,6 +1262,15 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(a11yIssues(html)).toEqual([]);
   });
 
+  it("/demo draws the deal page's own header on the sample, read by lib/sample-header, never typed", () => {
+    const page = readFileSync("app/demo/page.tsx", "utf8");
+    expect(page).toContain("<SampleDealHero header={sampleHeader(new Date(`${today}T12:00:00Z`))} titleAs=\"h2\" />");
+    // No summary bar of its own: no name, call or deal-type chip typed here.
+    expect(page).not.toContain("The Maddox at Brewerytown");
+    expect(page).not.toMatch(/>\s*Caution\s*</);
+    expect(page).not.toContain("kind is read first");
+  });
+
   it("labels its download as the OM underwrite, a separate model from the card's returns", () => {
     const html = render(
       React.createElement(ModelView, {
