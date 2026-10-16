@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ReturnsHeadline,
+  StressPanel,
   Sensitivity,
   Assumptions,
   Conflicts,
@@ -14,55 +15,60 @@ import type { UnderwritingModel } from "@/lib/model/types";
 const SLIDE_MS = 7000;
 
 /**
- * A stepped slideshow through the generated model — the exact components the
- * app renders (returns, cash flow, sensitivity, assumptions, conflicts), fed
- * by the illustrative sample. Auto-advances gently; any manual step takes
- * over. Respects prefers-reduced-motion and pauses in background tabs.
+ * The first-draft model card's views one at a time — the exact components
+ * the deal page's card stacks (app/(app)/deals/[id]/model-view), in its
+ * order, fed by the illustrative sample — then the card's workbook and its
+ * two-model sentence. Auto-advances gently; a step, or a hand on a slide's
+ * own controls, takes over. Respects prefers-reduced-motion and pauses in
+ * background tabs.
  */
 export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
+  // The deal page's first-draft card, view by view in its own order
+  // (model-view's ModelView): the returns, the stress test, the grid, the
+  // conflicts, the assumptions, the capital plan and the cash flow.
   const slides = useMemo(
     () => [
       {
         key: "returns",
         label: "Returns",
-        blurb:
-          "Levered IRR, equity multiple, and year-one cash-on-cash — computed from the reconciled inputs, not the OM's pro forma.",
+        blurb: "Levered IRR, equity multiple and year-one cash-on-cash, from the reconciled inputs.",
         node: <ReturnsHeadline model={model} />,
       },
       {
-        key: "cashflow",
-        label: "Cash flow",
-        blurb:
-          "Year by year across the hold: gross rent down through vacancy, expenses, reserves, and debt service to levered cash flow.",
-        node: <CashFlow cashFlow={model.cashFlow} defaultOpen />,
+        key: "stress",
+        label: "Stress test",
+        blurb: "Move rent, vacancy, expenses and the exit cap, and watch the returns move.",
+        node: <StressPanel model={model} />,
       },
       {
         key: "sensitivity",
         label: "Sensitivity",
-        blurb:
-          "Exit cap × purchase price grid — see where the return thesis breaks before you're in it.",
+        blurb: "Exit cap × purchase price: where the return thesis breaks.",
         node: <Sensitivity model={model} />,
-      },
-      {
-        key: "capex",
-        label: "CapEx",
-        blurb:
-          "The capital plan, reserved below NOI in every year — per-unit funding, the total across the hold, and what it costs year-1 NOI.",
-        node: <CapexPanel model={model} />,
-      },
-      {
-        key: "assumptions",
-        label: "Assumptions",
-        blurb:
-          "Every input with the document that won — OM claims versus rent-roll and T-12 actuals — and the ones no document states, marked assumed.",
-        node: <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />,
       },
       {
         key: "conflicts",
         label: "Conflicts",
-        blurb:
-          "Where the documents disagreed, and which figure the model chose to trust — with the rationale.",
+        blurb: "Where the documents disagreed, and which figure the model trusted.",
         node: <Conflicts conflicts={model.conflicts} />,
+      },
+      {
+        key: "assumptions",
+        label: "Assumptions",
+        blurb: "Every input with the document that won, and the ones no document states.",
+        node: <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />,
+      },
+      {
+        key: "capex",
+        label: "CapEx",
+        blurb: "The capital plan, reserved below NOI in every year.",
+        node: <CapexPanel model={model} />,
+      },
+      {
+        key: "cashflow",
+        label: "Cash flow",
+        blurb: "Gross rent down through vacancy, expenses, reserves and debt service, year by year.",
+        node: <CashFlow cashFlow={model.cashFlow} defaultOpen />,
       },
     ],
     [model],
@@ -104,20 +110,11 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
   }
 
   return (
-    <section
-      aria-roledescription="carousel"
-      aria-label="Inside the generated model"
-      className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6"
-    >
+    <section aria-roledescription="carousel" aria-label="Inside the generated model">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <h3 className="text-lg font-semibold tracking-tight">
-            Inside the generated model
-          </h3>
-          <span className="rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-caution">
-            Illustrative sample
-          </span>
-        </div>
+        <span className="rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-caution">
+          Illustrative sample
+        </span>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -162,13 +159,6 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
           </button>
         </div>
       </div>
-      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-        The screen doesn&rsquo;t stop at a verdict — it builds a working
-        underwriting model from your documents. These are its live views,
-        not screenshots; the Excel download is a separate workbook, built
-        from the memorandum&rsquo;s terms.
-      </p>
-
       {/* Step pills double as slide labels and direct navigation — the tabs
           pattern whole: arrow keys, Home and End, one tab stop, each tied to
           its slide (research pass 33: the arrow keys had done nothing). */}
@@ -213,7 +203,13 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
           reservation is a screen of blank space under the compact Returns
           slide (the cash-flow table is the tall one), so there the inactive
           slides are display:none and autoplay is off. */}
-      <div className="mt-4 grid grid-cols-[minmax(0,1fr)]">
+      <div
+        className="mt-4 grid grid-cols-[minmax(0,1fr)]"
+        // A hand on a slide's own controls (the stress test's sliders, the
+        // cash flow's fold) stops the show under it.
+        onPointerDown={() => setAuto(false)}
+        onFocusCapture={() => setAuto(false)}
+      >
         {slides.map((s, i) => (
           <div
             key={s.key}
@@ -229,6 +225,22 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
             {s.node}
           </div>
         ))}
+      </div>
+
+      {/* The card's foot, as the deal page's card ends: its workbook, here
+          the public sample's, and the sentence that says it is the other
+          model (model-view's own words). */}
+      <div className="mt-6 flex flex-col gap-1.5">
+        <a
+          href="/api/demo/underwrite.xlsx"
+          className="inline-flex w-fit items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+        >
+          Download the OM underwrite model (.xlsx)
+        </a>
+        <p data-qa="demo-two-models" className="max-w-2xl text-xs leading-relaxed text-muted">
+          The workbook is a separate model, built from the memorandum’s terms — its returns can differ from the ones
+          above. The Overview’s sensitivity playground runs the workbook’s model, not this one.
+        </p>
       </div>
     </section>
   );

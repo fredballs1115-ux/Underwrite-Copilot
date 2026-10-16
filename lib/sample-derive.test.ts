@@ -29,7 +29,7 @@ describe("sampleDerivedInputs — the sample deal, actuals included", () => {
 
   it("every public entry point derives through it — the page, the workbook and the report", () => {
     const root = process.cwd();
-    for (const rel of ["app/demo/page.tsx", "app/api/demo/underwrite.xlsx/route.ts", "app/api/demo/report/route.ts"]) {
+    for (const rel of ["app/demo/demo-data.ts", "app/api/demo/underwrite.xlsx/route.ts", "app/api/demo/report/route.ts"]) {
       const src = readFileSync(join(root, rel), "utf8");
       expect(src, rel).toContain("sampleDerivedInputs()");
       expect(src, rel).not.toMatch(/deriveUnderwriteInputs\(/);

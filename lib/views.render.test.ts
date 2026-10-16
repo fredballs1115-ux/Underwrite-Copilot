@@ -55,8 +55,7 @@ import { dealAllowance } from "@/lib/deal-allowance";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { DemoSections, type DemoData } from "@/app/demo/sections";
+import { DemoSections } from "@/app/demo/sections";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
@@ -1231,35 +1230,95 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(text).toContain("Projected returns · first-draft model");
   });
 
-  it("/demo's Financials & model tab names the first-draft model and the screening model the Sensitivity tab runs", () => {
-    const derived = sampleDerivedInputs();
-    const ex = SAMPLE_DEAL.extraction;
-    const data: DemoData = {
-      extraction: ex,
-      challenges: SAMPLE_DEAL.challenges,
-      comps: SAMPLE_DEAL.comps,
-      reconciliation: SAMPLE_DEAL.reconciliation,
-      market: SAMPLE_DEAL.market,
-      verdict: SAMPLE_DEAL.verdict,
-      model: SAMPLE_DEAL.model,
-      playground: {
-        inputs: derived.inputs,
-        dealAssetClass: SAMPLE_DEAL.asset_class,
-        checkSource: { assetClass: ex.assetClass, market: ex.market, metrics: ex.metrics },
-        box: SAMPLE_DEMO_BOX,
-        sources: derived.sources,
-      },
-      underwrite: derived.inputs,
-    };
-    const financials = visibleText(render(React.createElement(DemoSections, { data, initialTab: "financials" })));
-    expect(financials).toContain("Projected returns · first-draft model");
-    expect(financials).toContain(
-      "The Sensitivity tab and the sample workbook run the screening model, a separate model — their returns differ from these.",
-    );
-    expect(gluedWords(financials)).toEqual([]);
-    const html = render(React.createElement(DemoSections, { data, initialTab: "sensitivity" }));
-    expect(visibleText(html)).toContain("The screening model — the one the Excel workbook and the full report carry.");
-    expect(a11yIssues(html)).toEqual([]);
+  describe("/demo — the signed-in sample deal's sections, drawn by the deal page's own components", () => {
+    const { data } = sampleDemoData({ today: "2026-09-21", reads: null, debt: NO_DEBT_SEEDS });
+    const section = (initialSection: "overview" | "financials" | "buybox" | "analyses" | "documents", initialAnalysis?: "verdict" | "challenger" | "comps" | "market" | "reconciler") =>
+      render(React.createElement(DemoSections, { data, initialSection, ...(initialAnalysis ? { initialAnalysis } : {}) }));
+
+    it("draws the deal page's section bar, class for class: five sections, the active one brand-filled, the finding counts", () => {
+      const html = section("overview");
+      expect(html).toContain('role="tablist" aria-label="Deal sections"');
+      expect(html).toContain("flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm");
+      for (const k of ["overview", "financials", "buybox", "analyses", "documents"]) expect(html).toContain(`id="tab-${k}"`);
+      expect(html).toMatch(/id="tab-overview"[^>]*class="[^"]*bg-brand text-white shadow-sm/);
+      // The sample's finding counts, as the deal page counts them.
+      const text = visibleText(html);
+      expect(text).toMatch(/Buy box\s*1\s*finding\b/);
+      expect(text).toMatch(/Analyses\s*9\s*findings/);
+      // No round pill tabs of the old design.
+      expect(text).not.toContain("Buy box & fit");
+      expect(text).not.toContain("Financials & model");
+    });
+
+    it("opens on the Overview the deal page opens on: the guide, the actuals, the verdict and risk digest, the playground", () => {
+      const html = section("overview");
+      const text = visibleText(html);
+      expect(text).toContain("How to read this screen");
+      expect(text).toContain("Property actuals");
+      expect(text).toContain("Risk digest");
+      expect(text).toContain("The screening model — the one the Excel workbook and the full report carry.");
+      expect(text).toContain("Levered IRR 9.3%, the base case");
+      expect(a11yIssues(html)).toEqual([]);
+      expect(gluedWords(text)).toEqual([]);
+    });
+
+    it("draws the Financials tab's terms, debt and first-draft model card, with the model's two-model sentence", () => {
+      const html = section("financials");
+      const text = visibleText(html);
+      expect(text).toContain("First-draft model — ready");
+      expect(text).toContain("Projected returns · first-draft model");
+      // The slides run in the deal page's card's order.
+      const order = ["Returns", "Stress test", "Sensitivity", "Conflicts", "Assumptions", "CapEx", "Cash flow"].map((l) =>
+        html.indexOf(`>${l}</button>`),
+      );
+      expect(order.every((i) => i > 0)).toBe(true);
+      expect([...order].sort((a, b) => a - b)).toEqual(order);
+      expect(html).toContain('data-qa="demo-two-models"');
+      expect(text).toContain(
+        "The workbook is a separate model, built from the memorandum’s terms — its returns can differ from the ones above. The Overview’s sensitivity playground runs the workbook’s model, not this one.",
+      );
+      expect(html).toContain('href="/api/demo/underwrite.xlsx"');
+      expect(a11yIssues(html)).toEqual([]);
+      expect(gluedWords(text)).toEqual([]);
+    });
+
+    it("draws the Buy box tab's panel, and the sample's box read off the box itself", () => {
+      const html = section("buybox");
+      const text = visibleText(html);
+      expect(text).toContain("The deal against your mandate");
+      for (const line of buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false })) expect(text).toContain(line);
+      expect(text).not.toContain("A sample mandate (multifamily");
+      expect(a11yIssues(html)).toEqual([]);
+    });
+
+    it("draws the Analyses tab as the walkthrough's panel, the challenger by the deal's own name, its broker questions after it", () => {
+      const verdict = visibleText(section("analyses"));
+      expect(verdict).toContain("Caution");
+      const html = section("analyses", "challenger");
+      expect(html).toContain('aria-label="Analyses"');
+      expect(html).toContain("would you ask the broker");
+      expect(a11yIssues(html)).toEqual([]);
+      expect(gluedWords(visibleText(html))).toEqual([]);
+    });
+
+    it("draws the Documents tab as the sample's: no memorandum uploaded, and the three public downloads", () => {
+      const text = visibleText(section("documents"));
+      expect(text).toContain("Offering memorandum");
+      expect(text).toContain("none uploaded");
+      expect(text).toContain("Take the deliverables with you");
+      const html = section("documents");
+      for (const href of ["/api/demo/memo", "/api/demo/report", "/api/demo/underwrite.xlsx"]) expect(html).toContain(`href="${href}"`);
+    });
+
+    it("types no name, call or rule into the page: they are the readers'", () => {
+      const src = (p: string) => readFileSync(p, "utf8");
+      for (const p of ["app/demo/page.tsx", "app/demo/sections.tsx", "app/demo/demo-data.ts"]) {
+        const code = src(p);
+        expect(code, p).not.toContain("The Maddox at Brewerytown");
+        expect(code, p).not.toMatch(/>\s*Caution\s*</);
+        if (p !== "app/demo/page.tsx") expect(code, p).not.toContain("§ 9-811");
+      }
+    });
   });
 
   it("/demo draws the deal page's own header on the sample, read by lib/sample-header, never typed", () => {
@@ -6195,67 +6254,21 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
   });
 });
 
-// ── The sample screen's demand side ─────────────────────────────────────────
-import { SampleDemandCard } from "@/app/demo/demand-card";
+// ── The sample screen's demand side: the market check's own card ──────────
+import { sampleDemoData } from "@/app/demo/demo-data";
+import { NO_DEBT_SEEDS } from "@/lib/debt-index";
+import { buyBoxLines } from "@/lib/criteria";
 
-describe("SampleDemandCard — the sample market's payrolls by sector, read today", () => {
+describe("/demo's market check — the demand card in the deal page's own markup", () => {
   // Philadelphia's rows as lib/metro-demand hands them over: all payrolls
-  // first, three sectors, the leisure figure a year old. The sample is an
-  // apartment building, so no sector is marked.
+  // first, three sectors, the leisure figure a year old, and the supply line.
   const demand = {
     area: "Philadelphia MSA",
     grain: "metro" as const,
     newestMonth: "Aug 2026",
     mine: null,
     intro: "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing.",
-    supply: null,
-    stale: ["Leisure & hospitality as of Aug 2025"],
-    rows: [
-      { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
-      { key: "PHIL942PBSV_YOY", label: "Professional & business services", valuePct: 1.7451, text: "1.7%", href: "https://fred.stlouisfed.org/series/PHIL942PBSV", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
-      { key: "SMU42379804200000001SA_YOY", label: "Retail trade", valuePct: -1.85854, text: "−1.9%", href: "https://fred.stlouisfed.org/series/SMU42379804200000001SA", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
-      { key: "PHIL942LEIH_YOY", label: "Leisure & hospitality", valuePct: 2.65475, text: "2.7%", href: "https://fred.stlouisfed.org/series/PHIL942LEIH", obsDate: "2025-08-01", fresh: false, all: false, mine: false },
-    ],
-  };
-  const html = render(React.createElement(SampleDemandCard, { demand }));
-  const text = visibleText(html);
-
-  it("draws all payrolls first and the sectors beneath, dated, each figure linked, nothing singled out", () => {
-    expect(text).toContain("Demand check — read today, not opined");
-    expect(text).toContain("The demand side today — payrolls by sector, Philadelphia MSA");
-    expect(text).toContain("Rental housing runs on all payrolls, drawn first");
-    expect(text).not.toContain("this building's sector");
-    expect(text).toContain("Aug 2026 · BLS payrolls via FRED, against the same month a year earlier");
-    expect(text).toContain("one figure is stale: Leisure & hospitality as of Aug 2025");
-    expect(text).toContain("Every screened deal in a covered market gets this picture");
-    // Four bars: all payrolls in the neutral tone, every sector full (nothing is faded
-    // when nothing is marked), and the retail fall drawn leftward from the centre line.
-    expect((html.match(/data-bar="demand"/g) ?? []).length).toBe(4);
-    expect((html.match(/bg-ink\/40/g) ?? []).length).toBe(1);
-    expect(html).not.toContain("bg-brand/35");
-    expect(html).toContain('data-bar="demand" class="absolute inset-y-0 right-1/2 bg-brand"');
-    expect(html).toContain("https://fred.stlouisfed.org/series/PHIL942PBSV\"");
-    expect(html).toContain("https://fred.stlouisfed.org/series/SMU42379804200000001SA\"");
-  });
-
-  it("the phrase the live-verify marker greps is in the markup a curl receives", () => {
-    // The marker greps p_demo.html for "payrolls by sector, Philadelphia MSA" —
-    // inside one template literal, so React's <!-- --> separator never lands in it.
-    const served = renderToString(React.createElement(SampleDemandCard, { demand }));
-    expect(served).toContain("payrolls by sector, Philadelphia MSA");
-  });
-
-  it("renders nothing without a read, so the demo never shows a stale picture", () => {
-    expect(render(React.createElement(SampleDemandCard, { demand: null }))).not.toContain("demand side");
-  });
-
-  it("reads clean and names everything", () => {
-    expect(a11yIssues(html), "sample demand card").toEqual([]);
-    expect(gluedWords(text)).toEqual([]);
-  });
-
-  it("carries the supply side as one line under the bars, the split named as the total less the single-family series", () => {
-    const supply = {
+    supply: {
       metro: "philadelphia",
       area: "Philadelphia MSA",
       to: "2026-07-01",
@@ -6273,25 +6286,39 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
       hrefSingle: "https://fred.stlouisfed.org/series/PHIL942BP1FH",
       fresh: true,
       months: [],
-    };
-    const withSupply = render(React.createElement(SampleDemandCard, { demand: { ...demand, supply } }));
-    const t = visibleText(withSupply);
-    // The label is its own styled span, so the visible text splits after it.
-    expect(t).toContain("The supply side ·");
-    expect(t).toContain("8,400 units in buildings of two or more, twelve months to Jul 2026 (+40.0% on the twelve months before), 58.3% of the 14,400 permitted");
-    // The two counts are links, so the visible text splits around them.
-    expect(t).toContain("Census Bureau building permits via FRED,");
-    expect(t).toContain("all units");
-    expect(t).toContain("single-family");
-    expect(t).toContain(" — FRED carries no multi-unit series for a metro or a state");
-    expect(t).not.toContain("the only split published");
-    expect(withSupply).toContain("https://fred.stlouisfed.org/series/PHIL942BP1FH\"");
-    expect(a11yIssues(withSupply), "sample demand card with supply").toEqual([]);
-    expect(gluedWords(t)).toEqual([]);
-    // The marker's phrase is one JS string in the served markup.
-    expect(renderToString(React.createElement(SampleDemandCard, { demand: { ...demand, supply } }))).toContain("units in buildings of two or more, twelve months to");
-    // A stale read says so rather than passing as current.
-    expect(visibleText(render(React.createElement(SampleDemandCard, { demand: { ...demand, supply: { ...supply, fresh: false } } })))).toContain("a stale figure");
+    },
+    stale: ["Leisure & hospitality as of Aug 2025"],
+    rows: [
+      { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
+      { key: "PHIL942PBSV_YOY", label: "Professional & business services", valuePct: 1.7451, text: "1.7%", href: "https://fred.stlouisfed.org/series/PHIL942PBSV", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
+      { key: "SMU42379804200000001SA_YOY", label: "Retail trade", valuePct: -1.85854, text: "−1.9%", href: "https://fred.stlouisfed.org/series/SMU42379804200000001SA", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
+      { key: "PHIL942LEIH_YOY", label: "Leisure & hospitality", valuePct: 2.65475, text: "2.7%", href: "https://fred.stlouisfed.org/series/PHIL942LEIH", obsDate: "2025-08-01", fresh: false, all: false, mine: false },
+    ],
+  };
+  const { data } = sampleDemoData({ today: "2026-09-21", reads: null, debt: NO_DEBT_SEEDS });
+  const el = React.createElement(DemoSections, { data: { ...data, demand }, initialSection: "analyses", initialAnalysis: "market" });
+  const html = render(el);
+  const text = visibleText(html);
+
+  it("draws the payrolls by sector and the supply line under the market check, nothing singled out", () => {
+    expect(html).toContain('data-qa="metro-demand"');
+    expect(text).toContain("The demand side today — payrolls by sector, Philadelphia MSA");
+    expect(text).toContain("Rental housing runs on all payrolls, drawn first");
+    expect((html.match(/data-bar="demand"/g) ?? []).length).toBe(4);
+    expect(text).toContain("8,400 units in buildings of two or more, twelve months to Jul 2026 (+40.0% on the twelve months before), 58.3% of the 14,400 permitted");
+    expect(a11yIssues(html), "sample market tab").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("the phrases the live-verify markers grep are one string each in the served markup", () => {
+    const served = renderToString(el);
+    expect(served).toContain("payrolls by sector, Philadelphia MSA");
+    expect(served).toContain("units in buildings of two or more, twelve months to");
+  });
+
+  it("draws no demand card without a read, nor on another analysis", () => {
+    expect(render(React.createElement(DemoSections, { data, initialSection: "analyses", initialAnalysis: "market" }))).not.toContain("demand side");
+    expect(render(React.createElement(DemoSections, { data: { ...data, demand }, initialSection: "analyses", initialAnalysis: "verdict" }))).not.toContain("demand side");
   });
 });
 

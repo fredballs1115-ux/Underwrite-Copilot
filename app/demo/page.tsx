@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
-import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { FREE_DEALS_LINE, DEEP_TOOLS } from "@/lib/marketing-constants";
-import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
-import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
+import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { benchmark30, datedLong } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
@@ -19,18 +17,12 @@ import { researchAge, staleMark } from "@/lib/research-age";
 import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
 import { LegalPanel } from "./legal-panel";
-import { scoreMandateFit } from "@/lib/mandate";
-import { inferStrategy } from "@/lib/deal-strategy";
 import { sampleHeader } from "@/lib/sample-header";
 import { SampleDealHero } from "@/app/sample-hero";
-import { DemoSections, type DemoData } from "./sections";
-import { ModelSlideshow } from "./model-slideshow";
-import { BrokerQuestions } from "./broker-questions";
+import { DemoSections } from "./sections";
+import { sampleDemoData, samplePlacement } from "./demo-data";
 import { SampleLeverageCard } from "./leverage-card";
-import { SampleDemandCard } from "./demand-card";
-import { liveMetroRates } from "@/lib/live-rates-read";
-import { metroDemand, type MetroDemand } from "@/lib/metro-demand";
-import { metroForAddress } from "@/lib/market-match";
+import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { PlaceBand } from "@/app/place-band";
 import { DataNotices } from "@/app/data-notices";
 import { linkOk } from "@/lib/link-audit";
@@ -66,76 +58,18 @@ export default async function DemoPage() {
   // Today, read once outside the render: a fair market rent's year, the
   // rankings' year-old rule and every research date's age (lib/research-age).
   const today = fmrToday();
-  // Everything below is computed by the SAME functions the logged-in app
-  // runs — evaluateBuyBox, scoreMandateFit, deriveUnderwriteInputs — over
-  // the sample fixture, so the demo can never drift from the product.
-  // The kind-aware picker: the sample is a stabilized asset, so its pro
-  // forma figure is the story tested against the T-12.
-  const omPick = pickOmNoi(SAMPLE_DEAL.extraction.metrics, inferStrategy(SAMPLE_DEAL.extraction).kind);
-  const omNoi = omPick?.noi ?? null;
-  // One derivation with the demo workbook and the demo report
-  // (lib/sample-derive): actuals included, so the three never disagree.
-  const derived = sampleDerivedInputs();
-  const checkSource = {
-    assetClass: SAMPLE_DEAL.extraction.assetClass,
-    market: SAMPLE_DEAL.extraction.market,
-    metrics: SAMPLE_DEAL.extraction.metrics,
-  };
-
-  const data: DemoData = {
-    extraction: SAMPLE_DEAL.extraction,
-    challenges: SAMPLE_DEAL.challenges,
-    comps: SAMPLE_DEAL.comps,
-    reconciliation: SAMPLE_DEAL.reconciliation,
-    market: SAMPLE_DEAL.market,
-    verdict: SAMPLE_DEAL.verdict,
-    model: SAMPLE_DEAL.model,
-    actuals: {
-      rentRoll: {
-        asOf: SAMPLE_DEAL.rentRoll.as_of_date,
-        summary: SAMPLE_DEAL.rentRoll.summary,
-      },
-      t12: {
-        periodEnd: SAMPLE_DEAL.t12.period_end_date,
-        summary: SAMPLE_DEAL.t12.summary,
-      },
-      // The OM's pro forma NOI vs the T-12 actual — same pure comparator
-      // the app uses, fed from the same extraction metric.
-      noiComparison:
-        omNoi != null
-          ? compareNoi(omNoi, SAMPLE_DEAL.t12.summary.noi!, omPick)
-          : null,
-      // An apartment roll, read per unit a month as the app reads it.
-      assetClass: SAMPLE_DEAL.asset_class,
-    },
-    buyBox: {
-      checks: evaluateBuyBox(
-        SAMPLE_DEAL.asset_class,
-        checkSource,
-        SAMPLE_DEMO_BOX,
-      ),
-      mandate: scoreMandateFit(
-        SAMPLE_DEAL.asset_class,
-        checkSource,
-        SAMPLE_DEMO_BOX,
-      ),
-      scope: "personal",
-      provisional: false,
-      hasBox: true,
-    },
-    playground: {
-      inputs: derived.inputs,
-      dealAssetClass: SAMPLE_DEAL.asset_class,
-      checkSource,
-      box: SAMPLE_DEMO_BOX,
-      // The deal page's own read of where each input came from.
-      sources: derived.sources,
-    },
-    underwrite: derived.inputs,
-  };
-  const metrics = data.extraction.metrics;
+  // Today's figures for the market the live figures are read for, through
+  // the deal page's own read (lib/model-vs-market-read): the market check's
+  // demand card and the model's assumptions against the published figures.
+  // A failed read leaves both out rather than the page down.
+  let reads: TodayReads | null = null;
+  try {
+    reads = await todayReads(samplePlacement().live);
+  } catch (err) {
+    console.warn("sample live figures unavailable:", err instanceof Error ? err.message : err);
+  }
   // The shared going-in cap reader, as the deal page and the buy box use it.
-  const cap = findGoingInCap(metrics)?.value ?? null;
+  const cap = findGoingInCap(SAMPLE_DEAL.extraction.metrics)?.value ?? null;
 
   // Leverage check on the SAMPLE — the same lib/leverage code path every
   // real deal page runs, on the same benchmark read (lib/debt-index): the
@@ -150,22 +84,9 @@ export default async function DemoPage() {
     seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"),
   );
   const sampleCapPct = cap ? parsePct(cap) : null;
-
-  // The sample market's demand side — the same rows a screened deal in
-  // Philadelphia reads for its market section (lib/metro-demand): the metro
-  // the sample's own address falls in, through the same matcher and the
-  // same cached reader. The sample is an apartment building, so nothing is
-  // singled out. A failed read leaves the card out rather than the page
-  // down — the demo is the one page a visitor reads without signing in.
-  const sampleMetro = metroForAddress(SAMPLE_DEAL.address);
-  let demand: MetroDemand | null = null;
-  if (sampleMetro) {
-    try {
-      demand = metroDemand(await liveMetroRates(sampleMetro.id), SAMPLE_DEAL.asset_class);
-    } catch (err) {
-      console.warn("sample demand unavailable:", err instanceof Error ? err.message : err);
-    }
-  }
+  // The sample deal as the signed-in sample deal's page hands it to its
+  // sections, each part through the deal page's own readers (./demo-data).
+  const { data } = sampleDemoData({ today, reads, debt });
 
   // The sample's metro through the sector-fundamentals generator — the same
   // rows deal pages benchmark against. Formats a band or a point honestly.
@@ -295,14 +216,15 @@ export default async function DemoPage() {
           </p>
         </PlaceBand>
         <div className="mx-auto w-full max-w-5xl px-6 py-10">
-
           {/* The deal page's own header on the sample (lib/sample-header,
               app/sample-hero): its market photograph, the name, the call,
               the fit, the four figures and the tool row, as the homepage
               draws it — read on the page's day. */}
           <SampleDealHero header={sampleHeader(new Date(`${today}T12:00:00Z`))} titleAs="h2" />
 
-          <div className="mt-8">
+          {/* The deal page's five sections on the sample, in its own
+              section bar and its own order (./sections). */}
+          <div className="mt-6">
             <DemoSections data={data} />
           </div>
 
@@ -311,50 +233,6 @@ export default async function DemoPage() {
               sample's one rule happens to be dormant on a purchase, and the
               panel says so instead of hiding it — that honesty IS the demo. */}
           <LegalPanel legal={sampleLegal(today)} />
-
-          {/* Interactive: the challenger's real broker questions, revealed on
-              click — the reader plays analyst before seeing the drafted ask. */}
-          <BrokerQuestions />
-
-
-          {/* The actual deliverables — a prospect can hold the export in their
-              hands, not just look at a screenshot of it. Public fixture data. */}
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5 shadow-card">
-            <div>
-              <h2 className="text-sm font-semibold tracking-tight">
-                Take the deliverables with you
-              </h2>
-              <p className="mt-1 max-w-md text-sm text-muted">
-                The same files a Pro analyst exports from this screen, free here for the sample.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href="/api/demo/memo"
-                className="rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-              >
-                Sample IC memo (PDF)
-              </a>
-              <a
-                href="/api/demo/report"
-                className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
-              >
-                Full report (PDF)
-              </a>
-              <a
-                href="/api/demo/underwrite.xlsx"
-                className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
-              >
-                Sample model (.xlsx)
-              </a>
-            </div>
-          </div>
-
-          {/* The model, worked through as a slideshow — the artifact that
-              makes the screen concrete. */}
-          <div className="mt-10">
-            <ModelSlideshow model={data.model} />
-          </div>
 
           {/* What comes after the screen. Rendered from the SAME DEEP_TOOLS
               constant the homepage's grid uses, so the sample screen and the
@@ -565,7 +443,6 @@ export default async function DemoPage() {
             </div>
           </div>
           <SampleLeverageCard capPct={sampleCapPct} bench30={bench30} tenYear={debt.tenYear} today={today} />
-          <SampleDemandCard demand={demand} />
         </div>
       </section>
 

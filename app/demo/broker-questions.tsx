@@ -21,7 +21,7 @@ export function BrokerQuestions() {
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   if (ITEMS.length === 0) return null;
   return (
-    <section className="mt-8 rounded-2xl border border-line bg-surface p-5 shadow-card">
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">
           Try it: what would you ask the broker?
