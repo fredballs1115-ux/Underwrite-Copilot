@@ -17,6 +17,9 @@ import { PendingButton } from "../pending-button";
 import { GeoPicker } from "./geo-picker";
 import { coveredMarketGeoTargets } from "@/lib/market-match";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
+import { pipelineCard, type PipelineCardRow } from "@/lib/pipeline-card";
+import { isOpenStage, normalizeStage } from "@/lib/stages";
+import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem } from "./box-preview";
 
 export const metadata: Metadata = { title: "Buy box" };
 
@@ -59,6 +62,36 @@ export default async function CriteriaPage({
   // The reader's own day (lib/reader-day), read once per request: the
   // exchange's clock is said on it, as the deal header's chip says it.
   const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+
+  // What the box as saved says about the reader's own deals (signed-in
+  // gaps, M12): the deals it judges — the team's under a team box, the
+  // reader's own off a team — each built by the pipeline's own card
+  // builder, so the chip here is the card's. One read, the newest few.
+  const preview = await (async () => {
+    if (!user || !active.box) return { items: [], more: false };
+    let q = supabase
+      .from("deals")
+      .select("id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample")
+      .order("created_at", { ascending: false })
+      .limit(BOX_PREVIEW_MAX * 3);
+    q = active.scope === "team" && active.teamId ? q.eq("team_id", active.teamId) : q.eq("user_id", user.id).is("team_id", null);
+    const { data, error: readError } = await q;
+    if (readError || !data) return { items: [], more: false };
+    const live = (data as PipelineCardRow[]).filter((d) => isOpenStage(normalizeStage(d.stage)));
+    const items = live.slice(0, BOX_PREVIEW_MAX).map((d) =>
+      boxPreviewItem(
+        pipelineCard(d, {
+          viewerId: user.id,
+          onTeam: active.scope === "team",
+          box: active.box,
+          offersDue: null,
+          today: todayIso,
+          googleEnabled: false,
+        }),
+      ),
+    );
+    return { items, more: live.length > BOX_PREVIEW_MAX || data.length === BOX_PREVIEW_MAX * 3 };
+  })();
 
   const banner = saved
     ? {
@@ -114,6 +147,8 @@ export default async function CriteriaPage({
           )}
         </p>
       )}
+
+      <BoxPreview items={preview.items} more={preview.more} />
 
       {!active.editable ? (
         <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
