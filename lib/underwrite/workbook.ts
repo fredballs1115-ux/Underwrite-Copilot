@@ -1335,7 +1335,9 @@ function buildOmFacts(ws: ExcelJS.Worksheet, facts: OmFacts) {
     facts.totalPages != null
       ? `A page is printed only where it falls within the memorandum's ${facts.totalPages} pages; any other is "${SOURCE_NOT_LOCATED}".`
       : `The memorandum's length was not read, so no page can be checked against it and none is printed.`;
-  across(2, `${facts.rows.length} figures, ${facts.flaggedCount} flagged. Each value is the memorandum's own words. ${pages}`);
+  // "1 figure", never "1 figures" (audit C7, L9).
+  const figures = `${facts.rows.length} ${facts.rows.length === 1 ? "figure" : "figures"}`;
+  across(2, `${figures}, ${facts.flaggedCount} flagged. Each value is the memorandum's own words. ${pages}`);
   across(3, `${FLAG_RULE} The Assumptions tab says which of them the model runs on; change the model there.`);
   const headers = ["Figure", "As stated", "OM page", "Basis", "Flagged", "Why flagged"];
   sectionHeader(ws, OM_FACTS_HEAD_ROW, headers[0], 1, headers.length);

@@ -103,6 +103,14 @@ describe("the OM Facts tab", () => {
     expect(listed).toBe(true);
   });
 
+  it("counts one figure as one (audit C7, L9)", async () => {
+    const one = ex({ ...extraction, metrics: [m("Asking price", "$20,000,000", "na", "p. 2")] });
+    const wb = await load(await buildUnderwriteWorkbook(model, null, null, null, undefined, null, null, undefined, readOmFacts(one)));
+    const line = String(wb.getWorksheet("OM Facts")!.getCell(2, 1).value);
+    expect(line).toContain("1 figure, 0 flagged.");
+    expect(line).not.toContain("1 figures");
+  });
+
   it("is absent where nothing was read — never an empty tab — and the cover does not list it", async () => {
     for (const facts of [undefined, null, readOmFacts({ metrics: [], totalPages: 40 })]) {
       const wb = await load(await buildUnderwriteWorkbook(model, null, null, null, undefined, null, null, undefined, facts));
