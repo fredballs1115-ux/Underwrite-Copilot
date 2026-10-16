@@ -38,7 +38,9 @@ bower_components
 build/Release
 
 # Dependency directories
-node_modules/
+# No trailing slash: a worktree links node_modules as a symlink, which a
+# directory pattern does not match, and an agent's commit once carried one.
+node_modules
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
