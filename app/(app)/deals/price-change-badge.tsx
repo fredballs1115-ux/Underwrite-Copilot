@@ -7,7 +7,15 @@ import { priceChangePct, priceChangeWords, type PriceChange } from "@/lib/price-
  * tone, and the whole sentence (both asks, the screen's day) for a screen
  * reader and in its title. Nothing where the ask did not move.
  */
-export function PriceChangeBadge({ change }: { change: PriceChange | null | undefined }) {
+export function PriceChangeBadge({
+  change,
+  inline = true,
+}: {
+  change: PriceChange | null | undefined;
+  /** beside the price (the list row's), or on a line of its own under it
+   *  (the card's, whose price column truncates) */
+  inline?: boolean;
+}) {
   if (!change) return null;
   const words = priceChangeWords(change);
   const cut = change.direction === "cut";
@@ -15,7 +23,7 @@ export function PriceChangeBadge({ change }: { change: PriceChange | null | unde
     <span
       data-qa="price-change"
       title={words}
-      className={`ml-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-px align-middle font-sans text-[10px] font-semibold ${
+      className={`${inline ? "ml-1 " : ""}inline-flex items-center gap-0.5 rounded-full px-1.5 py-px align-middle font-sans text-[10px] font-semibold ${
         cut ? "bg-pass/5 text-pass" : "bg-caution/5 text-caution"
       }`}
     >

@@ -113,13 +113,33 @@ function TileCall({ d }: { d: DealCard }) {
   );
 }
 
-function TileStat({ label, title, sub, children }: { label: string; title?: string; sub?: string | null; children: ReactNode }) {
+function TileStat({
+  label,
+  title,
+  sub,
+  badge,
+  children,
+}: {
+  label: string;
+  title?: string;
+  sub?: string | null;
+  /** a mark on its own line under the figure (the price's move, research
+   *  pass 24 B14): beside the figure in a column this narrow, the figure's
+   *  truncation clipped it (audit C8, M6) */
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="min-w-0">
       <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">{label}</dt>
       <dd className="mt-0.5 truncate font-mono text-sm tabular-nums text-ink" title={title}>
         {children}
       </dd>
+      {badge ? (
+        <dd className="mt-0.5 leading-none" data-qa="tile-badge">
+          {badge}
+        </dd>
+      ) : null}
       {/* A second figure under the first, as a listing card prints the
           price per unit under the price (#469). */}
       {sub && <dd className="truncate font-mono text-[10px] tabular-nums text-muted" data-qa="tile-sub">{sub}</dd>}
@@ -324,9 +344,13 @@ export const DealTile = memo(function DealTile({
         {/* While a first screen has not read the terms, an empty slot
             shimmers ("not read yet"); once a read finds none, the dash
             ("not stated"). */}
-        <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
+        <TileStat
+          label="Price"
+          title={d.slots.price ?? undefined}
+          sub={d.slots.basis}
+          badge={d.priceChange ? <PriceChangeBadge change={d.priceChange} inline={false} /> : null}
+        >
           {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
-          <PriceChangeBadge change={d.priceChange} />
         </TileStat>
         {/* A plan deal has no going-in cap; its yield on total cost takes
             the slot, labelled. Nor has a note: its yield to maturity

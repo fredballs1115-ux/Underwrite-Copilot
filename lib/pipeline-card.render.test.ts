@@ -95,3 +95,25 @@ describe("the empty pipeline", () => {
     expect(html).not.toContain('data-qa="fit-checked"');
   });
 });
+
+// Audit C8, M6: the price's move sat inline after the price inside a
+// truncating <dd> about 75–100px wide, so "$40–42M ▼4.4%" clipped the
+// percentage. It is a line of its own under the price.
+describe("the price's move on a card", () => {
+  it("sits on its own line under the price, never inside the truncating figure", async () => {
+    const { priceChangeOf } = await import("@/lib/price-change");
+    const change = priceChangeOf(
+      { at: "2026-10-16T09:00:00Z", extraction: { metrics: [{ label: "Asking price", value: "$42,000,000" }] }, verdict: null },
+      { metrics: [{ label: "Asking price", value: "$40,150,000" }] },
+    );
+    expect(change?.direction).toBe("cut");
+    const html = render(React.createElement(DealTilePreview, { d: { ...card, priceChange: change }, note: "Sample deal", todayIso: TODAY }));
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const badge = html.match(/<dd class="mt-0\.5 leading-none" data-qa="tile-badge">([\s\S]*?)<\/dd>/);
+    expect(badge?.[1]).toContain('data-qa="price-change"');
+    // No truncating <dd> holds it.
+    for (const dd of html.match(/<dd class="[^"]*truncate[^"]*"[^>]*>[\s\S]*?<\/dd>/g) ?? []) expect(dd).not.toContain("price-change");
+    expect(visibleText(html)).toContain("since the last screen");
+  });
+});
