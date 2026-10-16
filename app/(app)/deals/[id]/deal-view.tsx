@@ -998,7 +998,7 @@ export function DealView({
               omUrl={omUrl}
               askers={askerNames ? { me: userId, names: askerNames } : null}
             />
-            <DealOutcomeCard dealId={dealId} stage={dealStage} history={stageHistory} />
+            <DealOutcomeCard dealId={dealId} stage={dealStage} history={stageHistory} names={askerNames} />
             <DecisionLog
               dealId={dealId}
               notes={notes}

@@ -47,10 +47,14 @@ export function DealOutcomeCard({
   dealId,
   stage,
   history,
+  names = null,
 }: {
   dealId: string;
   stage: string | null | undefined;
   history: StageChange[];
+  /** the team's names by account (the deal page's roster lookup), so a
+   *  trade says who reported it as the team knows them today */
+  names?: Record<string, string> | null;
 }) {
   const i = outcomeEntryIndex(stage, history);
   if (i == null) return null;
@@ -74,7 +78,7 @@ export function DealOutcomeCard({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
           {dead ? "What it traded at" : "The price paid"}
         </h3>
-        {trade && <p className="mt-1 text-sm" data-qa="deal-outcome-trade">{tradeWords(trade)}</p>}
+        {trade && <p className="mt-1 text-sm" data-qa="deal-outcome-trade">{tradeWords(trade, names)}</p>}
         <form action={setDealOutcome} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
           <input type="hidden" name="dealId" value={dealId} />
           <label className="text-xs text-muted">
@@ -108,7 +112,7 @@ export function DealOutcomeCard({
           <SaveTrade />
         </form>
         <p className="mt-1.5 text-[11px] text-muted">
-          A reported price, not a recorded one: it is kept apart from the asking prices your pipeline pools, with your name and the day.
+          {"A reported price, not a recorded one: it is kept apart from the asking prices your pipeline pools, with your profile's name (else your email) and the day."}
         </p>
       </div>
     </section>

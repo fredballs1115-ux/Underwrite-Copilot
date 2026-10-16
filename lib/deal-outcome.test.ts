@@ -62,6 +62,26 @@ describe("the outcome rides on the move that ended the deal", () => {
   });
 });
 
+// Audit C8, L4: the card said "with your name" and stored the email; the
+// reporter is now their account, named as the team's roster names it.
+describe("who reported a trade", () => {
+  it("keeps the reporter's account beside the name, and the page's roster names them", () => {
+    const id = "6f1c2a7e-0d4b-4a51-9a3e-2f8b9c1d0e11";
+    const form = readOutcomeForm({ price: "$41.5M" }, { id, name: "Jane Analyst" }, NOW);
+    expect(form.ok && form.outcome.trade).toMatchObject({ reportedBy: "Jane Analyst", reportedById: id });
+    const trade = (form as { ok: true; outcome: { trade: Parameters<typeof tradeWords>[0] } }).outcome.trade;
+    // Stored and read back as the column holds it.
+    const history = withOutcome("dead", dead, { reason: null, trade })!;
+    const back = parseStageHistory(JSON.parse(JSON.stringify(history)));
+    expect(back[back.length - 1].outcome?.trade?.reportedById).toBe(id);
+    expect(tradeWords(trade)).toContain("reported by Jane Analyst");
+    expect(tradeWords(trade, { [id]: "Jane Q. Analyst" })).toContain("reported by Jane Q. Analyst");
+    expect(outcomeWords({ reason: null, trade }, { [id]: "Jane Q. Analyst" })).toContain("reported by Jane Q. Analyst");
+    // A trade reported before the account was kept reads as it did.
+    expect(tradeWords({ ...trade, reportedById: undefined }, { [id]: "Jane Q. Analyst" })).toContain("reported by Jane Analyst");
+  });
+});
+
 describe("readOutcomeForm", () => {
   it("reads a reason alone, a trade with a blank buyer and day, and refuses what is no figure or no day", () => {
     expect(readOutcomeForm({ reason: "lost_to_bidder" }, null, NOW)).toEqual({ ok: true, outcome: { reason: "lost_to_bidder", trade: null } });

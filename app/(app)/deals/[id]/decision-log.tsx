@@ -72,7 +72,8 @@ export function DecisionLog({
   userId: string | null;
   /** a team deal's teammates by user id, named as Ask's askers are (the
    *  name each set, else their email's local part); where it is not
-   *  handed in, a teammate's note reads its author's email's local part */
+   *  handed in, a teammate's note reads its author's email's local part;
+   *  also who reported a trade, by account */
   names?: Record<string, string> | null;
 }) {
   const entries: Entry[] = [
@@ -162,7 +163,7 @@ export function DecisionLog({
                     {/* What became of the deal, on the move that ended it
                         (research pass 24, B4). */}
                     {e.stage.outcome ? (
-                      <span className="mt-0.5 block text-xs text-ink">{outcomeWords(e.stage.outcome)}</span>
+                      <span className="mt-0.5 block text-xs text-ink">{outcomeWords(e.stage.outcome, names)}</span>
                     ) : null}
                   </p>
                 )}

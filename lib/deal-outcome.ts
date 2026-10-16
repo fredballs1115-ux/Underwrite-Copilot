@@ -69,16 +69,24 @@ export type OutcomeForm =
   | { ok: true; outcome: DealOutcome }
   | { ok: false; error: "reason" | "price" | "date" };
 
+/** Who reported a trade: their account and the name it read under then. */
+export interface Reporter {
+  id: string | null;
+  name: string | null;
+}
+
 /**
  * The outcome form as typed: the reason (Dead only), and a trade where a
  * price is typed — its buyer and its day as given. `reporter` and `nowIso`
- * mark who reported it and when.
+ * mark who reported it and when: the account where one is given, and the
+ * name (a bare string is the name alone).
  */
 export function readOutcomeForm(
   fields: { reason?: string | null; price?: string | null; buyer?: string | null; date?: string | null },
-  reporter: string | null,
+  reporter: Reporter | string | null,
   nowIso: string,
 ): OutcomeForm {
+  const who: Reporter = typeof reporter === "string" || reporter == null ? { id: null, name: reporter ?? null } : reporter;
   const rawReason = (fields.reason ?? "").trim();
   let reason: OutcomeReason | null = null;
   if (rawReason) {
@@ -94,7 +102,14 @@ export function readOutcomeForm(
     const date = rawDate ? deadlineDay(rawDate) : null;
     if (rawDate && !date) return { ok: false, error: "date" };
     const buyer = (fields.buyer ?? "").trim().slice(0, 120) || null;
-    trade = { price, buyer, date, reportedBy: reporter?.trim().slice(0, 120) || null, reportedAt: nowIso };
+    trade = {
+      price,
+      buyer,
+      date,
+      reportedBy: who.name?.trim().slice(0, 120) || null,
+      ...(who.id ? { reportedById: who.id } : {}),
+      reportedAt: nowIso,
+    };
   }
   return { ok: true, outcome: { reason, trade } };
 }
@@ -122,16 +137,24 @@ export function tradePriceText(price: number): string {
   return compactUsd(price, { millions: 2 });
 }
 
-export function tradeWords(trade: ReportedTrade): string {
+/** The reporter as a reader of the page knows them: the name the team's
+ *  roster gives their account today (`names`, the page's own lookup), else
+ *  the name the trade was reported under. */
+export function reporterName(trade: ReportedTrade, names?: Record<string, string> | null): string | null {
+  return (trade.reportedById && names?.[trade.reportedById]) || trade.reportedBy;
+}
+
+export function tradeWords(trade: ReportedTrade, names?: Record<string, string> | null): string {
   const to = trade.buyer ? ` to ${trade.buyer}` : "";
   const on = trade.date ? ` on ${dayWords(trade.date)}` : "";
-  const by = trade.reportedBy ? `reported by ${trade.reportedBy}` : "reported";
+  const reporter = reporterName(trade, names);
+  const by = reporter ? `reported by ${reporter}` : "reported";
   return `Traded at ${tradePriceText(trade.price)}${to}${on} — ${by}, ${dayWords(trade.reportedAt)}`;
 }
 
 /** The outcome in one line, for the decision log and the card. */
-export function outcomeWords(outcome: DealOutcome): string {
-  return [outcome.reason ? `Why: ${OUTCOME_REASON_LABEL[outcome.reason]}` : null, outcome.trade ? tradeWords(outcome.trade) : null]
+export function outcomeWords(outcome: DealOutcome, names?: Record<string, string> | null): string {
+  return [outcome.reason ? `Why: ${OUTCOME_REASON_LABEL[outcome.reason]}` : null, outcome.trade ? tradeWords(outcome.trade, names) : null]
     .filter(Boolean)
     .join(". ");
 }

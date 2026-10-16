@@ -49,6 +49,7 @@ import { checkPdfOpens } from "@/lib/pdf-open";
 import { capRefusalOf } from "@/lib/deal-allowance";
 import { deadlineDay } from "@/lib/deadline-day";
 import { currentOutcome, readOutcomeForm, withOutcome } from "@/lib/deal-outcome";
+import { writeStageGuarded } from "@/lib/stage-write";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -717,26 +718,21 @@ export async function setStage(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Read the current stage + history so the change is logged with its date.
-  const { data: current } = await supabase
-    .from("deals")
-    .select("stage, stage_history")
-    .eq("id", dealId)
-    .maybeSingle();
-  if (!current) redirect(backTo);
-  if (normalizeStage(current!.stage as string) === stage) redirect(backTo);
-
-  const history = [
-    ...parseStageHistory(current!.stage_history),
-    { stage: stage as Stage, at: new Date().toISOString() },
-  ];
-
+  // Read the current stage + history so the change is logged with its date,
+  // and write it only onto the row as read: a change a teammate made in
+  // between is read again and kept, never written over (lib/stage-write,
+  // audit C8, L4).
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("deals")
-    .update({ stage, stage_history: history, updated_at: now })
-    .eq("id", dealId);
-  if (error) {
+  const written = await writeStageGuarded(supabase, dealId, (current) => {
+    if (normalizeStage(current.stage as string) === stage) return { skip: "unchanged" };
+    const history = [...parseStageHistory(current.stage_history), { stage: stage as Stage, at: now }];
+    return { patch: { stage, stage_history: history, updated_at: now } };
+  });
+  if (!written.ok && written.why !== "error") {
+    if (written.why === "conflict") redirect(`/deals/${dealId}?error=stage`);
+    redirect(backTo);
+  }
+  if (!written.ok) {
     // Pre-0013 schema: the history column may not exist yet — the stage value
     // itself should still save where the old constraint allows it.
     const { error: retryErr } = await supabase
@@ -764,12 +760,12 @@ export async function setDealOutcome(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: current } = await supabase
-    .from("deals")
-    .select("stage, stage_history")
-    .eq("id", dealId)
-    .maybeSingle();
-  if (!current) redirect(`/deals/${dealId}`);
+  // Who reports a trade: their account, and the name their profile gives
+  // (else their email) — the card says "your profile's name" and the deal
+  // page names a teammate's account as the team knows it today (audit C8,
+  // L4). A profile that cannot be read leaves the email.
+  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user!.id).maybeSingle();
+  const reporterName = ((profile as { full_name?: string | null } | null)?.full_name ?? "").trim() || user!.email || null;
 
   const form = readOutcomeForm(
     {
@@ -778,26 +774,28 @@ export async function setDealOutcome(formData: FormData) {
       buyer: formData.get("buyer") as string | null,
       date: formData.get("date") as string | null,
     },
-    user!.email ?? null,
+    { id: user!.id, name: reporterName },
     new Date().toISOString(),
   );
   if (!form.ok) redirect(`/deals/${dealId}?error=outcome${form.error}`);
   // The reason and the trade are two forms on the card: a field the form
   // did not send keeps what is recorded — a tap on a reason never clears a
-  // reported trade, nor a saved trade the reason.
-  const recorded = parseStageHistory(current!.stage_history);
-  const existing = currentOutcome(current!.stage as string | null, recorded);
-  const outcome = {
-    reason: formData.has("reason") ? form.outcome.reason : (existing?.reason ?? null),
-    trade: formData.has("price") ? form.outcome.trade : (existing?.trade ?? null),
-  };
-  const history = withOutcome(current!.stage as string | null, recorded, outcome);
-  if (!history) redirect(`/deals/${dealId}?error=outcome`);
-  const { error } = await supabase
-    .from("deals")
-    .update({ stage_history: history, updated_at: new Date().toISOString() })
-    .eq("id", dealId);
-  if (error) redirect(`/deals/${dealId}?error=outcome`);
+  // reported trade, nor a saved trade the reason. Built on the row as read,
+  // and written only onto it: a stage change made in between is read again
+  // and kept, never put back (lib/stage-write).
+  const written = await writeStageGuarded(supabase, dealId, (current) => {
+    const recorded = parseStageHistory(current.stage_history);
+    const existing = currentOutcome(current.stage as string | null, recorded);
+    const outcome = {
+      reason: formData.has("reason") ? form.outcome.reason : (existing?.reason ?? null),
+      trade: formData.has("price") ? form.outcome.trade : (existing?.trade ?? null),
+    };
+    const history = withOutcome(current.stage as string | null, recorded, outcome);
+    if (!history) return { skip: "refused" };
+    return { patch: { stage_history: history, updated_at: new Date().toISOString() } };
+  });
+  if (!written.ok && written.why === "missing") redirect(`/deals/${dealId}`);
+  if (!written.ok) redirect(`/deals/${dealId}?error=outcome`);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/analytics");
   redirect(`/deals/${dealId}`);

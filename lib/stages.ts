@@ -73,8 +73,13 @@ export interface ReportedTrade {
   buyer: string | null;
   /** the day it traded, yyyy-mm-dd, as reported; null where not given */
   date: string | null;
-  /** the reporter's name or email as it read when they reported it */
+  /** the reporter's name (their profile's), else email, as it read when
+   *  they reported it — said where the reader has no newer name for them */
   reportedBy: string | null;
+  /** the reporter's account, so a page that knows the team's names says
+   *  the name it knows today (audit C8, L4); absent on a trade reported
+   *  before it was kept */
+  reportedById?: string | null;
   /** ISO timestamp of the report */
   reportedAt: string;
 }
@@ -106,7 +111,8 @@ function parseTrade(raw: unknown): ReportedTrade | null {
   if (price == null || !reportedAt) return null;
   const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, TEXT_MAX) : null);
   const date = typeof t.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : null;
-  return { price, buyer: text(t.buyer), date, reportedBy: text(t.reportedBy), reportedAt };
+  const byId = typeof t.reportedById === "string" && /^[0-9a-f-]{8,64}$/i.test(t.reportedById) ? t.reportedById : null;
+  return { price, buyer: text(t.buyer), date, reportedBy: text(t.reportedBy), ...(byId ? { reportedById: byId } : {}), reportedAt };
 }
 
 /** A stored outcome, kept only where it is well formed and on an entry that
