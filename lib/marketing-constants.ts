@@ -70,7 +70,11 @@ export const DEEP_TOOLS: readonly DeepTool[] = [
       "Re-run a deal with a lower price and a tighter exit cap and the return jumps — but which change did the work? The bridge attributes the move to each input by Shapley value, so the answer doesn't depend on the order you'd have applied them, and the bars sum to the headline change exactly.",
   },
   {
-    title: "Two brokers, one asset, a $6.5M gap",
+    // No dollar figure: the gap this card once named ($6.5M) was the
+    // valuation tests' grounding case, not the sample's — the sample deal
+    // holds no BOVs, so there is no gap of its own to quote (lib/deep-tools
+    // test holds the cards to figures of none).
+    title: "Two brokers, one asset, the gap explained",
     where: "Deal → Valuations",
     blurb:
       "Upload both BOVs and the gap gets decomposed into Year-1 NOI, cap rate and capex treatment — with anything the identity can't explain shown as unexplained rather than smoothed over. Then each broker's price runs through your own model, so you see the levered IRR each one actually implies.",
