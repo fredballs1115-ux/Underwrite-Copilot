@@ -8,7 +8,7 @@
 // word doubled; the markup for an image with no alt, a button or link with
 // no accessible name, a form control with no label, an id used twice. Same
 // components, same props the server pages hand them.
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -1231,6 +1231,13 @@ describe("ModelView — the sample model renders every panel", () => {
   });
 
   describe("/demo — the signed-in sample deal's sections, drawn by the deal page's own components", () => {
+    // The walkthrough's sections past Overview load as their own chunk
+    // (app/landing-interactive `loadWalkthrough`); /demo's Analyses tab draws
+    // them, so load the chunk before rendering, as the browser would.
+    beforeAll(async () => {
+      const { loadWalkthrough } = await import("@/app/landing-interactive");
+      await loadWalkthrough();
+    });
     const { data } = sampleDemoData({ today: "2026-09-21", reads: null, debt: NO_DEBT_SEEDS });
     const section = (initialSection: "overview" | "financials" | "buybox" | "analyses" | "documents", initialAnalysis?: "verdict" | "challenger" | "comps" | "market" | "reconciler") =>
       render(React.createElement(DemoSections, { data, initialSection, ...(initialAnalysis ? { initialAnalysis } : {}) }));

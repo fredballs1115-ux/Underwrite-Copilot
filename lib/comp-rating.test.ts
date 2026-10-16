@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { COMP_RATING, inCompOrder } from "./comp-rating";
 
-const SECTIONS = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "deal-sections.tsx"), "utf8");
+const SECTIONS = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "deal-sections-view.tsx"), "utf8");
 
 describe("a comp's grade", () => {
   it("is the deal page's, word for word and tone for tone", () => {
