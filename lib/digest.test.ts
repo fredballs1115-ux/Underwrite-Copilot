@@ -535,6 +535,26 @@ describe("the digest says what moved and the reader's own tasks (research pass 2
     expect(out.myTasks!.map((t) => t.pictureUrl)).toEqual([`${SITE}/sq/${harbor.id}`]);
   });
 
+  // Audit C8, L9: the total was counted from at most DIGEST_TASKS_READ rows,
+  // after the tasks on deals the person cannot see were dropped, so "and N
+  // more" could undercount.
+  it("says a count read at its cap as a floor, never as the whole", () => {
+    const harbor = deal({ name: "Harbor Point" });
+    const tasks = Array.from({ length: 12 }, (_, i) => ({ title: `Task ${i}`, due_date: day(1), deal_id: harbor.id }));
+    const opts = { now: NOW, appUrl: SITE, recipient: "u1", pictureUrl: () => null, tasks };
+    const whole = buildDigest([harbor], new Map(), opts)!;
+    expect(whole.myTasksTotalIsFloor).toBe(false);
+    const capped = buildDigest([harbor], new Map(), { ...opts, tasksCapped: true })!;
+    expect(capped.myTasksTotalIsFloor).toBe(true);
+    const more = capped.myTasksTotal! - capped.myTasks!.length;
+    const email = (c: typeof whole) => weeklyDigestEmail({ ...c, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` }).text;
+    expect(email(whole)).toContain(`and ${more} more due by`);
+    expect(email(capped)).toContain(`and at least ${more} more due by`);
+    // Every task read is listed, but the read stopped at its cap.
+    const few = buildDigest([harbor], new Map(), { ...opts, tasks: tasks.slice(0, 2), tasksCapped: true })!;
+    expect(email(few)).toContain("and possibly more due by");
+  });
+
   it("says a task read that failed, never shows it as none", () => {
     const out = buildDigest([deal()], new Map(), { now: NOW, appUrl: SITE, recipient: "u1", pictureUrl: () => null, tasks: null })!;
     expect(out.myTasksUnread).toBe(true);

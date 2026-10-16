@@ -339,6 +339,9 @@ export interface DigestInput {
   }[];
   /** how many such tasks there are — `myTasks` lists the soonest few */
   myTasksTotal?: number;
+  /** `myTasksTotal` is a floor: the read stopped at its cap, so there may
+   *  be more — said "at least", never as the whole count */
+  myTasksTotalIsFloor?: boolean;
   /** the tasks could not be read: said, never shown as none */
   myTasksUnread?: boolean;
   pipelineUrl: string;
@@ -393,7 +396,12 @@ export function weeklyDigestEmail(input: DigestInput): {
   const movedMoreWords = movedMore > 0 ? `and ${movedMore} more since last week` : null;
   const myTasks = input.myTasks ?? [];
   const tasksMore = Math.max(input.myTasksTotal ?? 0, myTasks.length) - myTasks.length;
-  const tasksMoreWords = tasksMore > 0 ? `and ${tasksMore} more due by ${input.offersThrough}` : null;
+  const tasksMoreWords =
+    tasksMore > 0
+      ? `and ${input.myTasksTotalIsFloor ? "at least " : ""}${tasksMore} more due by ${input.offersThrough}`
+      : input.myTasksTotalIsFloor && myTasks.length > 0
+        ? `and possibly more due by ${input.offersThrough}`
+        : null;
   const tasksTitle = `Your tasks due by ${input.offersThrough}`;
   const tasksUnreadWords = "Your tasks could not be read for this digest — open My tasks to see them.";
 

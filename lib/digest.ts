@@ -100,6 +100,7 @@ export type DigestContent = Pick<
   | "movedTotal"
   | "myTasks"
   | "myTasksTotal"
+  | "myTasksTotalIsFloor"
   | "myTasksUnread"
 > & { offersDueTotal: number; verdictsTotal: number };
 
@@ -172,6 +173,9 @@ export function buildDigest(
      *  failed — the digest says so rather than "none" — and absent where
      *  none was read */
     tasks?: readonly DigestTaskRow[] | null;
+    /** the task read hit its cap (`DIGEST_TASKS_READ`): there may be more
+     *  of the person's tasks than were read, so their count is a floor */
+    tasksCapped?: boolean;
   },
 ): DigestContent | null {
   const { now } = opts;
@@ -270,6 +274,10 @@ export function buildDigest(
     movedTotal: week.moved.length,
     myTasks,
     myTasksTotal: mine.length,
+    // Counted from at most DIGEST_TASKS_READ rows, after the tasks on deals
+    // the person cannot see are dropped: a read that hit its cap counts a
+    // floor, and the email says "at least" (audit C8, L9).
+    myTasksTotalIsFloor: opts.tasks != null && opts.tasksCapped === true,
     myTasksUnread: opts.tasks === null,
   };
 }
@@ -412,7 +420,13 @@ export async function runWeeklyDigests(
       if (tasksErr) console.error(`[digest] task read failed for ${profile.id} — said in the email:`, tasksErr.message);
       const tasks = tasksErr ? null : ((taskRows ?? []) as DigestTaskRow[]).filter((t) => !!t.due_date);
 
-      const content = buildDigest(deals, jobs, { now, appUrl: site, recipient: profile.id, tasks });
+      const content = buildDigest(deals, jobs, {
+        now,
+        appUrl: site,
+        recipient: profile.id,
+        tasks,
+        tasksCapped: (taskRows ?? []).length >= DIGEST_TASKS_READ,
+      });
       if (!content) continue; // nothing open — nothing to say
 
       const { data: userRes } = await admin.auth.admin.getUserById(profile.id);
