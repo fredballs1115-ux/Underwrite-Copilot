@@ -27,6 +27,7 @@ import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
 import { MarketTable } from "./market-table";
+import { scorecardNote } from "./scorecard-note";
 import { readAllResult } from "@/lib/read-all";
 import { typedByHand } from "@/lib/manual-deal";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -361,9 +362,7 @@ export default async function AnalyticsPage() {
                 </table>
               </div>
               <p className="mt-2 text-xs text-muted">
-                {`Firms as each memorandum names its listing team; a deal co-listed by two firms counts for each. A deal fits only where the screen could check every criterion of your buy box, or misses one outright; one that passed with criteria left unchecked is counted apart as checked on part of the box. The Go calls are over the deals with a call.${
-                  brokers.unnamed > 0 ? ` ${brokers.unnamed} deal${brokers.unnamed === 1 ? " names" : "s name"} no firm.` : ""
-                }`}
+                {scorecardNote(brokers.unnamed)}
               </p>
             </section>
           )}
