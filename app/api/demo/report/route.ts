@@ -1,4 +1,4 @@
-import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
+import { buildReportData, renderReportPdf, withActuals } from "@/lib/memo/report-document";
 import type { MemoCover, MemoData } from "@/lib/memo/memo-document";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
@@ -19,7 +19,7 @@ import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leaseho
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
-import { sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
+import { sampleActuals, sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
 
@@ -31,8 +31,10 @@ let cachedRender: { day: string; pdf: Promise<Buffer> } | null = null;
 /**
  * The full report the signed-in route (app/api/deals/[id]/report) builds for
  * the sample, call for call: the same row, the same model reads off the same
- * derivation, the same arguments to `buildReportData` in the same order (a
- * test holds the two argument lists equal). What a visitor's copy cannot
+ * derivation, the same arguments to `buildReportData` in the same order,
+ * wrapped in `withActuals` with the sample's rent roll and T-12 and drawn
+ * by `renderReportPdf` (lib/sample-documents.render.test.ts renders both
+ * routes and holds the two PDFs' text equal). What a visitor's copy cannot
  * have, and why, is said where each is set below.
  */
 async function renderSampleReport(dateStr: string, readerDay: string): Promise<Buffer> {
@@ -154,7 +156,16 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
   // the one bounded, validated helper (lib/sample-cover).
   const cover = await sampleCover(readerDay);
 
-  const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay);
+  // The sample's rent roll and T-12 against its memorandum: the seed action
+  // stores both beside the signed-in sample, whose report wraps its data
+  // in `withActuals` and so prints "The actuals" page — this one does too
+  // (audit C8, H1).
+  const actuals = sampleActuals();
+
+  const input = withActuals(
+    buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay),
+    actuals,
+  );
   // The sample: its stress test is the first-draft model's run, which the
   // challenger page's heading says (lib/stress-test-title) — the row's
   // `is_sample` says so too.

@@ -9,11 +9,15 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import { COVER_SIZE, coverFrom } from "@/lib/memo/cover-aerial";
 import type { MemoCover } from "@/lib/memo/memo-document";
 import { fetchAerialImage } from "@/lib/imagery";
+import { actualsFromRows, actualsShortLine, type ActualsRead } from "@/lib/actuals/actuals-read";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { shownAssetClass } from "@/lib/asset-class";
+import { pdfSafe } from "@/lib/memo/pdf-text";
 
 /** The sample is placed at neighbourhood level on purpose (lib/sample-deal:
  *  never a street address), so its cover is the USGS frame of Brewerytown
@@ -100,4 +104,33 @@ export function sampleDocumentChecks(): BuyBoxCheck[] {
     ),
     SAMPLE_DEMO_BOX,
   );
+}
+
+/**
+ * The sample's rent roll and T-12 against its memorandum (research pass 24,
+ * B3), as the signed-in report and memo read them for the sample: the seed
+ * action stores both documents beside the deal (app/(app)/deals/actions.ts,
+ * `SAMPLE_DEAL.rentRoll` / `.t12`), and the two routes read them through
+ * `actualsFromRows` with the row's kind and class — the same expressions,
+ * on the same row (`sampleDocumentRow`). The public report wraps its data in
+ * `withActuals` with this, so it carries "The actuals" page the signed-in
+ * sample's report carries (audit C8, H1).
+ */
+export function sampleActuals(): ActualsRead | null {
+  const deal = sampleDocumentRow();
+  const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+  return actualsFromRows(
+    extraction,
+    inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null),
+    shownAssetClass(deal.asset_class as string | null, extraction) || null,
+    SAMPLE_DEAL.rentRoll,
+    SAMPLE_DEAL.t12,
+  );
+}
+
+/** The memo's actuals line for the sample, as the signed-in memo route
+ *  writes it (`pdfSafe(actualsShortLine(…))`); `renderMemoPdf` drops it
+ *  where it would push the one-page memo onto a second page. */
+export function sampleActualsLine(): string {
+  return pdfSafe(actualsShortLine(sampleActuals()));
 }

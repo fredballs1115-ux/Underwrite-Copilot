@@ -146,6 +146,38 @@ describe("the sample's public documents are the signed-in sample's", () => {
     );
   });
 
+  // The chain past the builders (audit C8, H1): the signed-in report wraps
+  // its data in `withActuals` and the memo goes through `renderMemoPdf` with
+  // an actuals line; the public routes had done neither, and the argument
+  // lists above could not see it. lib/sample-documents.render.test.ts renders
+  // both pairs and compares the PDFs' text; this holds the shape in source.
+  it("each demo route wraps and draws its document as the signed-in route does", () => {
+    const src = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
+    const demoReport = src("app/api/demo/report/route.ts");
+    const signedReport = src("app/api/deals/[id]/report/route.ts");
+    const wrapper = /withActuals\(\s*buildReportData\([^()]*\),\s*actuals,?\s*\)/;
+    expect(signedReport).toMatch(wrapper);
+    expect(demoReport).toMatch(wrapper);
+    for (const s of [demoReport, signedReport]) expect(s).toMatch(/renderReportPdf\(/);
+    const demoMemo = src("app/api/demo/memo/route.ts");
+    const signedMemo = src("app/api/deals/[id]/memo/route.ts");
+    for (const s of [demoMemo, signedMemo]) {
+      expect(s).toMatch(/renderMemoPdf\(memo\)/);
+      expect(s).toMatch(/\{ \.\.\.buildMemoData\([^()]*\), actualsLine \}/);
+      expect(s).not.toMatch(/renderToBuffer\(/);
+    }
+  });
+
+  it("the public memo's actuals line is the signed-in route's expression on the sample's stored documents", async () => {
+    fetchAerialImage.mockImplementation(async () => null);
+    await downloadBoth();
+    const { sampleActuals, sampleActualsLine } = await import("@/lib/sample-cover");
+    expect(sampleActuals()).not.toBeNull();
+    expect(captured.memo?.actualsLine).toBe(sampleActualsLine());
+    expect(captured.memo?.actualsLine).toMatch(/T-12 NOI .*Rent roll \(as of May 31, 2026\)/);
+    expect(captured.report?.actuals).toEqual(sampleActuals());
+  });
+
   it("reads the sample's row as the seed action stores it, judged on the deal page's check source", async () => {
     const { sampleDocumentChecks, sampleDocumentRow } = await import("@/lib/sample-cover");
     const { SAMPLE_DEAL, SAMPLE_DEMO_BOX } = await import("@/lib/sample-deal");

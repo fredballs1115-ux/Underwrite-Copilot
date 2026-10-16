@@ -1,9 +1,7 @@
-import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
-import { MemoDocument, buildMemoData, type MemoData, type MemoExchange } from "@/lib/memo/memo-document";
+import { buildMemoData, renderMemoPdf, type MemoData, type MemoExchange } from "@/lib/memo/memo-document";
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
-import { sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
+import { sampleActualsLine, sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
 
@@ -18,8 +16,9 @@ let cachedRender: { day: string; pdf: Promise<Buffer> } | null = null;
 /**
  * The memo the signed-in route (app/api/deals/[id]/memo) builds for the
  * sample, call for call: the same row, the same check source, the same
- * arguments to `buildMemoData` in the same order (a test holds the two
- * argument lists equal).
+ * arguments to `buildMemoData` in the same order, the same actuals line and
+ * the same `renderMemoPdf` (lib/sample-documents.render.test.ts renders both
+ * routes and holds the two PDFs' text equal).
  */
 async function renderSampleMemo(dateStr: string, readerDay: string): Promise<Buffer> {
   const deal = sampleDocumentRow();
@@ -38,11 +37,13 @@ async function renderSampleMemo(dateStr: string, readerDay: string): Promise<Buf
   // (lib/sample-cover), bounded like the real memo's: a slow or failed USGS
   // answer means a memo without a cover.
   const cover = await sampleCover(readerDay);
-  const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange);
-  const element = React.createElement(MemoDocument, {
-    data: memo,
-  }) as unknown as Parameters<typeof renderToBuffer>[0];
-  return renderToBuffer(element);
+  // The sample's rent roll and T-12 against its memorandum, in the line the
+  // signed-in memo sets beside its key terms (audit C8, H1).
+  const actualsLine = sampleActualsLine();
+  const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange), actualsLine };
+  // Drawn as the signed-in memo is: the line rides where the page has room
+  // for it, so the one-page memo stays on one page.
+  return renderMemoPdf(memo);
 }
 
 function getSampleMemo(dateStr: string, readerDay: string): Promise<Buffer> {
