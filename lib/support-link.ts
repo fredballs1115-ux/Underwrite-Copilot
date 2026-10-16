@@ -19,6 +19,22 @@ export interface SupportLinkInput {
   error: string | null | undefined;
 }
 
+/** A page that failed to load (the signed-in error boundary): the email
+ *  already says which page and the error ID the server logged, so support
+ *  can find it without asking. Either may be unknown, and is then left out. */
+export function pageErrorMailto(input: { path: string | null | undefined; digest: string | null | undefined }): string {
+  const subject = `A page failed to load${input.path ? ` — ${input.path}` : ""}`;
+  const body = [
+    input.path ? `Page: ${input.path}` : null,
+    input.digest ? `Error ID: ${input.digest}` : null,
+    "",
+    "What you were doing:",
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\r\n");
+  return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 /** A mailto that opens an email already saying which deal and what the
  *  page said. Lines end CRLF, as RFC 6068 asks of a mailto body. */
 export function supportMailto(input: SupportLinkInput): string {

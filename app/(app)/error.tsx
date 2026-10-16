@@ -2,10 +2,18 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { SUPPORT_EMAIL, pageErrorMailto } from "@/lib/support-link";
 
 // Boundary for the signed-in pages: an error in one page keeps the shell —
 // nav, palette, the rest of the product — and offers a real retry.
 // `unstable_retry` re-fetches the segment (Next 16.2 convention).
+//
+// It says only what is known: the page did not load. A page lands here as
+// much from a read that failed (the analytics and the tasks pages throw on
+// one) as from its own markup, so it never says the reader's data is fine
+// or calls the failure a rendering hiccup. The support link carries the
+// page and the error ID (lib/support-link).
 export default function AppError({
   error,
   unstable_retry,
@@ -19,6 +27,7 @@ export default function AppError({
     console.error(error);
   }, [error]);
   const retry = unstable_retry ?? reset;
+  const path = usePathname();
 
   return (
     <div className="rounded-2xl border border-line bg-surface p-10 text-center shadow-card">
@@ -28,25 +37,12 @@ export default function AppError({
       >
         !
       </div>
-      <p className="mt-5 text-base font-semibold tracking-tight">
-        This page hit an unexpected error.
-      </p>
+      <h1 className="mt-5 text-base font-semibold tracking-tight">
+        This page could not load.
+      </h1>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-        Your deals and data are fine — this is a rendering hiccup, not a data
-        loss. Try again, or jump back to the pipeline. Persisting? Email{" "}
-        <a
-          href="mailto:underwritecopilot.support@gmail.com"
-          className="underline decoration-dotted underline-offset-2 hover:text-ink"
-        >
-          underwritecopilot.support@gmail.com
-        </a>
-        {error.digest ? (
-          <>
-            {" "}
-            with error ID <span className="font-mono text-xs">{error.digest}</span>
-          </>
-        ) : null}
-        .
+        Something failed while loading it. Try again, or go back to the
+        pipeline.
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
         {retry && (
@@ -65,6 +61,22 @@ export default function AppError({
           Back to the pipeline
         </Link>
       </div>
+      <p className="mx-auto mt-5 max-w-md text-xs text-muted">
+        Still failing?{" "}
+        <a
+          href={pageErrorMailto({ path, digest: error.digest })}
+          title={`Email ${SUPPORT_EMAIL}`}
+          className="font-medium text-brand underline decoration-dotted underline-offset-2 hover:text-ink"
+        >
+          Tell support
+        </a>
+        {error.digest ? (
+          <>
+            {" "}
+            · error ID <span className="font-mono">{error.digest}</span>
+          </>
+        ) : null}
+      </p>
     </div>
   );
 }
