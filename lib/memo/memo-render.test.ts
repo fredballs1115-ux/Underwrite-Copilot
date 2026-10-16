@@ -7,11 +7,13 @@
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { MemoDocument, basePosition, buildMemoData, clampWords } from "./memo-document";
+import { MemoDocument, basePosition, buildMemoData, clampWords, pdfPageCount, renderMemoPdf } from "./memo-document";
 import { pdfFillCountOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
+import type { ExtractionResult } from "@/lib/anthropic/types";
+import { actualsFromRows, actualsShortLine } from "@/lib/actuals/actuals-read";
 import { TINY_PNG_DATA_URI } from "./test-png";
 
 describe("MemoDocument (redesigned)", () => {
@@ -986,6 +988,30 @@ describe("MemoDocument (redesigned)", () => {
     expect(pages[0]).toContain("TOP RISKS");
     expect(pages[0]).toContain("NEXT STEPS");
     for (const r of SAMPLE_DEAL.verdict.topRisks.slice(0, 2)) expect(pages[0]).toContain(r);
+
+    // …and with the deal's actuals beside its key terms (research pass 24,
+    // B3): this memo has no room for the line, so the route's renderer
+    // draws it again without — still one page.
+    const actualsLine = actualsShortLine(
+      actualsFromRows(
+        deal.extraction as ExtractionResult,
+        { kind: "stabilized", label: "Stabilized" },
+        "multifamily",
+        SAMPLE_DEAL.rentRoll,
+        SAMPLE_DEAL.t12,
+      ),
+    );
+    expect(actualsLine).toMatch(/^T-12 NOI \$[\d.]+M \(TTM to May 31, 2026\)/);
+    const full = await renderMemoPdf({ ...data, actualsLine });
+    expect(pdfPageCount(full)).toBe(1);
+    expect(pdfPageTextsOf(full)).toHaveLength(1);
+
+    // An ordinary memo has the room: the line prints beside the key terms.
+    const plain = buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction, site_flags: null } as unknown as DealRow, "October 5, 2026", checks);
+    const withLine = pdfPageTextsOf(await renderMemoPdf({ ...plain, actualsLine })).map((t) => t.replace(/\s+/g, " "));
+    expect(withLine).toHaveLength(1);
+    expect(withLine[0]).toContain("T-12 NOI");
+    expect(withLine[0]).toContain("Rent roll (as of May 31, 2026)");
   }, 30000);
 
   it("draws where the base sits in each range as a track and a dot, and the calls as dots", async () => {

@@ -65,7 +65,6 @@ import { readValueAdd } from "@/lib/value-add";
 import { readTaxAbatement } from "@/lib/tax-abatement";
 import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
-import { withArticle } from "@/lib/article";
 import { dealTypeLabel, interestOf, interestTag, isTenancyInCommon, readInterest } from "@/lib/interest";
 import { subjectBasis } from "@/lib/comp-detail";
 import { condoUnitsOffered } from "@/lib/condo-units";
@@ -152,7 +151,7 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
-import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import { readActuals } from "@/lib/actuals/actuals-read";
 import {
   signalGoingInCap,
   assessPlausibility,
@@ -875,16 +874,11 @@ export default async function DealPage({
   // project, three years away, and is judged on yield on cost. Degenerate
   // actual NOI (0 / non-finite) renders no comparison rather than an
   // infinite delta.
-  const omPick = pickOmNoi(metrics, strategy.kind);
-  const omNoi = omPick?.noi ?? null;
-  const noiNote = isPlanDeal(strategy.kind)
-    ? omPick
-      ? `${withArticle(strategy.label.toLowerCase(), true)}: the T-12 is held against the OM's ${OM_NOI_BASIS_LABEL[omPick.basis]}. The stabilized pro forma describes the finished project and is judged on yield on cost, never against today's actuals.`
-      : t12Summary
-        ? `${withArticle(strategy.label.toLowerCase(), true)}: the OM states only the finished project's NOI, so there is nothing to hold the T-12 against until an in-place figure is stated. The stabilized pro forma is judged on yield on cost.`
-        : null
-    : null;
-  const actuals: ActualsData = {
+  // One reader for the card, the report's actuals page and the memo's line
+  // (lib/actuals/actuals-read, research pass 24 B3).
+  const actuals: ActualsData = readActuals({
+    metrics,
+    strategy,
     rentRoll: rrRes.data?.summary
       ? {
           asOf: (rrRes.data.as_of_date as string | null) ?? null,
@@ -897,17 +891,9 @@ export default async function DealPage({
           summary: t12Summary,
         }
       : null,
-    noiComparison:
-      omNoi != null &&
-      t12Summary?.noi != null &&
-      Number.isFinite(t12Summary.noi) &&
-      t12Summary.noi !== 0
-        ? compareNoi(omNoi, t12Summary.noi, omPick)
-        : null,
-    noiNote,
     // An apartment roll is read per unit a month, an office's per foot.
     assetClass: readClass,
-  };
+  }) ?? { rentRoll: null, t12: null, noiComparison: null, noiNote: null, assetClass: readClass };
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
   // base underwriting model — actuals folded in — computed once server-side;

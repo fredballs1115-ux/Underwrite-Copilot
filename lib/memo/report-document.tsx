@@ -21,6 +21,17 @@ import type {
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
 import { nameBreaks } from "./pdf-text";
 import { cashCell } from "@/lib/underwrite/annual-cash-flow";
+import {
+  OM_NOI_LABEL,
+  SEVERITY_WORD,
+  actualsUsd,
+  avgRentOf,
+  gapWords,
+  rentRollDateWords,
+  t12DateWords,
+  type ActualsRead,
+} from "@/lib/actuals/actuals-read";
+import { rentQuotedMonthly } from "@/lib/asset-words";
 import { rangeInOrder } from "@/lib/verdict-range";
 import { typicalRangeParts } from "@/lib/typical-range";
 
@@ -1142,6 +1153,10 @@ export interface ReportInput {
    *  credited (lib/memo/cover-aerial `galleryPhotosFor`, #459); fewer than
    *  two is no page */
   photos?: MemoCover[] | null;
+  /** the deal's rent roll and T-12 against the memorandum (lib/actuals/
+   *  actuals-read, research pass 24 B3): "The actuals" page; null or absent
+   *  where neither document is on the deal */
+  actuals?: ActualsRead | null;
   /** the page the memo's target-return chip names for the model's IRR —
    *  the sensitivity page's, counted from the pages before it on a
    *  one-page memo and call; `renderReportPdf` draws again where the page
@@ -1334,6 +1349,17 @@ export function buildReportData(
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
     targetReturnPage,
   };
+}
+
+/**
+ * The report with the deal's actuals on it: "The actuals" page, read by the
+ * reader the standalone memo's line is (lib/actuals/actuals-read). The
+ * report's first page carries no line of its own: the page says it whole,
+ * and the memo page it leads with keeps the room it had.
+ */
+export function withActuals(input: ReportInput, read: ActualsRead | null): ReportInput {
+  if (!read) return input;
+  return { ...input, actuals: read };
 }
 
 /**
@@ -1629,6 +1655,110 @@ function AnnualCashFlowBlock({ b, totalPages }: { b: BaseCase; totalPages: numbe
       {irrWords ? <Text style={{ fontSize: 8, color: C.ink, marginTop: 3 }}>{str(irrWords)}</Text> : null}
       <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 6 }}>{str(annualDriversLine(b, totalPages))}</Text>
       {b.capitalLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 3 }}>{str(b.capitalLine)}</Text> : null}
+    </View>
+  );
+}
+
+const SEVERITY_COLOR: Record<string, string> = { in_line: C.pass, material: C.caution, red_flag: C.kill };
+
+/**
+ * The deal's actuals (research pass 24, B3): the T-12's NOI against the
+ * memorandum's, graded, with the note a plan deal needs; the rent roll's
+ * occupancy, WALT and rent with its date, and its expiry ladder as bars on
+ * a commercial roll; the T-12's statement line by line with its period.
+ */
+function ActualsBlock({ read }: { read: ActualsRead }) {
+  const c = read.noiComparison;
+  const rr = read.rentRoll?.summary;
+  const st = read.t12?.summary;
+  const monthly = rentQuotedMonthly(read.assetClass);
+  const pct = (d: number | null | undefined) => (d == null || !Number.isFinite(d) ? "—" : `${(d * 100).toFixed(1)}%`);
+  const tile = (label: string, value: string, sub?: string | null) => (
+    <View key={label} style={{ width: "25%", paddingRight: 4 }}>
+      <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{label.toUpperCase()}</Text>
+      <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>{str(value)}</Text>
+      {sub ? <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 1 }}>{str(sub)}</Text> : null}
+    </View>
+  );
+  const line = (label: string, value: string, opts: { bold?: boolean; indent?: boolean } = {}) => (
+    <View
+      key={label}
+      style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.5, ...(opts.bold ? { borderTopWidth: 0.5, borderColor: C.line } : {}) }}
+    >
+      <Text style={{ fontSize: 8, color: opts.indent ? C.muted : C.ink, paddingLeft: opts.indent ? 8 : 0, fontFamily: opts.bold ? "Helvetica-Bold" : "Helvetica" }}>
+        {str(label)}
+      </Text>
+      <Text style={{ fontSize: 8, color: C.ink, fontFamily: opts.bold ? "Helvetica-Bold" : "Helvetica" }}>{str(value)}</Text>
+    </View>
+  );
+  const rent = rr ? avgRentOf(rr, read.assetClass) : null;
+  return (
+    <View>
+      {c ? (
+        <View
+          wrap={false}
+          style={{ flexDirection: "row", alignItems: "center", borderTopWidth: 0.7, borderBottomWidth: 0.7, borderColor: C.line, paddingVertical: 6, marginBottom: 6 }}
+        >
+          {tile(c.omBasis ? OM_NOI_LABEL[c.omBasis] : "OM NOI", actualsUsd(c.omNoi))}
+          {tile("T-12 actual NOI", actualsUsd(c.t12Noi), t12DateWords(read.t12))}
+          <View style={{ width: "50%" }}>
+            <Text style={{ fontSize: 9, color: C.ink }}>{str(`The OM's figure runs ${gapWords(c)}.`)}</Text>
+            <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: SEVERITY_COLOR[c.severity], marginTop: 2 }}>
+              {SEVERITY_WORD[c.severity].toUpperCase()}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+      {read.noiNote ? <Text style={{ fontSize: 8, color: C.muted, marginBottom: 6 }}>{str(read.noiNote)}</Text> : null}
+      {rr ? (
+        <View wrap={false} style={{ marginBottom: 10 }}>
+          <TitleRow title="Rent roll" count={str(rentRollDateWords(read.rentRoll) ?? "") || undefined} marginTop={4} />
+          <View style={{ flexDirection: "row", marginBottom: 4 }}>
+            {tile("Occupancy", pct(rr.sfWeightedOccupancy))}
+            {tile("WALT", rr.waltYears != null ? `${rr.waltYears.toFixed(1)} yr` : "—")}
+            {tile("Avg rent", rent?.text ?? "—", rent?.basis)}
+            {tile("Occupied", `${rr.occupiedUnits} / ${rr.unitCount}`)}
+          </View>
+          {rr.expiryBuckets && !monthly ? (
+            <View style={{ marginTop: 4 }}>
+              <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted, marginBottom: 2 }}>LEASE EXPIRY (% OF OCCUPIED SF)</Text>
+              {(
+                [
+                  ["Next 12 mo", rr.expiryBuckets.next12mo],
+                  ["1-3 yr", rr.expiryBuckets.y1to3],
+                  ["3-5 yr", rr.expiryBuckets.y3to5],
+                  ["5 yr+", rr.expiryBuckets.y5plus],
+                ] as [string, number][]
+              ).map(([label, v]) => (
+                <View key={label} style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+                  <Text style={{ width: 60, fontSize: 7.5, color: C.muted }}>{label}</Text>
+                  <View style={{ flex: 1, height: 5, backgroundColor: C.line, borderRadius: 2 }}>
+                    <View style={{ width: `${Math.max(0, Math.min(100, Math.round(v * 100)))}%`, height: 5, backgroundColor: C.brand, borderRadius: 2 }} />
+                  </View>
+                  <Text style={{ width: 36, fontSize: 7.5, color: C.ink, textAlign: "right" }}>{pct(v)}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {rr.truncated ? (
+            <Text style={{ fontSize: 7.5, color: C.caution, marginTop: 3 }}>{str(`A large roll: read from its first ${rr.unitCount} rows.`)}</Text>
+          ) : null}
+        </View>
+      ) : null}
+      {st ? (
+        <View wrap={false}>
+          <TitleRow title="T-12 operating statement" count={str(t12DateWords(read.t12) ?? "") || undefined} marginTop={4} />
+          {line("Collected rent", actualsUsd(st.collectedRent))}
+          {st.vacancyLoss != null ? line("Vacancy / credit loss", `(${actualsUsd(st.vacancyLoss)})`) : null}
+          {st.otherIncome != null ? line("Other income", actualsUsd(st.otherIncome)) : null}
+          {line("Effective gross income", actualsUsd(st.egi), { bold: true })}
+          {st.opex.map((l, i) => (
+            <View key={`${l.key}-${i}`}>{line(l.label, `(${actualsUsd(l.amount)})`, { indent: true })}</View>
+          ))}
+          {line("Total operating expenses", `(${actualsUsd(st.totalOpex)})`, { bold: true })}
+          {line(st.noiDerived ? "Net operating income (derived)" : "Net operating income", actualsUsd(st.noi), { bold: true })}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -2577,6 +2707,23 @@ export function ReportDocument({
           </Text>
           {caveats}
           <AssumptionsBlock read={modelVsMarket} />
+        </PageChrome>
+      )}
+
+      {/* The deal's own documents against the memorandum (research pass
+          24, B3): the most persuasive fact a committee gets — the seller's
+          NOI against the T-12 — on paper, each document with its date. */}
+      {input.actuals && (input.actuals.rentRoll || input.actuals.t12) && (
+        <PageChrome
+          title="The actuals"
+          count={[input.actuals.rentRoll ? "rent roll" : null, input.actuals.t12 ? "T-12" : null].filter(Boolean).join(" and ")}
+          dealName={dealName}
+          branding={memo.branding}
+        >
+          <Text style={s.sub}>
+            {str("What the deal's rent roll and T-12 say, set against the memorandum's figures. Figures as read from each document.")}
+          </Text>
+          <ActualsBlock read={input.actuals} />
         </PageChrome>
       )}
 

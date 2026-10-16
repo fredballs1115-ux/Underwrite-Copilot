@@ -9,7 +9,8 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices } from "./report-document";
+import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices, withActuals } from "./report-document";
+import { actualsFromRows, gapWords } from "@/lib/actuals/actuals-read";
 import { readInterest } from "@/lib/interest";
 import { MemoDocument, buildMemoData } from "./memo-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -764,6 +765,35 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain(`${usd(a.sale.net)} to equity.`);
     expect(text).toMatch(/Each year rent grows [\d.]+% a year \(assumption\)/);
     expect(text).toContain("where the memorandum is silent the model's defaults stand, each marked assumption");
+  }, 60000);
+
+  it("prints the deal's actuals on a page of their own, each document dated (research pass 24, B3)", async () => {
+    const extraction = { ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const read = actualsFromRows(extraction, { kind: "stabilized", label: "Stabilized" }, "multifamily", SAMPLE_DEAL.rentRoll, SAMPLE_DEAL.t12)!;
+    const input = withActuals(buildReportData(deal, "September 30, 2026", [], null), read);
+    const text = (await pdfTextOf(await renderReportPdf(input))).replace(/\s+/g, " ");
+    expect(text).toContain("The actuals");
+    expect(text).toContain("rent roll and T-12");
+    expect(text).toContain("T-12 ACTUAL NOI");
+    expect(text).toContain("TTM to May 31, 2026");
+    expect(text).toContain("as of May 31, 2026");
+    expect(text).toContain("T-12 operating statement");
+    // The grade, where the OM's figure is compared.
+    if (read.noiComparison) expect(text).toContain(`The OM's figure runs ${gapWords(read.noiComparison)}.`);
+    // No actuals, no page.
+    const none = (await pdfTextOf(await renderReportPdf(withActuals(buildReportData(deal, "September 30, 2026", [], null), null)))).replace(/\s+/g, " ");
+    expect(none).not.toContain("T-12 operating statement");
   }, 60000);
 
   it("labels the retrade grid's base row the modelled price, never the ask, and says what the model priced it at", async () => {

@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
-import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
+import { buildReportData, renderReportPdf, withActuals } from "@/lib/memo/report-document";
+import { actualsFromRows, type ActualsRead } from "@/lib/actuals/actuals-read";
+import { shownAssetClass } from "@/lib/asset-class";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
@@ -211,6 +213,10 @@ export async function GET(
     readerDay,
   );
   let regulation: { line: string; read: string } | null = regulationRead ? { line: regulationShortLine(regulationRead), read: "" } : null;
+  // The deal's rent roll and T-12 against the memorandum (research pass 24,
+  // B3), from the rows the model reads: "The actuals" page and the memo's
+  // line beside its key terms.
+  let actuals: ActualsRead | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -230,6 +236,13 @@ export async function GET(
           .limit(1)
           .maybeSingle(),
       ]);
+      actuals = actualsFromRows(
+        extraction,
+        inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null),
+        shownAssetClass(deal.asset_class as string | null, extraction) || null,
+        rrRes.data,
+        t12Res.data,
+      );
       // The same rate read as the deal page and the workbook route — and,
       // as there, none for the sample (lib/model-market).
       const debt = await liveDebtSeeds(HOLD_MONTHS);
@@ -412,7 +425,10 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay);
+    const input = withActuals(
+      buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay),
+      actuals,
+    );
     // The memo's target-return chip names the page the model's IRR is
     // graded on, which the helper checks against where it lands.
     const buffer = await renderReportPdf(input);

@@ -1,11 +1,9 @@
-import React from "react";
 import { cookies } from "next/headers";
-import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
 import {
-  MemoDocument,
+  renderMemoPdf,
   buildMemoData,
   type MemoData,
   type MemoExchange,
@@ -20,6 +18,10 @@ import type { StructuredAddress } from "@/lib/address";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { verdictBehind } from "@/lib/screen-run";
 import { coverPictureFor } from "@/lib/memo/cover-aerial";
+import { actualsFromRows, actualsShortLine } from "@/lib/actuals/actuals-read";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { shownAssetClass } from "@/lib/asset-class";
+import { pdfSafe } from "@/lib/memo/pdf-text";
 import type { DealVisualCache } from "@/lib/deal-location";
 
 // PDF generation needs the Node runtime (not edge).
@@ -190,13 +192,45 @@ export async function GET(
     );
     // The rent allowance in force is read on the reader's day — the day the
     // memo is dated and its file named for (lib/rent-regulation).
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange);
-    // MemoDocument renders a <Document>; cast to the element type renderToBuffer
-    // expects (it's typed for a Document element, not a wrapping component).
-    const element = React.createElement(MemoDocument, {
-      data: memo,
-    }) as unknown as Parameters<typeof renderToBuffer>[0];
-    const buffer = await renderToBuffer(element);
+    // The deal's rent roll and T-12 against the memorandum, in one line
+    // beside the key terms (research pass 24, B3) — the report's own read.
+    // A read that fails prints no line, never a claim the documents hold
+    // nothing.
+    const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+    const [rrRes, t12Res] = await Promise.all([
+      supabase
+        .from("deal_rent_rolls")
+        .select("as_of_date, summary")
+        .eq("deal_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("deal_t12_statements")
+        .select("period_end_date, summary")
+        .eq("deal_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const actualsLine =
+      rrRes.error || t12Res.error
+        ? ""
+        : pdfSafe(
+            actualsShortLine(
+              actualsFromRows(
+                extraction,
+                inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null),
+                shownAssetClass(deal.asset_class as string | null, extraction) || null,
+                rrRes.data,
+                t12Res.data,
+              ),
+            ),
+          );
+    const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange), actualsLine };
+    // The line rides where the page has room for it (`renderMemoPdf`): the
+    // one-page memo stays on one page.
+    const buffer = await renderMemoPdf(memo);
 
     const safe =
       (deal.name || "deal")

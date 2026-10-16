@@ -1,4 +1,5 @@
 import "server-only";
+import React from "react";
 import { compactUsd } from "@/lib/money";
 import {
   Document,
@@ -8,6 +9,7 @@ import {
   Text,
   Image,
   StyleSheet,
+  renderToBuffer,
 } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 
@@ -483,6 +485,12 @@ export type MemoData = {
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
   floodLine?: string;
+  /** the deal's actuals in one line — the T-12's NOI with its period
+   *  against the OM's, and the rent roll's occupancy and WALT with its date
+   *  (lib/actuals/actuals-read `actualsShortLine`, research pass 24 B3);
+   *  printed beside the key terms; "" or absent where neither document is
+   *  on the deal */
+  actualsLine?: string;
   dateStr: string;
   /** the day the verdict was written ("Screened Sep 12, 2026"), so a memo
    *  printed weeks later never passes an old call off as the day's; "" for
@@ -1246,6 +1254,28 @@ export function MemoDocument({ data }: { data: MemoData }) {
   );
 }
 
+/** How many pages a rendered PDF holds: pdfkit writes each page as its own
+ *  `/Type /Page` object, never inside a compressed object stream. */
+export function pdfPageCount(buf: Buffer): number {
+  return (buf.toString("latin1").match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length;
+}
+
+/**
+ * The memo as PDF bytes — what the memo route serves. The deal's actuals
+ * line (research pass 24, B3) sits beside the key terms where the page has
+ * room for it: a memo it would push onto a second page is drawn again
+ * without it, since the one-page memo stays on one page and the full
+ * report carries the actuals on a page of their own.
+ */
+export async function renderMemoPdf(data: MemoData): Promise<Buffer> {
+  const draw = (d: MemoData) =>
+    renderToBuffer(React.createElement(MemoDocument, { data: d }) as unknown as Parameters<typeof renderToBuffer>[0]);
+  const first = await draw(data);
+  if (!data.actualsLine || pdfPageCount(first) <= 1) return first;
+  const without = await draw({ ...data, actualsLine: "" });
+  return pdfPageCount(without) < pdfPageCount(first) ? without : first;
+}
+
 /** The memo's single page, exported so the full report can lead with it.
  *  `pageNumbers`: the full report numbers its memo pages as it numbers
  *  every other ("1 / 10", research pass 35); the standalone memo keeps its
@@ -1585,8 +1615,17 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                 </View>
               ))}
             </View>
+            {/* The deal's own documents beside the memorandum's terms:
+                the T-12 against the OM's NOI, the rent roll's occupancy,
+                each with its date (research pass 24, B3). */}
+            {data.actualsLine ? <Text style={[s.termSub, { color: C.ink, marginTop: 3 }]}>{data.actualsLine}</Text> : null}
           </Section>
         )}
+        {data.keyTerms.length === 0 && data.actualsLine ? (
+          <Section title="Actuals" keep>
+            <Text style={[s.termSub, { fontSize: 8, color: C.ink }]}>{data.actualsLine}</Text>
+          </Section>
+        ) : null}
 
         {(data.topRisks.length > 0 || data.nextSteps.length > 0) && (
           <View style={s.twoCol} wrap={false}>
