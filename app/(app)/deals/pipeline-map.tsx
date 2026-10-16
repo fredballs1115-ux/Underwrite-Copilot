@@ -4,9 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
+import Link from "next/link";
 import { BASEMAPS, BASEMAP_ORDER, OSM_ATTRIBUTION, type BasemapId } from "@/lib/basemaps";
+import { DealAvatar } from "@/app/(app)/deal-avatar";
 import {
   MAX_TO_PLACE,
+  UNPLACED_SHOWN,
   PIN_LABEL,
   PIN_UNSCREENED,
   pinColor,
@@ -18,6 +21,8 @@ import {
   osmPlacedAny,
   previewHtml,
   tooltipHtml,
+  unplacedDeals,
+  unplacedReason,
   type MapDeal,
   type MapPlace,
 } from "@/lib/pipeline-map";
@@ -316,6 +321,9 @@ export function PipelineMap({
   }, [basemap]);
 
   const counts = { placed: points.length, placing: waiting.length, later: beyond, unplaceable: part.unplaceable.length + missed };
+  // The deals the map cannot draw, named with their pictures under it.
+  const unplaced = unplacedDeals(part, resolved);
+  const unplacedShown = unplaced.slice(0, UNPLACED_SHOWN);
   const legend: { label: string; color: string; n: number }[] = [
     ...(["pass", "caution", "pass_on"] as const).map((v) => ({
       label: PIN_LABEL[v],
@@ -365,6 +373,45 @@ export function PipelineMap({
       <p className="border-t border-line px-4 py-2 text-xs text-muted" data-map-count>
         {placementLine(counts)}
       </p>
+      {unplaced.length > 0 && (
+        // Not only a count (the Crexi / LoopNet map's list beside it): each
+        // deal the map cannot draw, its building beside its name — the
+        // avatar asks no Google picture (`google=0`), as nothing beside a
+        // Leaflet map may — and why it is off the map.
+        <div data-map-unplaced className="border-t border-line px-4 py-3">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">Not on the map</h3>
+          <ul className="mt-2 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+            {unplacedShown.map((d) => {
+              const picked = !!selected?.has(d.id);
+              return (
+                <li key={d.id} data-unplaced={d.id} className="flex min-w-0 items-center gap-2.5">
+                  <DealAvatar dealId={d.id} />
+                  <span className="min-w-0 flex-1">
+                    {compareMode && onToggle ? (
+                      <button
+                        type="button"
+                        onClick={() => onToggle(d.id)}
+                        aria-pressed={picked}
+                        className={`block max-w-full truncate text-left text-sm font-medium hover:text-brand ${picked ? "text-brand" : ""}`}
+                      >
+                        {d.name}
+                      </button>
+                    ) : (
+                      <Link href={`/deals/${d.id}`} className="block truncate text-sm font-medium hover:text-brand">
+                        {d.name}
+                      </Link>
+                    )}
+                    <span className="block text-xs text-muted">{unplacedReason(d)}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {unplaced.length > unplacedShown.length ? (
+            <p className="mt-2 text-xs text-muted">and {unplaced.length - unplacedShown.length} more, in the list view</p>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }

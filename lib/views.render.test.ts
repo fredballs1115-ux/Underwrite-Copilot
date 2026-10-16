@@ -808,6 +808,16 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(text).toContain(
       `2 of ${live.length} deals on the map · ${waiting} being placed · ${1 + noAddress} with no address a geocoder could place`,
     );
+    // And each of those is named under the map with its building and why,
+    // not only counted.
+    const off = live.filter((c) => c.id === "c" || !c.hasAddress);
+    expect(html.match(/data-unplaced="/g)).toHaveLength(off.length);
+    for (const c of off) {
+      const row = html.slice(html.indexOf(`data-unplaced="${c.id}"`)).split("</li>")[0];
+      expect(row).toContain(`/api/deals/${c.id}/image?`);
+      expect(row).toContain(c.hasAddress ? "Address not found" : "No address");
+    }
+    expect(text).toContain("Not on the map");
     expect(html).toMatch(/aria-pressed="true"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Map/);
   });
 

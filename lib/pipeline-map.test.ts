@@ -12,6 +12,8 @@ import {
   pinTitle,
   placementLine,
   previewHtml,
+  unplacedDeals,
+  unplacedReason,
   tooltipHtml,
   type MapDeal,
 } from "./pipeline-map";
@@ -135,5 +137,20 @@ describe("the pipeline map's rules (#431)", () => {
       "1 of 8 deals on the map · 2 being placed · 4 placed when first opened · 1 with no address a geocoder could place",
     );
     expect(placementLine({ placed: 0, placing: 1, later: 0, unplaceable: 0 })).toBe("0 of 1 deal on the map · 1 being placed");
+  });
+
+  it("names every deal off the map — no address, or one this view's lookup missed — each once, with why", () => {
+    const part = partitionForMap([
+      deal({ id: "a", place: { lat: 39.95, lng: -75.16, precision: "street" } }),
+      deal({ id: "b" }),
+      deal({ id: "c" }),
+      deal({ id: "d", hasAddress: false }),
+      deal({ id: "e", placeMiss: true }),
+    ]);
+    const off = unplacedDeals(part, { b: null, c: { lat: 1, lng: 2, precision: "area" } });
+    expect(off.map((d) => d.id)).toEqual(["d", "e", "b"]);
+    expect(off.map(unplacedReason)).toEqual(["No address", "Address not found", "Address not found"]);
+    // A lookup still running is no miss yet.
+    expect(unplacedDeals(part, {}).map((d) => d.id)).toEqual(["d", "e"]);
   });
 });

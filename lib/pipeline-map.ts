@@ -195,6 +195,25 @@ export function pinTapAction(t: {
   return t.pointer === "touch" && !t.previewOpen ? "preview" : "open";
 }
 
+/** The deals the map cannot draw, named under it rather than only counted:
+ *  every one with no address or none a geocoder placed — the partition's
+ *  own, then those this view's lookups missed — each once, in the list's
+ *  order. */
+export function unplacedDeals(part: MapPartition, resolved: Readonly<Record<string, MapPlace | null>>): MapDeal[] {
+  const missed = part.toPlace.filter((d) => d.id in resolved && resolved[d.id] === null);
+  return [...part.unplaceable, ...missed];
+}
+
+/** Why a deal is not on the map, in two words: no address at all, or an
+ *  address no geocoder could place. */
+export function unplacedReason(d: Pick<MapDeal, "hasAddress">): string {
+  return d.hasAddress ? "Address not found" : "No address";
+}
+
+/** How many of the deals off the map are named under it; the rest are
+ *  counted ("and 4 more"), so a pipeline of addressless deals stays short. */
+export const UNPLACED_SHOWN = 12;
+
 /** The counts said under the map, in plain words: every deal the filters
  *  leave is in exactly one of the four. */
 export function placementLine(p: { placed: number; placing: number; later: number; unplaceable: number }): string {
