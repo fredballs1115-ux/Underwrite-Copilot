@@ -58,6 +58,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { DemoSections } from "@/app/demo/sections";
 import { loadWalkthrough } from "@/app/landing-interactive";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
+import { fitFilterKey } from "@/lib/fit-filter";
 import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
 function render(node: React.ReactElement): string {
@@ -763,6 +764,35 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(at("Show dead (1)")).toBeLessThan(to);
     // The summary says how many are set.
     expect([0, 1, 2].map(filtersFoldLabel)).toEqual(["Filters", "Filters · 1 set", "Filters · 2 set"]);
+  });
+
+  it("offers the fit filter in the cards' own words, and files each deal where its chip says (signed-in gaps, M8)", () => {
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withThumbs(CARDS),
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
+        billing: BILLING, todayIso: TODAY,
+        initialView: "list",
+      }),
+    );
+    const select = /<select[^>]*aria-label="Filter by mandate fit"[^>]*>([\s\S]*?)<\/select>/.exec(html)?.[1] ?? "";
+    const options = [...select.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].map((m) => [m[1], m[2]]);
+    expect(options.length).toBeGreaterThan(1);
+    // Never "Pass", which beside the verdict's No-go reads as a decline.
+    for (const [, label] of options) expect(label).not.toMatch(/\bPass\b/);
+    // Every deal with a fit files under an option drawn, and the option's
+    // words are its chip's: a miss outright is "Outside box" whatever its
+    // score, never the score's band.
+    for (const c of CARDS) {
+      const key = fitFilterKey(c);
+      if (!key) continue;
+      const label = options.find(([k]) => k === key)?.[1];
+      expect(label, c.name).toBeDefined();
+      if (c.fit === "outside") expect(label, c.name).toBe("Outside box");
+    }
+    expect(options.map(([, l]) => l)).toContain("Outside box");
   });
 
   it("opens on the cards unless the reader chose the list, and never lands on the map (#438)", () => {

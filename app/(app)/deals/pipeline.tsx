@@ -58,6 +58,7 @@ import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
 import { checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone } from "@/lib/fit-label";
+import { fitFilterKey, fitFilterOptions, normalizeFitFilter } from "@/lib/fit-filter";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { DEAL_NAME_MAX, nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import { COMPARE_MAX } from "@/lib/link-limits";
@@ -330,7 +331,8 @@ export function Pipeline({
   const [stage, setStage] = useState("all");
   const [asset, setAsset] = useState("all");
   const [market, setMarket] = useState("all");
-  // Mandate-fit filter (Feature 4): all / PURSUE / WATCH / PASS.
+  // The fit filter, in the card's own words (lib/fit-filter): a score band,
+  // "Outside box", or "2 of 4 checked" — a deal files where its chip says.
   const [mfit, setMfit] = useState("all");
   // On a team: the shared pipeline's deals, or the reader's own the team
   // does not see (lib/personal-deal).
@@ -369,7 +371,7 @@ export function Pipeline({
           if (typeof v.stage === "string") setStage(v.stage);
           if (typeof v.asset === "string") setAsset(v.asset);
           if (typeof v.market === "string") setMarket(v.market);
-          if (typeof v.mfit === "string") setMfit(v.mfit);
+          if (typeof v.mfit === "string") setMfit(normalizeFitFilter(v.mfit));
           if (typeof v.sharing === "string") setSharing(v.sharing);
           if (typeof v.showDead === "boolean") setShowDead(v.showDead);
           if (v.collapsed && typeof v.collapsed === "object")
@@ -476,8 +478,10 @@ export function Pipeline({
     () => Array.from(new Set(deals.map((d) => d.market).filter(Boolean))).sort(),
     [deals],
   );
-  // Only surface the mandate-fit filter once at least one deal carries a score.
-  const hasScores = useMemo(() => deals.some((d) => !!d.mandateVerdict), [deals]);
+  // The fit filter's options: one for each set of words a deal's chip says
+  // (lib/fit-filter), drawn once a deal has a fit to file.
+  const fitOptions = useMemo(() => fitFilterOptions(deals, mfit), [deals, mfit]);
+  const hasScores = fitOptions.length > 1;
 
   // Typing stays instant even with hundreds of rows: the list follows the
   // query at deferred priority.
@@ -504,7 +508,7 @@ export function Pipeline({
       if (dealStage === "dead" && !showDead && stage !== "dead") return false;
       if (asset !== "all" && d.assetClass !== asset) return false;
       if (market !== "all" && d.market !== market) return false;
-      if (mfit !== "all" && d.mandateVerdict !== mfit) return false;
+      if (mfit !== "all" && fitFilterKey(d) !== mfit) return false;
       // Only where the filter is drawn: a choice saved on a team never
       // hides deals once the reader is off it.
       if (onTeam && !matchesSharing(sharing, !!d.personal)) return false;
@@ -1033,12 +1037,7 @@ export function Pipeline({
                 label="Filter by mandate fit"
                 value={mfit}
                 onChange={setMfit}
-                options={[
-                  ["all", "All fit"],
-                  ["PURSUE", "Pursue · 75+"],
-                  ["WATCH", "Watch · 50–74"],
-                  ["PASS", "Pass · <50"],
-                ]}
+                options={fitOptions}
               />
             )}
             {/* On a team the list holds the shared pipeline's deals beside the
