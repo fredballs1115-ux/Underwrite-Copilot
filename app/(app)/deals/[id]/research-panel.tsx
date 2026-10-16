@@ -239,22 +239,8 @@ export function SourceLink({
   );
 }
 
-export async function ResearchPanel({
-  address,
-  sizeText,
-  basis = null,
-  capText,
-  capWithheld = null,
-  yearBuilt,
-  sectorFields,
-  assetClass,
-  planLabel,
-  rateSeed = null,
-  tenYear = null,
-  survey30 = null,
-  placement,
-  census = null,
-}: {
+/** What the panel is handed about the deal — everything but the rows. */
+export type ResearchPanelProps = {
   address: StructuredAddress | null;
   /** what the Census geocoder read at the building (the deal's site flags,
    *  #452): its incorporated place and county, which decide whether a
@@ -298,11 +284,9 @@ export async function ResearchPanel({
   sectorFields?: Record<string, string | number | boolean> | null;
   /** the deal's asset class — same-sector benchmark rows sort first */
   assetClass?: string | null;
-}) {
-  // Today, for a fair market rent's year (ended or not) and every research
-  // date's age (lib/research-age) — read once here.
-  const today = fmrToday();
-  const standings = sectorStandings(TRACKED_SECTORS, today);
+};
+
+export async function ResearchPanel(props: ResearchPanelProps) {
   // The checked-in research layer, with the database's rows merged in — a
   // missing table (migration not yet run) degrades silently to the files.
   // A rule's words are always the file's (mergeRules: nothing else writes
@@ -315,6 +299,43 @@ export async function ResearchPanel({
   const [dbRules, dbBench] = await Promise.all([signedInRuleRows(), signedInBenchmarkRows()]);
   if (dbRules?.length) rules = mergeRules(dbRules);
   if (dbBench?.length) benchmarks = mergeBenchmarks(dbBench);
+  return <ResearchPanelView {...props} rules={rules} benchmarks={benchmarks} />;
+}
+
+/**
+ * The panel itself, on the rows it is handed — pure, so a public page draws
+ * it on the checked-in files alone (the tables are a signed-in reader's,
+ * lib/research-read: /demo draws the sample's panel for a visitor with
+ * `seedRules()` and `seedBenchmarks()`), and a render test reaches it.
+ */
+export function ResearchPanelView({
+  address,
+  sizeText,
+  basis = null,
+  capText,
+  capWithheld = null,
+  yearBuilt,
+  sectorFields,
+  assetClass,
+  planLabel,
+  rateSeed = null,
+  tenYear = null,
+  survey30 = null,
+  placement,
+  census = null,
+  rules,
+  benchmarks,
+}: ResearchPanelProps & {
+  /** the rules on file: the checked-in file's, with the database's merged
+   *  in for a signed-in reader */
+  rules: RegulatoryRule[];
+  /** the benchmark rows, by the same rule */
+  benchmarks: Benchmark[];
+}) {
+  // Today, for a fair market rent's year (ended or not) and every research
+  // date's age (lib/research-age) — read once here.
+  const today = fmrToday();
+  const standings = sectorStandings(TRACKED_SECTORS, today);
 
   // What the deal IS decides which rules can reach it (lib/asset-words): an
   // office or a hotel is commercial property to the rent-control regimes;
