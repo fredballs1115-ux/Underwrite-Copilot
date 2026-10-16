@@ -114,7 +114,15 @@ function MandateScoreHeader({
 }
 
 /** The mandate check, full detail — the bar carries only the chip. */
-export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
+export function BuyBoxPanel({
+  data,
+  publicDemo = false,
+}: {
+  data: BuyBoxPanelData;
+  /** the public pages' sample: a visitor has no criteria page to edit, so
+   *  the link asks them to sign up and set their own box */
+  publicDemo?: boolean;
+}) {
   if (!data.hasBox) {
     return (
       <EmptyState
@@ -152,10 +160,10 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           )}
         </div>
         <Link
-          href="/criteria"
+          href={publicDemo ? "/login?mode=signup" : "/criteria"}
           className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
         >
-          Edit criteria →
+          {publicDemo ? "Sign up to set your own box →" : "Edit criteria →"}
         </Link>
       </div>
       {data.mandate?.score != null && data.mandate.verdict && (

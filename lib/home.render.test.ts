@@ -255,7 +255,10 @@ describe("the homepage's buy box is the deal page's own panel", () => {
     const data = sampleBuyBox();
     const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", buyBox: data }));
     // The panel itself, markup for markup.
-    expect(html).toContain(renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: data.panel })));
+    expect(html).toContain(renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: data.panel, publicDemo: true })));
+    // A visitor has no criteria page: the link asks them to set their own box.
+    expect(html).toContain('href="/login?mode=signup"');
+    expect(html).not.toContain('href="/criteria"');
     const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(text).toContain("The deal against your mandate");
     expect(text).toMatch(new RegExp(`\\b${data.panel.mandate!.score}\\s*/ 100`));

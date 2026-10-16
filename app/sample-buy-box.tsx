@@ -30,7 +30,7 @@ export function SampleBuyBox({ data }: { data: SampleBuyBoxData }) {
           ))}
         </ul>
       </div>
-      <BuyBoxPanel data={data.panel} />
+      <BuyBoxPanel data={data.panel} publicDemo />
     </div>
   );
 }
