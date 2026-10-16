@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MAILTO_MAX, documentProfileOf, documentRequestEmail, mailtoHref, splitEmail } from "./broker-mail";
+import { MAILTO_MAX, documentProfileOf, documentRequestEmail, emailCopyText, mailtoHref, splitEmail } from "./broker-mail";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }), usePathname: () => "/deals/d1", useSearchParams: () => new URLSearchParams() }));
@@ -57,6 +57,33 @@ describe("the request asks for what the class keeps", () => {
       "the entitlement record: approvals, conditions and the zoning",
       "the confidentiality agreement, if one is required for the data room",
     ]);
+  });
+});
+
+// Audit C8, L7: an email too long for a link was copied with its subject
+// and body and no recipients.
+describe("an email too long for a link", () => {
+  it("is copied with its addresses, beside a short link that opens it addressed and titled", async () => {
+    expect(emailCopyText(["jane@cbre.com", "sam@cbre.com"], "The Maddox — questions", "Hi,")).toBe(
+      "To: jane@cbre.com, sam@cbre.com\nSubject: The Maddox — questions\n\nHi,",
+    );
+    expect(emailCopyText([], "S", "B")).toBe("Subject: S\n\nB");
+    const { BrokerEmailActions } = await import("@/app/(app)/deals/[id]/broker-email-actions");
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      assumption: `Assumption ${i}`,
+      severity: "high" as const,
+      challenge: "Too high",
+      question: `What supports figure number ${i} on the page, and where is the evidence for it in the data room?`,
+      page: "p. 12",
+    }));
+    const html = renderToStaticMarkup(
+      React.createElement(BrokerEmailActions, { to: ["jane@cbre.com"], dealName: "The Maddox", challenges: many, totalPages: 40, have: { rentRoll: true, t12: true } }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    expect(visibleText(html)).toContain("Email the questions (copy)");
+    expect(html).toContain('href="mailto:jane@cbre.com?subject=The%20Maddox%20%E2%80%94%20questions%20from%20our%20initial%20screen');
+    expect(html).toContain("Open an email to them");
   });
 });
 

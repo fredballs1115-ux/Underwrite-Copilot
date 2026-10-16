@@ -31,6 +31,14 @@ export function mailtoHref(to: readonly string[], subject: string, body: string)
   return href.length <= MAILTO_MAX ? href : null;
 }
 
+/** The email the card copies where its link would run too long: the
+ *  addresses on its first line, then the subject, a blank line and the body
+ *  — a copied email had carried no recipients (audit C8, L7). */
+export function emailCopyText(to: readonly string[], subject: string, body: string): string {
+  const list = to.filter(Boolean);
+  return `${list.length ? `To: ${list.join(", ")}\n` : ""}Subject: ${subject}\n\n${body}`;
+}
+
 /** An email written as one text — "Subject: …" on its first line, a blank
  *  line, then the body — split into its subject and body. */
 export function splitEmail(text: string): { subject: string; body: string } {
