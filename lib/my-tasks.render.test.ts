@@ -113,6 +113,10 @@ describe("MyTasksView — rendered on fixtures", () => {
     expect(html).toContain('data-qa="my-tasks-empty"');
     expect(html).not.toContain('data-bar="my-tasks"');
     expect(visibleText(html)).toContain("Nothing assigned to you is open.");
+    // A picture, not a sentence alone (the pipeline's empty-state style),
+    // and the one way on as a button.
+    expect(html).toContain('data-art="tasks-clear"');
+    expect(html).toMatch(/<a[^>]*href="\/deals"[^>]*>Open the pipeline<\/a>/);
     expect(gluedWords(visibleText(html))).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
   });

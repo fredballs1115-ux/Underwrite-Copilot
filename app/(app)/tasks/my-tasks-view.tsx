@@ -11,6 +11,28 @@ const TONE: Record<MyTaskGroupKey, { bar: string; dot: string; due: string }> = 
   undated: { bar: "bg-line", dot: "bg-line", due: "text-muted" },
 };
 
+/** The empty list as a picture, in the pipeline's empty-state style: a
+ *  task card with every line ticked off, and the brand's check beside it. */
+function ClearListArt() {
+  const rows = [26, 44, 62];
+  return (
+    <svg data-art="tasks-clear" viewBox="0 0 170 120" className="mx-auto h-28 w-auto" aria-hidden>
+      <rect x="34" y="14" width="90" height="94" rx="8" fill="#f3f5f4" stroke="#e7e4dd" transform="rotate(-6 79 61)" />
+      <rect x="46" y="10" width="90" height="94" rx="8" fill="#fff" stroke="#e7e4dd" />
+      {rows.map((y) => (
+        <g key={y}>
+          <rect x="56" y={y} width="10" height="10" rx="3" fill="#114e54" opacity="0.18" />
+          <path d={`M58.5 ${y + 5}l2 2 3.5-4`} stroke="#114e54" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="72" y={y + 3} width="52" height="4" rx="2" fill="#e7e4dd" />
+        </g>
+      ))}
+      <line x1="56" y1="84" x2="126" y2="84" stroke="#e7e4dd" />
+      <circle cx="136" cy="96" r="15" fill="#114e54" />
+      <path d="M129 96l5 5 9-10" stroke="#7fd6cc" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /**
  * "My tasks" (lib/my-tasks): the open tasks assigned to the reader across
  * every deal they can read, as one bar of how they fall due and then a list
@@ -41,13 +63,15 @@ export function MyTasksView({
 
       {total === 0 ? (
         <div data-qa="my-tasks-empty" className="rounded-2xl border border-dashed border-line bg-surface px-5 py-10 text-center">
-          <p className="text-sm font-medium">Nothing assigned to you is open.</p>
-          <p className="mt-1 text-sm text-muted">
-            A task assigned to you on a deal&apos;s page lands here.{" "}
-            <Link href="/deals" className="font-medium text-brand hover:text-brand-strong">
-              Open the pipeline
-            </Link>
-          </p>
+          <ClearListArt />
+          <p className="mt-4 text-sm font-medium">Nothing assigned to you is open.</p>
+          <p className="mt-1 text-sm text-muted">A task assigned to you on a deal&apos;s page lands here.</p>
+          <Link
+            href="/deals"
+            className="mt-4 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+          >
+            Open the pipeline
+          </Link>
         </div>
       ) : (
         <>
