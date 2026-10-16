@@ -2841,10 +2841,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   so the deal page's research panel, the compare table and the demo read
   one table through one read; each had queried the row for itself, and
   the demo read the August snapshot on the one page a visitor sees
-  without signing in. The demo's card is `app/demo/leverage-card.tsx`
-  (`SampleLeverageCard`, pure, rendered in `lib/views.render.test.ts`
-  with the marker's phrase checked against `renderToString`), and it
-  prints the cap over the latest 10-year, dated, beside the survey read.
+  without signing in. The demo draws the deal page's own research panel
+  (`ResearchPanelView`, the pure view `ResearchPanel` wraps, on the
+  checked-in rows a visitor reads), so its leverage check is the deal
+  page's: the cap over the latest 10-year, dated, beside the survey read.
 - The model's assumptions against the published figures:
   `lib/model-vs-market.ts` (pure, no model call — #388). The four
   numbers that decide the model's return (rent growth, expense growth,
@@ -5461,10 +5461,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   through `DealView` and the analyses panel as one prop, off the figures
   it already reads for the model's checks, and nothing renders outside
   the covered markets or before the pull has written a sector row. **The
-  demo draws the same picture on the sample** (#396,
-  `app/demo/demand-card.tsx`, `SampleDemandCard`, pure): the metro the
+  demo draws the same picture on the sample** (#396, in its Analyses
+  section beside the market check, `app/demo/demo-data.ts`): the metro the
   sample's own address falls in through `metroForAddress`, read through
-  `liveMetroRates`, beside the leverage card — the one page a visitor
+  `liveMetroRates` — the one page a visitor
   reads without signing in showing what a screened deal gets; the sample
   is an apartment building, so nothing is singled out. The bars are
   `app/demand-bars.tsx` (`DemandBars`), the ONE picture the deal page's

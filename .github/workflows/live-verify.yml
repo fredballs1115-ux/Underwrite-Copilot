@@ -102,16 +102,17 @@ jobs:
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
           done
           grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
-          grep -q "Eviction Diversion Program" p_demo.html && echo "/demo: legal panel present (real rule text serves)" || echo "/demo: legal panel not yet deployed"
-          grep -q "would you ask the broker" p_demo.html && echo "/demo: broker-question cards present" || echo "/demo: broker-question cards not yet deployed"
-          grep -q "ranks run tightest first" p_demo.html && echo "DEMO PACK POSITION (Aug 25): present" || echo "DEMO PACK POSITION (Aug 25): not yet deployed"
+          # /demo draws the deal page's own header and section bar on the
+          # sample (2026-10-16); the old hand-built legal panel, pack position
+          # and deal-type chip markers are retired with the parts they read.
+          grep -q "data-deal-hero" p_demo.html && echo "/demo: the deal page's own header present" || echo "/demo: deal-page header not yet deployed"
+          grep -q 'aria-label="Deal sections"' p_demo.html && echo "/demo: the deal page's section bar present" || echo "/demo: section bar not yet deployed"
           # The sample screen and the homepage render the same DEEP_TOOLS
           # constant, so this marker failing while the homepage one passes
           # means the two surfaces have drifted.
           grep -q "Four more tools pick up where it stops" p_demo.html && echo "DEMO DEEP TOOLS BLOCK (Aug 28): present" || echo "DEMO DEEP TOOLS BLOCK: not yet deployed"
           # The sample's summary bar carries its deal kind, inferred from its
           # own extraction; the chip's tooltip is the grep.
-          grep -q "kind is read first" p_demo.html && echo "DEMO DEAL TYPE CHIP (Sep 8): present" || echo "DEMO DEAL TYPE CHIP (Sep 8): not yet deployed"
           grep -q "copy citation" p_market.html && echo "/market: copy-citation + FMR ladder present" || echo "/market: citation tools not yet deployed"
           grep -q "By asset type" p_market.html && echo "/market: sector snapshot panel present (Aug 25)" || echo "/market: sector panel not yet deployed"
           # Coverage heat grid: every market x every asset class, with the
@@ -1003,7 +1004,8 @@ jobs:
           # renders ONLY when the read answered. /demo is ISR (five minutes),
           # so the first run after a deploy may read the build-time copy —
           # run again.
-          mark "#396 the demo reads the sample market's payrolls by sector" grep -q "payrolls by sector, Philadelphia MSA" p_demo.html
+          # #396's demo copy now sits inside /demo's Analyses section, which
+          # the served HTML does not carry until a reader opens it; retired.
           # #397 — the supply side: each metro's units permitted in buildings
           # of two or more, the total less FRED's single-family series, as a
           # stacked-bar picture on the market brief and one line under the
@@ -1012,7 +1014,6 @@ jobs:
           # the weekday cron, or a dispatched run — so the first run after
           # the deploy reads NOT DEPLOYED here: run the pull and look again.
           mark "#397 the supply picture is on the market brief" grep -q "units permitted, single-family and in buildings of two or more" p_market.html
-          mark "#397 the demo says the sample market's supply side" grep -q "units in buildings of two or more, twelve months to" p_demo.html
           # #398 — the insurance premium index on the strip's inflation fold:
           # the tile's label is the series table's own short name, one JS
           # expression, inside a closed <details>. Absent until the pull has
