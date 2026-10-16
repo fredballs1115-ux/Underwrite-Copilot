@@ -1608,7 +1608,7 @@ function AnnualCashFlowBlock({ b, totalPages }: { b: BaseCase; totalPages: numbe
   );
   const irrWords =
     b.leveredIrr != null && Number.isFinite(b.leveredIrr)
-      ? `Cash to equity is the stream the base case's ${(b.leveredIrr * 100).toFixed(1)}% levered IRR is solved on.`
+      ? `Cash to equity is the stream the base case's ${(b.leveredIrr * 100).toFixed(1)}% levered IRR is solved on, each figure rounded to the dollar.`
       : b.noIrr
         ? `No levered IRR solves on this stream: ${NO_IRR_WHY[b.noIrr]}.`
         : null;

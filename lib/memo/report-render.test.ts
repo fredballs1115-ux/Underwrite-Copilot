@@ -757,9 +757,13 @@ describe("ReportDocument (full report)", () => {
     // The rows, each year's figure the engine's.
     expect(text).toContain(`Net operating income ${a.years.map((y) => usd(y.noi)).join(" ")}`);
     expect(text).toContain(`Debt service ${a.years.map((y) => `(${usd(y.debtService)})`).join(" ")}`);
+    // Printed, they add up (audit C8, M1): each total from the figures above it.
+    expect(text).toContain(`Operating expenses ${a.years.map((y) => `(${usd(y.egi - y.noi)})`).join(" ")}`);
+    expect(text).toContain(`Cash after debt ${a.years.map((y) => usd(y.noi - y.capital - y.amFee - y.debtService)).join(" ")}`);
+    expect(text).toContain(`${usd(a.sale.gross - a.sale.costs - a.sale.loanPayoff)} to equity.`);
     // The IRR's own stream, the closing's equity out first.
     expect(text).toContain(`Cash to equity (${usd(a.equity)})`);
-    expect(text).toContain(`Cash to equity is the stream the base case's ${(b.leveredIrr! * 100).toFixed(1)}% levered IRR is solved on.`);
+    expect(text).toContain(`Cash to equity is the stream the base case's ${(b.leveredIrr! * 100).toFixed(1)}% levered IRR is solved on, each figure rounded to the dollar.`);
     // The sale, and what grows each year with its source.
     expect(text).toContain(`The sale, at the end of year ${a.sale.year}: the following year's NOI of ${usd(a.sale.forwardNoi)} at the 5.45% exit cap (derived)`);
     expect(text).toContain(`${usd(a.sale.net)} to equity.`);

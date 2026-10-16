@@ -6,10 +6,19 @@
 //
 // Its rules:
 //   - every figure is the engine's, never recomputed here: a row the page
-//     prints is a field of `CashFlowRow` or `Residual`;
-//   - the cash to equity row IS the levered vector the IRR is solved on —
-//     the closing's equity out, each year's cash after debt, the last year's
-//     with the net sale — so the page's IRR can be traced to its row;
+//     prints is a field of `CashFlowRow` or `Residual`, or a total of them;
+//   - printed, the rows add up (audit C8, M1 — the debt schedule's rule):
+//     each figure the engine computes is rounded to the dollar ONCE, and
+//     every total the page prints is derived from the rounded figures above
+//     it, never rounded on its own — operating expenses are revenue less the
+//     NOI (the NOI is the figure the base case prints elsewhere), cash after
+//     debt the NOI less capital, the fee and debt service, the net sale the
+//     gross less its costs and the loan. Rounded one by one, every year of
+//     the sample missed its own total by a dollar;
+//   - the cash to equity row is the closing's equity out, each year's cash
+//     after debt and the last year's net sale, from those printed figures:
+//     the levered vector the IRR is solved on, within the dollar a row's
+//     rounding moves it (`irrStream` keeps the engine's own);
 //   - a line the model carries at zero in every year (an asset-management
 //     fee of none, no capital) is left out rather than printed as a row of
 //     dashes.
@@ -50,38 +59,58 @@ export interface AnnualCashFlow {
     /** to equity, after the costs and the loan */
     net: number;
   };
-  /** the levered vector: [−equity, year 1 … year N with the sale] */
+  /** the printed cash to equity: [−equity, year 1 … year N with the sale],
+   *  each the sum of the row's printed figures */
   toEquity: number[];
+  /** the engine's levered vector, unrounded — the stream the IRR is solved
+   *  on, which `toEquity` ties to within rounding */
+  irrStream: number[];
   /** whether the model carries any capital, or any fee, in some year */
   hasCapital: boolean;
   hasAmFee: boolean;
 }
 
 export function annualCashFlowOf(uw: UnderwriteResult): AnnualCashFlow {
-  const years = uw.cashFlow.map((c) => ({
-    year: c.year,
-    egi: c.effectiveGrossRevenue,
-    opex: c.operatingExpenses,
-    noi: c.noi,
-    capital: c.totalCapEx,
-    amFee: c.assetManagementFees,
-    debtService: c.debtService,
-    cashAfterDebt: c.leveredCashFlow,
-  }));
+  const $ = (n: number) => Math.round(n);
+  const years = uw.cashFlow.map((c) => {
+    const egi = $(c.effectiveGrossRevenue);
+    const noi = $(c.noi);
+    const capital = $(c.totalCapEx);
+    const amFee = $(c.assetManagementFees);
+    const debtService = $(c.debtService);
+    return {
+      year: c.year,
+      egi,
+      // derived, so revenue less expenses is the printed NOI
+      opex: egi - noi,
+      noi,
+      capital,
+      amFee,
+      debtService,
+      // derived, so the column adds up to it
+      cashAfterDebt: noi - capital - amFee - debtService,
+    };
+  });
   const r = uw.residual;
+  const gross = $(r.grossSaleProceeds);
+  const costs = $(r.saleCosts);
+  const loanPayoff = $(r.outstandingDebt);
+  const net = gross - costs - loanPayoff;
+  const equity = $(uw.sourcesUses.equity);
   return {
     years,
-    equity: uw.sourcesUses.equity,
+    equity,
     sale: {
       year: uw.holdYears,
-      forwardNoi: r.residualNoi,
+      forwardNoi: $(r.residualNoi),
       exitCap: r.exitCapPct,
-      gross: r.grossSaleProceeds,
-      costs: r.saleCosts,
-      loanPayoff: r.outstandingDebt,
-      net: r.netSaleProceeds,
+      gross,
+      costs,
+      loanPayoff,
+      net,
     },
-    toEquity: [...uw.leveredVector],
+    toEquity: [-equity, ...years.map((y, i) => y.cashAfterDebt + (i === years.length - 1 ? net : 0))],
+    irrStream: [...uw.leveredVector],
     hasCapital: years.some((y) => y.capital !== 0),
     hasAmFee: years.some((y) => y.amFee !== 0),
   };
