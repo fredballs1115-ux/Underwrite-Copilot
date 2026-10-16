@@ -417,7 +417,7 @@ export default async function DealPage({
     ? readByIds(compIds, (ids) =>
         supabase
           .from("deals")
-          .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id, first_signal")
+          .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id, first_signal, stage, stage_history")
           .in("id", ids),
       )
         .then((rows) => {
@@ -1932,6 +1932,7 @@ export default async function DealPage({
         }}
         screenDiff={screenDiff}
         stageHistory={stageHistory}
+        dealStage={((deal as { stage?: string }).stage as string) ?? "screening"}
         internalComps={internalComps}
         internalCompsUnread={internalCompsUnread}
         omUrl={omUrl}

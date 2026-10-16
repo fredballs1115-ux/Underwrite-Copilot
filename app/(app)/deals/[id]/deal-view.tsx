@@ -41,6 +41,7 @@ import type { AssumableView } from "@/lib/assumable-debt";
 import type { LeaseholdExitView } from "@/lib/leasehold-exit";
 import type { MetroDemand } from "@/lib/metro-demand";
 import { DecisionLog } from "./decision-log";
+import { DealOutcomeCard } from "./deal-outcome";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
@@ -233,6 +234,10 @@ const MODEL_ERRORS: Record<string, string> = {
   deletepermission:
     "Only the deal’s creator or the team owner can delete this deal. Nothing was removed.",
   stage: "Couldn’t save the stage — please try again.",
+  outcome: "Couldn’t save what became of the deal — move it to Dead or Closed first, then try again.",
+  outcomereason: "Pick one of the reasons listed.",
+  outcomeprice: "Type the trade price as a dollar figure — $41,500,000 or $41.5M.",
+  outcomedate: "Type the trade’s day as a real date.",
   note: "Couldn’t save your note — please try again.",
   noteempty: "Write something in the note first — whitespace doesn’t count.",
   notedelete: "Couldn’t remove that note — please try again.",
@@ -354,6 +359,7 @@ export function DealView({
   buyBox,
   screenDiff,
   stageHistory,
+  dealStage = null,
   internalComps = [],
   internalCompsUnread = false,
   omUrl,
@@ -446,6 +452,9 @@ export function DealView({
   buyBox: BuyBoxPanelData;
   screenDiff: ScreenDiff | null;
   stageHistory: StageChange[];
+  /** the deal's stage, for what became of it once Dead or Closed (lib/
+   *  deal-outcome, research pass 24 B4) */
+  dealStage?: string | null;
   internalComps?: InternalComp[];
   /** the read of the reader's other screens failed (audit C5, LOW-5) */
   internalCompsUnread?: boolean;
@@ -990,6 +999,7 @@ export function DealView({
               omUrl={omUrl}
               askers={askerNames ? { me: userId, names: askerNames } : null}
             />
+            <DealOutcomeCard dealId={dealId} stage={dealStage} history={stageHistory} />
             <DecisionLog
               dealId={dealId}
               notes={notes}
@@ -2071,6 +2081,13 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
                     {c.priceLabel ?? <span className="text-line">—</span>}
+                    {/* A trade someone reported once the deal ended, its own
+                        figure under the ask — never pooled with it. */}
+                    {c.tradedLabel ? (
+                      <span className="block text-[10px] text-muted" title={c.tradedTitle ?? undefined}>
+                        traded {c.tradedLabel} (reported)
+                      </span>
+                    ) : null}
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
                     {c.capLabel ??

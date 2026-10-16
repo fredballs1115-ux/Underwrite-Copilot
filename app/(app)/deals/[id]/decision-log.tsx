@@ -3,6 +3,7 @@
 import { useFormStatus } from "react-dom";
 import type { DealNote } from "@/lib/deals";
 import { STAGE_LABEL, type StageChange } from "@/lib/stages";
+import { outcomeWords } from "@/lib/deal-outcome";
 import { addDealNote, deleteDealNote } from "../actions";
 
 // Module-level cached formatter (creating one per render is measurable).
@@ -137,6 +138,11 @@ export function DecisionLog({
                       {STAGE_LABEL[e.stage.stage] ?? e.stage.stage}
                     </span>
                     <span className="ml-2 text-xs">{safeWhen(e.at)}</span>
+                    {/* What became of the deal, on the move that ended it
+                        (research pass 24, B4). */}
+                    {e.stage.outcome ? (
+                      <span className="mt-0.5 block text-xs text-ink">{outcomeWords(e.stage.outcome)}</span>
+                    ) : null}
                   </p>
                 )}
               </div>

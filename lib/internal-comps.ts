@@ -25,6 +25,8 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { typedByHand } from "@/lib/manual-deal";
+import { parseStageHistory } from "@/lib/stages";
+import { currentOutcome, tradeWords } from "@/lib/deal-outcome";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -60,6 +62,12 @@ export interface InternalComp {
   /** the deal's facts were typed by hand, extracted from no OM
    *  (lib/manual-deal `typedByHand`) — the block says so */
   typedByHand?: boolean;
+  /** what the deal traded at, as someone on the team reported it once it
+   *  went Dead or Closed (lib/deal-outcome, research pass 24 B4) — "$41.5M",
+   *  its own track beside the ask, never pooled with it; `tradedTitle` says
+   *  who reported it and when */
+  tradedLabel?: string | null;
+  tradedTitle?: string | null;
 }
 
 interface MetricLike {
@@ -81,6 +89,10 @@ interface SiblingDealRow {
   first_signal?: unknown;
   /** who added the sibling, for whose screens the block says they are */
   user_id?: string | null;
+  /** the sibling's stage and its moves, for a trade reported once it went
+   *  Dead or Closed; absent on a row the caller did not select them for */
+  stage?: string | null;
+  stage_history?: unknown;
 }
 
 /** How many of the deal's own class the block reads in full, newest first:
@@ -290,6 +302,11 @@ export function deriveInternalComps(
       yieldOnCostLabel: yoc != null ? yieldOnCostText(yoc) : null,
       ...(viewerId !== undefined ? { teammate: row.user_id != null && row.user_id !== viewerId } : {}),
       ...(typedByHand(ext) ? { typedByHand: true } : {}),
+      // A reported trade, apart from the ask it never joins.
+      ...(() => {
+        const trade = currentOutcome(row.stage, parseStageHistory(row.stage_history))?.trade ?? null;
+        return trade ? { tradedLabel: fmtCompact(trade.price), tradedTitle: tradeWords(trade) } : {};
+      })(),
     });
     if (comps.length >= limit) break;
   }

@@ -48,6 +48,7 @@ import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { checkPdfOpens } from "@/lib/pdf-open";
 import { capRefusalOf } from "@/lib/deal-allowance";
 import { deadlineDay } from "@/lib/deadline-day";
+import { currentOutcome, readOutcomeForm, withOutcome } from "@/lib/deal-outcome";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -747,6 +748,59 @@ export async function setStage(formData: FormData) {
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
   redirect(backTo);
+}
+
+/** Why a dead deal died, and what it — or a closed one — traded at
+ *  (research pass 24, B4): stored on the stage-history entry that ended the
+ *  deal (lib/deal-outcome), which every later stage change keeps. A deal
+ *  whose move to Dead or Closed was not recorded has no entry to carry it,
+ *  and is refused rather than given a move on a day nobody made. */
+export async function setDealOutcome(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) redirect("/deals");
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: current } = await supabase
+    .from("deals")
+    .select("stage, stage_history")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!current) redirect(`/deals/${dealId}`);
+
+  const form = readOutcomeForm(
+    {
+      reason: formData.get("reason") as string | null,
+      price: formData.get("price") as string | null,
+      buyer: formData.get("buyer") as string | null,
+      date: formData.get("date") as string | null,
+    },
+    user!.email ?? null,
+    new Date().toISOString(),
+  );
+  if (!form.ok) redirect(`/deals/${dealId}?error=outcome${form.error}`);
+  // The reason and the trade are two forms on the card: a field the form
+  // did not send keeps what is recorded — a tap on a reason never clears a
+  // reported trade, nor a saved trade the reason.
+  const recorded = parseStageHistory(current!.stage_history);
+  const existing = currentOutcome(current!.stage as string | null, recorded);
+  const outcome = {
+    reason: formData.has("reason") ? form.outcome.reason : (existing?.reason ?? null),
+    trade: formData.has("price") ? form.outcome.trade : (existing?.trade ?? null),
+  };
+  const history = withOutcome(current!.stage as string | null, recorded, outcome);
+  if (!history) redirect(`/deals/${dealId}?error=outcome`);
+  const { error } = await supabase
+    .from("deals")
+    .update({ stage_history: history, updated_at: new Date().toISOString() })
+    .eq("id", dealId);
+  if (error) redirect(`/deals/${dealId}?error=outcome`);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/analytics");
+  redirect(`/deals/${dealId}`);
 }
 
 /** Set or clear the broker's call-for-offers date. */

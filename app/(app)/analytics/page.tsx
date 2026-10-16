@@ -14,7 +14,8 @@ import {
   type AnalyticsRow,
   type MiddleRead,
 } from "@/lib/analytics";
-import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
+import { STAGES, STAGE_LABEL, normalizeStage, parseStageHistory } from "@/lib/stages";
+import { deathReasons } from "@/lib/deal-outcome";
 import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
@@ -44,11 +45,12 @@ export default async function AnalyticsPage() {
   // (lib/read-all). The read had been the OLDEST 300: past them every newer
   // screen, the ones a reader looks for, was missing from every figure, and
   // nothing said so (research pass 42).
-  const { data, error } = await readAllResult<AnalyticsRow & { user_id?: string | null }>((from, to) =>
+  const { data, error } = await readAllResult<AnalyticsRow & { user_id?: string | null; stage_history?: unknown }>((from, to) =>
     supabase
       .from("deals")
       // The first signal too: the deal's kind is read with it, as on its page.
-      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, extraction, first_signal")
+      // The stage moves too: why each dead deal died (lib/deal-outcome).
+      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, stage_history, extraction, first_signal")
       .not("extraction", "is", null)
       .order("created_at", { ascending: false })
       .order("id")
@@ -130,6 +132,15 @@ export default async function AnalyticsPage() {
     }));
 
   const enough = deals.length >= 3;
+
+  // Why deals die (research pass 24, B4): each reason's count over the dead
+  // deals, read off the move that killed each one; a dead deal with no
+  // reason recorded is counted as such, never folded into one.
+  const dying = deathReasons(
+    data.filter((r) => !r.is_sample).map((r) => ({ stage: r.stage ?? null, history: parseStageHistory(r.stage_history) })),
+  );
+  const recordedDeaths = dying.dead - dying.unrecorded;
+  const maxReason = Math.max(1, ...dying.reasons.map((r) => r.count));
 
   return (
     <div className="space-y-6">
@@ -251,6 +262,34 @@ export default async function AnalyticsPage() {
               </div>
             )}
           </section>
+
+          {dying.dead > 0 && (
+            <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="why-deals-die">
+              <h2 className="text-sm font-semibold tracking-tight">Why deals die</h2>
+              <p className="mb-3 mt-0.5 text-xs text-muted">
+                {recordedDeaths > 0
+                  ? `${recordedDeaths} of ${dying.dead} dead deal${dying.dead === 1 ? "" : "s"} with a reason recorded.`
+                  : `${dying.dead} dead deal${dying.dead === 1 ? "" : "s"}, none with a reason recorded yet — tap one on the deal's page.`}
+              </p>
+              {recordedDeaths > 0 && (
+                <ul className="space-y-1.5">
+                  {dying.reasons.map((r) => (
+                    <li key={r.reason} className="flex items-center gap-2 text-sm">
+                      <span className="w-40 shrink-0 truncate text-xs text-muted">{r.label}</span>
+                      <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-line" aria-hidden>
+                        <span
+                          data-bar="why-dead"
+                          className="absolute inset-y-0 left-0 rounded-full bg-kill"
+                          style={{ width: `${Math.round((r.count / maxReason) * 100)}%` }}
+                        />
+                      </span>
+                      <span className="w-8 shrink-0 text-right font-mono text-xs tabular-nums">{r.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           {markets.length > 0 && (
             <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">

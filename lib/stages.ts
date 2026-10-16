@@ -41,22 +41,103 @@ export function normalizeStage(raw: string | null | undefined): Stage {
   return "screening";
 }
 
+/** Why a deal died (research pass 24, B4): the one tap a team makes when
+ *  it moves a deal to Dead, so the firm learns what it loses on. */
+export const OUTCOME_REASONS = [
+  "price",
+  "timing",
+  "market",
+  "physical",
+  "financing",
+  "lost_to_bidder",
+  "seller_withdrew",
+] as const;
+
+export type OutcomeReason = (typeof OUTCOME_REASONS)[number];
+
+export const OUTCOME_REASON_LABEL: Record<OutcomeReason, string> = {
+  price: "Price",
+  timing: "Timing",
+  market: "Market",
+  physical: "Physical",
+  financing: "Financing",
+  lost_to_bidder: "Lost to another bidder",
+  seller_withdrew: "Seller withdrew",
+};
+
+/** A trade price someone on the team reported — hearsay until recorded, and
+ *  always said with who reported it and when. */
+export interface ReportedTrade {
+  /** dollars */
+  price: number;
+  buyer: string | null;
+  /** the day it traded, yyyy-mm-dd, as reported; null where not given */
+  date: string | null;
+  /** the reporter's name or email as it read when they reported it */
+  reportedBy: string | null;
+  /** ISO timestamp of the report */
+  reportedAt: string;
+}
+
+/** What became of a deal moved to Dead or Closed: why it died (Dead only),
+ *  and what it traded at (either). Stored on the stage-history entry that
+ *  moved it, so a later stage change keeps it (`parseStageHistory`). */
+export interface DealOutcome {
+  reason: OutcomeReason | null;
+  trade: ReportedTrade | null;
+}
+
 /** One entry in deals.stage_history. */
 export interface StageChange {
   stage: Stage;
   /** ISO timestamp of the change */
   at: string;
+  /** on a move to Dead or Closed, what became of the deal (lib/deal-outcome) */
+  outcome?: DealOutcome;
+}
+
+const TEXT_MAX = 120;
+
+function parseTrade(raw: unknown): ReportedTrade | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown>;
+  const price = typeof t.price === "number" && Number.isFinite(t.price) && t.price > 0 ? t.price : null;
+  const reportedAt = typeof t.reportedAt === "string" ? t.reportedAt : null;
+  if (price == null || !reportedAt) return null;
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, TEXT_MAX) : null);
+  const date = typeof t.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : null;
+  return { price, buyer: text(t.buyer), date, reportedBy: text(t.reportedBy), reportedAt };
+}
+
+/** A stored outcome, kept only where it is well formed and on an entry that
+ *  ends the deal: a reason on Dead alone, a trade on Dead or Closed. */
+function parseOutcome(raw: unknown, stage: Stage): DealOutcome | undefined {
+  if ((stage !== "dead" && stage !== "closed") || !raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const reason =
+    stage === "dead" && typeof o.reason === "string" && (OUTCOME_REASONS as readonly string[]).includes(o.reason)
+      ? (o.reason as OutcomeReason)
+      : null;
+  const trade = parseTrade(o.trade);
+  return reason || trade ? { reason, trade } : undefined;
 }
 
 export function parseStageHistory(raw: unknown): StageChange[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter(
-      (e): e is { stage: string; at: string } =>
+      (e): e is { stage: string; at: string; outcome?: unknown } =>
         !!e &&
         typeof e === "object" &&
         typeof (e as { stage?: unknown }).stage === "string" &&
         typeof (e as { at?: unknown }).at === "string",
     )
-    .map((e) => ({ stage: normalizeStage(e.stage), at: e.at }));
+    .map((e) => {
+      const stage = normalizeStage(e.stage);
+      // The outcome rides on its entry, so the stage change that rewrites
+      // the array from this parse keeps it (research pass 24, B4): a parse
+      // that kept only the stage and the day erased it at the next move.
+      const outcome = parseOutcome(e.outcome, stage);
+      return outcome ? { stage, at: e.at, outcome } : { stage, at: e.at };
+    });
 }
