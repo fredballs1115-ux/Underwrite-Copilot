@@ -5213,8 +5213,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (the disk: `public/photos/<file>`, checked at render time). A slot
   renders only when its file exists — the "Who it's for" strip folds
   away otherwise, never a placeholder. Until the operator's `hero.jpg`
-  lands, the hero's backdrop is a USGS aerial of Midtown Manhattan from
-  the metro imagery route. `app/place-band.tsx` is the one piece behind
+  lands, the hero's backdrop is the sample deal's own market, Philadelphia
+  (`HERO_AERIAL`, drawn through `CityPhoto` with its credit; a test holds it
+  to the sample's market). **The homepage and /demo draw the product's own
+  parts on the sample deal, never imitations** (2026-10-16): the hero card is
+  the real `DealHero` (`app/sample-hero.tsx`, its data from
+  `lib/sample-header.ts`, which calls the deal page's own readers), the
+  walkthrough renders the deal page's sections, the stage rail reads
+  `lib/screen-stages.ts`, the memo tile `lib/sample-memo.ts`, and the empty
+  pipeline and any public page show the sample's real pipeline card
+  (`lib/pipeline-card.ts`, `DealTilePreview`). The public memo and report are
+  built the way the signed-in routes build them for the sample
+  (`lib/sample-cover.ts`: one row, one cover, the same arguments). `app/place-band.tsx` is the one piece behind
   every public page's opening: `PlaceBackdrop` (the picture, its scrim,
   the credit — `AerialBackdrop` in `app/aerial-img.tsx` drops the credit
   with the picture on a 404) and `PlaceBand` (a dark section at the
