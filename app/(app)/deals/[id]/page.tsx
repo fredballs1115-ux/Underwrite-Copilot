@@ -11,6 +11,8 @@ import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
+import { HeroCover } from "./hero-cover";
+import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
 import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
@@ -1449,7 +1451,21 @@ export default async function DealPage({
                   : null
               }
             />
-          ) : null
+          ) : (
+            // Nothing of the place to show — no address, no photograph, no
+            // market photograph: the deal's own cover, the one its pipeline
+            // card wears (lib/deal-cover), so the header is never bare text.
+            <HeroCover
+              cover={coverFor({
+                seed: id,
+                assetClass: shownClass,
+                place: coverPlace(dealAddress, null, extraction?.market ?? firstSignal?.market ?? null),
+              })}
+              label={deal.name as string}
+              dealId={id}
+              canAdd={!(deal as { is_sample?: boolean }).is_sample}
+            />
+          )
         }
         actions={
           <>
