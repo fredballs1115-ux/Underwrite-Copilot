@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { DealAvatar } from "@/app/(app)/deal-avatar";
 import { COMPARE_MAX } from "@/lib/link-limits";
-import { paletteCall } from "@/lib/palette-search";
+import { paletteCall, type PaletteRun } from "@/lib/palette-search";
 import { PIN_LABEL } from "@/lib/pipeline-map";
 
 /** One deal the picker offers: its name, where it is, and its call. */
@@ -15,6 +15,25 @@ export interface PickableDeal {
   place: string | null;
   /** the call on file (`pass`, `caution`, `pass_on`), or null */
   call: string | null;
+  /** the deal's latest run as the pipeline card reads it (lib/screen-run
+   *  `listJobStatus`): a re-screen, or a stalled or failed run, outranks
+   *  the call on file */
+  run?: PaletteRun;
+}
+
+/**
+ * A picker tile's call, the pipeline card's way: a failed or stalled run,
+ * or a screen still running, is said over the call it left on file
+ * (lib/palette-search `paletteCall`, the palette's and the pipeline CSV's
+ * words: "Failed", "Stalled", "Re-screening", "Screening") — the picker had
+ * printed "Go" beside a re-screen replacing it — and the call alone where
+ * no run stands in its way.
+ */
+export function pickerCall(d: Pick<PickableDeal, "call" | "run">): { dot: string; word: string | null; title: string | null } {
+  const { dot, word } = paletteCall(d.call, d.run);
+  const was = d.call ? (PIN_LABEL[d.call] ?? null) : null;
+  if (word) return { dot, word, title: was ? `${word} — the call on file is the previous screen's, ${was}` : null };
+  return { dot, word: was, title: null };
 }
 
 /** The compare link for a set of deals, in the order they were picked. */
@@ -71,7 +90,8 @@ export function ComparePicker({ deals, initial = [] }: { deals: readonly Pickabl
         {deals.map((d) => {
           const on = picked.includes(d.id);
           const off = !on && full;
-          const call = d.call ? (PIN_LABEL[d.call] ?? null) : null;
+          const shown = pickerCall(d);
+          const call = shown.word;
           return (
             <li key={d.id}>
               <label
@@ -90,11 +110,11 @@ export function ComparePicker({ deals, initial = [] }: { deals: readonly Pickabl
                   onChange={() => toggle(d.id)}
                   className="h-4 w-4 shrink-0 accent-brand"
                 />
-                <DealAvatar dealId={d.id} dot={paletteCall(d.call, undefined).dot} size="md" />
+                <DealAvatar dealId={d.id} dot={shown.dot} size="md" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{d.name}</span>
                   {(call || d.place) && (
-                    <span className="block truncate text-xs text-muted">
+                    <span className="block truncate text-xs text-muted" title={shown.title ?? undefined} data-qa="picker-call">
                       {[call, d.place].filter(Boolean).join(" · ")}
                     </span>
                   )}

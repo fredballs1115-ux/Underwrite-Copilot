@@ -7,7 +7,8 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ComparePicker, compareHref, type PickableDeal } from "@/app/(app)/deals/compare/compare-picker";
+import { ComparePicker, compareHref, pickerCall, type PickableDeal } from "@/app/(app)/deals/compare/compare-picker";
+import { paletteCall } from "./palette-search";
 import { COMPARE_MAX } from "./link-limits";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -56,6 +57,42 @@ describe("the empty compare page's picker", () => {
     expect(html.match(/disabled=""/g)).toHaveLength(DEALS.length - COMPARE_MAX);
     expect(visibleText(html)).toContain(`${COMPARE_MAX} of ${COMPARE_MAX} picked`);
     expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("says a re-screen, a stalled or a failed run over the call on file, the pipeline card's way (the audit)", () => {
+    expect(pickerCall({ call: "pass", run: "running" })).toMatchObject({ word: "Re-screening", dot: "pulse-bar bg-brand" });
+    expect(pickerCall({ call: "pass", run: "running" }).title).toContain("previous screen's, Go");
+    expect(pickerCall({ call: null, run: "running" })).toMatchObject({ word: "Screening", title: null });
+    expect(pickerCall({ call: "caution", run: "stalled" })).toMatchObject({ word: "Stalled", dot: "bg-caution" });
+    expect(pickerCall({ call: "pass_on", run: "failed" })).toMatchObject({ word: "Failed", dot: "bg-kill" });
+    // No run in the way: the call alone, as before.
+    expect(pickerCall({ call: "pass", run: null })).toEqual({ dot: paletteCall("pass", null).dot, word: "Go", title: null });
+    expect(pickerCall({ call: null })).toMatchObject({ word: null });
+    // The words each run gets are the ones the palette and the card's CSV say.
+    for (const run of ["running", "stalled", "failed"] as const) expect(pickerCall({ call: "pass", run }).word).toBe(paletteCall("pass", run).word);
+
+    const html = renderToStaticMarkup(
+      React.createElement(ComparePicker, {
+        deals: [
+          { id: "a1", name: "The Maddox", place: "Brewerytown, Philadelphia, PA", call: "caution", run: "running" },
+          { id: "b2", name: "Harbor Point", place: null, call: "pass", run: "stalled" },
+          { id: "c3", name: "Elm Street Lofts", place: null, call: "pass", run: null },
+        ],
+      }),
+    );
+    const text = visibleText(html);
+    expect(text).toContain("Re-screening · Brewerytown, Philadelphia, PA");
+    expect(text).not.toContain("Caution · Brewerytown");
+    expect(text).toContain("Stalled");
+    expect(text).toMatch(/Elm Street Lofts\s*Go/);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("is handed each deal's run by the page, read as the pipeline reads it", async () => {
+    const { readFileSync } = await import("node:fs");
+    const page = readFileSync("app/(app)/deals/compare/page.tsx", "utf8");
+    expect(page).toMatch(/run: listJobStatus\(pickerJobs\.get\(d\.id\), !!d\.call\)/);
   });
 
   it("writes the compare link in the order the deals were picked", () => {

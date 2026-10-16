@@ -53,7 +53,7 @@ import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
-import { screenedOn, verdictBehind, type JobLike } from "@/lib/screen-run";
+import { listJobStatus, screenedOn, verdictBehind, type JobLike } from "@/lib/screen-run";
 import { COMPARE_MAX } from "@/lib/link-limits";
 import { ComparePicker, type PickableDeal } from "./compare-picker";
 
@@ -406,9 +406,33 @@ export default async function ComparePage({
       .order("created_at", { ascending: false })
       .order("id")
       .limit(PICKER_LIMIT);
-    const pickable: PickableDeal[] = ((mine ?? []) as { id: string; name: string | null; call: string | null; market: string | null }[]).map(
-      (d) => ({ id: d.id, name: d.name || "Untitled deal", place: d.market || null, call: d.call || null }),
-    );
+    const mineRows = (mine ?? []) as { id: string; name: string | null; call: string | null; market: string | null }[];
+    // Each deal's latest run, read as the pipeline card reads it (lib/
+    // screen-run `listJobStatus`): a re-screen, or a stalled or failed run,
+    // is said over the call it left on file, never the call alone. A
+    // failed read leaves the calls as they are on file.
+    const pickerJobs = new Map<string, JobLike>();
+    if (mineRows.length) {
+      const { data: jobs } = await supabase
+        .from("analysis_jobs")
+        .select("deal_id, status, step, updated_at, created_at")
+        .in(
+          "deal_id",
+          mineRows.map((d) => d.id),
+        )
+        .order("created_at", { ascending: false })
+        .limit(Math.max(100, mineRows.length * 3));
+      for (const j of (jobs ?? []) as ({ deal_id: string } & JobLike)[]) {
+        if (j?.deal_id && !pickerJobs.has(j.deal_id)) pickerJobs.set(j.deal_id, j);
+      }
+    }
+    const pickable: PickableDeal[] = mineRows.map((d) => ({
+      id: d.id,
+      name: d.name || "Untitled deal",
+      place: d.market || null,
+      call: d.call || null,
+      run: listJobStatus(pickerJobs.get(d.id), !!d.call),
+    }));
     return (
       <div className="flex flex-col gap-6">
         {backLink}
