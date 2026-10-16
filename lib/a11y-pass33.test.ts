@@ -281,7 +281,7 @@ describe("text that reads at 4.5:1 where the pass measured it under (research pa
   it("the market page's dash for a figure the research does not state", () => {
     expect(ratio("line", "surface")).toBeLessThan(3);
     expect(ratio("muted", "surface")).toBeGreaterThanOrEqual(4.5);
-    expect(src("app/market/page.tsx")).toContain('{value ?? <span className="text-muted">—</span>}');
+    expect(src("app/market/market-memory-cards.tsx")).toContain('{value ?? <span className="text-muted">—</span>}');
   });
 
   it("the news page's source and kicker links are 24px tall without moving their line (WCAG 2.5.8)", () => {

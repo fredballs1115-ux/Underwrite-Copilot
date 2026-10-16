@@ -4,16 +4,8 @@ import { Fragment, Suspense } from "react";
 import Link from "next/link";
 import { MarketBand } from "@/app/place-band";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import {
-  basisLabel,
-  buildComps,
-  summarizeMarkets,
-  fmtCapRange,
-  explorerLeads,
-  fmtBasisRange,
-  marketsIn,
-  type MarketGroup,
-} from "@/lib/market-memory";
+import { buildComps, summarizeMarkets, explorerLeads, marketsIn } from "@/lib/market-memory";
+import { MarketMemoryCards } from "./market-memory-cards";
 import { RatesStrip } from "@/app/rates-strip";
 import { liveMetricRates, liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import type { LiveRate } from "@/lib/live-rates";
@@ -41,7 +33,6 @@ import { DC_AREA_METRO, FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrOf, fmrTwoBed, fm
 import { datedLong } from "@/lib/debt-index";
 import { asOfLabel } from "@/lib/research";
 import { linkOk } from "@/lib/link-audit";
-import { assetClassLabel } from "@/lib/asset-class";
 import { looseValue, SECTORS } from "@/lib/research-sectors";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS, compsFeedLive } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
@@ -226,12 +217,6 @@ export async function generateMetadata({
   return publicMetadata(marketMeta(marketPageFor(metro), sectorPageFor(sector)));
 }
 
-const CALL_META: Record<string, { label: string; cls: string }> = {
-  pass: { label: "Go", cls: "text-pass" },
-  caution: { label: "Caution", cls: "text-caution" },
-  pass_on: { label: "No-go", cls: "text-kill" },
-};
-
 export default async function MarketDataPage({
   searchParams,
 }: {
@@ -370,11 +355,7 @@ export default async function MarketDataPage({
             {totalScreens} screen{totalScreens === 1 ? "" : "s"} with a cap or basis on file, across{" "}
             {marketCount} market{marketCount === 1 ? "" : "s"}.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {groups.map((g) => (
-              <MarketCard key={`${g.assetClass}|${g.marketKey}`} g={g} />
-            ))}
-          </div>
+          <MarketMemoryCards groups={groups} />
         </>
       )}
 
@@ -1346,57 +1327,5 @@ async function IntelDigestCard() {
         <IntelItems items={items} />
       )}
     </section>
-  );
-}
-
-function MarketCard({ g }: { g: MarketGroup }) {
-  const calls = (
-    [
-      ["pass", g.calls.pass],
-      ["caution", g.calls.caution],
-      ["pass_on", g.calls.pass_on],
-    ] as const
-  ).filter(([, n]) => n > 0);
-
-  return (
-    <section className="shadow-card flex flex-col rounded-2xl border border-line bg-surface p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold tracking-tight">
-            {g.market}
-          </h2>
-          <p className="mt-0.5 text-xs text-muted">{assetClassLabel(g.assetClass)}</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-faint px-2 py-0.5 font-mono text-[11px] tabular-nums text-muted">
-          {g.count} screen{g.count === 1 ? "" : "s"}
-        </span>
-      </div>
-
-      <dl className="mt-4 space-y-2.5">
-        <Stat label="Going-in cap" value={g.cap ? fmtCapRange(g.cap) : null} />
-        <Stat label={basisLabel(g)} value={g.perUnit ? fmtBasisRange(g.perUnit) : null} />
-      </dl>
-
-      {calls.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 border-t border-line pt-3 text-xs">
-          {calls.map(([key, n]) => (
-            <span key={key} className={CALL_META[key].cls}>
-              <span className="font-mono tabular-nums">{n}</span> {CALL_META[key].label}
-            </span>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="font-mono text-sm tabular-nums">
-        {value ?? <span className="text-muted">—</span>}
-      </dd>
-    </div>
   );
 }
