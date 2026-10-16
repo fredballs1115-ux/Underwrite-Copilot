@@ -468,9 +468,10 @@ function SectionHead({
 /**
  * The photograph behind the hero's headline. The operator's own (a real
  * building, a team at work) when `public/photos/hero.jpg` exists; until
- * then Manhattan's skyline, the one photograph the site can always produce
- * for itself (PlaceBackdrop, shared with the other public pages' opening
- * bands). Both draw at full strength under the SAME scrim (PhotoScrim):
+ * then the sample deal's own market, Philadelphia (lib/photos HERO_AERIAL),
+ * so the band and the sample's header in it show one city — the photograph
+ * the site can always produce for itself (PlaceBackdrop, shared with the
+ * other public pages' opening bands), credited at the band's foot. Both draw at full strength under the SAME scrim (PhotoScrim):
  * dark under the left-hand type, clear over the picture. A photograph the
  * treatment washes out costs the same bytes and says nothing.
  *

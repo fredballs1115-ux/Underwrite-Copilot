@@ -17,6 +17,8 @@ import { priceFigureOf } from "./hero-figure";
 import { dealTypeLabel, interestTag } from "./interest";
 import { countyOf, placeDeal } from "./market-county";
 import { marketPictureFor } from "./market-picture";
+import { HERO_AERIAL } from "./photos";
+import { SKYLINES } from "./skyline";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { VERDICT_PILL, headerFacts, sampleHeader } from "./sample-header";
 
@@ -84,6 +86,10 @@ describe("the sample's header is the deal page's", () => {
     const h = sampleHeader(AS_OF);
     expect(h.market).toEqual(page);
     expect(h.market?.id).toBe("philadelphia");
+    // The homepage's hero band opens on the same city as the card in it,
+    // named in the skyline table's own words.
+    expect(HERO_AERIAL.metro).toBe(h.market?.id);
+    expect(HERO_AERIAL.place).toBe(SKYLINES[HERO_AERIAL.metro].place);
   });
 
   it("judges no fit without a box and draws no call without a verdict", () => {

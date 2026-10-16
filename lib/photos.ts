@@ -92,13 +92,17 @@ export function stripPhotos(
 }
 
 /**
- * The market whose downtown stands behind the hero until the operator's
- * photograph arrives. Midtown Manhattan reads as itself from above; the
- * frame is the imagery route's largest.
+ * The market behind the hero until the operator's photograph arrives: the
+ * sample deal's own, Philadelphia, so the band and the sample's header in
+ * it show one city (its skyline first, through PlaceBackdrop, the overhead
+ * the floor). `place` is the skyline table's own words for the photograph
+ * (lib/skyline). lib/sample-header.test.ts holds the market to the
+ * sample's; `height` is the overhead's frame, the imagery route's largest
+ * width at 16:9.
  */
 export const HERO_AERIAL = {
-  metro: "nyc",
-  place: "Midtown Manhattan",
+  metro: "philadelphia",
+  place: "Center City Philadelphia",
   width: 1600,
   height: 900,
 } as const;
