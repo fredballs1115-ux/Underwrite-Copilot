@@ -91,27 +91,23 @@ function ToolIcon({ children }: { children: ReactNode }) {
   );
 }
 
-/** The "Pro" mark the deal page sets beside an export on a free account. */
-function ProMark() {
-  return (
-    <>
-      {" "}
-      <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
-    </>
-  );
-}
+/** Said in each document's tooltip: the sample's copy is free, a deal of
+ *  your own's is Pro — so the row wears no "Pro" mark on a download that
+ *  costs nothing (audit C7, L10), and the homepage's artifact tiles, which
+ *  describe the exports on a deal of your own, keep theirs. */
+export const SAMPLE_DOWNLOAD_NOTE = "Free for the sample; Pro on a deal of your own.";
 
 /**
- * The deal header's five tools, as a free account sees them on the sample:
- * the three documents — here the sample's own public downloads, which are
- * free (on a deal of your own they are Pro, as the marks say) — then the
- * rent roll engine and the valuations reconciler, which work on a deal of
- * your own, so they open the sign-up.
+ * The deal header's five tools on the sample: the three documents — here
+ * the sample's own public downloads, which are free, so they carry no "Pro"
+ * mark (their tooltips say a deal of your own's are Pro) — then the rent
+ * roll engine and the valuations reconciler, which work on a deal of your
+ * own, so they open the sign-up.
  */
 export function SampleHeroTools() {
   return (
     <>
-      <a href="/api/demo/memo" title="One-page IC screening memo — verdict, buy-box fit, flags, next steps" className={HERO_TOOL}>
+      <a href="/api/demo/memo" title={`One-page IC screening memo — verdict, buy-box fit, flags, next steps. ${SAMPLE_DOWNLOAD_NOTE}`} className={HERO_TOOL}>
         <ToolIcon>
           <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
           <path d="M15 2v5h5" />
@@ -119,22 +115,20 @@ export function SampleHeroTools() {
           <path d="M10 16h4" />
         </ToolIcon>
         IC memo
-        <ProMark />
       </a>
       <a
         href="/api/demo/report"
-        title="The full screening report — memo plus every term, challenge, comp, and market check"
+        title={`The full screening report — memo plus every term, challenge, comp, and market check. ${SAMPLE_DOWNLOAD_NOTE}`}
         className={HERO_TOOL}
       >
         <ToolIcon>
           <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
         </ToolIcon>
         Full report
-        <ProMark />
       </a>
       <a
         href="/api/demo/underwrite.xlsx"
-        title="Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates"
+        title={`Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates. ${SAMPLE_DOWNLOAD_NOTE}`}
         className={HERO_TOOL}
       >
         <ToolIcon>
@@ -142,7 +136,6 @@ export function SampleHeroTools() {
           <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
         </ToolIcon>
         Underwrite model
-        <ProMark />
       </a>
       <Link
         href="/login?mode=signup"

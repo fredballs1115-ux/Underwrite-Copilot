@@ -22,6 +22,7 @@ import { buyBoxCoverage } from "./criteria";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { sampleHeader } from "./sample-header";
 import { sampleMemoData } from "./sample-memo";
+import { SAMPLE_DOWNLOAD_NOTE, SampleHeroTools } from "@/app/sample-hero";
 import { compRating, inCompOrder } from "./comp-rating";
 import { SKYLINES, commonsPage } from "./skyline";
 import { METRO_VIEWS } from "./metro-imagery";
@@ -60,6 +61,23 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(text).toContain("One-page IC memo Pro");
     expect(text).not.toMatch(/formulasPro|memoPro/);
   }, 60_000);
+
+  // Audit C7, L10: the sample header's tools read "IC memo Pro", "Full
+  // report Pro" and "Underwrite model Pro", accessible names and all, on
+  // downloads that are free.
+  it("marks none of the sample's free downloads Pro, and says a deal of your own's are", () => {
+    const html = renderToStaticMarkup(React.createElement(SampleHeroTools));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toContain("IC memo");
+    expect(text).toContain("Underwrite model");
+    expect(text).not.toMatch(/\bPro\b/);
+    for (const href of ["/api/demo/memo", "/api/demo/report", "/api/demo/underwrite.xlsx"]) {
+      const a = new RegExp(`<a href="${href.replace(/\./g, "\\.")}" title="([^"]*)"`).exec(html);
+      expect(a?.[1], href).toContain(SAMPLE_DOWNLOAD_NOTE);
+    }
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
 
   // The homepage and /demo against the signed-in product, H1: the card
   // called itself "a faithful miniature" of the deal header and was not —
