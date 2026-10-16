@@ -6,8 +6,16 @@
 // screens read a price of the same kind (an exact label, or one candidate a
 // side on the same basis), and its own tolerance, under which a move is
 // formatting noise and no change at all.
+//
+// And only where the two prices buy the same thing (audit C8, M4): a
+// reissued memorandum that now sells a 49% share, a note, the land under the
+// building or a share of the general partner's interest asks a price for
+// something else, and its move from the whole building's ask is no cut —
+// $68,000,000 for the building to $33,320,000 for 49% of it had read "▼ 51%".
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { parsePrice } from "@/lib/criteria";
+import { interestOf, shareHoldingOf } from "@/lib/interest";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export interface PriceChange {
   direction: "cut" | "raise";
@@ -20,13 +28,26 @@ export interface PriceChange {
   since: string;
 }
 
+/** What a price buys, as far as two asks can be set against each other: the
+ *  interest's kind, a share's stated percentage and what the share is a
+ *  share of (a tenancy in common, a trust, the general partner's). An
+ *  extraction saved before the interest was read is fee simple, as every
+ *  reader takes it. */
+export function whatThePriceBuys(ex: unknown): string {
+  const e = (ex ?? null) as ExtractionResult | null;
+  const i = interestOf(e);
+  return [i.kind, i.sharePct ?? "", shareHoldingOf(e) ?? ""].join("|");
+}
+
 /** The asking price's move since the previous screen, or null where the
- *  two screens did not both read a comparable price, or it did not move. */
+ *  two screens did not both read a comparable price, the two prices buy
+ *  different things, or it did not move. */
 export function priceChangeOf(
   prior: PriorScreen | null | undefined,
-  extraction: { metrics?: { label: string; value: string; basis?: string }[]; screenedOn?: string | null } | null | undefined,
+  extraction: { metrics?: { label: string; value: string; basis?: string }[]; screenedOn?: string | null; interest?: unknown } | null | undefined,
 ): PriceChange | null {
   if (!prior || !extraction?.metrics?.length) return null;
+  if (whatThePriceBuys(prior.extraction) !== whatThePriceBuys(extraction)) return null;
   const diff = computeScreenDiff(prior, { metrics: extraction.metrics, screenedOn: extraction.screenedOn ?? null }, null);
   const row = diff?.rows.find((r) => r.label === "Asking price");
   if (!row || row.direction === "flat") return null;

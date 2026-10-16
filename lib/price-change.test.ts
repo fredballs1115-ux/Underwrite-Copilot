@@ -33,6 +33,42 @@ describe("priceChangeOf", () => {
   });
 });
 
+// Audit C8, M4: the two asks are compared only where they buy the same
+// thing.
+describe("a price for something else is no cut", () => {
+  const interest = (kind: string, share = "") => ({ kind, summary: "", share, groundLease: "", loan: "", page: "" });
+  const priorWith = (metrics: ReturnType<typeof m>[], i?: ReturnType<typeof interest>) => ({
+    at: "2026-09-03T14:00:00Z",
+    extraction: { metrics, ...(i ? { interest: i } : {}) },
+    verdict: null,
+  });
+
+  it("the whole building to a 49% share of it, or to a note, or to the land, draws no badge", () => {
+    const whole = priorWith([m("Asking price", "$68,000,000")]);
+    expect(priceChangeOf(whole, { metrics: [m("Asking price", "$33,320,000")], interest: interest("partial_interest", "49% limited partnership interest") })).toBeNull();
+    expect(priceChangeOf(whole, { metrics: [m("Asking price", "$50,000,000")], interest: interest("note") })).toBeNull();
+    expect(priceChangeOf(whole, { metrics: [m("Asking price", "$20,000,000")], interest: interest("leased_fee") })).toBeNull();
+    // a 49% share to a 30% share of the same entity
+    const share49 = priorWith([m("Asking price", "$33,320,000")], interest("partial_interest", "49% limited partnership interest"));
+    expect(priceChangeOf(share49, { metrics: [m("Asking price", "$20,400,000")], interest: interest("partial_interest", "30% limited partnership interest") })).toBeNull();
+    // a share of the entity to a share of the general partner's interest
+    expect(
+      priceChangeOf(share49, { metrics: [m("Asking price", "$30,000,000")], interest: interest("partial_interest", "49% of the general partner interest") }),
+    ).toBeNull();
+  });
+
+  it("the same thing bought keeps its badge: a fee simple read before the interest was, the same share, the same note", () => {
+    const old = priorWith([m("Asking price", "$68,000,000")]);
+    expect(priceChangeOf(old, { metrics: [m("Asking price", "$65,000,000")], interest: interest("fee_simple") })?.direction).toBe("cut");
+    const share = priorWith([m("Asking price", "$33,320,000")], interest("partial_interest", "49% limited partnership interest"));
+    expect(
+      priceChangeOf(share, { metrics: [m("Asking price", "$31,000,000")], interest: interest("partial_interest", "49% limited partnership interest") })?.direction,
+    ).toBe("cut");
+    const note = priorWith([m("Asking price", "$50,000,000")], interest("note"));
+    expect(priceChangeOf(note, { metrics: [m("Asking price", "$47,000,000")], interest: interest("note") })?.direction).toBe("cut");
+  });
+});
+
 describe("the pipeline card carries the move", () => {
   it("reads the row's prior screen beside its extraction", async () => {
     const { pipelineCard } = await import("./pipeline-card");
