@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { ScreenRunStrip, STRIP_STAGES, STRIP_WORDS, screenRunLines } from "@/app/screen-run-strip";
-import { COMP_RATING, LEVER_META, TONE } from "@/app/(app)/deals/[id]/deal-sections";
+import { COMP_RATING, LEVER_META, SCENARIO_META, TONE } from "@/app/(app)/deals/[id]/deal-sections";
 import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
 import { fmtEm, fmtPct } from "./underwrite/playground";
 import type { SampleLegal } from "./sample-legal";
@@ -270,5 +270,64 @@ describe("the screen-run trace credits each stage with what it writes", () => {
     const html = renderToStaticMarkup(React.createElement(ScreenRunStrip));
     expect(gluedWords(visibleText(html))).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
+  });
+});
+
+// Research pass of 2026-10-16 (H4, M2): the walkthrough drew its own
+// versions of the deal page's tabs — a "Screening verdict" box the product
+// does not have, deal-killer chips ("Deal-killer / Stress it") on cards that
+// carry no severity, "Genuine support" for the product's "Supports", and
+// "Base" / "Sponsor" for "Base case" / "Sponsor's case". It draws the deal
+// page's own components on the sample now.
+describe("the walkthrough's tabs are the sample deal's own", () => {
+  const panel = (tab: string, analysis?: string) =>
+    renderToStaticMarkup(
+      React.createElement(DemoPanel, {
+        tab: tab as never,
+        analysis: analysis as never,
+        fit: sampleFit(),
+        returns: { irr: "", equityMultiple: "", cashOnCash: "", exitCap: "" },
+      }),
+    );
+  const text = (html: string) => visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+
+  it("opens on the deal page's Overview: the verdict card, the screened count and the risk digest", () => {
+    const html = panel("Overview");
+    const t = text(html);
+    expect(t).toContain("Verdict");
+    expect(t).toContain("Caution");
+    expect(t).toContain(SAMPLE_DEAL.verdict.reason);
+    expect(t).toContain("Screened · 5/5 · model reconciled");
+    expect(t).toContain("Risk digest");
+    expect(t).not.toMatch(/Screening verdict|one rubric|Deal-killer|Stress it|Holds up/);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("opens Analyses on the verdict, with the product's ranges, deal-killers and scenario words", () => {
+    const t = text(panel("Analyses"));
+    for (const name of ["Verdict", "Challenger", "Comps", "Market", "Reconciler"]) expect(t).toContain(name);
+    for (const s of SAMPLE_DEAL.verdict.screen!.sensitivity) expect(t).toContain(SCENARIO_META[s.scenario]);
+    expect(t).toContain("Stress the three deal-killers first");
+    for (const k of SAMPLE_DEAL.verdict.screen!.dealKillers) expect(t).toContain(LEVER_META[k.lever].label);
+    // The exit cap's range card, its base as the verdict states it.
+    const exit = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Exit cap")!;
+    expect(t).toContain(`Base ${exit.base}`);
+    expect(t).toContain(exit.source);
+    expect(t).not.toMatch(/Genuine support|Deal-killer\b/);
+  });
+
+  it("rates the comps and the challenges in the product's own words", () => {
+    const comps = text(panel("Analyses", "comps"));
+    for (const c of SAMPLE_DEAL.comps.saleComps) expect(comps).toContain(COMP_RATING[c.support].label);
+    expect(comps).not.toContain("Genuine support");
+    const challenger = text(panel("Analyses", "challenger"));
+    for (const c of SAMPLE_DEAL.challenges.challenges) expect(challenger).toContain(c.assumption);
+    expect(challenger).toContain("Ask the broker");
+    for (const sub of ["verdict", "challenger", "comps", "market", "reconciler"]) {
+      const html = panel("Analyses", sub);
+      expect(a11yIssues(html), sub).toEqual([]);
+      expect(gluedWords(visibleText(html)), sub).toEqual([]);
+    }
   });
 });

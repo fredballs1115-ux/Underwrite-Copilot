@@ -2314,7 +2314,7 @@ function ScreeningRanges({ screen }: { screen: ScreenResult }) {
   );
 }
 
-const SCENARIO_META: Record<VerdictScenario["scenario"], string> = {
+export const SCENARIO_META: Record<VerdictScenario["scenario"], string> = {
   conservative: "Conservative",
   base: "Base case",
   sponsor: "Sponsor's case",
