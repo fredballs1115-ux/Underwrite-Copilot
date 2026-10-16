@@ -262,6 +262,7 @@ export function Pipeline({
   totalDeals = null,
   readNote = null,
   sampleCard = null,
+  filterBar = null,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -300,6 +301,9 @@ export function Pipeline({
    *  latest screen, its offers-due date), said over the list — a failed
    *  read is never shown as no rows */
   readNote?: string | null;
+  /** a filter the page draws on the server and the list shows over its
+   *  deals — the brokerage filter (research pass 24, B13) */
+  filterBar?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -855,6 +859,8 @@ export function Pipeline({
           {readNote}
         </p>
       )}
+
+      {filterBar}
 
       {onboarding && (
         <GettingStarted

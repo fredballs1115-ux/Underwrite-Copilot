@@ -16,12 +16,18 @@ import {
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage, parseStageHistory } from "@/lib/stages";
 import { deathReasons } from "@/lib/deal-outcome";
+import { brokerScorecard, dealFirms, rateText } from "@/lib/brokerage";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { evaluateBuyBox, foldBuyBoxChecks } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { getTeam } from "@/lib/teams";
 import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
 import { readAllResult } from "@/lib/read-all";
 import { typedByHand } from "@/lib/manual-deal";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 export const metadata: Metadata = { title: "Analytics" };
 
@@ -45,12 +51,16 @@ export default async function AnalyticsPage() {
   // (lib/read-all). The read had been the OLDEST 300: past them every newer
   // screen, the ones a reader looks for, was missing from every figure, and
   // nothing said so (research pass 42).
-  const { data, error } = await readAllResult<AnalyticsRow & { user_id?: string | null; stage_history?: unknown }>((from, to) =>
+  const { data, error } = await readAllResult<
+    AnalyticsRow & { user_id?: string | null; stage_history?: unknown; address?: unknown; team_id?: string | null }
+  >((from, to) =>
     supabase
       .from("deals")
       // The first signal too: the deal's kind is read with it, as on its page.
       // The stage moves too: why each dead deal died (lib/deal-outcome).
-      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, stage_history, extraction, first_signal")
+      // …and the address and the team, for each deal's buy-box fit by its
+      // brokerage, judged as the pipeline judges it.
+      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, team_id, address, stage_history, extraction, first_signal")
       .not("extraction", "is", null)
       .order("created_at", { ascending: false })
       .order("id")
@@ -141,6 +151,34 @@ export default async function AnalyticsPage() {
   );
   const recordedDeaths = dying.dead - dying.unrecorded;
   const maxReason = Math.max(1, ...dying.reasons.map((r) => r.count));
+
+  // By brokerage (research pass 24, B13): the firms the memoranda name, the
+  // deals each sent, how many fit the buy box of the deal's own scope (its
+  // team's, else the reader's) and how many the screen called Go — the fit
+  // judged as the pipeline card judges it (lib/buy-box-chip
+  // `dealCheckSource`). A box that cannot be read judges nothing.
+  const team = await getTeam(supabase, user.id).catch(() => null);
+  const [personalBox, teamBox] = await Promise.all([
+    getBuyBoxForDeal(user.id, null).catch(() => null),
+    team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
+  ]);
+  const brokers = brokerScorecard(
+    pooled.map((r) => {
+      const extraction = r.extraction as ExtractionResult | null;
+      const box = r.team_id ? teamBox : personalBox;
+      const address = addressUpgrade(r.address, extraction) ?? ((r.address as StructuredAddress | null | undefined) ?? null);
+      const fit = box
+        ? foldBuyBoxChecks(
+            evaluateBuyBox(r.asset_class ?? "auto", dealCheckSource(extraction, (r.first_signal as FirstSignal | null) ?? null, address), box),
+          )
+        : null;
+      return {
+        firms: dealFirms(extraction),
+        fit,
+        verdict: (r.verdict as { verdict?: string } | null)?.verdict ?? null,
+      };
+    }),
+  );
 
   return (
     <div className="space-y-6">
@@ -288,6 +326,48 @@ export default async function AnalyticsPage() {
                   ))}
                 </ul>
               )}
+            </section>
+          )}
+
+          {brokers.rows.length > 0 && (
+            <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="by-brokerage">
+              <h2 className="text-sm font-semibold tracking-tight">By brokerage</h2>
+              <div className="scroll-shadows-x mt-3 overflow-x-auto">
+                <table className="w-full min-w-[34rem] text-sm">
+                  <thead>
+                    <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
+                      <th className="py-2 pr-3 font-medium">Brokerage</th>
+                      <th className="py-2 pr-3 text-right font-medium">Deals</th>
+                      <th className="py-2 pr-3 text-right font-medium">Fit the box</th>
+                      <th className="py-2 text-right font-medium">Go calls</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {brokers.rows.slice(0, 12).map((b) => (
+                      <tr key={b.key} className="border-b border-line/60">
+                        <td className="max-w-[16rem] py-2 pr-3">
+                          <Link href={`/deals?broker=${encodeURIComponent(b.key)}`} className="font-medium text-brand hover:underline">
+                            {b.name}
+                          </Link>
+                          {b.names.length > 1 && (
+                            <span className="block truncate text-[11px] text-muted" title={b.names.join(" · ")}>
+                              {`as ${b.names.join(" · ")}`}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{b.received}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{rateText(b.fits, b.judged)}</td>
+                        <td className="py-2 text-right tabular-nums">{rateText(b.go, b.decided)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                {`Firms as each memorandum names its listing team; a deal co-listed by two firms counts for each. The fit is over the deals your buy box could judge, the Go calls over the deals with a call.${
+                  brokers.unnamed > 0 ? ` ${brokers.unnamed} deal${brokers.unnamed === 1 ? " names" : "s name"} no firm.` : ""
+                }`}
+              </p>
             </section>
           )}
 

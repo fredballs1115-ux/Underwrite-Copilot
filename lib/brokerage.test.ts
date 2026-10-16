@@ -1,0 +1,75 @@
+// Which brokerages send the deals (research pass 24, B13).
+import { describe, expect, it } from "vitest";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import type { ExtractionResult } from "@/lib/anthropic/types";
+import { brokerScorecard, brokerageKey, dealFirms, rateText } from "./brokerage";
+import { BrokerageFilter } from "@/app/(app)/deals/brokerage-filter";
+import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+
+const withTeam = (...firms: string[]): ExtractionResult =>
+  ({
+    dealName: "X",
+    assetClass: "multifamily",
+    market: "",
+    metrics: [],
+    listingTeam: firms.map((firm, i) => ({ name: `Broker ${i}`, title: "", firm, phone: "", email: "", page: "" })),
+  }) as unknown as ExtractionResult;
+
+describe("brokerageKey", () => {
+  it("files a firm's variants under one key, conservatively", () => {
+    expect(brokerageKey("CBRE")).toBe("cbre");
+    expect(brokerageKey("CBRE, Inc.")).toBe("cbre");
+    expect(brokerageKey("Marcus & Millichap")).toBe(brokerageKey("Marcus and Millichap"));
+    expect(brokerageKey("Walker & Dunlop, LLC")).toBe("walker and dunlop");
+    // No guessed alias: an abbreviation is its own firm.
+    expect(brokerageKey("JLL")).not.toBe(brokerageKey("Jones Lang LaSalle"));
+  });
+
+  it("reads a deal's firms once each, as printed", () => {
+    expect(dealFirms(withTeam("CBRE", "CBRE, Inc.", "Newmark"))).toEqual([
+      { key: "cbre", name: "CBRE" },
+      { key: "newmark", name: "Newmark" },
+    ]);
+    expect(dealFirms(withTeam())).toEqual([]);
+  });
+});
+
+describe("brokerScorecard", () => {
+  it("counts the deals each firm sent, the fit over the judged and Go over the decided, a co-listing for each", () => {
+    const cbre = [{ key: "cbre", name: "CBRE" }];
+    const { rows, unnamed } = brokerScorecard([
+      { firms: cbre, fit: "fits", verdict: "pass" },
+      { firms: [{ key: "cbre", name: "CBRE, Inc." }], fit: "outside", verdict: "pass_on" },
+      { firms: [...cbre, { key: "jll", name: "JLL" }], fit: null, verdict: null },
+      { firms: [], fit: "fits", verdict: "pass" },
+    ]);
+    expect(unnamed).toBe(1);
+    expect(rows[0]).toMatchObject({ key: "cbre", name: "CBRE", names: ["CBRE", "CBRE, Inc."], received: 3, judged: 2, fits: 1, decided: 2, go: 1 });
+    expect(rows[0].fitRate).toBe(0.5);
+    expect(rows[1]).toMatchObject({ key: "jll", received: 1, judged: 0, fitRate: null, goRate: null });
+    expect(rateText(1, 2)).toBe("1 of 2 (50%)");
+    expect(rateText(0, 0)).toBe("—");
+  });
+});
+
+describe("BrokerageFilter", () => {
+  it("lists the firms with their counts, says what a chosen one leaves, and draws nothing with no firm", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(BrokerageFilter, {
+        firms: [
+          { key: "cbre", name: "CBRE", count: 4 },
+          { key: "jll", name: "JLL", count: 1 },
+        ],
+        active: "cbre",
+        shown: 4,
+        total: 9,
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    expect(visibleText(html)).toContain("CBRE (4)");
+    expect(visibleText(html)).toContain("4 of 9 deals offered by CBRE");
+    expect(renderToStaticMarkup(React.createElement(BrokerageFilter, { firms: [], active: null, shown: 0, total: 0 }))).toBe("");
+  });
+});

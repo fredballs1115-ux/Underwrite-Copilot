@@ -230,7 +230,9 @@ describe("the pipeline page reads every deal and states the count", () => {
     expect(read).toContain('.order("id")');
     expect(read).toContain(".range(from, to)");
     expect(page).toContain('supabase.from("deals").select("id", { count: "exact", head: true })');
-    expect(page).toContain("totalDeals={dealTotal ?? null}");
+    // The exact count, but for a brokerage filter (research pass 24, B13),
+    // whose own line says how many of the deals read it shows.
+    expect(page).toContain("totalDeals={activeBroker ? null : (dealTotal ?? null)}");
   });
 
   it("says the deals read, and both where the count is larger", () => {

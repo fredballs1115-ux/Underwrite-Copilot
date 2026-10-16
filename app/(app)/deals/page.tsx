@@ -11,6 +11,8 @@ import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "
 import { offersDueUpgrade } from "@/lib/offering";
 import { WhatsNewCard } from "./whats-new";
 import { NewsStrip, type NewsStripItem } from "./news-strip";
+import { BrokerageFilter, type BrokerageOption } from "./brokerage-filter";
+import { dealFirms } from "@/lib/brokerage";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
@@ -64,9 +66,10 @@ export default async function DealsPage({
     joined?: string;
     new?: string;
     addr?: string;
+    broker?: string;
   }>;
 }) {
-  const { error: errorCode, deleted, joined, new: newParam, addr } = await searchParams;
+  const { error: errorCode, deleted, joined, new: newParam, addr, broker } = await searchParams;
   // Pull Comps hand-off: a structured address arrives as ?addr=<json> and
   // opens the new-deal form on the manual tab with the address pre-picked.
   const prefillAddress = parseStructuredAddress(addr ?? "");
@@ -292,7 +295,25 @@ export default async function DealsPage({
   // Each deal's card (lib/pipeline-card): the figures, the fit, the tags
   // and the pictures the card, the list row and the map draw — one builder,
   // so a page that shows the sample's card draws the pipeline's own.
-  const deals: DealCard[] = rows.map((d) =>
+  // The pipeline by brokerage (research pass 24, B13): the firms the
+  // memoranda name, each with its count, and the deals of the one chosen —
+  // a firm no deal names any longer is no filter, never an empty list.
+  const firmCounts = new Map<string, BrokerageOption>();
+  const firmsByDeal = new Map<string, string[]>();
+  for (const d of rows) {
+    if (d.is_sample) continue;
+    const firms = dealFirms(d.extraction as ExtractionResult | null);
+    firmsByDeal.set(d.id, firms.map((f) => f.key));
+    for (const f of firms) {
+      const seen = firmCounts.get(f.key);
+      firmCounts.set(f.key, { key: f.key, name: seen?.name ?? f.name, count: (seen?.count ?? 0) + 1 });
+    }
+  }
+  const firmOptions = [...firmCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const activeBroker = broker && firmCounts.has(broker) ? broker : null;
+  const shownRows = activeBroker ? rows.filter((d) => firmsByDeal.get(d.id)?.includes(activeBroker)) : rows;
+
+  const deals: DealCard[] = shownRows.map((d) =>
     pipelineCard(d, {
       viewerId: user?.id ?? null,
       onTeam: !!billing?.team,
@@ -351,7 +372,8 @@ export default async function DealsPage({
         // The exact count beside the deals read: the page says the two
         // apart should they ever differ (a deal added or removed between the
         // count and the read), never a total it did not read.
-        totalDeals={dealTotal ?? null}
+        totalDeals={activeBroker ? null : (dealTotal ?? null)}
+        filterBar={<BrokerageFilter firms={firmOptions} active={activeBroker} shown={shownRows.length} total={rows.length} />}
         // A read beside the deals that failed, said over the list.
         readNote={readNote}
         // An empty pipeline shows the sample's own card, the one the reader
