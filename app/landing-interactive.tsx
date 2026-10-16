@@ -10,6 +10,7 @@ import {
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { SampleLegal } from "@/lib/sample-legal";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
+import type { SampleBuyBoxData } from "./sample-buy-box";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
 import {
   CardListSkeleton,
@@ -407,11 +408,26 @@ function FinancialsView({ returns }: { returns: SampleReturns }) {
   );
 }
 
+/** The deal page's Buy box tab on the sample (app/sample-buy-box), drawn
+ *  once its chunk has loaded, its shape until then. */
+function BuyBoxTab({ data }: { data?: SampleBuyBoxData }) {
+  const w = useWalkthrough();
+  if (!data) return null;
+  if (!w) {
+    return (
+      <TabLoading what="the buy box">
+        <CardListSkeleton />
+      </TabLoading>
+    );
+  }
+  return <w.SampleBuyBox data={data} />;
+}
+
 /** One tab's panel (exported for the homepage's render test). The
  *  Overview's jump links move the walkthrough as they move the deal page. */
 export function DemoPanel({
   tab,
-  fit,
+  buyBox,
   returns,
   analysis = "verdict",
   onAnalysis = () => {},
@@ -421,7 +437,8 @@ export function DemoPanel({
   /** no longer drawn: the deal page's research panel sits under its tabs,
    *  in none of them (accepted until the page stops passing it) */
   legal?: SampleLegal;
-  fit: SampleFit;
+  /** the Buy box tab's panel and the sample's box, read on the server */
+  buyBox?: SampleBuyBoxData;
   returns: SampleReturns;
   /** the Analyses tab's open sub-tab */
   analysis?: AnalysisKey;
@@ -435,30 +452,9 @@ export function DemoPanel({
     case "Financials":
       return <FinancialsView returns={returns} />;
     case "Buy box":
-      return (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-line p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-medium">Mandate fit</p>
-              <span title={fit.note} className={`rounded-full px-2.5 py-0.5 text-right text-xs font-semibold ${fit.cls}`}>
-                {fit.label}
-              </span>
-            </div>
-            {/* What the box judged, never more: on the sample the target
-                return and cash-on-cash cannot be checked, and the count on
-                the chip says so (lib/fit-label). */}
-            <p className="mt-1.5 text-xs leading-relaxed text-muted">
-              Your criteria, checked in code — as many as the documents let it judge.
-            </p>
-          </div>
-          {/* The sample deal's own checks against its demo buy box
-              (lib/sample-deal SAMPLE_DEMO_BOX), every one the count counts. */}
-          <CriteriaChips criteria={fit.criteria} />
-          {/* The chip's own sentence (lib/fit-label `checkedSentence`), the
-              one its tooltip and the verdict's brief say. */}
-          {fit.note && <p className="text-[10px] leading-relaxed text-muted">{fit.note}</p>}
-        </div>
-      );
+      // The deal page's own Buy box tab, against the sample's example box,
+      // said so over it (app/sample-buy-box).
+      return <BuyBoxTab data={buyBox} />;
     case "Analyses":
       return <AnalysesView analysis={analysis} onSelect={onAnalysis} />;
     case "Documents":
@@ -490,10 +486,18 @@ export function DemoPanel({
 
 /** The walkthrough: the deal page's section bar — its segmented control,
  *  each tab's dot and finding count — over the sample deal's own tabs. */
-export function DemoTabs({ fit, returns }: { legal?: SampleLegal; fit: SampleFit; returns: SampleReturns }) {
+export function DemoTabs({
+  buyBox,
+  returns,
+}: {
+  legal?: SampleLegal;
+  buyBox: SampleBuyBoxData;
+  returns: SampleReturns;
+}) {
   const [tab, setTab] = useState<Tab>("Overview");
   const [analysis, setAnalysis] = useState<AnalysisKey>("verdict");
-  const missed = fit.criteria.filter((c) => c.status === "miss").length;
+  // The deal page's count on its Buy box tab: the criteria missed outright.
+  const missed = buyBox.panel.checks.filter((c) => c.status === "miss").length;
   const counts: Record<Tab, number> = {
     Overview: 0,
     Financials: 0,
@@ -626,7 +630,7 @@ export function DemoTabs({ fit, returns }: { legal?: SampleLegal; fit: SampleFit
       >
         <DemoPanel
           tab={tab}
-          fit={fit}
+          buyBox={buyBox}
           returns={returns}
           analysis={analysis}
           onAnalysis={setAnalysis}

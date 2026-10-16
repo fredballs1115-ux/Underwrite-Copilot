@@ -27,6 +27,8 @@ import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "@
 import { fmtEm, fmtPct } from "@/lib/underwrite/playground";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
+import { buyBoxLines } from "@/lib/criteria";
+import type { SampleBuyBoxData } from "./sample-buy-box";
 import { ruleCounts } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { latestChange } from "@/lib/changelog";
@@ -400,6 +402,13 @@ const SAMPLE_FIT: SampleFit = {
   cls: BUY_BOX_CHIP_CLS[SAMPLE_READ.chip.tone],
   ...(SAMPLE_READ.chip.note ? { note: SAMPLE_READ.chip.note } : {}),
   criteria: boxCriteria(SAMPLE_READ.checks, SAMPLE_READ.mandate),
+};
+// The walkthrough's Buy box tab: the deal page's own panel on the same read
+// (its data built as /demo builds it, app/demo/demo-data), and the box's
+// lines, under a caption naming it the sample's example box.
+const SAMPLE_BUY_BOX: SampleBuyBoxData = {
+  panel: { checks: SAMPLE_READ.checks, mandate: SAMPLE_READ.mandate, scope: "personal", provisional: false, hasBox: true },
+  lines: buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }),
 };
 
 // The plan cards' lists are the billing page's too (lib/marketing-constants
@@ -972,7 +981,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={legal} fit={SAMPLE_FIT} returns={SAMPLE_RETURNS} />
+              <DemoTabs legal={legal} buyBox={SAMPLE_BUY_BOX} returns={SAMPLE_RETURNS} />
             </Reveal>
           </div>
         </section>

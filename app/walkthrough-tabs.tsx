@@ -1,8 +1,8 @@
 // The walkthrough's tabs past the Overview (app/landing-interactive.tsx's
-// `loadWalkthrough`): the deal page's own sections and the model's returns
-// headline, with the comps table's subject tick read on the sample. Loaded
-// when the walkthrough nears the screen or a tab is reached for, so the
-// homepage's first load carries the Overview's components alone.
+// `loadWalkthrough`): the deal page's own sections, its Buy box tab and the
+// model's returns headline, with the comps table's subject tick read on the
+// sample. Loaded when the walkthrough nears the screen or a tab is reached
+// for, so the homepage's first load carries the Overview's components alone.
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { assetWords } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
@@ -20,6 +20,7 @@ export {
   VerdictView,
 } from "./(app)/deals/[id]/deal-sections-view";
 export { ReturnsHeadline } from "./(app)/deals/[id]/returns-headline";
+export { SampleBuyBox } from "./sample-buy-box";
 
 const extraction = SAMPLE_DEAL.extraction;
 

@@ -216,6 +216,9 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
                   Near miss
                 </span>
               )}
+              {/* A word of its own for a screen reader: "Asset class inside
+                  the mandate", never "classinside" (a flex row draws no
+                  space for it). */}{" "}
               <span className="sr-only">
                 {c.status === "miss"
                   ? "outside the mandate"

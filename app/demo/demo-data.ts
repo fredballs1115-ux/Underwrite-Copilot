@@ -11,7 +11,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { sampleBaseReturns, sampleDerivedInputs } from "@/lib/sample-derive";
 import { buyBoxLines, findGoingInCap } from "@/lib/criteria";
-import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
+import { buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { constructionSeedFor } from "@/lib/model-market";
 import { fmtEm, fmtPct } from "@/lib/underwrite/playground";
 import { screeningCompareModel } from "@/lib/underwrite/report-grid";
@@ -134,14 +134,8 @@ export function sampleDemoData({
     strategy,
     modelVsMarket: modelRead,
     demand,
-    // The walkthrough's panel takes the homepage's two server reads, built
-    // as the homepage builds them (app/page.tsx SAMPLE_FIT, SAMPLE_RETURNS).
-    fit: {
-      label: boxRead.chip.label,
-      cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone],
-      ...(boxRead.chip.note ? { note: boxRead.chip.note } : {}),
-      criteria: boxCriteria(boxRead.checks, boxRead.mandate),
-    },
+    // The walkthrough's panel takes the homepage's server read, built as
+    // the homepage builds it (app/page.tsx SAMPLE_RETURNS).
     returns: {
       irr: fmtPct(base.leveredIrrPct),
       equityMultiple: fmtEm(base.leveredEquityMultiple),

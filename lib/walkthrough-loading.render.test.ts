@@ -17,11 +17,10 @@ import { sampleDealCard } from "./pipeline-card";
 
 const readSource = (p: string) => readFileSync(p, "utf8");
 
-const fit = { label: "Fit 80 · Pursue", cls: "", criteria: [] };
 const returns: SampleReturns = { irr: "8.7%", equityMultiple: "1.6x", cashOnCash: "5.0%", exitCap: "5.45%" };
 
 const panel = (tab: "Financials" | "Analyses", analysis: AnalysisKey = "verdict") =>
-  renderToStaticMarkup(React.createElement(DemoPanel, { tab, fit, returns, analysis }));
+  renderToStaticMarkup(React.createElement(DemoPanel, { tab, returns, analysis }));
 
 /** The number of shimmering blocks a render draws. */
 const shimmers = (html: string) => (html.match(/class="skeleton /g) ?? []).length;
@@ -67,7 +66,7 @@ describe("a walkthrough tab opened before its chunk has landed", () => {
 
   it("asks for the chunk from the panel itself, so /demo, which never asked, draws its views", () => {
     const src = readSource("app/landing-interactive.tsx");
-    expect(src.match(/const w = useWalkthrough\(\);/g)?.length).toBe(2);
+    expect(src.match(/const w = useWalkthrough\(\);/g)?.length).toBe(3);
     expect(src).not.toMatch(/const w = walkthrough;/);
   });
 

@@ -18,7 +18,8 @@ import { fmtEm, fmtPct } from "./underwrite/playground";
 import { DemoPanel, loadWalkthrough } from "@/app/landing-interactive";
 import { StressBench } from "@/app/landing-stress";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "./buy-box-chip";
-import { buyBoxCoverage } from "./criteria";
+import { buyBoxLines } from "./criteria";
+import { BuyBoxPanel } from "@/app/(app)/deals/[id]/buy-box-panel";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { sampleHeader } from "./sample-header";
 import { sampleMemoData } from "./sample-memo";
@@ -232,24 +233,40 @@ function sampleFit() {
 
 // Research pass 43, L2: the walkthrough's Buy box tab printed a typed
 // "WATCH" beside the hero card's "Fit 63 · Outside box · 3 of 5 checked",
-// and both rows of chips drew four of the box's five criteria.
-describe("the homepage's buy box is the deal header's read", () => {
-  it("the Buy box tab prints the header's chip and every criterion its count counts", () => {
-    const fit = sampleFit();
-    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", fit, returns: { irr: "", equityMultiple: "", cashOnCash: "", exitCap: "" } }));
+// and both rows of chips drew four of the box's five criteria. Then it drew
+// a "Mandate fit" card of its own; it draws the deal page's own panel now
+// (the pass of 2026-10-16, H1), as /demo does, under a caption saying the
+// box is the sample's example box, since the panel speaks to a signed-in
+// reader's mandate.
+function sampleBuyBox() {
+  const read = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
+  return {
+    panel: { checks: read.checks, mandate: read.mandate, scope: "personal" as const, provisional: false, hasBox: true },
+    lines: buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }),
+  };
+}
+
+describe("the homepage's buy box is the deal page's own panel", () => {
+  it("the Buy box tab draws the deal page's BuyBoxPanel on the sample's read, captioned as the sample's example box", () => {
+    const data = sampleBuyBox();
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", buyBox: data, returns: { irr: "", equityMultiple: "", cashOnCash: "", exitCap: "" } }));
+    // The panel itself, markup for markup.
+    expect(html).toContain(renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: data.panel })));
+    const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(text).toContain("The deal against your mandate");
+    expect(text).toMatch(new RegExp(`\\b${data.panel.mandate!.score}\\s*/ 100`));
+    for (const c of data.panel.checks) expect(text).toContain(c.label);
+    // Whose box it is, in words a visitor sees, before the panel.
+    expect(html).toContain('data-qa="sample-box-caption"');
+    expect(text).toContain("The sample's example buy box — on a deal of your own, the box you set.");
+    expect(html.indexOf('data-qa="sample-box-caption"')).toBeLessThan(html.indexOf("The deal against your mandate"));
+    for (const line of data.lines) expect(text).toContain(line);
+    // No drawn copy of its own.
+    expect(text).not.toContain("Mandate fit ");
+    expect(text).not.toContain("Your criteria, checked in code");
     expect(html).not.toContain("WATCH");
-    expect(html).toContain(`>${fit.label}</span>`);
-    const read = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
-    const total = buyBoxCoverage(read.checks, read.mandate).total;
-    expect(fit.label).toContain(`of ${total} checked`);
-    for (const c of fit.criteria) expect(html).toContain(`<span class="text-ink">${c.label}</span>`);
-    expect(html.match(/<span class="text-ink">/g)).toHaveLength(total);
-    // L6 (2026-10-16): it claimed the box checks "return targets", the two
-    // criteria the sample's chip says could not be checked. It says the
-    // chip's own sentence now.
-    expect(fit.note).toMatch(/could not be checked/);
-    expect(html).toContain(`>${fit.note!.replace(/'/g, "&#x27;")}</p>`);
-    expect(html).not.toContain("return targets");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 
   it("the page's card of criteria draws the same five", async () => {
@@ -378,7 +395,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
       cashOnCash: fmtPct(r.cocYr1Pct),
       exitCap: fmtPct(r.exitCapPct, 2),
     };
-    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", fit: sampleFit(), returns }));
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", returns }));
     const panel = words(html);
     // The card's own markup, figure for figure.
     expect(html).toContain(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model })));
@@ -452,7 +469,6 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
       React.createElement(DemoPanel, {
         tab: tab as never,
         analysis: analysis as never,
-        fit: sampleFit(),
         returns: { irr: "", equityMultiple: "", cashOnCash: "", exitCap: "" },
       }),
     );

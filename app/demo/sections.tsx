@@ -7,12 +7,13 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { OverviewView } from "../(app)/deals/[id]/deal-sections-base";
 import { TermsView } from "../(app)/deals/[id]/deal-sections-view";
 import { PropertyActuals, type ActualsData } from "../(app)/deals/[id]/property-actuals";
-import { BuyBoxPanel, type BuyBoxPanelData } from "../(app)/deals/[id]/buy-box-panel";
+import type { BuyBoxPanelData } from "../(app)/deals/[id]/buy-box-panel";
+import { SampleBuyBox } from "../sample-buy-box";
 import { SensitivityPlayground, type PlaygroundData } from "../(app)/deals/[id]/sensitivity-playground";
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import { ModelVsMarketCard } from "../(app)/deals/[id]/model-vs-market-card";
 import { SampleGuide } from "../(app)/deals/[id]/sample-guide";
-import { DemoPanel, type AnalysisKey, type SampleFit, type SampleReturns } from "../landing-interactive";
+import { DemoPanel, type AnalysisKey, type SampleReturns } from "../landing-interactive";
 import { DemandBars } from "@/app/demand-bars";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -62,8 +63,7 @@ export interface DemoData {
   modelVsMarket: ModelVsMarket | null;
   /** the metro area's payrolls by sector, read today; null where nothing was */
   demand: MetroDemand | null;
-  /** the walkthrough's two server reads, which its panel takes */
-  fit: SampleFit;
+  /** the walkthrough's server read, which its panel takes */
   returns: SampleReturns;
 }
 
@@ -280,24 +280,15 @@ export function DemoSections({
         )}
 
         {section === "buybox" && (
-          <div className="flex flex-col gap-3">
-            <BuyBoxPanel data={data.buyBox} />
-            {/* Whose box it is: the public sample's, read off the box itself. */}
-            <ul aria-label="The sample's buy box" className="flex flex-wrap gap-1.5">
-              {data.boxLines.map((line) => (
-                <li key={line} className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] text-muted">
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
+          // The deal page's panel against the sample's example box, said so
+          // over it (app/sample-buy-box), as the homepage's walkthrough draws it.
+          <SampleBuyBox data={{ panel: data.buyBox, lines: data.boxLines }} />
         )}
 
         {section === "analyses" && (
           <div className="flex flex-col gap-6">
             <DemoPanel
               tab="Analyses"
-              fit={data.fit}
               returns={data.returns}
               analysis={analysis}
               onAnalysis={setAnalysis}
@@ -320,7 +311,7 @@ export function DemoSections({
 
         {section === "documents" && (
           <div className="flex flex-col gap-6">
-            <DemoPanel tab="Documents" fit={data.fit} returns={data.returns} onNavigate={navigate} />
+            <DemoPanel tab="Documents" returns={data.returns} onNavigate={navigate} />
             <Deliverables />
           </div>
         )}
