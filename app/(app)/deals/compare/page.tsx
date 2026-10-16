@@ -55,8 +55,12 @@ import { placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { screenedOn, verdictBehind, type JobLike } from "@/lib/screen-run";
 import { COMPARE_MAX } from "@/lib/link-limits";
+import { ComparePicker, type PickableDeal } from "./compare-picker";
 
 export const metadata: Metadata = { title: "Compare deals" };
+
+/** The most deals the empty page's picker lists, newest first. */
+const PICKER_LIMIT = 60;
 
 /** The OM's in-place or Year-1 NOI as stated — never the stabilized pro
  *  forma, which on a plan deal would land in the "Year-1 NOI" row as if the
@@ -392,14 +396,38 @@ export default async function ComparePage({
   );
 
   if (cols.length < 2) {
+    // Fewer than two to compare: the reader's own deals as a tray to pick
+    // from (signed-in gaps, M5), newest first, where the page had been one
+    // sentence sending them back to the pipeline. A deal the link already
+    // named stays ticked.
+    const { data: mine } = await supabase
+      .from("deals")
+      .select("id, name, call:verdict->>verdict, market:extraction->>market")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .limit(PICKER_LIMIT);
+    const pickable: PickableDeal[] = ((mine ?? []) as { id: string; name: string | null; call: string | null; market: string | null }[]).map(
+      (d) => ({ id: d.id, name: d.name || "Untitled deal", place: d.market || null, call: d.call || null }),
+    );
     return (
       <div className="flex flex-col gap-6">
         {backLink}
-        <div className="rounded-xl border border-line bg-surface p-8 text-center shadow-sm">
-          <p className="text-sm text-muted">
-            Pick two or more deals from the pipeline to compare them.
-          </p>
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Compare deals</h1>
+          <p className="mt-1 text-sm text-muted">Up to {COMPARE_MAX} side by side.</p>
         </div>
+        {pickable.length >= 2 ? (
+          <ComparePicker deals={pickable} initial={cols.map((c) => c.id)} />
+        ) : (
+          <div className="rounded-xl border border-line bg-surface p-8 text-center shadow-sm">
+            <p className="text-sm text-muted">
+              {pickable.length === 1 ? "One deal so far — add another to compare the two." : "No deals yet to compare."}{" "}
+              <Link href="/deals" className="font-medium text-brand hover:text-brand-strong">
+                Go to the pipeline
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
     );
   }
