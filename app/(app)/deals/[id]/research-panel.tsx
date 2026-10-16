@@ -25,6 +25,7 @@ import {
   fmtBenchValue,
   mergeBenchmarks,
   mergeRules,
+  redfinSourceHref,
   seedBenchmarks,
   seedRules,
   vsMarketHeading,
@@ -35,6 +36,7 @@ import { monthOf } from "@/lib/zori";
 import { sectorStandings } from "@/lib/sector-leaderboard";
 import { rankLabel } from "@/lib/rank";
 import { linkOk } from "@/lib/link-audit";
+import { sourceParts } from "@/lib/source-parts";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
 import { capSpreadRead, leverageRead, SEEDED_RATE_BENCHMARK } from "@/lib/leverage";
@@ -209,10 +211,16 @@ export function SourceLink({
   const undated = age.asOf === null;
   const stale = yearEnded === undefined ? undated || age.stale : yearEnded;
   const dated = readOn ? `read ${asOf}` : asOfLabel(asOf);
+  // A source with a note after its address is split (lib/source-parts): the
+  // address is the link, the note its title — the whole string had been the
+  // href, an address with spaces in it that goes nowhere. Redfin's figures
+  // are credited to Redfin in words, as /market and /demo credit them.
+  const { href, words } = sourceParts(source);
+  const linkText = redfinSourceHref(source) ? "Redfin public dataset" : "source";
   // Audit gate: a link the audit script has verified DEAD renders as plain
   // text — the user never gets handed a clickable 404. Unaudited links render
   // normally (never audited ≠ dead).
-  const audited = linkOk(source);
+  const audited = linkOk(href);
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
       <span className={`rounded px-1.5 py-px font-medium ${meta.cls}`}>{meta.label}</span>
@@ -223,16 +231,17 @@ export function SourceLink({
       )}
       {!stale && <span>{dated}</span>}
       {source &&
-        (audited === false ? (
+        (!href || audited === false ? (
           <span title={source}>source on file — link unavailable</span>
         ) : (
           <a
-            href={source}
+            href={href}
+            title={words ?? undefined}
             target="_blank"
             rel="noreferrer"
             className="underline decoration-dotted underline-offset-2 hover:text-ink"
           >
-            source
+            {linkText}
           </a>
         ))}
     </span>

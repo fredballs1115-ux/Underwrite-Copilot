@@ -47,6 +47,21 @@ describe("the deal page's research panel — its source line", () => {
     expect(fmr(true)).toBe("verified year ended");
   });
 
+  it("links a source's address alone, its note the title, and credits Redfin's figures to Redfin in words", () => {
+    const redfin =
+      "https://www.redfin.com/news/data-center/downloads/ — redfin_metro_market_tracker.tsv000.gz (S3, HTTP 200, updated 2026-06-02)";
+    const html = render(React.createElement(SourceLink, { source: redfin, asOf: "2026-05-31", status: "sourced", today: "2026-10-01" }));
+    expect(html).toContain('<a href="https://www.redfin.com/news/data-center/downloads/" title="redfin_metro_market_tracker.tsv000.gz (S3, HTTP 200, updated 2026-06-02)"');
+    expect(text(html)).toBe("sourced as of 2026-05-31 Redfin public dataset");
+    // Any other source keeps its one word, the address alone its link.
+    const hud = render(React.createElement(SourceLink, { source: "https://www.huduser.gov/portal/datasets/fmr.html", asOf: "2026-09-30", status: "verified", today: "2026-10-01" }));
+    expect(hud).toContain('<a href="https://www.huduser.gov/portal/datasets/fmr.html" target="_blank"');
+    expect(text(hud)).toBe("verified as of 2026-09-30 source");
+    // A source with no address is never a link.
+    expect(render(React.createElement(SourceLink, { source: "HUD FMR dataset", asOf: "2026-09-30", status: "verified", today: "2026-10-01" }))).not.toContain("<a ");
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
   it("an undated figure says undated, never stale", () => {
     expect(text(render(React.createElement(SourceLink, { source: null, asOf: "", status: "sourced", today: "2027-06-01" })))).toBe(
       "sourced undated",
