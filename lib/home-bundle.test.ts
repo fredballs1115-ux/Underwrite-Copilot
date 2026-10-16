@@ -142,3 +142,34 @@ describe("/demo", () => {
     }
   });
 });
+
+// The homepage draws the sample's own pipeline card (app/sample-pipeline-card,
+// deal-tile.tsx). The card's module had imported the stage control and the
+// offers-due control's module, each a server action's form; the pipeline now
+// hands the card its stage control and the deadline's words live in
+// offers-due-bit.tsx (work package AK, 2026-10-16). The whole page, server
+// part and client part, reaches no server action and no Leaflet.
+describe("the homepage, whole", () => {
+  const page = reach("app/page.tsx");
+  const card = reach("app/(app)/deals/deal-tile.tsx");
+
+  it("draws the pipeline's own card for the sample", () => {
+    expect(page.files.has("app/sample-pipeline-card.tsx")).toBe(true);
+    expect(page.files.has("app/(app)/deals/deal-tile.tsx")).toBe(true);
+    expect(page.files.has("lib/pipeline-card.ts")).toBe(true);
+  });
+
+  it("loads no server action, no comps map and no Leaflet, the card included", () => {
+    for (const graph of [page, card]) {
+      expect([...graph.serverActions]).toEqual([]);
+      expect([...graph.files].filter((f) => /comps-map|stage-select|offers-due\.tsx$|pipeline\.tsx$/.test(f))).toEqual([]);
+      expect([...graph.packages].filter((p) => /leaflet|\.css$/.test(p))).toEqual([]);
+    }
+  });
+
+  it("is a walk that would find them: the pipeline reaches the card's stage control", () => {
+    const pipeline = reach("app/(app)/deals/pipeline.tsx");
+    expect(pipeline.files.has("app/(app)/deals/[id]/stage-select.tsx")).toBe(true);
+    expect(pipeline.serverActions.size).toBeGreaterThan(0);
+  });
+});

@@ -26,6 +26,7 @@ import { SAMPLE_DOWNLOAD_NOTE, SampleHeroTools } from "@/app/sample-hero";
 import { compRating, inCompOrder } from "./comp-rating";
 import { SKYLINES, commonsPage } from "./skyline";
 import { METRO_VIEWS } from "./metro-imagery";
+import { sampleDealCard } from "./pipeline-card";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -296,6 +297,36 @@ describe("the homepage's sample figures are the surfaces' own", () => {
       expect(i, line).toBeGreaterThan(-1);
       from = i;
     }
+  }, 60_000);
+
+  // Audit C7, L8: the homepage had a SLOT where the sample's pipeline card
+  // was to go. It draws the pipeline's own card now (DealTilePreview on
+  // lib/pipeline-card's `sampleDealCard`), opening /demo: the market's
+  // photograph, the call on it, the price with its basis, the cap, the fit.
+  it("the pipeline section draws the sample's own pipeline card, opening /demo, its picture asked lazily", async () => {
+    const html = await renderHome();
+    expect(html).not.toContain("SLOT:");
+    const at = html.indexOf('data-qa="home-pipeline-card"');
+    expect(at).toBeGreaterThan(-1);
+    const section = html.slice(at, html.indexOf("</section>", at));
+    const card = sampleDealCard({ today: new Date().toISOString().slice(0, 10) });
+    expect(section).toContain('data-deal-tile="sample"');
+    expect(section).toMatch(/<a [^>]*href="\/demo"/);
+    const text = words(section).replace(/&#x27;/g, "'");
+    expect(text).toContain("Your pipeline");
+    expect(text).toContain(SAMPLE_DEAL.name);
+    expect(text).toContain(sampleHeader().pill!.label);
+    for (const f of [card.slots.basis!, card.slots.cap!, String(card.score)]) expect(text).toContain(f);
+    // The card's market photograph, at the route the pipeline asks, lazily:
+    // the card is far down the page, so it is no first picture.
+    const src = card.pictures![0].src.replace(/&/g, "&amp;");
+    expect(section).toContain(src);
+    expect(section).toMatch(/loading="lazy"/);
+    expect(section).not.toMatch(/fetchPriority="high"|fetchpriority="high"/);
+    // No stage control: the card's module draws none outside the pipeline.
+    expect(section).not.toContain("<select");
+    expect(a11yIssues(section)).toEqual([]);
+    expect(gluedWords(visibleText(section))).toEqual([]);
   }, 60_000);
 
   // Research pass 40, M1: the stress bench ran the first-draft model

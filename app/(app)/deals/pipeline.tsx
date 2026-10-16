@@ -171,6 +171,10 @@ export type { PipelineView } from "@/lib/pipeline-view";
 // importers keep reading it here.
 export { DealTilePreview, PhotoFlip } from "./deal-tile";
 
+/** A card's stage control, handed to the card (deal-tile.tsx imports no
+ *  server action, so the homepage can draw the sample's card). */
+const tileStage = (d: DealCard) => <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />;
+
 // The cap slot's words where it holds no cap of the deal's own — a note's
 // or a position's own yield, or why the cap is withheld — live in
 // lib/cap-slot, import-free, so the CSV's cell is tested and the words are
@@ -1316,6 +1320,7 @@ export function Pipeline({
                             onToggle={toggleSelected}
                             onMarket={reportMarket}
                             todayIso={todayIso}
+                            stageControl={tileStage}
                           />
                         ))}
                       </ul>

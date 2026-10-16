@@ -21,8 +21,7 @@ import { GalleryCreditPartsText } from "@/app/credit-parts";
 import { bannerSizes, shownMarketCredits } from "@/lib/deal-banner";
 import { PIPELINE_CARD_SIZES } from "@/lib/pipeline-view";
 import { assetClassLabel } from "@/lib/asset-class";
-import { StageSelect } from "./[id]/stage-select";
-import { OffersDueBit } from "./offers-due";
+import { OffersDueBit } from "./offers-due-bit";
 import { PERSONAL_TAG, PICTURE_TIERS, dealTags, olderScreenTag, placeTagsByTier } from "@/lib/pipeline-tags";
 import { FIRST_READ_TITLE } from "@/lib/first-read";
 import { CAP_WITHHELD, ownYieldOf } from "@/lib/cap-slot";
@@ -142,6 +141,8 @@ export const DealTile = memo(function DealTile({
   onMarket,
   todayIso,
   preview,
+  stageControl,
+  lazy = false,
 }: {
   d: DealCard;
   i: number;
@@ -157,6 +158,13 @@ export const DealTile = memo(function DealTile({
    *  the card with none, and its footer names the stage rather than
    *  offering a change to it */
   preview?: TilePreviewTarget;
+  /** the footer's stage control, which the pipeline hands in (`StageSelect`,
+   *  a server action's form): this module imports none, so a page that
+   *  draws only the preview — the homepage — loads no server action */
+  stageControl?: (d: DealCard) => ReactNode;
+  /** asked for as it nears the screen, whatever its place: a card far down
+   *  a page (the homepage's) is no first picture */
+  lazy?: boolean;
 }) {
   const dealId = d.id;
   const reportMarket = useCallback((marketId: string | null) => onMarket?.(dealId, marketId), [dealId, onMarket]);
@@ -238,7 +246,7 @@ export const DealTile = memo(function DealTile({
           aspect="16/10"
           flush
           shade
-          priority={i < 4}
+          priority={i < 4 && !lazy}
           photos={d.photos ? d.photos - dead.size : 0}
           slides={slides}
           slide={canFlip ? slide : 0}
@@ -499,9 +507,7 @@ export const DealTile = memo(function DealTile({
                 <span className="sr-only">added by {d.addedBy}</span>
               </span>
             ) : null}
-            <span className="ml-auto">
-              <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />
-            </span>
+            <span className="ml-auto">{stageControl?.(d)}</span>
           </div>
         </>
       )}
@@ -539,12 +545,16 @@ export function DealTilePreview({
   note,
   todayIso,
   className = "grid",
+  lazy = false,
 }: {
   d: DealCard;
   /** the day the offers-due countdown counts from */
   todayIso: string;
   /** the list's classes: its width and grid */
   className?: string;
+  /** the picture asked for lazily, at no high priority (a card far down
+   *  the page); the empty pipeline's card, on the first screen, is not */
+  lazy?: boolean;
 } & TilePreviewTarget) {
   const [shown, setShown] = useState<ReadonlyMap<string, string | null>>(new Map());
   const onMarket = useCallback((id: string, marketId: string | null) => {
@@ -564,6 +574,7 @@ export function DealTilePreview({
           onMarket={onMarket}
           todayIso={todayIso}
           preview={{ href, title, note }}
+          lazy={lazy}
         />
       </ul>
       {credits.length > 0 ? (
