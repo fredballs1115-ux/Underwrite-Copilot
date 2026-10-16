@@ -102,6 +102,7 @@ import { moveDeal } from "@/app/(app)/deals/actions";
 import {
   isMoveRefusal,
   MOVE_ITEM,
+  movedLanding,
   moveBlock,
   moveBlockQuery,
   moveNotice,
@@ -370,6 +371,14 @@ describe("the words (lib/personal-deal)", () => {
     );
     expect(isMoveRefusal("moveteamwork")).toBe(true);
     expect(isMoveRefusal("movepersonalwork")).toBe(true);
+  });
+  it("a landing says a move only while the deal is where it says (audit C7, L1)", () => {
+    expect(movedLanding("team", TEAM)).toBe("team");
+    expect(movedLanding("team", null)).toBeNull();
+    expect(movedLanding("personal", null)).toBe("personal");
+    expect(movedLanding("personal", TEAM)).toBeNull();
+    expect(movedLanding("elsewhere", null)).toBeNull();
+    expect(movedLanding(undefined, TEAM)).toBeNull();
   });
   it("knows its own codes and no other", () => {
     expect(isMoveRefusal("movelimit")).toBe(true);

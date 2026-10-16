@@ -7,6 +7,7 @@ import {
   FILED_PERSONAL,
   filedPersonalNotice,
   isMoveRefusal,
+  movedLanding,
   moveNotice,
   parseMoveBlock,
   type MoveTarget,
@@ -649,20 +650,22 @@ export default async function DealPage({
     !isCreator || isSampleDeal ? null : ownership.team_id ? "personal" : readerTeam ? "team" : null;
   const moveTeamName =
     moveTo === "team" || (ownership.team_id && readerTeam?.team_id === ownership.team_id) ? readerTeamName : null;
-  const moveBanner =
-    moved === "team" || moved === "personal"
-      ? moveNotice({ moved, teamName: readerTeamName }, { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS })
-      : isMoveRefusal(errorCode)
-        ? moveNotice(
-            {
-              refused: errorCode,
-              // what blocked a move that would carry someone else's work
-              block: parseMoveBlock(moveOthers, moveUnrecorded),
-              teamName: errorCode === "moveteamwork" ? readerTeamName : moveTeamName,
-            },
-            { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS },
-          )
-        : null;
+  // A move's landing is said only while the deal is where it says
+  // (`movedLanding`), naming the team only where it is the reader's own.
+  const movedTo = movedLanding(moved, ownership.team_id);
+  const moveBanner = movedTo
+    ? moveNotice({ moved: movedTo, teamName: moveTeamName }, { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS })
+    : isMoveRefusal(errorCode)
+      ? moveNotice(
+          {
+            refused: errorCode,
+            // what blocked a move that would carry someone else's work
+            block: parseMoveBlock(moveOthers, moveUnrecorded),
+            teamName: errorCode === "moveteamwork" ? readerTeamName : moveTeamName,
+          },
+          { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS },
+        )
+      : null;
 
   // Delete is the creator's or the team owner's (the RLS delete policy); a
   // teammate is not offered it rather than refused after the fact.

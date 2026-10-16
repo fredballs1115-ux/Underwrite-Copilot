@@ -84,6 +84,16 @@ export function isMoveRefusal(code: string | null | undefined): code is MoveRefu
   return !!code && (MOVE_REFUSALS as readonly string[]).includes(code);
 }
 
+/** The move a landing's `?moved=` may announce: only where the deal is where
+ *  it says — in a team's pipeline for "team", in none for "personal" — so a
+ *  stale tab or a pasted link never says a deal moved that did not (audit
+ *  C7, L1). */
+export function movedLanding(moved: string | null | undefined, dealTeamId: string | null | undefined): MoveTarget | null {
+  if (moved === "team") return dealTeamId ? "team" : null;
+  if (moved === "personal") return dealTeamId ? null : "personal";
+  return null;
+}
+
 /** The menu item that opens the question. */
 export const MOVE_ITEM: Record<MoveTarget, string> = {
   team: "Share with team",
