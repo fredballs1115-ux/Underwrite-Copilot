@@ -11,6 +11,7 @@ import { exportOwnerName, pipelineExportRow } from "@/lib/pipeline-export-row";
 import { readAll, readByIds } from "@/lib/read-all";
 import { weekActivity, type PackTask } from "@/lib/meeting-pack";
 import { parseStageHistory } from "@/lib/stages";
+import { personName } from "@/lib/person";
 
 // exceljs needs the Node runtime.
 export const runtime = "nodejs";
@@ -188,7 +189,9 @@ export async function GET(req: Request) {
   }
   const nameById = new Map<string, string>();
   for (const m of mates) {
-    nameById.set(m.id, m.full_name || m.email || (m.id === user.id ? user.email : null) || "Teammate");
+    // A name, never an address (lib/person): the name set, else the
+    // email's local part — the workbook is passed round the room.
+    nameById.set(m.id, personName(m.full_name, m.email || (m.id === user.id ? user.email : null)));
   }
 
   // Each row read through the readers every other surface uses

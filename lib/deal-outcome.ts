@@ -18,6 +18,7 @@
 //   - a blank is null: no price typed is no trade, never $0.
 import { DEADLINE_FIRST_YEAR, DEADLINE_LAST_YEAR, deadlineDay } from "@/lib/deadline-day";
 import { compactUsd, readFigure } from "@/lib/money";
+import { displayName } from "@/lib/person";
 import {
   OUTCOME_REASONS,
   OUTCOME_REASON_LABEL,
@@ -139,9 +140,13 @@ export function tradePriceText(price: number): string {
 
 /** The reporter as a reader of the page knows them: the name the team's
  *  roster gives their account today (`names`, the page's own lookup), else
- *  the name the trade was reported under. */
+ *  the name the trade was reported under. Either is said as a name, never
+ *  an address: a trade reported before the reporter set a name stored their
+ *  whole email, which is printed by its local part (lib/person
+ *  `displayName`). */
 export function reporterName(trade: ReportedTrade, names?: Record<string, string> | null): string | null {
-  return (trade.reportedById && names?.[trade.reportedById]) || trade.reportedBy;
+  const name = (trade.reportedById && names?.[trade.reportedById]) || trade.reportedBy;
+  return name ? displayName(name) || null : null;
 }
 
 export function tradeWords(trade: ReportedTrade, names?: Record<string, string> | null): string {

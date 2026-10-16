@@ -761,7 +761,8 @@ export function Pipeline({
         d.slots.broker ?? "",
         // ISO like the deadline column, so both parse as dates in Excel.
         d.createdAt.slice(0, 10),
-        d.addedBy ?? "You",
+        // A name, never an address (lib/person).
+        d.addedBy ? displayName(d.addedBy) : "You",
       ]
         .map(esc)
         .join(","),

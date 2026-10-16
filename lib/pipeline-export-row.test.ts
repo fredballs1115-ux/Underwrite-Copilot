@@ -453,13 +453,23 @@ describe("a task owner in the meeting workbook", () => {
     expect(owner("u1")).toBe("Sam Exporter");
     expect(owner("u2")).toBe("Jane Doe");
     expect(owner("u3")).toBe("Teammate");
-    // A profile the read did not return: the exporter's own email.
-    expect(exportOwnerName(new Map(), { id: "u1", email: "sam@firm.com" })("u1")).toBe("sam@firm.com");
+    // A profile the read did not return: the exporter's own email, by its
+    // local part — never the whole address (the audit's M1).
+    expect(exportOwnerName(new Map(), { id: "u1", email: "sam.lee@firm.com" })("u1")).toBe("sam.lee");
+    expect(exportOwnerName(new Map(), { id: "u1", email: null })("u1")).toBe("The exporter");
+    // A name map that still holds an address is printed by its local part.
+    expect(exportOwnerName(new Map([["u2", "jane@firm.com"]]), { id: "u1", email: null })("u2")).toBe("jane");
     const row = pipelineExportRow(deal({ stage: "tracking", stage_history: [{ stage: "tracking", at: "2026-09-01T15:00:00Z" }] }), {
       ...ctx,
       tasks: [{ title: "Tour the site", assigneeUserId: "u1", dueDate: "2026-09-10", done: false, completedAt: null, createdAt: "2026-09-02T00:00:00Z" }],
       ownerName: owner,
     });
     expect(row.nextStep).toBe("Tour the site — Sam Exporter, due Sep 10");
+  });
+
+  it("names the teammate who added a deal, never by their whole address", () => {
+    expect(pipelineExportRow(deal(), { ...ctx, addedBy: "jordan.lee@firm.com" }).addedBy).toBe("jordan.lee");
+    expect(pipelineExportRow(deal(), { ...ctx, addedBy: "Jordan Lee" }).addedBy).toBe("Jordan Lee");
+    expect(pipelineExportRow(deal(), ctx).addedBy).toBeNull();
   });
 });

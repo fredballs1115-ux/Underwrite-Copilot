@@ -112,7 +112,7 @@ export function DealOutcomeCard({
           <SaveTrade />
         </form>
         <p className="mt-1.5 text-[11px] text-muted">
-          {"A reported price, not a recorded one: it is kept apart from the asking prices your pipeline pools, with your profile's name (else your email) and the day."}
+          {"A reported price, not a recorded one: it is kept apart from the asking prices your pipeline pools, with your profile's name (else your email's first part) and the day."}
         </p>
       </div>
     </section>

@@ -49,6 +49,7 @@ import { checkPdfOpens } from "@/lib/pdf-open";
 import { capRefusalOf } from "@/lib/deal-allowance";
 import { deadlineDay } from "@/lib/deadline-day";
 import { currentOutcome, readOutcomeForm, withOutcome } from "@/lib/deal-outcome";
+import { personName } from "@/lib/person";
 import { writeStageGuarded } from "@/lib/stage-write";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
@@ -808,11 +809,13 @@ export async function setDealOutcome(formData: FormData) {
   if (!user) redirect("/login");
 
   // Who reports a trade: their account, and the name their profile gives
-  // (else their email) — the card says "your profile's name" and the deal
-  // page names a teammate's account as the team knows it today (audit C8,
-  // L4). A profile that cannot be read leaves the email.
+  // (else their email's local part, lib/person `personName` — never the
+  // whole address, which the account page promises teammates do not see) —
+  // the card says "your profile's name" and the deal page names a
+  // teammate's account as the team knows it today (audit C8, L4). A
+  // profile that cannot be read leaves the email's local part.
   const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user!.id).maybeSingle();
-  const reporterName = ((profile as { full_name?: string | null } | null)?.full_name ?? "").trim() || user!.email || null;
+  const reporterName = personName((profile as { full_name?: string | null } | null)?.full_name ?? null, user!.email ?? null, "") || null;
 
   const form = readOutcomeForm(
     {

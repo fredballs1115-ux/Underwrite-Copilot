@@ -35,6 +35,7 @@ import { screenedDay, verdictBehind, type JobLike } from "@/lib/screen-run";
 import { shownAssetClass, statedCapSlot } from "@/lib/pipeline-slots";
 import type { PipelineExportRow } from "@/lib/pipeline-workbook";
 import { parseStageHistory } from "@/lib/stages";
+import { displayName, personName } from "@/lib/person";
 import { nextStepOf, nextStepText, stageAge, type PackTask } from "@/lib/meeting-pack";
 
 /** The deal columns the workbook's row reads. */
@@ -211,7 +212,9 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // LOW-7).
     ...(typedByHand(extraction) ? { typedByHand: true } : {}),
     createdAt: d.created_at,
-    addedBy: ctx.addedBy,
+    // A name, never an address: a caller that handed an email gets its
+    // local part (lib/person `displayName`).
+    addedBy: ctx.addedBy ? displayName(ctx.addedBy) : null,
     // How long it has sat where it is, and who owns its next step (research
     // pass 24, B1), on the route's day.
     stageAge: stageAge(d.stage, parseStageHistory(d.stage_history), d.created_at, ctx.today),
@@ -224,13 +227,19 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
 
 /**
  * A task owner's name in the meeting workbook: the name the team's profiles
- * give the account (`full_name`, else the email), the exporter's own
- * included. The workbook is made to be projected and passed round, so the
- * exporter is never "You", which names whoever is reading it (audit C8, L5).
+ * give the account (lib/person `personName`: `full_name`, else the email's
+ * local part — never the whole address, which the account page promises
+ * teammates do not see), the exporter's own included. The workbook is made
+ * to be projected and passed round, so the exporter is never "You", which
+ * names whoever is reading it (audit C8, L5).
  */
 export function exportOwnerName(
   names: ReadonlyMap<string, string>,
   exporter: { id: string; email: string | null },
 ): (userId: string) => string {
-  return (id) => names.get(id) ?? (id === exporter.id ? exporter.email || "The exporter" : "Teammate");
+  return (id) => {
+    const named = names.get(id);
+    if (named) return displayName(named);
+    return id === exporter.id ? personName(null, exporter.email, "The exporter") : "Teammate";
+  };
 }

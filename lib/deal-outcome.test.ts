@@ -10,11 +10,13 @@ import {
   deathReasons,
   outcomeWords,
   readOutcomeForm,
+  reporterName,
   tradePriceText,
   tradeWords,
   withOutcome,
 } from "./deal-outcome";
 import { deriveInternalComps } from "./internal-comps";
+import { personName } from "./person";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn(), useRouter: () => ({}) }));
@@ -80,6 +82,27 @@ describe("who reported a trade", () => {
     expect(outcomeWords({ reason: null, trade }, { [id]: "Jane Q. Analyst" })).toContain("reported by Jane Q. Analyst");
     // A trade reported before the account was kept reads as it did.
     expect(tradeWords({ ...trade, reportedById: undefined }, { [id]: "Jane Q. Analyst" })).toContain("reported by Jane Analyst");
+  });
+
+  it("names a reporter stored by their whole email by its first part, on every surface that prints a trade (the audit's M1)", () => {
+    const id = "6f1c2a7e-0d4b-4a51-9a3e-2f8b9c1d0e11";
+    // A trade reported before the reporter set a name stored their email;
+    // the internal comps call tradeWords with no roster, the card and the
+    // decision log with one that may hold an address too.
+    const trade = { price: 41_500_000, buyer: null, date: null, reportedBy: "jane.analyst@firm.com", reportedById: id, reportedAt: NOW };
+    expect(tradeWords(trade)).toContain("reported by jane.analyst,");
+    expect(tradeWords(trade)).not.toContain("@");
+    expect(tradeWords(trade, { [id]: "jane@firm.com" })).toContain("reported by jane,");
+    expect(outcomeWords({ reason: null, trade })).not.toContain("@firm.com");
+    expect(reporterName({ ...trade, reportedBy: null, reportedById: undefined })).toBeNull();
+  });
+
+  it("is stored by name, never by the whole address, when the reporter has set none", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/(app)/deals/actions.ts", "utf8");
+    expect(src).toMatch(/const reporterName = personName\(/);
+    expect(src).not.toMatch(/full_name \?\? ""\)\.trim\(\) \|\| user!\.email/);
+    expect(personName(null, "jane.analyst@firm.com", "")).toBe("jane.analyst");
   });
 });
 
