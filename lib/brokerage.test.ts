@@ -61,20 +61,20 @@ describe("a fit on part of the box", () => {
   const check = (label: string, status: BuyBoxCheck["status"]): BuyBoxCheck => ({ label, status, detail: "" }) as BuyBoxCheck;
 
   it("is no fit: counted apart, never in the judged deals", () => {
-    const partly = brokerDealFit([check("Asset class", "pass"), check("Going-in cap", "unknown"), check("Target return", "unknown")]);
+    const partly = brokerDealFit([check("Asset class", "pass"), check("Going-in cap", "unknown"), check("Target return", "unknown")], null);
     expect(partly).toEqual({ fit: "fits", partial: true });
-    const whole = brokerDealFit([check("Asset class", "pass"), check("Going-in cap", "pass")]);
+    const whole = brokerDealFit([check("Asset class", "pass"), check("Going-in cap", "pass")], null);
     expect(whole).toEqual({ fit: "fits", partial: false });
     // A miss outright is a call however much was checked.
-    const miss = brokerDealFit([check("Asset class", "miss"), check("Going-in cap", "unknown")]);
+    const miss = brokerDealFit([check("Asset class", "miss"), check("Going-in cap", "unknown")], null);
     expect(miss).toEqual({ fit: "outside", partial: true });
-    expect(brokerDealFit([check("Going-in cap", "unknown")])).toEqual({ fit: null, partial: false });
+    expect(brokerDealFit([check("Going-in cap", "unknown")], null)).toEqual({ fit: null, partial: false });
 
     const cbre = [{ key: "cbre", name: "CBRE" }];
     const { rows } = brokerScorecard([
       { firms: cbre, ...whole, verdict: null },
       { firms: cbre, ...partly, verdict: null },
-      { firms: cbre, ...brokerDealFit([check("Asset class", "near"), check("Basis", "unknown")]), verdict: null },
+      { firms: cbre, ...brokerDealFit([check("Asset class", "near"), check("Basis", "unknown")], null), verdict: null },
       { firms: cbre, ...miss, verdict: null },
     ]);
     expect(rows[0]).toMatchObject({ received: 4, judged: 2, fits: 1, partial: 2 });

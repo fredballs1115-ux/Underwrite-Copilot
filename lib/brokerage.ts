@@ -21,7 +21,7 @@
 //   - a deal with no firm named is counted apart, never as a firm.
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { listingTeamOf } from "@/lib/offering";
-import { buyBoxCoverage, foldBuyBoxChecks, type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxCoverage, foldBuyBoxChecks, type BuyBoxCheck, type MandateCoverageLike } from "@/lib/criteria";
 
 const SUFFIX = /(?:\s+|,\s*)(?:inc|incorporated|llc|l\.l\.c|ltd|limited|co|corp|corporation|company|lp|llp|plc)\.?$/i;
 
@@ -115,9 +115,15 @@ export function brokerageOptions(deals: readonly (readonly { key: string; name: 
  * A deal's fit as the scorecard counts it: the box's fold over its checks,
  * and whether that fold stands on part of the box only.
  */
-export function brokerDealFit(checks: BuyBoxCheck[]): { fit: BrokerDeal["fit"]; partial: boolean } {
+export function brokerDealFit(
+  checks: BuyBoxCheck[],
+  /** the deal's score against the box (lib/mandate `scoreMandateFit`), so the
+   *  cash-on-cash floor and the red lines count toward coverage as on every
+   *  other surface; null where the box could not be scored */
+  mandate: MandateCoverageLike | null,
+): { fit: BrokerDeal["fit"]; partial: boolean } {
   const fit = foldBuyBoxChecks(checks);
-  const cov = buyBoxCoverage(checks, null);
+  const cov = buyBoxCoverage(checks, mandate);
   return { fit, partial: fit != null && cov.checked < cov.total };
 }
 

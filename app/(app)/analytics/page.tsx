@@ -19,6 +19,7 @@ import { deathReasons } from "@/lib/deal-outcome";
 import { brokerDealFit, brokerScorecard, dealFirms, partialText, rateText } from "@/lib/brokerage";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox } from "@/lib/criteria";
+import { scoreMandateFit } from "@/lib/mandate";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { getTeam } from "@/lib/teams";
@@ -169,11 +170,11 @@ export default async function AnalyticsPage() {
       const extraction = r.extraction as ExtractionResult | null;
       const box = r.team_id ? teamBox : personalBox;
       const address = addressUpgrade(r.address, extraction) ?? ((r.address as StructuredAddress | null | undefined) ?? null);
-      const judged = box
-        ? brokerDealFit(
-            evaluateBuyBox(r.asset_class ?? "auto", dealCheckSource(extraction, (r.first_signal as FirstSignal | null) ?? null, address), box),
-          )
-        : null;
+      const source = box ? dealCheckSource(extraction, (r.first_signal as FirstSignal | null) ?? null, address) : null;
+      const judged =
+        box && source
+          ? brokerDealFit(evaluateBuyBox(r.asset_class ?? "auto", source, box), scoreMandateFit(r.asset_class ?? "", source, box))
+          : null;
       return {
         firms: dealFirms(extraction),
         fit: judged?.fit ?? null,

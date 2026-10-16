@@ -1584,7 +1584,7 @@ export interface BuyBoxCoverage {
 
 /** What the coverage reads off the mandate-fit score (lib/mandate
  *  `MandateScore`): its dimensions, and the red lines as criteria. */
-interface MandateCoverageLike {
+export interface MandateCoverageLike {
   dimensions: ReadonlyArray<{ key: string; label: string; status: string }>;
   dealbreakerCriteria?: ReadonlyArray<{ label: string; checked: boolean; onPrice: boolean }>;
 }
