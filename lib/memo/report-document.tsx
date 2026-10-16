@@ -88,7 +88,7 @@ import type { AssumableView } from "@/lib/assumable-debt";
 import { basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
-import { basisTracks, fmtBasis, subjectBasis } from "@/lib/comp-detail";
+import { basisTracks, compBarsCaption, subjectBasis } from "@/lib/comp-detail";
 import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
@@ -2681,21 +2681,13 @@ export function ReportDocument({
                   );
                 })}
                 {g.label === "Sale comps" && compTracks
-                  ? compTracks.tracks.map((t, k) => {
-                      const per = t.unit === "unit" ? t.noun : "SF";
-                      // Two tracks: each caption says which comps it draws.
-                      const which =
-                        compTracks.tracks.length > 1
-                          ? `the ${compTracks.counts[k]} ${compTracks.counts[k] === 1 ? "comp" : "comps"} stating a price per ${per}`
-                          : "each comp";
-                      return (
-                        <Text key={t.unit} style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
-                          {t.subjectValue != null
-                            ? `Bars: ${which}, per ${per}; the tick is the subject at ${fmtBasis(t.subjectValue, t.unit, t.noun)}.`
-                            : `Bars: ${which}, per ${per}, scaled to the widest in the set.`}
-                        </Text>
-                      );
-                    })
+                  ? compTracks.tracks.map((t, k) => (
+                      // Each caption says which comps its track draws
+                      // (lib/comp-detail `compBarsCaption`).
+                      <Text key={t.unit} style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
+                        {compBarsCaption(t, compTracks.counts[k], saleComps.length)}
+                      </Text>
+                    ))
                   : null}
               </View>
             ))}

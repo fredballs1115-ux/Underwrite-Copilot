@@ -243,8 +243,11 @@ describe("ReportDocument (full report)", () => {
     // The per-SF comp's tick is drawn only where the subject states a basis a foot.
     expect(pdfFillCountOf(mixedBuf) - pdfFillCountOf(bare)).toBeGreaterThanOrEqual(saleCount * 3 - 1);
     const mixedText = (await pdfTextOf(mixedBuf)).replace(/\s+/g, " ");
-    expect(mixedText).toContain("the 1 comp stating a price per SF");
-    expect(mixedText).toContain("the 2 comps stating a price per");
+    // lib/comp-detail `compBarsCaption` (audit C7, L6): the basis said once,
+    // a lone comp as one, and no scale claimed for a bar drawn alone.
+    expect(mixedText).toContain("Bars: the basis per SF that one of the 3 comps states.");
+    expect(mixedText).toContain("Bars: the basis per unit that 2 of the 3 comps state; the tick is the subject at");
+    expect(mixedText).not.toMatch(/per unit, per unit|per SF, per SF|the 1 comp/);
 
     // The reconciliation page draws each gap from a centre line — a track,
     // the fill and the centre tick, three fills a drawn row. Two of the

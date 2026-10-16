@@ -265,6 +265,28 @@ export function basisTracks(
   return { tracks, trackOf: unitOf.map((u) => (u ? tracks.findIndex((t) => t.unit === u) : null)).map((i) => (i != null && i >= 0 ? i : null)), counts };
 }
 
+/**
+ * The caption under one track of the report's comp bars: which comps the
+ * bars draw, on what basis, and what the tick or the scale is (audit C7,
+ * L6). "each comp" only where every sale comp is on this track; a lone bar
+ * with no subject tick is scaled to nothing but itself, so no scale is
+ * claimed for it. `drawn` is the track's count (`BasisTracks.counts`),
+ * `total` the sale comps in the set.
+ */
+export function compBarsCaption(track: Pick<BasisScale, "unit" | "noun" | "subjectValue">, drawn: number, total: number): string {
+  const per = track.unit === "unit" ? track.noun : "SF";
+  const which =
+    drawn >= total
+      ? `each comp's basis per ${per}`
+      : drawn === 1
+        ? `the basis per ${per} that one of the ${total} comps states`
+        : `the basis per ${per} that ${drawn} of the ${total} comps state`;
+  if (track.subjectValue != null) {
+    return `Bars: ${which}; the tick is the subject at ${fmtBasis(track.subjectValue, track.unit, track.noun)}.`;
+  }
+  return drawn > 1 ? `Bars: ${which}, scaled to the widest in the set.` : `Bars: ${which}.`;
+}
+
 /** "$274k/unit", "$410/SF" or, given the class's noun, "$274k/key" — the
  *  caption a bar's tooltip uses. */
 export function fmtBasis(value: number, unit: "unit" | "sf", noun = "unit"): string {
