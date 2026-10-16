@@ -15,6 +15,7 @@
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { parsePrice } from "@/lib/criteria";
 import { interestOf, shareHoldingOf } from "@/lib/interest";
+import { screenedOn } from "@/lib/screen-run";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export interface PriceChange {
@@ -24,8 +25,11 @@ export interface PriceChange {
   /** each ask as the memorandum stated it */
   from: string;
   to: string;
-  /** the screen the earlier ask was read in, ISO */
-  since: string;
+  /** the day the earlier ask's screen reached its call — that screen's
+   *  verdict's `generatedAt`, ISO — or null where the snapshot carries none.
+   *  Never the snapshot's own stamp, which is taken as the NEXT screen
+   *  starts (audit C8, M5) */
+  since: string | null;
 }
 
 /** What a price buys, as far as two asks can be set against each other: the
@@ -59,11 +63,18 @@ export function priceChangeOf(
     pct: Math.abs(after - before) / before,
     from: row.before,
     to: row.after,
-    since: diff!.at,
+    since: priorScreenDay(prior),
   };
 }
 
-const DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+/** The earlier screen's own day: its verdict's `generatedAt`, the day it
+ *  reached its call. The snapshot's `at` is stamped when the re-screen that
+ *  replaces it starts, roughly the new screen's day, so it dates nothing
+ *  about the earlier ask. */
+function priorScreenDay(prior: PriorScreen): string | null {
+  const g = (prior.verdict as { generatedAt?: unknown } | null | undefined)?.generatedAt;
+  return typeof g === "string" && screenedOn(g) ? g : null;
+}
 
 /** "4.4%" — one decimal under 10%, whole above. */
 export function priceChangePct(c: Pick<PriceChange, "pct">): string {
@@ -74,7 +85,7 @@ export function priceChangePct(c: Pick<PriceChange, "pct">): string {
 /** "Price cut 4.4% since the screen of Sep 3, 2026: $68,000,000 to
  *  $65,000,000" — the badge's name and title. */
 export function priceChangeWords(c: PriceChange): string {
-  const t = Date.parse(c.since);
-  const when = Number.isFinite(t) ? ` since the screen of ${DAY.format(new Date(t))}` : " since the last screen";
+  const day = screenedOn(c.since);
+  const when = day ? ` since the screen of ${day}` : " since the last screen";
   return `Price ${c.direction === "cut" ? "cut" : "raised"} ${priceChangePct(c)}${when}: ${c.from} to ${c.to}`;
 }

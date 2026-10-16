@@ -7,7 +7,13 @@ import { PriceChangeBadge } from "@/app/(app)/deals/price-change-badge";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const m = (label: string, value: string, basis?: string) => ({ label, value, ...(basis ? { basis } : {}) });
-const prior = (metrics: ReturnType<typeof m>[]) => ({ at: "2026-09-03T14:00:00Z", extraction: { metrics }, verdict: null });
+// The snapshot is stamped as the re-screen starts (Oct 16); the earlier
+// screen reached its call on Sep 3.
+const prior = (metrics: ReturnType<typeof m>[]) => ({
+  at: "2026-10-16T09:00:00Z",
+  extraction: { metrics },
+  verdict: { verdict: "pass", generatedAt: "2026-09-03T14:00:00Z" },
+});
 
 describe("priceChangeOf", () => {
   it("reads the ask's cut and its raise since the previous screen", () => {
@@ -66,6 +72,22 @@ describe("a price for something else is no cut", () => {
     ).toBe("cut");
     const note = priorWith([m("Asking price", "$50,000,000")], interest("note"));
     expect(priceChangeOf(note, { metrics: [m("Asking price", "$47,000,000")], interest: interest("note") })?.direction).toBe("cut");
+  });
+});
+
+// Audit C8, M5: the snapshot's `at` is stamped when the re-screen starts,
+// so it dated the earlier ask to the day it was replaced.
+describe("the badge dates the earlier screen by its own call", () => {
+  it("reads the earlier verdict's day, never the snapshot's stamp, and says the last screen where it has none", () => {
+    const cut = priceChangeOf(prior([m("Asking price", "$68,000,000")]), { metrics: [m("Asking price", "$65,000,000")] })!;
+    expect(priceChangeWords(cut)).toContain("since the screen of Sep 3, 2026");
+    expect(priceChangeWords(cut)).not.toContain("Oct 16");
+    const undated = priceChangeOf(
+      { at: "2026-10-16T09:00:00Z", extraction: { metrics: [m("Asking price", "$68,000,000")] }, verdict: null },
+      { metrics: [m("Asking price", "$65,000,000")] },
+    )!;
+    expect(undated.since).toBeNull();
+    expect(priceChangeWords(undated)).toBe("Price cut 4.4% since the last screen: $68,000,000 to $65,000,000");
   });
 });
 
