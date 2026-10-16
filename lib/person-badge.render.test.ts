@@ -86,6 +86,26 @@ describe("where a person shows", () => {
     expect(visibleText(aside)).toMatch(/jordan\.lee\s+jordan\.lee@firm\.com/);
   });
 
+  it("the phone's top bar wears the reader's badge in Sign out's place, and its strip the sidebar's icons", () => {
+    const html = renderToStaticMarkup(
+      h(AppShell, { userEmail: "fredballs1115@gmail.com", userId: ME, userName: "Fred Balls", children: h("p", null, "page") }),
+    );
+    const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+    // The menu, closed: the badge as a named button, Sign out behind it.
+    expect(header).toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-label="Account and sign out, Fred Balls"[^>]*>[\s\S]*?data-person-badge="sm"/);
+    expect(header).not.toContain("Sign out</button>");
+    // Eleven chips, each with its icon, the one on screen marked; both edge
+    // fades drawn over the row, hidden from a screen reader.
+    const strip = header.slice(header.indexOf("<nav"), header.indexOf("</nav>"));
+    expect(strip.match(/<a /g)).toHaveLength(11);
+    expect(strip.match(/<svg /g)).toHaveLength(11);
+    expect(strip).toMatch(/aria-current="page"[^>]*>[\s\S]*?Pipeline/);
+    expect(header).toMatch(/<span aria-hidden="true" data-nav-fade="start"[^>]*opacity-0/);
+    expect(header).toMatch(/<span aria-hidden="true" data-nav-fade="end"[^>]*opacity-100/);
+    expect(header).not.toMatch(/mask-/);
+    lint(html);
+  });
+
   it("a task wears its assignee's badge beside their name", () => {
     const html = renderToStaticMarkup(
       h(DealTasks, {

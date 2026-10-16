@@ -128,7 +128,8 @@ describe("the way there", () => {
     const read = (p: string) => readFileSync(p, "utf8");
     const shell = read("app/(app)/app-shell.tsx");
     expect(shell).toContain('["/tasks", "My tasks", inTasks, IconCheck]');
-    expect(shell).toContain('{ href: "/tasks", label: "My tasks", active: inTasks }');
+    // The phone's strip draws the sidebar's own list (signed-in gaps, M6).
+    expect(shell).toContain("<PhoneNav nav={nav} pathname={pathname} />");
     expect(read("app/(app)/command-palette.tsx")).toContain('href: "/tasks"');
     expect(read("lib/supabase/proxy-session.ts")).toContain('"/tasks",');
     // The deal's task list carries the anchor each row links to.
