@@ -14,7 +14,7 @@ import { SensitivityPlayground, type PlaygroundData } from "../(app)/deals/[id]/
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import { ModelVsMarketCard } from "../(app)/deals/[id]/model-vs-market-card";
 import { SampleGuide } from "../(app)/deals/[id]/sample-guide";
-import { DemoPanel, type AnalysisKey, type SampleReturns } from "../landing-interactive";
+import { DemoPanel, type AnalysisKey } from "../landing-interactive";
 import { DemandBars } from "@/app/demand-bars";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -67,8 +67,6 @@ export interface DemoData {
   modelVsMarket: ModelVsMarket | null;
   /** the metro area's payrolls by sector, read today; null where nothing was */
   demand: MetroDemand | null;
-  /** the walkthrough's server read, which its panel takes */
-  returns: SampleReturns;
 }
 
 // The deal page's sections and their legacy jump keys (deal-view.tsx
@@ -283,7 +281,6 @@ export function DemoSections({
           <div className="flex flex-col gap-6">
             <DemoPanel
               tab="Analyses"
-              returns={data.returns}
               analysis={analysis}
               onAnalysis={setAnalysis}
               onNavigate={navigate}
@@ -305,7 +302,7 @@ export function DemoSections({
 
         {section === "documents" && (
           <div className="flex flex-col gap-6">
-            <DemoPanel tab="Documents" returns={data.returns} onNavigate={navigate} />
+            <DemoPanel tab="Documents" onNavigate={navigate} />
             <Deliverables />
           </div>
         )}

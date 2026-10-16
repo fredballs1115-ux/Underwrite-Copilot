@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
-import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFit, type SampleReturns } from "./landing-interactive";
+import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFinancials, type SampleFit } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { ScrollProgress } from "./scroll-progress";
 import { RECONCILE_RUN, SCREEN_STAGES, type ScreenStageKey } from "@/lib/screen-stages";
@@ -23,8 +23,11 @@ import {
 } from "@/lib/marketing-constants";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
-import { fmtEm, fmtPct } from "@/lib/underwrite/playground";
+import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
+import { constructionSeedFor } from "@/lib/model-market";
+import { NO_DEBT_SEEDS } from "@/lib/debt-index";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { modelReturnsRead } from "@/lib/compare-interest";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
 import { buyBoxLines } from "@/lib/criteria";
@@ -378,15 +381,26 @@ const XLSX_PREVIEW_ROWS: [string, string, string][] = sampleWorkbookPreview();
 // gets the inputs and never the derivation (its readers hold data tables).
 const BENCH = sampleDerivedInputs();
 
-// The walkthrough's Financials tab: the same derivation's base case, so the
-// page prints the sample one levered IRR, the Excel tile's and the bench's.
-const BASE_RETURNS = sampleBaseReturns();
-const SAMPLE_RETURNS: SampleReturns = {
-  irr: fmtPct(BASE_RETURNS.leveredIrrPct),
-  equityMultiple: fmtEm(BASE_RETURNS.leveredEquityMultiple),
-  cashOnCash: fmtPct(BASE_RETURNS.cocYr1Pct),
-  exitCap: fmtPct(BASE_RETURNS.exitCapPct, 2),
-};
+// The walkthrough's Financials tab, its reads made as /demo makes them
+// (app/demo/demo-data): the debt sizer starts from the same derivation, and
+// the sample is never seeded from today's rates (lib/model-market), so no
+// rate is read for it here.
+function sampleFinancials(asOf: Date = new Date()): SampleFinancials {
+  return {
+    underwrite: BENCH.inputs,
+    underwriteSources: BENCH.sources,
+    rateSeeds: {
+      permanent: BENCH.meta.rateSeed ?? null,
+      construction: constructionSeedFor(true, NO_DEBT_SEEDS),
+    },
+    strategy: inferStrategy(SAMPLE_DEAL.extraction, null),
+    modelInterest: modelReturnsRead(
+      SAMPLE_DEAL.extraction,
+      { ...SAMPLE_DEAL.model.returns, holdYears: SAMPLE_DEAL.model.holdYears },
+      asOf,
+    ),
+  };
+}
 
 // The sample against its demo buy box, read the way the deal page's header
 // reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, a criterion the
@@ -981,7 +995,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={legal} buyBox={SAMPLE_BUY_BOX} returns={SAMPLE_RETURNS} />
+              <DemoTabs legal={legal} buyBox={SAMPLE_BUY_BOX} financials={sampleFinancials()} />
             </Reveal>
           </div>
         </section>

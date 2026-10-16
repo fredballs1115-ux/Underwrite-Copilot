@@ -9,11 +9,10 @@ import type { DebtSeeds } from "@/lib/debt-index";
 import type { TodayReads } from "@/lib/model-vs-market-read";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
-import { sampleBaseReturns, sampleDerivedInputs } from "@/lib/sample-derive";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buyBoxLines, findGoingInCap } from "@/lib/criteria";
 import { buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { constructionSeedFor } from "@/lib/model-market";
-import { fmtEm, fmtPct } from "@/lib/underwrite/playground";
 import { screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { seedBenchmarks, seedRules } from "@/lib/research-data";
 import { assessPlausibility, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
@@ -93,7 +92,6 @@ export function sampleDemoData({
   // The OM's NOI against the T-12, through the deal page's own picker.
   const omPick = pickOmNoi(ex.metrics, strategy.kind);
   const t12Noi = SAMPLE_DEAL.t12.summary.noi;
-  const base = sampleBaseReturns();
 
   const data: DemoData = {
     extraction: ex,
@@ -141,14 +139,6 @@ export function sampleDemoData({
     strategy,
     modelVsMarket: modelRead,
     demand,
-    // The walkthrough's panel takes the homepage's server read, built as
-    // the homepage builds it (app/page.tsx SAMPLE_RETURNS).
-    returns: {
-      irr: fmtPct(base.leveredIrrPct),
-      equityMultiple: fmtEm(base.leveredEquityMultiple),
-      cashOnCash: fmtPct(base.cocYr1Pct),
-      exitCap: fmtPct(base.exitCapPct, 2),
-    },
   };
 
   // The research panel's props, read as the deal page reads them for its

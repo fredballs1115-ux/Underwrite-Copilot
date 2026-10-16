@@ -11,16 +11,15 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
-import { DemoPanel, loadWalkthrough, type AnalysisKey, type SampleReturns } from "@/app/landing-interactive";
+import { DemoPanel, loadWalkthrough, type AnalysisKey } from "@/app/landing-interactive";
 import { SamplePipelineCardLazy, loadSampleTile } from "@/app/sample-pipeline-card-lazy";
 import { sampleDealCard } from "./pipeline-card";
 
 const readSource = (p: string) => readFileSync(p, "utf8");
 
-const returns: SampleReturns = { irr: "8.7%", equityMultiple: "1.6x", cashOnCash: "5.0%", exitCap: "5.45%" };
 
 const panel = (tab: "Financials" | "Analyses", analysis: AnalysisKey = "verdict") =>
-  renderToStaticMarkup(React.createElement(DemoPanel, { tab, returns, analysis }));
+  renderToStaticMarkup(React.createElement(DemoPanel, { tab, analysis }));
 
 /** The number of shimmering blocks a render draws. */
 const shimmers = (html: string) => (html.match(/class="skeleton /g) ?? []).length;
@@ -44,11 +43,11 @@ describe("a walkthrough tab opened before its chunk has landed", () => {
     expect(panel("Analyses", "comps")).not.toContain("skeleton h-11 w-11 rounded-full");
   });
 
-  it("draws the Financials' terms and returns as their figures' shape", () => {
+  it("draws the Financials' terms and model as their figures' shape", () => {
     const html = panel("Financials");
     expect(html).toContain('data-qa="walkthrough-loading"');
     expect(shimmers(html)).toBeGreaterThanOrEqual(16 + 6);
-    expect(html).not.toContain('data-qa="home-two-models"');
+    expect(html).not.toContain('data-qa="workbook-note"');
     expect(a11yIssues(html)).toEqual([]);
   });
 
@@ -77,7 +76,7 @@ describe("a walkthrough tab opened before its chunk has landed", () => {
     expect(visibleText(verdict)).toContain("Caution");
     const fin = panel("Financials");
     expect(fin).not.toContain('data-qa="walkthrough-loading"');
-    expect(fin).toContain('data-qa="home-two-models"');
+    expect(fin).toContain('data-qa="workbook-note"');
     expect(gluedWords(visibleText(fin))).toEqual([]);
   });
 });

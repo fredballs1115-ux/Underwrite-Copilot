@@ -11,6 +11,11 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { SampleLegal } from "@/lib/sample-legal";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
 import type { SampleBuyBoxData } from "./sample-buy-box";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import type { ModelSources } from "@/lib/underwrite/report-grid";
+import type { DealRateSeeds } from "@/lib/debt-index";
+import type { DealStrategy } from "@/lib/deal-strategy";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
 import {
   CardListSkeleton,
@@ -99,16 +104,17 @@ export interface SampleFit {
   criteria: BoxCriterion[];
 }
 
-/** The sample's base-case returns, formatted on the server from the one
- *  derivation the Excel tile and the stress bench read (lib/sample-derive
- *  `sampleBaseReturns`). The walkthrough's Financials tab draws the
- *  first-draft model's returns, as the deal page's does, and names the
- *  workbook's levered IRR beside them as the other model's. */
-export interface SampleReturns {
-  irr: string;
-  equityMultiple: string;
-  cashOnCash: string;
-  exitCap: string;
+/** The Financials tab's server reads, made as /demo makes them
+ *  (app/demo/demo-data): the derived screening model the debt sizer starts
+ *  from and where its inputs came from, the sizer's rate seeds (none for the
+ *  sample, which is never seeded from today's rates: lib/model-market), the
+ *  deal's kind, and what the price buys against the model card's returns. */
+export interface SampleFinancials {
+  underwrite: UnderwriteInputs;
+  underwriteSources: ModelSources | null;
+  rateSeeds: DealRateSeeds;
+  strategy: DealStrategy;
+  modelInterest: ModelReturnsRead | null;
 }
 
 const CRITERION_MARK: Record<BoxCriterion["status"], [string, string, string]> = {
@@ -369,12 +375,15 @@ function AnalysesView({
   );
 }
 
-/** The deal page's Financials tab on the sample: the extracted terms,
- *  then the first-draft model's returns, the card's own figures. Its
- *  tiles' grids are held to three across: four of them in this column left
- *  "$68,000,000" wider than its tile. Drawn once its chunk has loaded
- *  (`useWalkthrough`), its shape until then. */
-function FinancialsView({ returns }: { returns: SampleReturns }) {
+/** The deal page's Financials tab on the sample, in its order: the
+ *  extracted terms, the debt sizer, then the first-draft model card
+ *  (app/sample-model-card, the card's own body). The model's read against
+ *  the published figures, which the deal page draws between the two, needs
+ *  today's figures the homepage does not read, and is left out rather than
+ *  imitated (/demo draws it). The terms' tiles are held to three across:
+ *  four of them in this column left "$68,000,000" wider than its tile.
+ *  Drawn once its chunk has loaded (`useWalkthrough`), its shape until then. */
+function FinancialsView({ financials }: { financials?: SampleFinancials }) {
   const w = useWalkthrough();
   if (!w) {
     return (
@@ -394,16 +403,21 @@ function FinancialsView({ returns }: { returns: SampleReturns }) {
     );
   }
   return (
-    <div className="flex flex-col gap-6 [&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
-      <w.TermsView result={RESULTS.extraction} />
-      <div className="flex flex-col gap-1.5">
-        <w.ReturnsHeadline model={SAMPLE_DEAL.model} />
-        {/* Two models, said as two, as the deal page and /demo say it:
-            the workbook runs the screening model on its own base case. */}
-        <p className="text-xs text-muted" data-qa="home-two-models">
-          {`The Excel workbook is a separate model: its levered IRR is ${returns.irr}.`}
-        </p>
+    <div className="flex flex-col gap-6">
+      <div className="[&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
+        <w.TermsView result={RESULTS.extraction} />
       </div>
+      {financials && (
+        <w.DebtSizer
+          model={SAMPLE_DEAL.model}
+          extraction={RESULTS.extraction}
+          underwrite={financials.underwrite}
+          underwriteSources={financials.underwriteSources}
+          rateSeeds={financials.rateSeeds}
+          strategy={financials.strategy}
+        />
+      )}
+      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} />
     </div>
   );
 }
@@ -428,7 +442,7 @@ function BuyBoxTab({ data }: { data?: SampleBuyBoxData }) {
 export function DemoPanel({
   tab,
   buyBox,
-  returns,
+  financials,
   analysis = "verdict",
   onAnalysis = () => {},
   onNavigate = () => {},
@@ -439,7 +453,8 @@ export function DemoPanel({
   legal?: SampleLegal;
   /** the Buy box tab's panel and the sample's box, read on the server */
   buyBox?: SampleBuyBoxData;
-  returns: SampleReturns;
+  /** the Financials tab's server reads */
+  financials?: SampleFinancials;
   /** the Analyses tab's open sub-tab */
   analysis?: AnalysisKey;
   onAnalysis?: (key: AnalysisKey) => void;
@@ -450,7 +465,7 @@ export function DemoPanel({
     case "Overview":
       return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} />;
     case "Financials":
-      return <FinancialsView returns={returns} />;
+      return <FinancialsView financials={financials} />;
     case "Buy box":
       // The deal page's own Buy box tab, against the sample's example box,
       // said so over it (app/sample-buy-box).
@@ -488,11 +503,11 @@ export function DemoPanel({
  *  each tab's dot and finding count — over the sample deal's own tabs. */
 export function DemoTabs({
   buyBox,
-  returns,
+  financials,
 }: {
   legal?: SampleLegal;
   buyBox: SampleBuyBoxData;
-  returns: SampleReturns;
+  financials: SampleFinancials;
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const [analysis, setAnalysis] = useState<AnalysisKey>("verdict");
@@ -631,7 +646,7 @@ export function DemoTabs({
         <DemoPanel
           tab={tab}
           buyBox={buyBox}
-          returns={returns}
+          financials={financials}
           analysis={analysis}
           onAnalysis={setAnalysis}
           onNavigate={navigate}

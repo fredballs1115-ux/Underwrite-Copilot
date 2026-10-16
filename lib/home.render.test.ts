@@ -14,8 +14,12 @@ import { ScreenRunStrip, STRIP_STAGES, STRIP_WORDS, screenRunLines } from "@/app
 import { COMP_RATING, LEVER_META, SCENARIO_META, TONE } from "@/app/(app)/deals/[id]/deal-sections";
 import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
-import { fmtEm, fmtPct } from "./underwrite/playground";
+import { fmtPct } from "./underwrite/playground";
 import { DemoPanel, loadWalkthrough } from "@/app/landing-interactive";
+import { DebtSizer } from "@/app/(app)/deals/[id]/debt-sizer";
+import { SampleModelCard } from "@/app/sample-model-card";
+import { modelReturnsRead } from "./compare-interest";
+import { inferStrategy } from "./deal-strategy";
 import { StressBench } from "@/app/landing-stress";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { buyBoxLines } from "./criteria";
@@ -249,7 +253,7 @@ function sampleBuyBox() {
 describe("the homepage's buy box is the deal page's own panel", () => {
   it("the Buy box tab draws the deal page's BuyBoxPanel on the sample's read, captioned as the sample's example box", () => {
     const data = sampleBuyBox();
-    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", buyBox: data, returns: { irr: "", equityMultiple: "", cashOnCash: "", exitCap: "" } }));
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", buyBox: data }));
     // The panel itself, markup for markup.
     expect(html).toContain(renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: data.panel })));
     const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
@@ -379,34 +383,55 @@ describe("the homepage's sample figures are the surfaces' own", () => {
   // "Projected returns · the Excel workbook's base case" — figures the deal
   // page's Financials tab never prints, beside a hand-built exit-cap range
   // whose base (5.45%) the verdict's own card does not state (5.50%). The
-  // pass of 2026-10-16 (H5) draws what the deal page's Financials tab draws
-  // on the sample: its extracted terms and the first-draft model's returns,
-  // the card's own component. The workbook's IRR, the tile's and the
-  // bench's, is named beside them as the other model's, as the deal page and
-  // /demo name it; which model the sample should run is the owner's call.
-  it("the miniature's Financials tab is the deal page's: the terms and the first-draft model's returns, the workbook's IRR named apart", () => {
-    const { inputs, meta } = sampleDerivedInputs();
+  // pass of 2026-10-16 (H5) drew the terms and the card's returns headline
+  // bare, with a sentence of the homepage's own naming the workbook's IRR.
+  // It draws the deal page's Financials tab now (H, item 3): the terms, the
+  // debt sizer on the derivation the stress bench and the Excel tile run,
+  // and the first-draft model card's own body, whose own sentence says the
+  // workbook is a separate model. Which model the sample should run is the
+  // owner's call.
+  it("the miniature's Financials tab is the deal page's: the terms, the debt sizer and the model card's own body", () => {
+    const { inputs, meta, sources } = sampleDerivedInputs();
     const bench = words(renderToStaticMarkup(React.createElement(StressBench, { base: inputs, units: meta.units })));
     const tileIrr = sampleWorkbookPreview()[1][2].replace("IRR ", "");
     const r = sampleBaseReturns();
-    const returns = {
-      irr: fmtPct(r.leveredIrrPct),
-      equityMultiple: fmtEm(r.leveredEquityMultiple),
-      cashOnCash: fmtPct(r.cocYr1Pct),
-      exitCap: fmtPct(r.exitCapPct, 2),
-    };
-    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", returns }));
+    const modelInterest = modelReturnsRead(SAMPLE_DEAL.extraction, { ...SAMPLE_DEAL.model.returns, holdYears: SAMPLE_DEAL.model.holdYears });
+    const strategy = inferStrategy(SAMPLE_DEAL.extraction, null);
+    const rateSeeds = { permanent: meta.rateSeed ?? null, construction: null };
+    const financials = { underwrite: inputs, underwriteSources: sources, rateSeeds, strategy, modelInterest };
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", financials }));
     const panel = words(html);
-    // The card's own markup, figure for figure.
-    expect(html).toContain(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model })));
+    // The deal page's own parts, markup for markup, in its order.
+    const sizer = renderToStaticMarkup(
+      React.createElement(DebtSizer, {
+        model: SAMPLE_DEAL.model,
+        extraction: SAMPLE_DEAL.extraction,
+        underwrite: inputs,
+        underwriteSources: sources,
+        rateSeeds,
+        strategy,
+      }),
+    );
+    const card = renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest }));
+    expect(html).toContain(sizer);
+    expect(html).toContain(card);
+    expect(html.indexOf("Extracted terms")).toBeLessThan(html.indexOf(sizer));
+    expect(html.indexOf(sizer)).toBeLessThan(html.indexOf(card));
+    expect(card).toContain(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model, interest: modelInterest })));
+    expect(panel).toContain("First-draft model — ready");
     expect(panel).toContain("Projected returns · first-draft model");
     expect(panel).toContain(`Levered IRR ${SAMPLE_DEAL.model.returns.leveredIrrPct!.toFixed(2)}%`);
-    expect(panel).toContain("Extracted terms");
     for (const m of SAMPLE_DEAL.extraction.metrics.filter((x) => x.flagged)) expect(panel).toContain(m.value);
-    // The other model's, said as another model's: the tile's and the bench's.
-    expect(returns.irr).toBe(tileIrr);
+    // The two models said as the product says them, never in a sentence of
+    // the homepage's own.
+    expect(html).toContain('data-qa="workbook-note"');
+    expect(html).not.toContain('data-qa="home-two-models"');
+    expect(panel).not.toContain("The Excel workbook is a separate model: its levered IRR is");
+    expect(html).toContain('href="/api/demo/underwrite.xlsx"');
+    expect(html).not.toContain("<form");
+    // The bench and the Excel tile still read one base case.
+    expect(fmtPct(r.leveredIrrPct)).toBe(tileIrr);
     expect(bench).toContain(`Levered IRR ${tileIrr}`);
-    expect(panel).toContain(`The Excel workbook is a separate model: its levered IRR is ${tileIrr}.`);
     expect(panel).not.toContain("the Excel workbook's base case");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
@@ -469,7 +494,6 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
       React.createElement(DemoPanel, {
         tab: tab as never,
         analysis: analysis as never,
-        returns: { irr: "", equityMultiple: "", cashOnCash: "", exitCap: "" },
       }),
     );
   const text = (html: string) => visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
