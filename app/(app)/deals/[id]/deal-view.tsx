@@ -80,6 +80,7 @@ import { condoUnitsOffered } from "@/lib/condo-units";
 import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
+import { sampleExportsFree } from "@/lib/sample-exports";
 import { fileKindOf, FILE_KIND_WORDS, type FileKind } from "@/lib/file-kind";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import { longerThanUsual, longerThanUsualLine } from "@/lib/screen-duration";
@@ -488,6 +489,9 @@ export function DealView({
 }) {
   const router = useRouter();
   const toast = useToast();
+  // The three downloads are open on the reader's own sample deal, as the
+  // public pages promise (lib/sample-exports, the routes' own rule).
+  const downloadsOpen = isPro || sampleExportsFree({ isSample, hasOm });
 
   // Live job status, kept fresh by polling. Server data (results) arrives via
   // props on each router.refresh(); this just tracks the in-flight step/%.
@@ -1024,6 +1028,7 @@ export function DealView({
             model={model}
             documents={documents}
             isPro={isPro}
+            downloadsOpen={downloadsOpen}
             supplement={supplements["terms"]}
             facts={facts}
             omUrl={omUrl}
@@ -1085,7 +1090,7 @@ export function DealView({
               dealId={dealId}
               hasOm={hasOm}
               omUrl={omUrl}
-              canMemo={isPro && !!results.verdict}
+              canMemo={downloadsOpen && !!results.verdict}
               hasVerdict={!!results.verdict}
               documents={documents}
               supplements={supplements}
@@ -1135,6 +1140,7 @@ function FinancialsPanel({
   model,
   documents,
   isPro,
+  downloadsOpen = isPro,
   supplement,
   facts = {},
   omUrl = null,
@@ -1159,6 +1165,9 @@ function FinancialsPanel({
   model: UnderwritingModel | null;
   documents: DealDocument[];
   isPro: boolean;
+  /** the workbook download: Pro, or the reader's own sample deal
+   *  (lib/sample-exports) */
+  downloadsOpen?: boolean;
   supplement: TabSupplement | undefined;
   facts?: Record<string, DealFact>;
   omUrl?: string | null;
@@ -1246,6 +1255,7 @@ function FinancialsPanel({
             documents={documents}
             active={active}
             isPro={isPro}
+            downloadsOpen={downloadsOpen}
             isSample={isSample}
             interest={modelInterest}
           />

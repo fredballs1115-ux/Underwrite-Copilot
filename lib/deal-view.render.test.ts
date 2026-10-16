@@ -1986,3 +1986,27 @@ describe("DealView — Ask's thread on a team deal", () => {
     expect(html).toContain('href="/api/deals/d1/om#page=12"');
   });
 });
+
+describe("the sample's downloads are free, as the public pages promise (lib/sample-exports)", () => {
+  it("draws the memo and the workbook as downloads, with no Pro mark or upgrade, for a free reader", () => {
+    const docs = render(sampleProps("documents"));
+    expect(docs).toContain('href="/api/deals/sample/memo"');
+    expect(textOf(docs)).not.toMatch(/Upgrade for the PDF memo/);
+    const fin = render(sampleProps("financials"));
+    expect(fin).toContain('href="/api/deals/sample/underwrite.xlsx"');
+    expect(textOf(fin)).not.toMatch(/Upgrade to Pro/);
+    const overview = textOf(render(sampleProps("overview")));
+    const ask = overview.slice(overview.indexOf("Ask this deal") + "Ask this deal".length);
+    expect(overview).toContain("Ask this deal");
+    expect(ask.trimStart().startsWith("Pro")).toBe(false);
+  });
+
+  it("keeps a free reader's own deal behind Pro", () => {
+    const own = { ...sampleProps("documents"), isSample: false, hasOm: true, omUrl: "/api/deals/sample/om" } as Props;
+    const docs = render(own);
+    expect(textOf(docs)).toMatch(/Upgrade for the PDF memo/);
+    expect(docs).not.toContain('href="/api/deals/sample/memo"');
+    const fin = render({ ...own, initialTab: "financials" } as Props);
+    expect(textOf(fin)).toMatch(/Upgrade to Pro to download the OM underwrite model/);
+  });
+});

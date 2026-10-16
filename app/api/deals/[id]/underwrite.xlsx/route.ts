@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
+import { exportGate, exportGateDealOf, sampleExportsFree } from "@/lib/sample-exports";
 import { HOLD_MONTHS, deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
@@ -50,20 +51,25 @@ export async function GET(
     );
   }
 
-  let pro = false;
-  try {
-    pro = await isPro(supabase, user.id);
-  } catch (err) {
-    console.error(`underwrite.xlsx isPro check failed for deal ${id}:`, err);
-    return Response.redirect(new URL(`/deals/${id}?error=exportfail`, req.url), 302);
-  }
-  if (!pro) {
-    return Response.redirect(new URL(`/billing?upsell=underwrite`, req.url), 302);
-  }
-
   const { data, error } = await supabase.from("deals").select("*").eq("id", id).maybeSingle();
   if (error) return Response.redirect(new URL(`/deals/${id}?error=exportfail`, req.url), 302);
   if (!data) return new Response("Not found", { status: 404 });
+
+  // Pro, as the memo — except on the reader's own sample deal, which the
+  // public pages promise free (lib/sample-exports).
+  const gateDeal = exportGateDealOf(data as { is_sample?: boolean | null; om_storage_path?: string | null });
+  let pro = false;
+  if (!sampleExportsFree(gateDeal)) {
+    try {
+      pro = await isPro(supabase, user.id);
+    } catch (err) {
+      console.error(`underwrite.xlsx isPro check failed for deal ${id}:`, err);
+      return Response.redirect(new URL(`/deals/${id}?error=exportfail`, req.url), 302);
+    }
+  }
+  if (exportGate(pro, gateDeal) === "upsell") {
+    return Response.redirect(new URL(`/billing?upsell=underwrite`, req.url), 302);
+  }
 
   const deal = data as DealRow;
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;

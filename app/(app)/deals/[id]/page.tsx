@@ -105,6 +105,7 @@ import { dealTitle } from "@/lib/deal-title";
 import { omLinkFor } from "@/lib/om-link";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { isPro } from "@/lib/billing";
+import { sampleExportsFree } from "@/lib/sample-exports";
 import { type DealRow } from "@/lib/deals";
 import { type DealDocument } from "@/lib/documents";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -630,6 +631,11 @@ export default async function DealPage({
   // offered to the deal's creator alone, never on the sample.
   const isCreator = !!user && ownership.user_id === user.id;
   const isSampleDeal = !!(deal as { is_sample?: boolean }).is_sample;
+  // The three downloads are open on the reader's own sample deal, as the
+  // public pages promise (lib/sample-exports) — the routes read the same
+  // rule, so no Pro mark is drawn on a file the reader can take.
+  const downloadsOpen =
+    pro || sampleExportsFree({ isSample: isSampleDeal, hasOm: !!deal.om_storage_path });
   const readerTeam =
     isCreator && !isSampleDeal
       ? (
@@ -1505,7 +1511,7 @@ export default async function DealPage({
               <a
                 href={`/api/deals/${id}/memo`}
                 title={
-                  pro
+                  downloadsOpen
                     ? "One-page IC screening memo — verdict, buy-box fit, flags, next steps"
                     : "One-page IC screening memo — part of Pro"
                 }
@@ -1527,7 +1533,7 @@ export default async function DealPage({
                   <path d="M10 16h4" />
                 </svg>
                 IC memo
-                {!pro && (
+                {!downloadsOpen && (
                   <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
                     Pro
                   </span>
@@ -1538,7 +1544,7 @@ export default async function DealPage({
               <a
                 href={`/api/deals/${id}/report`}
                 title={
-                  pro
+                  downloadsOpen
                     ? "The full screening report — memo plus every term, challenge, comp, and market check"
                     : "The full screening report — part of Pro"
                 }
@@ -1557,7 +1563,7 @@ export default async function DealPage({
                   <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
                 </svg>
                 Full report
-                {!pro && (
+                {!downloadsOpen && (
                   <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
                     Pro
                   </span>
@@ -1568,7 +1574,7 @@ export default async function DealPage({
               <a
                 href={`/api/deals/${id}/underwrite.xlsx`}
                 title={
-                  pro
+                  downloadsOpen
                     ? "Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates"
                     : "Institutional acquisition model (Excel) — part of Pro"
                 }
@@ -1588,7 +1594,7 @@ export default async function DealPage({
                   <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
                 </svg>
                 Underwrite model
-                {!pro && (
+                {!downloadsOpen && (
                   <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
                     Pro
                   </span>

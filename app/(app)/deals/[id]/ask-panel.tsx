@@ -109,7 +109,9 @@ export function AskPanel({
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold tracking-tight">Ask this deal</h2>
-        {!isPro && (
+        {/* No Pro mark on the sample, which the public pages promise whole
+            (lib/sample-exports); the line below says what Ask needs. */}
+        {!isPro && !isSample && (
           <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
             Pro
           </span>

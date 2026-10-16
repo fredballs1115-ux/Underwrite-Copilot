@@ -32,6 +32,7 @@ export function ModelView({
   documents,
   active,
   isPro,
+  downloadsOpen = isPro,
   isSample = false,
   interest = null,
 }: {
@@ -40,6 +41,9 @@ export function ModelView({
   documents: DealDocument[];
   active: boolean;
   isPro: boolean;
+  /** the workbook download: Pro, or the reader's own sample deal, which
+   *  the public pages promise free (lib/sample-exports) */
+  downloadsOpen?: boolean;
   /** the sample deal, whose model lists the fixture's documents and which
    *  has no document rows of its own to compare them with */
   isSample?: boolean;
@@ -65,7 +69,7 @@ export function ModelView({
           <CashFlow cashFlow={model.cashFlow} />
           <SummaryCaveats summary={model.summary} caveats={model.caveats} />
           <div className="flex flex-col gap-1.5">
-            {isPro ? (
+            {downloadsOpen ? (
               <DownloadRow dealId={dealId} />
             ) : (
               <Link
@@ -96,6 +100,7 @@ export function ModelView({
         active={active}
         hasModel={!!model}
         isPro={isPro}
+        isSample={isSample}
       />
     </div>
   );
@@ -271,12 +276,16 @@ function DocumentsPanel({
   active,
   hasModel,
   isPro,
+  isSample = false,
 }: {
   dealId: string;
   documents: DealDocument[];
   active: boolean;
   hasModel: boolean;
   isPro: boolean;
+  /** the sample deal: no upgrade prompt is drawn on it — the public pages
+   *  promise the sample whole (lib/sample-exports) */
+  isSample?: boolean;
 }) {
   return (
     // The banner's "Regenerate the model" lands here, at the control.
@@ -364,7 +373,7 @@ function DocumentsPanel({
             </p>
           )}
         </form>
-      ) : (
+      ) : isSample ? null : (
         <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
             Building this model from your documents is a{" "}
