@@ -5,7 +5,8 @@ import type { DealCard } from "./(app)/deals/pipeline";
 
 // The pipeline's card (deal-tile.tsx, with its banner, its cover drawing and
 // its tags) is a chunk of its own on the homepage, asked for as the
-// "Your pipeline" section nears the screen or a pointer or focus reaches it,
+// "Your pipeline" section nears the screen (800px ahead of it, so before a
+// reader scrolling or tabbing down reaches it) or a pointer reaches it,
 // as the walkthrough's tabs are (landing-interactive's `loadWalkthrough`):
 // drawn in the page's first load it added about 100 KB of script to every
 // visit for a card far down the page.

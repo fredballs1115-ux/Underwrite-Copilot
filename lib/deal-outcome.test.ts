@@ -5,6 +5,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseStageHistory, type StageChange } from "./stages";
 import {
+  OUTCOME_FORM_ERROR,
   currentOutcome,
   deathReasons,
   outcomeWords,
@@ -79,6 +80,19 @@ describe("who reported a trade", () => {
     expect(outcomeWords({ reason: null, trade }, { [id]: "Jane Q. Analyst" })).toContain("reported by Jane Q. Analyst");
     // A trade reported before the account was kept reads as it did.
     expect(tradeWords({ ...trade, reportedById: undefined }, { [id]: "Jane Q. Analyst" })).toContain("reported by Jane Analyst");
+  });
+});
+
+// Audit C8, L11: the deal page kept its own copy of the form's words, its
+// date message without the year bounds.
+describe("the deal page's refusal words are the form's", () => {
+  it("reads OUTCOME_FORM_ERROR, the years and all", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8");
+    expect(src).toContain("outcomedate: OUTCOME_FORM_ERROR.date");
+    expect(src).toContain("outcomeprice: OUTCOME_FORM_ERROR.price");
+    expect(src).toContain("outcomereason: OUTCOME_FORM_ERROR.reason");
+    expect(OUTCOME_FORM_ERROR.date).toMatch(/between \d{4} and \d{4}/);
   });
 });
 

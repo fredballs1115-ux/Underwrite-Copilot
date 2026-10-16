@@ -771,6 +771,38 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("where the memorandum is silent the model's defaults stand, each marked assumption");
   }, 60000);
 
+  // Audit C8, L11: an all-cash model's sale said "the loan's $0 payoff", and
+  // the capital row's name left out the leasing costs it carries.
+  it("says no loan payoff on an all-cash model, and names the capital row for what it carries", async () => {
+    const extraction = { ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData({ ...derived.inputs, ltc: 0 }, null, { sources: derived.sources });
+    const a = sensitivity.baseCase?.annual;
+    expect(a).toBeTruthy();
+    if (!a) return;
+    expect(a.sale.loanPayoff).toBe(0);
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("of sale costs, $");
+    expect(text).not.toContain("payoff");
+    expect(a.hasCapital).toBe(true);
+    expect(text).toContain("Capital, leasing and reserves");
+    expect(text).not.toContain("Capital and reserves");
+  }, 60000);
+
   it("prints the deal's actuals on a page of their own, each document dated (research pass 24, B3)", async () => {
     const extraction = { ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 };
     const deal = {

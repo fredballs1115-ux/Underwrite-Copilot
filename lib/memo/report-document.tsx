@@ -1594,7 +1594,10 @@ function AnnualCashFlowBlock({ b, totalPages }: { b: BaseCase; totalPages: numbe
     { label: "Effective gross revenue", close: null, years: a.years.map((y) => y.egi) },
     { label: "Operating expenses", close: null, years: out("opex") },
     { label: "Net operating income", close: null, years: a.years.map((y) => y.noi), bold: true },
-    ...(a.hasCapital ? [{ label: "Capital and reserves", close: null, years: out("capital") }] : []),
+    // The engine's capital line carries reserves, tenant improvements,
+    // leasing commissions and the year's improvements, so its name says
+    // leasing too (audit C8, L11).
+    ...(a.hasCapital ? [{ label: "Capital, leasing and reserves", close: null, years: out("capital") }] : []),
     ...(a.hasAmFee ? [{ label: "Asset-management fee", close: null, years: out("amFee") }] : []),
     { label: "Debt service", close: null, years: out("debtService") },
     { label: "Cash after debt", close: null, years: a.years.map((y) => y.cashAfterDebt), bold: true },
@@ -1649,7 +1652,7 @@ function AnnualCashFlowBlock({ b, totalPages }: { b: BaseCase; totalPages: numbe
       ))}
       <Text style={{ fontSize: 8, color: C.ink, marginTop: 8 }}>
         {str(
-          `The sale, at the end of year ${a.sale.year}: the following year's NOI of ${cashCell(a.sale.forwardNoi)} at the ${(a.sale.exitCap * 100).toFixed(2)}% exit cap${exitTag} is ${cashCell(a.sale.gross)}; less ${cashCell(a.sale.costs)} of sale costs and the loan's ${cashCell(a.sale.loanPayoff)} payoff, ${cashCell(a.sale.net)} to equity.`,
+          `The sale, at the end of year ${a.sale.year}: the following year's NOI of ${cashCell(a.sale.forwardNoi)} at the ${(a.sale.exitCap * 100).toFixed(2)}% exit cap${exitTag} is ${cashCell(a.sale.gross)}; less ${cashCell(a.sale.costs)} of sale costs${a.sale.loanPayoff !== 0 ? ` and the loan's ${cashCell(a.sale.loanPayoff)} payoff` : ""}, ${cashCell(a.sale.net)} to equity.`,
         )}
       </Text>
       {irrWords ? <Text style={{ fontSize: 8, color: C.ink, marginTop: 3 }}>{str(irrWords)}</Text> : null}

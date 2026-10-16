@@ -40,6 +40,7 @@ import type { LeaseholdExitView } from "@/lib/leasehold-exit";
 import type { MetroDemand } from "@/lib/metro-demand";
 import { DecisionLog } from "./decision-log";
 import { DealOutcomeCard } from "./deal-outcome";
+import { OUTCOME_FORM_ERROR } from "@/lib/deal-outcome";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
@@ -239,9 +240,10 @@ const MODEL_ERRORS: Record<string, string> = {
     "Only the deal’s creator or the team owner can delete this deal. Nothing was removed.",
   stage: "Couldn’t save the stage — please try again.",
   outcome: "Couldn’t save what became of the deal — move it to Dead or Closed first, then try again.",
-  outcomereason: "Pick one of the reasons listed.",
-  outcomeprice: "Type the trade price as a dollar figure — $41,500,000 or $41.5M.",
-  outcomedate: "Type the trade’s day as a real date.",
+  // The form's own words (lib/deal-outcome), the date's with its years.
+  outcomereason: OUTCOME_FORM_ERROR.reason,
+  outcomeprice: OUTCOME_FORM_ERROR.price,
+  outcomedate: OUTCOME_FORM_ERROR.date,
   note: "Couldn’t save your note — please try again.",
   noteempty: "Write something in the note first — whitespace doesn’t count.",
   notedelete: "Couldn’t remove that note — please try again.",
