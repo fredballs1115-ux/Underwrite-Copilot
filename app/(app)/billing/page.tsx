@@ -16,6 +16,8 @@ import { FREE_PLAN, PRICE_PRO_MONTHLY, PRO_PLAN_LINES, PRO_UPSELL } from "@/lib/
 import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
+import { PersonBadge } from "../person-badge";
+import { personName } from "@/lib/person";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -340,8 +342,9 @@ export default async function BillingPage({
                   key={m.userId}
                   className="flex items-center gap-3 px-3 py-2 text-sm"
                 >
+                  <PersonBadge name={personName(m.fullName, m.email)} id={m.userId} size="sm" decorative />
                   <span className="min-w-0 flex-1 truncate">
-                    {m.fullName || m.email || "Teammate"}
+                    {personName(m.fullName, m.email)}
                   </span>
                   <span className="shrink-0 text-xs text-muted">
                     {m.role === "owner"

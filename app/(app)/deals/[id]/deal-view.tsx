@@ -1005,6 +1005,7 @@ export function DealView({
               stageHistory={stageHistory}
               userEmail={userEmail}
               userId={userId}
+              names={askerNames}
             />
           </div>
         )}
