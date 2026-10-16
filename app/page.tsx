@@ -978,11 +978,14 @@ export default function Home() {
 
         {/* SLOT: "Your pipeline, as cards" — the sample's own pipeline card
             (the Philadelphia photograph with its "Market photo" caption, the
-            call on the picture, Price with $/unit under it, Cap, Fit) goes
-            here once the pipeline's card is exported as a pure view with a
-            pure builder (the homepage and /demo gap research, M9). Only the
-            sample's card, linking to /demo, never an invented deal, and no
-            stage select (a server action). */}
+            call on the picture, Price with $/unit under it, Cap, Fit; the
+            homepage and /demo gap research, M9). The view and its builder
+            exist: `DealTilePreview` (app/(app)/deals/pipeline.tsx) drawn on
+            lib/pipeline-card `sampleDealCard`. It is drawn here once the
+            card lives in a client file of its own, so the homepage does not
+            load the whole pipeline module (audit C7, L8; that move is under
+            way). Only the sample's card, linking to /demo, never an
+            invented deal, and no stage select (a server action). */}
 
         {/* Break it yourself — the deterministic engine, live in the browser. */}
         <section id="stress" className="band-dark text-white">
