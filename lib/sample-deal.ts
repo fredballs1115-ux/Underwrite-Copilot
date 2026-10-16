@@ -23,6 +23,7 @@ import type { BuyBox } from "@/lib/criteria";
 import type { AskEntry, DealNote } from "@/lib/deals";
 import { normalizeTaskTitle } from "@/lib/deal-tasks";
 import { withArticle } from "@/lib/article";
+import { SAMPLE_AUTHOR } from "@/lib/note-remove";
 
 /** The hypothetical mandate the PUBLIC sample is judged against — the
  *  homepage's chip, /demo's buy-box tab, and the public memo and full
@@ -616,8 +617,10 @@ const t12Summary: T12Summary = {
 // carries a person: no asker, no author id, no creator — they are the
 // sample's, and lib/sample-deal.test.ts holds them to all of it.
 
-/** Who the seeded note is by: the sample, never a person. */
-export const SAMPLE_AUTHOR = "Sample deal";
+/** Who the seeded note is by: the sample, never a person (defined beside
+ *  the rule for who may remove a note, lib/note-remove: the sample's reader
+ *  may remove this one). */
+export { SAMPLE_AUTHOR };
 
 /** One of the memorandum's stated facts, by its label: its value and page. */
 function memoFact(label: string): { value: string; page: string } {

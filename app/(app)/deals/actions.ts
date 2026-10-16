@@ -1573,15 +1573,19 @@ export async function deleteDealNote(formData: FormData) {
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, notes")
+    .select("id, notes, is_sample")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) redirect("/deals");
 
   // Identity: the stamped user id when present (survives email changes),
-  // else the write-time email for notes from before byId existed.
+  // else the write-time email for notes from before byId existed; the
+  // sample deal's own seeded note is its reader's to remove
+  // (lib/note-remove, the decision log's rule too).
+  const { mayRemoveNote } = await import("@/lib/note-remove");
+  const reader = { userId: user.id, userEmail: user.email ?? "unknown" };
   const notes = parseDealNotes(deal.notes).filter(
-    (n) => !(n.at === at && (n.byId ? n.byId === user.id : n.by === (user.email ?? "unknown"))),
+    (n) => !(n.at === at && mayRemoveNote(n, reader, deal.is_sample === true)),
   );
   const { error } = await supabase
     .from("deals")

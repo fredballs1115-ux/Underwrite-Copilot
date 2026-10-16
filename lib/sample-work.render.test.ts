@@ -78,21 +78,28 @@ describe("the sample's seeded panels", () => {
     lint(html);
   });
 
-  it("the note is the sample's, and not the reader's to remove", () => {
-    const html = renderToStaticMarkup(
-      h(DecisionLog, {
-        dealId: "s1",
-        userEmail: "fredballs1115@gmail.com",
-        userId: ME,
-        stageHistory: [],
-        notes: parseDealNotes(work.notes),
-      }),
-    );
+  it("the note is the sample's, never the reader's words, and on the sample deal the reader may remove it", () => {
+    const log = (isSample: boolean) =>
+      renderToStaticMarkup(
+        h(DecisionLog, {
+          dealId: "s1",
+          userEmail: "fredballs1115@gmail.com",
+          userId: ME,
+          stageHistory: [],
+          notes: parseDealNotes(work.notes),
+          isSample,
+        }),
+      );
+    const html = log(true);
     const text = visibleText(html);
     expect(text).toContain(work.notes[0].text);
     expect(text).toContain("Sample deal");
     expect(text).not.toMatch(/\byou\b/);
-    expect(html).not.toMatch(/name="at"/);
+    // The seed puts a removed note back never (seedSampleWork), so the
+    // reader can clear it (audit C9, L2).
+    expect(html).toContain(`name="at" value="${work.notes[0].at}"`);
     lint(html);
+    // A note signed "Sample deal" on any other deal is nobody's to remove.
+    expect(log(false)).not.toMatch(/name="at"/);
   });
 });

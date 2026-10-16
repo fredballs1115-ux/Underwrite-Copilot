@@ -6,6 +6,7 @@ import { STAGE_LABEL, type StageChange } from "@/lib/stages";
 import { outcomeWords } from "@/lib/deal-outcome";
 import { addDealNote, deleteDealNote } from "../actions";
 import { displayName } from "@/lib/person";
+import { mayRemoveNote } from "@/lib/note-remove";
 import { PersonBadge } from "../../person-badge";
 
 // Module-level cached formatter (creating one per render is measurable).
@@ -64,8 +65,12 @@ export function DecisionLog({
   userEmail,
   userId,
   names = null,
+  isSample = false,
 }: {
   dealId: string;
+  /** the sample deal, whose own seeded note its reader may remove
+   *  (lib/note-remove, the delete action's rule too) */
+  isSample?: boolean;
   notes: DealNote[];
   stageHistory: StageChange[];
   userEmail: string | null;
@@ -144,7 +149,7 @@ export function DecisionLog({
                       <span>{safeWhen(e.at)}</span>
                       <span aria-hidden>·</span>
                       <span className="truncate">{authorOf(e.note)}</span>
-                      {mine(e.note) && (
+                      {mayRemoveNote(e.note, { userId, userEmail }, isSample) && (
                         <form action={deleteDealNote} className="inline">
                           <input type="hidden" name="dealId" value={dealId} />
                           <input type="hidden" name="at" value={e.at} />

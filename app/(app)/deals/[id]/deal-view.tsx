@@ -1008,6 +1008,7 @@ export function DealView({
               userEmail={userEmail}
               userId={userId}
               names={askerNames}
+              isSample={isSample}
             />
           </div>
         )}
