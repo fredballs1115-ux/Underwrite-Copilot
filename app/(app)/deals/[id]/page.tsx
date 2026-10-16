@@ -56,6 +56,7 @@ import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
 import { SiteReportsPanel } from "@/app/site-reports-panel";
 import { ListingTeam } from "./listing-team";
 import { BrokerEmailActions } from "./broker-email-actions";
+import { ddChecklist } from "@/lib/dd-checklist";
 import { listingTeamOf, offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
@@ -138,7 +139,7 @@ import {
 import { StageSelect } from "./stage-select";
 import { OffersDueControl } from "../offers-due";
 import { ShareControl, type ShareRow } from "./share-control";
-import { parseStageHistory } from "@/lib/stages";
+import { normalizeStage, parseStageHistory } from "@/lib/stages";
 import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps, internalCompCandidates, type CompKeyRow, type InternalComp } from "@/lib/internal-comps";
 import {
@@ -1951,6 +1952,13 @@ export default async function DealPage({
         screenDiff={screenDiff}
         stageHistory={stageHistory}
         dealStage={((deal as { stage?: string }).stage as string) ?? "screening"}
+        // The due-diligence checklist, once the deal is under LOI or
+        // contract (research pass 24, B16) — never on the sample.
+        ddChecklist={
+          !isSampleDeal && ["loi_submitted", "under_contract"].includes(normalizeStage((deal as { stage?: string }).stage ?? null))
+            ? ddChecklist(deal.asset_class as string | null, extraction)
+            : null
+        }
         internalComps={internalComps}
         internalCompsUnread={internalCompsUnread}
         omUrl={omUrl}

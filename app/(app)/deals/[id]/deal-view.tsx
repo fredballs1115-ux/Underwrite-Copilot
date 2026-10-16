@@ -360,6 +360,7 @@ export function DealView({
   screenDiff,
   stageHistory,
   dealStage = null,
+  ddChecklist = null,
   internalComps = [],
   internalCompsUnread = false,
   omUrl,
@@ -455,6 +456,9 @@ export function DealView({
   /** the deal's stage, for what became of it once Dead or Closed (lib/
    *  deal-outcome, research pass 24 B4) */
   dealStage?: string | null;
+  /** the due-diligence checklist the tasks card offers (lib/dd-checklist,
+   *  research pass 24 B16): only once the deal is under LOI or contract */
+  ddChecklist?: string[] | null;
   internalComps?: InternalComp[];
   /** the read of the reader's other screens failed (audit C5, LOW-5) */
   internalCompsUnread?: boolean;
@@ -988,6 +992,7 @@ export function DealView({
                 assignees={taskAssignees}
                 todayIso={todayIso}
                 verdictSteps={results.verdict?.nextSteps}
+                ddChecklist={ddChecklist}
               />
             )}
             <AskPanel

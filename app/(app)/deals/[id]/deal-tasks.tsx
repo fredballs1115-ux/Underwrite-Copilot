@@ -18,7 +18,9 @@ import {
   toggleDealTask,
   deleteDealTask,
   importVerdictTasks,
+  importDdChecklist,
 } from "./task-actions";
+import { unaddedChecklist } from "@/lib/dd-checklist";
 
 function AddButton() {
   const { pending } = useFormStatus();
@@ -87,6 +89,7 @@ export function DealTasks({
   assignees,
   todayIso,
   verdictSteps,
+  ddChecklist = null,
 }: {
   dealId: string;
   tasks: DealTask[];
@@ -97,6 +100,10 @@ export function DealTasks({
   todayIso: string;
   /** the verdict's raw nextSteps (unknown shape — normalized here) */
   verdictSteps?: unknown;
+  /** the due-diligence checklist for the deal (lib/dd-checklist, research
+   *  pass 24 B16), offered once the deal is under LOI or contract; null
+   *  where it is not offered */
+  ddChecklist?: string[] | null;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const sorted = sortDealTasks(tasks);
@@ -108,6 +115,8 @@ export function DealTasks({
   // NEW steps after a re-screen; it never vanishes forever after one import).
   const anyImported = tasks.some((t) => t.source === "verdict");
   const freshSteps = unimportedVerdictSteps(verdictSteps, tasks);
+  // The checklist's items not yet tasks — the action's own rule.
+  const freshChecklist = ddChecklist ? unaddedChecklist(ddChecklist, tasks) : [];
 
   return (
     // `id="tasks"`: "My tasks" (app/(app)/tasks) links each task here.
@@ -130,6 +139,22 @@ export function DealTasks({
           </span>
         )}
       </div>
+
+      {freshChecklist.length > 0 && (
+        <form action={importDdChecklist} className="mt-3" data-qa="dd-checklist">
+          <input type="hidden" name="dealId" value={dealId} />
+          <ImportButton
+            label={
+              freshChecklist.length === ddChecklist!.length
+                ? `Add the due-diligence checklist (${freshChecklist.length} items)`
+                : `Add the checklist's ${freshChecklist.length} remaining item${freshChecklist.length === 1 ? "" : "s"}`
+            }
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            {`Title, zoning, the reports and the leases for this kind of deal, undated: set each one's day from the contract.`}
+          </p>
+        </form>
+      )}
 
       {freshSteps.length > 0 && (
         <form action={importVerdictTasks} className="mt-3">
