@@ -216,8 +216,10 @@ function Byline({ h, now }: { h: RankedHeadline; now: number }) {
   );
 }
 
-/** The publisher's picture for a story, decorative beside its headline. */
-function Picture({ src, className }: { src: string; className: string }) {
+/** The publisher's picture for a story, decorative beside its headline.
+ *  Exported for the pipeline's news strip, which draws its headlines the
+ *  way this page does. */
+export function Picture({ src, className }: { src: string; className: string }) {
   return (
     <div className={`overflow-hidden rounded-sm bg-faint ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element -- the publisher's

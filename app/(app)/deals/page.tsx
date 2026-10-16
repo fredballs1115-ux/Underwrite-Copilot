@@ -10,7 +10,9 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueUpgrade } from "@/lib/offering";
 import { WhatsNewCard } from "./whats-new";
-import { NewsStrip, type NewsStripItem } from "./news-strip";
+import { NewsStrip } from "./news-strip";
+import { fetchLiveHeadlines } from "@/lib/news/live";
+import type { RankedHeadline } from "@/lib/news/feeds";
 import { BrokerageFilter, type BrokerageOption } from "./brokerage-filter";
 import { brokerageOptions, dealFirms } from "@/lib/brokerage";
 import { PRIOR_PRICE_COLUMNS, priorScreenOfColumns, type PriorPriceColumns } from "@/lib/price-change";
@@ -397,24 +399,17 @@ export default async function DealsPage({
   );
 }
 
-/** Compact stories strip under the pipeline: the newest headlines the
- *  weekday sweep scored 5 or more, each linking to its source and dated. The
- *  sweep's table is shared by every account and carries no market, so the
- *  strip is titled for what it is (`NewsStrip`). Renders nothing at all
- *  until the intel cron has stories — no filler card. */
+/** The live headlines under the pipeline (signed-in gaps, H6): the
+ *  publishers' own feeds, read through the News page's live layer
+ *  (lib/news/live — one copy a process, shared with that page), drawn with
+ *  their pictures, publishers and days (`NewsStrip`). Renders nothing at
+ *  all until a publisher has answered — no filler card. */
 async function TodaysNews() {
-  let items: NewsStripItem[] = [];
+  let headlines: RankedHeadline[] = [];
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase
-      .from("market_intel_items")
-      .select("url, title, source, relevance, published_at")
-      .gte("relevance", 5)
-      .order("created_at", { ascending: false })
-      .limit(4);
-    items = (data as NewsStripItem[] | null) ?? [];
-  } catch {
-    // table absent — no card
+    headlines = (await fetchLiveHeadlines()).headlines;
+  } catch (e) {
+    console.error("[pipeline] live headlines read failed:", e);
   }
-  return <NewsStrip items={items} />;
+  return <NewsStrip headlines={headlines} />;
 }
