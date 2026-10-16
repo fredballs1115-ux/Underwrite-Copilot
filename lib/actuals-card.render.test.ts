@@ -155,6 +155,22 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
     expect(text).toMatch(/as of Jun 30, 2026/);
   });
 
+  // Audit C8, L2: the card left a T-12 with no stated period undated, where
+  // the report says "period not stated", and wrote the roll's dates by hand.
+  it("dates each document in the report's own words, an undated one said as undated", () => {
+    const text = visibleText(
+      render({
+        rentRoll: { asOf: null, summary: { ...SAMPLE_DEAL.rentRoll.summary, asOfUsed: undefined } },
+        t12: { periodEnd: null, summary: T12 },
+        noiComparison: null,
+        assetClass: "multifamily",
+      }),
+    );
+    expect(text).toContain("period not stated");
+    expect(text).toContain("no stated as-of");
+    expect(gluedWords(text)).toEqual([]);
+  });
+
   it("an older comparison without a basis still reads 'OM assumed NOI'", () => {
     const html = render({
       rentRoll: null,

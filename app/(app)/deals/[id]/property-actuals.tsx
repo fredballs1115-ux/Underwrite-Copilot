@@ -4,7 +4,9 @@ import {
   OM_NOI_LABEL,
   actualsUsd,
   avgRentOf,
+  rentRollDateWords,
   statedDay,
+  t12DateWords,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
 
@@ -26,8 +28,6 @@ const pct = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;
 const num = (n: number | null | undefined, digits = 1): string =>
   n == null || !Number.isFinite(n) ? "—" : n.toFixed(digits);
-
-const day = statedDay;
 
 /** The card's data: lib/actuals/actuals-read's `readActuals`, the note and
  *  the class optional for a caller that builds it by hand. */
@@ -114,15 +114,11 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
                 Rent roll
               </h3>
-              {rentRoll?.asOf ? (
-                <span className="text-[11px] text-muted">as of {day(rentRoll.asOf)}</span>
-              ) : rr.asOfUsed ? (
-                // The roll stated no as-of date — WALT/expiry were measured
-                // from the screen date, and that basis must be visible.
-                <span className="text-[11px] text-muted">
-                  no stated as-of — measured at screen date {day(rr.asOfUsed)}
-                </span>
-              ) : null}
+              {/* The report's and the memo's own words (lib/actuals
+                  `rentRollDateWords`): a roll that stated no as-of says the
+                  screen date it was measured from, or that it is undated —
+                  never undated silently (audit C8, L2). */}
+              <span className="text-[11px] text-muted">{rentRollDateWords(rentRoll)}</span>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <Stat k="Occupancy" v={pct(rr.sfWeightedOccupancy)} />
@@ -162,9 +158,9 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
                 T-12 actual operating statement
               </h3>
-              {t12?.periodEnd && (
-                <span className="text-[11px] text-muted">TTM to {day(t12.periodEnd)}</span>
-              )}
+              {/* "period not stated" where the T-12 states none, as the
+                  report says it (lib/actuals `t12DateWords`). */}
+              <span className="text-[11px] text-muted">{t12DateWords(t12)}</span>
             </div>
             <table className="mt-3 w-full text-sm">
               <tbody>
