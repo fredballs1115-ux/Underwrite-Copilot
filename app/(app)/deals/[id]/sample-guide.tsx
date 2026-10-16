@@ -46,8 +46,12 @@ export function SampleGuide({ onNavigate }: { onNavigate?: (key: string) => void
         <h2 className="text-sm font-semibold tracking-tight">
           How to read this screen
         </h2>
+        {/* The building is invented, so it has no photograph: the header
+            leads with the one its market is known by, captioned "Market
+            photo" — said here, so a first reader does not take the skyline
+            for the building or a missing photograph for a broken one. */}
         <p className="text-xs text-ink/75">
-          An invented deal on real Brewerytown rules and records.
+          An invented building on real Brewerytown rules and records; the photo is its market’s.
         </p>
       </div>
       <ol className="mt-3 grid gap-2 sm:grid-cols-3">
