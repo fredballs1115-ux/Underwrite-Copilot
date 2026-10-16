@@ -2,7 +2,6 @@ import type { NoiComparison } from "@/lib/actuals/types";
 import { rentQuotedMonthly } from "@/lib/asset-words";
 import {
   OM_NOI_LABEL,
-  SEVERITY_WORD,
   actualsUsd,
   avgRentOf,
   statedDay,
@@ -17,9 +16,9 @@ const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
   // A 5% tint, since the chip sits on the faint comparison box: at 10%
   // the 10px label read 4.37:1 (pass) and 4.39:1 (caution), at 5% 4.67:1
   // and 4.69:1. Kill reads 4.85:1 at 10% and keeps it.
-  in_line: { label: SEVERITY_WORD.in_line, cls: "bg-pass/5 text-pass" },
-  material: { label: SEVERITY_WORD.material, cls: "bg-caution/5 text-caution" },
-  red_flag: { label: SEVERITY_WORD.red_flag, cls: "bg-kill/10 text-kill" },
+  in_line: { label: "In line", cls: "bg-pass/5 text-pass" },
+  material: { label: "Material", cls: "bg-caution/5 text-caution" },
+  red_flag: { label: "Red flag", cls: "bg-kill/10 text-kill" },
 };
 
 const usd = actualsUsd;
