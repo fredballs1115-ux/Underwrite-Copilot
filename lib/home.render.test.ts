@@ -364,6 +364,17 @@ describe("the screen-run trace credits each stage with what it writes", () => {
     expect(l.challenge).toContain("each with a question for the broker");
   });
 
+  // Audit C7, L5: the signal's line printed the extraction's figures, and
+  // the sample has no first signal; the challenger's line claimed a stress
+  // test that on the sample is the first-draft model's run.
+  it("credits no stage with output it did not write on the sample", () => {
+    const l = lines();
+    expect((SAMPLE_DEAL as { first_signal?: unknown }).first_signal ?? null).toBeNull();
+    expect(l.signal).toBe("reads the headline figures first: the price, the size and the cap");
+    expect(l.signal).not.toMatch(/\$|\d/);
+    expect(l.challenge).not.toMatch(/stress test/);
+  });
+
   it("speaks the product's own words for a lever, a comp's rating and a market read", () => {
     for (const [k, word] of Object.entries(STRIP_WORDS.lever)) expect(word).toBe(LEVER_META[k as keyof typeof LEVER_META].label.toLowerCase());
     for (const [k, word] of Object.entries(STRIP_WORDS.comp)) expect(word).toBe(COMP_RATING[k as keyof typeof COMP_RATING].label.toLowerCase());

@@ -35,7 +35,9 @@ function tally<K extends string>(items: K[], order: [K, string][]): string {
 }
 
 /** The trace's lines, one a stage, each crediting the stage with what IT
- *  writes on the sample: the signal its headline figures, the extraction
+ *  writes on the sample: the signal what a signal reads (the sample has no
+ *  first signal, so none of its figures is credited to one — audit C7,
+ *  L5), the extraction
  *  its cited figures, the challenger its challenges and their questions for
  *  the broker, the comp scrutiny its ratings, the market check its reads
  *  against rules of thumb, and the verdict its ranges and the three
@@ -43,14 +45,6 @@ function tally<K extends string>(items: K[], order: [K, string][]): string {
  *  credited to the challenger). */
 export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
   const ex = SAMPLE_DEAL.extraction;
-  const stated = (label: string) => ex.metrics.find((m) => m.label === label)?.value ?? "";
-  const headline = [
-    stated("Asking price"),
-    stated("Units") && `${stated("Units")} units`,
-    stated("Going-in cap") && `${stated("Going-in cap")} cap`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
   const cited = ex.metrics.filter((m) => m.page).length;
   const flagged = ex.metrics.filter((m) => m.flagged).length;
   const challenges = SAMPLE_DEAL.challenges.challenges;
@@ -84,14 +78,16 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
     [["aggressive", STRIP_WORDS.market.aggressive], ["conservative", STRIP_WORDS.market.conservative], ["in-line", STRIP_WORDS.market["in-line"]]],
   );
   return [
-    ["signal", `the headline figures first: ${headline}`],
+    // What a signal reads (lib/anthropic/types `FirstSignal`); the sample's
+    // own run has none.
+    ["signal", "reads the headline figures first: the price, the size and the cap"],
     [
       "extract",
       `${plural(ex.metrics.length, "figure")} pulled, ${cited === ex.metrics.length ? "each" : cited} with its OM page · ${flagged} flagged to verify`,
     ],
     [
       "challenge",
-      `${plural(challenges.length, "assumption")} challenged (${severities}), ${asked === challenges.length ? "each" : asked} with a question for the broker${SAMPLE_DEAL.challenges.stressTest ? " · a stress test" : ""}`,
+      `${plural(challenges.length, "assumption")} challenged (${severities}), ${asked === challenges.length ? "each" : asked} with a question for the broker`,
     ],
     ["comps", `${plural(comps.length, "broker comp")} rated: ${ratings}${flags ? ` · ${plural(flags, "selection flag")}` : ""}`],
     ["market", `${plural(checks.length, "assumption")} read against rules of thumb: ${reads}`],
