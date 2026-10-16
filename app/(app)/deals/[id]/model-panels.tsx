@@ -2,9 +2,9 @@
 
 // The first-draft model card's views — the sensitivity grid, the stress
 // test, the conflicts, the assumptions, the capital plan and the cash flow —
-// moved out of model-view.tsx so a page that draws them on the sample (/demo's
-// slideshow) loads none of the card's server actions. model-view.tsx
-// re-exports every one and stacks them as before.
+// moved out of model-view.tsx so a page that draws them on the sample (/demo
+// and the homepage, through model-body's `ModelBody`) loads none of the
+// card's server actions. model-view.tsx re-exports every one.
 import { useMemo, useState } from "react";
 import { ScrollRegion } from "@/app/scroll-region";
 import type { UnderwritingModel, ReconciledMetric } from "@/lib/model/types";
@@ -516,15 +516,8 @@ export function CapexPanel({ model }: { model: UnderwritingModel }) {
   );
 }
 
-export function CashFlow({
-  cashFlow,
-  defaultOpen = false,
-}: {
-  cashFlow: CashFlowYear[];
-  /** the demo slideshow shows the table straight away */
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
+export function CashFlow({ cashFlow }: { cashFlow: CashFlowYear[] }) {
+  const [open, setOpen] = useState(false);
   if (cashFlow.length === 0) return null;
   // The plan's spend gets its own line only when there is one — models
   // stored before the plan existed carry no capitalSpend and read as before.

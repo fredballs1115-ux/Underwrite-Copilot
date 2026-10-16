@@ -9,6 +9,7 @@ import { TermsView } from "../(app)/deals/[id]/deal-sections-view";
 import { PropertyActuals, type ActualsData } from "../(app)/deals/[id]/property-actuals";
 import type { BuyBoxPanelData } from "../(app)/deals/[id]/buy-box-panel";
 import { SampleBuyBox } from "../sample-buy-box";
+import { SampleModelCard } from "../sample-model-card";
 import { SensitivityPlayground, type PlaygroundData } from "../(app)/deals/[id]/sensitivity-playground";
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import { ModelVsMarketCard } from "../(app)/deals/[id]/model-vs-market-card";
@@ -30,7 +31,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
-import { ModelSlideshow } from "./model-slideshow";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { BrokerQuestions } from "./broker-questions";
 
 /** The sample deal as the signed-in sample deal's page hands it to its
@@ -44,6 +45,9 @@ export interface DemoData {
   market: MarketResult;
   verdict: VerdictResult;
   model: UnderwritingModel;
+  /** what the price buys, read against the model's returns as the deal
+   *  page reads it (lib/compare-interest `modelReturnsRead`) */
+  modelInterest: ModelReturnsRead | null;
   /** the rent roll and the T-12, the Overview's actuals card */
   actuals: ActualsData;
   /** the buy box tab, against the public sample's box */
@@ -264,18 +268,8 @@ export function DemoSections({
             />
             <ModelVsMarketCard read={data.modelVsMarket} />
             {/* The deal page's first-draft model card, open as it opens
-                with a model: its views one at a time, then its workbook. */}
-            <details className="rounded-2xl border border-line bg-surface shadow-card" open>
-              <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold tracking-tight [&::-webkit-details-marker]:hidden">
-                <span className="flex items-center justify-between gap-2">
-                  First-draft model — ready
-                  <span className="text-xs font-normal text-muted">the Excel workbook</span>
-                </span>
-              </summary>
-              <div className="border-t border-line p-5">
-                <ModelSlideshow model={data.model} />
-              </div>
-            </details>
+                with a model, its body the card's own (model-body). */}
+            <SampleModelCard model={data.model} interest={data.modelInterest} />
           </div>
         )}
 

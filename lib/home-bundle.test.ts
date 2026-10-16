@@ -108,7 +108,7 @@ describe("the homepage's walkthrough", () => {
 });
 
 // /demo draws the deal page's own parts on the sample (app/demo/sections.tsx:
-// the Overview, the terms, the debt sizer, the model card's views, the buy
+// the Overview, the terms, the debt sizer, the model card's body, the buy
 // box) and, past them, the walkthrough's panel. It had read them from
 // deal-sections.tsx, deal-view.tsx and model-view.tsx, which brought it the
 // comps map's Leaflet stylesheet and seven server-action modules, though it
@@ -125,6 +125,7 @@ describe("/demo", () => {
       "app/(app)/deals/[id]/deal-sections-base.tsx",
       "app/(app)/deals/[id]/deal-sections-view.tsx",
       "app/(app)/deals/[id]/buy-box-panel.tsx",
+      "app/(app)/deals/[id]/model-body.tsx",
       "app/(app)/deals/[id]/model-panels.tsx",
       "app/(app)/deals/[id]/returns-headline.tsx",
     ]) {

@@ -45,6 +45,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 
 import { PhotoFlip, Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
+import { DownloadRow, ModelBody } from "@/app/(app)/deals/[id]/model-body";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import { CompareTable, MODEL_ROWS_NOTE, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
@@ -1360,22 +1361,37 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(gluedWords(text)).toEqual([]);
     });
 
-    it("draws the Financials tab's terms, debt and first-draft model card, with the model's two-model sentence", () => {
+    it("draws the Financials tab's terms, debt and first-draft model card, the card's own body stacked as the deal page stacks it", () => {
       const html = section("financials");
       const text = visibleText(html);
       expect(text).toContain("First-draft model — ready");
-      expect(text).toContain("Projected returns · first-draft model");
-      // The slides run in the deal page's card's order.
-      const order = ["Returns", "Stress test", "Sensitivity", "Conflicts", "Assumptions", "CapEx", "Cash flow"].map((l) =>
-        html.indexOf(`>${l}</button>`),
+      // The card's body is the deal page's (model-body), markup for markup:
+      // the banner, the returns, the stress test, the grid, the conflicts,
+      // the assumptions, the capital plan, the cash flow, the caveats, the
+      // workbook and its two-model sentence — stacked, never a carousel.
+      expect(html).toContain(
+        renderToStaticMarkup(
+          React.createElement(ModelBody, {
+            model: data.model,
+            documents: [],
+            compare: false,
+            interest: data.modelInterest,
+            download: React.createElement(DownloadRow, { href: "/api/demo/underwrite.xlsx" }),
+          }),
+        ),
       );
-      expect(order.every((i) => i > 0)).toBe(true);
-      expect([...order].sort((a, b) => a - b)).toEqual(order);
-      expect(html).toContain('data-qa="demo-two-models"');
+      expect(text).toContain("First-draft model — verify before relying on it");
+      expect(text).toContain("Projected returns · first-draft model");
+      expect(text).toContain("Add more to the model");
+      expect(html).not.toContain('aria-label="Model views"');
+      expect(html).toContain('data-qa="workbook-note"');
       expect(text).toContain(
         "The workbook is a separate model, built from the memorandum’s terms — its returns can differ from the ones above. The Overview’s sensitivity playground runs the workbook’s model, not this one.",
       );
-      expect(html).toContain('href="/api/demo/underwrite.xlsx"');
+      expect(html).toMatch(/<a href="\/api\/demo\/underwrite\.xlsx"[^>]*>[\s\S]*?Download the OM underwrite model \(\.xlsx\)<\/a>/);
+      // Nothing that needs an account: no document form, no regenerate.
+      expect(html).not.toContain("<form");
+      expect(text).not.toContain("or regenerate");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(text)).toEqual([]);
     });

@@ -187,15 +187,13 @@ describe("focus never drops to the page, and a status is said (research pass 33,
 
 describe("tabs that are tabs, and states said in words (research pass 33, items 14 and 25)", () => {
   const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
-  it("gives the Analyses tabs and the demo's model views arrow keys, one tab stop and a panel each", () => {
+  it("gives the Analyses tabs arrow keys, one tab stop and a panel each", () => {
     const view = src("app/(app)/deals/[id]/deal-view.tsx");
     expect(view).toMatch(/aria-label="Analyses"\s*onKeyDown=/);
     expect(view).toMatch(/id=\{`analysis-tab-\$\{a\.key\}`\}[\s\S]{0,200}aria-controls="analysis-tabpanel"\s*tabIndex=\{on \? 0 : -1\}/);
     expect(view).toMatch(/id="analysis-tabpanel"\s*role="tabpanel"\s*aria-labelledby=\{`analysis-tab-\$\{analysis\}`\}/);
-    const demo = src("app/demo/model-slideshow.tsx");
-    expect(demo).toMatch(/aria-label="Model views"\s*onKeyDown=/);
-    expect(demo).toMatch(/tabIndex=\{i === index \? 0 : -1\}/);
-    expect(demo).toMatch(/role="tabpanel"\s*aria-labelledby=\{`model-tab-\$\{s\.key\}`\}/);
+    // /demo's model views were a carousel of tabs of their own; it draws
+    // the deal page's card, its views stacked, now (app/sample-model-card).
   });
 
   it("says what a badge counts, a section that is running, and whether a list or the new-deal form is open", () => {

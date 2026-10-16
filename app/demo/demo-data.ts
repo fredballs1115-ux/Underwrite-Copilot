@@ -103,6 +103,13 @@ export function sampleDemoData({
     market: SAMPLE_DEAL.market,
     verdict: SAMPLE_DEAL.verdict,
     model: SAMPLE_DEAL.model,
+    // The model card's read of what the price buys, as the deal page hands
+    // it to its card (page.tsx `modelInterest`).
+    modelInterest: modelReturnsRead(
+      ex,
+      { ...SAMPLE_DEAL.model.returns, holdYears: SAMPLE_DEAL.model.holdYears },
+      noon,
+    ),
     actuals: {
       rentRoll: { asOf: SAMPLE_DEAL.rentRoll.as_of_date, summary: SAMPLE_DEAL.rentRoll.summary },
       t12: { periodEnd: SAMPLE_DEAL.t12.period_end_date, summary: SAMPLE_DEAL.t12.summary },
