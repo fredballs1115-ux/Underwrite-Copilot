@@ -35,7 +35,17 @@ function asWritten(stated: string): ReactNode {
  * leads, as written, time of day and all; the day itself is the deadline
  * the header counts down to and puts in a calendar.
  */
-export function ListingTeam({ team, offersDue }: { team: ListingBroker[]; offersDue: OffersDueRead | null }) {
+export function ListingTeam({
+  team,
+  offersDue,
+  actions = null,
+}: {
+  team: ListingBroker[];
+  offersDue: OffersDueRead | null;
+  /** what the reader can send the team from here — the questions and the
+   *  document request (research pass 24, B15), drawn by the page */
+  actions?: ReactNode;
+}) {
   if (!team.length && !offersDue) return null;
   const firms: string[] = [];
   for (const b of team) if (b.firm && !firms.some((f) => f.toLowerCase() === b.firm.toLowerCase())) firms.push(b.firm);
@@ -103,6 +113,7 @@ export function ListingTeam({ team, offersDue }: { team: ListingBroker[]; offers
           ))}
         </ul>
       )}
+      {actions}
     </section>
   );
 }

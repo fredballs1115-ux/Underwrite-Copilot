@@ -1,0 +1,73 @@
+"use client";
+
+import { useState } from "react";
+import type { Challenge } from "@/lib/anthropic/types";
+import { documentRequestEmail, mailtoHref, splitEmail } from "@/lib/broker-mail";
+import { buildBrokerEmail } from "./deal-sections";
+
+/** One email: opened in the reader's mail program, addressed and filled,
+ *  where the link fits; copied, subject and all, where it would not. */
+function EmailAction({ label, to, subject, body }: { label: string; to: string[]; subject: string; body: string }) {
+  const [copied, setCopied] = useState<"yes" | "no" | null>(null);
+  const href = mailtoHref(to, subject, body);
+  const cls =
+    "inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-brand transition-colors hover:border-brand/50";
+  if (href) {
+    return (
+      <a href={href} className={cls}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="m3 7 9 6 9-6" />
+        </svg>
+        {label}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className={cls}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+          setCopied("yes");
+        } catch {
+          setCopied("no");
+        }
+      }}
+    >
+      {copied === "yes" ? "Copied — paste it into your email" : copied === "no" ? "Couldn't copy — try again" : `${label} (copy)`}
+    </button>
+  );
+}
+
+/**
+ * Writing to the listing team from the offering card (research pass 24,
+ * B15): the challenger's questions as the broker email the Challenge tab
+ * copies, and a request for the documents the deal does not hold yet — each
+ * addressed to the brokers whose address the memorandum prints whole
+ * (lib/broker-mail). Nothing renders where there is no one to write to.
+ */
+export function BrokerEmailActions({
+  to,
+  dealName,
+  challenges,
+  totalPages,
+  have,
+}: {
+  to: string[];
+  dealName: string;
+  challenges: Challenge[];
+  totalPages: number | null;
+  have: { rentRoll: boolean; t12: boolean };
+}) {
+  if (!to.length) return null;
+  const questions = challenges.some((c) => c.question) ? splitEmail(buildBrokerEmail(challenges, dealName, totalPages)) : null;
+  const docs = documentRequestEmail(dealName, have);
+  return (
+    <div className="mt-3 flex flex-wrap gap-2" data-qa="broker-email-actions">
+      {questions && <EmailAction label="Email the questions" to={to} subject={questions.subject} body={questions.body} />}
+      {docs.asked.length > 0 && <EmailAction label="Request documents" to={to} subject={docs.subject} body={docs.body} />}
+    </div>
+  );
+}

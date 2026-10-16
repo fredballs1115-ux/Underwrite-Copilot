@@ -55,6 +55,7 @@ import { ValueAddPanel } from "@/app/value-add-panel";
 import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
 import { SiteReportsPanel } from "@/app/site-reports-panel";
 import { ListingTeam } from "./listing-team";
+import { BrokerEmailActions } from "./broker-email-actions";
 import { listingTeamOf, offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
@@ -1847,7 +1848,24 @@ export default async function DealPage({
         {/* Who is selling it and when offers are due (#467): the brokers as
             the memorandum prints them, a tap to call or write, and the call
             for offers as written (lib/offering). */}
-        <ListingTeam team={listingTeam} offersDue={offeringDue} />
+        <ListingTeam
+          team={listingTeam}
+          offersDue={offeringDue}
+          // Writing to the brokers the memorandum names (research pass 24,
+          // B15): the questions and the documents the deal does not hold —
+          // never on the sample, whose brokers are the walkthrough's.
+          actions={
+            isSampleDeal ? null : (
+              <BrokerEmailActions
+                to={listingTeam.map((b) => b.email).filter((e): e is string => !!e)}
+                dealName={deal.name}
+                challenges={challenges?.challenges ?? []}
+                totalPages={typeof extraction?.totalPages === "number" ? extraction.totalPages : null}
+                have={{ rentRoll: !!actuals.rentRoll, t12: !!actuals.t12 }}
+              />
+            )
+          }
+        />
         <PlanSensitivity plan={plan} refCap={refCap} />
 
         {!extraction && firstSignal?.take && (
