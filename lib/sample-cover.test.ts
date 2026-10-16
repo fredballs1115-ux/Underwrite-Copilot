@@ -48,6 +48,17 @@ vi.mock("@/lib/model-vs-market", async (importOriginal) => {
   };
 });
 
+// The workbook's builder, captured: what the public route hands it is
+// compared with what the signed-in route hands it.
+const workbookArgs: { value: unknown[] | null } = { value: null };
+vi.mock("@/lib/underwrite/workbook", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/underwrite/workbook")>()),
+  buildUnderwriteWorkbook: async (...args: unknown[]) => {
+    workbookArgs.value = args;
+    return Buffer.from("xlsx");
+  },
+}));
+
 const png = (bytes: Buffer) => new Response(new Uint8Array(bytes), { headers: { "content-type": "image/png" } });
 
 beforeEach(() => {
@@ -60,6 +71,7 @@ beforeEach(() => {
   modelVsMarketFor.mockReset();
   captured.memo = null;
   captured.report = null;
+  workbookArgs.value = null;
 });
 
 async function downloadBoth() {
@@ -190,5 +202,73 @@ describe("the sample's public documents are the signed-in sample's", () => {
     expect(report.status).toBe(200);
     expect(captured.report?.modelVsMarket ?? null).toBeNull();
     expect(captured.report?.sensitivity).toBeTruthy();
+  });
+});
+
+// The public workbook (linked from the homepage's "Underwrite model") is the
+// one a signed-in reader downloads for the sample (audit C7, M2): it had been
+// `buildUnderwriteWorkbook(derived)` alone, with no OM Facts tab, no Market
+// Read, no findings and no read of what the price buys.
+describe("the sample's public workbook is the signed-in sample's", () => {
+  /** A call's arguments, split at its top-level commas (they nest calls). */
+  const callArgs = (rel: string, fn: string): string[] => {
+    const src = readFileSync(join(process.cwd(), rel), "utf8");
+    const at = src.indexOf(`${fn}(`);
+    if (at < 0) throw new Error(`${rel} makes no ${fn}(…) call`);
+    const args: string[] = [];
+    let depth = 0;
+    let cur = "";
+    for (let i = at + fn.length + 1; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === "(") depth++;
+      if (ch === ")") {
+        if (depth === 0) break;
+        depth--;
+      }
+      if (ch === "," && depth === 0) {
+        args.push(cur.trim());
+        cur = "";
+      } else cur += ch;
+    }
+    if (cur.trim()) args.push(cur.trim());
+    return args;
+  };
+
+  it("hands the builder every argument the signed-in route hands it, in its order", () => {
+    const signedIn = callArgs("app/api/deals/[id]/underwrite.xlsx/route.ts", "buildUnderwriteWorkbook");
+    expect(signedIn).toContain("readOmFacts(extraction)");
+    expect(callArgs("app/api/demo/underwrite.xlsx/route.ts", "buildUnderwriteWorkbook")).toEqual(signedIn);
+  });
+
+  it("builds with the sample's OM Facts, its findings and its day, the model's figures unmoved", async () => {
+    const { readOmFacts } = await import("@/lib/underwrite/om-facts");
+    const { SAMPLE_DEAL } = await import("@/lib/sample-deal");
+    const { sampleDerivedInputs } = await import("@/lib/sample-derive");
+    const route = await import("@/app/api/demo/underwrite.xlsx/route");
+    const res = await route.GET();
+    expect(res.status).toBe(200);
+    const args = workbookArgs.value!;
+    expect(args).toHaveLength(9);
+    const [model, branding, marketRead, , asOf, findings, interest, , omFacts] = args as [
+      { inputs: unknown },
+      unknown,
+      unknown,
+      unknown,
+      Date,
+      unknown[],
+      unknown,
+      unknown,
+      unknown,
+    ];
+    const facts = readOmFacts(SAMPLE_DEAL.extraction as never);
+    expect(facts).not.toBeNull();
+    expect(omFacts).toEqual(facts);
+    expect(model.inputs).toEqual(sampleDerivedInputs().inputs);
+    expect(branding).toBeNull();
+    // the live read fails in a test: the tab is left out, the workbook served
+    expect(marketRead).toBeNull();
+    expect(asOf.toISOString()).toMatch(/T12:00:00\.000Z$/);
+    expect(Array.isArray(findings)).toBe(true);
+    expect(interest).toBeTruthy();
   });
 });

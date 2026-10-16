@@ -7,7 +7,7 @@
 // sensitivity page that cleared the hurdle) while the page beside it ran the
 // actuals (5.45%, 9.3%, and did not). Pure: no I/O.
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { deriveUnderwriteInputs, type DealForModel } from "@/lib/underwrite/inputs";
 import { buildSensitivityGrids, type SensCell } from "@/lib/underwrite/sensitivity";
 import { runScenario } from "@/lib/underwrite/playground";
 
@@ -23,9 +23,13 @@ export const SAMPLE_ACTUALS = {
   },
 } as const;
 
-/** The sample deal's derived model inputs, actuals included. */
-export function sampleDerivedInputs() {
-  return deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS);
+/** The sample deal's derived model inputs, actuals included. `deal` is what
+ *  a document is told beside the extraction (the rent rules, the day its
+ *  dated readers read on), as the signed-in sample's workbook route tells
+ *  its derivation: it reaches the cover's lines (`meta`) and never a figure
+ *  the model runs on. */
+export function sampleDerivedInputs(deal?: DealForModel) {
+  return deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS, undefined, deal);
 }
 
 /**

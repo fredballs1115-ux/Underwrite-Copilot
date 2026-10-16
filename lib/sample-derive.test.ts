@@ -31,9 +31,16 @@ describe("sampleDerivedInputs — the sample deal, actuals included", () => {
     const root = process.cwd();
     for (const rel of ["app/demo/demo-data.ts", "app/api/demo/underwrite.xlsx/route.ts", "app/api/demo/report/route.ts"]) {
       const src = readFileSync(join(root, rel), "utf8");
-      expect(src, rel).toContain("sampleDerivedInputs()");
+      // The workbook tells it the rent rules and the day, as the signed-in
+      // route tells its derivation (the cover's lines; no figure moves).
+      expect(src, rel).toMatch(/sampleDerivedInputs\((\{ regulation, asOf \})?\)/);
       expect(src, rel).not.toMatch(/deriveUnderwriteInputs\(/);
     }
+  });
+
+  it("what a document tells the derivation reaches its cover lines, never a figure", () => {
+    const told = sampleDerivedInputs({ regulation: null, asOf: new Date("2026-10-16T12:00:00Z") });
+    expect(told.inputs).toEqual(sampleDerivedInputs().inputs);
   });
 });
 
