@@ -49,6 +49,19 @@ describe("the request asks for what the class keeps", () => {
     expect(hotel.body).toContain("2. The STR reports for the last 12 months");
     // A T-12 already on the deal is not asked for again.
     expect(documentRequestEmail("The Inn", { t12: true }, "lodging").body).not.toContain("P&L");
+    // A short-term rental is filed with the hotels, but has no franchise,
+    // no PIP and no STR report (audit C9, L8): its bookings and permits.
+    expect(documentProfileOf("hospitality_str", "Short-term rental portfolio")).toBe("rental");
+    expect(documentProfileOf("hospitality_str", "Vacation rentals (Airbnb)")).toBe("rental");
+    expect(documentProfileOf("hospitality_str", "Boutique hotel")).toBe("lodging");
+    expect(documentProfileOf("hospitality_str", "Hotel")).toBe("lodging");
+    expect(documentProfileOf("hospitality_str", "Hospitality")).toBe("lodging");
+    const rental = documentRequestEmail("The Cottages", {}, "rental");
+    expect(rental.body).not.toMatch(/STR report|franchise|PIP|rent roll/);
+    expect(rental.body).toContain("1. The trailing-12-month P&L (T-12)");
+    expect(rental.body).toContain("The booking history for the last 12 months");
+    expect(rental.body).toContain("The short-term rental permits and the local rules they are held under");
+    expect(documentRequestEmail("The Cottages", { t12: true }, "rental").body).not.toContain("P&L");
     const land = documentRequestEmail("The Parcel", { rentRoll: false, t12: false }, "land");
     expect(land.body).not.toMatch(/rent roll|T-12/);
     expect(land.asked).toEqual([

@@ -30,8 +30,8 @@ export function stripHeadlines(headlines: readonly RankedHeadline[], n = STRIP_S
 
 /**
  * The newest live headlines under the pipeline, drawn as the News page's
- * live layer draws them (app/(app)/news/live-headlines.tsx): the
- * publisher's own picture, the headline as its link, and the publisher and
+ * live layer draws them (app/(app)/news/live-headlines.tsx): the picture
+ * the story's feed carries, the headline as its link, and the publisher and
  * the story's day under it. It had listed the weekday sweep's stories with
  * their relevance scores and a line saying whose buyer profile scored them
  * (a small East Coast 2–4 unit buyer, never the reader's box), which read as
@@ -97,7 +97,10 @@ export function NewsStrip({ headlines }: { headlines: readonly RankedHeadline[] 
           );
         })}
       </ul>
-      <p className="mt-3 text-[11px] text-muted">The publishers&apos; own words and pictures, nothing written here.</p>
+      {/* A picture is the one the story's feed carries: the publisher's, or
+          a search host's thumbnail of it (Bing News's `News:Image`), so the
+          line claims no more than that (audit C9, L8). */}
+      <p className="mt-3 text-[11px] text-muted">Headlines and pictures as the feeds carry them, nothing written here.</p>
     </section>
   );
 }

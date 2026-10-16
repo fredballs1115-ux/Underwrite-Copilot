@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileKindOf } from "./file-kind";
+import { FILE_KIND_WORDS, fileKindOf } from "./file-kind";
 
 describe("fileKindOf", () => {
   it("reads the kind off the file's own name first", () => {
@@ -17,5 +17,11 @@ describe("fileKindOf", () => {
     expect(fileKindOf("export", "text/csv; charset=utf-8")).toBe("sheet");
     expect(fileKindOf("upload.bin", "application/octet-stream")).toBe("other");
     expect(fileKindOf("README")).toBe("other");
+  });
+
+  it("calls a doc a document, since it is not always Word's", () => {
+    for (const name of ["a.docx", "a.odt", "a.rtf", "a.pages"]) expect(fileKindOf(name)).toBe("doc");
+    expect(FILE_KIND_WORDS.doc).toBe("Document");
+    expect(Object.values(FILE_KIND_WORDS).join(" ")).not.toMatch(/\bWord\b/);
   });
 });

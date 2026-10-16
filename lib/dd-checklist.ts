@@ -12,7 +12,9 @@
 //     arrive undated, never on a day nobody chose;
 //   - the class decides the tenancy item: tenant estoppels and SNDAs where
 //     the building leases to businesses, a lease audit where it leases
-//     homes, the PIP and the franchise on a hotel, the utilities on a park;
+//     homes, the PIP and the franchise on a hotel, the permits on a
+//     short-term rental (filed with the hotels, but with no brand), the
+//     utilities on a park;
 //     land has no building to inspect or contracts to assume;
 //   - what the price buys decides whose diligence it is (audit C8, M3): a
 //     fee simple, a leasehold or a tenancy in common takes title to the
@@ -31,6 +33,7 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey } from "@/lib/asset-words";
 import { interestOf, isDst, isGpStake, isTenancyInCommon } from "@/lib/interest";
 import { normalizeTaskTitle } from "@/lib/deal-tasks";
+import { isShortTermRental } from "@/lib/short-term-rental";
 
 const BASE = {
   title: "Title commitment and survey",
@@ -61,7 +64,14 @@ export function ddChecklist(storedClass: string | null | undefined, extraction: 
   items.push(BASE.phase1);
   if (BUSINESS_LEASES.has(cls)) items.push("Tenant estoppels and SNDAs");
   else if (assetWords(cls).residential) items.push("Lease audit: a sample of the leases against the rent roll");
-  if (cls === "hospitality_str") items.push("PIP and franchise: the brand's improvement plan and its approval of the sale");
+  // A short-term rental is filed with the hotels but has no brand: its
+  // diligence is its permits (lib/short-term-rental reads the deck's words).
+  if (cls === "hospitality_str")
+    items.push(
+      isShortTermRental(ex?.assetClass)
+        ? "Short-term rental permits: each one and the local rules it is held under"
+        : "PIP and franchise: the brand's improvement plan and its approval of the sale",
+    );
   if (cls === "manufactured_housing") items.push("Utilities: the water, sewer and electric systems, and who owns and bills them");
   if (kind === "leasehold") items.push("Ground lease: the lease, its amendments and the ground lessor's estoppel");
   if (kind === "partial_interest") {

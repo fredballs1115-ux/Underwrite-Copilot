@@ -32,6 +32,11 @@ describe("ddChecklist", () => {
 
   it("adds a hotel's PIP, a park's utilities and a leasehold's ground lease; land has no building to inspect", () => {
     expect(ddChecklist("hospitality_str", ex("hotel"))).toContain("PIP and franchise: the brand's improvement plan and its approval of the sale");
+    // A short-term rental is filed with the hotels but has no brand
+    // (audit C9, L8): its permits, never a PIP or a franchise.
+    const str = ddChecklist("hospitality_str", ex("Short-term rental portfolio"));
+    expect(str).toContain("Short-term rental permits: each one and the local rules it is held under");
+    expect(str.some((i) => /PIP|franchise/.test(i))).toBe(false);
     expect(ddChecklist("manufactured_housing", ex("manufactured housing"))).toContain(
       "Utilities: the water, sewer and electric systems, and who owns and bills them",
     );

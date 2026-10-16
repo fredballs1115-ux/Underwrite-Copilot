@@ -1,7 +1,8 @@
 // Writing to the listing team from the deal (research pass 24, B15): the
 // challenger's questions, and a request for the documents the deal does not
 // have yet, opened in the reader's own mail program addressed to the brokers
-// the memorandum names. Pure; no imports, so the client card reads it.
+// the memorandum names. Pure, importing only lib/short-term-rental (which
+// imports nothing), so the client card reads it.
 //
 // Its rules:
 //   - only the brokers whose address is one plain address are written to
@@ -15,7 +16,11 @@
 //     — it is asked for its P&L and its STR reports — and land has neither a
 //     rent roll nor a T-12 — it is asked for its survey, its title and its
 //     entitlements. The class is the caller's to read (`documentProfileOf`
-//     over lib/asset-words' class key), since this module imports nothing.
+//     over lib/asset-words' class key), since this module imports nothing
+//     of the class tables; a short-term rental, filed with the hotels, is
+//     told apart by the deck's own words for its class.
+
+import { isShortTermRental } from "./short-term-rental";
 
 /** The longest mailto: link the card builds. Mail programs and browsers cut
  *  long links at different lengths (some near 2,000 characters), so past
@@ -47,12 +52,15 @@ export function splitEmail(text: string): { subject: string; body: string } {
 }
 
 /** What a class keeps on file for a first screen to ask for. */
-export type DocumentProfile = "income" | "lodging" | "land";
+export type DocumentProfile = "income" | "lodging" | "rental" | "land";
 
 /** The profile a deal's class asks by, from its class key (lib/asset-words
- *  `dealClassKey`): a hotel's documents, land's, else an income property's. */
-export function documentProfileOf(classKey: string | null | undefined): DocumentProfile {
-  if (classKey === "hospitality_str") return "lodging";
+ *  `dealClassKey`): a hotel's documents, a short-term rental's (the deck's
+ *  own words for its class name one — lib/short-term-rental; it has no
+ *  franchise and no STR report, audit C9, L8), land's, else an income
+ *  property's. */
+export function documentProfileOf(classKey: string | null | undefined, classWords?: string | null): DocumentProfile {
+  if (classKey === "hospitality_str") return isShortTermRental(classWords) ? "rental" : "lodging";
   if (classKey === "land_infill") return "land";
   return "income";
 }
@@ -71,6 +79,13 @@ export const DOCUMENT_REQUESTS: Record<DocumentProfile, readonly { key: string; 
     { key: "t12", label: "the trailing-12-month P&L, by department (T-12)" },
     { key: "str", label: "the STR reports for the last 12 months" },
     { key: "franchise", label: "the franchise agreement and any property improvement plan (PIP)" },
+    CA,
+  ],
+  rental: [
+    { key: "t12", label: "the trailing-12-month P&L (T-12)" },
+    { key: "bookings", label: "the booking history for the last 12 months: nights booked and the nightly rate, by month" },
+    { key: "permits", label: "the short-term rental permits and the local rules they are held under" },
+    { key: "management", label: "the management agreement, if a manager runs the bookings" },
     CA,
   ],
   land: [

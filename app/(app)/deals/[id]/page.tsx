@@ -1869,7 +1869,7 @@ export default async function DealPage({
                 challenges={challenges?.challenges ?? []}
                 totalPages={typeof extraction?.totalPages === "number" ? extraction.totalPages : null}
                 have={{ rentRoll: !!actuals.rentRoll, t12: !!actuals.t12 }}
-                profile={documentProfileOf(compsClassKey)}
+                profile={documentProfileOf(compsClassKey, extraction?.assetClass)}
               />
             )
           }

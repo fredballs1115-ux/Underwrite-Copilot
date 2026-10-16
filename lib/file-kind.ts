@@ -48,12 +48,14 @@ export function fileKindOf(filename: string, contentType?: string | null): FileK
   return "other";
 }
 
-/** The kind said in words, for a screen reader and the icon's title. */
+/** The kind said in words, for a screen reader and the icon's title. A
+ *  "doc" is Word's, OpenDocument's, Pages' or rich text, so it is a
+ *  document, never "Word document" (audit C9, L8). */
 export const FILE_KIND_WORDS: Record<FileKind, string> = {
   pdf: "PDF",
   sheet: "Spreadsheet",
   image: "Image",
-  doc: "Word document",
+  doc: "Document",
   text: "Text file",
   other: "File",
 };

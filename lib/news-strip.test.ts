@@ -67,8 +67,12 @@ describe("the pipeline's news strip", () => {
     // A story whose feed gave no date says none, rather than a made-up one.
     expect(text).toMatch(/Example Daily(?! ·)/);
     expect(html.match(/<time /g)).toHaveLength(2);
-    // The pictures are the publishers', decorative beside their headlines.
+    // The pictures are decorative beside their headlines, and said to be
+    // the feeds' — a Bing News picture is Bing's thumbnail, not the
+    // publisher's own (audit C9, L8).
     expect(html).toContain('alt=""');
+    expect(text).toContain("Headlines and pictures as the feeds carry them, nothing written here.");
+    expect(text).not.toMatch(/publishers.{0,2}own/i);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
