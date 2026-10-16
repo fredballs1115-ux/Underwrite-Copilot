@@ -7,6 +7,7 @@ import { Fragment } from "react";
 import { compactUsd } from "@/lib/money";
 import { parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import { FOLD_WORD, type FitTone } from "@/lib/fit-label";
+import { personInitials } from "@/lib/person";
 import type { DealTag, TagTone } from "@/lib/pipeline-tags";
 import type { DealCard } from "./pipeline";
 
@@ -65,11 +66,12 @@ const ASSET_META: Record<string, { dot: string; rail: string }> = {
 const OTHER_ASSET = { dot: "bg-asset-other", rail: "border-l-asset-other" };
 export const assetMeta = (cls: string) => ASSET_META[cls.toLowerCase()] ?? OTHER_ASSET;
 
-/** "Jordan Lee" → "JL"; an email → its first letter. */
+/** "Jordan Lee" → "JL"; an email by its local part alone, never its
+ *  domain — "jordan.lee@firm.com" → "JL", "fredballs1115@gmail.com" → "F"
+ *  (lib/person `personInitials`, the one rule every badge reads). It had
+ *  split the address on its dots and worn the domain's letter ("FC"). */
 export function initials(name: string): string {
-  const parts = name.split(/[\s._-]+/).filter(Boolean);
-  const letters = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 1);
-  return letters.toUpperCase();
+  return personInitials(name);
 }
 
 // One cached formatter — constructing Intl.DateTimeFormat per call costs
