@@ -9,6 +9,7 @@ import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueUpgrade } from "@/lib/offering";
+import { personName } from "@/lib/person";
 import { WhatsNewCard } from "./whats-new";
 import { NewsStrip } from "./news-strip";
 import { fetchLiveHeadlines } from "@/lib/news/live";
@@ -240,7 +241,9 @@ export default async function DealsPage({
   }
   // Read here from the values computed; written behind the response (below).
   for (const [id, due] of dueFills) dueById.set(id, due);
-  const nameById = new Map((mates ?? []).map((m) => [m.id, m.full_name || m.email || "Teammate"]));
+  // A teammate is named as every surface names a person (lib/person): the
+  // name they set, else their email's local part — never the whole address.
+  const nameById = new Map((mates ?? []).map((m) => [m.id, personName(m.full_name, m.email)]));
 
   // Every deal placed by its address (#441): a deal uploaded with the
   // address box empty takes the one its memorandum states, and a typed line
@@ -317,8 +320,8 @@ export default async function DealsPage({
   const activeBroker = broker && firmOptions.some((f) => f.key === broker) ? broker : null;
   const shownRows = activeBroker ? rows.filter((d) => firmsByDeal.get(d.id)?.includes(activeBroker)) : rows;
 
-  const deals: DealCard[] = shownRows.map((d) =>
-    pipelineCard(d, {
+  const deals: DealCard[] = shownRows.map((d) => {
+    const card = pipelineCard(d, {
       viewerId: user?.id ?? null,
       onTeam: !!billing?.team,
       box: d.team_id ? teamBox : personalBox,
@@ -327,8 +330,11 @@ export default async function DealsPage({
       offersDue: dueById.get(d.id) ?? null,
       today: todayIso,
       googleEnabled,
-    }),
-  );
+    });
+    // The adder's user id beside their name, so their badge wears the tone
+    // it wears on every other surface (the roster, a task, a note).
+    return card.addedBy ? { ...card, addedById: d.user_id } : card;
+  });
 
   // Getting-started state — all real, computed from the reader's own data:
   // the list carries a team's deals too, and a teammate's screened memorandum

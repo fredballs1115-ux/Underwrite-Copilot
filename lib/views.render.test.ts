@@ -59,6 +59,7 @@ import { DemoSections } from "@/app/demo/sections";
 import { loadWalkthrough } from "@/app/landing-interactive";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { fitFilterKey } from "@/lib/fit-filter";
+import { PERSON_TONES, personName, personToneIndex } from "@/lib/person";
 import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
 function render(node: React.ReactElement): string {
@@ -793,6 +794,32 @@ describe("Pipeline — every card shape renders and reads clean", () => {
       if (c.fit === "outside") expect(label, c.name).toBe("Outside box");
     }
     expect(options.map(([, l]) => l)).toContain("Outside box");
+  });
+
+  it("draws a teammate's deal with their badge, by name and never the address, in the tone their id keys (signed-in gaps, H3)", () => {
+    const mate = card({ id: "m", name: "Teammate's deal", stage: "screening", addedBy: "jordan.lee@firm.com", addedById: "user-jordan" });
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(
+        React.createElement(Pipeline, {
+          deals: withThumbs([mate]),
+          errorMessage: null,
+          notice: null,
+          onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
+          billing: BILLING, todayIso: TODAY,
+          initialView,
+        }),
+      );
+      const badges = [...html.matchAll(/<span data-person-badge="xs"[^>]*style="background-color:([^";]+)[^>]*>([^<]*)<\/span>/g)];
+      expect(badges.length, initialView).toBeGreaterThan(0);
+      for (const b of badges) {
+        expect(b[1].toLowerCase(), initialView).toBe(PERSON_TONES[personToneIndex("user-jordan")].toLowerCase());
+        expect(b[2], initialView).toBe("JL");
+      }
+      expect(html, initialView).toContain('title="Added by jordan.lee"');
+      expect(visibleText(html), initialView).not.toContain("@firm.com");
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+    expect(personName(null, "jordan.lee@firm.com")).toBe("jordan.lee");
   });
 
   it("opens on the cards unless the reader chose the list, and never lands on the map (#438)", () => {

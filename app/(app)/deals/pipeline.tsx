@@ -30,8 +30,9 @@ import {
   callTitle,
   compactPrice,
   fmtDate,
-  initials,
 } from "./deal-card-parts";
+import { PersonBadge } from "../person-badge";
+import { displayName } from "@/lib/person";
 import { GalleryCreditPartsText } from "@/app/credit-parts";
 import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
@@ -84,6 +85,10 @@ export type DealCard = {
   stage: string;
   /** teammate who added this team deal (null when it's yours) */
   addedBy: string | null;
+  /** that teammate's user id, so their badge wears the tone it wears on
+   *  every other surface (lib/person `personToneIndex`); absent where the
+   *  page has none, and the badge is keyed on the name */
+  addedById?: string | null;
   /** the deal is in the reader's own pipeline while the reader is on a team
    *  — no team holds it, so the teammates do not see it (lib/personal-deal);
    *  absent off a team */
@@ -1834,17 +1839,14 @@ const DealRow = memo(function DealRow({
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
   const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} today={todayIso} /> : null;
-  // A teammate's deal wears their initials; the name is the tooltip and
-  // what a screen reader says.
+  // A teammate's deal wears their badge — the one every surface draws a
+  // person with, in the tone their user id keys; the name (an email's local
+  // part, never the address) is the tooltip and what a screen reader says.
+  const addedByName = d.addedBy ? displayName(d.addedBy) : "";
   const addedByBit = d.addedBy ? (
-    <span className="inline-flex items-center align-middle" title={`Added by ${d.addedBy}`}>
-      <span
-        aria-hidden
-        className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 text-[9px] font-semibold text-brand"
-      >
-        {initials(d.addedBy)}
-      </span>
-      <span className="sr-only">added by {d.addedBy}</span>
+    <span className="inline-flex items-center align-middle" title={`Added by ${addedByName}`} data-qa="added-by">
+      <PersonBadge name={d.addedBy} id={d.addedById} size="xs" decorative />
+      <span className="sr-only">added by {addedByName}</span>
     </span>
   ) : null;
 

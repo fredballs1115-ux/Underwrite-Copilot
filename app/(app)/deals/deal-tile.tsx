@@ -526,7 +526,7 @@ export const DealTile = memo(function DealTile({
             )}
             {d.addedBy ? (
               <span className="inline-flex items-center" title={`Added by ${displayName(d.addedBy)}`}>
-                <PersonBadge name={d.addedBy} size="xs" decorative />
+                <PersonBadge name={d.addedBy} id={d.addedById} size="xs" decorative />
                 <span className="sr-only">added by {displayName(d.addedBy)}</span>
               </span>
             ) : null}

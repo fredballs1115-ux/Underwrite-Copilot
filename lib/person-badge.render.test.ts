@@ -197,7 +197,11 @@ describe("where a person shows", () => {
     const team = readFileSync("app/(app)/team/page.tsx", "utf8");
     expect(team).toContain('<PersonBadge name={memberLabel(m)} id={m.userId} size="md" decorative />');
     const tile = readFileSync("app/(app)/deals/deal-tile.tsx", "utf8");
-    expect(tile).toContain('<PersonBadge name={d.addedBy} size="xs" decorative />');
+    expect(tile).toContain('<PersonBadge name={d.addedBy} id={d.addedById} size="xs" decorative />');
     expect(tile).toContain("added by {displayName(d.addedBy)}");
+    // The list row's teammate wears the same badge, keyed on the same id.
+    const row = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
+    expect(row).toContain('<PersonBadge name={d.addedBy} id={d.addedById} size="xs" decorative />');
+    expect(row).not.toMatch(/\binitials\(d\.addedBy\)/);
   });
 });
