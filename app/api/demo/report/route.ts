@@ -7,6 +7,7 @@ import { bidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { sampleCover } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
 
@@ -60,12 +61,22 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
     provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
   });
 
-  // The sample: its stress test is the first-draft model's run, which the
-  // challenger page's heading says (lib/stress-test-title).
-  const input = { ...buildReportData(deal, dateStr, checks, sensitivity, undefined, plan), sample: true };
+  const render = async () => {
+    // Its first page is the memo, cover and all, as the signed-in sample's
+    // report opens on its picture: the aerial the sample memo prints, through
+    // the one bounded, validated helper (lib/sample-cover).
+    const cover = await sampleCover(new Date().toISOString().slice(0, 10));
+    // The sample: its stress test is the first-draft model's run, which the
+    // challenger page's heading says (lib/stress-test-title).
+    const input = {
+      ...buildReportData(deal, dateStr, checks, sensitivity, undefined, plan, undefined, cover),
+      sample: true,
+    };
+    return renderReportPdf(input);
+  };
   const next = {
     dateStr,
-    pdf: renderReportPdf(input).catch((err) => {
+    pdf: render().catch((err) => {
       if (cachedRender === next) cachedRender = null;
       throw err;
     }),

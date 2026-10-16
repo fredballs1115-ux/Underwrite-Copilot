@@ -4,16 +4,9 @@ import { MemoDocument, buildMemoData } from "@/lib/memo/memo-document";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
-import { COVER_SIZE, coverFrom } from "@/lib/memo/cover-aerial";
-import { fetchAerialImage } from "@/lib/imagery";
+import { sampleCover } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
-
-// The sample is placed at neighbourhood level on purpose (lib/sample-deal:
-// never a street address), so its cover is the USGS frame of Brewerytown
-// itself — a real place, the building invented. Fixed coordinates, no
-// geocode and no deal row to cache on.
-const BREWERYTOWN = { lat: 39.9735, lng: -75.185, precision: "area" as const };
 
 // The memo prints today's date but is otherwise pure fixture, so render it
 // once per day per process and serve the same bytes: this is a public
@@ -48,13 +41,11 @@ function getSampleMemo(dateStr: string): Promise<Buffer> {
   );
 
   const render = async () => {
-    // Bounded like the real memo's cover: a slow or failed USGS answer means
-    // a memo without a cover, cached for the day like every other render.
-    const cover = await coverFrom(() =>
-      fetchAerialImage(BREWERYTOWN, COVER_SIZE).then((res) =>
-        res ? { response: res, source: "aerial" as const } : null,
-      ),
-    );
+    // The aerial of Brewerytown, the sample report's cover too
+    // (lib/sample-cover), bounded like the real memo's: a slow or failed
+    // USGS answer means a memo without a cover, cached for the day like
+    // every other render.
+    const cover = await sampleCover(new Date().toISOString().slice(0, 10));
     const memo = buildMemoData(deal, dateStr, checks, null, null, cover);
     const element = React.createElement(MemoDocument, {
       data: memo,
