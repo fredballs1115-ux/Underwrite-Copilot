@@ -322,6 +322,7 @@ export function Pipeline({
   todayIso,
   totalDeals = null,
   readNote = null,
+  sampleCard = null,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -330,6 +331,10 @@ export function Pipeline({
    *  fresh nonce per invocation re-triggers the effect even when the form
    *  was closed and the param is still in the URL. */
   openNew?: string;
+  /** the sample deal's own card (lib/pipeline-card `sampleDealCard`), which
+   *  an empty pipeline shows as its first deal: the card the reader gets
+   *  the moment they add it, judged against their own buy box */
+  sampleCard?: DealCard | null;
   /** structured address handed in from Pull Comps ("screen this address") —
    *  opens the form on the manual tab with the address pre-picked. */
   prefillAddress?: StructuredAddress | null;
@@ -1161,51 +1166,73 @@ export function Pipeline({
       )}
 
       {deals.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-surface p-10 text-center shadow-card">
-          <EmptyArt />
-          <p className="mt-5 text-base font-semibold tracking-tight">
-            Start your pipeline
-          </p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-            Upload an OM or type the deal’s facts. Or open the worked sample first.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-            {atLimit ? (
+        <div
+          className={`rounded-2xl border border-line bg-surface shadow-card ${
+            sampleCard
+              ? "grid items-center gap-6 p-5 sm:p-8 md:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] md:gap-10"
+              : "p-10 text-center"
+          }`}
+        >
+          {/* The sample's own card, as the pipeline draws it the moment the
+              reader adds it (lib/pipeline-card): its market's photograph,
+              the call on it, the figures. A click adds it and opens it. */}
+          {sampleCard ? (
+            <DealTilePreview
+              d={sampleCard}
+              action={createSampleDeal}
+              title="Add the sample deal to your pipeline and open it"
+              note="Sample deal"
+              todayIso={todayIso}
+              className="grid max-w-[19rem]"
+            />
+          ) : (
+            <EmptyArt />
+          )}
+          <div>
+            <p className={`text-base font-semibold tracking-tight ${sampleCard ? "" : "mt-5"}`}>
+              Start your pipeline
+            </p>
+            <p className={`mt-1 max-w-md text-sm text-muted ${sampleCard ? "" : "mx-auto"}`}>
+              Upload an OM or type the deal’s facts. Or open the worked sample first.
+            </p>
+            <div className={`mt-4 flex flex-wrap items-center gap-2.5 ${sampleCard ? "" : "justify-center"}`}>
+              {atLimit ? (
+                <Link
+                  href="/billing"
+                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                >
+                  See plans
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowForm(true)}
+                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                >
+                  + New deal
+                </button>
+              )}
+              <form action={createSampleDeal}>
+                <PendingButton
+                  pendingLabel="Setting up your sample…"
+                  className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+                >
+                  Try a sample deal
+                </PendingButton>
+              </form>
+            </div>
+            <p className="mt-3 text-xs">
+              {/* To the metro explorer itself: /market opens a signed-in
+                  reader on their own market data, which an empty pipeline has
+                  none of ("No market data yet", and a link back here). */}
               <Link
-                href="/billing"
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                href="/market#explorer"
+                className="font-medium text-brand hover:text-brand-strong"
               >
-                See plans
+                Browse the covered markets →
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowForm(true)}
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-              >
-                + New deal
-              </button>
-            )}
-            <form action={createSampleDeal}>
-              <PendingButton
-                pendingLabel="Setting up your sample…"
-                className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
-              >
-                Try a sample deal
-              </PendingButton>
-            </form>
+            </p>
           </div>
-          <p className="mt-3 text-xs">
-            {/* To the metro explorer itself: /market opens a signed-in
-                reader on their own market data, which an empty pipeline has
-                none of ("No market data yet", and a link back here). */}
-            <Link
-              href="/market#explorer"
-              className="font-medium text-brand hover:text-brand-strong"
-            >
-              Browse the covered markets →
-            </Link>
-          </p>
         </div>
       ) : filtered.length === 0 ? (
         deadCount === deals.length && !showDead && stage !== "dead" ? (
@@ -2351,6 +2378,7 @@ const DealTile = memo(function DealTile({
   onToggle,
   onMarket,
   todayIso,
+  preview,
 }: {
   d: DealCard;
   i: number;
@@ -2361,6 +2389,10 @@ const DealTile = memo(function DealTile({
   onMarket?: (dealId: string, marketId: string | null) => void;
   /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
   todayIso: string;
+  /** the card shown outside the reader's pipeline (`DealTilePreview`): it
+   *  opens `href`, or submits `action`, in place of the deal's page, and
+   *  its footer names the stage rather than offering a change to it */
+  preview?: TilePreviewTarget;
 }) {
   const dealId = d.id;
   const reportMarket = useCallback((marketId: string | null) => onMarket?.(dealId, marketId), [dealId, onMarket]);
@@ -2646,7 +2678,29 @@ const DealTile = memo(function DealTile({
         checked ? "border-brand ring-2 ring-brand/40" : "border-line"
       } ${isDead ? "grayscale" : ""}`}
     >
-      {compareMode ? (
+      {preview ? (
+        <>
+          {preview.action ? (
+            <form action={preview.action} className="row-span-4 grid grid-rows-subgrid">
+              <button type="submit" title={preview.title} className="row-span-4 grid grid-rows-subgrid text-left">
+                {inner}
+              </button>
+            </form>
+          ) : (
+            <Link href={preview.href ?? "/demo"} title={preview.title} className="row-span-4 grid grid-rows-subgrid">
+              {inner}
+            </Link>
+          )}
+          {/* The stage the card is filed under, as words: a change to it is
+              the reader's own pipeline's, never a preview's. */}
+          <div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">
+            {preview.note ? <span className="truncate">{preview.note}</span> : null}
+            <span className="ml-auto font-medium text-ink" data-qa="tile-stage">
+              {STAGE_LABEL[normalizeStage(d.stage)]}
+            </span>
+          </div>
+        </>
+      ) : compareMode ? (
         <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="row-span-4 grid grid-rows-subgrid text-left">
           {inner}
         </button>
@@ -2685,6 +2739,75 @@ const DealTile = memo(function DealTile({
     </li>
   );
 });
+
+/** Where a card shown outside the reader's pipeline goes (`DealTilePreview`). */
+type TilePreviewTarget = {
+  /** a page the card opens — the public sample's, /demo */
+  href?: string;
+  /** a server action the card submits instead — the empty pipeline's
+   *  "Try a sample deal", which adds the sample and opens it */
+  action?: (formData: FormData) => void | Promise<void>;
+  /** the card's tooltip: where it goes */
+  title?: string;
+  /** a word for the card's footer, before its stage */
+  note?: string;
+};
+
+/**
+ * The pipeline's own card, drawn outside the reader's pipeline (the empty
+ * pipeline, a public page): `DealTile` itself on a card built by lib/
+ * pipeline-card, so it is the very card the pipeline shows — the picture
+ * and its caption, the call on it, the name, the place, the three figures —
+ * opening `href` or submitting `action` instead of the deal's page, with no
+ * stage control and no photographs to flip. Under it, the one credit line
+ * the pipeline prints under its cards, for the market photograph the card
+ * settled on.
+ */
+export function DealTilePreview({
+  d,
+  href,
+  action,
+  title,
+  note,
+  todayIso,
+  className = "grid",
+}: {
+  d: DealCard;
+  /** the day the offers-due countdown counts from */
+  todayIso: string;
+  /** the list's classes: its width and grid */
+  className?: string;
+} & TilePreviewTarget) {
+  const [shown, setShown] = useState<ReadonlyMap<string, string | null>>(new Map());
+  const onMarket = useCallback((id: string, marketId: string | null) => {
+    setShown((prev) => (prev.has(id) && prev.get(id) === marketId ? prev : new Map(prev).set(id, marketId)));
+  }, []);
+  const credits = shownMarketCredits([d], shown);
+  const card = useMemo(() => ({ ...d, slides: [], photos: 0 }), [d]);
+  return (
+    <div>
+      <ul className={className} data-view="cards">
+        <DealTile
+          d={card}
+          i={0}
+          compareMode={false}
+          checked={false}
+          onToggle={noop}
+          onMarket={onMarket}
+          todayIso={todayIso}
+          preview={{ href, action, title, note }}
+        />
+      </ul>
+      {credits.length > 0 ? (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="market-photo-credit">
+          <GalleryCreditPartsText credits={credits} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function noop() {}
 
 /**
  * A card's way through its deal's photographs (#450), over the picture: an

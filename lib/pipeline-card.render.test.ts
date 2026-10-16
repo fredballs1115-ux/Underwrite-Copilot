@@ -1,0 +1,87 @@
+// The sample deal's own pipeline card, drawn where the reader's pipeline is
+// empty and wherever a page shows the sample's card (`DealTilePreview`): the
+// pipeline's `DealTile` on lib/pipeline-card's card, its market photograph
+// credited under it, and no control a preview cannot offer.
+import { describe, expect, it, vi } from "vitest";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {}, back: () => {} }),
+  usePathname: () => "/deals",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// The server actions the pipeline binds to forms — never called in a render.
+vi.mock("../app/(app)/deals/actions", () => {
+  const noop = async () => {};
+  return { createDeal: noop, createDealFromBatch: noop, createManualDeal: noop, createSampleDeal: noop, setStage: noop };
+});
+import { DealTilePreview, Pipeline } from "@/app/(app)/deals/pipeline";
+import { ToastProvider } from "@/app/(app)/toaster";
+import { sampleDealCard } from "@/lib/pipeline-card";
+import { dealAllowance } from "@/lib/deal-allowance";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+
+const TODAY = "2026-10-16";
+const render = (node: React.ReactElement) => renderToStaticMarkup(React.createElement(ToastProvider, null, node));
+const card = sampleDealCard({ today: TODAY });
+
+describe("the sample deal's card outside the pipeline", () => {
+  it("draws the pipeline's card: its market's photograph and caption, the call, the figures, the fit", () => {
+    const html = render(React.createElement(DealTilePreview, { d: card, href: "/demo", title: "Open the sample deal", todayIso: TODAY }));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain("data-deal-tile=\"sample\"");
+    expect(html).toContain('href="/demo"');
+    expect(text).toContain(SAMPLE_DEAL.name);
+    expect(text).toContain("Caution");
+    expect(text).toContain(card.coveredMarket!);
+    expect(text).toContain(card.slots.basis!);
+    expect(text).toContain(card.slots.cap!);
+    expect(text).toContain(String(card.score));
+    // The market photograph, asked at the public skyline route, and no
+    // deal's own route anywhere on the card.
+    expect(html).toContain(card.pictures![0].src.replace(/&/g, "&amp;"));
+    expect(html).not.toContain("/api/deals/");
+    // The stage as words, never the stage control, and no photographs to flip.
+    expect(html).toContain('data-qa="tile-stage"');
+    expect(html).not.toContain("<select");
+    expect(html).not.toContain('data-flip="photos"');
+  });
+
+  it("submits an action in place of a link where one is given", () => {
+    const action = async () => {};
+    const html = render(React.createElement(DealTilePreview, { d: card, action, title: "Add the sample deal", note: "Sample deal", todayIso: TODAY }));
+    expect(a11yIssues(html)).toEqual([]);
+    expect(html).toMatch(/<form[^>]*>\s*<button type="submit" title="Add the sample deal"/);
+    expect(visibleText(html)).toContain("Sample deal");
+  });
+});
+
+describe("the empty pipeline", () => {
+  it("shows the sample's own card beside the ways in, in place of the drawing", () => {
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: [],
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: false, sampleId: null, hasScreenedOm: false },
+        billing: { isPro: false, canCreateDeal: true, allowance: dealAllowance({ plan: "free", dealCount: 0, team: null }) },
+        todayIso: TODAY,
+        sampleCard: sampleDealCard({ today: TODAY, box: null }),
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('data-deal-tile="sample"');
+    expect(text).toContain("Start your pipeline");
+    expect(text).toContain("Try a sample deal");
+    expect(text).toContain("Browse the covered markets");
+    // No buy box, no fit: the card the reader's sample would show them.
+    expect(html).not.toContain('data-qa="fit-checked"');
+  });
+});

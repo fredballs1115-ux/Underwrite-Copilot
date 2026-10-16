@@ -20,7 +20,7 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { type JobLike } from "@/lib/screen-run";
 import { screenedAnOm } from "@/lib/onboarding";
-import { pipelineCard } from "@/lib/pipeline-card";
+import { pipelineCard, sampleDealCard } from "@/lib/pipeline-card";
 import { readAllResult, readByIds } from "@/lib/read-all";
 import { pipelineReadNote } from "@/lib/pipeline-read-note";
 import { inTurns } from "@/lib/in-turns";
@@ -354,6 +354,14 @@ export default async function DealsPage({
         totalDeals={dealTotal ?? null}
         // A read beside the deals that failed, said over the list.
         readNote={readNote}
+        // An empty pipeline shows the sample's own card, the one the reader
+        // gets the moment they add it: their own box judges it, and a deal
+        // the sample action files is the reader's own, on a team or off.
+        sampleCard={
+          rows.length === 0
+            ? sampleDealCard({ today: todayIso, box: personalBox, viewerId: user?.id ?? null, onTeam: !!billing?.team })
+            : null
+        }
       />
       {/* The strip's own read streams after the pipeline rather than
           holding it back; nothing is drawn until it has stories. */}
