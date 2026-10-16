@@ -16,9 +16,9 @@ import {
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage, parseStageHistory } from "@/lib/stages";
 import { deathReasons } from "@/lib/deal-outcome";
-import { brokerScorecard, dealFirms, rateText } from "@/lib/brokerage";
+import { brokerDealFit, brokerScorecard, dealFirms, partialText, rateText } from "@/lib/brokerage";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks } from "@/lib/criteria";
+import { evaluateBuyBox } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { getTeam } from "@/lib/teams";
@@ -155,8 +155,10 @@ export default async function AnalyticsPage() {
   // By brokerage (research pass 24, B13): the firms the memoranda name, the
   // deals each sent, how many fit the buy box of the deal's own scope (its
   // team's, else the reader's) and how many the screen called Go — the fit
-  // judged as the pipeline card judges it (lib/buy-box-chip
-  // `dealCheckSource`). A box that cannot be read judges nothing.
+  // read off the pipeline card's check source (lib/buy-box-chip
+  // `dealCheckSource`) and, as the card says it, a call only on the whole
+  // box: a fit on part of the box is counted apart (lib/brokerage
+  // `brokerDealFit`). A box that cannot be read judges nothing.
   const team = await getTeam(supabase, user.id).catch(() => null);
   const [personalBox, teamBox] = await Promise.all([
     getBuyBoxForDeal(user.id, null).catch(() => null),
@@ -167,14 +169,15 @@ export default async function AnalyticsPage() {
       const extraction = r.extraction as ExtractionResult | null;
       const box = r.team_id ? teamBox : personalBox;
       const address = addressUpgrade(r.address, extraction) ?? ((r.address as StructuredAddress | null | undefined) ?? null);
-      const fit = box
-        ? foldBuyBoxChecks(
+      const judged = box
+        ? brokerDealFit(
             evaluateBuyBox(r.asset_class ?? "auto", dealCheckSource(extraction, (r.first_signal as FirstSignal | null) ?? null, address), box),
           )
         : null;
       return {
         firms: dealFirms(extraction),
-        fit,
+        fit: judged?.fit ?? null,
+        partial: judged?.partial ?? false,
         verdict: (r.verdict as { verdict?: string } | null)?.verdict ?? null,
       };
     }),
@@ -356,7 +359,11 @@ export default async function AnalyticsPage() {
                           )}
                         </td>
                         <td className="py-2 pr-3 text-right tabular-nums">{b.received}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums">{rateText(b.fits, b.judged)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">
+                          {rateText(b.fits, b.judged)}
+                          {b.partial > 0 && " "}
+                          {b.partial > 0 && <span className="block text-[11px] text-muted">{partialText(b.partial)}</span>}
+                        </td>
                         <td className="py-2 text-right tabular-nums">{rateText(b.go, b.decided)}</td>
                       </tr>
                     ))}
@@ -364,7 +371,7 @@ export default async function AnalyticsPage() {
                 </table>
               </div>
               <p className="mt-2 text-xs text-muted">
-                {`Firms as each memorandum names its listing team; a deal co-listed by two firms counts for each. The fit is over the deals your buy box could judge, the Go calls over the deals with a call.${
+                {`Firms as each memorandum names its listing team; a deal co-listed by two firms counts for each. A deal fits only where the screen could check every criterion of your buy box, or misses one outright; one that passed with criteria left unchecked is counted apart as checked on part of the box. The Go calls are over the deals with a call.${
                   brokers.unnamed > 0 ? ` ${brokers.unnamed} deal${brokers.unnamed === 1 ? " names" : "s name"} no firm.` : ""
                 }`}
               </p>

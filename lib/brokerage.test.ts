@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { brokerScorecard, brokerageKey, dealFirms, rateText } from "./brokerage";
+import { brokerDealFit, brokerScorecard, brokerageKey, dealFirms, partialText, rateText } from "./brokerage";
+import type { BuyBoxCheck } from "./criteria";
 import { BrokerageFilter } from "@/app/(app)/deals/brokerage-filter";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -50,6 +51,36 @@ describe("brokerScorecard", () => {
     expect(rows[1]).toMatchObject({ key: "jll", received: 1, judged: 0, fitRate: null, goRate: null });
     expect(rateText(1, 2)).toBe("1 of 2 (50%)");
     expect(rateText(0, 0)).toBe("—");
+  });
+});
+
+// Audit C8, M2: a deal that passed one criterion with the rest unchecked
+// was counted as fitting the box, where the pipeline card prints it "Fit N ·
+// 2 of 4 checked" — no call.
+describe("a fit on part of the box", () => {
+  const check = (label: string, status: BuyBoxCheck["status"]): BuyBoxCheck => ({ label, status, detail: "" }) as BuyBoxCheck;
+
+  it("is no fit: counted apart, never in the judged deals", () => {
+    const partly = brokerDealFit([check("Asset class", "pass"), check("Going-in cap", "unknown"), check("Target return", "unknown")]);
+    expect(partly).toEqual({ fit: "fits", partial: true });
+    const whole = brokerDealFit([check("Asset class", "pass"), check("Going-in cap", "pass")]);
+    expect(whole).toEqual({ fit: "fits", partial: false });
+    // A miss outright is a call however much was checked.
+    const miss = brokerDealFit([check("Asset class", "miss"), check("Going-in cap", "unknown")]);
+    expect(miss).toEqual({ fit: "outside", partial: true });
+    expect(brokerDealFit([check("Going-in cap", "unknown")])).toEqual({ fit: null, partial: false });
+
+    const cbre = [{ key: "cbre", name: "CBRE" }];
+    const { rows } = brokerScorecard([
+      { firms: cbre, ...whole, verdict: null },
+      { firms: cbre, ...partly, verdict: null },
+      { firms: cbre, ...brokerDealFit([check("Asset class", "near"), check("Basis", "unknown")]), verdict: null },
+      { firms: cbre, ...miss, verdict: null },
+    ]);
+    expect(rows[0]).toMatchObject({ received: 4, judged: 2, fits: 1, partial: 2 });
+    expect(rateText(rows[0].fits, rows[0].judged)).toBe("1 of 2 (50%)");
+    expect(partialText(rows[0].partial)).toBe("+2 checked on part of the box");
+    expect(partialText(0)).toBe("");
   });
 });
 
