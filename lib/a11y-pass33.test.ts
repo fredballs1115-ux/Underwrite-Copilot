@@ -121,6 +121,7 @@ describe("a copy that says so (research pass 33, items 9 and 25)", () => {
       [
         "app/(app)/comps/record-sales-map.tsx",
         "app/(app)/deals/[id]/bridge/bridge-view.tsx",
+        "app/(app)/deals/[id]/broker-email-actions.tsx",
         "app/(app)/deals/[id]/share-control.tsx",
         "app/(app)/deals/[id]/valuations/valuations-view.tsx",
         "app/market/copy-cite.tsx",

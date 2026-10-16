@@ -26,6 +26,7 @@ function EmailAction({ label, to, subject, body }: { label: string; to: string[]
   return (
     <button
       type="button"
+      aria-live="polite"
       className={cls}
       onClick={async () => {
         try {
