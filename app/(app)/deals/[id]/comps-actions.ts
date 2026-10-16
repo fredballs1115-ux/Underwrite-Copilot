@@ -44,10 +44,13 @@ export async function searchPublicComps(formData: FormData) {
   if (!user) redirect("/login");
   const { data: deal } = await supabase
     .from("deals")
-    .select("id")
+    .select("id, is_sample")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) return;
+  // The sample's building and comps are fictional: the web is never
+  // searched for them (the Comps tab says so in the button's place).
+  if (deal.is_sample) return;
 
   // Pro-only feature.
   if (!(await isPro(supabase, user.id))) return;

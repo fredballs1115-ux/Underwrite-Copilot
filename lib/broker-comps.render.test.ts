@@ -81,6 +81,19 @@ describe("the sample's comps are never pinned to real places", () => {
     }
   });
 
+  it("offers no public-web search and no upgrade on the sample, and the action refuses one", () => {
+    const html = draw(true, null);
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(html).toContain('data-qa="sample-no-web-search"');
+    expect(text).not.toContain("Search public web");
+    expect(text).not.toContain("Upgrade to search");
+    // a real deal keeps its button
+    expect(visibleText(draw(false, null))).toContain("Search public web");
+    const action = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "comps-actions.ts"), "utf8");
+    expect(action).toContain('.select("id, is_sample")');
+    expect(action).toContain("if (deal.is_sample) return;");
+  });
+
   it("asks the geocoder for no memorandum comp on the sample", () => {
     const src = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "deal-sections-view.tsx"), "utf8");
     expect(src).toContain("...(mapContext.sample ? [] : saleComps).map(");

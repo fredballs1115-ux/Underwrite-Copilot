@@ -577,6 +577,7 @@ export function BrokerComps({
         hasOmComps={hasComps}
         isPro={isPro}
         publicDemo={publicDemo}
+        sample={!!mapContext?.sample}
         searchAction={searchAction}
       />
     </section>
@@ -598,6 +599,7 @@ function PublicWebComps({
   hasOmComps,
   isPro,
   publicDemo = false,
+  sample = false,
   searchAction,
 }: {
   dealId: string;
@@ -606,6 +608,10 @@ function PublicWebComps({
   hasOmComps: boolean;
   isPro: boolean;
   publicDemo?: boolean;
+  /** the reader's own sample deal: its building and its comps are
+   *  fictional, so no public-web search runs on it and no upgrade is
+   *  offered for one (comps-actions refuses it too) */
+  sample?: boolean;
   searchAction?: (formData: FormData) => void | Promise<void>;
 }) {
   return (
@@ -632,6 +638,10 @@ function PublicWebComps({
           >
             Sign up to search
           </Link>
+        ) : sample ? (
+          <p className="max-w-xs text-xs leading-relaxed text-muted" data-qa="sample-no-web-search">
+            The sample&rsquo;s building is fictional, so the web is not searched for it; a deal of your own can be.
+          </p>
         ) : isPro ? (
           <form action={searchAction}>
             <input type="hidden" name="dealId" value={dealId} />
