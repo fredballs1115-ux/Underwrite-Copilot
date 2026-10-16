@@ -558,7 +558,7 @@ describe("a compact figure is rounded one way on every surface (finding 14)", ()
     walk("lib");
     expect(found).toEqual([]);
     // The card's own price writer is the helper.
-    expect(readFileSync(join(process.cwd(), "app/(app)/deals/pipeline.tsx"), "utf8")).toMatch(/return compactUsd\(n\);/);
+    expect(readFileSync(join(process.cwd(), "app/(app)/deals/deal-card-parts.tsx"), "utf8")).toMatch(/return compactUsd\(n\);/);
   });
 });
 

@@ -225,7 +225,7 @@ describe("placeTags — the card's picture carries a chip only where it fits who
   });
 
   it("asks of the card's picture the widths it places for: the card's container queries are the tiers'", () => {
-    const source = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
+    const source = readFileSync("app/(app)/deals/deal-tile.tsx", "utf8");
     const asked = new Set([...source.matchAll(/@min-\[(\d+)px\]\/card:/g)].map((m) => Number(m[1])));
     expect([...asked].sort((a, b) => a - b)).toEqual(PICTURE_TIERS.slice(1));
   });

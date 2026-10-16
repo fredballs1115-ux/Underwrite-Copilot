@@ -50,7 +50,7 @@ describe("the focus ring, wherever a keyboard reaches", () => {
   it("is drawn on a pipeline card, which clips its link's own, and white on the card's photo arrows", () => {
     const body = ruleBody("[data-deal-tile]:has(> a:focus-visible),\n[data-deal-tile]:has(> button[aria-pressed]:focus-visible)") ?? "";
     expect(body).toMatch(/outline: 2px solid var\(--color-brand\)/);
-    const pipeline = src("app/(app)/deals/pipeline.tsx");
+    const pipeline = src("app/(app)/deals/deal-tile.tsx");
     expect(pipeline).toMatch(/data-deal-tile=\{d\.id\}/);
     expect(pipeline).toMatch(/data-flip-step=\{step\}[\s\S]{0,200}focus-on-photo/);
   });
