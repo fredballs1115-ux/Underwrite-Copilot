@@ -110,7 +110,8 @@ export function DealTasks({
   const freshSteps = unimportedVerdictSteps(verdictSteps, tasks);
 
   return (
-    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+    // `id="tasks"`: "My tasks" (app/(app)/tasks) links each task here.
+    <section id="tasks" className="scroll-mt-20 rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold tracking-tight">Tasks</h2>

@@ -80,6 +80,19 @@ const ACTIONS: Item[] = [
     ),
   },
   {
+    key: "a-tasks",
+    label: "My tasks",
+    hint: "assigned to you, every deal",
+    href: "/tasks",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="m8 12 3 3 5-6" />
+      </ActionIcon>
+    ),
+  },
+  {
     key: "a-criteria",
     label: "Buy box",
     hint: "your criteria",
