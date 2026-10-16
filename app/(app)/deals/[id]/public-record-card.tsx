@@ -11,6 +11,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import { NEAREST_PARCEL } from "@/lib/public-record-asks";
+import { SAMPLE_PUBLIC_RECORD_LINE } from "@/lib/public-record-subject";
 
 interface PropertyRow {
   market: string;
@@ -28,6 +29,18 @@ interface PropertyRow {
   ingested_at: string;
 }
 
+/** In the card's place on the sample deal: one line saying why there is no
+ *  parcel — never a real neighbour's parcel and owner as the fictional
+ *  building's record. */
+export function SamplePublicRecord() {
+  return (
+    <section className="rounded-xl border border-line bg-surface p-4" data-qa="public-record-sample">
+      <h2 className="text-sm font-semibold">Public record (assessor)</h2>
+      <p className="mt-1 text-xs text-muted">{SAMPLE_PUBLIC_RECORD_LINE}</p>
+    </section>
+  );
+}
+
 const money = (v: number | null) =>
   v === null ? "—" : `$${Math.round(v).toLocaleString("en-US")}`;
 
@@ -35,14 +48,21 @@ export async function PublicRecordCard({
   address,
   subject,
   market,
+  sample = false,
 }: {
   address: StructuredAddress | null;
+  /** the point to look a parcel up at (lib/public-record-subject): the
+   *  building's own, never a street's or an area's centre */
   subject: { lat: number; lng: number } | null;
   /** the briefed market the page placed the deal in (lib/market-county's
    *  `placeDeal(...).briefed`, which drops an address word naming a place
    *  in another county's metro area); the address matchers otherwise */
   market?: { id: string } | null;
+  /** the sample deal: its building is fictional, so no parcel is looked up
+   *  and the card says why in its place */
+  sample?: boolean;
 }) {
+  if (sample) return <SamplePublicRecord />;
   if (!address?.label) return null;
   const supabase = await createSupabaseServerClient();
 

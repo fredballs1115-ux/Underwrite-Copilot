@@ -97,6 +97,7 @@ import { floodClassOfZone } from "@/lib/flood-style";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
+import { publicRecordSubject } from "@/lib/public-record-subject";
 import { buildingSfRow, countNounOf, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -2012,14 +2013,17 @@ export default async function DealPage({
           market={placement.briefed}
           // The nearest parcel within 120 m is the building's only from a
           // point placed at the building: never a street's centreline or an
-          // area's centre, where the nearest parcel is somebody else's.
-          subject={
-            pointIsBuilding(visualCache, dealAddress)
-              ? knownPoint
-              : publicComps?.subject && (publicComps.subject.precision ?? "street") === "street"
-                ? publicComps.subject
-                : (siteFlags?.subject ?? null)
-          }
+          // area's centre, where the nearest parcel is somebody else's — and
+          // never on the sample, whose building is fictional
+          // (lib/public-record-subject).
+          sample={isSampleDeal}
+          subject={publicRecordSubject({
+            isSample: isSampleDeal,
+            buildingPoint: pointIsBuilding(visualCache, dealAddress) ? knownPoint : null,
+            compsSubject: publicComps?.subject ?? null,
+            siteFlagsSubject: siteFlags?.subject ?? null,
+            siteFlagsPointIsBuilding: siteFlags?.pointIsBuilding ?? null,
+          })}
         />
         {/* Anchor target for the Regulation panel's "answer in Deal facts"
             links; scroll-mt keeps the jump clear of the sticky header. */}
