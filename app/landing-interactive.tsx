@@ -22,8 +22,10 @@ import {
   MarketCheck,
   OverviewView,
   Reconciliation,
+  TermsView,
   VerdictView,
 } from "./(app)/deals/[id]/deal-sections";
+import { ReturnsHeadline } from "./(app)/deals/[id]/model-view";
 
 /** The sample's fit against its demo buy box, read on the server through
  *  the deal header's own reader (lib/buy-box-chip `buyBoxRead`), so the
@@ -40,7 +42,9 @@ export interface SampleFit {
 
 /** The sample's base-case returns, formatted on the server from the one
  *  derivation the Excel tile and the stress bench read (lib/sample-derive
- *  `sampleBaseReturns`), so the walkthrough prints the page's one IRR. */
+ *  `sampleBaseReturns`). The walkthrough's Financials tab draws the
+ *  first-draft model's returns, as the deal page's does, and names the
+ *  workbook's levered IRR beside them as the other model's. */
 export interface SampleReturns {
   irr: string;
   equityMultiple: string;
@@ -221,57 +225,6 @@ function TabDot({ done, active }: { done: boolean; active: boolean }) {
   );
 }
 
-function RangeRow({
-  label,
-  low,
-  base,
-  high,
-  src,
-}: {
-  label: string;
-  low: string;
-  base: string;
-  high: string;
-  src: string;
-}) {
-  return (
-    <div className="rounded-lg border border-line p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium">{label}</span>
-        <span className="font-mono text-[10px] text-muted">range</span>
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line">
-        {[
-          ["Low", low, false],
-          ["Base", base, true],
-          ["High", high, false],
-        ].map(([k, v, e]) => (
-          <div
-            key={k as string}
-            // Opaque, so the grid's line colour never shows through the
-            // base's tint (research pass 33).
-            className={`px-2.5 py-1.5 ${e ? "bg-[color-mix(in_oklab,var(--color-brand)_5%,var(--color-surface))]" : "bg-surface"}`}
-          >
-            <p className="text-[9px] uppercase tracking-wide text-muted">
-              {k as string}
-            </p>
-            <p
-              className={`mt-0.5 font-mono tabular-nums ${
-                e ? "text-sm font-semibold text-brand" : "text-xs"
-              }`}
-            >
-              {v as string}
-            </p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
-        <span className="font-medium text-ink">Source:</span> {src}
-      </p>
-    </div>
-  );
-}
-
 /** The Analyses tab's own sub-tabs and the view each opens — the deal
  *  page's AnalysesPanel, its classes and its components, on the sample. */
 function AnalysesView({
@@ -390,39 +343,21 @@ export function DemoPanel({
     case "Overview":
       return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} />;
     case "Financials":
+      // The deal page's Financials tab on the sample: the extracted terms,
+      // then the first-draft model's returns, the card's own figures. Its
+      // tiles' grids are held to three across: four of them in this column
+      // left "$68,000,000" wider than its tile.
       return (
-        <div className="space-y-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-            Projected returns · the Excel workbook&apos;s base case
-          </p>
-          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
-            {(
-              [
-                ["Levered IRR", returns.irr],
-                ["Equity multiple", returns.equityMultiple],
-                ["Cash-on-cash (Yr 1)", returns.cashOnCash],
-              ] as const
-            ).map(([k, v]) => (
-              <div key={k} className="bg-surface px-2 py-2">
-                <p className="text-[9px] uppercase tracking-wide text-muted">{k}</p>
-                <p className="mt-0.5 font-mono text-xs font-semibold tabular-nums">{v}</p>
-              </div>
-            ))}
+        <div className="flex flex-col gap-6 [&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
+          <TermsView result={RESULTS.extraction} />
+          <div className="flex flex-col gap-1.5">
+            <ReturnsHeadline model={SAMPLE_DEAL.model} />
+            {/* Two models, said as two, as the deal page and /demo say it:
+                the workbook runs the screening model on its own base case. */}
+            <p className="text-xs text-muted" data-qa="home-two-models">
+              {`The Excel workbook is a separate model: its levered IRR is ${returns.irr}.`}
+            </p>
           </div>
-          <RangeRow
-            label="Exit cap"
-            low="5.25%"
-            base={returns.exitCap}
-            high="5.75%"
-            src="the market check's typical range, a rule of thumb; the OM holds 5.25%."
-          />
-          <RangeRow
-            label="Market rent / unit"
-            low="$2,400"
-            base="$2,480"
-            high="$2,600"
-            src="rent roll actuals · OM p.12 pro forma flagged +8%."
-          />
         </div>
       );
     case "Buy box":

@@ -121,7 +121,11 @@ describe("the call chips and a range's base read at 4.5:1 (research pass 33, ite
     const opaque = /bg-\[color-mix\(in_oklab,var\(--color-brand\)_(?:5|10)%,var\(--color-surface\)\)\]/;
     expect(readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections.tsx"), "utf8")).toMatch(opaque);
     expect(readFileSync(join(process.cwd(), "app/share/[token]/share-view.tsx"), "utf8")).toMatch(opaque);
-    expect(readFileSync(join(process.cwd(), "app/landing-interactive.tsx"), "utf8")).toMatch(opaque);
+    // The homepage walkthrough draws no range cell of its own any more: its
+    // ranges are the deal page's RangeCard, through VerdictView.
+    const home = readFileSync(join(process.cwd(), "app/landing-interactive.tsx"), "utf8");
+    expect(home).toMatch(/\bVerdictView\b[^]*from "\.\/\(app\)\/deals\/\[id\]\/deal-sections"/);
+    expect(home).not.toMatch(/\bRangeRow\b/);
   });
 });
 
