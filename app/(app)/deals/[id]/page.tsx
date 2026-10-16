@@ -1698,6 +1698,7 @@ export default async function DealPage({
               canRename={!(deal as { is_sample?: boolean }).is_sample}
               moveTo={moveTo}
               teamName={moveTeamName}
+              inReadersTeam={!ownership.team_id || readerTeam?.team_id === ownership.team_id}
             />
           </>
         }

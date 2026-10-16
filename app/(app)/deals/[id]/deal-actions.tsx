@@ -15,6 +15,7 @@ export function DealActions({
   canRename = true,
   moveTo = null,
   teamName = null,
+  inReadersTeam = true,
 }: {
   dealId: string;
   dealName: string;
@@ -30,6 +31,9 @@ export function DealActions({
   moveTo?: MoveTarget | null;
   /** The team's name, where it is the reader's own team. */
   teamName?: string | null;
+  /** False where the deal sits in a team the reader is no longer on: the
+   *  question then says so, rather than "your teammates". */
+  inReadersTeam?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"menu" | "rename" | "delete" | "move">("menu");
@@ -157,7 +161,7 @@ export function DealActions({
             {mode === "move" && moveTo && (
               <div role="group" aria-labelledby={`${dealId}-move-q`} className="space-y-2.5 p-1.5">
                 <p id={`${dealId}-move-q`} className="text-sm leading-relaxed">
-                  {moveQuestion(moveTo, teamName)}
+                  {moveQuestion(moveTo, teamName, inReadersTeam)}
                 </p>
                 <div className="flex gap-2">
                   <form action={moveDeal}>

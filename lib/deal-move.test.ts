@@ -348,6 +348,14 @@ describe("the words (lib/personal-deal)", () => {
     expect(moveQuestion("personal", "Acme")).toContain("Your teammates stop seeing all of it");
     expect(MOVE_ITEM.team).toBe("Share with team");
   });
+  it("a deal in a team the reader has left is not said to be the reader's teammates' (audit C7, L2)", () => {
+    const q = moveQuestion("personal", null, false);
+    expect(q).toBe(
+      "Take this deal out of the team pipeline it is in, with its tasks, notes, files and Ask questions? That team’s members stop seeing all of it.",
+    );
+    expect(q).not.toMatch(/your team|teammates/i);
+    expect(moveQuestion("personal", "Acme", true)).toContain("Acme’s pipeline");
+  });
   it("the confirm question names what moves with the deal", () => {
     for (const to of ["team", "personal"] as const) {
       expect(moveQuestion(to, "Acme")).toContain("tasks, notes, files and Ask questions");

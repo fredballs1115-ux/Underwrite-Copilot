@@ -220,8 +220,13 @@ function workList(kinds: readonly MoveWork[]): string {
 }
 
 /** The menu's question before a move — the confirm step's words, naming
- *  what goes with the deal. */
-export function moveQuestion(to: MoveTarget, teamName: string | null): string {
+ *  what goes with the deal. `inReadersTeam` false: the deal sits in the
+ *  pipeline of a team the reader is no longer on, whose members are not the
+ *  reader's teammates (audit C7, L2). */
+export function moveQuestion(to: MoveTarget, teamName: string | null, inReadersTeam = true): string {
+  if (to === "personal" && !inReadersTeam) {
+    return "Take this deal out of the team pipeline it is in, with its tasks, notes, files and Ask questions? That team’s members stop seeing all of it.";
+  }
   const team = teamName ? `${teamName}’s pipeline` : "your team’s pipeline";
   return to === "team"
     ? `Move this deal into ${team}, with its tasks, notes, files and Ask questions? Every member of the team can then see and edit them. You can make it personal again from this menu.`
