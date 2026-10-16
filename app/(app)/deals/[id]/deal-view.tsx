@@ -79,6 +79,7 @@ import { condoUnitsOffered } from "@/lib/condo-units";
 import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
+import { fileKindOf, FILE_KIND_WORDS, type FileKind } from "@/lib/file-kind";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import { longerThanUsual, longerThanUsualLine } from "@/lib/screen-duration";
 import { supportMailto } from "@/lib/support-link";
@@ -1539,6 +1540,54 @@ function AnalysesPanel({
   );
 }
 
+/** A stored file's kind as a picture: a page with its kind drawn on
+ *  it — a PDF's band, a spreadsheet's grid, an image's hills, a document's
+ *  lines — in the slot the memorandum's avatar takes, so the names start at
+ *  one x. Hidden from a screen reader, which hears the file's own name and
+ *  the row's kind word (Rent roll, BOV…) beside it. */
+function FileKindIcon({ kind }: { kind: FileKind }) {
+  const tone =
+    kind === "pdf"
+      ? "text-kill"
+      : kind === "sheet"
+        ? "text-pass"
+        : kind === "image"
+          ? "text-asset-office"
+          : kind === "doc"
+            ? "text-brand"
+            : "text-muted";
+  return (
+    <span
+      aria-hidden
+      data-file-kind={kind}
+      title={FILE_KIND_WORDS[kind]}
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-faint ${tone}`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-6 w-6"
+      >
+        <path d="M6 2.75h8.5L19 7.25v14H6z" />
+        <path d="M14.5 2.75v4.5H19" />
+        {kind === "pdf" && <rect x="8" y="12" width="9" height="5" rx="1" fill="currentColor" stroke="none" />}
+        {kind === "sheet" && <path d="M8.5 11h8v7h-8zM8.5 13.33h8M8.5 15.67h8M11.17 11v7M13.83 11v7" />}
+        {kind === "image" && (
+          <>
+            <circle cx="10.5" cy="11.5" r="1.25" />
+            <path d="M8.5 18l3-3.5 2 2 1.5-1.5 1.5 3" />
+          </>
+        )}
+        {(kind === "doc" || kind === "text") && <path d="M8.5 11h8M8.5 13.5h8M8.5 16h5" />}
+      </svg>
+    </span>
+  );
+}
+
 /** Documents: the OM itself, the memo export, uploaded documents, and every
  *  note/file added along the way — one home for all of it. For a manual deal
  *  the typed facts ARE the source document, so this is also where they're
@@ -1593,7 +1642,13 @@ function DocumentsPanel({
       <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
         <h2 className="text-sm font-semibold tracking-tight">Source documents</h2>
         <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
-          <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
+          <li
+            data-doc-row="om"
+            className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
+          >
+            {/* The memorandum wears the deal's own picture (its photograph,
+                else its drawn cover), the way a deal room shows the deck. */}
+            <DealAvatar dealId={dealId} size="md" />
             <span className="min-w-0 flex-1 truncate font-medium">
               Offering memorandum
             </span>
@@ -1620,6 +1675,7 @@ function DocumentsPanel({
           </li>
           {manualFacts && (
             <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
+              <FileKindIcon kind="text" />
               <span className="min-w-0 flex-1 truncate font-medium">
                 Typed deal facts
               </span>
@@ -1642,6 +1698,7 @@ function DocumentsPanel({
                 key={d.id}
                 className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
               >
+                <FileKindIcon kind={fileKindOf(d.filename, d.content_type)} />
                 <span className="min-w-0 flex-1 truncate">{d.filename}</span>
                 <span className="shrink-0 text-xs text-muted">
                   {KIND_LABEL[d.kind] ?? DOC_KIND_LABEL[d.kind] ?? d.kind}

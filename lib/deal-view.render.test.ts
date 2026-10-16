@@ -1499,6 +1499,12 @@ describe("the Documents tab opens each source document", () => {
     expect(html).not.toMatch(/aria-label="View Elsewhere\.pdf"/);
     // Never a storage host's signed URL minted at render.
     expect(html).not.toMatch(/token=|\/storage\/v1\/object\/sign/);
+    // Pictures, not words: the memorandum's row wears the deal's own
+    // picture, and each file an icon of its kind, read off its name.
+    const omRow = html.slice(html.indexOf('data-doc-row="om"'));
+    expect(omRow.slice(0, 1200)).toContain(`/api/deals/${dealId}/image?`);
+    expect(html.match(/data-file-kind="sheet"/g)).toHaveLength(1);
+    expect(html.match(/data-file-kind="pdf"/g)).toHaveLength(2);
   });
 });
 
