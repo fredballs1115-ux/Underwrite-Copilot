@@ -27,8 +27,9 @@ export const SPREAD_BPS = (SPREAD_HIGH_IRR_PCT - SPREAD_LOW_IRR_PCT) * 100; // 4
 // wallMs) and said only from three of their own finished screens.
 
 // ── Product shape facts (countable in the codebase) ─────────────────────────
-// Six checkpointed analysis stages per OM: extract, challenge, comps,
-// reconcile, market, verdict (lib/anthropic/pipeline.ts).
+// Six stages per OM, as the deal page's rail names them: signal, extract,
+// challenge, comps, market, verdict (lib/screen-stages, held to the rail by
+// its test; reconciling the buyer's model is a run of its own).
 export const ANALYSIS_STAGES = 6;
 // The three deal-killers the challenger stresses first: basis, exit, debt.
 export const DEAL_KILLERS = 3;

@@ -4,6 +4,7 @@ import { LogoMark } from "./logo";
 import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFit, type SampleReturns } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { ScrollProgress } from "./scroll-progress";
+import { RECONCILE_RUN, SCREEN_STAGES, type ScreenStageKey } from "@/lib/screen-stages";
 import type { Metadata } from "next";
 import {
   SPREAD_LOW_IRR_PCT,
@@ -108,68 +109,59 @@ function Icon({ children, className = "h-5 w-5" }: { children: ReactNode; classN
   );
 }
 
-// The actual six-stage pipeline — a word or two each; the trace band under
-// the rail shows what each stage produces. Reconcile runs only where the
-// buyer adds their own model, as a run of its own after the screen that
-// re-runs the verdict (lib/anthropic/pipeline), so it is last and says so.
-const STAGES: { title: string; note?: string; icon: ReactNode }[] = [
-  {
-    title: "Extract",
-    icon: (
-      <Icon>
-        <path d="M6 2h9l5 5v15H6z" />
-        <path d="M14 2v6h6" />
-        <path d="M9 13h6M9 17h6" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Challenge",
-    icon: (
-      <Icon>
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Comps",
-    icon: (
-      <Icon>
-        <path d="M4 20v-9M10 20V5M16 20v-6M2 20h20" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Market",
-    icon: (
-      <Icon>
-        <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
-        <circle cx="12" cy="10" r="2.5" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Verdict",
-    icon: (
-      <Icon>
-        <circle cx="12" cy="12" r="9" />
-        <path d="m8.5 12 2.5 2.5 4.5-5" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Reconcile",
-    note: "when you add your model",
-    icon: (
-      <Icon>
-        <path d="M12 4v16M5 20h14M6 8h12" />
-        <path d="m6 8-3 6h6zM18 8l-3 6h6z" />
-      </Icon>
-    ),
-  },
-];
+// The screen's six stages, named and ordered as the deal page's progress
+// rail names them (lib/screen-stages, which a test holds to the rail): the
+// first pass on the headline figures, then the extraction, the challenger,
+// the broker comps, the market check and the verdict. An icon each; the
+// trace band under the rail shows what each stage produces.
+const STAGE_ICON: Record<ScreenStageKey, ReactNode> = {
+  signal: (
+    <Icon>
+      <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+    </Icon>
+  ),
+  extract: (
+    <Icon>
+      <path d="M6 2h9l5 5v15H6z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 13h6M9 17h6" />
+    </Icon>
+  ),
+  challenge: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
+    </Icon>
+  ),
+  comps: (
+    <Icon>
+      <path d="M4 20v-9M10 20V5M16 20v-6M2 20h20" />
+    </Icon>
+  ),
+  market: (
+    <Icon>
+      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </Icon>
+  ),
+  verdict: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
+    </Icon>
+  ),
+};
+
+// Reconciling the buyer's own model is a run of its own, after the screen,
+// which re-runs the verdict (lib/anthropic/pipeline) — drawn apart from the
+// six, as the deal page's rail keeps it among its side jobs.
+const RECONCILE_ICON = (
+  <Icon>
+    <path d="M12 4v16M5 20h14M6 8h12" />
+    <path d="m6 8-3 6h6zM18 8l-3 6h6z" />
+  </Icon>
+);
 
 // Everything else the product does, as an icon and a few words. Each tile
 // opens the surface that shows it working.
@@ -824,9 +816,9 @@ export default function Home() {
             <SectionHead eyebrow="How it works" title="Six stages, same order." />
             <Reveal delay={60}>
               <ol className="stage-rail mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
-                {STAGES.map((s, i) => (
+                {SCREEN_STAGES.map((s, i) => (
                   <li
-                    key={s.title}
+                    key={s.key}
                     style={{ "--i": i } as React.CSSProperties}
                     className="hover-lift stage-cycle relative flex flex-col items-center gap-3 rounded-xl border border-line bg-surface px-3 py-5 text-center shadow-card"
                   >
@@ -834,13 +826,21 @@ export default function Home() {
                       {i + 1}
                     </span>
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                      {s.icon}
+                      {STAGE_ICON[s.key]}
                     </span>
-                    <span className="text-sm font-medium">{s.title}</span>
-                    {s.note && <span className="-mt-2 text-[11px] leading-tight text-muted">{s.note}</span>}
+                    <span className="text-sm font-medium">{s.label}</span>
                   </li>
                 ))}
               </ol>
+              {/* Apart from the six, dashed: it runs only once you add your
+                  own model. */}
+              <p className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-line px-4 py-3 text-sm">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface text-muted">
+                  {RECONCILE_ICON}
+                </span>
+                <span className="font-medium">{RECONCILE_RUN.label}</span>{" "}
+                <span className="text-muted">a run of its own, when you add your model</span>
+              </p>
             </Reveal>
           </div>
         </section>
