@@ -218,6 +218,9 @@ interface Db {
   team: { data: Row | null; error: { message: string } | null };
   deals: Row[];
   jobs: Row[];
+  /** deal_tasks rows; `tasksFail` makes their read fail */
+  tasks?: Row[];
+  tasksFail?: boolean;
   /** every call the runner made, in order */
   calls: { table: string; op: string; patch?: Row; inIds?: unknown[]; or?: string; order?: string; range?: [number, number] }[];
   /** the most rows one response holds, as a project's max rows caps a read
@@ -261,6 +264,11 @@ function fakeAdmin(db: Db): SupabaseClient {
           inIds = ids;
           return q;
         },
+        lte: (col: string, val: string) => {
+          eqs.push([`lte:${col}`, val]);
+          return q;
+        },
+        limit: () => q,
         order: (col: string) => {
           order = col;
           return q;
@@ -273,8 +281,15 @@ function fakeAdmin(db: Db): SupabaseClient {
           db.calls.push({ table, op });
           return table === "team_members" ? db.team : { data: null, error: null };
         },
-        then<T>(resolve: (v: { data: unknown; error: null }) => T) {
+        then<T>(resolve: (v: { data: unknown; error: { message: string } | null }) => T) {
           db.calls.push({ table, op, patch, inIds, or, order, range });
+          if (table === "deal_tasks") {
+            if (db.tasksFail) return Promise.resolve({ data: null, error: { message: "boom" } }).then(resolve);
+            const rows = (db.tasks ?? []).filter((t) =>
+              eqs.every(([c, v]) => (c.startsWith("lte:") ? String(t[c.slice(4)]) <= String(v) : t[c] === v)),
+            );
+            return Promise.resolve({ data: rows, error: null }).then(resolve);
+          }
           let data: unknown = null;
           let rows: Row[] | null = null;
           // A read hands back copies, as the database does.
@@ -450,6 +465,89 @@ describe("runWeeklyDigests", () => {
     const db = dbWith({ deals: [{ ...deal({ stage: "closed" }) }, { ...deal({ stage: "dead", offers_due: day(1) }) }] });
     expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(0);
     expect(sent).toEqual([]);
+  });
+});
+
+describe("the digest says what moved and the reader's own tasks (research pass 24, B1)", () => {
+  const at = (offset: number) => new Date(NOW + offset * DAY).toISOString();
+
+  it("lists the week's stage moves, newest first, with the stage each left — none older than a week", () => {
+    const deals = [
+      deal({ name: "Harbor Point", stage: "tracking", stage_history: [{ stage: "tracking", at: at(-2) }] }),
+      deal({
+        name: "The Maddox",
+        stage: "dead",
+        stage_history: [
+          { stage: "tracking", at: at(-30) },
+          { stage: "dead", at: at(-1) },
+        ],
+      }),
+      deal({ name: "Old move", stage: "tracking", stage_history: [{ stage: "tracking", at: at(-9) }] }),
+    ];
+    const out = build(deals)!;
+    expect(out.moved!.map((m) => [m.name, m.move])).toEqual([
+      ["The Maddox", "Tracking → Dead"],
+      ["Harbor Point", "to Tracking"],
+    ]);
+    expect(out.movedTotal).toBe(2);
+    const email = weeklyDigestEmail({ ...out, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` });
+    expect(email.text).toContain("Moved since last week:");
+    expect(email.text).toContain("  The Maddox: Tracking → Dead");
+    expect(email.html).toContain("Moved since last week");
+  });
+
+  it("lists the reader's overdue tasks and the week's, soonest first, never a dead deal's or a deal they cannot see", () => {
+    const harbor = deal({ name: "Harbor Point" });
+    const dead = deal({ name: "Gone", stage: "dead" });
+    const out = buildDigest([harbor, dead], new Map(), {
+      now: NOW,
+      appUrl: SITE,
+      recipient: "u1",
+      pictureUrl: () => null,
+      tasks: [
+        { title: "Order the PCA", due_date: day(2), deal_id: harbor.id },
+        { title: "Call the broker", due_date: day(-3), deal_id: harbor.id },
+        { title: "Dead deal's task", due_date: day(1), deal_id: dead.id },
+        { title: "Someone else's deal", due_date: day(1), deal_id: "not-visible" },
+        { title: "Too far out", due_date: day(9), deal_id: harbor.id },
+      ],
+    })!;
+    expect(out.myTasks!.map((t) => [t.title, t.overdue])).toEqual([
+      ["Call the broker", true],
+      ["Order the PCA", false],
+    ]);
+    const email = weeklyDigestEmail({ ...out, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` });
+    expect(email.text).toContain("Your tasks due by Sun, Oct 11:");
+    expect(email.text).toContain("  Call the broker (Harbor Point) — overdue, was due Fri, Oct 2");
+    expect(email.html).toContain("Overdue · Fri, Oct 2");
+  });
+
+  it("says a task read that failed, never shows it as none", () => {
+    const out = buildDigest([deal()], new Map(), { now: NOW, appUrl: SITE, recipient: "u1", pictureUrl: () => null, tasks: null })!;
+    expect(out.myTasksUnread).toBe(true);
+    const email = weeklyDigestEmail({ ...out, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` });
+    expect(email.text).toContain("Your tasks could not be read for this digest");
+  });
+
+  it("the runner reads the person's own tasks through the window's last day and hands them in", async () => {
+    const db = dbWith();
+    const harbor = db.deals[0].id as string;
+    db.tasks = [
+      { title: "Order the PCA", due_date: day(2), deal_id: harbor, assignee_user_id: "u1", done: false },
+      { title: "A teammate's", due_date: day(2), deal_id: harbor, assignee_user_id: "u2", done: false },
+      { title: "Done already", due_date: day(2), deal_id: harbor, assignee_user_id: "u1", done: true },
+    ];
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    expect(sent[0].text).toContain("  Order the PCA (Harbor Point) — Wed, Oct 7");
+    expect(sent[0].text).not.toContain("A teammate's");
+    expect(sent[0].text).not.toContain("Done already");
+  });
+
+  it("a failed task read still sends the digest and says so", async () => {
+    const db = dbWith({ tasksFail: true });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    expect(sent[0].text).toContain("Your tasks could not be read for this digest");
   });
 });
 

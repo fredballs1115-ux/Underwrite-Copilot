@@ -330,3 +330,50 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     );
   });
 });
+
+describe("the meeting pack: days in stage, the next step and this week (research pass 24, B1)", () => {
+  it("says how long each deal has sat and who owns its next step, an overdue step in red", async () => {
+    const ws = (
+      await load([
+        { ...STABILIZED, stageAge: { days: 12, from: "moved" }, nextStep: "Order the PCA — Jane Doe, due Oct 2 (overdue)", nextStepOverdue: true },
+        { ...CONVERSION, stageAge: { days: 3, from: "added" }, nextStep: null },
+        { ...LEGACY, stageAge: null },
+      ])
+    ).getWorksheet("Pipeline")!;
+    expect(ws.getRow(4).getCell(16).value).toBe("Days in stage");
+    expect(ws.getRow(4).getCell(17).value).toBe("Next step");
+    expect(ws.getRow(6).getCell(16).value).toBe(12);
+    expect(ws.getRow(6).getCell(17).value).toBe("Order the PCA — Jane Doe, due Oct 2 (overdue)");
+    expect(ws.getRow(6).getCell(17).font?.color?.argb).toBe("FFB23A30");
+    // Never moved: the days since it was added, said in the cell's note.
+    expect(ws.getRow(7).getCell(16).value).toBe(3);
+    expect(JSON.stringify(ws.getRow(7).getCell(16).note)).toContain("since the deal was added");
+    expect(ws.getRow(7).getCell(17).value).toBe("—");
+    // A history that cannot say is a dash, never a guessed count.
+    expect(ws.getRow(8).getCell(16).value).toBe("—");
+  });
+
+  it("a This week sheet lists what moved, and says an empty block rather than leaving it blank", async () => {
+    const buf = await buildPipelineWorkbook([STABILIZED], new Date("2026-10-05T13:00:00Z"), null, {
+      since: "2026-09-28",
+      through: "2026-10-05",
+      added: [{ dealId: "b", name: "The Maddox", at: "2026-10-02T10:00:00Z" }],
+      moved: [{ dealId: "a", name: "Harbor Point", from: "tracking", to: "dead", at: "2026-10-04T10:00:00Z" }],
+      calls: [],
+      killed: [{ dealId: "a", name: "Harbor Point", from: "tracking", to: "dead", at: "2026-10-04T10:00:00Z" }],
+    });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet("This week")!;
+    const cells: string[] = [];
+    ws.eachRow((row) => cells.push([2, 3, 4].map((c) => String(row.getCell(c).value ?? "")).join(" | ")));
+    expect(cells).toContain("NEW DEALS  ·  1 |  | ");
+    expect(cells).toContain("The Maddox | Added | 2026-10-02");
+    expect(cells).toContain("Harbor Point | Tracking → Dead | 2026-10-04");
+    expect(cells).toContain("CALLS LANDED  ·  0 |  | ");
+    expect(cells).toContain("No call landed. |  | ");
+    expect(cells).toContain("DEALS KILLED  ·  1 |  | ");
+    // Without a week, no sheet.
+    expect((await load([STABILIZED])).getWorksheet("This week")).toBeUndefined();
+  });
+});

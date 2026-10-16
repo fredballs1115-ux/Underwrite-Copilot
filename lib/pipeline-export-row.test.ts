@@ -421,4 +421,22 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal({ extraction: typed }), ctx).typedByHand).toBe(true);
     expect(pipelineExportRow(deal(), ctx).typedByHand).toBeUndefined();
   });
+
+  it("reads how long the deal has sat and its next step's owner, on the route's day (research pass 24, B1)", () => {
+    const row = pipelineExportRow(
+      deal({ stage: "tracking", stage_history: [{ stage: "tracking", at: "2026-09-01T15:00:00Z" }] }),
+      {
+        ...ctx,
+        tasks: [
+          { title: "Tour the site", assigneeUserId: "u2", dueDate: "2026-09-10", done: false, completedAt: null, createdAt: "2026-09-02T00:00:00Z" },
+        ],
+        ownerName: (id) => (id === "u2" ? "Jane Doe" : null),
+      },
+    );
+    expect(row.stageAge).toEqual({ days: 7, from: "moved" });
+    expect(row.nextStep).toBe("Tour the site — Jane Doe, due Sep 10");
+    expect(row.nextStepOverdue).toBe(false);
+    // Nothing read: no step, never an invented one.
+    expect(pipelineExportRow(deal(), ctx).nextStep).toBeNull();
+  });
 });

@@ -9,6 +9,8 @@ import {
 } from "@/lib/pipeline-workbook";
 import { pipelineExportRow } from "@/lib/pipeline-export-row";
 import { readAll, readByIds } from "@/lib/read-all";
+import { weekActivity, type PackTask } from "@/lib/meeting-pack";
+import { parseStageHistory } from "@/lib/stages";
 
 // exceljs needs the Node runtime.
 export const runtime = "nodejs";
@@ -45,6 +47,7 @@ export async function GET(req: Request) {
     user_id: string;
     team_id: string | null;
     stage: string | null;
+    stage_history: unknown;
     is_sample: boolean | null;
   };
   // Every deal, a page at a time, newest first (lib/read-all), with the
@@ -62,7 +65,7 @@ export async function GET(req: Request) {
         // The first signal and the address too: the row reads the deal's kind
         // and its buy-box fit on the pipeline page's own inputs.
         .select(
-          "id, name, asset_class, created_at, verdict, extraction, first_signal, address, site_flags, user_id, team_id, stage, is_sample",
+          "id, name, asset_class, created_at, verdict, extraction, first_signal, address, site_flags, user_id, team_id, stage, stage_history, is_sample",
         )
         .order("created_at", { ascending: false })
         .order("id")
@@ -87,13 +90,53 @@ export async function GET(req: Request) {
   // ids goes a hundred a request (lib/read-all): the whole pipeline's ids in
   // one URL ran past what a request line carries, and the jobs' one read past
   // the project's max rows (research pass 42).
-  const mateIds = Array.from(
-    new Set(
-      rows.filter((d) => d.team_id && d.user_id !== user.id).map((d) => d.user_id),
-    ),
-  );
   const dealIds = rows.map((d) => d.id);
   const failedRead = (what: string) => (e: unknown) => console.error(`[pipeline export] ${what} read failed:`, e);
+  // Every deal's open tasks, for its next step and who owns it (research
+  // pass 24, B1) — read first, since their owners are named beside the
+  // teammates who added deals. A read that fails builds no workbook, as for
+  // the deals: "no next step" would be a claim the route could not make.
+  type TaskRow = {
+    deal_id: string;
+    title: string;
+    assignee_user_id: string | null;
+    due_date: string | null;
+    done: boolean;
+    completed_at: string | null;
+    created_at: string;
+  };
+  const taskRows = await readByIds<TaskRow>(
+    dealIds,
+    (chunk) =>
+      supabase
+        .from("deal_tasks")
+        .select("deal_id, title, assignee_user_id, due_date, done, completed_at, created_at")
+        .in("deal_id", chunk)
+        .eq("done", false),
+    failedRead("task"),
+  );
+  if (!taskRows) {
+    return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
+  }
+  const tasksByDeal = new Map<string, PackTask[]>();
+  for (const t of taskRows) {
+    const list = tasksByDeal.get(t.deal_id) ?? [];
+    list.push({
+      title: t.title,
+      assigneeUserId: t.assignee_user_id,
+      dueDate: t.due_date,
+      done: t.done,
+      completedAt: t.completed_at,
+      createdAt: t.created_at,
+    });
+    tasksByDeal.set(t.deal_id, list);
+  }
+  const mateIds = Array.from(
+    new Set([
+      ...rows.filter((d) => d.team_id && d.user_id !== user.id).map((d) => d.user_id),
+      ...taskRows.map((t) => t.assignee_user_id).filter((id): id is string => !!id && id !== user.id),
+    ]),
+  );
   const [dueRows, mates, personalBox, teamBox, jobRows] = await Promise.all([
     readByIds<{ id: string; offers_due: string | null }>(
       dealIds,
@@ -163,7 +206,21 @@ export async function GET(req: Request) {
           : null,
       today,
       now: now.getTime(),
+      tasks: tasksByDeal.get(d.id) ?? [],
+      ownerName: (id) => (id === user.id ? "You" : (nameById.get(id) ?? "Teammate")),
     }),
+  );
+  // What moved in the week before the export: the "This week" sheet.
+  const week = weekActivity(
+    rows.map((d) => ({
+      id: d.id,
+      name: d.name,
+      stage: d.stage,
+      createdAt: d.created_at,
+      history: parseStageHistory(d.stage_history),
+      verdict: (d.verdict as { verdict?: string; generatedAt?: string } | null) ?? null,
+    })),
+    now.getTime(),
   );
 
   // Firm branding (Feature 6) — the caller's own identity (this is an
@@ -175,7 +232,7 @@ export async function GET(req: Request) {
     branding = null;
   }
 
-  const buffer = await buildPipelineWorkbook(exportRows, now, branding);
+  const buffer = await buildPipelineWorkbook(exportRows, now, branding, week);
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type":

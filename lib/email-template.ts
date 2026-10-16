@@ -311,6 +311,18 @@ export interface DigestInput {
    *  few, and the rest are said as "and 4 more since last week"; absent is
    *  the list's own length */
   verdictsTotal?: number;
+  /** the stage moves of the last 7 days, newest first (lib/meeting-pack):
+   *  "Screening → Tracking" — absent or empty, no section */
+  moved?: { name: string; move: string; url: string }[];
+  /** how many moves the week held — `moved` lists the newest few */
+  movedTotal?: number;
+  /** the reader's own open tasks overdue or due by `offersThrough`, soonest
+   *  first; `title` is the task as typed */
+  myTasks?: { title: string; dealName: string; url: string; due: string; overdue: boolean }[];
+  /** how many such tasks there are — `myTasks` lists the soonest few */
+  myTasksTotal?: number;
+  /** the tasks could not be read: said, never shown as none */
+  myTasksUnread?: boolean;
   pipelineUrl: string;
   settingsUrl: string;
   /** the unsubscribe link (lib/email-unsubscribe): drawn in the footer
@@ -358,6 +370,14 @@ export function weeklyDigestEmail(input: DigestInput): {
   const verdictsMore = verdictsTotal - input.verdicts.length;
   const offersMoreWords = offersMore > 0 ? `and ${offersMore} more due by ${input.offersThrough}` : null;
   const verdictsMoreWords = verdictsMore > 0 ? `and ${verdictsMore} more since last week` : null;
+  const moved = input.moved ?? [];
+  const movedMore = Math.max(input.movedTotal ?? 0, moved.length) - moved.length;
+  const movedMoreWords = movedMore > 0 ? `and ${movedMore} more since last week` : null;
+  const myTasks = input.myTasks ?? [];
+  const tasksMore = Math.max(input.myTasksTotal ?? 0, myTasks.length) - myTasks.length;
+  const tasksMoreWords = tasksMore > 0 ? `and ${tasksMore} more due by ${input.offersThrough}` : null;
+  const tasksTitle = `Your tasks due by ${input.offersThrough}`;
+  const tasksUnreadWords = "Your tasks could not be read for this digest — open My tasks to see them.";
 
   const text = [
     `Your pipeline this week — ${dealsWord}, by stage:`,
@@ -371,6 +391,15 @@ export function weeklyDigestEmail(input: DigestInput): {
     input.verdicts.length ? `Verdicts since last week:` : null,
     ...input.verdicts.map((v) => `  ${v.label}: ${v.name}${v.note ? ` (${v.note})` : ""} — ${v.url}`),
     verdictsMoreWords ? `  ${verdictsMoreWords}` : null,
+    moved.length ? `` : null,
+    moved.length ? `Moved since last week:` : null,
+    ...moved.map((m) => `  ${m.name}: ${m.move} — ${m.url}`),
+    movedMoreWords ? `  ${movedMoreWords}` : null,
+    myTasks.length || input.myTasksUnread ? `` : null,
+    myTasks.length ? `${tasksTitle}:` : null,
+    ...myTasks.map((t) => `  ${t.title} (${t.dealName}) — ${t.overdue ? `overdue, was due ${t.due}` : t.due}: ${t.url}`),
+    tasksMoreWords ? `  ${tasksMoreWords}` : null,
+    input.myTasksUnread ? tasksUnreadWords : null,
     ``,
     `Open the pipeline: ${input.pipelineUrl}`,
     ``,
@@ -451,6 +480,28 @@ export function weeklyDigestEmail(input: DigestInput): {
     : null;
   const verdictsMoreHtml = verdictsMoreWords ? esc(verdictsMoreWords) : null;
 
+  // The week's stage moves, and the reader's own tasks — the meeting's two
+  // questions a count by stage cannot answer (research pass 24, B1).
+  const movedRows = moved
+    .map(
+      (m) => `<tr>
+        <td style="padding:4px 0;font-size:13px;vertical-align:middle;"><a href="${esc(m.url)}" style="color:#18211f;font-weight:600;text-decoration:none;">${esc(m.name)}</a></td>
+        <td style="padding:4px 0 4px 16px;font-size:13px;color:#5f6b69;text-align:right;vertical-align:middle;">${esc(m.move)}</td>
+      </tr>`,
+    )
+    .join("");
+  const taskRows = myTasks
+    .map(
+      (t) => `<tr>
+        <td style="padding:4px 0;font-size:13px;vertical-align:middle;">${esc(t.title)}<br /><a href="${esc(t.url)}" style="font-size:12px;color:#114e54;text-decoration:none;">${esc(t.dealName)}</a></td>
+        <td style="padding:4px 0 4px 16px;font-size:13px;font-weight:600;color:${t.overdue ? "#b23a30" : "#18211f"};text-align:right;white-space:nowrap;vertical-align:middle;">${t.overdue ? `Overdue · ${esc(t.due)}` : esc(t.due)}</td>
+      </tr>`,
+    )
+    .join("");
+  const tasksUnreadHtml = input.myTasksUnread
+    ? `<p style="margin:20px 0 0;font-size:13px;color:#a05a1c;">${esc(tasksUnreadWords)}</p>`
+    : "";
+
   const html = emailDocument({
     title: subject,
     preheader,
@@ -462,6 +513,8 @@ export function weeklyDigestEmail(input: DigestInput): {
             ${section("Open deals by stage", stageRows)}
             ${section(offersTitle, offerRows, offersMoreHtml)}
             ${section("Verdicts since last week", verdictRows, verdictsMoreHtml)}
+            ${section("Moved since last week", movedRows, movedMoreWords ? esc(movedMoreWords) : null)}
+            ${section(tasksTitle, taskRows, tasksMoreWords ? esc(tasksMoreWords) : null)}${tasksUnreadHtml}
             ${button(input.pipelineUrl, "Open the pipeline")}
           </td>
         </tr>${footerRow(

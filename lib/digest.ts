@@ -2,7 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { weeklyDigestEmail, type DigestInput } from "@/lib/email-template";
 import { sendEmail, emailEnabled, occasionKey } from "@/lib/email";
-import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage } from "@/lib/stages";
+import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage, parseStageHistory } from "@/lib/stages";
+import { moveText, weekActivity } from "@/lib/meeting-pack";
 import { emailPictureUrl } from "@/lib/email-picture";
 import { emailUnsubscribeUrl, oneClickHeaders } from "@/lib/email-unsubscribe";
 import { appUrl } from "@/lib/app-url";
@@ -56,7 +57,22 @@ export interface DigestDealRow {
   is_sample?: boolean | null;
   user_id: string;
   team_id: string | null;
+  /** the deal's stage moves (deals.stage_history), for "Moved this week" */
+  stage_history?: unknown;
+  created_at?: string | null;
 }
+
+/** One open task assigned to the person the digest goes to. */
+export interface DigestTaskRow {
+  title: string;
+  /** yyyy-mm-dd */
+  due_date: string;
+  deal_id: string;
+}
+
+/** How many of the person's tasks the runner reads at once: the overdue and
+ *  the week's, soonest first. */
+export const DIGEST_TASKS_READ = 50;
 
 /** A deal's job row, as far as the digest reads it. */
 export interface DigestJobRow extends JobLike {
@@ -74,7 +90,17 @@ export function digestWeek(now: number): string {
 /** What one person's digest says, before the links around it. */
 export type DigestContent = Pick<
   DigestInput,
-  "stages" | "offersDue" | "offersDueTotal" | "offersThrough" | "verdicts" | "verdictsTotal"
+  | "stages"
+  | "offersDue"
+  | "offersDueTotal"
+  | "offersThrough"
+  | "verdicts"
+  | "verdictsTotal"
+  | "moved"
+  | "movedTotal"
+  | "myTasks"
+  | "myTasksTotal"
+  | "myTasksUnread"
 > & { offersDueTotal: number; verdictsTotal: number };
 
 const generatedAt = (d: DigestDealRow): string => d.verdict?.generatedAt ?? "";
@@ -141,6 +167,11 @@ export function buildDigest(
      *  them, and serves only while they can still read its deal */
     recipient: string;
     pictureUrl?: (dealId: string) => string | null;
+    /** the open tasks assigned to the recipient that are overdue or due by
+     *  the window's last day (research pass 24, B1); null where the read
+     *  failed — the digest says so rather than "none" — and absent where
+     *  none was read */
+    tasks?: readonly DigestTaskRow[] | null;
   },
 ): DigestContent | null {
   const { now } = opts;
@@ -189,6 +220,43 @@ export function buildDigest(
     };
   });
 
+  // What moved in the seven days before the digest (lib/meeting-pack, the
+  // meeting workbook's own read): every stage move on a deal the person
+  // sees, newest first, the stage it left where the history says it.
+  const week = weekActivity(
+    deals.map((d) => ({
+      id: d.id,
+      name: d.name,
+      stage: d.stage ?? null,
+      createdAt: d.created_at ?? "",
+      history: parseStageHistory(d.stage_history),
+      verdict: null,
+    })),
+    now,
+  );
+  const moved = week.moved.slice(0, LIST_MAX).map((m) => ({
+    name: m.name,
+    move: moveText(m),
+    url: dealUrl(m.dealId),
+  }));
+
+  // The person's own tasks: overdue first, then the window's, on deals still
+  // in play or closed — a dead deal's to-dos are no one's — soonest first.
+  const names = new Map(deals.map((d) => [d.id, d]));
+  const mine = (opts.tasks ?? [])
+    .filter((t) => {
+      const d = names.get(t.deal_id);
+      return !!d && normalizeStage(d.stage ?? null) !== "dead" && t.due_date <= lastDay;
+    })
+    .sort((a, b) => a.due_date.localeCompare(b.due_date) || a.title.localeCompare(b.title));
+  const myTasks = mine.slice(0, LIST_MAX).map((t) => ({
+    title: t.title,
+    dealName: names.get(t.deal_id)!.name,
+    url: dealUrl(t.deal_id),
+    due: DUE_FMT.format(new Date(`${t.due_date}T00:00:00Z`)),
+    overdue: t.due_date < today,
+  }));
+
   return {
     stages,
     offersDue,
@@ -196,6 +264,11 @@ export function buildDigest(
     offersThrough: DUE_FMT.format(through),
     verdicts,
     verdictsTotal: calls.length,
+    moved,
+    movedTotal: week.moved.length,
+    myTasks,
+    myTasksTotal: mine.length,
+    myTasksUnread: opts.tasks === null,
   };
 }
 
@@ -288,7 +361,7 @@ export async function runWeeklyDigests(
         (from, to) => {
           const query = admin
             .from("deals")
-            .select("id, name, stage, offers_due, verdict, updated_at, is_sample, user_id, team_id");
+            .select("id, name, stage, offers_due, verdict, updated_at, is_sample, user_id, team_id, stage_history, created_at");
           return (teamId ? query.or(`user_id.eq.${profile.id},team_id.eq.${teamId}`) : query.eq("user_id", profile.id))
             .order("id")
             .range(from, to);
@@ -316,7 +389,28 @@ export async function runWeeklyDigests(
         else jobs = newestJobs((jobRows ?? []) as DigestJobRow[]);
       }
 
-      const content = buildDigest(deals, jobs, { now, appUrl: site, recipient: profile.id });
+      // The person's own open tasks, overdue or due by the window's last day
+      // (research pass 24, B1), on the deals they see: the service role
+      // reads past RLS, so a task on a deal they can no longer read is
+      // dropped by the builder against their deal list. A failed read is
+      // said in the email, never shown as no tasks.
+      const lastDay = new Date(
+        Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00Z`) + (OFFERS_WINDOW_DAYS - 1) * DAY_MS,
+      )
+        .toISOString()
+        .slice(0, 10);
+      const { data: taskRows, error: tasksErr } = await admin
+        .from("deal_tasks")
+        .select("title, due_date, deal_id")
+        .eq("assignee_user_id", profile.id)
+        .eq("done", false)
+        .lte("due_date", lastDay)
+        .order("due_date")
+        .limit(DIGEST_TASKS_READ);
+      if (tasksErr) console.error(`[digest] task read failed for ${profile.id} — said in the email:`, tasksErr.message);
+      const tasks = tasksErr ? null : ((taskRows ?? []) as DigestTaskRow[]).filter((t) => !!t.due_date);
+
+      const content = buildDigest(deals, jobs, { now, appUrl: site, recipient: profile.id, tasks });
       if (!content) continue; // nothing open — nothing to say
 
       const { data: userRes } = await admin.auth.admin.getUserById(profile.id);

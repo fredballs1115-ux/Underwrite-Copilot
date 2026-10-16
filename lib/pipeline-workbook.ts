@@ -10,6 +10,7 @@ import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
 import { CAP_WITHHELD, PLAN_CAP_NA } from "@/lib/cap-slot";
 import { debtTagMeaning } from "@/lib/pipeline-tags";
 import { YOC_WITHHELD } from "@/lib/plan-facts";
+import { moveText, type StageAge, type WeekActivity } from "@/lib/meeting-pack";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -175,6 +176,14 @@ export interface PipelineExportRow {
   offersDue: string | null; // YYYY-MM-DD
   createdAt: string; // ISO
   addedBy: string | null;
+  /** how long the deal has sat in its stage on the export's day (lib/
+   *  meeting-pack `stageAge`) — null where the stage history cannot say */
+  stageAge?: StageAge | null;
+  /** the deal's next step — its soonest open task, its owner and its day
+   *  (lib/meeting-pack `nextStepText`) — null where it has none */
+  nextStep?: string | null;
+  /** that step is past its day */
+  nextStepOverdue?: boolean;
   /** the deal was typed by hand, its figures extracted from no OM
    *  (lib/manual-deal `typedByHand`): the summary says so where any is
    *  among the rows (audit C6, LOW-7) */
@@ -201,6 +210,9 @@ export async function buildPipelineWorkbook(
   rows: PipelineExportRow[],
   exportedAt: Date,
   branding?: ExportBranding | null,
+  /** what moved in the seven days before the export (lib/meeting-pack
+   *  `weekActivity`): the "This week" sheet, left out where not given */
+  week?: WeekActivity | null,
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
@@ -231,6 +243,8 @@ export async function buildPipelineWorkbook(
     { width: 12 }, // Offers due
     { width: 12 }, // Added
     { width: 16 }, // Added by
+    { width: 12 }, // Days in stage
+    { width: 40 }, // Next step — "Order the PCA — Jane Doe, due Oct 20" wraps
   ];
   // Printed as a meeting reads it: landscape, one page wide however many
   // deals run down it, the header row on every page. With no page setup the
@@ -268,6 +282,8 @@ export async function buildPipelineWorkbook(
     "Offers due",
     "Added",
     "Added by",
+    "Days in stage",
+    "Next step",
   ];
   const headRow = ws.getRow(HEAD_ROW);
   HEADERS.forEach((h, i) => {
@@ -276,12 +292,20 @@ export async function buildPipelineWorkbook(
     c.font = { bold: true, size: 10, color: { argb: WHITE } };
     c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND } };
     c.alignment = {
-      horizontal: i >= 5 && i <= 7 ? "right" : "left",
+      horizontal: (i >= 5 && i <= 7) || h === "Days in stage" ? "right" : "left",
       vertical: "middle",
       // The Buy box column sets its words off the right-aligned yield on
       // cost beside it: printed one page wide, "—Outside" read as one word.
       ...(h === "Buy box" ? { indent: 1 } : {}),
     };
+    if (h === "Days in stage") {
+      c.note =
+        "Whole days since the deal moved to its stage, or since it was added where it has sat in Screening since. " +
+        "Blank where the stage history cannot say.";
+    }
+    if (h === "Next step") {
+      c.note = "The deal's soonest open task: its title as typed, who owns it and when it is due.";
+    }
     if (h === "Yield on cost") {
       c.note =
         "Plan deals — value-add, lease-up, conversion, development — are judged on yield on total cost, " +
@@ -492,6 +516,23 @@ export async function buildPipelineWorkbook(
       row.getCell(14).font = baseFont;
       row.getCell(15).value = d.addedBy ?? "";
       row.getCell(15).font = baseFont;
+
+      // How long it has sat, and who owns what comes next — the meeting's
+      // two questions a stage alone cannot answer (research pass 24, B1).
+      const ageCell = row.getCell(16);
+      if (d.stageAge) {
+        ageCell.value = d.stageAge.days;
+        if (d.stageAge.from === "added") ageCell.note = "No stage move yet: days since the deal was added.";
+      } else {
+        ageCell.value = "—";
+      }
+      ageCell.font = baseFont;
+      ageCell.alignment = { horizontal: "right" };
+      const stepCell = row.getCell(17);
+      stepCell.value = d.nextStep ?? "—";
+      stepCell.alignment = { wrapText: true };
+      stepCell.font =
+        d.nextStepOverdue && !isDead ? { size: 10, bold: true, color: { argb: KILL } } : baseFont;
       lastDealRow = rowN;
       rowN++;
     }
@@ -634,6 +675,8 @@ export async function buildPipelineWorkbook(
     color: { argb: planLive ? INK : MUTED },
   };
 
+  if (week) addWeekSheet(wb, week, exportedAt);
+
   // Firm branding (Feature 6): file properties + print chrome only — the
   // meeting workbook is the artifact most likely to be projected, so it
   // carries the same identity as every other export.
@@ -641,4 +684,74 @@ export async function buildPipelineWorkbook(
 
   const out = await wb.xlsx.writeBuffer();
   return Buffer.from(out as ArrayBuffer);
+}
+
+const VERDICT_WORD: Record<string, string> = { pass: "Go", caution: "Caution", pass_on: "No-go" };
+
+/**
+ * "This week": what moved in the seven days before the export — the deals
+ * added, the stage moves, the calls landed and the deals killed, each a
+ * block with its count, newest first. A block with nothing in it says so in
+ * one line rather than leaving a reader to wonder whether it was read.
+ */
+function addWeekSheet(wb: ExcelJS.Workbook, week: WeekActivity, exportedAt: Date): void {
+  const ws = wb.addWorksheet("This week");
+  ws.columns = [{ width: 2 }, { width: 38 }, { width: 30 }, { width: 14 }];
+  ws.pageSetup = {
+    ...ws.pageSetup,
+    orientation: "portrait",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: PRINT_MARGINS,
+  };
+  ws.getCell("B2").value = "This week";
+  ws.getCell("B2").font = { bold: true, size: 16, color: { argb: INK } };
+  ws.getCell("B3").value = `${week.since} through ${week.through} (UTC) — exported ${exportedAt.toISOString().slice(0, 10)}.`;
+  ws.getCell("B3").font = { size: 10, color: { argb: MUTED }, italic: true };
+
+  let r = 5;
+  const block = (title: string, rows: [string, string, string][], empty: string) => {
+    const h = ws.getCell(`B${r}`);
+    h.value = `${title.toUpperCase()}  ·  ${rows.length}`;
+    h.font = { bold: true, size: 10, color: { argb: BRAND } };
+    r++;
+    if (!rows.length) {
+      ws.getCell(`B${r}`).value = empty;
+      ws.getCell(`B${r}`).font = { size: 10, italic: true, color: { argb: MUTED } };
+      r++;
+    }
+    for (const [a, b, c] of rows) {
+      ws.getCell(`B${r}`).value = a;
+      ws.getCell(`B${r}`).font = { size: 10, bold: true, color: { argb: INK } };
+      ws.getCell(`B${r}`).alignment = { wrapText: true };
+      ws.getCell(`C${r}`).value = b;
+      ws.getCell(`C${r}`).font = { size: 10, color: { argb: INK } };
+      ws.getCell(`D${r}`).value = c;
+      ws.getCell(`D${r}`).font = { size: 10, color: { argb: MUTED } };
+      r++;
+    }
+    r++;
+  };
+  const day = (iso: string) => iso.slice(0, 10);
+  block(
+    "New deals",
+    week.added.map((d) => [d.name, "Added", day(d.at)]),
+    "No deal added.",
+  );
+  block(
+    "Stage moves",
+    week.moved.map((m) => [m.name, moveText(m), day(m.at)]),
+    "No deal changed stage.",
+  );
+  block(
+    "Calls landed",
+    week.calls.map((c) => [c.name, VERDICT_WORD[c.verdict] ?? "Screened", day(c.at)]),
+    "No call landed.",
+  );
+  block(
+    "Deals killed",
+    week.killed.map((m) => [m.name, moveText(m), day(m.at)]),
+    "No deal was moved to Dead.",
+  );
 }

@@ -34,6 +34,8 @@ import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { screenedDay, verdictBehind, type JobLike } from "@/lib/screen-run";
 import { shownAssetClass, statedCapSlot } from "@/lib/pipeline-slots";
 import type { PipelineExportRow } from "@/lib/pipeline-workbook";
+import { parseStageHistory } from "@/lib/stages";
+import { nextStepOf, nextStepText, stageAge, type PackTask } from "@/lib/meeting-pack";
 
 /** The deal columns the workbook's row reads. */
 export interface ExportDeal {
@@ -53,6 +55,8 @@ export interface ExportDeal {
    *  the deal has now */
   site_flags?: unknown;
   stage: string | null;
+  /** the deal's stage moves (deals.stage_history), for how long it has sat */
+  stage_history?: unknown;
 }
 
 /** What the route read beside the deal. */
@@ -74,6 +78,11 @@ export interface ExportRowContext {
    *  progress by then is stalled, never "Re-screening" (lib/screen-run
    *  `isStalled`); the caller's clock where it is not given */
   now?: number;
+  /** the deal's open tasks, for its next step (lib/meeting-pack) — absent
+   *  where none was read, and the cell says none */
+  tasks?: readonly PackTask[];
+  /** a task owner's name by user id — the reader is "You" */
+  ownerName?: (userId: string) => string | null;
 }
 
 export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): PipelineExportRow {
@@ -203,5 +212,12 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     ...(typedByHand(extraction) ? { typedByHand: true } : {}),
     createdAt: d.created_at,
     addedBy: ctx.addedBy,
+    // How long it has sat where it is, and who owns its next step (research
+    // pass 24, B1), on the route's day.
+    stageAge: stageAge(d.stage, parseStageHistory(d.stage_history), d.created_at, ctx.today),
+    ...(() => {
+      const step = nextStepOf(ctx.tasks ?? [], ctx.today, ctx.ownerName ?? (() => null));
+      return step ? { nextStep: nextStepText(step, ctx.today), nextStepOverdue: step.overdue } : { nextStep: null };
+    })(),
   };
 }
