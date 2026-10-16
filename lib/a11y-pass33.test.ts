@@ -185,10 +185,11 @@ describe("the homepage's running trace can be stopped (research pass 33, item 21
     expect(wrapper?.[1]).toBe("data-[ticker-paused]:[--screenrun-play:paused]");
     // The button is the wrapper's first child, before the aria-hidden block.
     expect(html.indexOf('aria-label="Pause the trace"')).toBeLessThan(html.indexOf('aria-hidden="true"', html.indexOf("relative mt-4")));
-    // Six lines and the caret, each following the button's state inline.
+    // A line a stage — the pipeline's six and the reconciliation after
+    // them — and the caret, each following the button's state inline.
     const lines = html.match(/class="screenrun-line[^"]*"/g) ?? [];
-    expect(lines).toHaveLength(6);
-    expect(html.match(/animation-play-state:var\(--screenrun-play, running\)/g)).toHaveLength(7);
+    expect(lines).toHaveLength(7);
+    expect(html.match(/animation-play-state:var\(--screenrun-play, running\)/g)).toHaveLength(8);
     expect(a11yIssues(html)).toEqual([]);
   });
 });

@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
 import { renderToStaticMarkup } from "react-dom/server";
-import { a11yIssues } from "./render-lint";
+import { readFileSync } from "node:fs";
+import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { ScreenRunStrip, STRIP_STAGES, STRIP_WORDS, screenRunLines } from "@/app/screen-run-strip";
+import { COMP_RATING, LEVER_META, TONE } from "@/app/(app)/deals/[id]/deal-sections";
 import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
 import { fmtEm, fmtPct } from "./underwrite/playground";
 import type { SampleLegal } from "./sample-legal";
@@ -234,5 +237,38 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     expect(bench).toContain(`Equity multiple ${returns.equityMultiple}`);
     expect(panel).toContain(`Base ${sampleWorkbookPreview()[1][1]}`);
     expect(panel).not.toContain("8.72%");
+  });
+});
+
+// The trace credited the deal-killers to the challenger ("3 deal-killers
+// stressed first" on its line); they are the verdict's (lib/anthropic/prompts
+// `verdictInstruction`). Each line now says what its own stage writes, in the
+// pipeline's order, in the product's own words.
+describe("the screen-run trace credits each stage with what it writes", () => {
+  const lines = () => Object.fromEntries(screenRunLines());
+
+  it("runs in the pipeline's order, the reconciliation after it", () => {
+    const view = readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8");
+    const pipeline = JSON.parse(/const PIPELINE = (\[[^\]]*\]);/.exec(view)![1]) as string[];
+    expect(screenRunLines().map(([stage]) => stage)).toEqual([...pipeline, "reconcile"]);
+    expect([...STRIP_STAGES]).toEqual([...pipeline, "reconcile"]);
+  });
+
+  it("puts the deal-killers on the verdict's line, in the order its cards draw them", () => {
+    const l = lines();
+    expect(l.challenge).not.toMatch(/deal-killer/);
+    const levers = SAMPLE_DEAL.verdict.screen!.dealKillers.map((k) => k.lever);
+    expect(l.verdict).toContain(`${levers.length} deal-killers stressed first: ${["basis", "exit", "debt"].filter((x) => levers.includes(x as never)).join(" · ")}`);
+    expect(l.challenge).toContain(`${SAMPLE_DEAL.challenges.challenges.length} assumptions challenged`);
+    expect(l.challenge).toContain("each with a question for the broker");
+  });
+
+  it("speaks the product's own words for a lever, a comp's rating and a market read", () => {
+    for (const [k, word] of Object.entries(STRIP_WORDS.lever)) expect(word).toBe(LEVER_META[k as keyof typeof LEVER_META].label.toLowerCase());
+    for (const [k, word] of Object.entries(STRIP_WORDS.comp)) expect(word).toBe(COMP_RATING[k as keyof typeof COMP_RATING].label.toLowerCase());
+    for (const [k, word] of Object.entries(STRIP_WORDS.market)) expect(word).toBe(TONE[k as keyof typeof TONE].label.toLowerCase());
+    const html = renderToStaticMarkup(React.createElement(ScreenRunStrip));
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
   });
 });

@@ -922,7 +922,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 
 // "favorable" means broker-favorable — label it honestly so a screener never
 // reads the middle tier as good news.
-const COMP_RATING = {
+export const COMP_RATING = {
   supports: { label: "Supports", badge: "bg-pass/10 text-pass", rank: 2 },
   favorable: { label: "Leans favorable", badge: "bg-caution/10 text-caution", rank: 1 },
   stretched: { label: "Stretched", badge: "bg-kill/10 text-kill", rank: 0 },
@@ -1687,7 +1687,7 @@ export function ReconcileSection({
 /* 5 — Market plausibility check                                       */
 /* ================================================================== */
 
-const TONE = {
+export const TONE = {
   "in-line": { badge: "bg-pass/10 text-pass", label: "In-line" },
   aggressive: { badge: "bg-kill/10 text-kill", label: "Aggressive" },
   conservative: { badge: "bg-brand/10 text-brand", label: "Conservative" },
@@ -2261,7 +2261,7 @@ export function VerdictView({
 /* The pre-model screen: ranges + provenance + the three deal-killers */
 /* ------------------------------------------------------------------ */
 
-const LEVER_META: Record<
+export const LEVER_META: Record<
   DealKiller["lever"],
   { label: string; blurb: string }
 > = {
