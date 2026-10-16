@@ -729,6 +729,43 @@ describe("ReportDocument (full report)", () => {
     );
   }, 60000);
 
+  it("prints the base case's years on a page of their own: the NOI, the debt service, the sale and the IRR's own stream (research pass 24, B2)", async () => {
+    const extraction = { ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null, { sources: derived.sources });
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    const b = sensitivity.baseCase!;
+    const a = b.annual!;
+    const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+    expect(text).toContain("The annual cash flow");
+    expect(text).toContain(`the base case, ${a.years.length} years`);
+    // The rows, each year's figure the engine's.
+    expect(text).toContain(`Net operating income ${a.years.map((y) => usd(y.noi)).join(" ")}`);
+    expect(text).toContain(`Debt service ${a.years.map((y) => `(${usd(y.debtService)})`).join(" ")}`);
+    // The IRR's own stream, the closing's equity out first.
+    expect(text).toContain(`Cash to equity (${usd(a.equity)})`);
+    expect(text).toContain(`Cash to equity is the stream the base case's ${(b.leveredIrr! * 100).toFixed(1)}% levered IRR is solved on.`);
+    // The sale, and what grows each year with its source.
+    expect(text).toContain(`The sale, at the end of year ${a.sale.year}: the following year's NOI of ${usd(a.sale.forwardNoi)} at the 5.45% exit cap (derived)`);
+    expect(text).toContain(`${usd(a.sale.net)} to equity.`);
+    expect(text).toMatch(/Each year rent grows [\d.]+% a year \(assumption\)/);
+    expect(text).toContain("where the memorandum is silent the model's defaults stand, each marked assumption");
+  }, 60000);
+
   it("labels the retrade grid's base row the modelled price, never the ask, and says what the model priced it at", async () => {
     const render = async (extraction: ExtractionResult) => {
       const deal = {

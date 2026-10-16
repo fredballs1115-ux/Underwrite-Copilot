@@ -20,6 +20,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
 import { nameBreaks } from "./pdf-text";
+import { cashCell } from "@/lib/underwrite/annual-cash-flow";
 import { rangeInOrder } from "@/lib/verdict-range";
 import { typicalRangeParts } from "@/lib/typical-range";
 
@@ -1530,6 +1531,109 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
 }
 
 /**
+ * What grows the base case's years, and where each came from: rent growth,
+ * expense growth and the vacancy, each with its provenance — a default said
+ * as an assumption, so a committee never reads the model's defaults as the
+ * sponsor's case (research pass 24, B2).
+ */
+export function annualDriversLine(b: BaseCase, totalPages: number | null): string {
+  const tag = (src: InputSource | null | undefined) => (src ? ` (${provenanceOf(src, totalPages)})` : "");
+  const pct = (d: number | undefined) => (d == null || !Number.isFinite(d) ? null : `${Number((d * 100).toFixed(2))}%`);
+  const parts = [
+    pct(b.rentGrowth) != null ? `rent grows ${pct(b.rentGrowth)} a year${tag(b.rentGrowthSource)}` : null,
+    pct(b.expenseGrowth) != null ? `expenses ${pct(b.expenseGrowth)} a year${tag(b.expenseGrowthSource)}` : null,
+    pct(b.vacancy) != null ? `vacancy holds at ${pct(b.vacancy)} of potential revenue${tag(b.vacancySource)}` : null,
+  ].filter((p): p is string => p != null);
+  return (
+    (parts.length ? `Each year ${parts.join(", ")}. ` : "") +
+    "The loan, its rate and the yearly fees are the base case's, named under the grids; where the memorandum is silent the model's defaults stand, each marked assumption."
+  );
+}
+
+/**
+ * The base case's years (lib/underwrite/annual-cash-flow, research pass 24
+ * B2): a column a year, the closing before them, rows from the revenue down
+ * to the cash to equity — the levered IRR's own stream — then the sale in
+ * one sentence and what grows each year in another. Money out in brackets.
+ */
+function AnnualCashFlowBlock({ b, totalPages }: { b: BaseCase; totalPages: number | null }) {
+  const a = b.annual!;
+  const n = a.years.length;
+  const fontSize = n <= 7 ? 7 : 6;
+  const labelW = 118;
+  const colW = `${(100 / (n + 1)).toFixed(3)}%`;
+  type Row = { label: string; close: number | null; years: (number | null)[]; bold?: boolean };
+  const out = (k: keyof (typeof a.years)[number]) => a.years.map((y) => -(y[k] as number));
+  const rows: Row[] = [
+    { label: "Effective gross revenue", close: null, years: a.years.map((y) => y.egi) },
+    { label: "Operating expenses", close: null, years: out("opex") },
+    { label: "Net operating income", close: null, years: a.years.map((y) => y.noi), bold: true },
+    ...(a.hasCapital ? [{ label: "Capital and reserves", close: null, years: out("capital") }] : []),
+    ...(a.hasAmFee ? [{ label: "Asset-management fee", close: null, years: out("amFee") }] : []),
+    { label: "Debt service", close: null, years: out("debtService") },
+    { label: "Cash after debt", close: null, years: a.years.map((y) => y.cashAfterDebt), bold: true },
+    { label: "Net sale proceeds", close: null, years: a.years.map((_, i) => (i === n - 1 ? a.sale.net : null)) },
+    { label: "Cash to equity", close: a.toEquity[0], years: a.toEquity.slice(1), bold: true },
+  ];
+  const cell = (v: number | null, bold?: boolean, key?: string) => (
+    <View key={key} style={{ width: colW, alignItems: "flex-end" }}>
+      <Text style={{ fontSize, color: C.ink, fontFamily: bold ? "Helvetica-Bold" : "Helvetica" }}>{v == null ? "" : cashCell(v)}</Text>
+    </View>
+  );
+  const irrWords =
+    b.leveredIrr != null && Number.isFinite(b.leveredIrr)
+      ? `Cash to equity is the stream the base case's ${(b.leveredIrr * 100).toFixed(1)}% levered IRR is solved on.`
+      : b.noIrr
+        ? `No levered IRR solves on this stream: ${NO_IRR_WHY[b.noIrr]}.`
+        : null;
+  const exitTag = b.exitCapSource ? ` (${provenanceOf(b.exitCapSource, totalPages)})` : "";
+  return (
+    <View>
+      <View style={{ flexDirection: "row", borderBottomWidth: 0.7, borderColor: C.line, paddingBottom: 3, marginBottom: 3 }}>
+        <Text style={{ width: labelW, fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{"YEAR"}</Text>
+        <View style={{ flex: 1, flexDirection: "row" }}>
+          <View style={{ width: colW, alignItems: "flex-end" }}>
+            <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{"CLOSE"}</Text>
+          </View>
+          {a.years.map((y) => (
+            <View key={y.year} style={{ width: colW, alignItems: "flex-end" }}>
+              <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{String(y.year)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      {rows.map((r) => (
+        <View
+          key={r.label}
+          wrap={false}
+          style={{
+            flexDirection: "row",
+            paddingVertical: 2,
+            ...(r.bold ? { borderTopWidth: 0.5, borderColor: C.line } : {}),
+          }}
+        >
+          <Text style={{ width: labelW, fontSize, color: r.bold ? C.ink : C.muted, fontFamily: r.bold ? "Helvetica-Bold" : "Helvetica" }}>
+            {r.label}
+          </Text>
+          <View style={{ flex: 1, flexDirection: "row" }}>
+            {cell(r.close, r.bold, "close")}
+            {r.years.map((v, i) => cell(v, r.bold, String(i)))}
+          </View>
+        </View>
+      ))}
+      <Text style={{ fontSize: 8, color: C.ink, marginTop: 8 }}>
+        {str(
+          `The sale, at the end of year ${a.sale.year}: the following year's NOI of ${cashCell(a.sale.forwardNoi)} at the ${(a.sale.exitCap * 100).toFixed(2)}% exit cap${exitTag} is ${cashCell(a.sale.gross)}; less ${cashCell(a.sale.costs)} of sale costs and the loan's ${cashCell(a.sale.loanPayoff)} payoff, ${cashCell(a.sale.net)} to equity.`,
+        )}
+      </Text>
+      {irrWords ? <Text style={{ fontSize: 8, color: C.ink, marginTop: 3 }}>{str(irrWords)}</Text> : null}
+      <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 6 }}>{str(annualDriversLine(b, totalPages))}</Text>
+      {b.capitalLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 3 }}>{str(b.capitalLine)}</Text> : null}
+    </View>
+  );
+}
+
+/**
  * The max bid, or why there is none, for what the price buys (lib/interest).
  * A note's model runs the collateral at the loan's price, so a bid solved on
  * it is a price for the building, never for the note: none prints. Nor on a
@@ -2239,7 +2343,7 @@ export function ReportDocument({
               // view in the model").
               `Reference cap: ${fmtPct(plan.refCap.pct, 2)}, ${refCapNote(
                 plan.refCap.provenance,
-              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return — this grid is.`,
+              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal, and the annual cash flow with it: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return — this grid is.`,
             )}
           </Text>
 
@@ -2402,6 +2506,31 @@ export function ReportDocument({
           <AssumableBlock view={input.assumable} />
           <AssumableBlock view={input.sellerNote} />
           <LeaseholdBlock view={input.leasehold} />
+        </PageChrome>
+      )}
+
+      {/* The base case's years on paper (research pass 24, B2): the NOI,
+          the debt service and the sale behind the IRR the grids grade —
+          wherever the base case prints, never on a plan deal (whose plan
+          page says why) or where the returns are withheld. */}
+      {sensitivity?.baseCase?.annual && sensitivity.baseCase.annual.years.length > 0 && (
+        <PageChrome
+          title="The annual cash flow"
+          count={`the base case, ${sensitivity.baseCase.annual.years.length} year${sensitivity.baseCase.annual.years.length === 1 ? "" : "s"}`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
+          <Text style={s.sub}>
+            {str(
+              "The base case the grids are struck around, a year at a time: what the building earns, what the loan takes, and the sale at the end. Money out is in brackets.",
+            )}
+          </Text>
+          {interest?.modelCaveat ? (
+            <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
+              {str(`${interest.label}: ${caveatOnPaper(interest.modelCaveat, input.leasehold)}`)}
+            </Text>
+          ) : null}
+          <AnnualCashFlowBlock b={sensitivity.baseCase} totalPages={totalPages} />
         </PageChrome>
       )}
 

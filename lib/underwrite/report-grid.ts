@@ -9,6 +9,7 @@ import type { CompareModel, ModelReturnsRead } from "@/lib/compare-interest";
 import { findingWithholdsReturns, type PlausibilityFinding } from "@/lib/deal-strategy";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import { costAssumptionsLine, yearOneCapitalLine } from "./cost-note";
+import { annualCashFlowOf, type AnnualCashFlow } from "./annual-cash-flow";
 import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
 import { NO_IRR_SHORT, NO_IRR_WHY, noIrrWhy, type NoIrrWhy } from "./no-irr";
@@ -429,6 +430,18 @@ export interface BaseCase {
    *  model spends capital in year 1 (lib/underwrite/cost-note
    *  `yearOneCapitalLine`); null where it spends none */
   capitalLine: string | null;
+  /** the base case's years, from the same engine run (lib/underwrite/
+   *  annual-cash-flow, research pass 24 B2): the report's annual cash flow
+   *  page; absent on a bundle built before it was recorded */
+  annual?: AnnualCashFlow;
+  /** what grows each year's figures, each with its source: rent growth,
+   *  expense growth and the vacancy, decimals */
+  rentGrowth?: number;
+  rentGrowthSource?: InputSource | null;
+  expenseGrowth?: number;
+  expenseGrowthSource?: InputSource | null;
+  vacancy?: number;
+  vacancySource?: InputSource | null;
 }
 
 export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): BaseCase {
@@ -468,6 +481,13 @@ export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): 
     totalUses: su.totalUses,
     costLine: costAssumptionsLine(inputs),
     capitalLine: yearOneCapitalLine(inputs.capitalImprovementsYr1),
+    annual: annualCashFlowOf(uw),
+    rentGrowth: inputs.rentGrowthPct,
+    rentGrowthSource: sources.rentGrowthPct ?? null,
+    expenseGrowth: inputs.expenseGrowthPct,
+    expenseGrowthSource: sources.expenseGrowthPct ?? null,
+    vacancy: inputs.vacancyPct,
+    vacancySource: sources.vacancyPct ?? null,
   };
 }
 
