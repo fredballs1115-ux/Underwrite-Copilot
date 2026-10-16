@@ -81,7 +81,7 @@ export interface ExportRowContext {
   /** the deal's open tasks, for its next step (lib/meeting-pack) — absent
    *  where none was read, and the cell says none */
   tasks?: readonly PackTask[];
-  /** a task owner's name by user id — the reader is "You" */
+  /** a task owner's name by user id (`exportOwnerName`) */
   ownerName?: (userId: string) => string | null;
 }
 
@@ -220,4 +220,17 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
       return step ? { nextStep: nextStepText(step, ctx.today), nextStepOverdue: step.overdue } : { nextStep: null };
     })(),
   };
+}
+
+/**
+ * A task owner's name in the meeting workbook: the name the team's profiles
+ * give the account (`full_name`, else the email), the exporter's own
+ * included. The workbook is made to be projected and passed round, so the
+ * exporter is never "You", which names whoever is reading it (audit C8, L5).
+ */
+export function exportOwnerName(
+  names: ReadonlyMap<string, string>,
+  exporter: { id: string; email: string | null },
+): (userId: string) => string {
+  return (id) => names.get(id) ?? (id === exporter.id ? exporter.email || "The exporter" : "Teammate");
 }

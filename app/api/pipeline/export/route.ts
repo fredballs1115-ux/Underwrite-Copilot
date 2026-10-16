@@ -7,7 +7,7 @@ import {
   buildPipelineWorkbook,
   type PipelineExportRow,
 } from "@/lib/pipeline-workbook";
-import { pipelineExportRow } from "@/lib/pipeline-export-row";
+import { exportOwnerName, pipelineExportRow } from "@/lib/pipeline-export-row";
 import { readAll, readByIds } from "@/lib/read-all";
 import { weekActivity, type PackTask } from "@/lib/meeting-pack";
 import { parseStageHistory } from "@/lib/stages";
@@ -143,8 +143,10 @@ export async function GET(req: Request) {
       (chunk) => supabase.from("deals").select("id, offers_due").in("id", chunk),
       failedRead("offers-due"),
     ),
+    // The teammates' names, and the exporter's own: a task's owner is
+    // named in the workbook, never "You" (audit C8, L5).
     readByIds<{ id: string; email: string | null; full_name: string | null }>(
-      mateIds,
+      [...mateIds, user.id],
       (chunk) => supabase.from("profiles").select("id, email, full_name").in("id", chunk),
       failedRead("teammate name"),
     ),
@@ -186,7 +188,7 @@ export async function GET(req: Request) {
   }
   const nameById = new Map<string, string>();
   for (const m of mates) {
-    nameById.set(m.id, m.full_name || m.email || "Teammate");
+    nameById.set(m.id, m.full_name || m.email || (m.id === user.id ? user.email : null) || "Teammate");
   }
 
   // Each row read through the readers every other surface uses
@@ -207,7 +209,7 @@ export async function GET(req: Request) {
       today,
       now: now.getTime(),
       tasks: tasksByDeal.get(d.id) ?? [],
-      ownerName: (id) => (id === user.id ? "You" : (nameById.get(id) ?? "Teammate")),
+      ownerName: exportOwnerName(nameById, { id: user.id, email: user.email ?? null }),
     }),
   );
   // What moved in the week before the export: the "This week" sheet.

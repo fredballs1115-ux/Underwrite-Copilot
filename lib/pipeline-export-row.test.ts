@@ -8,7 +8,7 @@ import type { ExtractedMetric, ExtractionResult, FirstSignal } from "@/lib/anthr
 import type { BuyBox } from "./criteria";
 import { buildPipelineWorkbook } from "./pipeline-workbook";
 import { pickSlots } from "./pipeline-slots";
-import { pipelineExportRow, type ExportDeal, type ExportRowContext } from "./pipeline-export-row";
+import { exportOwnerName, pipelineExportRow, type ExportDeal, type ExportRowContext } from "./pipeline-export-row";
 import { yieldOnCostText } from "./plan-facts";
 import { noteCapSlot, ownYieldText } from "./compare-interest";
 import { buildManualExtraction } from "./manual-deal";
@@ -438,5 +438,28 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(row.nextStepOverdue).toBe(false);
     // Nothing read: no step, never an invented one.
     expect(pipelineExportRow(deal(), ctx).nextStep).toBeNull();
+  });
+});
+
+// Audit C8, L5: the workbook is projected and passed round, so its Next step
+// column named the exporter "You" — whoever was reading it.
+describe("a task owner in the meeting workbook", () => {
+  it("is named, the exporter included, never 'You'", () => {
+    const names = new Map([
+      ["u1", "Sam Exporter"],
+      ["u2", "Jane Doe"],
+    ]);
+    const owner = exportOwnerName(names, { id: "u1", email: "sam@firm.com" });
+    expect(owner("u1")).toBe("Sam Exporter");
+    expect(owner("u2")).toBe("Jane Doe");
+    expect(owner("u3")).toBe("Teammate");
+    // A profile the read did not return: the exporter's own email.
+    expect(exportOwnerName(new Map(), { id: "u1", email: "sam@firm.com" })("u1")).toBe("sam@firm.com");
+    const row = pipelineExportRow(deal({ stage: "tracking", stage_history: [{ stage: "tracking", at: "2026-09-01T15:00:00Z" }] }), {
+      ...ctx,
+      tasks: [{ title: "Tour the site", assigneeUserId: "u1", dueDate: "2026-09-10", done: false, completedAt: null, createdAt: "2026-09-02T00:00:00Z" }],
+      ownerName: owner,
+    });
+    expect(row.nextStep).toBe("Tour the site — Sam Exporter, due Sep 10");
   });
 });
