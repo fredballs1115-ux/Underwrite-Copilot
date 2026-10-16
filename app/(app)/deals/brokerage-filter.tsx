@@ -30,7 +30,10 @@ export function BrokerageFilter({
   const current = active ? firms.find((f) => f.key === active) ?? null : null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" data-qa="brokerage-filter">
-      <form method="get" action="/deals" className="flex items-center gap-2">
+      {/* Wraps, and the select shrinks to the row: its width follows its
+          longest option ("Cushman & Wakefield of …, Inc. (3)"), which ran
+          past a 390px screen (audit C8, L8). */}
+      <form method="get" action="/deals" className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
         <label htmlFor="broker-filter" className="text-xs font-medium text-muted">
           Brokerage
         </label>
@@ -38,7 +41,7 @@ export function BrokerageFilter({
           id="broker-filter"
           name="broker"
           defaultValue={current?.key ?? ""}
-          className="min-h-9 rounded-lg border border-line bg-surface px-2 py-1 text-sm"
+          className="min-h-9 min-w-0 max-w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm"
         >
           <option value="">Every brokerage</option>
           {firms.map((f) => (

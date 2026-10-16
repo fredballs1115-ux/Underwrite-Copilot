@@ -84,6 +84,33 @@ export interface BrokerRow {
   goRate: number | null;
 }
 
+/** The name a firm's key is shown under, everywhere it is shown (the
+ *  scorecard and the pipeline's filter alike — they had named one firm two
+ *  ways, audit C8, L8): the name the memoranda print most often, the first
+ *  printed on a tie. `order` is the names in the order first seen. */
+export function firmDisplayName(order: readonly string[], counts: ReadonlyMap<string, number>): string {
+  return order.reduce((best, n) => ((counts.get(n) ?? 0) > (counts.get(best) ?? 0) ? n : best), order[0]);
+}
+
+/** The pipeline filter's firms: each key once, its name by
+ *  `firmDisplayName`, and how many of the deals name it — the most first,
+ *  then by name. */
+export function brokerageOptions(deals: readonly (readonly { key: string; name: string }[])[]): { key: string; name: string; count: number }[] {
+  const by = new Map<string, { names: Map<string, number>; order: string[]; count: number }>();
+  for (const firms of deals) {
+    for (const f of firms) {
+      const row = by.get(f.key) ?? { names: new Map<string, number>(), order: [] as string[], count: 0 };
+      if (!row.names.has(f.name)) row.order.push(f.name);
+      row.names.set(f.name, (row.names.get(f.name) ?? 0) + 1);
+      row.count++;
+      by.set(f.key, row);
+    }
+  }
+  return [...by]
+    .map(([key, r]) => ({ key, name: firmDisplayName(r.order, r.names), count: r.count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
 /**
  * A deal's fit as the scorecard counts it: the box's fold over its checks,
  * and whether that fold stands on part of the box only.
@@ -125,7 +152,7 @@ export function brokerScorecard(deals: readonly BrokerDeal[]): { rows: BrokerRow
     }
   }
   const rows: BrokerRow[] = [...by].map(([key, r]) => {
-    const name = r.order.reduce((best, n) => ((r.names.get(n) ?? 0) > (r.names.get(best) ?? 0) ? n : best), r.order[0]);
+    const name = firmDisplayName(r.order, r.names);
     return {
       key,
       name,

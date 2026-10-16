@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { brokerDealFit, brokerScorecard, brokerageKey, dealFirms, partialText, rateText } from "./brokerage";
+import { brokerDealFit, brokerScorecard, brokerageKey, brokerageOptions, dealFirms, partialText, rateText } from "./brokerage";
 import type { BuyBoxCheck } from "./criteria";
 import { BrokerageFilter } from "@/app/(app)/deals/brokerage-filter";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -81,6 +81,32 @@ describe("a fit on part of the box", () => {
     expect(rateText(rows[0].fits, rows[0].judged)).toBe("1 of 2 (50%)");
     expect(partialText(rows[0].partial)).toBe("+2 checked on part of the box");
     expect(partialText(0)).toBe("");
+  });
+});
+
+// Audit C8, L8: the scorecard named a firm by the name printed most often,
+// the pipeline's filter by the first seen.
+describe("a firm's name", () => {
+  it("is the one printed most often, on the scorecard and the filter alike", () => {
+    const first = [{ key: "cbre", name: "CBRE, Inc." }];
+    const often = [{ key: "cbre", name: "CBRE" }];
+    const options = brokerageOptions([first, often, often]);
+    expect(options).toEqual([{ key: "cbre", name: "CBRE", count: 3 }]);
+    const { rows } = brokerScorecard([first, often, often].map((firms) => ({ firms, fit: null, verdict: null })));
+    expect(rows[0].name).toBe(options[0].name);
+  });
+
+  it("the filter wraps and its select shrinks to a phone's row", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(BrokerageFilter, {
+        firms: [{ key: "cw", name: "Cushman & Wakefield of Northern California, Inc.", count: 3 }],
+        active: null,
+        shown: 3,
+        total: 3,
+      }),
+    );
+    expect(html).toMatch(/<form[^>]*class="[^"]*flex-wrap[^"]*"/);
+    expect(html).toMatch(/<select[^>]*class="[^"]*min-w-0 max-w-full/);
   });
 });
 

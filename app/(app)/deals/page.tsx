@@ -12,7 +12,7 @@ import { offersDueUpgrade } from "@/lib/offering";
 import { WhatsNewCard } from "./whats-new";
 import { NewsStrip, type NewsStripItem } from "./news-strip";
 import { BrokerageFilter, type BrokerageOption } from "./brokerage-filter";
-import { dealFirms } from "@/lib/brokerage";
+import { brokerageOptions, dealFirms } from "@/lib/brokerage";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
@@ -299,19 +299,18 @@ export default async function DealsPage({
   // The pipeline by brokerage (research pass 24, B13): the firms the
   // memoranda name, each with its count, and the deals of the one chosen —
   // a firm no deal names any longer is no filter, never an empty list.
-  const firmCounts = new Map<string, BrokerageOption>();
+  // Each firm named as the analytics scorecard names it (lib/brokerage
+  // `firmDisplayName`: the name printed most often).
   const firmsByDeal = new Map<string, string[]>();
+  const dealFirmLists: { key: string; name: string }[][] = [];
   for (const d of rows) {
     if (d.is_sample) continue;
     const firms = dealFirms(d.extraction as ExtractionResult | null);
     firmsByDeal.set(d.id, firms.map((f) => f.key));
-    for (const f of firms) {
-      const seen = firmCounts.get(f.key);
-      firmCounts.set(f.key, { key: f.key, name: seen?.name ?? f.name, count: (seen?.count ?? 0) + 1 });
-    }
+    dealFirmLists.push(firms);
   }
-  const firmOptions = [...firmCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  const activeBroker = broker && firmCounts.has(broker) ? broker : null;
+  const firmOptions: BrokerageOption[] = brokerageOptions(dealFirmLists);
+  const activeBroker = broker && firmOptions.some((f) => f.key === broker) ? broker : null;
   const shownRows = activeBroker ? rows.filter((d) => firmsByDeal.get(d.id)?.includes(activeBroker)) : rows;
 
   const deals: DealCard[] = shownRows.map((d) =>
