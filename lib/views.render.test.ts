@@ -839,6 +839,29 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(empty).toContain("Start your pipeline");
     expect(empty).toContain("Try a sample deal");
     expect(empty).toContain("Browse the covered markets");
+    // One way in each, never two (signed-in gaps, H4): the checklist's
+    // steps are the empty card's own list, with its segment bar, and the
+    // "Get set up" card does not stand over it offering them again.
+    expect(empty).not.toContain("Get set up");
+    expect(empty.match(/\+ New deal/g)).toHaveLength(1);
+    expect(empty.match(/Try a sample deal/g)).toHaveLength(1);
+    expect(empty).not.toMatch(/Upload →|Add it →/);
+    for (const step of ["Screen your first OM", "Open the sample deal", "Set your buy box"]) expect(empty).toContain(step);
+    expect(emptyHtml).toContain('aria-label="0 of 3 steps done"');
+    // A step already taken is ticked and offers nothing.
+    const boxSet = visibleText(
+      render(
+        React.createElement(Pipeline, {
+          deals: [],
+          errorMessage: null,
+          notice: null,
+          onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: false },
+          billing: BILLING, todayIso: TODAY,
+        }),
+      ),
+    );
+    expect(boxSet).toContain("Set your buy box (done)");
+    expect(boxSet).not.toMatch(/Set it\b/);
     // …to the metro explorer itself: /market opens a signed-in reader on
     // their own market data, and an empty pipeline has none.
     expect(emptyHtml).toMatch(/<a[^>]*href="\/market#explorer"[^>]*>Browse the covered markets →<\/a>/);

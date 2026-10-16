@@ -871,7 +871,11 @@ export function Pipeline({
 
       {filterBar}
 
-      {onboarding && (
+      {/* With no deals the empty card below carries the same three steps
+          as its own list, so the checklist would offer the upload and the
+          sample a second time on a new reader's first screen (signed-in
+          gaps, H4). */}
+      {onboarding && deals.length > 0 && (
         <GettingStarted
           state={onboarding}
           atLimit={atLimit}
@@ -1145,35 +1149,14 @@ export function Pipeline({
             <p className={`text-base font-semibold tracking-tight ${sampleCard ? "" : "mt-5"}`}>
               Start your pipeline
             </p>
-            <p className={`mt-1 max-w-md text-sm text-muted ${sampleCard ? "" : "mx-auto"}`}>
-              Upload an OM or type the deal’s facts. Or open the worked sample first.
-            </p>
-            <div className={`mt-4 flex flex-wrap items-center gap-2.5 ${sampleCard ? "" : "justify-center"}`}>
-              {atLimit ? (
-                <Link
-                  href="/billing"
-                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-                >
-                  See plans
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowForm(true)}
-                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-                >
-                  + New deal
-                </button>
-              )}
-              <form action={createSampleDeal}>
-                <PendingButton
-                  pendingLabel="Setting up your sample…"
-                  className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
-                >
-                  Try a sample deal
-                </PendingButton>
-              </form>
-            </div>
+            {/* The three first steps, each with its one way in: the upload,
+                the sample, the buy box — the checklist's own steps and
+                segment bar (`SetupSteps`), drawn here in place of a second
+                copy above (signed-in gaps, H4). */}
+            <SetupSteps
+              steps={setupSteps(onboarding ?? NO_ONBOARDING, { atLimit, onNewDeal: () => setShowForm(true), variant: "buttons" })}
+              className={`mt-3 max-w-md text-left ${sampleCard ? "" : "mx-auto"}`}
+            />
             <p className="mt-3 text-xs">
               {/* To the metro explorer itself: /market opens a signed-in
                   reader on their own market data, which an empty pipeline has
@@ -2159,8 +2142,129 @@ function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: Pipe
 
 const ONBOARD_KEY = "uc-onboard-dismissed";
 
-/** Three real steps to a working account — every check reflects actual data,
- *  and the card retires itself (or can be dismissed) once the account is set. */
+/** An account with nothing done: the empty pipeline's steps when the page
+ *  was handed no onboarding state. */
+const NO_ONBOARDING: OnboardingState = { hasBuyBox: false, sampleId: null, hasScreenedOm: false };
+
+type SetupStep = { key: string; label: string; done: boolean; action: ReactNode };
+
+/** The three real steps to a working account, each with its one way in —
+ *  the upload first, the sample second, the buy box last: the checklist had
+ *  opened on the buy box, the step that asks the most of someone who has not
+ *  yet seen a screen (research pass 32). `variant` is how the ways in are
+ *  drawn: as the checklist's small links, or as the empty pipeline's
+ *  buttons, where they are the only ways in on the screen. */
+function setupSteps(
+  state: OnboardingState,
+  { atLimit, onNewDeal, variant }: { atLimit: boolean; onNewDeal: () => void; variant: "links" | "buttons" },
+): SetupStep[] {
+  const link = "text-xs font-medium text-brand hover:text-brand-strong";
+  const primary =
+    "inline-block rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong";
+  const secondary =
+    "inline-block rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint";
+  const buttons = variant === "buttons";
+  return [
+    {
+      key: "screen",
+      label: "Screen your first OM",
+      done: state.hasScreenedOm,
+      action: atLimit ? (
+        <Link href="/billing" className={buttons ? primary : link}>
+          {buttons ? "See plans" : "See plans →"}
+        </Link>
+      ) : (
+        <button type="button" onClick={onNewDeal} className={buttons ? primary : link}>
+          {buttons ? "+ New deal" : "Upload →"}
+        </button>
+      ),
+    },
+    {
+      key: "sample",
+      label: "Open the sample deal",
+      done: !!state.sampleId,
+      // Both states route through the ACTION (it redirects into an existing
+      // sample after topping up anything the fixture gained since — a plain
+      // link would bypass that self-heal).
+      action: (
+        <form action={createSampleDeal}>
+          <PendingButton
+            pendingLabel={buttons ? "Setting up your sample…" : state.sampleId ? "Opening…" : "Adding…"}
+            className={buttons ? secondary : link}
+          >
+            {buttons ? "Try a sample deal" : state.sampleId ? "Open it →" : "Add it →"}
+          </PendingButton>
+        </form>
+      ),
+    },
+    {
+      key: "buybox",
+      label: "Set your buy box",
+      done: state.hasBuyBox,
+      action: (
+        <Link href="/criteria" className={buttons ? secondary : link}>
+          {buttons ? "Set it" : "Set it →"}
+        </Link>
+      ),
+    },
+  ];
+}
+
+/** The steps as one picture: a segment a step, then a row a step with its
+ *  number (or a tick) and its way in. */
+function SetupSteps({ steps, className = "" }: { steps: SetupStep[]; className?: string }) {
+  const done = steps.filter((s) => s.done).length;
+  return (
+    <div className={className}>
+      {/* Progress as segments, one per step. */}
+      <div
+        className="mt-1.5 flex items-center gap-1"
+        role="img"
+        aria-label={`${done} of ${steps.length} steps done`}
+        data-qa="setup-progress"
+      >
+        {steps.map((s) => (
+          <span
+            key={s.key}
+            className={`h-1.5 w-8 rounded-full ${s.done ? "bg-pass" : "bg-line"}`}
+          />
+        ))}
+      </div>
+      <ol className="mt-3 space-y-2" data-qa="setup-steps">
+        {steps.map((s, i) => (
+          <li
+            key={s.key}
+            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2"
+          >
+            <span
+              aria-hidden
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                s.done
+                  ? "bg-pass/10 text-pass"
+                  : "bg-faint text-muted ring-1 ring-inset ring-line"
+              }`}
+            >
+              {s.done ? "✓" : i + 1}
+            </span>
+            <span
+              className={`min-w-0 flex-1 text-sm ${
+                s.done ? "text-muted line-through decoration-line" : ""
+              }`}
+            >
+              {s.label}
+              {s.done && <span className="sr-only"> (done)</span>}
+            </span>
+            {!s.done && <span className="shrink-0">{s.action}</span>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** The setup checklist over a pipeline that has deals: every check reflects
+ *  actual data, and the card retires itself (or can be dismissed) once the
+ *  account is set. */
 function GettingStarted({
   state,
   atLimit,
@@ -2183,69 +2287,7 @@ function GettingStarted({
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // The upload first, the sample second, the buy box last: the checklist
-  // had opened on the buy box, the step that asks the most of someone who
-  // has not yet seen a screen (research pass 32).
-  const steps: {
-    key: string;
-    label: string;
-    done: boolean;
-    action: ReactNode;
-  }[] = [
-    {
-      key: "screen",
-      label: "Screen your first OM",
-      done: state.hasScreenedOm,
-      action: atLimit ? (
-        <Link
-          href="/billing"
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          See plans →
-        </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={onNewDeal}
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          Upload →
-        </button>
-      ),
-    },
-    {
-      key: "sample",
-      label: "Open the sample deal",
-      done: !!state.sampleId,
-      // Both states route through the ACTION (it redirects into an existing
-      // sample after topping up anything the fixture gained since — a plain
-      // link would bypass that self-heal).
-      action: (
-        <form action={createSampleDeal}>
-          <PendingButton
-            pendingLabel={state.sampleId ? "Opening…" : "Adding…"}
-            className="text-xs font-medium text-brand hover:text-brand-strong"
-          >
-            {state.sampleId ? "Open it →" : "Add it →"}
-          </PendingButton>
-        </form>
-      ),
-    },
-    {
-      key: "buybox",
-      label: "Set your buy box",
-      done: state.hasBuyBox,
-      action: (
-        <Link
-          href="/criteria"
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          Set it →
-        </Link>
-      ),
-    },
-  ];
-
+  const steps = setupSteps(state, { atLimit, onNewDeal, variant: "links" });
   const remaining = steps.filter((s) => !s.done);
   if (!show || remaining.length === 0) return null;
 
@@ -2261,22 +2303,7 @@ function GettingStarted({
   return (
     <section className="animate-rise rounded-2xl border border-brand/20 bg-brand/[0.03] p-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">Get set up</h2>
-          {/* Progress as segments, one per step. */}
-          <div
-            className="mt-1.5 flex items-center gap-1"
-            role="img"
-            aria-label={`${steps.length - remaining.length} of ${steps.length} steps done`}
-          >
-            {steps.map((s) => (
-              <span
-                key={s.key}
-                className={`h-1.5 w-8 rounded-full ${s.done ? "bg-pass" : "bg-line"}`}
-              />
-            ))}
-          </div>
-        </div>
+        <h2 className="text-sm font-semibold tracking-tight">Get set up</h2>
         <button
           type="button"
           onClick={dismiss}
@@ -2298,33 +2325,7 @@ function GettingStarted({
           </svg>
         </button>
       </div>
-      <ul className="mt-3 space-y-2">
-        {steps.map((s, i) => (
-          <li
-            key={s.key}
-            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2"
-          >
-            <span
-              aria-hidden
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                s.done
-                  ? "bg-pass/10 text-pass"
-                  : "bg-faint text-muted ring-1 ring-inset ring-line"
-              }`}
-            >
-              {s.done ? "✓" : i + 1}
-            </span>
-            <span
-              className={`min-w-0 flex-1 text-sm ${
-                s.done ? "text-muted line-through decoration-line" : ""
-              }`}
-            >
-              {s.label}
-            </span>
-            {!s.done && <span className="shrink-0">{s.action}</span>}
-          </li>
-        ))}
-      </ul>
+      <SetupSteps steps={steps} />
     </section>
   );
 }
