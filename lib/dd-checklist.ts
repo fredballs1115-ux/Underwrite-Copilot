@@ -53,8 +53,8 @@ export function ddChecklist(storedClass: string | null | undefined, extraction: 
   const kind = interestOf(ex).kind;
   if (kind === "note") return noteChecklist(land);
   if (kind === "leased_fee") return leasedFeeChecklist();
-  if (kind === "preferred_equity") return positionChecklist();
-  if (kind === "partial_interest" && !isTenancyInCommon(ex)) return shareChecklist(ex);
+  if (kind === "preferred_equity") return positionChecklist(land);
+  if (kind === "partial_interest" && !isTenancyInCommon(ex)) return shareChecklist(ex, land);
 
   const items: string[] = [BASE.title, BASE.zoning];
   if (!land) items.push(BASE.pca);
@@ -103,7 +103,7 @@ function leasedFeeChecklist(): string[] {
 
 /** A share of the owning entity, a trust's beneficial interests or a share
  *  of the general partner's: what is bought is the entity's paper. */
-function shareChecklist(ex: ExtractionResult | null): string[] {
+function shareChecklist(ex: ExtractionResult | null, land: boolean): string[] {
   const agreement = isDst(ex)
     ? "Trust agreement: the trustee's powers, transfers and how the trust ends"
     : isGpStake(ex)
@@ -113,23 +113,38 @@ function shareChecklist(ex: ExtractionResult | null): string[] {
     agreement,
     "The waterfall: distributions, the promote and capital calls",
     "The entity's loan: its documents and the lender's consent to the transfer",
-    "The sponsor's reporting: the latest financials, rent roll and budget",
+    sponsorReporting(land),
     "Entity diligence: formation documents, good standing, liens and litigation",
-    "The property's reports: the sponsor's title policy, PCA and Phase I",
+    propertyReports(land),
   ].map(normalizeTaskTitle);
 }
 
 /** A preferred equity position: capital behind the mortgage, so its terms,
  *  the senior loan ahead of it and the sponsor's reporting. */
-function positionChecklist(): string[] {
+function positionChecklist(land: boolean): string[] {
   return [
     "Operating agreement: the preferred return, redemption, remedies and change of control",
     "The senior loan: its documents, maturity and the lender's consent to the position",
     "The waterfall: where the position sits ahead of the common equity",
-    "The sponsor's reporting: the latest financials, rent roll and budget",
+    sponsorReporting(land),
     "Entity diligence: formation documents, good standing, liens and litigation",
-    "The property's reports: the sponsor's title policy, PCA and Phase I",
+    propertyReports(land),
   ].map(normalizeTaskTitle);
+}
+
+/** The sponsor's reporting on an entity's property: land has no rent roll. */
+function sponsorReporting(land: boolean): string {
+  return land
+    ? "The sponsor's reporting: the latest financials and budget"
+    : "The sponsor's reporting: the latest financials, rent roll and budget";
+}
+
+/** The property's reports the sponsor hands over: land has no building for
+ *  a property condition assessment to inspect (audit C9, L6). */
+function propertyReports(land: boolean): string {
+  return land
+    ? "The property's reports: the sponsor's title policy and Phase I"
+    : "The property's reports: the sponsor's title policy, PCA and Phase I";
 }
 
 /** The checklist's items not yet among the deal's tasks, by title. */

@@ -101,6 +101,17 @@ describe("ddChecklist", () => {
       expect(pref).toContain("The senior loan: its documents, maturity and the lender's consent to the position");
     });
 
+    it("a share or a position in land asks for no PCA and no rent roll: there is no building (audit C9, L6)", () => {
+      const share = ddChecklist("land_infill", ex("land", interest("partial_interest", { share: "49% limited partnership interest" })));
+      const pref = ddChecklist("land_infill", ex("land", interest("preferred_equity")));
+      for (const list of [share, pref]) {
+        expect(list.some((i) => /\bPCA\b|property condition/i.test(i))).toBe(false);
+        expect(list.some((i) => /rent roll/i.test(i))).toBe(false);
+        expect(list).toContain("The property's reports: the sponsor's title policy and Phase I");
+        expect(list).toContain("The sponsor's reporting: the latest financials and budget");
+      }
+    });
+
     it("a tenancy in common takes title: the property's list, with the co-owners' agreement and the loan", () => {
       const tic = ddChecklist("multifamily", ex("multifamily", interest("partial_interest", { share: "30% undivided tenant-in-common interest" })));
       expect(tic).toContain("Title commitment and survey");
