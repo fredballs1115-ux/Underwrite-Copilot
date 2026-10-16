@@ -26,6 +26,8 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { listJobStatus, screenedDay, screenedOn, type JobLike } from "@/lib/screen-run";
 import { olderScreen } from "@/lib/older-screen";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { priceChangeOf } from "@/lib/price-change";
+import type { PriorScreen } from "@/lib/screen-diff";
 
 /** A deal row as the pipeline reads it. */
 export interface PipelineCardRow {
@@ -44,6 +46,9 @@ export interface PipelineCardRow {
   site_flags?: SiteFlagsResult | null;
   photo?: DealVisualCache | null;
   om_storage_path?: string | null;
+  /** the previous screen's snapshot (deals.prior_screen, migration 0010),
+   *  for the ask's move since it (lib/price-change) */
+  prior_screen?: unknown;
 }
 
 /** What the page read beside the row. */
@@ -224,6 +229,9 @@ export function pipelineCard(d: PipelineCardRow, ctx: PipelineCardContext): Deal
       return on && day ? { on, day } : null;
     })(),
     stage: (d.stage as DealCard["stage"]) ?? "screening",
+    // A reissued memorandum's new ask (research pass 24, B14): the retrade
+    // diff's own price pair, only where both screens read a comparable ask.
+    priceChange: priceChangeOf((d.prior_screen as PriorScreen | null | undefined) ?? null, extraction),
     // Any miss → outside; else any near-miss → near; all-pass → fits.
     // Unknown-only results (nothing checkable yet) stay null and render as —.
     fit: checks ? foldBuyBoxChecks(checks) : null,

@@ -4,6 +4,7 @@
 // the card — the sample's on an empty pipeline or a public page
 // (`DealTilePreview`) — without loading the whole pipeline: the list, the
 // map, the filters and the new-deal form stay there.
+import { PriceChangeBadge } from "./price-change-badge";
 import {
   Fragment,
   memo,
@@ -315,6 +316,7 @@ export const DealTile = memo(function DealTile({
             ("not stated"). */}
         <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
           {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
+          <PriceChangeBadge change={d.priceChange} />
         </TileStat>
         {/* A plan deal has no going-in cap; its yield on total cost takes
             the slot, labelled. Nor has a note: its yield to maturity

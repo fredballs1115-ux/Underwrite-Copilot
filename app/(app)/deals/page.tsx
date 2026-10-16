@@ -101,6 +101,7 @@ export default async function DealsPage({
     site_flags?: SiteFlagsResult | null;
     photo?: DealVisualCache | null;
     om_storage_path?: string | null;
+    prior_screen?: unknown;
   };
 
   // Billing state, the deal list, its count and the personal buy box are
@@ -116,7 +117,7 @@ export default async function DealsPage({
       supabase
         .from("deals")
         .select(
-          "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path",
+          "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path, prior_screen",
         )
         .order("created_at", { ascending: false })
         .order("id")

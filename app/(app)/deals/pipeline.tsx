@@ -1,5 +1,7 @@
 "use client";
 
+import type { PriceChange } from "@/lib/price-change";
+import { PriceChangeBadge } from "./price-change-badge";
 import {
   Fragment,
   memo,
@@ -112,6 +114,9 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
+  /** the ask's move since the previous screen (lib/price-change, research
+   *  pass 24 B14): drawn beside the price by its own badge */
+  priceChange?: PriceChange | null;
   slots: { cap: string | null; price: string | null; yoc: string | null; yocWithheld?: string | null; plan?: boolean; capWithheld?: "note" | "position" | "share" | "under_water" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
@@ -1723,6 +1728,7 @@ const DealRow = memo(function DealRow({
   const priceBit = d.slots.price ? (
     <span className="font-mono tabular-nums" title={d.slots.basis ? `${d.slots.price} — ${d.slots.basis}` : d.slots.price}>
       {compactPrice(d.slots.price)}
+      <PriceChangeBadge change={d.priceChange} />
     </span>
   ) : null;
   // What the price buys where it is not the building, the seller's loan, a
