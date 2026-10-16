@@ -146,7 +146,11 @@ describe("focus never drops to the page, and a status is said (research pass 33,
 
   it("sends 'Back to the top' to the deal's title, out of the bar that hides", () => {
     expect(src("app/(app)/deals/[id]/deal-sticky-bar.tsx")).toMatch(/document\.getElementById\("deal-title"\)\?\.focus\(\{ preventScroll: true \}\)/);
-    expect(src("app/(app)/deals/[id]/deal-hero.tsx")).toMatch(/<h1 id="deal-title" tabIndex=\{-1\}/);
+    // The title is an h1 by default (the homepage's sample header asks for an
+    // h2 through `titleAs`, keeping that page's one h1).
+    const hero = src("app/(app)/deals/[id]/deal-hero.tsx");
+    expect(hero).toMatch(/titleAs: Title = "h1"/);
+    expect(hero).toMatch(/<Title id="deal-title" tabIndex=\{-1\}/);
   });
 
   it("keeps a saving button focusable and says its pending words once", () => {

@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { ScreenRunStrip, STRIP_STAGES, STRIP_WORDS, screenRunLines } from "@/app/screen-run-strip";
 import { COMP_RATING, LEVER_META, SCENARIO_META, TONE } from "@/app/(app)/deals/[id]/deal-sections";
