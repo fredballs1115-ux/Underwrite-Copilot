@@ -388,33 +388,28 @@ export function DemoPanel({
     case "Analyses":
       return <AnalysesView analysis={analysis} onSelect={onAnalysis} />;
     case "Documents":
+      // What the deal page's Documents tab holds on the sample (deal-view's
+      // DocumentsPanel): no memorandum was ever uploaded for it and no
+      // document rows are stored, so the one row says so, and the memo the
+      // verdict makes is the public sample's. Never a file name it has not.
       return (
-        <div className="space-y-2.5">
-          {(
-            [
-              ["offering-memorandum.pdf", "screened — all six stages, page-cited", "bg-pass/10 text-pass", "Screened"],
-              ["rent-roll.csv", "actuals beat pro forma in every conflict", "bg-brand/10 text-brand", "Reconciled"],
-              ["t12-operating.pdf", "expense load anchored to the trailing twelve", "bg-brand/10 text-brand", "Reconciled"],
-            ] as const
-          ).map(([file, meta, cls, chip]) => (
-            <div
-              key={file}
-              className="flex items-center justify-between gap-3 rounded-lg border border-line p-3"
+        <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+          <h2 className="text-sm font-semibold tracking-tight">Source documents</h2>
+          <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
+            <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
+              <span className="min-w-0 flex-1 truncate font-medium">Offering memorandum</span>
+              <span className="text-xs text-muted">none uploaded</span>
+            </li>
+          </ul>
+          <div className="mt-3">
+            <a
+              href="/api/demo/memo"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
             >
-              <div className="min-w-0">
-                <p className="truncate font-mono text-xs">{file}</p>
-                <p className="truncate text-[10px] text-muted">{meta}</p>
-              </div>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${cls}`}>
-                {chip}
-              </span>
-            </div>
-          ))}
-          <p className="text-[10px] leading-relaxed text-muted">
-            Add a rent roll, T-12, or loan terms any time — the screen
-            re-anchors itself and flags where the OM&apos;s pro forma drifts.
-          </p>
-        </div>
+              Download the IC memo (PDF)
+            </a>
+          </div>
+        </section>
       );
   }
 }

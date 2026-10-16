@@ -329,6 +329,20 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(t).not.toMatch(/Genuine support|Deal-killer\b/);
   });
 
+  // H3: the tab listed "offering-memorandum.pdf", "rent-roll.csv" and
+  // "t12-operating.pdf", none of which the sample has; the deal page's tab
+  // reads "Offering memorandum — none uploaded" on it.
+  it("lists the documents the sample deal holds, and no file it does not", () => {
+    const html = panel("Documents");
+    const t = text(html);
+    expect(t).toContain("Source documents");
+    expect(t).toContain("Offering memorandum none uploaded");
+    expect(html).toContain('href="/api/demo/memo"');
+    expect(t).not.toMatch(/\.(pdf|csv|xlsx)\b/);
+    expect(t).not.toMatch(/Reconciled|Screened/);
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
   it("rates the comps and the challenges in the product's own words", () => {
     const comps = text(panel("Analyses", "comps"));
     for (const c of SAMPLE_DEAL.comps.saleComps) expect(comps).toContain(COMP_RATING[c.support].label);
