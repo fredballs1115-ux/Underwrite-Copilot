@@ -56,6 +56,7 @@ import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
 import { SiteReportsPanel } from "@/app/site-reports-panel";
 import { ListingTeam } from "./listing-team";
 import { BrokerEmailActions } from "./broker-email-actions";
+import { documentProfileOf } from "@/lib/broker-mail";
 import { ddChecklist } from "@/lib/dd-checklist";
 import { listingTeamOf, offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { readAffordable } from "@/lib/affordable";
@@ -1868,6 +1869,7 @@ export default async function DealPage({
                 challenges={challenges?.challenges ?? []}
                 totalPages={typeof extraction?.totalPages === "number" ? extraction.totalPages : null}
                 have={{ rentRoll: !!actuals.rentRoll, t12: !!actuals.t12 }}
+                profile={documentProfileOf(compsClassKey)}
               />
             )
           }

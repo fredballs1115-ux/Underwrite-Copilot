@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Challenge } from "@/lib/anthropic/types";
-import { documentRequestEmail, mailtoHref, splitEmail } from "@/lib/broker-mail";
+import { documentRequestEmail, mailtoHref, splitEmail, type DocumentProfile } from "@/lib/broker-mail";
 import { buildBrokerEmail } from "./deal-sections";
 
 /** One email: opened in the reader's mail program, addressed and filled,
@@ -55,16 +55,20 @@ export function BrokerEmailActions({
   challenges,
   totalPages,
   have,
+  profile = "income",
 }: {
   to: string[];
   dealName: string;
   challenges: Challenge[];
   totalPages: number | null;
   have: { rentRoll: boolean; t12: boolean };
+  /** what the deal's class keeps to ask for (lib/broker-mail
+   *  `documentProfileOf`) */
+  profile?: DocumentProfile;
 }) {
   if (!to.length) return null;
   const questions = challenges.some((c) => c.question) ? splitEmail(buildBrokerEmail(challenges, dealName, totalPages)) : null;
-  const docs = documentRequestEmail(dealName, have);
+  const docs = documentRequestEmail(dealName, have, profile);
   return (
     <div className="mt-3 flex flex-wrap gap-2" data-qa="broker-email-actions">
       {questions && <EmailAction label="Email the questions" to={to} subject={questions.subject} body={questions.body} />}

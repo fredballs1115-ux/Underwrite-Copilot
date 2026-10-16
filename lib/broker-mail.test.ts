@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MAILTO_MAX, documentRequestEmail, mailtoHref, splitEmail } from "./broker-mail";
+import { MAILTO_MAX, documentProfileOf, documentRequestEmail, mailtoHref, splitEmail } from "./broker-mail";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }), usePathname: () => "/deals/d1", useSearchParams: () => new URLSearchParams() }));
@@ -32,6 +32,31 @@ describe("documentRequestEmail", () => {
     const some = documentRequestEmail("The Maddox", { rentRoll: true, t12: true });
     expect(some.asked).toEqual(["the confidentiality agreement, if one is required for the data room"]);
     expect(some.body).not.toContain("rent roll");
+  });
+});
+
+// Audit C8, L6: a hotel was asked for a rent roll, and land for a rent roll
+// and a T-12.
+describe("the request asks for what the class keeps", () => {
+  it("a hotel's P&L and STR reports, land's survey, title and entitlements, never a rent roll", () => {
+    expect(documentProfileOf("hospitality_str")).toBe("lodging");
+    expect(documentProfileOf("land_infill")).toBe("land");
+    expect(documentProfileOf("office")).toBe("income");
+    expect(documentProfileOf(null)).toBe("income");
+    const hotel = documentRequestEmail("The Inn", {}, "lodging");
+    expect(hotel.body).not.toContain("rent roll");
+    expect(hotel.body).toContain("1. The trailing-12-month P&L, by department (T-12)");
+    expect(hotel.body).toContain("2. The STR reports for the last 12 months");
+    // A T-12 already on the deal is not asked for again.
+    expect(documentRequestEmail("The Inn", { t12: true }, "lodging").body).not.toContain("P&L");
+    const land = documentRequestEmail("The Parcel", { rentRoll: false, t12: false }, "land");
+    expect(land.body).not.toMatch(/rent roll|T-12/);
+    expect(land.asked).toEqual([
+      "the survey",
+      "the title commitment",
+      "the entitlement record: approvals, conditions and the zoning",
+      "the confidentiality agreement, if one is required for the data room",
+    ]);
   });
 });
 
