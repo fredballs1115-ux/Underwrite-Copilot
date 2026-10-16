@@ -1,7 +1,12 @@
-// Red banner for regulatory alerts (research build, Phase 2 item 5): when
+// Banner for regulatory alerts (research build, Phase 2 item 5): when
 // the daily intel job flags a likely law/regulation change, it shows on every
 // signed-in screen until the reader dismisses it.
 // Server component + server action — no client JS.
+//
+// Drawn in the site's caution tone (the `caution` token) on a white band,
+// its words at AA on it, never a stock red: a POSSIBLE rule change is
+// something to check, not a kill, and the band reads as the app's own
+// notice beside the deal page's caution chips.
 //
 // THE RULE: an alert shows where it was detected in the last
 // ALERT_WINDOW_DAYS (30) days and THIS READER has not dismissed it. The
@@ -84,26 +89,32 @@ export async function RegulatoryAlertBanner() {
         return (
         <div
           key={a.id}
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-red-600 px-4 py-2 text-sm text-white"
+          data-alert-tone="caution"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-l-4 border-b-caution/25 border-l-caution bg-surface px-4 py-2 text-sm text-ink"
         >
-          <span className="rounded bg-white/20 px-1.5 py-px text-[11px] font-semibold uppercase tracking-wide">
+          <span className="rounded bg-caution px-1.5 py-px text-[11px] font-semibold uppercase tracking-wide text-white">
             Possible rule change
           </span>
           <span className="min-w-0 flex-1">
             {href ? (
-              <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline decoration-caution/50 underline-offset-2 hover:decoration-caution"
+              >
                 {a.headline}
               </a>
             ) : (
               a.headline
             )}
-            {rule && <span className="ml-2 text-white/80">affects {rule}</span>}
+            {rule && <span className="ml-2 text-muted">affects {rule}</span>}
           </span>
           <form action={dismissAlert}>
             <input type="hidden" name="id" value={a.id} />
             <button
               type="submit"
-              className="rounded border border-white/40 px-2 py-0.5 text-[12px] hover:bg-white/10"
+              className="rounded border border-caution/40 px-2 py-0.5 text-[12px] font-medium text-caution transition-colors hover:bg-caution/10"
             >
               Dismiss
             </button>
