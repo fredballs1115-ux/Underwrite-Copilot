@@ -20,6 +20,8 @@ import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "./bu
 import { buyBoxCoverage } from "./criteria";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { sampleHeader } from "./sample-header";
+import { sampleMemoData } from "./sample-memo";
+import { compRating, inCompOrder } from "./comp-rating";
 import { SKYLINES, commonsPage } from "./skyline";
 import { METRO_VIEWS } from "./metro-imagery";
 
@@ -211,6 +213,32 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     for (const [k, v, e] of sampleWorkbookPreview()) expect(tile).toContain(`${k} ${v} ${e}`);
     expect(tile).toContain("Exit cap 5.45% IRR 9.3%");
     expect(tile).not.toContain("Rent growth");
+  }, 60_000);
+
+  // The homepage and /demo against the signed-in product, M6: the memo tile
+  // was grey bars and a typed "Caution", the comps tile three hand-typed
+  // names and grades.
+  it("the memo tile draws the memo it downloads, and the comps tile the sample's own comps", async () => {
+    const html = await renderHome();
+    const at = html.indexOf("One-page IC memo");
+    expect(at).toBeGreaterThan(-1);
+    const tile = words(html.slice(at, html.indexOf("/api/demo/memo", at)));
+    const memo = sampleMemoData("October 16, 2026");
+    expect(tile).toContain(memo.name);
+    expect(tile).toContain(`${memo.verdictWord} ${memo.verdictSub}`);
+    expect(memo.verdictWord).toBe(sampleHeader().pill!.label);
+    for (const t of memo.keyTerms.slice(0, 4)) expect(tile, t.label).toContain(`${t.label} ${t.value}`);
+    const cAt = html.indexOf("Comps, graded");
+    const comps = words(html.slice(cAt, html.indexOf("Your buy box, checked in code", cAt))).replace(/&#x27;/g, "'");
+    const ordered = inCompOrder(SAMPLE_DEAL.comps.saleComps);
+    expect(ordered).toHaveLength(SAMPLE_DEAL.comps.saleComps.length);
+    let from = 0;
+    for (const c of ordered) {
+      const line = `${c.name} ${compRating(c.support).label} ${c.detail}`;
+      const i = comps.indexOf(line, from);
+      expect(i, line).toBeGreaterThan(-1);
+      from = i;
+    }
   }, 60_000);
 
   // Research pass 40, M1: the stress bench ran the first-draft model

@@ -43,6 +43,9 @@ import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos
 import { photosOnDisk } from "@/lib/photos-fs";
 import { sampleHeader, type HeaderFacts } from "@/lib/sample-header";
 import { SampleDealHero } from "./sample-hero";
+import { MemoPreview } from "./memo-preview";
+import { sampleMemoData } from "@/lib/sample-memo";
+import { compRating, inCompOrder } from "@/lib/comp-rating";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -539,6 +542,11 @@ export default function Home() {
   const legal = legalToday();
   // The sample's header, read on the render's day (the page is ISR).
   const header = sampleHeader();
+  // The sample memo's own data, as its download draws it (the date is the
+  // download's, which names the day it is printed).
+  const memo = sampleMemoData(
+    new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+  );
   return (
     <div className="flex flex-1 flex-col">
       <script
@@ -997,25 +1005,10 @@ export default function Home() {
                     One-page IC memo{" "}
                     <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
                   </h3>
+                  {/* The memo it downloads: its own title, call and key
+                      terms, from the download's own inputs. */}
                   <div className="mt-4 flex-1">
-                    <div className="rounded-lg border border-line bg-paper p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="h-2 w-20 rounded bg-ink/70" />
-                        <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[9px] font-semibold text-caution">
-                          Caution
-                        </span>
-                      </div>
-                      <div className="mt-2.5 space-y-1.5">
-                        <div className="h-1.5 w-full rounded bg-line" />
-                        <div className="h-1.5 w-5/6 rounded bg-line" />
-                        <div className="h-1.5 w-full rounded bg-line" />
-                        <div className="h-1.5 w-2/3 rounded bg-line" />
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-1.5">
-                        <div className="h-8 rounded bg-faint" />
-                        <div className="h-8 rounded bg-faint" />
-                      </div>
-                    </div>
+                    <MemoPreview data={memo} />
                   </div>
                   <a
                     href="/api/demo/memo"
@@ -1028,23 +1021,27 @@ export default function Home() {
                 {/* Comps */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">Comps, graded</h3>
-                  <div className="mt-4 space-y-1.5 text-[10px]">
-                    {[
-                      ["The Brixton", "Supports", "text-pass bg-pass/10"],
-                      ["Parkside", "Leans favorable", "text-caution bg-caution/10"],
-                      ["Vue at Girard", "Stretched", "text-kill bg-kill/10"],
-                    ].map(([n, r, c]) => (
-                      <div
-                        key={n}
-                        className="flex items-center justify-between rounded-md border border-line px-2.5 py-1.5"
-                      >
-                        <span className="font-medium">{n}</span>
-                        <span className={`rounded-full px-1.5 py-0.5 font-medium ${c}`}>
-                          {r}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {/* The sample's own sale comps, in the deal page's order
+                      and grades (lib/comp-rating), each with the figures its
+                      memorandum line states. */}
+                  <ul className="mt-4 space-y-1.5 text-[10px]">
+                    {inCompOrder(SAMPLE_DEAL.comps.saleComps).map((c) => {
+                      const r = compRating(c.support);
+                      return (
+                        <li key={c.name} className="rounded-md border border-line px-2.5 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate font-medium">{c.name}</span>{" "}
+                            <span
+                              className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
+                            >
+                              {r.label}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 truncate font-mono tabular-nums text-muted">{c.detail}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
 
                 {/* Buy box */}
