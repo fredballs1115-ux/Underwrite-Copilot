@@ -5,7 +5,7 @@
 // the test never reaches for a network.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -15,7 +15,7 @@ import { COMP_RATING, LEVER_META, SCENARIO_META, TONE } from "@/app/(app)/deals/
 import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
 import { fmtEm, fmtPct } from "./underwrite/playground";
-import { DemoPanel } from "@/app/landing-interactive";
+import { DemoPanel, loadWalkthrough } from "@/app/landing-interactive";
 import { StressBench } from "@/app/landing-stress";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { buyBoxCoverage } from "./criteria";
@@ -31,6 +31,11 @@ vi.mock("@/lib/supabase/admin", () => ({
     throw new Error("no database in a test");
   },
 }));
+
+// The walkthrough's tabs past the Overview are a chunk of their own, which
+// the page loads as the walkthrough nears the screen; the tests that draw
+// every tab load it first, as the page has by the time a tab is opened.
+beforeAll(() => loadWalkthrough());
 
 async function renderHome(): Promise<string> {
   const { default: Home } = await import("@/app/page");

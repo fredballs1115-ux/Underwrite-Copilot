@@ -124,9 +124,13 @@ describe("the call chips and a range's base read at 4.5:1 (research pass 33, ite
     // The homepage walkthrough draws no range cell of its own any more: its
     // ranges are the deal page's RangeCard, through VerdictView (read from
     // deal-sections-view, the sections without the deal page's map and
-    // server actions, which deal-sections re-exports).
+    // server actions, which deal-sections re-exports), in the chunk the
+    // walkthrough loads for its tabs past the Overview.
     const home = readFileSync(join(process.cwd(), "app/landing-interactive.tsx"), "utf8");
-    expect(home).toMatch(/\bVerdictView\b[^]*from "\.\/\(app\)\/deals\/\[id\]\/deal-sections-view"/);
+    expect(home).toContain('import("./walkthrough-tabs")');
+    expect(home).toMatch(/\bw\.VerdictView\b/);
+    const tabs = readFileSync(join(process.cwd(), "app/walkthrough-tabs.tsx"), "utf8");
+    expect(tabs).toMatch(/\bVerdictView\b[^]*from "\.\/\(app\)\/deals\/\[id\]\/deal-sections-view"/);
     expect(home).not.toMatch(/\bRangeRow\b/);
   });
 });

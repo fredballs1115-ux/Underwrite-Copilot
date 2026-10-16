@@ -73,17 +73,28 @@ function reach(entry: string) {
 }
 
 describe("the homepage's walkthrough", () => {
+  // What the page loads first, and the chunk its tabs past the Overview
+  // arrive in (a dynamic import(), which the walk does not follow).
   const home = reach("app/landing-interactive.tsx");
+  const tabs = reach("app/walkthrough-tabs.tsx");
 
-  it("draws the deal page's own sections", () => {
-    expect(home.files.has("app/(app)/deals/[id]/deal-sections-view.tsx")).toBe(true);
-    expect(home.files.has("app/(app)/deals/[id]/returns-headline.tsx")).toBe(true);
+  it("draws the deal page's own sections: the Overview first, the rest in a chunk of their own", () => {
+    expect(home.files.has("app/(app)/deals/[id]/deal-sections-base.tsx")).toBe(true);
+    expect(readFileSync(join(ROOT, "app/landing-interactive.tsx"), "utf8")).toContain('import("./walkthrough-tabs")');
+    // The deal-strategy readers too: the risk digest's one band had brought
+    // them, through lib/actuals/analyze (lib/actuals/in-line-band now).
+    for (const f of ["app/(app)/deals/[id]/deal-sections-view.tsx", "app/(app)/deals/[id]/returns-headline.tsx", "lib/deal-strategy.ts"]) {
+      expect(home.files.has(f), f).toBe(false);
+      expect(tabs.files.has(f), f).toBe(true);
+    }
   });
 
-  it("loads no server action, no comps map and no Leaflet", () => {
-    expect([...home.serverActions]).toEqual([]);
-    expect([...home.files].filter((f) => /comps-map|deal-sections\.tsx$|model-view\.tsx$/.test(f))).toEqual([]);
-    expect([...home.packages].filter((p) => /leaflet|\.css$/.test(p))).toEqual([]);
+  it("loads no server action, no comps map and no Leaflet, first or later", () => {
+    for (const graph of [home, tabs]) {
+      expect([...graph.serverActions]).toEqual([]);
+      expect([...graph.files].filter((f) => /comps-map|deal-sections\.tsx$|model-view\.tsx$/.test(f))).toEqual([]);
+      expect([...graph.packages].filter((p) => /leaflet|\.css$/.test(p))).toEqual([]);
+    }
   });
 
   it("is a walk that would find them: the deal page's modules reach both", () => {

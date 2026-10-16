@@ -6,6 +6,7 @@
 // extraction it always returns the same summary.
 
 import { isPlanDeal, noiFigures, type NoiKind, type StrategyKind } from "@/lib/deal-strategy";
+import { NOI_IN_LINE_BAND } from "./in-line-band";
 import type {
   RentRollExtraction,
   RentRollSummary,
@@ -222,11 +223,9 @@ export function pickOmNoi(
   return { label: pick.label, value: raw?.value ?? "", noi: pick.value, basis: pick.kind };
 }
 
-/** The band the property-actuals card calls "In line": the OM's NOI within
- *  5% of the actual, either way. The Overview's risk digest grades a
- *  reconciliation gap on the same band, so one gap never reads "In line"
- *  on the card and HIGH beside it. */
-export const NOI_IN_LINE_BAND = 0.05;
+// The "In line" band lives in ./in-line-band (no imports), so the Overview's
+// risk digest reads it without this module's readers.
+export { NOI_IN_LINE_BAND };
 
 export function severityForNoiDelta(deltaPct: number): ActualsSeverity {
   const abs = Math.abs(deltaPct);

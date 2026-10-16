@@ -10,22 +10,23 @@ import {
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { SampleLegal } from "@/lib/sample-legal";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
-import { assetWords } from "@/lib/asset-words";
-import { subjectBasis } from "@/lib/comp-detail";
-import { condoUnitsOffered } from "@/lib/condo-units";
-import { screenYearOf } from "@/lib/criteria";
-import { inferStrategy } from "@/lib/deal-strategy";
-import { interestOf } from "@/lib/interest";
-import {
-  BrokerComps,
-  ChallengerView,
-  MarketCheck,
-  OverviewView,
-  Reconciliation,
-  TermsView,
-  VerdictView,
-} from "./(app)/deals/[id]/deal-sections-view";
-import { ReturnsHeadline } from "./(app)/deals/[id]/returns-headline";
+import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
+
+// The tabs past the Overview — the deal page's other sections and the
+// model's returns (deal-sections-view, returns-headline), with the comps'
+// subject tick — are one chunk of their own (./walkthrough-tabs), loaded once
+// the walkthrough nears the screen or a tab is reached for: the homepage's
+// first load carries the Overview alone.
+type Walkthrough = typeof import("./walkthrough-tabs");
+let walkthrough: Walkthrough | null = null;
+let walkthroughLoad: Promise<Walkthrough> | null = null;
+
+/** Loads the tabs past the Overview, once (exported for the render test,
+ *  which draws every tab). */
+export function loadWalkthrough(): Promise<Walkthrough> {
+  walkthroughLoad ??= import("./walkthrough-tabs").then((m) => (walkthrough = m));
+  return walkthroughLoad;
+}
 
 /** The sample's fit against its demo buy box, read on the server through
  *  the deal header's own reader (lib/buy-box-chip `buyBoxRead`), so the
@@ -166,17 +167,6 @@ const RESULTS = {
   verdict: SAMPLE_DEAL.verdict,
 };
 
-/** The comps table's subject tick, read as the deal page reads it
- *  (deal-view's `compSubject`): the building's basis by the deal's kind. */
-const COMP_SUBJECT = subjectBasis(
-  RESULTS.extraction.metrics,
-  inferStrategy(RESULTS.extraction).kind,
-  screenYearOf(RESULTS.extraction),
-  interestOf(RESULTS.extraction),
-  RESULTS.extraction.assetClass,
-  condoUnitsOffered(RESULTS.extraction),
-);
-
 // The REAL deal page's section list and analyses (deal-view.tsx SECTIONS
 // and ANALYSES) — the product's own information architecture.
 const TABS = ["Overview", "Financials", "Buy box", "Analyses", "Documents"] as const;
@@ -234,6 +224,8 @@ function AnalysesView({
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
 }) {
+  // The sections, once their chunk has loaded (`loadWalkthrough`).
+  const w = walkthrough;
   return (
     <div className="flex flex-col gap-5">
       <div
@@ -286,32 +278,32 @@ function AnalysesView({
         aria-labelledby={`demo-analysis-tab-${analysis}`}
         className="animate-fade flex flex-col gap-6"
       >
-        {analysis === "verdict" && <VerdictView result={RESULTS.verdict} />}
-        {analysis === "challenger" && (
-          <ChallengerView
+        {w && analysis === "verdict" && <w.VerdictView result={RESULTS.verdict} />}
+        {w && analysis === "challenger" && (
+          <w.ChallengerView
             result={RESULTS.challenges}
             dealName={SAMPLE_DEAL.name}
             totalPages={RESULTS.extraction.totalPages ?? null}
             sample
           />
         )}
-        {analysis === "comps" && (
+        {w && analysis === "comps" && (
           // No map: the deal page's comps map geocodes each comp in the
           // visitor's browser, which a homepage section has no business
           // doing; /demo's comps tab draws none either.
-          <BrokerComps
+          <w.BrokerComps
             result={RESULTS.comps}
             dealId="sample"
             compSearch={null}
             active={false}
             isPro={false}
             publicDemo
-            subject={COMP_SUBJECT}
-            noun={assetWords(RESULTS.extraction.assetClass).noun?.one}
+            subject={w.COMP_SUBJECT}
+            noun={w.COMP_NOUN}
           />
         )}
-        {analysis === "market" && <MarketCheck result={RESULTS.market} />}
-        {analysis === "reconciler" && <Reconciliation result={RESULTS.reconciliation} />}
+        {w && analysis === "market" && <w.MarketCheck result={RESULTS.market} />}
+        {w && analysis === "reconciler" && <w.Reconciliation result={RESULTS.reconciliation} />}
       </div>
     </div>
   );
@@ -342,16 +334,19 @@ export function DemoPanel({
   switch (tab) {
     case "Overview":
       return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} />;
-    case "Financials":
+    case "Financials": {
       // The deal page's Financials tab on the sample: the extracted terms,
       // then the first-draft model's returns, the card's own figures. Its
       // tiles' grids are held to three across: four of them in this column
-      // left "$68,000,000" wider than its tile.
+      // left "$68,000,000" wider than its tile. Drawn once its chunk has
+      // loaded (`loadWalkthrough`).
+      const w = walkthrough;
+      if (!w) return null;
       return (
         <div className="flex flex-col gap-6 [&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
-          <TermsView result={RESULTS.extraction} />
+          <w.TermsView result={RESULTS.extraction} />
           <div className="flex flex-col gap-1.5">
-            <ReturnsHeadline model={SAMPLE_DEAL.model} />
+            <w.ReturnsHeadline model={SAMPLE_DEAL.model} />
             {/* Two models, said as two, as the deal page and /demo say it:
                 the workbook runs the screening model on its own base case. */}
             <p className="text-xs text-muted" data-qa="home-two-models">
@@ -360,6 +355,7 @@ export function DemoPanel({
           </div>
         </div>
       );
+    }
     case "Buy box":
       return (
         <div className="space-y-3">
@@ -431,6 +427,35 @@ export function DemoTabs({ fit, returns }: { legal?: SampleLegal; fit: SampleFit
   // so its dot is the deal page's "done" (deal-view's `sectionState`).
   const done = (t: Tab) => t !== "Documents";
 
+  // The tabs past the Overview arrive in a chunk of their own: asked for
+  // once the walkthrough nears the screen, or a tab is reached for, and drawn
+  // when they land (a tab opened before then draws as they do).
+  const box = useRef<HTMLDivElement>(null);
+  const [, setLoaded] = useState(walkthrough != null);
+  const want = () => {
+    if (!walkthrough) void loadWalkthrough().then(() => setLoaded(true));
+  };
+  useEffect(() => {
+    if (walkthrough) return;
+    const el = box.current;
+    const load = () => void loadWalkthrough().then(() => setLoaded(true));
+    if (!el || typeof IntersectionObserver === "undefined") {
+      load();
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          load();
+        }
+      },
+      { rootMargin: "800px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   function onKeys(e: KeyboardEvent<HTMLDivElement>) {
     const i = TABS.indexOf(tab);
     const next =
@@ -458,7 +483,12 @@ export function DemoTabs({ fit, returns }: { legal?: SampleLegal; fit: SampleFit
   }
 
   return (
-    <div className="shadow-float overflow-hidden rounded-2xl border border-line bg-surface">
+    <div
+      ref={box}
+      onPointerEnter={want}
+      onFocus={want}
+      className="shadow-float overflow-hidden rounded-2xl border border-line bg-surface"
+    >
       <div className="flex items-center gap-2 border-b border-line bg-faint p-2">
         {/* The deal page's section bar, class for class (deal-view). It
             scrolls sideways where the column is narrower than the five

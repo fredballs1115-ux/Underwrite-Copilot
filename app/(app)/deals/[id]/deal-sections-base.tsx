@@ -10,7 +10,7 @@
 import { useState, type ReactNode } from "react";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { incomeGapShare } from "@/lib/gap-detail";
-import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
+import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import type {
   ExtractionResult,
   ChallengerResult,
