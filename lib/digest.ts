@@ -238,6 +238,7 @@ export function buildDigest(
     name: m.name,
     move: moveText(m),
     url: dealUrl(m.dealId),
+    pictureUrl: pictureUrl(m.dealId),
   }));
 
   // The person's own tasks: overdue first, then the window's, on deals still
@@ -255,6 +256,7 @@ export function buildDigest(
     url: dealUrl(t.deal_id),
     due: DUE_FMT.format(new Date(`${t.due_date}T00:00:00Z`)),
     overdue: t.due_date < today,
+    pictureUrl: pictureUrl(t.deal_id),
   }));
 
   return {

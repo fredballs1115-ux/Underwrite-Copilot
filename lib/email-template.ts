@@ -323,12 +323,20 @@ export interface DigestInput {
   verdictsTotal?: number;
   /** the stage moves of the last 7 days, newest first (lib/meeting-pack):
    *  "Screening → Tracking" — absent or empty, no section */
-  moved?: { name: string; move: string; url: string }[];
+  moved?: { name: string; move: string; url: string; pictureUrl?: string | null }[];
   /** how many moves the week held — `moved` lists the newest few */
   movedTotal?: number;
   /** the reader's own open tasks overdue or due by `offersThrough`, soonest
    *  first; `title` is the task as typed */
-  myTasks?: { title: string; dealName: string; url: string; due: string; overdue: boolean }[];
+  myTasks?: {
+    title: string;
+    dealName: string;
+    url: string;
+    due: string;
+    overdue: boolean;
+    /** the task's deal's square, as on every other row (#464) */
+    pictureUrl?: string | null;
+  }[];
   /** how many such tasks there are — `myTasks` lists the soonest few */
   myTasksTotal?: number;
   /** the tasks could not be read: said, never shown as none */
@@ -492,18 +500,22 @@ export function weeklyDigestEmail(input: DigestInput): {
 
   // The week's stage moves, and the reader's own tasks — the meeting's two
   // questions a count by stage cannot answer (research pass 24, B1).
+  // Each row wears its deal's square, as the deadlines and the calls do.
+  const movedPictures = moved.some((m) => m.pictureUrl);
   const movedRows = moved
     .map(
       (m) => `<tr>
-        <td style="padding:4px 0;font-size:13px;vertical-align:middle;"><a href="${esc(m.url)}" style="color:#18211f;font-weight:600;text-decoration:none;">${esc(m.name)}</a></td>
+        ${pictureCell(m, movedPictures)}<td style="padding:4px 0;font-size:13px;vertical-align:middle;"><a href="${esc(m.url)}" style="color:#18211f;font-weight:600;text-decoration:none;">${esc(m.name)}</a></td>
         <td style="padding:4px 0 4px 16px;font-size:13px;color:#5f6b69;text-align:right;vertical-align:middle;">${esc(m.move)}</td>
       </tr>`,
     )
     .join("");
+  // A task's square is its deal's, named for the deal it links to.
+  const taskPictures = myTasks.some((t) => t.pictureUrl);
   const taskRows = myTasks
     .map(
       (t) => `<tr>
-        <td style="padding:4px 0;font-size:13px;vertical-align:middle;">${esc(t.title)}<br /><a href="${esc(t.url)}" style="font-size:12px;color:#114e54;text-decoration:none;">${esc(t.dealName)}</a></td>
+        ${pictureCell({ name: t.dealName, url: t.url, pictureUrl: t.pictureUrl }, taskPictures)}<td style="padding:4px 0;font-size:13px;vertical-align:middle;">${esc(t.title)}<br /><a href="${esc(t.url)}" style="font-size:12px;color:#114e54;text-decoration:none;">${esc(t.dealName)}</a></td>
         <td style="padding:4px 0 4px 16px;font-size:13px;font-weight:600;color:${t.overdue ? "#b23a30" : "#18211f"};text-align:right;white-space:nowrap;vertical-align:middle;">${t.overdue ? `Overdue · ${esc(t.due)}` : esc(t.due)}</td>
       </tr>`,
     )

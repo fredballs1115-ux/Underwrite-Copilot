@@ -522,6 +522,19 @@ describe("the digest says what moved and the reader's own tasks (research pass 2
     expect(email.html).toContain("Overdue · Fri, Oct 2");
   });
 
+  it("gives each move and each task its deal's square, as the deadlines and calls have", () => {
+    const harbor = deal({ name: "Harbor Point", stage: "tracking", stage_history: [{ stage: "tracking", at: at(-2) }] });
+    const out = buildDigest([harbor], new Map(), {
+      now: NOW,
+      appUrl: SITE,
+      recipient: "u1",
+      pictureUrl: (id) => `${SITE}/sq/${id}`,
+      tasks: [{ title: "Order the PCA", due_date: day(2), deal_id: harbor.id }],
+    })!;
+    expect(out.moved!.map((m) => m.pictureUrl)).toEqual([`${SITE}/sq/${harbor.id}`]);
+    expect(out.myTasks!.map((t) => t.pictureUrl)).toEqual([`${SITE}/sq/${harbor.id}`]);
+  });
+
   it("says a task read that failed, never shows it as none", () => {
     const out = buildDigest([deal()], new Map(), { now: NOW, appUrl: SITE, recipient: "u1", pictureUrl: () => null, tasks: null })!;
     expect(out.myTasksUnread).toBe(true);

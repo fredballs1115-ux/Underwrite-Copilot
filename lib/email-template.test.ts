@@ -207,6 +207,30 @@ describe("the Monday digest pictures each deal it names (#464)", () => {
     expect(mixed.html.match(/<img /g)?.length).toBe(2);
   });
 
+  it("pictures the week's moves and the reader's tasks too, a task's square named for its deal", () => {
+    const { html } = weeklyDigestEmail({
+      ...base,
+      moved: [{ name: "Elm Court", move: "Screening → Tracking", url: "https://underwrite.example/deals/e", pictureUrl: thumb(5) }],
+      myTasks: [
+        {
+          title: "Call the broker",
+          dealName: "Ash & Vine",
+          url: "https://underwrite.example/deals/f",
+          due: "Wed, Oct 7",
+          overdue: false,
+          pictureUrl: thumb(6),
+        },
+      ],
+    });
+    expect(html).toContain(`<img src="${thumb(5)}" width="48" height="48" alt="Elm Court"`);
+    expect(html).toContain(`<img src="${thumb(6)}" width="48" height="48" alt="Ash &amp; Vine"`);
+    expect(html).toContain('<a href="https://underwrite.example/deals/f" style="display:block;text-decoration:none;"><img');
+    // Every row with a square: two deadlines, a call, a move, a task.
+    expect(html.match(/<td width="48"/g)?.length).toBe(5);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
   it("with no pictures at all, reads as it always has: the call first", () => {
     const plain = weeklyDigestEmail({
       ...base,
