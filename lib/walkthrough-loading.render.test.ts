@@ -12,6 +12,8 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { DemoPanel, loadWalkthrough, type AnalysisKey, type SampleReturns } from "@/app/landing-interactive";
+import { SamplePipelineCardLazy, loadSampleTile } from "@/app/sample-pipeline-card-lazy";
+import { sampleDealCard } from "./pipeline-card";
 
 const readSource = (p: string) => readFileSync(p, "utf8");
 
@@ -78,5 +80,30 @@ describe("a walkthrough tab opened before its chunk has landed", () => {
     expect(fin).not.toContain('data-qa="walkthrough-loading"');
     expect(fin).toContain('data-qa="home-two-models"');
     expect(gluedWords(visibleText(fin))).toEqual([]);
+  });
+});
+
+// The homepage's pipeline card is a chunk of its own too
+// (app/sample-pipeline-card-lazy.tsx): its shape until it lands, then the
+// pipeline's own card.
+describe("the homepage's pipeline card before and after its chunk", () => {
+  const today = "2026-10-16";
+  const card = sampleDealCard({ today });
+  const draw = () => renderToStaticMarkup(React.createElement(SamplePipelineCardLazy, { card, today }));
+
+  it("draws the card's shape, hidden from a screen reader, before the chunk lands", () => {
+    const html = draw();
+    expect(html).toContain('data-qa="sample-card-loading"');
+    expect(html).toMatch(/<div aria-hidden="true"[^>]*>[\s\S]*skeleton aspect-\[16\/10\]/);
+    expect(html).not.toContain("data-deal-tile");
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("draws the pipeline's own card, opening /demo, once it has", async () => {
+    await loadSampleTile();
+    const html = draw();
+    expect(html).not.toContain('data-qa="sample-card-loading"');
+    expect(html).toContain('data-deal-tile="sample"');
+    expect(html).toMatch(/<a [^>]*href="\/demo"/);
   });
 });

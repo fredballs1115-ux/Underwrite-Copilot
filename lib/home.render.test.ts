@@ -28,6 +28,7 @@ import { SKYLINES, commonsPage, coverWidth, skylineSrcSet } from "./skyline";
 import { skylineSrcSetOf } from "./skyline-srcset";
 import { METRO_VIEWS } from "./metro-imagery";
 import { sampleDealCard } from "./pipeline-card";
+import { loadSampleTile } from "@/app/sample-pipeline-card-lazy";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -305,6 +306,10 @@ describe("the homepage's sample figures are the surfaces' own", () => {
   // lib/pipeline-card's `sampleDealCard`), opening /demo: the market's
   // photograph, the call on it, the price with its basis, the cap, the fit.
   it("the pipeline section draws the sample's own pipeline card, opening /demo, its picture asked lazily", async () => {
+    // The card's chunk, which the page asks for as the section nears the
+    // screen (lib/walkthrough-loading.render.test.ts draws its shape until
+    // then), landed.
+    await loadSampleTile();
     const html = await renderHome();
     expect(html).not.toContain("SLOT:");
     const at = html.indexOf('data-qa="home-pipeline-card"');

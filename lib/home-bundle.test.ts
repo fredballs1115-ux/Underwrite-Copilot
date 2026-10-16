@@ -147,16 +147,20 @@ describe("/demo", () => {
 // deal-tile.tsx). The card's module had imported the stage control and the
 // offers-due control's module, each a server action's form; the pipeline now
 // hands the card its stage control and the deadline's words live in
-// offers-due-bit.tsx (work package AK, 2026-10-16). The whole page, server
-// part and client part, reaches no server action and no Leaflet.
+// offers-due-bit.tsx (work package AK, 2026-10-16). The card is a chunk of
+// its own, asked for as its section nears the screen (a dynamic import(),
+// which the walk does not follow), so the first load carries none of it. The
+// whole page, server part and client part, and the card's chunk reach no
+// server action and no Leaflet.
 describe("the homepage, whole", () => {
   const page = reach("app/page.tsx");
   const card = reach("app/(app)/deals/deal-tile.tsx");
 
-  it("draws the pipeline's own card for the sample", () => {
+  it("draws the pipeline's own card for the sample, in a chunk of its own", () => {
     expect(page.files.has("app/sample-pipeline-card.tsx")).toBe(true);
-    expect(page.files.has("app/(app)/deals/deal-tile.tsx")).toBe(true);
     expect(page.files.has("lib/pipeline-card.ts")).toBe(true);
+    expect(page.files.has("app/(app)/deals/deal-tile.tsx")).toBe(false);
+    expect(readFileSync(join(ROOT, "app/sample-pipeline-card-lazy.tsx"), "utf8")).toContain('import("./(app)/deals/deal-tile")');
   });
 
   it("loads no server action, no comps map and no Leaflet, the card included", () => {

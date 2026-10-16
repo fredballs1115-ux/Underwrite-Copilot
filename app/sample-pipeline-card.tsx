@@ -7,25 +7,14 @@
 // invented deal, and no stage control: the card's module imports no server
 // action (lib/home-bundle.test.ts holds the homepage to that).
 //
-// A server component: the builder reads the market tables on the server,
-// and only the card's own client code reaches the browser.
-import { DealTilePreview } from "./(app)/deals/deal-tile";
+// A server component: the builder reads the market tables on the server;
+// the card's own client code is a chunk the browser asks for as the section
+// nears the screen (app/sample-pipeline-card-lazy.tsx).
+import { SamplePipelineCardLazy } from "./sample-pipeline-card-lazy";
 import { sampleDealCard } from "@/lib/pipeline-card";
 
 export function SamplePipelineCard() {
   // The render's day (the page is ISR); the sample's card prints no date.
   const today = new Date().toISOString().slice(0, 10);
-  return (
-    <DealTilePreview
-      d={sampleDealCard({ today })}
-      href="/demo"
-      title="Open the sample deal"
-      note="Sample deal"
-      todayIso={today}
-      className="grid w-full max-w-[20rem]"
-      // Far down the page: no preload, no high priority, asked for as it
-      // nears the screen.
-      lazy
-    />
-  );
+  return <SamplePipelineCardLazy card={sampleDealCard({ today })} today={today} />;
 }
