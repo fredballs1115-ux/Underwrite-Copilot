@@ -13,6 +13,29 @@ import { SKYLINES, bandSizes } from "@/lib/skyline";
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8");
 const imgOf = (html: string) => /<img\b[^>]*>/.exec(html)?.[0] ?? "";
 
+// /demo opened on Philadelphia's photograph and drew the deal header right
+// under it, whose picture is the same photograph (the pass of 2026-10-16,
+// E1): the band draws the market's overhead instead, so a reader never meets
+// one picture twice in a row.
+describe("/demo's band and its deal header show two pictures, never one twice", () => {
+  it("draws the overhead where the band asks for it, credited to USGS, and the skyline nowhere", () => {
+    const props = { metro: "philadelphia", eager: true, picture: "overhead" } as React.ComponentProps<typeof PlaceBand>;
+    const html = renderToStaticMarkup(React.createElement(PlaceBand, props, "Words"));
+    expect(imgOf(html)).toContain("/api/imagery/metro/philadelphia?w=1400&amp;h=600");
+    expect(html).not.toContain("/api/imagery/skyline/");
+    expect(html).toContain("from above · USGS");
+    expect(imgOf(html)).toContain('loading="eager"');
+  });
+
+  it("keeps the skyline by default, and the demo asks for the overhead under its own header's photograph", () => {
+    const html = renderToStaticMarkup(React.createElement(PlaceBand, { metro: "philadelphia" } as React.ComponentProps<typeof PlaceBand>, "Words"));
+    expect(imgOf(html)).toContain("/api/imagery/skyline/philadelphia");
+    const demo = read("app/demo/page.tsx");
+    expect(demo).toMatch(/<PlaceBand metro="philadelphia"[^>]*\bpicture="overhead"/);
+    expect(demo).toContain("<SampleDealHero");
+  });
+});
+
 describe("a page's opening picture is fetched first", () => {
   it("asks for an eager band's picture at once, ahead of the page, and preloads it", () => {
     const props = { metro: "dc", eager: true } as React.ComponentProps<typeof PlaceBand>;

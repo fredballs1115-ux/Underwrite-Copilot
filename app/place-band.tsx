@@ -211,6 +211,7 @@ export function PlaceBackdrop({
   layer,
   creditLayer,
   creditClassName,
+  picture,
   children,
 }: {
   metro: string;
@@ -235,6 +236,8 @@ export function PlaceBackdrop({
   /** the credit's own classes, where the default's place at the picture's
    *  foot is not where it goes */
   creditClassName?: string;
+  /** the overhead in the skyline's place (CityPhoto `picture`) */
+  picture?: "skyline" | "overhead";
   /** the band's words, before the picture's credit in the markup */
   children?: ReactNode;
 }) {
@@ -267,6 +270,7 @@ export function PlaceBackdrop({
       layer={layer ?? (scrim === "hero" ? HERO_STRIP : "absolute inset-0")}
       creditLayer={creditLayer}
       {...(creditClassName ? { creditClassName } : {})}
+      {...(picture ? { picture } : {})}
       overlay={<PhotoScrim scrim={scrim} />}
     >
       {children}
@@ -301,6 +305,7 @@ export function PlaceBand({
   metro,
   width = "max-w-3xl",
   eager = false,
+  picture,
   children,
 }: {
   metro: string;
@@ -308,11 +313,14 @@ export function PlaceBand({
   width?: string;
   /** the band opens its page: its picture is fetched first (PlaceBackdrop) */
   eager?: boolean;
+  /** the overhead in the skyline's place, where the page draws the market's
+   *  photograph right under the band (CityPhoto `picture`) */
+  picture?: "skyline" | "overhead";
   children: ReactNode;
 }) {
   return (
     <section className="band-dark relative flex min-h-[19rem] items-end overflow-hidden text-white sm:min-h-[23rem]">
-      <PlaceBackdrop metro={metro} eager={eager} boxes={PLACE_BAND_BOXES}>
+      <PlaceBackdrop metro={metro} eager={eager} boxes={PLACE_BAND_BOXES} {...(picture ? { picture } : {})}>
         <div className={`relative mx-auto w-full ${width} px-6 pb-12 pt-16 sm:pb-16 sm:pt-24`}>
           <div className="on-photo band-words">{children}</div>
         </div>

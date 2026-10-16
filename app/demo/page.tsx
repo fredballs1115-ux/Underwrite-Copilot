@@ -101,8 +101,11 @@ export default async function DemoPage() {
 
       <main id="main" className="flex-1">
         {/* The sample deal's own city, from above: Center City, Philadelphia
-            — Brewerytown is two miles north-west of the frame. */}
-        <PlaceBand metro="philadelphia" width="max-w-5xl" eager>
+            (USGS's overhead) — Brewerytown is two miles north-west of the
+            frame. The overhead, not the market's photograph: the deal
+            header right under the band draws that photograph, and a reader
+            should never meet one picture twice in a row. */}
+        <PlaceBand metro="philadelphia" width="max-w-5xl" eager picture="overhead">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               A complete screen, worked end to end

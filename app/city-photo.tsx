@@ -72,6 +72,7 @@ export function CityPhoto({
   showCredit = true,
   sizes,
   bandFocus = false,
+  picture = "skyline",
   layer,
   creditLayer,
   overlay,
@@ -109,6 +110,12 @@ export function CityPhoto({
    *  through a band's crops — never a card's or a tile's, whose frames are
    *  other shapes */
   bandFocus?: boolean;
+  /** which picture leads: the skyline, the overhead its floor (the
+   *  default), or the overhead alone where the market's photograph is
+   *  already on the page right under the band (/demo, whose deal header
+   *  draws it), so a reader never meets one photograph twice in a row. A
+   *  market with no overhead keeps its skyline. */
+  picture?: "skyline" | "overhead";
   /** a band's picture layer: the box the picture fills behind the band's
    *  words ("absolute inset-0", or the hero's strip), and the shape of the
    *  box its credit is drawn in after them. Unset, the picture and its
@@ -125,8 +132,8 @@ export function CityPhoto({
   /** the band's words, drawn between the picture and its credit */
   children?: ReactNode;
 }) {
-  const shot = skylineFor(metro);
   const view = metroView(metro);
+  const shot = picture === "overhead" && view ? null : skylineFor(metro);
   // `v` is a cache buster, not a parameter the route reads: the bytes are
   // served immutable for a year, and without a token that moves when the
   // table names a different file, a returning visitor would hold last
