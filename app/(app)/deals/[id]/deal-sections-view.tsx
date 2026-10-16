@@ -434,6 +434,10 @@ export function BrokerComps({
     /** the deal's resolved location (lib/deal-location), where the page has
      *  one: the map measures from it rather than geocoding again */
     subjectPoint?: SubjectPoint | null;
+    /** the sample deal: its memorandum's comps are fictional, so none is
+     *  geocoded or pinned — a fictional comp's name placed on a real
+     *  building would say it sold there */
+    sample?: boolean;
   } | null;
   /** the subject's own basis (lib/comp-detail's subjectBasis), the tick the
    *  sale comps' bars are drawn against; null draws the bars with no tick */
@@ -452,12 +456,15 @@ export function BrokerComps({
   // LADDER (address-in-text first, cleaned name, raw name — lib/geo), because
   // bare property names rarely exist in OpenStreetMap and used to leave most
   // pins unplaced. Memoized: a stable array identity keeps CompsMap's
-  // geocode/map effects from re-firing on unrelated re-renders.
+  // geocode/map effects from re-firing on unrelated re-renders. On the
+  // sample deal the memorandum's comps are fictional: none is geocoded or
+  // pinned, and the table says so.
+  const omCompsPinned = !!mapContext && !mapContext.sample;
   const mapComps: MapComp[] = useMemo(
     () =>
       mapContext
         ? [
-            ...saleComps.map((c, i): MapComp => {
+            ...(mapContext.sample ? [] : saleComps).map((c, i): MapComp => {
               // A page the memorandum has, never the model's raw citation.
               const pageNum = locatedPage(c.page, mapContext.totalPages);
               return {
@@ -534,13 +541,18 @@ export function BrokerComps({
           </ul>
         </div>
       )}
+      {saleComps.length > 0 && mapContext?.sample && (
+        <p className="text-xs text-muted" data-qa="sample-comps-unmapped">
+          The sample&rsquo;s comps are fictional, like its building, so they are not placed on a map.
+        </p>
+      )}
       {saleComps.length > 0 && (
         <CompTable
           title="Sale comps"
           comps={saleComps}
           subject={subject ?? null}
           noun={noun}
-          pins={!!CompsMapView && !!mapContext && mapComps.length > 0}
+          pins={!!CompsMapView && omCompsPinned && mapComps.length > 0}
           cite={mapContext ? { omUrl: mapContext.omUrl, totalPages: mapContext.totalPages } : null}
         />
       )}

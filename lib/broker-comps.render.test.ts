@@ -8,6 +8,8 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {}, back: () => {} }),
@@ -45,7 +47,7 @@ const search: CompSearchResult = {
   ],
 } as unknown as CompSearchResult;
 
-const draw = () =>
+const draw = (sample = false, compSearch: CompSearchResult | null = search) =>
   renderToStaticMarkup(
     React.createElement(
       ToastProvider,
@@ -53,14 +55,39 @@ const draw = () =>
       React.createElement(BrokerComps, {
         result: comps,
         dealId: "d1",
-        compSearch: search,
+        compSearch,
         active: false,
         isPro: true,
         subject: { perUnit: 280_000, perSf: 380 },
-        mapContext: { subjectLabel: "1 Main St", market: "Philadelphia", omUrl: "/api/deals/d1/om", totalPages: 40 },
+        mapContext: { subjectLabel: "1 Main St", market: "Philadelphia", omUrl: "/api/deals/d1/om", totalPages: 40, sample },
       }),
     ),
   );
+
+describe("the sample's comps are never pinned to real places", () => {
+  it("draws the table and bars alone, with no pin, and says the comps are fictional", () => {
+    for (const s of [null, search]) {
+      const html = draw(true, s);
+      const text = visibleText(html).replace(/\s+/g, " ");
+      expect(text).toContain("The sample’s comps are fictional, like its building, so they are not placed on a map.");
+      expect(text).not.toMatch(/Pins? 1/);
+      expect(html).not.toContain("Pin 1 on the map");
+      // still listed, with their pages and bars
+      expect(text).toContain("The Alden");
+      expect(html).toContain('href="/api/deals/d1/om#page=14"');
+      expect(text).toMatch(/Bars per unit \(1 comp\)/);
+      expect(a11yIssues(html)).toEqual([]);
+      expect(gluedWords(visibleText(html))).toEqual([]);
+    }
+  });
+
+  it("asks the geocoder for no memorandum comp on the sample", () => {
+    const src = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "deal-sections-view.tsx"), "utf8");
+    expect(src).toContain("...(mapContext.sample ? [] : saleComps).map(");
+    const view = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "deal-view.tsx"), "utf8");
+    expect(view).toMatch(/sample: isSample,/);
+  });
+});
 
 describe("the Comps tab", () => {
   it("lists the OM's sale comps once, with their pins and pages", () => {

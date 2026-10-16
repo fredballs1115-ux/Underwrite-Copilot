@@ -1461,6 +1461,8 @@ function AnalysesPanel({
             omUrl,
             totalPages: results.extraction?.totalPages ?? null,
             subjectPoint: compsSubjectPoint,
+            // The sample's comps are fictional: none is geocoded or pinned.
+            sample: isSample,
           }}
         />
       ) : (
