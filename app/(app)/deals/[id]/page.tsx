@@ -190,6 +190,7 @@ import { readAll, readByIds } from "@/lib/read-all";
 import { readMemoryGroup, readMemoryKeys } from "@/lib/market-memory-read";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
+import { personName, viewerName } from "@/lib/person";
 import { SubmarketCard } from "./submarket-card";
 import type { PlaygroundData } from "./sensitivity-playground";
 
@@ -1072,9 +1073,11 @@ export default async function DealPage({
   // personal deal, whose thread names no one.
   const askerNames: Record<string, string> | null = ownership.team_id ? {} : null;
   if (user) {
+    // Each person by the name they set on the account page, else their
+    // email's local part (lib/person), never the whole address.
     taskAssignees.push({
       userId: user.id,
-      label: user.email ? `${user.email.split("@")[0]} (you)` : "You",
+      label: `${viewerName(user, "You")} (you)`,
     });
     if (ownership.team_id) {
       const otherIds = ((memberRes.data ?? []) as { user_id: string }[])
@@ -1092,11 +1095,9 @@ export default async function DealPage({
         }[]) {
           taskAssignees.push({
             userId: p.id,
-            label:
-              (p.full_name ?? "").trim() ||
-              (p.email ? p.email.split("@")[0] : "teammate"),
+            label: personName(p.full_name, p.email, "teammate"),
           });
-          if (askerNames) askerNames[p.id] = p.full_name || p.email || "Teammate";
+          if (askerNames) askerNames[p.id] = personName(p.full_name, p.email);
         }
       }
     }

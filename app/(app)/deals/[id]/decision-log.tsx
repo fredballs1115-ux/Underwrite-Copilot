@@ -5,6 +5,7 @@ import type { DealNote } from "@/lib/deals";
 import { STAGE_LABEL, type StageChange } from "@/lib/stages";
 import { outcomeWords } from "@/lib/deal-outcome";
 import { addDealNote, deleteDealNote } from "../actions";
+import { displayName } from "@/lib/person";
 
 // Module-level cached formatter (creating one per render is measurable).
 // UTC-pinned, date-only: the server and the browser must render the SAME
@@ -61,12 +62,17 @@ export function DecisionLog({
   stageHistory,
   userEmail,
   userId,
+  names = null,
 }: {
   dealId: string;
   notes: DealNote[];
   stageHistory: StageChange[];
   userEmail: string | null;
   userId: string | null;
+  /** a team deal's teammates by user id, named as Ask's askers are (the
+   *  name each set, else their email's local part); where it is not
+   *  handed in, a teammate's note reads its author's email's local part */
+  names?: Record<string, string> | null;
 }) {
   const entries: Entry[] = [
     ...notes.map((note): Entry => ({ kind: "note", at: note.at, note })),
@@ -75,6 +81,11 @@ export function DecisionLog({
 
   const mine = (n: DealNote) =>
     n.byId ? n.byId === userId : !!userEmail && n.by === userEmail;
+  // Who wrote a note: the reader as "you", a teammate by name, and an
+  // author no name is known for by their email's local part — a note
+  // stores the address it was written under, never printed whole.
+  const authorOf = (n: DealNote): string =>
+    mine(n) ? "you" : (n.byId && names?.[n.byId]) || displayName(n.by) || "a teammate";
 
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -121,7 +132,7 @@ export function DecisionLog({
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
                       <span>{safeWhen(e.at)}</span>
                       <span aria-hidden>·</span>
-                      <span className="truncate">{e.note.by}</span>
+                      <span className="truncate">{authorOf(e.note)}</span>
                       {mine(e.note) && (
                         <form action={deleteDealNote} className="inline">
                           <input type="hidden" name="dealId" value={dealId} />

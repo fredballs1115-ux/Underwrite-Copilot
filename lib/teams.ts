@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chunks, readAll, readByIds } from "@/lib/read-all";
+import { personName } from "@/lib/person";
 
 export type TeamRole = "owner" | "member";
 
@@ -167,12 +168,12 @@ export async function revokeSharesOfDepartingMember(
   }
 }
 
-/** Display name for a member: full name, else the email's local part. */
+/** Display name for a member: full name, else the email's local part —
+ *  never the whole address, which this had printed despite saying so
+ *  (lib/person `personName`, the one rule every surface reads). */
 export function memberLabel(m: {
   fullName: string | null;
   email: string | null;
 }): string {
-  if (m.fullName) return m.fullName;
-  if (m.email) return m.email;
-  return "Teammate";
+  return personName(m.fullName, m.email);
 }

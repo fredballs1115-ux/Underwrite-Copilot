@@ -38,6 +38,18 @@ export function personName(
   return local || fallback;
 }
 
+/** The signed-in reader's own name, from the sign-in check every page
+ *  already makes: the copy the account page's save leaves in the account's
+ *  metadata (saveFullName), else the email's local part. Only ever used to
+ *  name the reader to themselves; what teammates read is the profile. */
+export function viewerName(
+  user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined,
+  fallback = "You",
+): string {
+  const meta = user?.user_metadata?.full_name;
+  return personName(typeof meta === "string" ? meta : null, user?.email ?? null, fallback);
+}
+
 /** A label that may be a name or an email, as a page shows it: an email's
  *  local part, a name as written. */
 export function displayName(nameOrEmail: string | null | undefined): string {
@@ -94,4 +106,26 @@ export function personToneIndex(key: string | null | undefined): number {
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0) % PERSON_TONES.length;
+}
+
+/** The longest name the account page keeps, in characters. */
+export const FULL_NAME_MAX = 80;
+
+/** What the account page's "Your name" field may save: the words typed,
+ *  their runs of space made one and control and format characters dropped,
+ *  or null for an empty field (no name, so the email's local part shows).
+ *  An email is refused, since a name field holding the address would print
+ *  it whole on every row, and so is a name past FULL_NAME_MAX. */
+export function readFullName(
+  raw: unknown,
+): { ok: true; name: string | null } | { ok: false; why: "long" | "email" } {
+  const text = typeof raw === "string" ? raw : "";
+  const name = text
+    .replace(/[\p{Cc}\p{Cf}]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!name) return { ok: true, name: null };
+  if ([...name].length > FULL_NAME_MAX) return { ok: false, why: "long" };
+  if (looksLikeEmail(name)) return { ok: false, why: "email" };
+  return { ok: true, name };
 }

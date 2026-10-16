@@ -237,7 +237,10 @@ export default async function TeamPage({
                           <span className="text-muted"> (you)</span>
                         )}
                       </p>
-                      {m.email && m.fullName && (
+                      {/* The account under the name, on the roster alone,
+                          where an owner tells two people apart before
+                          removing one; set or not, the name leads. */}
+                      {m.email && (
                         <p className="truncate text-xs text-muted">{m.email}</p>
                       )}
                     </div>

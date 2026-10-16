@@ -7,6 +7,9 @@ import {
   personInitials,
   personName,
   personToneIndex,
+  readFullName,
+  viewerName,
+  FULL_NAME_MAX,
 } from "./person";
 import { initials } from "@/app/(app)/deals/deal-card-parts";
 
@@ -61,6 +64,13 @@ describe("a person's name", () => {
     expect(personName(undefined, "", "You")).toBe("You");
   });
 
+  it("names the reader to themselves from the account's own copy, else the email's local part", () => {
+    expect(viewerName({ email: "fredballs1115@gmail.com", user_metadata: { full_name: "Fred Balls" } })).toBe("Fred Balls");
+    expect(viewerName({ email: "fredballs1115@gmail.com", user_metadata: { full_name: 7 } })).toBe("fredballs1115");
+    expect(viewerName({ email: "fredballs1115@gmail.com", user_metadata: {} })).toBe("fredballs1115");
+    expect(viewerName(null)).toBe("You");
+  });
+
   it("shows a label that may be an email as its local part", () => {
     expect(displayName("jordan.lee@firm.com")).toBe("jordan.lee");
     expect(displayName("Jordan Lee")).toBe("Jordan Lee");
@@ -96,5 +106,21 @@ describe("a person's tone", () => {
       expect(n).toBeLessThan(PERSON_TONES.length);
     }
     expect(personToneIndex(null)).toBe(personToneIndex(""));
+  });
+});
+
+describe("the name the account page saves", () => {
+  it("keeps the words typed, one space between them, and reads an empty field as no name", () => {
+    expect(readFullName("  Fred   Balls ")).toEqual({ ok: true, name: "Fred Balls" });
+    expect(readFullName("Fred​ Balls\n")).toEqual({ ok: true, name: "Fred Balls" });
+    expect(readFullName("   ")).toEqual({ ok: true, name: null });
+    expect(readFullName(null)).toEqual({ ok: true, name: null });
+    expect(readFullName("Zoë O'Brien-Núñez")).toEqual({ ok: true, name: "Zoë O'Brien-Núñez" });
+  });
+
+  it("refuses an email, which would print whole on every row, and a name past the limit", () => {
+    expect(readFullName("fredballs1115@gmail.com")).toEqual({ ok: false, why: "email" });
+    expect(readFullName("x".repeat(FULL_NAME_MAX))).toEqual({ ok: true, name: "x".repeat(FULL_NAME_MAX) });
+    expect(readFullName("x".repeat(FULL_NAME_MAX + 1))).toEqual({ ok: false, why: "long" });
   });
 });
