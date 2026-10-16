@@ -2,6 +2,7 @@
  * Shared shapes/helpers for "deals" (one screened OM). Kept here so the deals
  * list, the single-deal view, and (later) the worker all agree.
  */
+import { RECONCILE_RUN, SCREEN_STAGES, type ScreenStageKey } from "@/lib/screen-stages";
 
 export interface DealRow {
   id: string;
@@ -196,12 +197,22 @@ export function memorandumReplacedSince(
   });
 }
 
-/** The six analysis steps, in order, keyed to the columns on `deals`. */
+const STAGE_LABEL = Object.fromEntries([...SCREEN_STAGES, RECONCILE_RUN].map((s) => [s.key, s.label])) as Record<
+  ScreenStageKey | typeof RECONCILE_RUN.key,
+  string
+>;
+
+/** The results the analysis writes, keyed to the columns on `deals` — not
+ *  the screen's stages, which are lib/screen-stages' `SCREEN_STAGES` (the
+ *  first signal is a stage with no column here, and the reconciliation a
+ *  column that is no stage: a run of its own once the buyer adds a model).
+ *  In the screen's order, the reconciliation last, each labelled as the
+ *  stage that writes it is (audit C7, L11). */
 export const DEAL_STEPS = [
-  { key: "extraction", label: "Extract & flag" },
-  { key: "challenges", label: "Challenge the assumptions" },
-  { key: "comps", label: "Scrutinize the comps" },
-  { key: "reconciliation", label: "Reconcile your model" },
-  { key: "market", label: "Market check" },
-  { key: "verdict", label: "Verdict" },
+  { key: "extraction", label: STAGE_LABEL.extract },
+  { key: "challenges", label: STAGE_LABEL.challenge },
+  { key: "comps", label: STAGE_LABEL.comps },
+  { key: "market", label: STAGE_LABEL.market },
+  { key: "verdict", label: STAGE_LABEL.verdict },
+  { key: "reconciliation", label: STAGE_LABEL.reconcile },
 ] as const satisfies ReadonlyArray<{ key: keyof DealRow; label: string }>;

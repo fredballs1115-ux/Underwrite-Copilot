@@ -31,3 +31,22 @@ describe("the screen's stages", () => {
     expect(HOME).not.toMatch(/title: "(Extract|Challenge|Comps|Market|Verdict|Reconcile)"/);
   });
 });
+
+// Audit C7, L11: the first signal's prompt said "the full six-stage screen
+// runs next" (the signal is one of the six), and lib/deals' DEAL_STEPS
+// named six steps with the reconciliation in them and the signal out.
+describe("what else names the stages", () => {
+  it("the first signal's prompt says the rest of the screen runs next", async () => {
+    const { firstSignalInstruction } = await import("./anthropic/prompts");
+    const text = firstSignalInstruction("multifamily" as never);
+    expect(text).toContain("The rest of the screen runs next; this is just the instant signal.");
+    expect(text).not.toMatch(/six-stage/);
+  });
+
+  it("DEAL_STEPS labels each stored result as the stage that writes it, the reconciliation last", async () => {
+    const { DEAL_STEPS } = await import("./deals");
+    const words = [...SCREEN_STAGES.map((s) => s.label), RECONCILE_RUN.label];
+    for (const step of DEAL_STEPS) expect(words, step.key).toContain(step.label);
+    expect(DEAL_STEPS.map((s) => s.label)).toEqual(["Extract", "Challenge", "Comps", "Market", "Verdict", "Reconcile"]);
+  });
+});
