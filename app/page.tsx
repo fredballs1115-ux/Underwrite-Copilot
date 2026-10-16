@@ -978,6 +978,14 @@ export default function Home() {
           </div>
         </section>
 
+        {/* SLOT: "Your pipeline, as cards" — the sample's own pipeline card
+            (the Philadelphia photograph with its "Market photo" caption, the
+            call on the picture, Price with $/unit under it, Cap, Fit) goes
+            here once the pipeline's card is exported as a pure view with a
+            pure builder (the homepage and /demo gap research, M9). Only the
+            sample's card, linking to /demo, never an invented deal, and no
+            stage select (a server action). */}
+
         {/* Break it yourself — the deterministic engine, live in the browser. */}
         <section id="stress" className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
