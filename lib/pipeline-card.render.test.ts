@@ -117,3 +117,34 @@ describe("the price's move on a card", () => {
     expect(visibleText(html)).toContain("since the last screen");
   });
 });
+
+// A card's footer: the offers-due deadline where one is set, else the day
+// the deal was added, said as that — a bare date in the deadline's place
+// had read as a deadline (the signed-in survey of 2026-10-17).
+describe("a pipeline card's footer date", () => {
+  const pipeline = (offersDue: string | null) =>
+    render(
+      React.createElement(Pipeline, {
+        deals: [{ ...card, id: "d-footer", offersDue, createdAt: "2026-09-02T12:00:00Z" }],
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
+        billing: { isPro: false, canCreateDeal: true, allowance: dealAllowance({ plan: "free", dealCount: 1, team: null }) },
+        todayIso: TODAY,
+        initialView: "cards",
+      }),
+    );
+
+  it("says the day the deal was added as Added, never a bare date", () => {
+    const html = pipeline(null);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const added = html.match(/data-qa="tile-added">([\s\S]*?)<\/span><\/span>/)?.[1] ?? "";
+    expect(visibleText(added).replace(/\s+/g, " ").trim()).toBe("Added Sep 2, 2026");
+  });
+
+  it("shows the deadline in its place where one is set, and no Added", () => {
+    const html = pipeline("2026-10-20");
+    expect(html).not.toContain('data-qa="tile-added"');
+  });
+});

@@ -522,7 +522,11 @@ export const DealTile = memo(function DealTile({
             {d.offersDue ? (
               <OffersDueBit iso={d.offersDue} today={todayIso} />
             ) : (
-              <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
+              // Said as what it is: a bare date where the offers-due
+              // deadline sits on other cards read as one.
+              <span data-qa="tile-added">
+                Added <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
+              </span>
             )}
             {d.addedBy ? (
               <span className="inline-flex items-center" title={`Added by ${displayName(d.addedBy)}`}>
