@@ -1348,6 +1348,19 @@ export function occupancyPctFromMetrics(metrics: MetricLike[]): number | null {
   return n != null && n >= 0 && n <= 100 ? n : null;
 }
 
+/** A "Year built" row ("Year built", "Year built / renovated"). */
+const YEAR_BUILT_ROW = /\byear built\b/i;
+
+/** The year the building was built, as the memorandum's "Year built" row
+ *  states it — the first four-digit year in its value — with the row, or
+ *  null where no such row states one. The rent rules' reader (lib/rent-
+ *  regulation) and the deal header's. */
+export function yearBuiltRow(metrics: readonly MetricLike[]): { row: MetricLike; year: number } | null {
+  const row = metrics.find((m) => !!m && typeof m.label === "string" && typeof m.value === "string" && YEAR_BUILT_ROW.test(m.label));
+  const raw = row?.value.match(/\b(1[7-9]\d{2}|20\d{2})\b/)?.[1];
+  return row && raw ? { row, year: Number(raw) } : null;
+}
+
 /** The effective price band, folding the legacy max-only field in. */
 export function priceBand(box: BuyBox): { min?: number; max?: number } {
   return {

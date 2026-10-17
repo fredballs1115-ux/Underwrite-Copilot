@@ -44,6 +44,7 @@ export function DealHero({
   chips,
   subtitle,
   figures,
+  facts: factsIn = [],
   picture,
   actions,
   controls,
@@ -57,6 +58,10 @@ export function DealHero({
   /** the address and the asset class */
   subtitle: ReactNode;
   figures: HeroFigure[];
+  /** the building's own facts the memorandum states (lib/hero-figure
+   *  `buildingFacts`: the year built, today's occupancy), on a line under
+   *  the tiles; a fact with no value is left out */
+  facts?: HeroFigure[];
   /** the building's picture (PropertyVisual); null where the deal has no
    *  address and no photograph */
   picture?: ReactNode;
@@ -75,6 +80,7 @@ export function DealHero({
    *  sample, lib/sample-header) keeps one h1 on the page */
   titleAs?: "h1" | "h2";
 }) {
+  const facts = factsIn.filter((f) => f.value);
   return (
     // No overflow-hidden on the card: the share panel and the deal's menu open
     // out of the toolbar as popovers and must not be clipped by it. The
@@ -136,6 +142,20 @@ export function DealHero({
               </div>
             ))}
           </dl>
+          {/* The building's own facts the memorandum states — the year
+              built, today's occupancy — on one short line under the tiles,
+              never as tiles of their own: six tiles had run a phone's
+              header to three rows. Only where stated; nothing otherwise. */}
+          {facts.length > 0 && (
+            <dl data-qa="hero-facts" className="-mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {facts.map((f) => (
+                <div key={f.label} className="flex items-baseline gap-1.5" title={f.title}>
+                  <dt className="text-muted">{f.label}</dt>
+                  <dd className="font-mono font-semibold tabular-nums">{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
 
         {picture ? <div className="min-w-0 [grid-area:pic]">{picture}</div> : null}

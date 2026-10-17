@@ -54,6 +54,7 @@ export function SampleDealHero({
       }
       subtitle={header.subtitle}
       figures={header.figures}
+      facts={header.facts}
       picture={
         market ? (
           <SampleMarketPicture

@@ -25,7 +25,7 @@ import {
   signalGoingInCap,
   unitCountRow,
 } from "@/lib/deal-strategy";
-import { type HeroFigure, priceFigureOf } from "@/lib/hero-figure";
+import { type HeroFigure, buildingFacts, priceFigureOf } from "@/lib/hero-figure";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { type MarketPicture, marketPictureFor } from "@/lib/market-picture";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -57,6 +57,9 @@ export interface HeaderFacts {
   /** the address line, then the asset class as the label map says it */
   subtitle: string;
   figures: HeroFigure[];
+  /** the year built and today's occupancy, only where the memorandum
+   *  states them (lib/hero-figure `buildingFacts`) */
+  facts: HeroFigure[];
   /** the photograph the deal's market is known by, which leads the picture
    *  where the building has none of its own (#439) */
   market: MarketPicture | null;
@@ -151,6 +154,7 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
       returnFigure,
       { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
     ],
+    facts: buildingFacts(metrics),
     market: marketPictureFor(input.address, extraction?.market ?? null, input.placed, input.county),
     pictureLabel: input.address?.label ?? input.name,
   };

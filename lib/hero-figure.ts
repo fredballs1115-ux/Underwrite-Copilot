@@ -1,4 +1,4 @@
-import { priceRange, priceRangeShort } from "@/lib/criteria";
+import { occupancyPctFromMetrics, occupancyRow, priceRange, priceRangeShort, yearBuiltRow } from "@/lib/criteria";
 
 /**
  * One of the deal header's figure tiles (app/(app)/deals/[id]/deal-hero.tsx
@@ -30,4 +30,25 @@ export function priceFigureOf(label: string, stated: string | null): HeroFigure 
   return range && stated
     ? { label, value: priceRangeShort(range), title: `As stated: ${stated.trim()}`, figure: true }
     : { label, value: stated, figure: true };
+}
+
+/**
+ * The building's own facts the header states under its tiles, each only
+ * where the memorandum states it: the year built (lib/criteria
+ * `yearBuiltRow`, the rent rules' reader) and today's occupancy
+ * (`occupancyPctFromMetrics`, the reader the workbook's in-place occupancy
+ * and the retrade diff take — never a stabilized or pro forma figure), each
+ * with the row as stated in its title. A deal that states neither has none.
+ */
+export function buildingFacts(metrics: readonly { label: string; value: string }[] | null | undefined): HeroFigure[] {
+  const rows = (metrics ?? []).filter((m) => !!m && typeof m.label === "string" && typeof m.value === "string");
+  const out: HeroFigure[] = [];
+  const built = yearBuiltRow(rows);
+  if (built) out.push({ label: "Year built", value: String(built.year), figure: true, title: `As stated: ${built.row.value.trim()}` });
+  const occ = occupancyPctFromMetrics(rows);
+  const occRow = occupancyRow(rows);
+  if (occ != null && occRow) {
+    out.push({ label: "Occupancy", value: `${Number(occ.toFixed(1))}%`, figure: true, title: `As stated: ${occRow.label.trim()}, ${occRow.value.trim()}` });
+  }
+  return out;
 }

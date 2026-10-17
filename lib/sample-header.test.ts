@@ -21,6 +21,12 @@ import { HERO_AERIAL } from "./photos";
 import { SKYLINES } from "./skyline";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { VERDICT_PILL, headerFacts, sampleHeader } from "./sample-header";
+import { buildingFacts } from "./hero-figure";
+import { yearBuiltRow } from "./criteria";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { DealHero } from "@/app/(app)/deals/[id]/deal-hero";
+import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const AS_OF = new Date("2026-10-16T12:00:00Z");
 const PAGE = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "page.tsx"), "utf8");
@@ -108,6 +114,42 @@ describe("the sample's header is the deal page's", () => {
   });
 });
 
+describe("the header's line of the building's own facts: the year built and today's occupancy, only where stated", () => {
+  const stated = [
+    { label: "Stabilized occupancy", value: "96%" },
+    { label: "Year built", value: "1987 / renovated 2015" },
+    { label: "Occupancy (current)", value: "94.5%" },
+  ];
+
+  it("reads each through the shared reader, the row as stated in its title — never the stabilized figure", () => {
+    expect(buildingFacts(stated)).toEqual([
+      { label: "Year built", value: "1987", figure: true, title: "As stated: 1987 / renovated 2015" },
+      { label: "Occupancy", value: "94.5%", figure: true, title: "As stated: Occupancy (current), 94.5%" },
+    ]);
+    // The rent rules read the same year off the same row.
+    expect(yearBuiltRow(stated)?.year).toBe(1987);
+    expect(buildingFacts([{ label: "Stabilized occupancy", value: "96%" }])).toEqual([]);
+    expect(buildingFacts(null)).toEqual([]);
+    // The sample states neither, so the homepage's card is as it was.
+    expect(sampleHeader(AS_OF).facts).toEqual([]);
+  });
+
+  it("draws them on one line under the four tiles, a phone's header kept to its two rows of tiles", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(DealHero, { title: "Elm Court", subtitle: "Baltimore, MD · Multifamily", figures: sampleHeader(AS_OF).figures, facts: buildingFacts(stated) }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    const line = html.match(/<dl data-qa="hero-facts"[\s\S]*?<\/dl>/)?.[0] ?? "";
+    expect(visibleText(line)).toMatch(/Year built\s*1987[\s\S]*Occupancy\s*94\.5%/);
+    // Still four tiles.
+    expect((html.match(/<dt class="line-clamp-2/g) ?? []).length).toBe(4);
+    const none = renderToStaticMarkup(React.createElement(DealHero, { title: "x", subtitle: "y", figures: [], facts: [] }));
+    expect(none).not.toContain('data-qa="hero-facts"');
+  });
+});
+
 describe("the deal page still builds its header from the readers this module calls", () => {
   it("draws the call in the same words and classes", () => {
     const literal = /const VERDICT_PILL = \{([\s\S]*?)\} as const;/.exec(PAGE)?.[1];
@@ -135,6 +177,7 @@ describe("the deal page still builds its header from the readers this module cal
       ["extraction?.address || dealAddress?.label || extraction?.market || firstSignal?.market || null", "extraction?.address || input.address?.label || extraction?.market || firstSignal?.market || null"],
       ["marketPictureFor(dealAddress, extraction?.market ?? null,", "marketPictureFor(input.address, extraction?.market ?? null,"],
       ["label={dealAddress?.label ?? (deal.name as string)}", "pictureLabel: input.address?.label ?? input.name"],
+      ["facts={buildingFacts(metrics)}", "facts: buildingFacts(metrics)"],
     ];
     for (const [page, own] of pairs) {
       expect(fold(PAGE), page).toContain(page);

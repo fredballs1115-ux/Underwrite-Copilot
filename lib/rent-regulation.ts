@@ -45,7 +45,7 @@ import { buildSubject, seedRules } from "@/lib/research-data";
 import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/asset-class";
 import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
-import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
+import { parseCount, unitCountFromMetrics, unitCountRow, yearBuiltRow } from "@/lib/criteria";
 import { inferStrategy, notYetDelivered } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
 import { condoUnitsInCondominium } from "@/lib/condo-units";
@@ -271,11 +271,10 @@ export interface RegulationInput {
   rules?: RegulatoryRule[];
 }
 
-const YEAR_BUILT_ROW = /\byear built\b/i;
-
+/** The year built, through the one reader the deal header reads it with
+ *  (lib/criteria `yearBuiltRow`). */
 function yearBuiltOf(metrics: readonly MetricRow[]): number | null {
-  const raw = rowOf(metrics, YEAR_BUILT_ROW)?.value.match(/\b(1[7-9]\d{2}|20\d{2})\b/)?.[1];
-  return raw ? Number(raw) : null;
+  return yearBuiltRow(metrics)?.year ?? null;
 }
 
 /** "Oct 1, 2026" — a period's end as a page says it. */

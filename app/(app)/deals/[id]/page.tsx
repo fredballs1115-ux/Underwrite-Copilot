@@ -22,6 +22,7 @@ import { PropertyVisual } from "./property-visual";
 import { HeroCover } from "./hero-cover";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
+import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
@@ -1417,6 +1418,9 @@ export default async function DealPage({
           returnFigure,
           { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
         ]}
+        // The year built and today's occupancy, only where the memorandum
+        // states them, on a line under the tiles (lib/hero-figure).
+        facts={buildingFacts(metrics)}
         // While a first screen has not yet written the terms of a memorandum,
         // a figure not read yet shimmers; once they are written, a missing
         // one keeps its dash — the pipeline row's own rule (`readingTerms`).
