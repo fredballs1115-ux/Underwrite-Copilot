@@ -2446,8 +2446,29 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
     expect(gluedWords(text)).toEqual([]);
     expect([...html.matchAll(/data-roll-year="(\d+)"/g)]).toHaveLength(12);
     expect(text).toContain("2037+");
-    expect(text).toContain("The last bar, 2037+, folds the 4 years from 2037 to 2040 into one; the table lists each year that rolls.");
+    expect(text).toContain(
+      "The last bar, 2037+, folds the 4 years from 2037 to 2040 into one, hatched and drawn on a single year's scale; the table lists each year that rolls.",
+    );
     expect(html).toContain("<title>2037–2040: 10,000 SF");
+  });
+
+  it("scales the rollover by single years: the folded bar is hatched, cut at the top and its share said over its years (audit C11, M2)", () => {
+    // Twenty years of 10,000 SF each: the last nine fold into one 90,000 SF bar.
+    const rows = Array.from({ length: 20 }, (_, i) => `${100 + i},Tenant ${i + 1},10000,2020-01-01,${2026 + i}-12-31,150000,NNN`);
+    const csv = `Suite,Tenant,Rentable SF,Lease Start,Lease Expiration,Annual Rent,Lease Type\n${rows.join("\n")}\n`;
+    const { text, html } = renderRoll(csv, { nra: 200_000 });
+    expect(gluedWords(text)).toEqual([]);
+    expect([...html.matchAll(/data-roll-year="(\d+)"/g)]).toHaveLength(12);
+    // A single year draws to the full plot, never at a ninth of it.
+    const heights = [...html.matchAll(/data-roll-year="(\d+)"[^>]*><title>[^<]*<\/title><rect[^>]*height="([\d.]+)"/g)].map((m) => Number(m[2]));
+    expect(heights.length).toBe(11);
+    for (const h of heights) expect(h).toBe(170);
+    // The folded bar: hatched, cut with a break, its share over its years.
+    expect(html).toContain('<g data-roll-folded="" data-roll-capped="">');
+    expect(html).toContain('fill="url(#rollover-fold-hatch)"');
+    expect(html).toContain('id="rollover-fold-hatch"');
+    expect(text).toMatch(/45\.0%\s+over 9 yrs/);
+    expect(text).toContain("cut at the top where the sum runs past the tallest year");
   });
 
   it("a roll with missing expiries names what the import found", () => {

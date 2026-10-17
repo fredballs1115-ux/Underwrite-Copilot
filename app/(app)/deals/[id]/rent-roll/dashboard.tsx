@@ -75,12 +75,18 @@ function RolloverChart({
   const fold = years.at(-1)?.through != null ? years.at(-1)! : null;
   const COL_W = 74;
   const BAR_W = 40;
-  const PAD_T = 26;
+  // The folded bar's share takes two lines above it ("45.0%", "over 9 yrs").
+  const PAD_T = fold ? 38 : 26;
   const PLOT_H = 170;
   const AXIS_H = 52;
   const W = 16 + years.length * COL_W;
   const H = PAD_T + PLOT_H + AXIS_H;
-  const maxSf = Math.max(...years.map((y) => y.sfExpiring), 1);
+  // The scale is a single year's: the folded bar is several years' sum, and
+  // set by it every real year drew at a fraction of its height. Where the
+  // sum runs past the tallest year it is cut at the plot's top with a break.
+  const single = years.filter((y) => y.through == null);
+  const maxSf = Math.max(...(single.length ? single : years).map((y) => y.sfExpiring), 1);
+  const foldCapped = fold != null && fold.sfExpiring > maxSf;
   const costByYear = new Map(cost.years.map((y) => [y.year, y.totalCost]));
   const costOf = (y: RolloverBar) => {
     let total = 0;
@@ -93,11 +99,21 @@ function RolloverChart({
     <div className="overflow-x-auto">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={chartWidthStyle(W, 560)} role="img"
         aria-label="SF expiring by year">
+        {fold ? (
+          <defs>
+            <pattern id="rollover-fold-hatch" width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width={6} height={6} fill="var(--color-brand)" opacity={0.15} />
+              <line x1={0} y1={0} x2={0} y2={6} stroke="var(--color-brand)" strokeWidth={2.5} opacity={0.75} />
+            </pattern>
+          </defs>
+        ) : null}
         <line x1={8} x2={W - 8} y1={PAD_T + PLOT_H} y2={PAD_T + PLOT_H} stroke="var(--color-line)" />
         {years.map((y, i) => {
           const x = 8 + i * COL_W + (COL_W - BAR_W) / 2;
           const none = y.leaseCount === 0;
-          const h = none ? 0 : Math.max(2, (y.sfExpiring / maxSf) * PLOT_H);
+          const folded = y.through != null;
+          const capped = folded && y.sfExpiring > maxSf;
+          const h = none ? 0 : Math.max(2, Math.min(PLOT_H, (y.sfExpiring / maxSf) * PLOT_H));
           const top = PAD_T + PLOT_H - h;
           // A year's expiries on a roll of one-year leases is no cliff, and
           // the folded bar is several years', never one year's cliff.
@@ -112,7 +128,31 @@ function RolloverChart({
                       y.leaseCount === 1 ? "" : "s"
                     }, ${usd(costOf(y))} leasing capital`}
               </title>
-              {none ? null : (
+              {none ? null : folded ? (
+                // Several years' expiries: hatched and outlined, never a
+                // solid bar that reads as one year's cliff.
+                <g data-roll-folded="" data-roll-capped={capped ? "" : undefined}>
+                  <rect
+                    x={x}
+                    y={top}
+                    width={BAR_W}
+                    height={h}
+                    rx={2}
+                    fill="url(#rollover-fold-hatch)"
+                    stroke="var(--color-brand)"
+                    strokeWidth={1.5}
+                  />
+                  {capped ? (
+                    // The break: the sum runs past the plot's top.
+                    <path
+                      d={`M${x - 3} ${top + 12} L${x + BAR_W + 3} ${top + 6} L${x + BAR_W + 3} ${top + 11} L${x - 3} ${top + 17} Z`}
+                      fill="var(--color-surface)"
+                      stroke="var(--color-brand)"
+                      strokeWidth={1}
+                    />
+                  ) : null}
+                </g>
+              ) : (
                 <rect
                   x={x}
                   y={top}
@@ -123,7 +163,13 @@ function RolloverChart({
                   opacity={0.9}
                 />
               )}
-              {none ? null : (
+              {none ? null : folded ? (
+                // The share is the folded years' together, said so.
+                <text x={x + BAR_W / 2} y={top - 17} textAnchor="middle" fontSize={10} fill="var(--color-ink)">
+                  {y.pctOfNra == null ? null : <tspan>{pct1(y.pctOfNra)}</tspan>}{" "}
+                  <tspan x={x + BAR_W / 2} dy={11}>{`over ${y.foldedYears} yrs`}</tspan>
+                </text>
+              ) : (
                 <text x={x + BAR_W / 2} y={top - 6} textAnchor="middle" fontSize={10} fill="var(--color-ink)">
                   {pct1(y.pctOfNra)}
                 </text>
@@ -145,7 +191,9 @@ function RolloverChart({
       </svg>
       {fold ? (
         <p data-qa="rollover-folded" className="mt-1 text-xs text-muted">
-          {`The last bar, ${fold.year}+, folds the ${fold.foldedYears} years from ${fold.year} to ${fold.through} into one; the table lists each year that rolls.`}
+          {`The last bar, ${fold.year}+, folds the ${fold.foldedYears} years from ${fold.year} to ${fold.through} into one, hatched and drawn on a single year's scale${
+            foldCapped ? ", cut at the top where the sum runs past the tallest year" : ""
+          }; the table lists each year that rolls.`}
         </p>
       ) : null}
     </div>
