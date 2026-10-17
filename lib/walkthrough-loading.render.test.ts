@@ -65,7 +65,8 @@ describe("a walkthrough tab opened before its chunk has landed", () => {
 
   it("asks for the chunk from the panel itself, so /demo, which never asked, draws its views", () => {
     const src = readSource("app/landing-interactive.tsx");
-    expect(src.match(/const w = useWalkthrough\(\);/g)?.length).toBe(3);
+    // Overview, Financials, Buy box and Documents each ask for it.
+    expect(src.match(/const w = useWalkthrough\(\);/g)?.length).toBe(4);
     expect(src).not.toMatch(/const w = walkthrough;/);
   });
 
