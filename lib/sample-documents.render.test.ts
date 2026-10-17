@@ -121,3 +121,69 @@ describe("the sample's public documents render as the signed-in sample's", () =>
     expect(sampleActualsLine()).toMatch(/T-12 NOI/);
   }, 60_000);
 });
+
+// Audit C10, L4: the sample's memorandum comps are fictional, like its
+// building, and the deal page's Comps section is the one surface that
+// guarded them from the geocoder (deal-sections-view's `mapContext.sample`).
+// No other surface geocodes a memorandum's comps today; these hold the
+// report and the /comps page to it, so it stays true.
+describe("the sample's memorandum comps are never geocoded", () => {
+  const GEOCODERS = /photon\.komoot\.io|nominatim|geocoding\.geo\.census\.gov|maps\.googleapis\.com\/maps\/api\/geocode/i;
+  const COMP_NAMES = [...SAMPLE_DEAL.comps.saleComps, ...(SAMPLE_DEAL.comps.leaseComps ?? [])].map((c) => c.name);
+
+  it("the full report, signed-in and public, asks no geocoder and names no comp in any request", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      asked.push(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+      throw new Error("no network in a test");
+    });
+    try {
+      const signedIn = await import("@/app/api/deals/[id]/report/route");
+      const demo = await import("@/app/api/demo/report/route");
+      const a = await textOf(await signedIn.GET(req, ctx));
+      const b = await textOf(await demo.GET());
+      // The comps are printed — as the memorandum states them, never placed.
+      for (const name of SAMPLE_DEAL.comps.saleComps.map((c) => c.name)) {
+        expect(a.replace(/\s+/g, " ")).toContain(name);
+        expect(b.replace(/\s+/g, " ")).toContain(name);
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(asked.filter((u) => GEOCODERS.test(u))).toEqual([]);
+    for (const name of COMP_NAMES) {
+      expect(asked.filter((u) => decodeURIComponent(u.replace(/\+/g, " ")).includes(name)), name).toEqual([]);
+    }
+  }, 120_000);
+
+  it("only the deal page's Comps section turns a memorandum comp into a geocode query, and the report reaches no geocoder for them", async () => {
+    const { readFileSync, readdirSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const sources = (dir: string): string[] =>
+      readdirSync(dir).flatMap((f) => {
+        const p = join(dir, f);
+        if (statSync(p).isDirectory()) return f === "node_modules" ? [] : sources(p);
+        return /\.(ts|tsx)$/.test(f) && !/\.test\./.test(f) ? [p] : [];
+      });
+    const callers = [...sources("app"), ...sources("lib")].filter((p) => /\bgeocodeCandidates\(/.test(readFileSync(p, "utf8")));
+    expect(callers.filter((p) => !p.endsWith("lib/geo.ts"))).toEqual(["app/(app)/deals/[id]/deal-sections-view.tsx"]);
+    // And there the memorandum's sale comps are left off on the sample.
+    expect(readFileSync("app/(app)/deals/[id]/deal-sections-view.tsx", "utf8")).toContain("...(mapContext.sample ? [] : saleComps).map(");
+    // The report's document and both report routes import no geocoder and
+    // no comps map: their comps page is the memorandum's words.
+    for (const p of ["lib/memo/report-document.tsx", "app/api/deals/[id]/report/route.ts", "app/api/demo/report/route.ts"]) {
+      const src = readFileSync(p, "utf8");
+      expect(src, p).not.toMatch(/from "@\/lib\/(geo|geocode)"|comps-map|geocodeCandidates/);
+    }
+  });
+
+  it("/comps reads no deal and no memorandum comps: it pulls recorded sales around an address the reader types", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const files = readdirSync("app/(app)/comps").filter((f) => /\.(ts|tsx)$/.test(f));
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) {
+      const src = readFileSync(`app/(app)/comps/${f}`, "utf8");
+      expect(src, f).not.toMatch(/\bsaleComps\b|\bleaseComps\b|BrokerCompsResult|from\("deals"\)|is_sample|geocodeCandidates/);
+    }
+  });
+});
