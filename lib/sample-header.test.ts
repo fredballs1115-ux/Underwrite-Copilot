@@ -171,6 +171,24 @@ describe("the header's line of the building's own facts: the year built and toda
     expect(buildingFacts([{ label: "Year built", value: "1962" }], STANDING).map((f) => f.value)).toEqual(["1962"]);
   });
 
+  it("reads today's occupancy only: never a row the extraction tagged pro forma, never a leased share", () => {
+    const occ = (rows: { label: string; value: string; basis?: string }[]) =>
+      buildingFacts(rows, STANDING).find((f) => f.label === "Occupancy")?.value ?? null;
+    // The audit's probes (C11, M1).
+    expect(occ([{ label: "Occupancy", value: "95%", basis: "pro_forma" }])).toBeNull();
+    expect(occ([{ label: "Leased", value: "100% (incl. 3 not yet in occupancy)" }])).toBeNull();
+    expect(occ([{ label: "Percent leased", value: "100%" }])).toBeNull();
+    // Today's row beside them reads.
+    expect(
+      occ([
+        { label: "Occupancy", value: "95%", basis: "pro_forma" },
+        { label: "Leased", value: "100%" },
+        { label: "Occupancy", value: "88%", basis: "in_place" },
+      ]),
+    ).toBe("88%");
+    expect(occ([{ label: "Occupancy", value: "91%" }])).toBe("91%");
+  });
+
   it("draws them on one line under the four tiles, a phone's header kept to its two rows of tiles", () => {
     const html = renderToStaticMarkup(
       React.createElement(DealHero, { title: "Elm Court", subtitle: "Baltimore, MD · Multifamily", figures: sampleHeader(AS_OF).figures, facts: buildingFacts(stated, STANDING) }),
