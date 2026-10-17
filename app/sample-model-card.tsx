@@ -31,16 +31,20 @@ export function SampleModelCard({
       </summary>
       <div className="border-t border-line p-5">
         {/* The sample is seeded with no document rows of its own, and the
-            deal page compares none with the model's on it (`compare`). */}
+            deal page compares none with the model's on it (`compare`). Its
+            banner speaks of the sample's documents (`sample`), and the
+            inputs its fixture was built from are ticked as in (`builtFrom`),
+            never offered to a visitor as missing. */}
         <div className="flex flex-col gap-6">
           <ModelBody
             model={model}
             documents={[]}
             compare={false}
+            sample
             interest={interest}
             download={<DownloadRow href={SAMPLE_WORKBOOK_HREF} />}
           />
-          <InputsNeeded documents={[]} />
+          <InputsNeeded documents={[]} builtFrom={model.generatedFrom} />
         </div>
       </div>
     </details>

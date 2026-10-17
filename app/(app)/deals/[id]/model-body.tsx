@@ -14,6 +14,7 @@ import type { DealDocument } from "@/lib/documents";
 import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
 import type { UnderwritingModel } from "@/lib/model/types";
 import {
+  builtFromKinds,
   builtSentence,
   changedSinceSentence,
   modelProvenance,
@@ -30,11 +31,15 @@ export function ModelBody({
   compare,
   interest = null,
   download,
+  sample = false,
 }: {
   model: UnderwritingModel;
   documents: Pick<DealDocument, "id" | "kind" | "filename">[];
   /** compare the deal's documents with the model's — never on the sample */
   compare: boolean;
+  /** the sample deal: its banner speaks of the sample's documents, never
+   *  the reader's, and never calls the fixture "undated" */
+  sample?: boolean;
   /** what the price buys (lib/compare-interest `modelReturnsRead`): a
    *  note's, a share's or a preferred equity position's returns withheld */
   interest?: ModelReturnsRead | null;
@@ -46,12 +51,12 @@ export function ModelBody({
   const withheld = interest?.withheld ?? null;
   return (
     <>
-      <FirstDraftBanner model={model} documents={documents} compare={compare} />
+      <FirstDraftBanner model={model} documents={documents} compare={compare} sample={sample} />
       <ReturnsHeadline model={model} interest={interest} />
       {!withheld && <StressPanel model={model} />}
       {!withheld && <Sensitivity model={model} />}
-      <Conflicts conflicts={model.conflicts} />
-      <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />
+      <Conflicts conflicts={model.conflicts} sample={sample} />
+      <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} sample={sample} />
       <CapexPanel model={model} />
       <CashFlow cashFlow={model.cashFlow} />
       <SummaryCaveats summary={model.summary} caveats={model.caveats} />
@@ -71,8 +76,17 @@ export function ModelBody({
   );
 }
 
-export function InputsNeeded({ documents }: { documents: Pick<DealDocument, "kind">[] }) {
-  const have = new Set(documents.map((d) => d.kind));
+export function InputsNeeded({
+  documents,
+  builtFrom,
+}: {
+  documents: Pick<DealDocument, "kind">[];
+  /** the sample deal's model's `generatedFrom`: the sample has no document
+   *  rows of its own, so the kinds its fixture was built from are ticked
+   *  as in — never offered as missing beside a banner naming them */
+  builtFrom?: string[];
+}) {
+  const have = new Set([...documents.map((d) => d.kind), ...builtFromKinds(builtFrom)]);
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">
@@ -128,20 +142,22 @@ function FirstDraftBanner({
   model,
   documents,
   compare,
+  sample,
 }: {
   model: UnderwritingModel;
   documents: Pick<DealDocument, "id" | "kind" | "filename">[];
   /** compare the deal's documents with the model's — never on the sample */
   compare: boolean;
+  sample: boolean;
 }) {
   const read = modelProvenance(model, documents);
   const changed = compare ? changedSinceSentence(read) : "";
   return (
     <div className="rounded-xl border border-line border-l-4 border-l-caution bg-caution/5 px-4 py-3">
       <p className="text-sm font-medium">First-draft model — verify before relying on it</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-muted">{sourcingSentence(read)}</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-muted">{sourcingSentence(read, { sample })}</p>
       <p data-qa="model-built" className="mt-1 text-xs leading-relaxed text-muted">
-        {builtSentence(read)}
+        {builtSentence(read, { sample })}
       </p>
       {changed && (
         <p data-qa="model-changed" className="mt-1 text-xs font-medium leading-relaxed text-caution">

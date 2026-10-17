@@ -1290,6 +1290,16 @@ describe("Pipeline — its loading state, and the reads that stream after it", (
   });
 });
 
+/** An "Add more to the model" chip's state, read off its title: "added",
+ *  "optional", or null where no chip names the input. */
+function inputChip(html: string, label: string): string | null {
+  for (const li of html.match(/<li [^>]*title="[^"]*"[^>]*>[\s\S]*?<\/li>/g) ?? []) {
+    const state = /title="[^"]*— (added|optional)"/.exec(li)?.[1];
+    if (state && li.replace(/<[^>]+>/g, "").replace(/[✓+]|— (added|optional)/g, "").trim() === label) return state;
+  }
+  return null;
+}
+
 describe("ModelView — the sample model renders every panel", () => {
   it("renders the returns, stress, sensitivity, assumptions, capex and cash-flow panels", () => {
     const html = render(
@@ -1376,6 +1386,7 @@ describe("ModelView — the sample model renders every panel", () => {
             model: data.model,
             documents: [],
             compare: false,
+            sample: true,
             interest: data.modelInterest,
             download: React.createElement(DownloadRow, { href: "/api/demo/underwrite.xlsx" }),
           }),
@@ -1621,13 +1632,34 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(whole).toMatch(/Stress the assumptions/);
   });
 
-  it("says a model stored undated is undated, and compares nothing on the sample, whose documents are the fixture's", () => {
+  // Audit C10 (M1): the sample's banner said "Undated — built from
+  // Maddox-OM.pdf …" and "Built from your documents", and the list under
+  // it offered the same three documents as missing. The sample's model is
+  // the sample deal's, built from its fixture's documents, which are in.
+  it("says the sample's model is the sample deal's, ticks the documents it was built from, and compares nothing on it", () => {
     const html = render(
       React.createElement(ModelView, { dealId: "sample", model: SAMPLE_DEAL.model, documents: [], active: false, isPro: false, isSample: true }),
     );
     const text = visibleText(html);
-    expect(text).toMatch(/Undated — built from Maddox-OM\.pdf \(Offering memorandum\)/);
+    expect(text).toMatch(/The sample deal's model, built from Maddox-OM\.pdf \(Offering memorandum\)/);
+    expect(text).toContain("Built from the sample deal's documents");
+    expect(text).not.toMatch(/Undated|your documents/);
+    for (const label of ["Offering memorandum", "Rent roll", "T-12 / operating statement"]) {
+      expect(inputChip(html, label), label).toBe("added");
+    }
+    expect(inputChip(html, "Loan terms")).toBe("optional");
     expect(html).not.toMatch(/data-qa="model-changed"/);
+  });
+
+  it("a real deal's model stored undated still says undated, from your documents, and ticks only the deal's own documents", () => {
+    const html = render(
+      React.createElement(ModelView, { dealId: "d1", model: SAMPLE_DEAL.model, documents: [], active: false, isPro: false, isSample: false }),
+    );
+    const text = visibleText(html);
+    expect(text).toMatch(/Undated — built from Maddox-OM\.pdf \(Offering memorandum\)/);
+    expect(text).toContain("Built from your documents");
+    expect(html).not.toContain("— added");
+    expect(inputChip(html, "Offering memorandum")).toBe("optional");
   });
 });
 

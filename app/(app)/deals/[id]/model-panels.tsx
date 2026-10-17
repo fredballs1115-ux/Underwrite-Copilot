@@ -326,7 +326,14 @@ function sourceLine(m: ReconciledMetric): string {
     .join("  ·  ");
 }
 
-export function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
+export function Conflicts({
+  conflicts,
+  sample = false,
+}: {
+  conflicts: ReconciledMetric[];
+  /** the sample deal: its documents are the sample's, never the reader's */
+  sample?: boolean;
+}) {
   if (conflicts.length === 0) {
     return (
       <section>
@@ -334,8 +341,8 @@ export function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
           Source conflicts
         </h2>
         <p className="mt-2 text-sm text-muted">
-          No material disagreements between your documents — the sources lined
-          up.
+          No material disagreements between {sample ? "the sample deal's" : "your"} documents — the
+          sources lined up.
         </p>
       </section>
     );
@@ -379,24 +386,28 @@ export function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
 export function Assumptions({
   metrics,
   generatedFrom = [],
+  sample = false,
 }: {
   metrics: ReconciledMetric[];
   /** the documents the model was built from, which a row's source may cite
    *  by file name (lib/model/provenance) */
   generatedFrom?: string[];
+  /** the sample deal: its documents are the sample's, never the reader's */
+  sample?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const shown = open ? metrics : metrics.slice(0, 8);
   // Counted, never claimed: a row no document states is the model's own.
   const assumed = metrics.filter((m) => !statedByDocument(m, generatedFrom)).length;
+  const docs = sample ? "the sample deal's documents" : "your documents";
   return (
     <section>
       <h2 className="text-sm font-semibold tracking-tight">
         Assumptions{" "}
         <span className="font-normal text-muted">
           {assumed === 0
-            ? "· each from your documents"
-            : `· ${metrics.length - assumed} from your documents, ${assumed} assumed`}
+            ? `· each from ${docs}`
+            : `· ${metrics.length - assumed} from ${docs}, ${assumed} assumed`}
         </span>
       </h2>
       <ScrollRegion label="Assumptions" className="mt-3 rounded-xl border border-line bg-surface shadow-sm">

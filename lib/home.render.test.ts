@@ -422,6 +422,15 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     expect(html.indexOf(sizer)).toBeLessThan(html.indexOf(card));
     expect(card).toContain(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: SAMPLE_DEAL.model, interest: modelInterest })));
     expect(panel).toContain("First-draft model — ready");
+    // Audit C10 (M1): the banner speaks of the sample deal's documents,
+    // never a visitor's, and the documents it names are ticked as in.
+    const said = visibleText(card);
+    expect(said).toContain("The sample deal's model, built from Maddox-OM.pdf (Offering memorandum)");
+    expect(said).toContain("Built from the sample deal's documents");
+    expect(said).not.toMatch(/Undated|your documents/);
+    const chips = card.match(/<li [^>]*title="[^"]*— (?:added|optional)"[^>]*>[\s\S]*?<\/li>/g) ?? [];
+    const added = chips.filter((c) => c.includes("— added\"")).map((c) => visibleText(c).replace(/[✓]|— added/g, "").trim());
+    expect(added).toEqual(["Offering memorandum", "Rent roll", "T-12 / operating statement"]);
     expect(panel).toContain("Projected returns · first-draft model");
     expect(panel).toContain(`Levered IRR ${SAMPLE_DEAL.model.returns.leveredIrrPct!.toFixed(2)}%`);
     for (const m of SAMPLE_DEAL.extraction.metrics.filter((x) => x.flagged)) expect(panel).toContain(m.value);

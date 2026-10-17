@@ -51,6 +51,7 @@ export function ModelView({
           model={model}
           documents={documents}
           compare={!isSample}
+          sample={isSample}
           interest={interest}
           download={
             downloadsOpen ? (
@@ -68,7 +69,9 @@ export function ModelView({
       ) : (
         <Intro />
       )}
-      <InputsNeeded documents={documents} />
+      {/* The sample has no document rows of its own: the kinds its model
+          was built from are ticked as in, as the public sample's are. */}
+      <InputsNeeded documents={documents} builtFrom={isSample ? model?.generatedFrom : undefined} />
       <DocumentsPanel
         dealId={dealId}
         documents={documents}
