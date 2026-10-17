@@ -103,7 +103,10 @@ describe("feedHealth — each feed judged on its own cadence, the stale series n
       feedHealth({ rates: [], metro: [], zillow: [], realtor, now: new Date(`${day}T12:00:00Z`) }).find((s) => s.spec.id === "realtor")!;
     expect(onDay("2026-09-30")).toMatchObject({ fresh: true, ageDays: 60 });
     expect(onDay("2026-10-08")).toMatchObject({ fresh: true, ageDays: 68 });
-    expect(onDay("2026-10-15")).toMatchObject({ fresh: false, stale: ["inventory (2026-08-01)", "hotness rank (2026-08-01)"] });
+    // The hotness rank runs a month behind the inventory (its own file
+    // publishes after the 8th), so on Oct 15 only the inventory is stale.
+    expect(onDay("2026-10-15")).toMatchObject({ fresh: false, stale: ["inventory (2026-08-01)"] });
+    expect(onDay("2026-11-13")).toMatchObject({ fresh: false, stale: ["inventory (2026-08-01)", "hotness rank (2026-08-01)"] });
   });
 
   it("judges each of a monthly pull's files on its own, and names the one a dead file left behind", () => {

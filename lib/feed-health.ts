@@ -125,7 +125,7 @@ function ofFiles(spec: FeedSpec, files: readonly FileMonth[], freshDays: number,
     return { spec, newest: null, ageDays: null, fresh: null, seriesFresh: 0, seriesTotal: 0, stale: [], sample };
   }
   const stale = files.flatMap((f) =>
-    !f.asOf ? [`${f.label} (no rows)`] : ageDays(f.asOf, now) > freshDays ? [`${f.label} (${f.asOf})`] : [],
+    !f.asOf ? [`${f.label} (no rows)`] : ageDays(f.asOf, now) > (f.freshDays ?? freshDays) ? [`${f.label} (${f.asOf})`] : [],
   );
   return {
     spec,

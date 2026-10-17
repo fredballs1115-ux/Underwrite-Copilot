@@ -53,6 +53,24 @@ export function realtorFresh(asOf: string, now: Date): boolean {
   return ageDays(asOf, now) <= REALTOR_FRESH_DAYS;
 }
 
+/**
+ * How long a hotness rank is current. Realtor.com's hotness history runs a
+ * month behind its inventory file: the Oct 8 pull wrote September's
+ * inventory and August's ranks (realtor.yml run 37835558400, "inventory
+ * 202609 … hotness 202608"), so the August rank (Aug 1) is replaced on the
+ * Nov 8 pull at the earliest. The oldest a current rank gets is its own
+ * month and the next two at their longest (31 + 31 + 30) and the 7 days to
+ * the pull: 99. The same four days' grace make 103. Held to the inventory's
+ * 73, every rank read "stale" from the 12th of the month after it was
+ * written, and the brief dropped it.
+ */
+export const HOTNESS_FRESH_DAYS = 103;
+
+/** A hotness rank dated `asOf` is current on `now`. */
+export function hotnessFresh(asOf: string, now: Date): boolean {
+  return ageDays(asOf, now) <= HOTNESS_FRESH_DAYS;
+}
+
 export interface RealtorRead {
   /** Median list price, dollars, whole. */
   medianListPrice: number;
@@ -145,7 +163,7 @@ export function hotnessFor(rows: readonly BenchRow[], metroName: string, now: Da
   const rankRow = rows.find((r) => r.metro === metroName && r.metric === "rdc_hotness_rank");
   const rank = rankRow && typeof rankRow.low === "number" ? Math.round(rankRow.low) : NaN;
   if (!rankRow || !Number.isFinite(rank) || rank < 1 || rank > HOTNESS_METROS || !rankRow.as_of) return null;
-  if (!realtorFresh(rankRow.as_of, now)) return null;
+  if (!hotnessFresh(rankRow.as_of, now)) return null;
   const month = rankRow.as_of;
   const priorRaw = figureOfMonth(rows, metroName, "rdc_hotness_rank_prior", yearBefore(month));
   const priorRank = priorRaw !== null && priorRaw >= 1 && priorRaw <= HOTNESS_METROS ? Math.round(priorRaw) : null;
@@ -209,14 +227,15 @@ export function realtorFor(rows: readonly BenchRow[], metroName: string, now: Da
  *  inventory file and the hotness history, fetched one after the other, so
  *  one can be a month behind the other. */
 export const REALTOR_FILES = [
-  { metric: "rdc_median_list_price", label: "inventory" },
-  { metric: "rdc_hotness_rank", label: "hotness rank" },
+  { metric: "rdc_median_list_price", label: "inventory", freshDays: REALTOR_FRESH_DAYS },
+  { metric: "rdc_hotness_rank", label: "hotness rank", freshDays: HOTNESS_FRESH_DAYS },
 ] as const;
 
 /** Each Realtor.com file's month for a metro, current or not (the feeds card's read). */
 export function realtorFileMonths(rows: readonly BenchRow[], metroName: string): FileMonth[] {
   return REALTOR_FILES.map((f) => ({
     label: f.label,
+    freshDays: f.freshDays,
     asOf: rows.find((r) => r.metro === metroName && r.metric === f.metric)?.as_of ?? null,
   }));
 }
