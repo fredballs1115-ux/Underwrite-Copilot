@@ -4,6 +4,8 @@ import Link from "next/link";
 import { FileField } from "../../file-field";
 import { type ReactNode } from "react";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
+import { fileKindOf } from "@/lib/file-kind";
+import { FileKindIcon, SAMPLE_ACTUALS_WORDS } from "./source-documents";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import {
@@ -79,9 +81,19 @@ export function ModelView({
         hasModel={!!model}
         isPro={isPro}
         isSample={isSample}
+        builtFrom={model?.generatedFrom ?? []}
       />
     </div>
   );
+}
+
+/** A document as the model keeps it ("Rent roll: Maddox-RentRoll.xlsx"):
+ *  its kind and its file name. */
+function sampleDocument(label: string): { label: string; kind: string; filename: string } {
+  const at = label.indexOf(": ");
+  return at > 0
+    ? { label, kind: label.slice(0, at).trim(), filename: label.slice(at + 2).trim() }
+    : { label, kind: "Document", filename: label.trim() };
 }
 
 function Intro() {
@@ -105,6 +117,7 @@ function DocumentsPanel({
   hasModel,
   isPro,
   isSample = false,
+  builtFrom = [],
 }: {
   dealId: string;
   documents: DealDocument[];
@@ -114,13 +127,42 @@ function DocumentsPanel({
   /** the sample deal: no upgrade prompt is drawn on it — the public pages
    *  promise the sample whole (lib/sample-exports) */
   isSample?: boolean;
+  /** the documents the model names as built from (`generatedFrom`) */
+  builtFrom?: string[];
 }) {
+  // Only the sample lists the model's documents in place of rows: a real
+  // deal's rows are its documents, and its banner says what changed since.
+  const sampleRows = isSample && documents.length === 0 ? builtFrom.map(sampleDocument) : [];
   return (
     // The banner's "Regenerate the model" lands here, at the control.
     <section id="model-documents" className="scroll-mt-24 rounded-xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">
-        Documents <span className="font-normal text-muted">· {documents.length}</span>
+        Documents <span className="font-normal text-muted">· {documents.length + sampleRows.length}</span>
       </h2>
+
+      {/* The sample holds no document rows: its model was built from the
+          three documents it names (`generatedFrom`), which were read into
+          it with no file behind them. They are listed as the model names
+          them, the Documents tab's way, never as "0" under a model built
+          from three. */}
+      {sampleRows.length > 0 && (
+        <>
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line" data-qa="model-sample-documents">
+            {sampleRows.map((d) => (
+              <li key={d.label} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                <FileKindIcon kind={fileKindOf(d.filename)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{d.filename}</span>
+                  <span className="block text-xs text-muted">{d.kind}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-xs text-muted">
+            {`The model was built from these ${sampleRows.length === 1 ? "document" : `${sampleRows.length} documents`}, ${SAMPLE_ACTUALS_WORDS}.`}
+          </p>
+        </>
+      )}
 
       {documents.length > 0 && (
         <ul className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line">
@@ -129,10 +171,11 @@ function DocumentsPanel({
               key={d.id}
               className="flex items-center gap-3 px-3 py-2.5 text-sm"
             >
-              <span className="rounded bg-faint px-2 py-0.5 text-[10px] font-medium uppercase text-muted">
-                {DOC_KIND_LABEL[d.kind] ?? d.kind}
+              <FileKindIcon kind={fileKindOf(d.filename, d.content_type)} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{d.filename}</span>
+                <span className="block text-xs text-muted">{DOC_KIND_LABEL[d.kind] ?? d.kind}</span>
               </span>
-              <span className="min-w-0 flex-1 truncate">{d.filename}</span>
               <form action={removeDealDocument}>
                 <input type="hidden" name="dealId" value={dealId} />
                 <input type="hidden" name="docId" value={d.id} />

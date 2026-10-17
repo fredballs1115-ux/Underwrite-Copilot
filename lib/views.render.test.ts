@@ -1665,6 +1665,39 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(html).not.toContain("— added");
     expect(inputChip(html, "Offering memorandum")).toBe("optional");
   });
+
+  it("lists the documents the sample's model was built from with the Documents tab's file icons, never 'Documents · 0'", () => {
+    const html = render(
+      React.createElement(ModelView, { dealId: "sample", model: SAMPLE_DEAL.model, documents: [], active: false, isPro: false, isSample: true }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const n = SAMPLE_DEAL.model.generatedFrom.length;
+    const text = visibleText(html);
+    expect(text).toMatch(new RegExp(`Documents\\s*· ${n}`));
+    expect(text).not.toMatch(/Documents\s*· 0/);
+    const listed = html.match(/data-qa="model-sample-documents"[\s\S]*?<\/ul>/)?.[0] ?? "";
+    expect((listed.match(/data-file-kind="/g) ?? []).length).toBe(n);
+    expect(listed).toContain('data-file-kind="pdf"');
+    expect(listed).toContain('data-file-kind="sheet"');
+    expect(text).toContain("Maddox-RentRoll.xlsx");
+    expect(text).toContain(`The model was built from these ${n} documents, read into the sample — no file to open.`);
+    // No remove control on a document the sample does not hold.
+    expect(listed).not.toContain("Remove document");
+  });
+
+  it("draws a deal's own documents with the Documents tab's file icons, not text pills", () => {
+    const docs = [
+      { id: "d1", deal_id: "x", kind: "rent_roll", filename: "RentRoll.xlsx", storage_path: "documents/x/a", content_type: null, created_at: "2026-10-01T00:00:00Z" },
+      { id: "d2", deal_id: "x", kind: "t12", filename: "T12.pdf", storage_path: "documents/x/b", content_type: "application/pdf", created_at: "2026-10-01T00:00:00Z" },
+    ];
+    const html = render(React.createElement(ModelView, { dealId: "x", model: null, documents: docs, active: false, isPro: true }));
+    expect(a11yIssues(html)).toEqual([]);
+    expect(visibleText(html)).toMatch(/Documents\s*· 2/);
+    expect(html).toContain('data-file-kind="sheet"');
+    expect(html).toContain('data-file-kind="pdf"');
+    expect(html).not.toContain('data-qa="model-sample-documents"');
+  });
 });
 
 describe("CompareTable — a stabilized asset, a conversion and a rejected deal side by side", () => {
