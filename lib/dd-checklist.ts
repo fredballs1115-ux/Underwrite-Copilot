@@ -68,7 +68,7 @@ export function ddChecklist(storedClass: string | null | undefined, extraction: 
   // diligence is its permits (lib/short-term-rental reads the deck's words).
   if (cls === "hospitality_str")
     items.push(
-      isShortTermRental(ex?.assetClass)
+      isShortTermRental(ex?.assetClass, ex?.hotel)
         ? "Short-term rental permits: each one and the local rules it is held under"
         : "PIP and franchise: the brand's improvement plan and its approval of the sale",
     );

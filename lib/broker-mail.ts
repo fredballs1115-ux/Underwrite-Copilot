@@ -20,7 +20,7 @@
 //     of the class tables; a short-term rental, filed with the hotels, is
 //     told apart by the deck's own words for its class.
 
-import { isShortTermRental } from "./short-term-rental";
+import { isShortTermRental, type HotelSignal } from "./short-term-rental";
 
 /** The longest mailto: link the card builds. Mail programs and browsers cut
  *  long links at different lengths (some near 2,000 characters), so past
@@ -57,10 +57,15 @@ export type DocumentProfile = "income" | "lodging" | "rental" | "land";
 /** The profile a deal's class asks by, from its class key (lib/asset-words
  *  `dealClassKey`): a hotel's documents, a short-term rental's (the deck's
  *  own words for its class name one — lib/short-term-rental; it has no
- *  franchise and no STR report, audit C9, L8), land's, else an income
- *  property's. */
-export function documentProfileOf(classKey: string | null | undefined, classWords?: string | null): DocumentProfile {
-  if (classKey === "hospitality_str") return isShortTermRental(classWords) ? "rental" : "lodging";
+ *  franchise and no STR report, audit C9, L8 — and a memorandum stating a
+ *  flag or a franchise, `hotel`, is a hotel's, audit C10, M2), land's, else
+ *  an income property's. */
+export function documentProfileOf(
+  classKey: string | null | undefined,
+  classWords?: string | null,
+  hotel?: HotelSignal | null,
+): DocumentProfile {
+  if (classKey === "hospitality_str") return isShortTermRental(classWords, hotel) ? "rental" : "lodging";
   if (classKey === "land_infill") return "land";
   return "income";
 }

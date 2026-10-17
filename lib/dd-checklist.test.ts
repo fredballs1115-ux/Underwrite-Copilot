@@ -37,6 +37,14 @@ describe("ddChecklist", () => {
     const str = ddChecklist("hospitality_str", ex("Short-term rental portfolio"));
     expect(str).toContain("Short-term rental permits: each one and the local rules it is held under");
     expect(str.some((i) => /PIP|franchise/.test(i))).toBe(false);
+    // Audit C10, M2: the class's own label echoed back ("Hospitality /
+    // STR") is a hotel's, and so is a deck stating a flag or a franchise.
+    const PIP = "PIP and franchise: the brand's improvement plan and its approval of the sale";
+    expect(ddChecklist("hospitality_str", ex("Hospitality / STR"))).toContain(PIP);
+    const franchised = ex("Short-term rental portfolio", {
+      hotel: { brand: "Courtyard by Marriott", franchise: "Marriott franchise through 2034", management: "", encumbrance: "brand", pip: "", page: "" },
+    } as Partial<ExtractionResult>);
+    expect(ddChecklist("hospitality_str", franchised)).toContain(PIP);
     expect(ddChecklist("manufactured_housing", ex("manufactured housing"))).toContain(
       "Utilities: the water, sewer and electric systems, and who owns and bills them",
     );

@@ -56,6 +56,20 @@ describe("the request asks for what the class keeps", () => {
     expect(documentProfileOf("hospitality_str", "Boutique hotel")).toBe("lodging");
     expect(documentProfileOf("hospitality_str", "Hotel")).toBe("lodging");
     expect(documentProfileOf("hospitality_str", "Hospitality")).toBe("lodging");
+    // Audit C10, M2: the extraction is told the class's label, so the deck's
+    // class can echo "Hospitality / STR" — a hotel's label, never a rental's;
+    // and a memorandum stating a flag or a franchise is a hotel's whatever
+    // its class words say.
+    expect(documentProfileOf("hospitality_str", "Hospitality / STR")).toBe("lodging");
+    expect(documentProfileOf("hospitality_str", "STR")).toBe("lodging");
+    expect(documentProfileOf("hospitality_str", "Lodging")).toBe("lodging");
+    expect(documentProfileOf("hospitality_str", "Beach resort")).toBe("lodging");
+    const flagged = { brand: "Courtyard by Marriott", franchise: "Marriott franchise agreement through 2034, transferable" };
+    expect(documentProfileOf("hospitality_str", "Short-term rental portfolio", flagged)).toBe("lodging");
+    expect(documentProfileOf("hospitality_str", "Vacation rentals", { brand: "", franchise: "Franchise agreement with Hilton" })).toBe("lodging");
+    // "Independent" is no flag, and a blank or "None" franchise none.
+    expect(documentProfileOf("hospitality_str", "Short-term rental portfolio", { brand: "Independent", franchise: "None" })).toBe("rental");
+    expect(documentProfileOf("hospitality_str", "Vacation rentals", { brand: "", franchise: "" })).toBe("rental");
     const rental = documentRequestEmail("The Cottages", {}, "rental");
     expect(rental.body).not.toMatch(/STR report|franchise|PIP|rent roll/);
     expect(rental.body).toContain("1. The trailing-12-month P&L (T-12)");
