@@ -32,6 +32,7 @@ export function ModelBody({
   interest = null,
   download,
   sample = false,
+  playground = true,
 }: {
   model: UnderwritingModel;
   documents: Pick<DealDocument, "id" | "kind" | "filename">[];
@@ -45,6 +46,10 @@ export function ModelBody({
   interest?: ModelReturnsRead | null;
   /** the workbook's download, or the way to it */
   download: ReactNode;
+  /** the page draws the Overview's sensitivity playground, so the note may
+   *  name it: the deal page and /demo do, the homepage's walkthrough does
+   *  not (audit C10, L2) */
+  playground?: boolean;
 }) {
   // Returns the price did not buy are withheld — and so are the stress
   // panel's and the grid's, which recompute the same returns.
@@ -64,12 +69,12 @@ export function ModelBody({
         {download}
         {/* Two models, said as two: the card's returns are this
             first draft's; the workbook's are the OM underwrite's, and
-            so are the Overview's sensitivity playground's. */}
+            so are the Overview's sensitivity playground's — named only
+            where the page draws one. */}
         <p data-qa="workbook-note" className="max-w-2xl text-xs leading-relaxed text-muted">
           The workbook is a separate model, built from the memorandum’s
-          terms — its returns can differ from the ones above. The
-          Overview’s sensitivity playground runs the workbook’s model,
-          not this one.
+          terms — its returns can differ from the ones above.
+          {playground ? " The Overview’s sensitivity playground runs the workbook’s model, not this one." : null}
         </p>
       </div>
     </>

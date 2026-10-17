@@ -15,11 +15,15 @@ export const SAMPLE_WORKBOOK_HREF = "/api/demo/underwrite.xlsx";
 export function SampleModelCard({
   model,
   interest = null,
+  playground = true,
 }: {
   model: UnderwritingModel;
   /** what the price buys, read as the deal page reads it (lib/compare-
    *  interest `modelReturnsRead`) */
   interest?: ModelReturnsRead | null;
+  /** the page draws the Overview's sensitivity playground (/demo does, the
+   *  homepage's walkthrough does not), so the card's note may name it */
+  playground?: boolean;
 }) {
   return (
     <details className="rounded-2xl border border-line bg-surface shadow-card" open>
@@ -41,6 +45,7 @@ export function SampleModelCard({
             documents={[]}
             compare={false}
             sample
+            playground={playground}
             interest={interest}
             download={<DownloadRow href={SAMPLE_WORKBOOK_HREF} />}
           />

@@ -417,7 +417,15 @@ describe("the homepage's sample figures are the surfaces' own", () => {
         strategy,
       }),
     );
-    const card = renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest }));
+    const card = renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest, playground: false }));
+    // Audit C10, L2: the walkthrough's Overview draws no sensitivity
+    // playground, so the card's note names none; /demo's, which draws one,
+    // names it.
+    expect(visibleText(card)).toContain("The workbook is a separate model, built from the memorandum’s terms — its returns can differ from the ones above.");
+    expect(card).not.toContain("sensitivity playground");
+    expect(renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest }))).toContain(
+      "The Overview’s sensitivity playground runs the workbook’s model, not this one.",
+    );
     expect(html).toContain(sizer);
     expect(html).toContain(card);
     expect(html.indexOf("Extracted terms")).toBeLessThan(html.indexOf(sizer));

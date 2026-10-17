@@ -422,7 +422,9 @@ function FinancialsView({ financials }: { financials?: SampleFinancials }) {
           strategy={financials.strategy}
         />
       )}
-      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} />
+      {/* The walkthrough's Overview draws no sensitivity playground, so
+          the card's note does not name one (audit C10, L2). */}
+      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} playground={false} />
     </div>
   );
 }
