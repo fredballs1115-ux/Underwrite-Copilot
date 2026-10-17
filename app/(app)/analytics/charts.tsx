@@ -30,23 +30,21 @@ const C = {
   kill: "#b23a30",
 };
 
+/** A deal's screen day with its year: "Aug 11, 2026". */
 const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
+  year: "numeric",
   timeZone: "UTC",
 });
+/** A month on the axis and in a chart's spoken name, the year in full: the
+ *  axis's "Aug 26" had read as the 26th of August. */
 const MONTH_FMT = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  year: "2-digit",
-  timeZone: "UTC",
-});
-/** A month in a chart's spoken name: the year in full, since the axis's
- *  "Jan 26" would be heard as a day. */
-const SPOKEN_MONTH_FMT = new Intl.DateTimeFormat("en-US", {
   month: "short",
   year: "numeric",
   timeZone: "UTC",
 });
+const SPOKEN_MONTH_FMT = MONTH_FMT;
 
 /** The scatter's name for a screen reader: how many deals, over which
  *  months, the median, and the lowest and highest — each said only where

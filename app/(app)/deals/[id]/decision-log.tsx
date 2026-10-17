@@ -11,10 +11,12 @@ import { PersonBadge } from "../../person-badge";
 
 // Module-level cached formatter (creating one per render is measurable).
 // UTC-pinned, date-only: the server and the browser must render the SAME
-// string or React logs a hydration mismatch on every deal with a note.
+// string or React logs a hydration mismatch on every deal with a note. The
+// year in full: a log runs across New Year, and "Aug 26" reads as the 26th.
 const WHEN_FMT = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
+  year: "numeric",
   timeZone: "UTC",
 });
 

@@ -140,8 +140,9 @@ describe("where a person shows", () => {
       }),
     );
     const text = visibleText(html);
-    expect(text).toMatch(/Passed at \$68M\.\s*Oct 2\s*·\s*you/);
-    expect(text).toMatch(/Broker says they'll move\.\s*Oct 1\s*·\s*jordan\.lee/);
+    // Each date with its year: a log runs across New Year.
+    expect(text).toMatch(/Passed at \$68M\.\s*Oct 2, 2026\s*·\s*you/);
+    expect(text).toMatch(/Broker says they'll move\.\s*Oct 1, 2026\s*·\s*jordan\.lee/);
     expect(text).not.toMatch(EMAIL);
     expect(badges(html).map((m) => [m[1], m[2]])).toEqual([["sm", "F"], ["sm", "JL"]]);
     lint(html);
@@ -158,7 +159,7 @@ describe("where a person shows", () => {
         notes: [{ at: "2026-10-01T00:00:00Z", by: "jordan.lee@firm.com", byId: MATE, text: "Noted." }],
       }),
     );
-    expect(visibleText(html)).toMatch(/Noted\.\s*Oct 1\s*·\s*Jordan Lee/);
+    expect(visibleText(html)).toMatch(/Noted\.\s*Oct 1, 2026\s*·\s*Jordan Lee/);
     expect(badges(html).map((m) => m[2])).toEqual(["JL"]);
   });
 

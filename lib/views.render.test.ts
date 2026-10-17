@@ -2506,6 +2506,12 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
     expect(gluedWords(text)).toEqual([]);
     expect(html).toContain("<svg");
     expect(text).toMatch(/Vacancy/);
+    // The axis says each period's month and year, never the raw "2025-03";
+    // a mark's title its full day.
+    expect(text).toContain("Mar 2025");
+    expect(text).toContain("Dec 2025");
+    expect(html).not.toMatch(/>2025-\d\d</);
+    expect(html).toContain("<title>Mar 31, 2025 — Vacancy: 5.2%");
     const empty = visibleText(
       renderToStaticMarkup(
         React.createElement(DualAxisTrend, { bars: [], barLabel: "Vacancy", segments: [], lineLabel: "Asking rent", formatBar: String, formatLine: String }),
