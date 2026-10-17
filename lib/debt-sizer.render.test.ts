@@ -282,6 +282,26 @@ describe("the three lender tests are one picture", () => {
     }
   });
 
+  it("measures the track in potential rent, and past 100% says the breakeven is not reached at full occupancy, as the workbook does (audit C11, L2)", () => {
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
+    const sample = visibleText(render({ model: SAMPLE_DEAL.model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null }));
+    expect(sample).toContain("100% of potential rent");
+    expect(sample).not.toContain("100% occupied");
+    // The same deal with its expenses near its whole potential rent.
+    const inp = SAMPLE_DEAL.model.inputs;
+    const heavy = { ...SAMPLE_DEAL.model, inputs: { ...inp, year1Opex: inp.year1Gpr! * 0.97 } };
+    const html = render({ model: heavy, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    clean(html);
+    const text = visibleText(html);
+    const past = /need\s*([\d.]+)%\s*of the potential rent/.exec(text)?.[1];
+    expect(Number(past)).toBeGreaterThan(100);
+    expect(text).toContain("Not reached at full occupancy:");
+    expect(text).toContain(`Breakeven not reached at full occupancy (${past}% of potential rent)`);
+    expect(text).not.toMatch(/[\d.]+%\s*occupancy covers expenses/);
+    // The fill sits at the track's end.
+    expect(html).toMatch(/style="width:100%"[^>]*data-bar="breakeven-need"/);
+  });
+
   it("with nothing to size on, draws no bars and no key", () => {
     const html = render({ model: null, extraction: null, underwrite: null, rateSeeds: null });
     clean(html);

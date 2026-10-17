@@ -308,11 +308,14 @@ function SubHead({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The breakeven occupancy as a picture: a track from 0% to 100% occupied,
- * filled to the occupancy the expenses, reserves and debt service need, with
- * the breakeven and the model's own occupancy as ticks and the cushion
- * between them shaded. A figure past either end sits at the end; the key
- * keeps the figure as computed.
+ * The breakeven occupancy as a picture: a track from 0% to 100% of the
+ * potential rent (the breakeven is a share of gross potential rent, an
+ * economic occupancy, not a count of doors), filled to the share the
+ * expenses, reserves and debt service need, with the breakeven and the
+ * model's own occupancy as ticks and the cushion between them shaded. A
+ * figure past either end sits at the end; the key keeps the figure as
+ * computed, and past 100% says what the workbook says: "not reached at full
+ * occupancy" (lib/underwrite/workbook).
  */
 function BreakevenTrack({ occ, underwritten }: { occ: number; underwritten: number }) {
   const clamp = (v: number) => Math.max(0, Math.min(100, v));
@@ -331,10 +334,12 @@ function BreakevenTrack({ occ, underwritten }: { occ: number; underwritten: numb
       </div>
       <div className="mt-1 flex justify-between font-mono text-[10px] tabular-nums text-muted" aria-hidden>
         <span>0%</span>
-        <span>100% occupied</span>
+        <span>100% of potential rent</span>
       </div>
       <Key>
-        <KeyItem mark="tick" tone="bg-kill">{`Breakeven ${occ.toFixed(1)}%`}</KeyItem>
+        <KeyItem mark="tick" tone="bg-kill">
+          {occ > 100 ? `Breakeven not reached at full occupancy (${occ.toFixed(1)}% of potential rent)` : `Breakeven ${occ.toFixed(1)}%`}
+        </KeyItem>
         <KeyItem mark="dashed" tone="border-ink">{`The model's ${underwritten.toFixed(0)}%`}</KeyItem>
         {cushion && (
           <KeyItem mark="swatch" tone="bg-pass/30">The cushion</KeyItem>
@@ -825,13 +830,28 @@ export function DebtSizer({
               <>
                 <SubHead>Breakeven occupancy</SubHead>
                 <p className="mt-2 text-sm">
-                  <span className="font-mono font-semibold tabular-nums">
-                    {breakeven.occ.toFixed(1)}%
-                  </span>{" "}
-                  <span className="text-muted">
-                    occupancy covers expenses, reserves, and this debt service —
-                    the model underwrites {breakeven.underwritten.toFixed(0)}%.
-                  </span>
+                  {breakeven.occ > 100 ? (
+                    // Past the whole potential rent no occupancy covers it:
+                    // the workbook's own words.
+                    <>
+                      <span className="font-semibold">Not reached at full occupancy:</span>{" "}
+                      <span className="text-muted">
+                        expenses, reserves, and this debt service need{" "}
+                        <span className="font-mono tabular-nums">{breakeven.occ.toFixed(1)}%</span> of the potential rent —
+                        the model underwrites {breakeven.underwritten.toFixed(0)}%.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono font-semibold tabular-nums">
+                        {breakeven.occ.toFixed(1)}%
+                      </span>{" "}
+                      <span className="text-muted">
+                        occupancy covers expenses, reserves, and this debt service —
+                        the model underwrites {breakeven.underwritten.toFixed(0)}%.
+                      </span>
+                    </>
+                  )}
                   {breakeven.occ >= breakeven.underwritten && (
                     <span className="font-medium text-kill">
                       {" "}
