@@ -173,8 +173,6 @@ export function avgRentOf(summary: RentRollSummary, assetClass: string | null | 
   return { text, basis };
 }
 
-/** The gap in words: "8.7% over the T-12", "3.1% under the T-12", "in line
- *  with the T-12". */
 /**
  * The rent roll's WALT as a page prints it, by the rent-roll page's own rule
  * (lib/rentroll/profiles `leasesShort`): a class that leases by the month or
@@ -190,6 +188,8 @@ export function actualsWalt(
   return { text: summary.waltYears != null ? `${summary.waltYears.toFixed(1)} yr` : "—", note: null };
 }
 
+/** The gap in words: "8.7% over the T-12", "3.1% under the T-12", "in line
+ *  with the T-12". */
 export function gapWords(c: NoiComparison): string {
   if (c.direction === "in_line") return "in line with the T-12";
   return `${pct1(Math.abs(c.deltaPct))} ${c.direction === "above" ? "over" : "under"} the T-12`;
