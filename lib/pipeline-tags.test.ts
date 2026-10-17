@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { PICTURE_CHIPS, PICTURE_TIERS, chipWidth, dealTags, pictureRoom, placeTags, placeTagsByTier } from "./pipeline-tags";
+import { PICTURE_CHIPS, PICTURE_TIERS, ROUNDING_PX_PER_CHAR, chipWidth, chipWidthBound, dealTags, pictureRoom, placeTags, placeTagsByTier } from "./pipeline-tags";
 import type { PipelineSlots } from "./pipeline-slots";
 import type { ExtractionResult } from "./anthropic/types";
 import { exchangeForDeal } from "./exchange-deal";
@@ -200,9 +200,15 @@ describe("placeTags — the card's picture carries a chip only where it fits who
     // the chip the research pass found cut, "Shadow-anchored, 56% rolls in 5 …".
     const roster = tag("Shadow-anchored, 56% rolls in 5 yrs");
     for (const w of PICTURE_TIERS) expect(placeTags([roster], w)).toEqual({ picture: [], line: [roster] });
-    // 188.8px drawn: whole on a 348px picture, not on a 278px one.
+    // 188.8px drawn, 194.8 estimated, in a 348px picture's 201px column: a
+    // few pixels from wrapping where each glyph is rounded up to a whole
+    // pixel, and it wrapped into a two-line pill on a phone. It waits on the
+    // line at every width now.
     const abated = tag("Tax abated, 4 yrs left, +$450k/yr");
-    expect(placeTagsByTier([abated])).toEqual([{ tag: abated, onPicture: [false, false, true] }]);
+    expect(placeTagsByTier([abated])).toEqual([{ tag: abated, onPicture: [false, false, false] }]);
+    // A chip with room for every glyph rounded up rides where it has it.
+    const preleased = tag("Pre-leased 87%, +5 pts y/y");
+    expect(placeTagsByTier([preleased])[0].onPicture).toEqual([false, false, true]);
     // A short chip rides on every picture.
     expect(placeTagsByTier([tag("49% share")])[0].onPicture).toEqual([true, true, true]);
   });
@@ -213,14 +219,28 @@ describe("placeTags — the card's picture carries a chip only where it fits who
     const narrow = placeTags(tags, PICTURE_TIERS[0]);
     expect(narrow.picture.map((t) => t.text)).toEqual(["Flood AE", "49% share"]);
     expect(narrow.line.map((t) => t.text)).toEqual(["Mgmt encumbered, PIP $35k/key", "Note"]);
-    const wide = placeTags(tags, PICTURE_TIERS[2]);
-    expect(wide.picture.map((t) => t.text)).toEqual(["Mgmt encumbered, PIP $35k/key", "Flood AE"]);
-    expect(wide.line.map((t) => t.text)).toEqual(["49% share", "Note"]);
+    const wide = placeTags([tag("Pre-leased 87%, +5 pts y/y"), ...tags], PICTURE_TIERS[2]);
+    expect(wide.picture.map((t) => t.text)).toEqual(["Pre-leased 87%, +5 pts y/y", "Flood AE"]);
+    expect(wide.line.map((t) => t.text)).toEqual(["Mgmt encumbered, PIP $35k/key", "49% share", "Note"]);
     // Every tag is on the picture or the line at every width, never both
     // and never neither.
     for (const w of PICTURE_TIERS) {
       const { picture, line } = placeTags(tags, w);
       expect([...picture, ...line].map((t) => t.key).sort()).toEqual(tags.map((t) => t.key).sort());
+    }
+  });
+
+  it("never wraps a chip it puts on a picture: each one the site writes fits its column with every glyph rounded up a pixel", () => {
+    expect(ROUNDING_PX_PER_CHAR).toBe(1);
+    for (const [text, drawn] of DRAWN_CHIP) {
+      expect(chipWidthBound(text), text).toBeGreaterThanOrEqual(drawn + [...text].length);
+      PICTURE_TIERS.forEach((w, k) => {
+        if (placeTagsByTier([tag(text)])[0].onPicture[k]) {
+          // The column a chip has at the tier's narrowest card, and the
+          // widest the chip can draw on any engine.
+          expect(drawn + [...text].length, `${text} at ${w}px`).toBeLessThanOrEqual(w * 0.58);
+        }
+      });
     }
   });
 

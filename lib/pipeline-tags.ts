@@ -252,17 +252,35 @@ export function pictureRoom(width: number): number {
 export const PICTURE_CHIPS = 2;
 
 /**
+ * The most a chip's text can draw wider than Chromium's estimate on another
+ * engine, in px a character: Chromium places glyphs at fractions of a pixel,
+ * and an engine that rounds each glyph's advance to a whole pixel draws each
+ * up to a pixel wider. A chip estimated to fill its column within a few
+ * pixels — "Tax abated, 4 yrs left, +$450k/yr", 194.8px in a 201px column —
+ * wrapped there into a two-line pill. A bound, not a measurement: no glyph
+ * rounds by a pixel or more.
+ */
+export const ROUNDING_PX_PER_CHAR = 1;
+
+/** A chip's widest drawing on any engine: Chromium's estimate, every glyph
+ *  rounded up a whole pixel. */
+export function chipWidthBound(text: string): number {
+  return Math.round((chipWidth(text) + [...text].length * ROUNDING_PX_PER_CHAR) * 10) / 10;
+}
+
+/**
  * Which tags ride on a card's picture of a width and which wait on the
  * card's line under the figures: the first two, in order, that fit whole
- * ride on the picture; every other tag keeps its order on the line. A tag
- * is never cut wherever it is.
+ * ride on the picture — whole on any engine (`chipWidthBound`), so none
+ * wraps into a second line on a phone — and every other tag keeps its order
+ * on the line. A tag is never cut wherever it is.
  */
 export function placeTags(tags: readonly DealTag[], width: number = PICTURE_TIERS[0]): { picture: DealTag[]; line: DealTag[] } {
   const room = pictureRoom(width);
   const picture: DealTag[] = [];
   const line: DealTag[] = [];
   for (const t of tags) {
-    if (picture.length < PICTURE_CHIPS && chipWidth(t.text) <= room) picture.push(t);
+    if (picture.length < PICTURE_CHIPS && chipWidthBound(t.text) <= room) picture.push(t);
     else line.push(t);
   }
   return { picture, line };

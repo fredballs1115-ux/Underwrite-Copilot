@@ -538,14 +538,17 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // Short chips ride on every picture.
     expect(where("l", "Flood AE")).toEqual(["picture", "picture", "picture"]);
     expect(where("g", "49% share")).toEqual(["picture", "picture", "picture"]);
-    expect(where("p", "Assumable 3.45%")).toEqual(["picture", "picture", "picture"]);
     // The chip found cut — 206.6px drawn, more room than any picture has —
     // never rides on one.
     expect(where("e", "Shadow-anchored, 56% rolls in 5 yrs")).toEqual(["line", "line", "line"]);
     // A chip whole only on the wider pictures rides on them, and waits on
-    // the line under the figures on the narrower.
+    // the line under the figures on the narrower — whole on any engine, every
+    // glyph rounded up a pixel (lib/pipeline-tags `chipWidthBound`).
+    expect(where("p", "Assumable 3.45%")).toEqual(["line", "picture", "picture"]);
     expect(where("e", "Auction, 5% premium")).toEqual(["line", "picture", "picture"]);
-    expect(where("p", "Tax abated, 4 yrs left, +$450k/yr")).toEqual(["line", "line", "picture"]);
+    // The chip found wrapped into a two-line pill on a phone: a few pixels
+    // from its column's edge, it waits on the line at every width.
+    expect(where("p", "Tax abated, 4 yrs left, +$450k/yr")).toEqual(["line", "line", "line"]);
     // The card's rows are the grid row's own, so a row of cards lines up
     // its figures whichever carry tags under them; the picture and the tag
     // row each ask their own width (a container cannot be a subgrid).
