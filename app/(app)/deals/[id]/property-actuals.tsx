@@ -3,6 +3,7 @@ import { rentQuotedMonthly } from "@/lib/asset-words";
 import {
   OM_NOI_LABEL,
   actualsUsd,
+  actualsWalt,
   avgRentOf,
   rentRollDateWords,
   statedDay,
@@ -26,8 +27,6 @@ const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
 const usd = actualsUsd;
 const pct = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;
-const num = (n: number | null | undefined, digits = 1): string =>
-  n == null || !Number.isFinite(n) ? "—" : n.toFixed(digits);
 
 /** The card's data: lib/actuals/actuals-read's `readActuals`, the note and
  *  the class optional for a caller that builds it by hand. */
@@ -65,6 +64,7 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
   const monthly = rentQuotedMonthly(data.assetClass);
   // An average over fewer units than are occupied says so.
   const { text: avgRent, basis: rentBasis } = rr ? avgRentOf(rr, data.assetClass) : { text: "—", basis: null };
+  const walt = rr ? actualsWalt(rr, data.assetClass) : null;
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -122,7 +122,9 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <Stat k="Occupancy" v={pct(rr.sfWeightedOccupancy)} />
-              <Stat k="WALT" v={rr.waltYears != null ? `${num(rr.waltYears)} yr` : "—"} />
+              {/* By the rent-roll page's rule: an apartment roll is read for
+                  loss to lease, never by its WALT (lib/actuals `actualsWalt`). */}
+              <Stat k="WALT" v={walt?.text ?? "—"} sub={walt?.note ?? null} />
               <Stat k="Avg rent" v={avgRent} sub={rentBasis} />
               <Stat k="Units" v={`${rr.occupiedUnits} / ${rr.unitCount}`} />
             </dl>

@@ -97,6 +97,10 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
     expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
+    // The rent-roll page's rule: an apartment roll is read for loss to
+    // lease, so its WALT (0.6 yr on the sample) is no figure here.
+    expect(text).toMatch(/WALT\s*n\/a\s*leases of a year or less — read for loss to lease/);
+    expect(text).not.toMatch(/0\.6 yr/);
 
     // A summary stored before the monthly figure was read keeps the rent per
     // foot, with its period said.
@@ -153,6 +157,9 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
     expect(text).not.toContain("/unit/mo");
     expect(text).toContain("Lease expiry (% of occupied SF)");
     expect(text).toMatch(/as of Jun 30, 2026/);
+    // An office roll reads its WALT, as the rent-roll page does.
+    expect(text).toMatch(/WALT\s*0\.6 yr/);
+    expect(text).not.toContain("read for loss to lease");
   });
 
   // Audit C8, L2: the card left a T-12 with no stated period undated, where

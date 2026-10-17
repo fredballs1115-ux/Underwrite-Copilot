@@ -19,6 +19,7 @@ import { compactUsd } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
 import { isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
+import { leasesShort } from "@/lib/rentroll/profiles";
 import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "./analyze";
 import type { NoiComparison, RentRollSummary, T12Summary } from "./types";
 
@@ -174,6 +175,21 @@ export function avgRentOf(summary: RentRollSummary, assetClass: string | null | 
 
 /** The gap in words: "8.7% over the T-12", "3.1% under the T-12", "in line
  *  with the T-12". */
+/**
+ * The rent roll's WALT as a page prints it, by the rent-roll page's own rule
+ * (lib/rentroll/profiles `leasesShort`): a class that leases by the month or
+ * the year — apartments, storage, a hotel — is read for loss to lease, not
+ * WALT, so its WALT is not a figure to print ("0.6 yr" on an apartment roll
+ * had read as a cliff the rent-roll page says is routine). `note` says why.
+ */
+export function actualsWalt(
+  summary: Pick<RentRollSummary, "waltYears">,
+  assetClass: string | null | undefined,
+): { text: string; note: string | null } {
+  if (leasesShort(assetClass)) return { text: "n/a", note: "leases of a year or less — read for loss to lease" };
+  return { text: summary.waltYears != null ? `${summary.waltYears.toFixed(1)} yr` : "—", note: null };
+}
+
 export function gapWords(c: NoiComparison): string {
   if (c.direction === "in_line") return "in line with the T-12";
   return `${pct1(Math.abs(c.deltaPct))} ${c.direction === "above" ? "over" : "under"} the T-12`;
