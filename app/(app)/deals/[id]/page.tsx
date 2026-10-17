@@ -167,6 +167,7 @@ import {
   inferStrategy,
   isPlanDeal,
   buildsSomething,
+  notYetDelivered,
   planSummary,
   planWithBasisChecked,
   signalAskPrice,
@@ -1420,7 +1421,7 @@ export default async function DealPage({
         ]}
         // The year built and today's occupancy, only where the memorandum
         // states them, on a line under the tiles (lib/hero-figure).
-        facts={buildingFacts(metrics)}
+        facts={buildingFacts(metrics, { screenYear: screenYearOf(extraction), notYetDelivered: notYetDelivered(strategy.kind) })}
         // While a first screen has not yet written the terms of a memorandum,
         // a figure not read yet shimmers; once they are written, a missing
         // one keeps its dash — the pipeline row's own rule (`readingTerms`).

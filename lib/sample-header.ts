@@ -19,6 +19,7 @@ import { type BuyBox, buildingSfRow, findGoingInCap, screenYearOf } from "@/lib/
 import {
   findPriceMetric,
   inferStrategy,
+  notYetDelivered,
   planSummary,
   planWithBasisChecked,
   signalAskPrice,
@@ -154,7 +155,7 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
       returnFigure,
       { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
     ],
-    facts: buildingFacts(metrics),
+    facts: buildingFacts(metrics, { screenYear: screenYearOf(extraction), notYetDelivered: notYetDelivered(strategy.kind) }),
     market: marketPictureFor(input.address, extraction?.market ?? null, input.placed, input.county),
     pictureLabel: input.address?.label ?? input.name,
   };

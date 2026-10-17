@@ -32,18 +32,29 @@ export function priceFigureOf(label: string, stated: string | null): HeroFigure 
     : { label, value: stated, figure: true };
 }
 
+/** What the header's facts line needs to know of the deal beyond its rows:
+ *  the year the screen read the memorandum (lib/criteria `screenYearOf`),
+ *  and whether the building is yet to be delivered (lib/deal-strategy
+ *  `notYetDelivered`: a development, or a conversion whose new use comes
+ *  with the works) — such a building has no year built. */
+export interface BuildingFactsOf {
+  screenYear: number;
+  notYetDelivered: boolean;
+}
+
 /**
  * The building's own facts the header states under its tiles, each only
  * where the memorandum states it: the year built (lib/criteria
- * `yearBuiltRow`, the rent rules' reader) and today's occupancy
+ * `yearBuiltRow`, the rent rules' reader; none on a building yet to be
+ * delivered) and today's occupancy
  * (`occupancyPctFromMetrics`, the reader the workbook's in-place occupancy
  * and the retrade diff take — never a stabilized or pro forma figure), each
  * with the row as stated in its title. A deal that states neither has none.
  */
-export function buildingFacts(metrics: readonly { label: string; value: string }[] | null | undefined): HeroFigure[] {
+export function buildingFacts(metrics: readonly { label: string; value: string }[] | null | undefined, of: BuildingFactsOf): HeroFigure[] {
   const rows = (metrics ?? []).filter((m) => !!m && typeof m.label === "string" && typeof m.value === "string");
   const out: HeroFigure[] = [];
-  const built = yearBuiltRow(rows);
+  const built = of.notYetDelivered ? null : yearBuiltRow(rows, of.screenYear);
   if (built) out.push({ label: "Year built", value: String(built.year), figure: true, title: `As stated: ${built.row.value.trim()}` });
   const occ = occupancyPctFromMetrics(rows);
   const occRow = occupancyRow(rows);

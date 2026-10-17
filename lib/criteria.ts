@@ -1350,15 +1350,50 @@ export function occupancyPctFromMetrics(metrics: MetricLike[]): number | null {
 
 /** A "Year built" row ("Year built", "Year built / renovated"). */
 const YEAR_BUILT_ROW = /\byear built\b/i;
+/** A label whose year is not the building's: an effective age, or an
+ *  average across buildings. */
+const YEAR_BUILT_LABEL_EXCLUDE = /\b(effective|average|avg|weighted|wtd)\b/i;
+const YEAR = /\b(1[7-9]\d{2}|20\d{2})\b/;
+/** A renovation clause and the year (or years) it names — "renovated 2019",
+ *  "remodeled in 2015–2016", "rehabbed 2018" — and a year said before the
+ *  word ("2019 renovation"). Neither is the year the building was built. */
+const RENOVATION_CLAUSE =
+  /\b(?:gut[- ])?(?:renovat\w*|remodel\w*|rehab\w*|redevelop\w*|reposition\w*|moderni[sz]\w*|refurbish\w*|updated|upgraded)\b[^;,()\/\d]*(?:(?:1[7-9]\d{2}|20\d{2})(?:\s*[-–—]\s*(?:\d{4}|\d{2})\b)?)?/gi;
+const YEAR_BEFORE_RENOVATION =
+  /\b(?:1[7-9]\d{2}|20\d{2})(?:\s*[-–—]\s*(?:\d{4}|\d{2}))?\s+(?:gut[- ])?(?:renovations?|remodel(?:ing)?|rehab(?:ilitation)?|redevelopment|repositioning|modernization|refurbishment|upgrades?)\b/gi;
+/** A year stated as the one the building was built — "originally built
+ *  1964", "built in 1964", "constructed 1964" — never "to be built". */
+const BUILT_YEAR = /\b(?<!to be |will be )(?:built|constructed)\b\D{0,12}?\b(1[7-9]\d{2}|20\d{2})\b/i;
+/** A value that states a year not yet come or not the building's: an
+ *  estimate, a projection, a delivery or completion, a building under
+ *  construction. */
+const YEAR_BUILT_VALUE_REFUSE =
+  /\best\b\.?|\bestimated\b|\bprojected\b|\bproposed\b|\bexpected\b|\banticipated\b|\bdeliver\w*|\bunder construction\b|\bcompletion\b|\bto be (built|completed|delivered)\b|\bplanned\b/i;
 
 /** The year the building was built, as the memorandum's "Year built" row
- *  states it — the first four-digit year in its value — with the row, or
- *  null where no such row states one. The rent rules' reader (lib/rent-
- *  regulation) and the deal header's. */
-export function yearBuiltRow(metrics: readonly MetricLike[]): { row: MetricLike; year: number } | null {
-  const row = metrics.find((m) => !!m && typeof m.label === "string" && typeof m.value === "string" && YEAR_BUILT_ROW.test(m.label));
-  const raw = row?.value.match(/\b(1[7-9]\d{2}|20\d{2})\b/)?.[1];
-  return row && raw ? { row, year: Number(raw) } : null;
+ *  states it, with the row, or null where no such row states one. The rent
+ *  rules' reader (lib/rent-regulation) and the deal header's, so the two
+ *  read one year: a renovation is never the year built (a 1964 building
+ *  renovated in 2019 is not inside AB 1482's 15-year window); a year said as
+ *  built wins over the others in the value; an estimate, a projection, a
+ *  delivery or a completion states no year built, nor does a year after the
+ *  year the screen read the memorandum (`screenYear`, lib/criteria
+ *  `screenYearOf`); and an effective or an average year built is not the
+ *  building's. */
+export function yearBuiltRow(metrics: readonly MetricLike[], screenYear: number): { row: MetricLike; year: number } | null {
+  for (const row of metrics) {
+    if (!row || typeof row.label !== "string" || typeof row.value !== "string") continue;
+    if (!YEAR_BUILT_ROW.test(row.label) || YEAR_BUILT_LABEL_EXCLUDE.test(row.label)) continue;
+    const rest = row.value.replace(YEAR_BEFORE_RENOVATION, " ").replace(RENOVATION_CLAUSE, " ");
+    if (YEAR_BUILT_VALUE_REFUSE.test(rest)) continue;
+    const built = BUILT_YEAR.exec(rest)?.[1];
+    const raw = built ?? rest.match(YEAR)?.[1];
+    if (!raw) continue;
+    const year = Number(raw);
+    if (year > screenYear) continue;
+    return { row, year };
+  }
+  return null;
 }
 
 /** The effective price band, folding the legacy max-only field in. */

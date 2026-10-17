@@ -564,6 +564,30 @@ describe("Washington DC and Los Angeles", () => {
   });
 });
 
+describe("the year built the rules read (audit C11, H1)", () => {
+  const fresno = { address: { state: "CA", city: "Fresno" }, classKey: "multifamily" };
+  const tacoma = { address: { state: "WA", city: "Tacoma" }, classKey: "multifamily" };
+  const outcome = (built: Row, where: typeof fresno, id: string) =>
+    readRegulation(ex([row("Units", "24"), built]), where, "2026-10-05")?.regimes.find((g) => g.ruleId === id)?.outcome ?? null;
+
+  it("never reads a renovation as the year built: a 1964 building renovated in 2019 is outside the new-building exemptions", () => {
+    // AB 1482's 15 years and Washington's 12: a 2019 year built would have
+    // exempted both buildings as new construction.
+    expect(outcome(row("Year built / renovated", "Renovated 2019 (originally built 1964)"), fresno, "ca-ab1482-rent-cap")).toBe("applies");
+    expect(outcome(row("Year built / renovated", "1964 / renovated 2019"), tacoma, "wa-rent-cap-hb1217")).toBe("applies");
+    // A building that really is 2019's is inside both.
+    expect(outcome(row("Year built", "2019"), fresno, "ca-ab1482-rent-cap")).toBeNull();
+    expect(outcome(row("Year built", "2019"), tacoma, "wa-rent-cap-hb1217")).toBeNull();
+  });
+
+  it("reads no year built off an effective year, an average or a projected delivery", () => {
+    // Each leaves the year open, so the exemption is a question, never an answer.
+    for (const built of [row("Effective year built", "2018"), row("Year built", "2027 (projected delivery)"), row("Year built", "Est. Q3 2028")]) {
+      expect(outcome(built, fresno, "ca-ab1482-rent-cap"), built.value).toBe("possibly_applies");
+    }
+  });
+});
+
 describe("the words", () => {
   it("never glue a figure to a word", () => {
     const r = readRegulation(walkUp([row("Rent-regulated units", "41"), row("Preferential rent", "$1,480")]), BROOKLYN, "2026-10-05")!;

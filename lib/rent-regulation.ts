@@ -45,7 +45,7 @@ import { buildSubject, seedRules } from "@/lib/research-data";
 import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/asset-class";
 import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
-import { parseCount, unitCountFromMetrics, unitCountRow, yearBuiltRow } from "@/lib/criteria";
+import { parseCount, screenYearOf, unitCountFromMetrics, unitCountRow, yearBuiltRow } from "@/lib/criteria";
 import { inferStrategy, notYetDelivered } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
 import { condoUnitsInCondominium } from "@/lib/condo-units";
@@ -272,9 +272,10 @@ export interface RegulationInput {
 }
 
 /** The year built, through the one reader the deal header reads it with
- *  (lib/criteria `yearBuiltRow`). */
-function yearBuiltOf(metrics: readonly MetricRow[]): number | null {
-  return yearBuiltRow(metrics)?.year ?? null;
+ *  (lib/criteria `yearBuiltRow`), against the year the screen read the
+ *  memorandum. */
+function yearBuiltOf(metrics: readonly MetricRow[], screenYear: number): number | null {
+  return yearBuiltRow(metrics, screenYear)?.year ?? null;
 }
 
 /** "Oct 1, 2026" — a period's end as a page says it. */
@@ -436,7 +437,9 @@ export function readRegulation(
       address: input.address,
       census: input.census ?? null,
       sizeText: rulesSizeText(ex, input.classKey),
-      yearBuilt: yearBuiltOf(metrics),
+      // A building yet to be delivered has no year built: the shell a
+      // conversion reuses was built for another use (the header's rule).
+      yearBuilt: permittedFrom != null ? null : yearBuiltOf(metrics, screenYearOf(ex)),
       residential,
       today,
       sectorFields: permittedFrom != null ? { building_permit_year: permittedFrom } : null,

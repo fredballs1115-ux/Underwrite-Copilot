@@ -115,6 +115,7 @@ describe("the sample's header is the deal page's", () => {
 });
 
 describe("the header's line of the building's own facts: the year built and today's occupancy, only where stated", () => {
+  const STANDING = { screenYear: 2026, notYetDelivered: false };
   const stated = [
     { label: "Stabilized occupancy", value: "96%" },
     { label: "Year built", value: "1987 / renovated 2015" },
@@ -122,21 +123,57 @@ describe("the header's line of the building's own facts: the year built and toda
   ];
 
   it("reads each through the shared reader, the row as stated in its title — never the stabilized figure", () => {
-    expect(buildingFacts(stated)).toEqual([
+    expect(buildingFacts(stated, STANDING)).toEqual([
       { label: "Year built", value: "1987", figure: true, title: "As stated: 1987 / renovated 2015" },
       { label: "Occupancy", value: "94.5%", figure: true, title: "As stated: Occupancy (current), 94.5%" },
     ]);
     // The rent rules read the same year off the same row.
-    expect(yearBuiltRow(stated)?.year).toBe(1987);
-    expect(buildingFacts([{ label: "Stabilized occupancy", value: "96%" }])).toEqual([]);
-    expect(buildingFacts(null)).toEqual([]);
+    expect(yearBuiltRow(stated, 2026)?.year).toBe(1987);
+    expect(buildingFacts([{ label: "Stabilized occupancy", value: "96%" }], STANDING)).toEqual([]);
+    expect(buildingFacts(null, STANDING)).toEqual([]);
     // The sample states neither, so the homepage's card is as it was.
     expect(sampleHeader(AS_OF).facts).toEqual([]);
   });
 
+  it("reads the year the building was built: never a renovation, a projection, an effective or average year, or a year not yet come", () => {
+    const year = (label: string, value: string, screenYear = 2026) => yearBuiltRow([{ label, value }], screenYear)?.year ?? null;
+    // The audit's probes.
+    expect(year("Year built / renovated", "Renovated 2019 (originally built 1964)")).toBe(1964);
+    expect(year("Year built", "2027 (projected delivery)")).toBeNull();
+    expect(year("Year built", "Est. Q3 2028")).toBeNull();
+    expect(year("Effective year built", "2005")).toBeNull();
+    expect(year("Average year built", "1982")).toBeNull();
+    expect(year("Weighted average year built", "1991")).toBeNull();
+    // A renovation clause, either side of the year built.
+    expect(year("Year built / renovated", "1964 / renovated 2019")).toBe(1964);
+    expect(year("Year built", "1964 (renovated 2018–2019)")).toBe(1964);
+    expect(year("Year built", "2019 renovation; built 1964")).toBe(1964);
+    expect(year("Year built", "Built 1964, remodeled in 2015")).toBe(1964);
+    expect(year("Year built", "Rehabbed 2017")).toBeNull();
+    expect(year("Year built", "Under construction, delivery Q2 2027")).toBeNull();
+    expect(year("Year built", "Expected completion 2026")).toBeNull();
+    // A year after the screen's is not built yet; the screen's own year is.
+    expect(year("Year built", "2027")).toBeNull();
+    expect(year("Year built", "2026")).toBe(2026);
+    expect(year("Year built", "2027", 2027)).toBe(2027);
+    // An effective year beside the real one: the real one reads.
+    expect(
+      yearBuiltRow(
+        [
+          { label: "Effective year built", value: "2005" },
+          { label: "Year built", value: "1982" },
+        ],
+        2026,
+      )?.year,
+    ).toBe(1982);
+    // A building yet to be delivered has no year built on the header.
+    expect(buildingFacts([{ label: "Year built", value: "1962" }], { screenYear: 2026, notYetDelivered: true })).toEqual([]);
+    expect(buildingFacts([{ label: "Year built", value: "1962" }], STANDING).map((f) => f.value)).toEqual(["1962"]);
+  });
+
   it("draws them on one line under the four tiles, a phone's header kept to its two rows of tiles", () => {
     const html = renderToStaticMarkup(
-      React.createElement(DealHero, { title: "Elm Court", subtitle: "Baltimore, MD · Multifamily", figures: sampleHeader(AS_OF).figures, facts: buildingFacts(stated) }),
+      React.createElement(DealHero, { title: "Elm Court", subtitle: "Baltimore, MD · Multifamily", figures: sampleHeader(AS_OF).figures, facts: buildingFacts(stated, STANDING) }),
     );
     expect(a11yIssues(html)).toEqual([]);
     const text = visibleText(html);
@@ -177,7 +214,10 @@ describe("the deal page still builds its header from the readers this module cal
       ["extraction?.address || dealAddress?.label || extraction?.market || firstSignal?.market || null", "extraction?.address || input.address?.label || extraction?.market || firstSignal?.market || null"],
       ["marketPictureFor(dealAddress, extraction?.market ?? null,", "marketPictureFor(input.address, extraction?.market ?? null,"],
       ["label={dealAddress?.label ?? (deal.name as string)}", "pictureLabel: input.address?.label ?? input.name"],
-      ["facts={buildingFacts(metrics)}", "facts: buildingFacts(metrics)"],
+      [
+        "facts={buildingFacts(metrics, { screenYear: screenYearOf(extraction), notYetDelivered: notYetDelivered(strategy.kind) })}",
+        "facts: buildingFacts(metrics, { screenYear: screenYearOf(extraction), notYetDelivered: notYetDelivered(strategy.kind) })",
+      ],
     ];
     for (const [page, own] of pairs) {
       expect(fold(PAGE), page).toContain(page);
