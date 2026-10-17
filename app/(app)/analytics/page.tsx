@@ -12,6 +12,7 @@ import {
   stageCountLine,
   stageCounts,
   marketRows,
+  unitTileSub,
   type AnalyticsRow,
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage, parseStageHistory } from "@/lib/stages";
@@ -25,7 +26,7 @@ import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { getTeam } from "@/lib/teams";
 import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
-import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
+import { ANALYTICS_MIN_DEALS, AnalyticsEmptyPicture, DotTimeline, VerdictMix, StageFunnel } from "./charts";
 import { MarketTable } from "./market-table";
 import { scorecardNote } from "./scorecard-note";
 import { readAllResult } from "@/lib/read-all";
@@ -85,9 +86,13 @@ export default async function AnalyticsPage() {
   const capPoints = deals
     .filter((d) => d.capPct != null)
     .map((d) => ({ at: d.at, value: d.capPct!, name: d.name, id: d.id }));
+  // A standing multifamily building's price per unit only: a plan deal's
+  // all-in cost per planned unit is another basis (lib/analytics
+  // `costPerUnit`), and the two pooled had read as one median.
   const unitPoints = deals
     .filter((d) => d.perUnit != null)
     .map((d) => ({ at: d.at, value: d.perUnit!, name: d.name, id: d.id }));
+  const planCostCount = deals.filter((d) => d.costPerUnit != null).length;
   // Plan deals have no going-in cap — their stabilized figure is the finished
   // project's, judged on yield on total cost — so they sit outside the cap
   // series and are counted, and read, on their own.
@@ -132,7 +137,7 @@ export default async function AnalyticsPage() {
   // market's spellings are one row on both pages.
   const markets = marketRows(deals);
 
-  const enough = deals.length >= 3;
+  const enough = deals.length >= ANALYTICS_MIN_DEALS;
 
   // Why deals die (research pass 24, B4): each reason's count over the dead
   // deals, read off the move that killed each one; a dead deal with no
@@ -185,7 +190,8 @@ export default async function AnalyticsPage() {
 
       {!enough ? (
         <section className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center shadow-sm">
-          <h2 className="text-lg font-semibold tracking-tight">
+          <AnalyticsEmptyPicture screened={deals.length} />
+          <h2 className="mt-5 text-lg font-semibold tracking-tight">
             Screen a few deals first
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
@@ -214,9 +220,9 @@ export default async function AnalyticsPage() {
                     : parsedPhrase(capPoints.length),
               },
               {
-                label: unitRead.kind === "median" ? "Median $/unit" : "$/unit",
+                label: unitRead.kind === "median" ? "Median price / unit" : "Price / unit",
                 value: middleText(unitRead, fmtUsdCompact) ?? "—",
-                sub: parsedPhrase(unitPoints.length),
+                sub: unitTileSub(unitPoints.length, planCostCount),
               },
               {
                 label: "Go rate",
@@ -241,7 +247,7 @@ export default async function AnalyticsPage() {
             {capPoints.length >= 3 && (
               <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-sm font-semibold tracking-tight">
-                  Going-in cap rate, by screen date
+                  Going-in cap rate, by date added
                 </h2>
                 <p className="mb-2 mt-0.5 text-xs text-muted">
                   One dot per deal; each opens its deal.
@@ -254,12 +260,12 @@ export default async function AnalyticsPage() {
             {unitPoints.length >= 3 && (
               <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-sm font-semibold tracking-tight">
-                  Price per unit, by screen date
+                  Price per unit, by date added
                 </h2>
                 <p className="mb-2 mt-0.5 text-xs text-muted">
                   Multifamily deals where price and unit count both parsed.
-                  {planDeals.length > 0 &&
-                    " A plan deal plots its total cost per planned unit."}
+                  {planCostCount > 0 &&
+                    " A plan deal's all-in cost per planned unit is another basis and is not plotted."}
                 </p>
                 <DotTimeline
                   points={unitPoints}

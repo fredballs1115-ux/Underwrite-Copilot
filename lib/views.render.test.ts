@@ -2293,7 +2293,7 @@ describe("ValuationsView — two BOVs, the gap decomposed, renders and reads cle
 
 // ── The rent roll, the analytics charts and the submarket trend ────────────
 import { RentRollDashboard } from "@/app/(app)/deals/[id]/rent-roll/dashboard";
-import { DotTimeline, StageFunnel, VerdictMix } from "@/app/(app)/analytics/charts";
+import { AnalyticsEmptyPicture, DotTimeline, StageFunnel, VerdictMix } from "@/app/(app)/analytics/charts";
 import { DualAxisTrend } from "@/app/(app)/submarkets/[id]/trend-chart";
 import { chartScaleIssues } from "@/lib/chart-bounds";
 import { analyzeRentRoll, leaseUpCurve, markToMarket, rolloverCostForecast, rolloverSchedule } from "@/lib/rentroll/analytics";
@@ -2460,6 +2460,21 @@ describe("Analytics charts — timeline, verdict mix and stage funnel render and
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Screening");
     expect(html).toContain("<svg");
+    // The price-per-unit series is the standing buildings' alone: the
+    // conversion's all-in cost per planned unit is kept apart.
+    expect(unitPoints.map((p) => p.name)).toEqual(["Maddox", "Harbor View"]);
+    expect(deals.find((d) => d.name === "1400 Market")?.costPerUnit).toBeCloseTo(180_000_000 / 612, 3);
+  });
+
+  it("the empty state draws the timeline to come, ghosted, and a ring for each deal it waits for", () => {
+    const html = renderToStaticMarkup(React.createElement(AnalyticsEmptyPicture, { screened: 2 }));
+    expect(a11yIssues(html), "a11y analytics-empty").toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    expect(chartScaleIssues(html)).toEqual([]);
+    expect(html.match(/data-ring="screened"/g)).toHaveLength(2);
+    expect(html.match(/data-ring="waiting"/g)).toHaveLength(1);
+    expect(visibleText(html)).toContain("2 of 3 screened");
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"/);
   });
 });
 

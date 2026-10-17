@@ -68,7 +68,7 @@ function niceBounds(lo: number, hi: number): [number, number] {
   return [lo - pad, hi + pad];
 }
 
-/** One deal on a timeline: its screen date, its figure, its name, and —
+/** One deal on a timeline: the day it was added, its figure, its name, and —
  *  where the page has it — its id, so the dot opens the deal. */
 export interface TimelinePoint {
   at: string;
@@ -104,9 +104,9 @@ export const TIMELINE_FRAME_SPANS: Record<(typeof TIMELINE_FRAMES)[number]["key"
 };
 type Frame = (typeof TIMELINE_FRAMES)[number];
 
-/** A dot's words: its deal, its figure and its screen date. */
+/** A dot's words: its deal, its figure and the day it was added. */
 const dotWords = (p: TimelinePoint, format: (v: number) => string) =>
-  `${p.name} — ${format(p.value)} · ${DATE_FMT.format(new Date(p.at))}`;
+  `${p.name} — ${format(p.value)} · added ${DATE_FMT.format(new Date(p.at))}`;
 
 /** Discrete deals over time: one dot per deal, a dashed median reference.
  *  A dot with an id links to its deal (a phone cannot hover for a title),
@@ -138,7 +138,7 @@ export function DotTimeline({
                 <Link href={`/deals/${encodeURIComponent(p.id)}`} className="flex items-baseline justify-between gap-3 py-2.5">
                   <span className="min-w-0 truncate font-medium text-brand">{p.name}</span>
                   <span className="shrink-0 font-mono tabular-nums text-muted">
-                    {`${format(p.value)} · ${DATE_FMT.format(new Date(p.at))}`}
+                    {`${format(p.value)} · added ${DATE_FMT.format(new Date(p.at))}`}
                   </span>
                 </Link>
               </li>
@@ -258,6 +258,53 @@ function Scatter({
         {MONTH_FMT.format(new Date(t1))}
       </text>
     </svg>
+  );
+}
+
+/** How many screened deals the analytics wait for before they draw. */
+export const ANALYTICS_MIN_DEALS = 3;
+
+/** The empty state's picture: the timeline the page will draw, ghosted —
+ *  dots over a dashed median, no figures — and under it a ring a deal the
+ *  page waits for, filled for each one screened (the site's "not screened"
+ *  is an empty ring). */
+export function AnalyticsEmptyPicture({ screened }: { screened: number }) {
+  const done = Math.max(0, Math.min(ANALYTICS_MIN_DEALS, screened));
+  const W = 320;
+  const H = 110;
+  const dots = [
+    [40, 70],
+    [78, 52],
+    [116, 78],
+    [150, 46],
+    [192, 60],
+    [228, 38],
+    [262, 64],
+    [292, 44],
+  ];
+  return (
+    <div data-qa="analytics-empty-picture" className="mx-auto max-w-sm">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={chartWidthStyle(W)} aria-hidden className="mx-auto">
+        {[28, 58, 88].map((y) => (
+          <line key={y} x1={16} x2={W - 16} y1={y} y2={y} stroke={C.line} strokeWidth={1} />
+        ))}
+        <line x1={16} x2={W - 16} y1={57} y2={57} stroke={C.muted} strokeOpacity={0.35} strokeDasharray="4 4" />
+        {dots.map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r={5} fill={C.brand} fillOpacity={0.18} />
+        ))}
+      </svg>
+      <div className="mt-3 flex items-center justify-center gap-2">
+        {Array.from({ length: ANALYTICS_MIN_DEALS }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden
+            data-ring={i < done ? "screened" : "waiting"}
+            className={`h-3.5 w-3.5 rounded-full ${i < done ? "bg-brand" : "border-2 border-line"}`}
+          />
+        ))}
+        <span className="ml-1 text-xs font-medium tabular-nums text-muted">{`${done} of ${ANALYTICS_MIN_DEALS} screened`}</span>
+      </div>
+    </div>
   );
 }
 

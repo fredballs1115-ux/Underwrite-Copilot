@@ -10,6 +10,7 @@ import {
   parsedPhrase,
   stageCountLine,
   stageCounts,
+  unitTileSub,
   type AnalyticsRow,
 } from "./analytics";
 import { MEDIAN_FLOOR } from "./public-comps/core";
@@ -100,10 +101,13 @@ describe("deriveAnalytics — the deal's kind is read first", () => {
     expect(d.price).toBe(20_000_000);
   });
 
-  it("a plan deal's basis per unit is total cost over the planned units, not the shell's price", () => {
+  it("a plan deal's basis per unit is total cost over the planned units, not the shell's price — and never a price per unit", () => {
     const d = deals.find((x) => x.id === "2")!;
-    expect(d.perUnit).toBeCloseTo(180_000_000 / 612, 3);
-    expect(d.perUnit).not.toBeCloseTo(20_000_000 / 612, 0);
+    expect(d.costPerUnit).toBeCloseTo(180_000_000 / 612, 3);
+    expect(d.costPerUnit).not.toBeCloseTo(20_000_000 / 612, 0);
+    // Held apart from the standing buildings' prices per unit.
+    expect(d.perUnit).toBeNull();
+    expect(deals.find((x) => x.id === "1")!.costPerUnit).toBeNull();
   });
 
   it("the sample deal never counts, and the series reads oldest to newest", () => {
@@ -179,10 +183,18 @@ describe("deriveAnalytics — the $/unit series is multifamily's, never a pool o
     expect(deals.find((d) => d.id === "1")?.perUnit).toBeCloseTo(50_000_000 / 248, 3);
     expect(deals.find((d) => d.id === "2")?.perUnit).toBeNull();
     expect(deals.find((d) => d.id === "3")?.perUnit).toBeNull();
-    // A multifamily plan deal keeps its all-in basis per planned unit.
-    expect(deals.find((d) => d.id === "4")?.perUnit).toBeCloseTo(180_000_000 / 612, 3);
+    // A multifamily plan deal keeps its all-in basis per planned unit, apart:
+    // the price-per-unit median is the standing buildings' alone.
+    expect(deals.find((d) => d.id === "4")?.perUnit).toBeNull();
+    expect(deals.find((d) => d.id === "4")?.costPerUnit).toBeCloseTo(180_000_000 / 612, 3);
     const units = deals.map((d) => d.perUnit).filter((v): v is number => v != null);
-    expect(median(units)).toBeCloseTo((50_000_000 / 248 + 180_000_000 / 612) / 2, 3);
+    expect(median(units)).toBeCloseTo(50_000_000 / 248, 3);
+  });
+
+  it("the tile names its class and basis, and the plan deals it leaves out", () => {
+    expect(unitTileSub(3, 0)).toBe("Multifamily, price over units · 3 deals parsed");
+    expect(unitTileSub(1, 1)).toBe("Multifamily, price over units · the one deal that parsed · 1 plan deal's cost per planned unit left out");
+    expect(unitTileSub(0, 2)).toBe("Multifamily, price over units · none parsed · 2 plan deals' cost per planned unit left out");
   });
 });
 

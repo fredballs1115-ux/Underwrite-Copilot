@@ -34,7 +34,8 @@ import { isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 export interface AnalyticsDeal {
   id: string;
   name: string;
-  /** ISO created_at — the screen date */
+  /** ISO created_at — the day the deal was added, which the charts plot
+   *  and say so ("by date added"); a re-screen does not move it */
   at: string;
   stage: Stage;
   verdict: "pass" | "caution" | "pass_on" | null;
@@ -44,8 +45,13 @@ export interface AnalyticsDeal {
   capPct: number | null;
   /** a plan deal's stabilized NOI over total cost, % — null for a stabilized asset */
   yieldOnCostPct: number | null;
-  /** derived $/unit (multifamily) — null when either side didn't parse */
+  /** an operating multifamily deal's price per unit — null on a plan deal,
+   *  another class, or where either side didn't parse */
   perUnit: number | null;
+  /** a multifamily plan deal's all-in cost per planned unit — kept apart
+   *  from `perUnit`: a finished unit's cost is not a standing unit's price,
+   *  and the two pooled had read as one median */
+  costPerUnit: number | null;
   price: number | null;
   market: string;
   assetClass: string;
@@ -128,13 +134,15 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     // a deck's "Garden-style multifamily" is multifamily.
     const cls = dealClassKey(r.asset_class, extraction);
     let perUnit: number | null = null;
+    let costPerUnit: number | null = null;
     if (cls !== "multifamily") {
       perUnit = null;
     } else if (plan) {
-      // Basis per planned unit: what a finished unit costs all-in. The
-      // shell's price over units still to be built is not a comparable
-      // figure, so with no total cost there is no point to plot.
-      perUnit = plan.costPerUnit;
+      // Basis per planned unit: what a finished unit costs all-in, held
+      // apart from the standing buildings' prices. The shell's price over
+      // units still to be built is not a comparable figure, so with no
+      // total cost there is no figure at all.
+      costPerUnit = plan.costPerUnit;
     } else {
       // The shared per-unit reader: the price over the units, never a rent
       // or an expense per unit.
@@ -167,6 +175,7 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
       capPct: capPct != null && capPct > 0 && capPct < 25 ? capPct : null,
       yieldOnCostPct: plan?.yieldOnCost != null ? plan.yieldOnCost * 100 : null,
       perUnit: perUnit != null && perUnit > 1_000 ? perUnit : null,
+      costPerUnit: costPerUnit != null && costPerUnit > 1_000 ? costPerUnit : null,
       price,
       market: extraction.market ?? "",
       assetClass: extraction.assetClass ?? (r.asset_class ?? ""),
@@ -254,7 +263,16 @@ export function parsedPhrase(n: number): string {
   return `${n} deals parsed`;
 }
 
-export const fmtUsdCompact = (dollars: number): string => compactUsd(dollars);
+/** The price-per-unit tile's line: the class and the basis it is of, the
+ *  count behind it, and the plan deals whose all-in cost per planned unit is
+ *  left out of it (a finished unit's cost is not a standing unit's price). */
+export function unitTileSub(priced: number, planCost: number): string {
+  const base = `Multifamily, price over units · ${parsedPhrase(priced)}`;
+  if (planCost <= 0) return base;
+  return `${base} · ${planCost === 1 ? "1 plan deal's" : `${planCost} plan deals'`} cost per planned unit left out`;
+}
+
+export const fmtUsdCompact =(dollars: number): string => compactUsd(dollars);
 
 /** One row of the analytics page's market table: the deals filed under one
  *  market, and the label it is shown under. */

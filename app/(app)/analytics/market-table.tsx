@@ -104,7 +104,8 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
         market with one or two shows those deals&rsquo; own, marked.
         Deals whose figures didn&rsquo;t parse are counted in Screens
         but not in the figures.
-        {planNote && " Plan deals are judged on yield on total cost and sit outside the cap figures."}
+        {planNote &&
+          " Plan deals are judged on yield on total cost and sit outside the cap figures; the $/unit is a standing multifamily building's price, never a plan deal's cost per planned unit."}
       </p>
       </ShownCreditGrid>
     </section>

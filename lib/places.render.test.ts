@@ -148,7 +148,7 @@ describe("DotTimeline — readable at 390px, and every dot opens its deal (no ho
       // Once in each of the four frames, once in the phone's list.
       expect(html.match(new RegExp(`href="/deals/${p.id}"`, "g"))?.length).toBe(5);
     }
-    expect(html).toContain('aria-label="The Maddox — 5.45% · Aug 11, 2026"');
+    expect(html).toContain('aria-label="The Maddox — 5.45% · added Aug 11, 2026"');
     // The axis says the month and the year in full: "Aug 26" had read as the 26th.
     expect(visibleText(html)).toContain("Aug 2026");
     expect(visibleText(html)).not.toMatch(/\bAug 26\b/);
