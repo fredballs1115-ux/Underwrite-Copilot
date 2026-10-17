@@ -13,7 +13,7 @@ import { statedByDocument } from "@/lib/model/provenance";
 import { computeSensitivityGrid, SENSITIVITY_PRICE_FACTORS } from "@/lib/model/sensitivity";
 import { compactUsd } from "@/lib/money";
 import { mult, pct, usd } from "./returns-headline";
-import { heatShade } from "@/app/market/heat-shade";
+import { irrShade } from "./irr-shade";
 import { Key, KeyItem } from "@/app/panel-parts";
 
 const CONF: Record<string, { label: string; cls: string }> = {
@@ -42,16 +42,17 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
     exit: g.exitCapPct,
     cells: g.cells.map((c) => ({ irr: c.irrPct, isBase: c.isBase })),
   }));
-  // A heat map by the figure: each cell shaded on the board's one scale
-  // (app/market/heat-shade), the highest IRR in the grid emerald and the
-  // lowest amber, the figure kept on top in its own tone. A cell with no
-  // IRR is left unshaded.
+  // A heat map by the figure: each cell shaded in one hue, deeper as the
+  // IRR rises from the grid's lowest to its highest (./irr-shade) — never
+  // green for "good", since the least-bad cell of an all-negative grid is
+  // the deepest and its figure stays red. The figure is kept on top in its
+  // own tone; a cell with no IRR is left unshaded.
   const irrs = rows.flatMap((r) => r.cells.map((c) => c.irr)).filter((v): v is number => v != null && isFinite(v));
   const lo = irrs.length ? Math.min(...irrs) : null;
   const hi = irrs.length ? Math.max(...irrs) : null;
   const shadeOf = (v: number | null): string | undefined => {
     if (v == null || lo == null || hi == null) return undefined;
-    return heatShade(hi > lo ? (hi - v) / (hi - lo) : 0.5);
+    return irrShade(hi > lo ? (v - lo) / (hi - lo) : 0.5);
   };
 
   return (
@@ -117,10 +118,10 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
                 aria-hidden
                 data-bar="sensitivity-scale"
                 className="mx-0.5 inline-block h-2.5 w-20 rounded-sm align-[-1px]"
-                style={{ backgroundImage: `linear-gradient(to right, ${heatShade(1)}, ${heatShade(0.5)}, ${heatShade(0)})` }}
+                style={{ backgroundImage: `linear-gradient(to right, ${irrShade(0)}, ${irrShade(1)})` }}
               />{" "}
               <span className="font-mono tabular-nums">{`${hi.toFixed(1)}%`}</span>
-              {" — the grid's lowest IRR to its highest"}
+              {" — the grid's lowest IRR to its highest, deeper as it rises"}
             </span>
           </KeyItem>
           <KeyItem>
