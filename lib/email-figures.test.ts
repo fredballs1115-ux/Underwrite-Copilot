@@ -5,6 +5,7 @@ import { sampleDealCard } from "./pipeline-card";
 import { sampleHeader } from "./sample-header";
 import { compactPrice } from "@/app/(app)/deals/deal-card-parts";
 import { SAMPLE_DEAL } from "./sample-deal";
+import { pickSlots } from "./pipeline-slots";
 import type { ExtractionResult } from "./anthropic/types";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -54,6 +55,32 @@ describe("the screen-complete email's figure tiles read what the card and the he
     const ret = figs.find((f) => f.label === "Yield on cost" || f.label === "Cap");
     expect(ret?.label).toBe("Yield on cost");
     expect(figs.find((f) => f.label === "Size")?.value).toBe("100 units");
+  });
+
+  it("the price says what it buys beside its label, as the card's chip and the header do (audit C11, M3)", () => {
+    const priced = (interest: NonNullable<ExtractionResult["interest"]>): ExtractionResult => ({
+      dealName: "Elm",
+      assetClass: "multifamily",
+      metrics: [
+        { label: "Asking price", value: "$8,500,000", flagged: false, page: "p. 3" },
+        { label: "NOI (in-place)", value: "$600,000", flagged: false, page: "p. 8" },
+        { label: "Units", value: "60", flagged: false, page: "p. 3" },
+      ],
+      interest,
+    });
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    for (const interest of [
+      { ...blank, kind: "note" as const, summary: "The note secured by the property is offered." },
+      { ...blank, kind: "partial_interest" as const, share: "49% limited partnership interest" },
+    ]) {
+      const ex = priced(interest);
+      const figs = emailFigures({ name: "Elm", assetClass: "multifamily", extraction: ex, firstSignal: null, address: null, today: TODAY });
+      const card = pickSlots(ex, null, "multifamily", { address: null, siteFlags: null, today: TODAY });
+      expect(card.interest, interest.kind).toBeTruthy();
+      expect(figs[0].label).toBe(`Price · ${card.interest}`);
+    }
+    // A fee simple's tile is the plain "Price", as before.
+    expect(sample()[0].label).toBe("Price");
   });
 
   it("nothing read yet is no tiles at all", () => {

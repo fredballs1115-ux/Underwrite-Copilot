@@ -40,8 +40,14 @@ export function emailFigures(input: {
   });
   const out: EmailFigure[] = [];
 
-  // The card's price tile: the figure as the card draws it, its basis under it.
-  if (slots.price) out.push({ label: "Price", value: compactPrice(slots.price), sub: slots.basis ?? null });
+  // The card's price tile: the figure as the card draws it, its basis under
+  // it, and what the price buys beside its label where it is not the
+  // building outright ("Price · Note", "Price · 49% share") — the card's
+  // interest chip and the header's "Price · 49% share", since the figure
+  // stands alone here.
+  if (slots.price) {
+    out.push({ label: slots.interest ? `Price · ${slots.interest}` : "Price", value: compactPrice(slots.price), sub: slots.basis ?? null });
+  }
 
   // The card's cap tile, its label and its words: a plan deal's yield on
   // cost, a note's or a position's own yield, or why no cap stands.
