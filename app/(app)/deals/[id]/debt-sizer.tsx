@@ -27,6 +27,7 @@ import { assumableLevyRows, assumableStatedRows, sellerNoteStatedRows } from "@/
 import { assetWords } from "@/lib/asset-words";
 import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
 import { compactUsd } from "@/lib/money";
+import { BarRow, BarRows, Key, KeyItem, Tick } from "@/app/panel-parts";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -422,6 +423,12 @@ export function DebtSizer({
   }, [price, noi, ratePct, amortYears, io, maxLtvPct, minDscr, minDebtYieldPct]);
 
   const { rows, maxLoan, binding, k } = sized;
+  // One scale for the three tests' bars: the price where no test's loan
+  // passes it (so each bar reads as a share of the price), else the largest
+  // test's loan.
+  const loansDrawn = rows.map((r) => r.loan).filter((l): l is number => l != null && isFinite(l) && l > 0);
+  const sizerScaleIsPrice = price != null && price > 0 && loansDrawn.every((l) => l <= price);
+  const sizerScale = sizerScaleIsPrice ? price! : loansDrawn.length ? Math.max(...loansDrawn) : 0;
   const equity = maxLoan != null && price != null && price > 0 ? price - maxLoan : null;
   const effLtv = maxLoan != null && price != null && price > 0 ? (maxLoan / price) * 100 : null;
   const effDscr =
@@ -648,31 +655,55 @@ export function DebtSizer({
           </p>
         )}
 
-        <ul className="mt-4 space-y-1.5">
-          {rows.map((r) => (
-            <li
-              key={r.key}
-              className={`flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-lg border px-3 py-2 text-sm ${
-                binding === r.key ? "border-brand/40 bg-brand/5" : "border-line"
-              }`}
-            >
-              <span className="font-medium">{r.label}</span>
-              <span className="text-xs text-muted">{r.detail}</span>
-              <span className="ml-auto font-mono text-sm tabular-nums">
-                {r.loan != null && isFinite(r.loan) ? (
-                  fmtUsd(r.loan)
-                ) : (
-                  <span className="text-muted">—</span>
+        {/* The three lender tests as one picture: each test's loan on one
+            track, so the binding one — the smallest, the loan a lender
+            gives — is the shortest bar, filled in the brand tone, and the
+            max loan is a dashed tick on every row. */}
+        <BarRows className="mt-4 space-y-2 text-xs" qa="sizer-tests">
+          {rows.map((r) => {
+            const has = r.loan != null && isFinite(r.loan);
+            const isBinding = binding === r.key;
+            return (
+              <BarRow
+                key={r.key}
+                label={
+                  <span className="block">
+                    <span className={`font-medium ${isBinding ? "text-ink" : ""}`}>{r.label}</span>
+                    {isBinding && (
+                      <>
+                        {" "}
+                        <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-brand">
+                          Binding
+                        </span>
+                      </>
+                    )}
+                    <span className="block text-[11px]">{r.detail}</span>
+                  </span>
+                }
+                figure={has ? fmtUsd(r.loan!) : <span className="text-muted">—</span>}
+              >
+                {has && sizerScale > 0 && (
+                  <div
+                    className={`absolute inset-y-0 left-0 rounded-full ${isBinding ? "bg-brand" : "bg-muted/35"}`}
+                    style={{ width: `${Math.min(100, (r.loan! / sizerScale) * 100)}%` }}
+                    data-bar={isBinding ? "sizer-binding" : "sizer-test"}
+                  />
                 )}
-              </span>
-              {binding === r.key && (
-                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
-                  Binding
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+                {maxLoan != null && sizerScale > 0 && (
+                  <Tick at={`${Math.min(100, (maxLoan / sizerScale) * 100)}%`} bar="sizer-max" tone="border-ink" dashed track="secondary" />
+                )}
+              </BarRow>
+            );
+          })}
+        </BarRows>
+        {maxLoan != null && sizerScale > 0 && (
+          <Key qa="sizer-key">
+            <KeyItem mark="swatch" tone="bg-brand">The binding test, the smallest loan</KeyItem>
+            <KeyItem mark="swatch" tone="bg-muted/35">{"Another test's loan"}</KeyItem>
+            <KeyItem mark="dashed" tone="border-ink">The max loan</KeyItem>
+            <KeyItem>{sizerScaleIsPrice ? `Track: $0 to the ${fmtUsd(sizerScale)} price` : `Track: $0 to ${fmtUsd(sizerScale)}`}</KeyItem>
+          </Key>
+        )}
 
         {maxLoan != null && pay != null ? (
           <>

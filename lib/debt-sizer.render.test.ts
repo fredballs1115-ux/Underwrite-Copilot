@@ -244,3 +244,29 @@ describe("sizerStartingRate — the precedence, one rule", () => {
     expect(sizerStartingRate({ statedPct: null, seed: null, modelRateDec: Number.NaN, operating: true }).from).toBe("flat");
   });
 });
+
+describe("the three lender tests are one picture", () => {
+  it("draws each test's loan on one track, the binding one filled and the max loan ticked on every row", () => {
+    const derived = deriveUnderwriteInputs(OM, "Harbor Point Apartments");
+    const html = render({ model: null, extraction: OM, underwrite: derived.inputs, underwriteSources: derived.sources, rateSeeds: null });
+    clean(html);
+    expect((html.match(/data-bar="sizer-binding"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-bar="sizer-test"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="sizer-max"/g) ?? []).length).toBe(3);
+    const text = visibleText(html);
+    // 65% of the $40M price is the smallest of the three: the LTV binds.
+    expect(text).toContain("Max LTV 65%");
+    expect(text).toContain("Binding");
+    expect(text).toContain("Track: $0 to the $40M price");
+    // The binding bar is the price's 65%, on the price's track.
+    expect(html).toMatch(/style="width:65%"[^>]*data-bar="sizer-binding"/);
+  });
+
+  it("with nothing to size on, draws no bars and no key", () => {
+    const html = render({ model: null, extraction: null, underwrite: null, rateSeeds: null });
+    clean(html);
+    expect(html).not.toContain('data-bar="sizer-');
+    expect(html).not.toContain('data-qa="sizer-key"');
+    expect(visibleText(html)).toContain("needs a price");
+  });
+});
