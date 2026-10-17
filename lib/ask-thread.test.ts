@@ -392,6 +392,12 @@ describe("AskPanel — opens on the challenger's questions for the broker, as ch
     expect((block.match(/<button type="button"/g) ?? []).length).toBe(3);
     for (const q of starters) expect(visibleText(block)).toContain(q);
     expect(html.indexOf('data-qa="ask-starters"')).toBeLessThan(html.indexOf("<textarea"));
+    // They are the broker's questions, which the OM may not answer, and each
+    // spends one of the capped questions: said before a reader spends one
+    // (audit C11, L5).
+    expect(visibleText(block)).toContain(
+      `The screen’s questions for the broker: the OM may not answer them, and each one asked spends one of its ${ASK_QUESTION_CAP} questions.`,
+    );
     const bare = renderToStaticMarkup(
       React.createElement(AskPanel, { dealId: DEAL, qa: [], hasOm: true, isSample: false, isPro: true, starters: [] }),
     );

@@ -7,6 +7,7 @@ import { askAnsweredLine, type AskEntry } from "@/lib/deals";
 import { parsePageNumber } from "@/lib/facts";
 import { askDeal, type AskState } from "./ask-actions";
 import { askCountLine } from "@/lib/ask-cap";
+import { ASK_STARTERS_NOTE } from "@/lib/ask-starters";
 import { PersonBadge } from "../../person-badge";
 
 // UTC-pinned so server and client render identical strings (hydration).
@@ -230,7 +231,7 @@ export function AskPanel({
           {starters.length > 0 && (
             <div className="mb-2" data-qa="ask-starters">
               <p id={startersId} className="text-[11px] text-muted">
-                {"The screen’s questions for the broker — choose one to put it to the OM"}
+                {ASK_STARTERS_NOTE}
               </p>
               <ul aria-labelledby={startersId} className="mt-1.5 flex flex-wrap gap-1.5">
                 {starters.map((q) => (

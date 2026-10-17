@@ -1,13 +1,20 @@
 // Ask's starter questions: the challenger's own questions for the broker on
 // this deal (`Challenge.question`), the most severe first, each a chip that
 // fills Ask's input — so Ask opens on the questions the screen already found
-// worth asking, never on a bare box. Pure, no imports beyond types; none
+// worth asking, never on a bare box. Pure, importing only the cap; none
 // where the deal has no questions, and none already asked of it.
 
 import type { Challenge } from "@/lib/anthropic/types";
+import { ASK_QUESTION_CAP } from "@/lib/ask-cap";
 
 /** How many chips Ask shows at most. */
 export const ASK_STARTERS_MAX = 3;
+
+/** The line over the chips (audit C11, L5). They are the challenger's
+ *  questions for the BROKER, usually ones the memorandum does not answer,
+ *  and each one sent spends one of the memorandum's capped questions
+ *  (lib/ask-cap), so the line says both before a reader spends one. */
+export const ASK_STARTERS_NOTE = `The screen’s questions for the broker: the OM may not answer them, and each one asked spends one of its ${ASK_QUESTION_CAP} questions. Choose one to put it to the OM.`;
 
 /** Ask's own bounds on a question (its textarea's `minLength` and
  *  `maxLength`): a starter outside them could not be sent as it stands. */
