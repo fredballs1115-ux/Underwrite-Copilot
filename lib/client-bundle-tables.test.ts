@@ -134,5 +134,7 @@ describe("no data table reaches a browser", () => {
       .filter((c): c is string[] => c !== null)
       .map((c) => c.join(" → "));
     expect(found).toEqual([]);
-  });
+    // It walks every client module's imports to the end: past 5 s on a
+    // loaded CI runner (run 38986963186), so it has room of its own.
+  }, 60_000);
 });
