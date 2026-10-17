@@ -20,6 +20,11 @@ describe("the signed-in error page", () => {
   const html = renderToStaticMarkup(React.createElement(AppError, { error, unstable_retry: () => {} }));
   const text = visibleText(html);
 
+  it("wears the covers' own drawing, as the not-found page does, never a red '!'", () => {
+    expect(html).toContain('data-deal-cover="building"');
+    expect(html).not.toMatch(/>\s*!\s*</);
+  });
+
   it("says the page did not load, never that the reader's data is fine", () => {
     expect(text).toContain("This page could not load.");
     expect(text).not.toMatch(/data (are|is) fine|hiccup|not a data loss|stored safely/i);
