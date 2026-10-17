@@ -128,7 +128,20 @@ function clampStep(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, Math.round(v * 100) / 100));
 }
 
-/** "+1.3pt" / "−0.21x" deltas, colored by whether the move helps returns. */
+/**
+ * A stress tile's change from the base case, signed and in the figure's own
+ * unit — percentage points for a rate, "x" for a multiple or a coverage —
+ * at the figure's two places, so the tile never just repeats the headline
+ * above it: at the base case it reads "±0.00 pts", muted. Coloured by
+ * whether the move helps returns.
+ */
+function stressDeltaText(now: number, was: number, unit: "pts" | "x"): { text: string; sign: -1 | 0 | 1 } {
+  const d = Math.round((now - was) * 100) / 100;
+  const sign = d > 0 ? 1 : d < 0 ? -1 : 0;
+  const mark = sign > 0 ? "+" : sign < 0 ? "−" : "±";
+  return { text: `${mark}${Math.abs(d).toFixed(2)}${unit === "pts" ? " pts" : "x"}`, sign };
+}
+
 function StressDelta({
   now,
   was,
@@ -136,23 +149,25 @@ function StressDelta({
 }: {
   now: number | null;
   was: number | null;
-  unit: "pt" | "x";
+  unit: "pts" | "x";
 }) {
   if (now == null || was == null) return null;
-  const d = now - was;
-  if (Math.abs(d) < 0.005) return null;
-  const text =
-    (d > 0 ? "+" : "−") +
-    Math.abs(d).toFixed(unit === "pt" ? 1 : 2) +
-    (unit === "pt" ? "pt" : "x");
+  const { text, sign } = stressDeltaText(now, was, unit);
+  // The space is spelled, not a margin: a number followed by a margin-spaced
+  // span is one word to a screen reader.
   return (
-    <span
-      className={`ml-1.5 font-mono text-[11px] font-medium tabular-nums ${
-        d > 0 ? "text-pass" : "text-kill"
-      }`}
-    >
-      {text}
-    </span>
+    <>
+      {" "}
+      <span
+        data-qa="stress-delta"
+        className={`whitespace-nowrap font-mono text-[11px] font-medium tabular-nums ${
+          sign > 0 ? "text-pass" : sign < 0 ? "text-kill" : "text-muted"
+        }`}
+      >
+        {text}
+        <span className="sr-only"> from the base case</span>
+      </span>
+    </>
   );
 }
 
@@ -212,7 +227,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
         )}
       </div>
       <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
-        Live — the saved model doesn&apos;t change.
+        Live — the saved model doesn&apos;t change; each figure carries its change from the base case.
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -279,7 +294,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
           </p>
           <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
             {pct(r.leveredIrrPct)}
-            <StressDelta now={r.leveredIrrPct} was={b.leveredIrrPct} unit="pt" />
+            <StressDelta now={r.leveredIrrPct} was={b.leveredIrrPct} unit="pts" />
           </p>
         </div>
         <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
@@ -297,7 +312,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
           </p>
           <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
             {pct(r.cashOnCashPct)}
-            <StressDelta now={r.cashOnCashPct} was={b.cashOnCashPct} unit="pt" />
+            <StressDelta now={r.cashOnCashPct} was={b.cashOnCashPct} unit="pts" />
           </p>
         </div>
         <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
