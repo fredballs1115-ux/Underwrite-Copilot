@@ -178,6 +178,9 @@ export interface FileMonth {
   label: string;
   /** null where the file has written no row for the metro */
   asOf: string | null;
+  /** how long this file's figure is current, where it differs from its
+   *  feed's (Realtor.com's hotness rank runs a month behind its inventory) */
+  freshDays?: number;
 }
 
 /** The three files the pull reads, each by the lead row it writes. They are

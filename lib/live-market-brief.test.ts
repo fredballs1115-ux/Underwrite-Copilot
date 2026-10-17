@@ -146,8 +146,12 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
       "For-sale market: median list price $599,000 (-1.2% from a year ago), 12,400 active listings (+14.3%), median 41 days on market (+12.5%), loosening on both flow figures, hotness rank 40 of 300 metros for Jul 2026 (12 places cooler than a year ago) (Aug 2026; Realtor.com — list prices are asks, not sales)",
     ]);
     expect(early.figures.find((f) => f.key === "rdc_hotness_rank")?.asOf).toBe("2026-07-01");
-    // July's rank was due to be replaced on Sep 8: on Sep 23 the inventory is said and the rank is not.
-    const late = liveMarketBrief({ ...input, now: NOW })!;
+    // The rank's own file publishes after the 8th, so the 8th's pull writes
+    // the month before: July's rank stands until the Oct 8 pull could
+    // replace it (lib/realtor HOTNESS_FRESH_DAYS). Past that, on Oct 13, the
+    // inventory is said and the rank is not.
+    expect(liveMarketBrief({ ...input, now: NOW })!.lines[0]).toContain("hotness rank 40 of 300 metros for Jul 2026");
+    const late = liveMarketBrief({ ...input, now: new Date("2026-10-13T12:00:00Z") })!;
     expect(late.lines[0]).toContain("median list price $599,000");
     expect(late.lines[0]).not.toContain("hotness");
     expect(late.figures.some((f) => f.key === "rdc_hotness_rank")).toBe(false);

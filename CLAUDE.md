@@ -3114,7 +3114,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   month's LAST day, pulled on the 20th of the next month and replaced on
   the 20th of the month after, about 50 days old) or `REALTOR_FRESH_DAYS` (73:
   dated the 1st, replaced on the 8th of the month after next — 45 had
-  marked a current figure stale), and every figure — the apartment rent,
+  marked a current figure stale) — and the hotness rank past
+  `HOTNESS_FRESH_DAYS` (103: its own file publishes after the 8th, so the
+  8th's pull always writes the month before the inventory's, realtor.yml
+  run 37835558400; held to 73, every rank read stale and live-verify's
+  #377 marker read NOT DEPLOYED, 2026-10-17) — and every figure — the apartment rent,
   the home value, each year-ago change, the hotness parts — is read only
   from a row of the month it is shown under, null otherwise, never zero.
   **The same pull reads Realtor.com's hotness file** (#377 — the metro

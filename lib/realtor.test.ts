@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOTNESS_METROS, REALTOR_CREDIT, REALTOR_FILES, REALTOR_METRICS, hotnessFor, hotnessMove, marketDirection, realtorFileMonths, realtorFor } from "./realtor";
+import { HOTNESS_FRESH_DAYS, HOTNESS_METROS, REALTOR_CREDIT, REALTOR_FRESH_DAYS, REALTOR_FILES, REALTOR_METRICS, hotnessFor, hotnessMove, marketDirection, realtorFileMonths, realtorFor } from "./realtor";
 import type { BenchRow } from "./zori";
 
 /** The day the fixtures are read on: the pull of Sep 8 wrote August, dated its first day. */
@@ -89,8 +89,8 @@ describe("a metro's for-sale market", () => {
 
   it("gives the feeds card each file's month, current or not", () => {
     expect(realtorFileMonths(ROWS, "Dallas-Fort Worth")).toEqual([
-      { label: "inventory", asOf: "2026-08-01" },
-      { label: "hotness rank", asOf: null },
+      { label: "inventory", asOf: "2026-08-01", freshDays: REALTOR_FRESH_DAYS },
+      { label: "hotness rank", asOf: null, freshDays: HOTNESS_FRESH_DAYS },
     ]);
     for (const f of REALTOR_FILES) expect(REALTOR_METRICS as readonly string[]).toContain(f.metric);
   });
@@ -156,6 +156,18 @@ describe("a metro's hotness rank, and which way it moved", () => {
     expect(realtorFor(HOT.slice(0, 1), "Washington DC", NOW)?.hotness).toBeNull();
   });
 
+  it("holds a rank current while it is the newest the pull could have, a month behind the inventory's", () => {
+    // The Oct 8 pull wrote September's inventory and August's ranks
+    // (realtor.yml run 37835558400): on Oct 17 the August rank is 77 days
+    // old and the newest there is, so it stands, and it stands until the
+    // Nov 8 pull could have replaced it.
+    expect(hotnessFor(HOT, "Washington DC", new Date("2026-10-17T12:00:00Z"))?.rank).toBe(154);
+    expect(hotnessFor(HOT, "Washington DC", new Date("2026-11-08T12:00:00Z"))?.rank).toBe(154);
+    expect(hotnessFor(HOT, "Washington DC", new Date("2026-11-13T12:00:00Z"))).toBeNull();
+    expect(HOTNESS_FRESH_DAYS).toBeGreaterThan(REALTOR_FRESH_DAYS);
+    expect(realtorFileMonths(HOT, "Washington DC").map((f) => f.freshDays)).toEqual([REALTOR_FRESH_DAYS, HOTNESS_FRESH_DAYS]);
+  });
+
   it("keeps the rank's own month, which its own file can leave a month behind the inventory's", () => {
     // The hotness history had not moved on when the pull of Sep 8 ran:
     // July's rank beside August's inventory, read two days later.
@@ -166,11 +178,12 @@ describe("a metro's hotness rank, and which way it moved", () => {
     expect(r.asOf).toBe("2026-08-01");
     expect(r.hotness?.asOf).toBe("2026-07-01");
     expect(r.hotness?.move).toEqual({ places: -12, direction: "cooler" });
-    // July's rank was due to be replaced on Sep 8; past the grace it is not
-    // said, whatever the inventory's month, and the inventory still is.
-    expect(hotnessFor(july, "Washington DC", new Date("2026-09-12T12:00:00Z"))?.rank).toBe(154);
-    expect(hotnessFor(july, "Washington DC", new Date("2026-09-13T12:00:00Z"))).toBeNull();
-    const later = realtorFor(july, "Washington DC", NOW)!;
+    // The rank's file publishes after the 8th, so July's rank is the newest
+    // until the Oct 8 pull; past its grace it is not said, whatever the
+    // inventory's month, and the inventory still is.
+    expect(hotnessFor(july, "Washington DC", new Date("2026-10-12T12:00:00Z"))?.rank).toBe(154);
+    expect(hotnessFor(july, "Washington DC", new Date("2026-10-13T12:00:00Z"))).toBeNull();
+    const later = realtorFor(july, "Washington DC", new Date("2026-10-13T12:00:00Z"))!;
     expect(later.medianListPrice).toBe(565_000);
     expect(later.hotness).toBeNull();
   });

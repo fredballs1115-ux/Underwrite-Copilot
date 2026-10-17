@@ -9,7 +9,7 @@ import {
 } from "@/lib/live-rates";
 import { monthOf, zillowFresh, type ZoriRead } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
-import { HOTNESS_METROS, realtorFresh, type RealtorRead } from "@/lib/realtor";
+import { HOTNESS_METROS, hotnessFresh, realtorFresh, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { isDataMetro, isStateMarket } from "@/lib/market-match";
 import { ownMarketBuilding } from "@/lib/tracker-read";
@@ -519,7 +519,7 @@ function realtorLine(m: RealtorRead | null, now: Date): Said | null {
     figures.push({ key: "rdc_days_on_market", label: "Median days on market", value: m.daysOnMarket, unit: "days", asOf: m.asOf });
   }
   if (m.direction) parts.push(`${m.direction} on both flow figures`);
-  const h = m.hotness && realtorFresh(m.hotness.asOf, now) ? m.hotness : null;
+  const h = m.hotness && hotnessFresh(m.hotness.asOf, now) ? m.hotness : null;
   if (h) {
     // The line's month is the inventory's; a rank of another month says its own.
     const ownMonth = h.asOf !== m.asOf ? ` for ${monthOf(h.asOf)}` : "";
