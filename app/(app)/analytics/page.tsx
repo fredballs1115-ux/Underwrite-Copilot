@@ -87,7 +87,7 @@ export default async function AnalyticsPage() {
     .filter((d) => d.capPct != null)
     .map((d) => ({ at: d.at, value: d.capPct!, name: d.name, id: d.id }));
   // A standing multifamily building's price per unit only: a plan deal's
-  // all-in cost per planned unit is another basis (lib/analytics
+  // all-in cost per unit is another basis (lib/analytics
   // `costPerUnit`), and the two pooled had read as one median.
   const unitPoints = deals
     .filter((d) => d.perUnit != null)
@@ -265,7 +265,7 @@ export default async function AnalyticsPage() {
                 <p className="mb-2 mt-0.5 text-xs text-muted">
                   Multifamily deals where price and unit count both parsed.
                   {planCostCount > 0 &&
-                    " A plan deal's all-in cost per planned unit is another basis and is not plotted."}
+                    " A plan deal's all-in cost per unit is another basis and is not plotted."}
                 </p>
                 <DotTimeline
                   points={unitPoints}

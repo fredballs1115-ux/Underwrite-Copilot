@@ -264,12 +264,14 @@ export function parsedPhrase(n: number): string {
 }
 
 /** The price-per-unit tile's line: the class and the basis it is of, the
- *  count behind it, and the plan deals whose all-in cost per planned unit is
- *  left out of it (a finished unit's cost is not a standing unit's price). */
+ *  count behind it, and the plan deals whose all-in cost per unit is left
+ *  out of it (a finished unit's cost is not a standing unit's price). "All-
+ *  in", never "planned": a lease-up's and a value-add's units already
+ *  stand (audit C11, L3). */
 export function unitTileSub(priced: number, planCost: number): string {
   const base = `Multifamily, price over units · ${parsedPhrase(priced)}`;
   if (planCost <= 0) return base;
-  return `${base} · ${planCost === 1 ? "1 plan deal's" : `${planCost} plan deals'`} cost per planned unit left out`;
+  return `${base} · ${planCost === 1 ? "1 plan deal's" : `${planCost} plan deals'`} all-in cost per unit left out`;
 }
 
 export const fmtUsdCompact =(dollars: number): string => compactUsd(dollars);

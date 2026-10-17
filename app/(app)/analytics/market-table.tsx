@@ -105,7 +105,7 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
         Deals whose figures didn&rsquo;t parse are counted in Screens
         but not in the figures.
         {planNote &&
-          " Plan deals are judged on yield on total cost and sit outside the cap figures; the $/unit is a standing multifamily building's price, never a plan deal's cost per planned unit."}
+          " Plan deals are judged on yield on total cost and sit outside the cap figures; the $/unit is a standing multifamily building's price, never a plan deal's all-in cost per unit."}
       </p>
       </ShownCreditGrid>
     </section>

@@ -193,8 +193,10 @@ describe("deriveAnalytics — the $/unit series is multifamily's, never a pool o
 
   it("the tile names its class and basis, and the plan deals it leaves out", () => {
     expect(unitTileSub(3, 0)).toBe("Multifamily, price over units · 3 deals parsed");
-    expect(unitTileSub(1, 1)).toBe("Multifamily, price over units · the one deal that parsed · 1 plan deal's cost per planned unit left out");
-    expect(unitTileSub(0, 2)).toBe("Multifamily, price over units · none parsed · 2 plan deals' cost per planned unit left out");
+    expect(unitTileSub(1, 1)).toBe("Multifamily, price over units · the one deal that parsed · 1 plan deal's all-in cost per unit left out");
+    expect(unitTileSub(0, 2)).toBe("Multifamily, price over units · none parsed · 2 plan deals' all-in cost per unit left out");
+    // A lease-up's or a value-add's units already stand: never "planned".
+    expect(unitTileSub(1, 1)).not.toContain("planned");
   });
 });
 
