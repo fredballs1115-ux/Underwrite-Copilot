@@ -19,7 +19,8 @@ import { coveredMarketGeoTargets } from "@/lib/market-match";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 import { pipelineCard, type PipelineCardRow } from "@/lib/pipeline-card";
 import { isOpenStage, normalizeStage } from "@/lib/stages";
-import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem } from "./box-preview";
+import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem, OPEN_STAGE_FILTER } from "./box-preview";
+import type { JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Buy box" };
 
@@ -66,31 +67,56 @@ export default async function CriteriaPage({
   // What the box as saved says about the reader's own deals (signed-in
   // gaps, M12): the deals it judges — the team's under a team box, the
   // reader's own off a team — each built by the pipeline's own card
-  // builder, so the chip here is the card's. One read, the newest few.
+  // builder, so the chip here is the card's. One read, the newest few live
+  // deals — the closed and the dead left out in the query, so "more" is
+  // said only where a live deal past the few exists (audit C10, L3: it had
+  // been said wherever 24 rows were read, live or not).
   const preview = await (async () => {
     if (!user || !active.box) return { items: [], more: false };
     let q = supabase
       .from("deals")
       .select("id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample")
+      .or(OPEN_STAGE_FILTER)
       .order("created_at", { ascending: false })
-      .limit(BOX_PREVIEW_MAX * 3);
+      .limit(BOX_PREVIEW_MAX + 1);
     q = active.scope === "team" && active.teamId ? q.eq("team_id", active.teamId) : q.eq("user_id", user.id).is("team_id", null);
     const { data, error: readError } = await q;
     if (readError || !data) return { items: [], more: false };
     const live = (data as PipelineCardRow[]).filter((d) => isOpenStage(normalizeStage(d.stage)));
-    const items = live.slice(0, BOX_PREVIEW_MAX).map((d) =>
+    const shown = live.slice(0, BOX_PREVIEW_MAX);
+    // Each deal's latest run, read as the pipeline page reads it: a
+    // re-screen, or a stalled or failed run, is said beside the chip, as
+    // the pipeline card says it over its call. A failed read leaves the
+    // chips as they are on file.
+    const jobs = new Map<string, JobLike>();
+    if (shown.length) {
+      const { data: jobRows } = await supabase
+        .from("analysis_jobs")
+        .select("deal_id, status, step, updated_at, created_at")
+        .in(
+          "deal_id",
+          shown.map((d) => d.id),
+        )
+        .order("created_at", { ascending: false })
+        .limit(Math.max(100, shown.length * 3));
+      for (const j of (jobRows ?? []) as ({ deal_id: string } & JobLike)[]) {
+        if (j?.deal_id && !jobs.has(j.deal_id)) jobs.set(j.deal_id, j);
+      }
+    }
+    const items = shown.map((d) =>
       boxPreviewItem(
         pipelineCard(d, {
           viewerId: user.id,
           onTeam: active.scope === "team",
           box: active.box,
+          job: jobs.get(d.id),
           offersDue: null,
           today: todayIso,
           googleEnabled: false,
         }),
       ),
     );
-    return { items, more: live.length > BOX_PREVIEW_MAX || data.length === BOX_PREVIEW_MAX * 3 };
+    return { items, more: live.length > BOX_PREVIEW_MAX };
   })();
 
   const banner = saved

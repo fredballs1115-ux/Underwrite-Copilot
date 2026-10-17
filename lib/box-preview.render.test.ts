@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem } from "@/app/(app)/criteria/box-preview";
+import { BOX_PREVIEW_MAX, BoxPreview, OPEN_STAGE_FILTER, boxPreviewItem, previewCountLine, runWords } from "@/app/(app)/criteria/box-preview";
 import { sampleDealCard } from "@/lib/pipeline-card";
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { fitScoreLabel } from "@/lib/fit-label";
@@ -59,10 +59,47 @@ describe("the buy box page's preview of the reader's deals (signed-in gaps, M12)
     expect(renderToStaticMarkup(React.createElement(BoxPreview, { items: [], more: false }))).toBe("");
   });
 
-  it("is built on the page from the pipeline's own card builder, the newest few", () => {
+  it("is built on the page from the pipeline's own card builder, the newest few live deals, each with its latest run", () => {
     const page = readFileSync("app/(app)/criteria/page.tsx", "utf8");
     expect(page).toMatch(/boxPreviewItem\(\s*pipelineCard\(/);
-    expect(page).toContain(".limit(BOX_PREVIEW_MAX * 3)");
+    // The closed and the dead are left out in the query, and one row past
+    // the few says whether more live deals exist (audit C10, L3).
+    expect(page).toContain(".or(OPEN_STAGE_FILTER)");
+    expect(page).toContain(".limit(BOX_PREVIEW_MAX + 1)");
+    expect(page).toContain("more: live.length > BOX_PREVIEW_MAX");
+    expect(page).toContain('.from("analysis_jobs")');
+    expect(page).toContain("job: jobs.get(d.id)");
+    expect(OPEN_STAGE_FILTER).toBe("stage.is.null,stage.not.in.(closed,dead)");
     expect(BOX_PREVIEW_MAX).toBeLessThanOrEqual(12);
+  });
+
+  // Audit C10, L3: "Your 5 newest live deals" when five was all there were,
+  // and a chip with no word of a re-screen the pipeline card says over its
+  // call.
+  it("says 'newest' only where more live deals exist", () => {
+    expect(previewCountLine(5, false)).toBe("Your 5 live deals, as saved.");
+    expect(previewCountLine(1, false)).toBe("Your one live deal, as saved.");
+    expect(previewCountLine(8, true)).toBe("Your 8 newest live deals, as saved.");
+  });
+
+  it("says a running, stalled or failed run beside the chip, in the pipeline card's words", () => {
+    const rescreen = boxPreviewItem(card({ id: "a", name: "A", score: 82, mandateVerdict: "PURSUE", fit: "fits", jobStatus: "running", verdict: "pass" }));
+    const first = boxPreviewItem(card({ id: "b", name: "B", jobStatus: "running", verdict: null }));
+    const stalled = boxPreviewItem(card({ id: "c", name: "C", fit: "near", jobStatus: "stalled", verdict: "caution" }));
+    const failed = boxPreviewItem(card({ id: "d", name: "D", jobStatus: "failed" }));
+    const quiet = boxPreviewItem(card({ id: "e", name: "E", score: 71, mandateVerdict: "WATCH", fit: "near" }));
+    expect(runWords(rescreen)?.label).toBe("Re-screening…");
+    expect(runWords(first)?.label).toBe("Screening…");
+    expect(runWords(stalled)?.label).toBe("Stalled");
+    expect(runWords(failed)?.label).toBe("Failed");
+    expect(runWords(quiet)).toBeNull();
+    const html = renderToStaticMarkup(React.createElement(BoxPreview, { items: [rescreen, stalled, quiet], more: false }));
+    expect((html.match(/data-qa="box-preview-run"/g) ?? []).length).toBe(2);
+    const text = visibleText(html);
+    expect(text).toContain("Your 3 live deals, as saved.");
+    expect(text.replace(/\s+/g, " ")).toContain("Fit 82 · Pursue Re-screening…");
+    expect(text).toContain("Stalled");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 });
