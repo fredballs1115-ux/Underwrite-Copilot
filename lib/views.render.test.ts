@@ -2574,6 +2574,8 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
 
 // ── A submarket, opened on its metro's photograph (#424) ────────────────────
 import { SubmarketCards } from "@/app/market/submarket-cards";
+import { coverImage } from "@/lib/deal-cover-art";
+import { COVER_FRAME } from "@/app/(app)/deals/deal-cover";
 import { MARKET_BAND_PICTURE, MarketBand } from "@/app/place-band";
 import { CityPhoto } from "@/app/city-photo";
 import { EMPTY_RULES, type Submarket } from "@/lib/market/types";
@@ -2622,10 +2624,31 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
     expect(text.replace(/\n/g, "")).toContain(credit);
     expect(html).toContain(`href="${commonsPage(SKYLINES.richmond.file)}"`);
 
-    // No market named, no picture and no credit owed.
+    // No market named, no photograph and no credit owed.
     const plain = render(React.createElement(SubmarketCards, { submarkets: SUBS.slice(2) }));
     expect(plain).not.toContain('data-picture="submarket"');
     expect(visibleText(plain)).not.toContain("Photographs by");
+  });
+
+  // The lead's ask (2026-10-17): a card with no recognised metro had no
+  // picture, so the grid was ragged ("Harbor East", "Airport flex"). It
+  // opens on its class's drawn cover (lib/deal-cover), the pipeline's own.
+  it("opens every other card on its class's drawn cover, so every card opens on a picture", () => {
+    const html = render(React.createElement(SubmarketCards, { submarkets: SUBS }));
+    const cards = html.match(/<li>[\s\S]*?<\/li>/g) ?? [];
+    expect(cards).toHaveLength(SUBS.length);
+    for (const c of cards) expect(c).toMatch(/data-picture="submarket(?:-cover)?"/);
+    expect(html.match(/data-picture="submarket-cover"/g)?.length).toBe(2);
+    // The very drawing the pipeline paints for a deal of that class and id.
+    const cover = coverFor({ seed: "s3", assetClass: "industrial" });
+    expect(cover.kind).toBe("industrial");
+    expect(html).toContain(`data-deal-cover="${cover.kind}"`);
+    expect(html).toContain(coverImage(cover, ...COVER_FRAME.card).replaceAll("&", "&amp;").replaceAll('"', "&quot;").slice(0, 200));
+    // An illustration owes no credit, and the plain grid still owes none.
+    const plain = render(React.createElement(SubmarketCards, { submarkets: SUBS.slice(2) }));
+    expect(plain).not.toContain('data-qa="submarket-credit"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("opens the submarket's page on the band with the submarket's name as the page's heading", () => {

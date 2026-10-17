@@ -6,6 +6,8 @@ import { OVERHEAD_GRID_CREDIT } from "@/lib/skyline";
 import { CityPhoto } from "@/app/city-photo";
 import { ShownCreditGrid } from "@/app/shown-credit";
 import { gridPictures } from "@/app/market/grid-credit";
+import { DealCover } from "@/app/(app)/deals/deal-cover";
+import { coverFor } from "@/lib/deal-cover";
 
 /** One line naming what a submarket's persistent exclusion rules drop. */
 export function exclusionLine(rules: Submarket["exclusionRules"]): string | null {
@@ -25,7 +27,8 @@ export function exclusionLine(rules: Submarket["exclusionRules"]): string | null
  * strip wears the market's name, because the picture is the metro's and
  * not the submarket's. One credit line under the grid names the pictures
  * the strips actually show (app/shown-credit, audit C10, M3): a photograph
- * that fails takes its photographer off it and puts the overhead's on.
+ * that fails takes its photographer off it and puts the overhead's on. A
+ * card whose metro names no market opens on its class's drawn cover.
  *
  * Pure: the panel reads the list and hands it in, so the render test draws
  * this on a fixture.
@@ -69,7 +72,25 @@ export function SubmarketCards({ submarkets }: { submarkets: readonly Submarket[
                       {market.name}
                     </span>
                   </div>
-                ) : null}
+                ) : (
+                  // No metro named: the drawn cover of its kind of building
+                  // (lib/deal-cover, the pipeline's last resort), so every
+                  // card opens on a picture and the grid keeps one rhythm.
+                  // An illustration owes no credit, and its class is said
+                  // in the card's words below, so it is hidden from a
+                  // screen reader.
+                  <div className="relative h-24 shrink-0 bg-faint" data-picture="submarket-cover" aria-hidden>
+                    <DealCover
+                      cover={coverFor({ seed: s.id, assetClass: s.assetClass })}
+                      label={s.name}
+                      words={false}
+                      className="absolute inset-0"
+                    />
+                    <span className="absolute bottom-1.5 left-2 rounded bg-black/60 px-1.5 py-px text-[10px] font-medium text-white">
+                      {assetClassLabel(s.assetClass)}
+                    </span>
+                  </div>
+                )}
                 <span className="flex flex-col gap-1 p-3.5">
                   <span className="text-sm font-medium text-ink">{s.name}</span>
                   <span className="text-xs text-muted">
