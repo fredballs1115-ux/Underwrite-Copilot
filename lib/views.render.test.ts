@@ -2361,6 +2361,21 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
     expect(html).toContain('aria-label="Leases marked to market"');
     expect(html).toMatch(/data-mtm-bar[\s\S]{0,400}?(bg-pass|bg-kill)/);
     expect(html).toMatch(/class="mt-3 hidden overflow-x-auto sm:block"/);
+    // The roll's 2026, 2027 and 2029 are drawn with 2028 between them, at
+    // zero and said so, never closed up.
+    expect([...html.matchAll(/data-roll-year="(\d+)"/g)].map((m) => m[1])).toEqual(["2026", "2027", "2028", "2029"]);
+    expect(html).toMatch(/data-roll-year="2028" data-roll-none=""><title>2028: no leases expire<\/title>/);
+    expect(html).not.toContain('data-qa="rollover-folded"');
+  });
+
+  it("a roll whose leases run past the twelfth year folds the later years into one bar and says how many", () => {
+    const long = `${CLEAN_CSV.trimEnd()}\n300,Long Haul Partners,10000,2020-01-01,2040-06-30,150000,NNN\n`;
+    const { text, html } = renderRoll(long);
+    expect(gluedWords(text)).toEqual([]);
+    expect([...html.matchAll(/data-roll-year="(\d+)"/g)]).toHaveLength(12);
+    expect(text).toContain("2037+");
+    expect(text).toContain("The last bar, 2037+, folds the 4 years from 2037 to 2040 into one; the table lists each year that rolls.");
+    expect(html).toContain("<title>2037–2040: 10,000 SF");
   });
 
   it("a roll with missing expiries names what the import found", () => {
