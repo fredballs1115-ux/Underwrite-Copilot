@@ -126,14 +126,14 @@ describe("DotTimeline — readable at 390px, and every dot opens its deal (no ho
     { at: "2026-09-02T12:00:00Z", value: 8.1, name: "Tysons Plaza", id: "d3" },
   ];
 
-  it("draws a wide frame from sm up and a phone frame below it, whose type is the larger", () => {
+  it("draws a phone frame under a 24rem card and wider frames past it, whose type is the larger on the phone", () => {
     const html = render(React.createElement(DotTimeline, { points, format: pct, medianLabel: "median" }));
     const svgs = html.match(/<svg[^>]*>/g) ?? [];
-    expect(svgs).toHaveLength(2);
-    expect(svgs[0]).toContain('viewBox="0 0 560 190"');
-    expect(svgs[0]).toContain('class="hidden sm:block"');
-    expect(svgs[1]).toContain('viewBox="0 0 320 210"');
-    expect(svgs[1]).toContain('class="sm:hidden"');
+    expect(svgs).toHaveLength(4);
+    expect(svgs[0]).toContain('viewBox="0 0 320 210"');
+    expect(svgs[0]).toContain('class="@sm:hidden"');
+    expect(svgs[2]).toContain('viewBox="0 0 560 190"');
+    expect(svgs[2]).toContain('class="hidden @lg:block @2xl:hidden"');
     // 12 units in a 320-wide frame draw at about 12px on a 390px screen's
     // ~318px card; the wide frame's 9.5 units had drawn at about 5.5px.
     expect(html).toContain('font-size="12"');
@@ -145,8 +145,8 @@ describe("DotTimeline — readable at 390px, and every dot opens its deal (no ho
     expect(a11yIssues(html), "a11y timeline").toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
     for (const p of points) {
-      // Once in each frame, once in the phone's list.
-      expect(html.match(new RegExp(`href="/deals/${p.id}"`, "g"))?.length).toBe(3);
+      // Once in each of the four frames, once in the phone's list.
+      expect(html.match(new RegExp(`href="/deals/${p.id}"`, "g"))?.length).toBe(5);
     }
     expect(html).toContain('aria-label="The Maddox — 5.45% · Aug 11"');
     expect(html).toContain('role="group"');

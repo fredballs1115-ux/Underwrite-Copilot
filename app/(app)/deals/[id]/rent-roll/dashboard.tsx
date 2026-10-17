@@ -8,6 +8,7 @@ import {
 } from "@/lib/rentroll/analytics";
 import type { ValidationIssue } from "@/lib/rentroll/validate";
 import { ScrollRegion } from "@/app/scroll-region";
+import { chartWidthStyle } from "@/lib/chart-bounds";
 
 /**
  * The rent roll dashboard. Server-rendered — every figure is deterministic and
@@ -79,7 +80,7 @@ function RolloverChart({
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: Math.min(W, 560) }} role="img"
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={chartWidthStyle(W, 560)} role="img"
         aria-label="SF expiring by year">
         <line x1={8} x2={W - 8} y1={PAD_T + PLOT_H} y2={PAD_T + PLOT_H} stroke="var(--color-line)" />
         {years.map((y, i) => {

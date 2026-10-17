@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ScrollRegion } from "@/app/scroll-region";
+import { chartWidthStyle } from "@/lib/chart-bounds";
 import type { Bridge, BridgeStep } from "@/lib/bridge/attribution";
 import { fieldFormat, formatFieldPair, formatFieldValue } from "@/lib/bridge/fields";
 
@@ -115,10 +116,9 @@ function Waterfall({ bridge }: { bridge: Bridge }) {
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
-        style={{ minWidth: Math.min(W, 720) }}
+        style={chartWidthStyle(W, 720)}
         role="img"
         aria-label={`Waterfall from ${pct1(bridge.fromIrr)} to ${pct1(bridge.toIrr)} levered IRR`}
-        className="max-w-full"
       >
         {/* zero line */}
         <line

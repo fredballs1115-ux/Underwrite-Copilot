@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { AnalyticsDeal } from "@/lib/analytics";
 import { median } from "@/lib/analytics";
+import { chartWidthStyle } from "@/lib/chart-bounds";
 
 /**
  * Server-rendered SVG charts. Design rules (dataviz method):
@@ -78,14 +79,32 @@ export interface TimelinePoint {
   id?: string;
 }
 
-/** A timeline's frame: the viewBox, its padding, the type and the dot. The
- *  wide frame draws from `sm` up; the phone's is narrower, so the same type
- *  reads at about its own size on a 390px screen (the wide frame's 9.5 units
- *  drew at about 5.5px there) and each dot carries a hit area a finger can
- *  find. */
-const WIDE = { W: 560, H: 190, pad: { l: 52, r: 16, t: 14, b: 26 }, font: 11, r: 4.5, hit: 9 } as const;
-const PHONE = { W: 320, H: 210, pad: { l: 50, r: 12, t: 16, b: 30 }, font: 12, r: 5.5, hit: 13 } as const;
-type Frame = { W: number; H: number; pad: { l: number; r: number; t: number; b: number }; font: number; r: number; hit: number };
+/** A timeline's frame: the viewBox, its padding, the type and the dot, and
+ *  the classes that show it. The card is the container, and a frame draws
+ *  only over the card widths it was drawn for, so its type reads at about
+ *  its own size at every width: the phone's under 24rem (each dot with a hit
+ *  area a finger can find — the wide frame's 9.5 units drew at about 5.5px
+ *  on a 390px screen), then three wider frames, each shown between about
+ *  0.9× and 1.2× its own width. One frame stretched across them all had
+ *  drawn its 12 units at about 21px on a 600px phone (lib/chart-bounds caps
+ *  each at 1.25× besides). */
+export const TIMELINE_FRAMES = [
+  { key: "phone", W: 320, H: 210, pad: { l: 50, r: 12, t: 16, b: 30 }, font: 12, r: 5.5, hit: 13, className: "@sm:hidden" },
+  { key: "mid", W: 420, H: 200, pad: { l: 52, r: 14, t: 16, b: 28 }, font: 12, r: 5, hit: 11, className: "hidden @sm:block @lg:hidden" },
+  { key: "wide", W: 560, H: 190, pad: { l: 52, r: 16, t: 14, b: 26 }, font: 11, r: 4.5, hit: 9, className: "hidden @lg:block @2xl:hidden" },
+  { key: "widest", W: 740, H: 220, pad: { l: 56, r: 16, t: 14, b: 26 }, font: 11, r: 4.5, hit: 9, className: "hidden @2xl:block" },
+] as const;
+/** The card widths, in px, each frame shows over (Tailwind's container
+ *  sizes: @sm 24rem, @lg 32rem, @2xl 42rem); the last runs to the widest
+ *  column a timeline's card is laid out at — the app's 5xl column, one card
+ *  across, less its padding. */
+export const TIMELINE_FRAME_SPANS: Record<(typeof TIMELINE_FRAMES)[number]["key"], [number, number]> = {
+  phone: [0, 384],
+  mid: [384, 512],
+  wide: [512, 672],
+  widest: [672, 918],
+};
+type Frame = (typeof TIMELINE_FRAMES)[number];
 
 /** A dot's words: its deal, its figure and its screen date. */
 const dotWords = (p: TimelinePoint, format: (v: number) => string) =>
@@ -108,9 +127,10 @@ export function DotTimeline({
     .filter((p): p is TimelinePoint & { id: string } => !!p.id)
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   return (
-    <div>
-      <Scatter frame={WIDE} points={points} format={format} medianLabel={medianLabel} className="hidden sm:block" />
-      <Scatter frame={PHONE} points={points} format={format} medianLabel={medianLabel} className="sm:hidden" />
+    <div className="@container">
+      {TIMELINE_FRAMES.map((f) => (
+        <Scatter key={f.key} frame={f} points={points} format={format} medianLabel={medianLabel} className={f.className} />
+      ))}
       {listed.length > 0 ? (
         <details className="mt-2 text-xs sm:hidden" data-qa="timeline-list">
           <summary className="cursor-pointer py-2 text-muted">{`List the ${listed.length} deal${listed.length === 1 ? "" : "s"}`}</summary>
@@ -167,6 +187,7 @@ function Scatter({
     <svg
       viewBox={`0 0 ${W} ${H}`}
       width="100%"
+      style={chartWidthStyle(W)}
       role={links ? "group" : "img"}
       aria-label={timelineName(points, format)}
       className={className}

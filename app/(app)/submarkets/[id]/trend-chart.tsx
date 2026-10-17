@@ -1,4 +1,5 @@
 import type { TrendPoint, TrendSegment } from "@/lib/market/metrics";
+import { chartWidthStyle } from "@/lib/chart-bounds";
 
 /**
  * A dual-axis trend: one series as bars, one as a line, sharing an x of
@@ -46,7 +47,7 @@ export function DualAxisTrend({
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: Math.min(W, 560) }} role="img"
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={chartWidthStyle(W, 560)} role="img"
         aria-label={`${barLabel} and ${lineLabel} by period`}>
         <line x1={PAD_L} x2={W - PAD_L} y1={PAD_T + PLOT_H} y2={PAD_T + PLOT_H} stroke="var(--color-line)" />
 

@@ -2160,6 +2160,8 @@ describe("BridgeView — an IRR move attributed to its drivers renders and reads
     );
     dumpView("bridge", html);
     expect(a11yIssues(html), "a11y bridge").toEqual([]);
+    // Five columns drawn in a 496-unit frame: capped, never stretched to the column.
+    expect(chartScaleIssues(html)).toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/bps/);
@@ -2258,6 +2260,7 @@ describe("ValuationsView — two BOVs, the gap decomposed, renders and reads cle
     );
     dumpView("valuations", html);
     expect(a11yIssues(html), "a11y valuations").toEqual([]);
+    expect(chartScaleIssues(html)).toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("JLL BOV");
@@ -2292,6 +2295,7 @@ describe("ValuationsView — two BOVs, the gap decomposed, renders and reads cle
 import { RentRollDashboard } from "@/app/(app)/deals/[id]/rent-roll/dashboard";
 import { DotTimeline, StageFunnel, VerdictMix } from "@/app/(app)/analytics/charts";
 import { DualAxisTrend } from "@/app/(app)/submarkets/[id]/trend-chart";
+import { chartScaleIssues } from "@/lib/chart-bounds";
 import { analyzeRentRoll, leaseUpCurve, markToMarket, rolloverCostForecast, rolloverSchedule } from "@/lib/rentroll/analytics";
 import { parseCsv, suggestMapping, toLeases } from "@/lib/rentroll/parse";
 import { PROFILE_DEFAULTS } from "@/lib/rentroll/profiles";
@@ -2340,6 +2344,7 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
       html,
     );
     expect(a11yIssues(html), "a11y rent roll").toEqual([]);
+    expect(chartScaleIssues(html), "rollover chart's lettering").toEqual([]);
     return { text: visibleText(html), html, priced: Math.min(25, mtm.rows.length) };
   };
 
@@ -2435,6 +2440,7 @@ describe("Analytics charts — timeline, verdict mix and stage funnel render and
       );
     dumpView("analytics-charts", html);
     expect(a11yIssues(html), "a11y analytics-charts").toEqual([]);
+    expect(chartScaleIssues(html)).toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Screening");
@@ -2480,6 +2486,7 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
     );
     dumpView("submarket-trend", html);
     expect(a11yIssues(html), "a11y submarket-trend").toEqual([]);
+    expect(chartScaleIssues(html)).toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(html).toContain("<svg");

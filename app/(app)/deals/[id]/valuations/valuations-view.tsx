@@ -3,6 +3,7 @@
 import { compactUsd } from "@/lib/money";
 import { useState } from "react";
 import { ScrollRegion } from "@/app/scroll-region";
+import { chartWidthStyle } from "@/lib/chart-bounds";
 import { tallySentence, type ValuationBridge, type AggressivenessTally } from "@/lib/valuation/reconcile";
 import { FIELD_LABELS, VALUATION_FIELDS, type ValuationField } from "@/lib/valuation/types";
 
@@ -135,7 +136,7 @@ function ValueWaterfall({ bridge }: { bridge: Extract<ValuationBridge, { ok: tru
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
-        style={{ minWidth: Math.min(W, 640) }}
+        style={chartWidthStyle(W, 640)}
         role="img"
         aria-label={`Value bridge from ${bridge.fromLabel} to ${bridge.toLabel}`}
       >
