@@ -28,6 +28,44 @@ export interface AnalysisReadyEmailInput {
    *  photograph, else its cover — so the alt is the template's, worded to be
    *  true of either (`bannerAlt`), never decided at send time. */
   picture?: { url: string } | null;
+  /** the pipeline card's figure tiles under the name, as a listing alert
+   *  draws them (lib/email-figures): the price and its basis, the cap or a
+   *  plan deal's yield on cost, the size — each only where the deal states
+   *  it; none leaves the email as it was */
+  figures?: { label: string; value: string; sub?: string | null }[] | null;
+}
+
+/**
+ * The figures as one row of tiles, a listing alert's: a table, a cell each,
+ * inline styles only, so every mail client draws it — the label small over
+ * the figure, the basis or what a yield runs to under it. Three across fit
+ * a phone's 320px.
+ */
+function figureTiles(figures: { label: string; value: string; sub?: string | null }[] | null | undefined): string {
+  const shown = (figures ?? []).filter((f) => f.value.trim()).slice(0, 3);
+  if (shown.length === 0) return "";
+  const width = Math.floor(100 / shown.length);
+  const cells = shown
+    .map(
+      (f, i) => `<td width="${width}%" valign="top" style="width:${width}%;padding:10px 12px;background-color:#f6f8f7;${i > 0 ? "border-left:1px solid #dde3e2;" : ""}">
+                  <p style="margin:0;font-size:11px;line-height:1.3;letter-spacing:0.04em;text-transform:uppercase;color:#5f6b69;">${esc(f.label)}</p>
+                  <p style="margin:3px 0 0;font-size:17px;line-height:1.25;font-weight:600;color:#18211f;">${esc(f.value)}</p>${
+                    f.sub ? `\n                  <p style="margin:2px 0 0;font-size:12px;line-height:1.35;color:#5f6b69;">${esc(f.sub)}</p>` : ""
+                  }
+                </td>`,
+    )
+    .join("\n                ");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border:1px solid #dde3e2;border-radius:8px;border-collapse:separate;overflow:hidden;">
+              <tr>
+                ${cells}
+              </tr>
+            </table>`;
+}
+
+/** The figures as the plain-text part says them, one line. */
+function figuresLine(figures: { label: string; value: string; sub?: string | null }[] | null | undefined): string | null {
+  const shown = (figures ?? []).filter((f) => f.value.trim()).slice(0, 3);
+  return shown.length ? shown.map((f) => `${f.label}: ${f.value}${f.sub ? ` (${f.sub})` : ""}`).join(" · ") : null;
 }
 
 /** Text made safe inside an email's HTML, in an element or an attribute. */
@@ -143,6 +181,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
   const text = [
     `${input.dealName} — the screen is complete.`,
     ``,
+    figuresLine(input.figures),
     `Verdict: ${input.verdictLabel}`,
     `Buy box: ${input.buyBoxLabel}`,
     input.reason ? `Why: ${input.reason}` : null,
@@ -167,6 +206,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#5f6b69;">Screen complete</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
+            ${figureTiles(input.figures)}
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:14px;">
               <tr>
                 <td style="background-color:${esc(input.verdictColor)};border-radius:999px;padding:5px 14px;">

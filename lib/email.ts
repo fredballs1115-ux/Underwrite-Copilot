@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { escapeHtml, screenStoppedEmail, analysisReadyEmail } from "@/lib/email-template";
+import { emailFigures } from "@/lib/email-figures";
 import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE, needsOperator } from "@/lib/anthropic/operator-failures";
 import { documentFailure } from "@/lib/anthropic/document-failures";
 import { operatorEmails } from "@/lib/operator";
@@ -203,11 +204,29 @@ export async function notifyAnalysisReady(
       },
       to.userId,
     );
+    // The pipeline card's figure tiles, a listing alert's (lib/email-figures),
+    // read on the UTC day, as the worker's other dates are. Best-effort: a
+    // read that throws leaves the email as it was.
+    let figures: ReturnType<typeof emailFigures> = [];
+    try {
+      const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+      figures = emailFigures({
+        name: dealName,
+        assetClass: (deal.asset_class as string | null) ?? null,
+        extraction,
+        firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
+        address: addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null,
+        today: new Date().toISOString().slice(0, 10),
+      });
+    } catch {
+      // no figures: the call and the box still go
+    }
     const { subject, html, text } = analysisReadyEmail({
       dealName,
       verdictLabel: v.label,
       verdictColor: v.color,
       buyBoxLabel,
+      figures,
       reason: verdict.reason ?? "",
       dealUrl: `${appUrl()}/deals/${dealId}`,
       settingsUrl: `${appUrl()}/account`,
