@@ -482,30 +482,40 @@ export function DemoPanel({
     case "Analyses":
       return <AnalysesView analysis={analysis} onSelect={onAnalysis} demand={demand} />;
     case "Documents":
-      // What the deal page's Documents tab holds on the sample (deal-view's
-      // DocumentsPanel): no memorandum was ever uploaded for it and no
-      // document rows are stored, so the one row says so, and the memo the
-      // verdict makes is the public sample's. Never a file name it has not.
-      return (
-        <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
-          <h2 className="text-sm font-semibold tracking-tight">Source documents</h2>
-          <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
-            <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
-              <span className="min-w-0 flex-1 truncate font-medium">Offering memorandum</span>
-              <span className="text-xs text-muted">none uploaded</span>
-            </li>
-          </ul>
-          <div className="mt-3">
-            <a
-              href="/api/demo/memo"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-            >
-              Download the IC memo (PDF)
-            </a>
-          </div>
-        </section>
-      );
+      return <DocumentsTab />;
   }
+}
+
+/** The deal page's Documents tab on the sample (deal-view's
+ *  DocumentsPanel, through the same SourceDocumentsView the signed-in
+ *  sample draws): the memorandum's row saying the sample's is fictional,
+ *  the rent roll and the T-12 the sample was read with, each with its own
+ *  date and no file to open, and the memo the verdict makes — the public
+ *  sample's (audit C10, M4). Never a file name it has not. Drawn once its
+ *  chunk has loaded, its shape until then. */
+function DocumentsTab() {
+  const w = useWalkthrough();
+  if (!w) {
+    return (
+      <TabLoading what="the documents">
+        <CardListSkeleton />
+      </TabLoading>
+    );
+  }
+  return (
+    <w.SourceDocumentsView
+      data={{
+        dealId: "sample",
+        hasOm: false,
+        omUrl: null,
+        sample: true,
+        typedFacts: false,
+        documents: [],
+        sampleActuals: w.SAMPLE_DOCUMENT_ACTUALS,
+        memo: { href: "/api/demo/memo" },
+      }}
+    />
+  );
 }
 
 /** The walkthrough: the deal page's section bar — its segmented control,

@@ -34,6 +34,8 @@ import { skylineSrcSetOf } from "./skyline-srcset";
 import { METRO_VIEWS } from "./metro-imagery";
 import { sampleDealCard } from "./pipeline-card";
 import { loadSampleTile } from "@/app/sample-pipeline-card-lazy";
+import { SAMPLE_ACTUALS_WORDS, SAMPLE_OM_WORDS, SourceDocumentsView } from "@/app/(app)/deals/[id]/source-documents";
+import { rentRollDateWords, t12DateWords } from "./actuals/actuals-read";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -539,15 +541,45 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
   // H3: the tab listed "offering-memorandum.pdf", "rent-roll.csv" and
   // "t12-operating.pdf", none of which the sample has; the deal page's tab
   // reads "Offering memorandum — none uploaded" on it.
-  it("lists the documents the sample deal holds, and no file it does not", () => {
+  // Audit C10, M4: it still said "Offering memorandum — none uploaded" and
+  // listed no rent roll or T-12 beside an Overview (on /demo) that draws
+  // both. It is the signed-in sample's card now (SourceDocumentsView), on
+  // the sample's actuals as the public report reads them.
+  it("lists the documents the sample deal holds, and no file it does not", async () => {
     const html = panel("Documents");
     const t = text(html);
     expect(t).toContain("Source documents");
-    expect(t).toContain("Offering memorandum none uploaded");
+    expect(visibleText(html)).toContain(SAMPLE_OM_WORDS);
+    expect(t).not.toContain("none uploaded");
+    for (const row of ["om", "rent_roll", "t12"]) expect(html).toContain(`data-doc-row="${row}"`);
+    const { sampleActuals } = await import("@/lib/sample-cover");
+    const read = sampleActuals()!;
+    expect(t).toContain(rentRollDateWords(read.rentRoll!)!);
+    expect(t).toContain(t12DateWords(read.t12!)!);
+    expect(html.match(new RegExp(SAMPLE_ACTUALS_WORDS.replace(/[—]/g, "."), "g"))?.length).toBe(2);
+    // The card is the signed-in sample's, markup for markup.
+    expect(html).toContain(
+      renderToStaticMarkup(
+        React.createElement(SourceDocumentsView, {
+          data: {
+            dealId: "sample",
+            hasOm: false,
+            omUrl: null,
+            sample: true,
+            typedFacts: false,
+            documents: [],
+            sampleActuals: read,
+            memo: { href: "/api/demo/memo" },
+          },
+        }),
+      ),
+    );
     expect(html).toContain('href="/api/demo/memo"');
+    expect(html).not.toMatch(/<form|<button/);
     expect(t).not.toMatch(/\.(pdf|csv|xlsx)\b/);
     expect(t).not.toMatch(/Reconciled|Screened/);
     expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("rates the comps and the challenges in the product's own words", () => {

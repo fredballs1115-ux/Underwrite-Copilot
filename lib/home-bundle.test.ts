@@ -83,7 +83,14 @@ describe("the homepage's walkthrough", () => {
     expect(readFileSync(join(ROOT, "app/landing-interactive.tsx"), "utf8")).toContain('import("./walkthrough-tabs")');
     // The deal-strategy readers too: the risk digest's one band had brought
     // them, through lib/actuals/analyze (lib/actuals/in-line-band now).
-    for (const f of ["app/(app)/deals/[id]/deal-sections-view.tsx", "app/(app)/deals/[id]/returns-headline.tsx", "lib/deal-strategy.ts"]) {
+    // The Documents tab's card (audit C10, M4) and the actuals it reads, too.
+    for (const f of [
+      "app/(app)/deals/[id]/deal-sections-view.tsx",
+      "app/(app)/deals/[id]/returns-headline.tsx",
+      "lib/deal-strategy.ts",
+      "app/(app)/deals/[id]/source-documents.tsx",
+      "lib/actuals/actuals-read.ts",
+    ]) {
       expect(home.files.has(f), f).toBe(false);
       expect(tabs.files.has(f), f).toBe(true);
     }

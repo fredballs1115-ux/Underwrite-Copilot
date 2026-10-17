@@ -11,6 +11,8 @@ import { condoUnitsOffered } from "@/lib/condo-units";
 import { screenYearOf } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { shownAssetClass } from "@/lib/asset-class";
+import { actualsFromRows } from "@/lib/actuals/actuals-read";
 
 export {
   BrokerComps,
@@ -23,8 +25,21 @@ export {
 export { SampleBuyBox } from "./sample-buy-box";
 export { SampleModelCard } from "./sample-model-card";
 export { DebtSizer } from "./(app)/deals/[id]/debt-sizer";
+export { SourceDocumentsView } from "./(app)/deals/[id]/source-documents";
 
 const extraction = SAMPLE_DEAL.extraction;
+
+/** The sample's rent roll and T-12, read as the signed-in sample's
+ *  Documents tab and the public report read them (lib/sample-cover
+ *  `sampleActuals`: the seeded row's kind — no first signal — and class),
+ *  so the walkthrough's Documents tab lists them with their own dates. */
+export const SAMPLE_DOCUMENT_ACTUALS = actualsFromRows(
+  extraction,
+  inferStrategy(extraction, null),
+  shownAssetClass(SAMPLE_DEAL.asset_class, extraction) || null,
+  SAMPLE_DEAL.rentRoll,
+  SAMPLE_DEAL.t12,
+);
 
 /** The comps table's subject tick, read as the deal page reads it
  *  (deal-view's `compSubject`): the building's basis by the deal's kind. */

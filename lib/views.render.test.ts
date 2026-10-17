@@ -1435,10 +1435,14 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(gluedWords(visibleText(html))).toEqual([]);
     });
 
-    it("draws the Documents tab as the sample's: no memorandum uploaded, and the three public downloads", () => {
+    it("draws the Documents tab as the sample's: its fictional memorandum, the rent roll and T-12 it was read with, and the three public downloads", () => {
       const text = visibleText(section("documents"));
       expect(text).toContain("Offering memorandum");
-      expect(text).toContain("none uploaded");
+      // Audit C10, M4: the signed-in sample's card, never "none uploaded"
+      // beside an Overview that draws the rent roll and the T-12.
+      expect(text).toContain("none — the sample's memorandum is fictional");
+      expect(text).not.toContain("none uploaded");
+      expect(text.match(/read into the sample — no file to open/g)?.length).toBe(2);
       expect(text).toContain("Take the deliverables with you");
       const html = section("documents");
       for (const href of ["/api/demo/memo", "/api/demo/report", "/api/demo/underwrite.xlsx"]) expect(html).toContain(`href="${href}"`);
