@@ -307,6 +307,43 @@ function SubHead({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The breakeven occupancy as a picture: a track from 0% to 100% occupied,
+ * filled to the occupancy the expenses, reserves and debt service need, with
+ * the breakeven and the model's own occupancy as ticks and the cushion
+ * between them shaded. A figure past either end sits at the end; the key
+ * keeps the figure as computed.
+ */
+function BreakevenTrack({ occ, underwritten }: { occ: number; underwritten: number }) {
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  const be = clamp(occ);
+  const uw = clamp(underwritten);
+  const cushion = uw > be;
+  return (
+    <div className="mt-2 max-w-md" data-qa="breakeven-track">
+      <div className="relative h-3 rounded-full bg-faint" aria-hidden>
+        <div className="absolute inset-y-0 left-0 rounded-l-full bg-kill/20" style={{ width: `${be}%` }} data-bar="breakeven-need" />
+        {cushion && (
+          <div className="absolute inset-y-0 bg-pass/30" style={{ left: `${be}%`, width: `${uw - be}%` }} data-bar="breakeven-cushion" />
+        )}
+        <Tick at={`${be}%`} bar="breakeven" tone="bg-kill" />
+        <Tick at={`${uw}%`} bar="model-occupancy" tone="border-ink" dashed />
+      </div>
+      <div className="mt-1 flex justify-between font-mono text-[10px] tabular-nums text-muted" aria-hidden>
+        <span>0%</span>
+        <span>100% occupied</span>
+      </div>
+      <Key>
+        <KeyItem mark="tick" tone="bg-kill">{`Breakeven ${occ.toFixed(1)}%`}</KeyItem>
+        <KeyItem mark="dashed" tone="border-ink">{`The model's ${underwritten.toFixed(0)}%`}</KeyItem>
+        {cushion && (
+          <KeyItem mark="swatch" tone="bg-pass/30">The cushion</KeyItem>
+        )}
+      </Key>
+    </div>
+  );
+}
+
 export function DebtSizer({
   model,
   extraction,
@@ -802,6 +839,7 @@ export function DebtSizer({
                     </span>
                   )}
                 </p>
+                <BreakevenTrack occ={breakeven.occ} underwritten={breakeven.underwritten} />
               </>
             )}
 

@@ -262,6 +262,26 @@ describe("the three lender tests are one picture", () => {
     expect(html).toMatch(/style="width:65%"[^>]*data-bar="sizer-binding"/);
   });
 
+  it("draws the breakeven occupancy on a 0–100% track, the breakeven and the model's occupancy as ticks", () => {
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
+    const html = render({ model: SAMPLE_DEAL.model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    clean(html);
+    const text = visibleText(html);
+    // The figure the sentence states is the tick's key, one figure.
+    const occ = /([\d.]+)%\s*occupancy covers expenses/.exec(text)?.[1];
+    expect(occ).toBeTruthy();
+    expect(text).toContain(`Breakeven ${occ}%`);
+    expect(text).toContain(`The model's ${100 - SAMPLE_DEAL.model.inputs.vacancyPct!}%`);
+    expect(html).toContain('data-bar="breakeven"');
+    expect(html).toContain('data-bar="model-occupancy"');
+    const drawn = /style="width:([\d.]+)%"[^>]*data-bar="breakeven-need"/.exec(html)?.[1];
+    expect(Math.abs(Number(drawn) - Number(occ))).toBeLessThan(0.05);
+    if (Number(occ) < 100 - SAMPLE_DEAL.model.inputs.vacancyPct!) {
+      expect(html).toContain('data-bar="breakeven-cushion"');
+      expect(text).toContain("The cushion");
+    }
+  });
+
   it("with nothing to size on, draws no bars and no key", () => {
     const html = render({ model: null, extraction: null, underwrite: null, rateSeeds: null });
     clean(html);
