@@ -13,6 +13,8 @@ import { statedByDocument } from "@/lib/model/provenance";
 import { computeSensitivityGrid, SENSITIVITY_PRICE_FACTORS } from "@/lib/model/sensitivity";
 import { compactUsd } from "@/lib/money";
 import { mult, pct, usd } from "./returns-headline";
+import { heatShade } from "@/app/market/heat-shade";
+import { Key, KeyItem } from "@/app/panel-parts";
 
 const CONF: Record<string, { label: string; cls: string }> = {
   high: { label: "High", cls: "bg-pass/10 text-pass" },
@@ -40,6 +42,17 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
     exit: g.exitCapPct,
     cells: g.cells.map((c) => ({ irr: c.irrPct, isBase: c.isBase })),
   }));
+  // A heat map by the figure: each cell shaded on the board's one scale
+  // (app/market/heat-shade), the highest IRR in the grid emerald and the
+  // lowest amber, the figure kept on top in its own tone. A cell with no
+  // IRR is left unshaded.
+  const irrs = rows.flatMap((r) => r.cells.map((c) => c.irr)).filter((v): v is number => v != null && isFinite(v));
+  const lo = irrs.length ? Math.min(...irrs) : null;
+  const hi = irrs.length ? Math.max(...irrs) : null;
+  const shadeOf = (v: number | null): string | undefined => {
+    if (v == null || lo == null || hi == null) return undefined;
+    return heatShade(hi > lo ? (hi - v) / (hi - lo) : 0.5);
+  };
 
   return (
     <section>
@@ -48,7 +61,7 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
         <span className="font-normal text-muted">· levered IRR</span>
       </h2>
       <p className="mt-1 text-sm leading-relaxed text-muted">
-        IRR by exit cap and price; your base case is highlighted.
+        IRR by exit cap and price, each cell shaded by its figure; your base case is outlined.
       </p>
       <ScrollRegion label="Return sensitivity grid" className="mt-3 rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[34rem] text-sm">
@@ -78,13 +91,16 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
                 {r.cells.map((c, i) => (
                   <td
                     key={i}
+                    data-heat={shadeOf(c.irr) ? "irr" : undefined}
+                    style={shadeOf(c.irr) ? { backgroundColor: shadeOf(c.irr) } : undefined}
                     className={`px-3 py-2.5 text-right font-mono tabular-nums ${
                       c.isBase
-                        ? "bg-brand/10 font-semibold text-brand"
+                        ? "font-semibold text-brand ring-2 ring-inset ring-brand"
                         : irrTone(c.irr)
                     }`}
                   >
                     {c.irr == null ? "—" : c.irr.toFixed(1) + "%"}
+                    {c.isBase && <span className="sr-only"> (base case)</span>}
                   </td>
                 ))}
               </tr>
@@ -92,6 +108,27 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
           </tbody>
         </table>
       </ScrollRegion>
+      {lo != null && hi != null && (
+        <Key qa="sensitivity-legend" className="mt-2 items-center">
+          <KeyItem>
+            <span>
+              <span className="font-mono tabular-nums">{`${lo.toFixed(1)}%`}</span>{" "}
+              <span
+                aria-hidden
+                data-bar="sensitivity-scale"
+                className="mx-0.5 inline-block h-2.5 w-20 rounded-sm align-[-1px]"
+                style={{ backgroundImage: `linear-gradient(to right, ${heatShade(1)}, ${heatShade(0.5)}, ${heatShade(0)})` }}
+              />{" "}
+              <span className="font-mono tabular-nums">{`${hi.toFixed(1)}%`}</span>
+              {" — the grid's lowest IRR to its highest"}
+            </span>
+          </KeyItem>
+          <KeyItem>
+            <span aria-hidden className="mt-0.5 inline-block h-3 w-3 shrink-0 rounded-sm ring-2 ring-inset ring-brand" />
+            Your base case
+          </KeyItem>
+        </Key>
+      )}
     </section>
   );
 }
