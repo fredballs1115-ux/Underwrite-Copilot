@@ -221,7 +221,9 @@ export function actualsShortLine(read: ActualsRead | null): string {
   if (rr) {
     const stats = [
       rr.sfWeightedOccupancy != null ? `${pct1(rr.sfWeightedOccupancy)} occupied` : `${rr.occupiedUnits} of ${rr.unitCount} occupied`,
-      rr.waltYears != null ? `WALT ${rr.waltYears.toFixed(1)} yrs` : null,
+      // The rent-roll page's rule (actualsWalt): a roll of leases of a year
+      // or less has no WALT worth printing.
+      rr.waltYears != null && !leasesShort(read.assetClass) ? `WALT ${rr.waltYears.toFixed(1)} yrs` : null,
     ].filter(Boolean);
     // The line is the memo's, beside its key terms: an undated roll is
     // said as undated, and the day the screen measured it from is on the

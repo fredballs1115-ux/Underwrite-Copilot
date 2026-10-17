@@ -44,8 +44,18 @@ describe("readActuals", () => {
     expect(t12DateWords(read.t12)).toBe("TTM to May 31, 2026");
     expect(rentRollDateWords(read.rentRoll)).toBe("as of Jun 1, 2026");
     expect(actualsShortLine(read)).toBe(
-      "T-12 NOI $2.40M (TTM to May 31, 2026): OM pro forma NOI 9.0% over, material. Rent roll (as of Jun 1, 2026): 94.2% occupied, WALT 3.1 yrs.",
+      // An apartment roll's leases run a year or less: no WALT, by the
+      // rent-roll page's rule (actualsWalt), as the card and the report say.
+      "T-12 NOI $2.40M (TTM to May 31, 2026): OM pro forma NOI 9.0% over, material. Rent roll (as of Jun 1, 2026): 94.2% occupied.",
     );
+    const office = readActuals({
+      metrics: OM,
+      strategy: { kind: "stabilized", label: "Stabilized" },
+      rentRoll: { asOf: "2026-06-01", summary: ROLL },
+      t12: null,
+      assetClass: "office",
+    })!;
+    expect(actualsShortLine(office)).toContain("WALT 3.1 yrs");
   });
 
   it("says an undated document as undated, never silently", () => {

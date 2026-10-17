@@ -25,6 +25,7 @@ import {
   OM_NOI_LABEL,
   SEVERITY_WORD,
   actualsUsd,
+  actualsWalt,
   avgRentOf,
   gapWords,
   rentRollDateWords,
@@ -1695,6 +1696,7 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
     </View>
   );
   const rent = rr ? avgRentOf(rr, read.assetClass) : null;
+  const walt = rr ? actualsWalt(rr, read.assetClass) : null;
   return (
     <View>
       {c ? (
@@ -1718,7 +1720,7 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
           <TitleRow title="Rent roll" count={str(rentRollDateWords(read.rentRoll) ?? "") || undefined} marginTop={4} />
           <View style={{ flexDirection: "row", marginBottom: 4 }}>
             {tile("Occupancy", pct(rr.sfWeightedOccupancy))}
-            {tile("WALT", rr.waltYears != null ? `${rr.waltYears.toFixed(1)} yr` : "—")}
+            {tile("WALT", walt?.text ?? "—", walt?.note)}
             {tile("Avg rent", rent?.text ?? "—", rent?.basis)}
             {tile("Occupied", `${rr.occupiedUnits} / ${rr.unitCount}`)}
           </View>
