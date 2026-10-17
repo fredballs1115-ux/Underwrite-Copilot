@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { askAnsweredLine, type AskEntry } from "@/lib/deals";
@@ -59,6 +59,7 @@ export function AskPanel({
   isPro,
   omUrl = null,
   askers = null,
+  starters = [],
 }: {
   dealId: string;
   qa: AskEntry[];
@@ -75,9 +76,24 @@ export function AskPanel({
    *  them, for the badge on their questions. Null on a personal deal,
    *  which names no one. */
   askers?: { me: string | null; names: Record<string, string> } | null;
+  /** the challenger's questions for the broker on this deal, the most
+   *  severe first and none already asked (lib/ask-starters): a chip each
+   *  that fills the input; none where the deal has none */
+  starters?: string[];
 }) {
   const [state, action] = useActionState<AskState, FormData>(askDeal, null);
   const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const startersId = useId();
+  // A starter fills the box and hands it the focus, the cursor at its end,
+  // for the reader to send or edit — it never sends by itself.
+  const fill = (q: string) => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.value = q;
+    el.focus();
+    el.setSelectionRange(q.length, q.length);
+  };
 
   // A successful answer re-renders the thread via revalidate — clear the box.
   useEffect(() => {
@@ -211,9 +227,30 @@ export function AskPanel({
         </p>
       ) : (
         <form ref={formRef} action={action} className="mt-3">
+          {starters.length > 0 && (
+            <div className="mb-2" data-qa="ask-starters">
+              <p id={startersId} className="text-[11px] text-muted">
+                {"The screen’s questions for the broker — choose one to put it to the OM"}
+              </p>
+              <ul aria-labelledby={startersId} className="mt-1.5 flex flex-wrap gap-1.5">
+                {starters.map((q) => (
+                  <li key={q} className="max-w-full">
+                    <button
+                      type="button"
+                      onClick={() => fill(q)}
+                      className="max-w-full rounded-full border border-line bg-paper px-2.5 py-1 text-left text-xs text-ink transition-colors hover:border-brand/40 hover:bg-brand/5 pointer-coarse:py-2"
+                    >
+                      {q}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex items-start gap-2">
             <input type="hidden" name="dealId" value={dealId} />
             <textarea
+              ref={inputRef}
               name="question"
               aria-label="Your question about the offering memorandum"
               required

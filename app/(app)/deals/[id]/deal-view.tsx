@@ -45,6 +45,7 @@ import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import { AskPanel } from "./ask-panel";
+import { askStarters } from "@/lib/ask-starters";
 import { ReconciliationPanel } from "./reconciliation-panel";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { LoiPanel } from "./loi-panel";
@@ -1001,6 +1002,7 @@ export function DealView({
               isPro={isPro}
               omUrl={omUrl}
               askers={askerNames ? { me: userId, names: askerNames } : null}
+              starters={askStarters(results.challenges?.challenges, qa)}
             />
             <DealOutcomeCard dealId={dealId} stage={dealStage} history={stageHistory} names={askerNames} />
             <DecisionLog

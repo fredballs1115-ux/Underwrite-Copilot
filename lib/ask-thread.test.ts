@@ -84,6 +84,7 @@ import { OM_REPLACED, memorandumReplacedSince, parseDealQa, type AskEntry } from
 import { omFingerprint } from "./om-fingerprint";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { ASK_QUESTION_CAP } from "./ask-cap";
+import { askStarters } from "./ask-starters";
 import { readFileSync } from "node:fs";
 
 const ask = (question: string) => {
@@ -353,6 +354,53 @@ describe("AskPanel — page chips open the OM only for the memorandum the deal h
       React.createElement(AskPanel, { dealId: DEAL, qa, hasOm: false, isSample: false, isPro: true, omUrl: null }),
     );
     expect(bare).not.toMatch(/#page=/);
+  });
+});
+
+describe("AskPanel — opens on the challenger's questions for the broker, as chips that fill the input", () => {
+  const challenges = [
+    { question: "What is the T-12 behind the in-place NOI?", severity: "medium" as const },
+    { question: "Which renovated comps achieved this premium, and at what cost per unit?", severity: "high" as const },
+    { question: "Why?", severity: "high" as const },
+    { question: "What's the absorption schedule to get from 9% to 6%?", severity: "low" as const },
+    { question: "Is the tax bill reassessed on sale?", severity: "medium" as const },
+  ];
+
+  it("the most severe first, three at most, none too short to send and none already asked", () => {
+    expect(askStarters(challenges)).toEqual([
+      "Which renovated comps achieved this premium, and at what cost per unit?",
+      "What is the T-12 behind the in-place NOI?",
+      "Is the tax bill reassessed on sale?",
+    ]);
+    expect(askStarters(challenges, [{ q: "what is the  T-12 behind the in-place NOI?" }])).toEqual([
+      "Which renovated comps achieved this premium, and at what cost per unit?",
+      "Is the tax bill reassessed on sale?",
+      "What's the absorption schedule to get from 9% to 6%?",
+    ]);
+    expect(askStarters([])).toEqual([]);
+    expect(askStarters(undefined)).toEqual([]);
+  });
+
+  it("draws each as a button in the form, above the input; none where the deal has no questions", () => {
+    const starters = askStarters(challenges);
+    const html = renderToStaticMarkup(
+      React.createElement(AskPanel, { dealId: DEAL, qa: [], hasOm: true, isSample: false, isPro: true, starters }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const block = html.match(/data-qa="ask-starters"[\s\S]*?<\/ul>/)?.[0] ?? "";
+    expect((block.match(/<button type="button"/g) ?? []).length).toBe(3);
+    for (const q of starters) expect(visibleText(block)).toContain(q);
+    expect(html.indexOf('data-qa="ask-starters"')).toBeLessThan(html.indexOf("<textarea"));
+    const bare = renderToStaticMarkup(
+      React.createElement(AskPanel, { dealId: DEAL, qa: [], hasOm: true, isSample: false, isPro: true, starters: [] }),
+    );
+    expect(bare).not.toContain('data-qa="ask-starters"');
+    // Never where the reader cannot ask: no OM, or not on Pro.
+    const free = renderToStaticMarkup(
+      React.createElement(AskPanel, { dealId: DEAL, qa: [], hasOm: true, isSample: false, isPro: false, starters }),
+    );
+    expect(free).not.toContain('data-qa="ask-starters"');
   });
 });
 
