@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { extractionInstruction } from "@/lib/anthropic/prompts";
-import { brokerageOf, initialsOf, listingTeamOf, offersDueOf, offersDueUpgrade, telOf } from "./offering";
+import { ListingTeam } from "@/app/(app)/deals/[id]/listing-team";
+import {
+  brokerageOf,
+  initialsOf,
+  listingTeamOf,
+  mailtoAddressOf,
+  offersDueEventText,
+  offersDueOf,
+  offersDueTimeOf,
+  offersDueUpgrade,
+  telOf,
+} from "./offering";
 import { allDayEventIcs, foldLine, icsText } from "./ics";
+import { a11yIssues, visibleText } from "./render-lint";
 
 const row = (label: string, value: string, page = "p. 2") => ({ label, value, page, flagged: false });
 const deal = (over: Partial<ExtractionResult> & { metrics?: ReturnType<typeof row>[] } = {}): ExtractionResult =>
@@ -68,6 +82,41 @@ describe("the listing team (#467)", () => {
     expect(initialsOf("Madonna")).toBe("M");
     expect(initialsOf("J. R. Smith, CCIM")).toBe("JS");
   });
+
+  // Research pass 39: an address carrying a character a mailto link reads
+  // as more than an address had been linked as printed.
+  it("links an email only where it is one plain address, and prints one carrying more as written", () => {
+    const carrying = ["broker?team@firm.example", "broker&team@firm.example", "broker=team@firm.example", "broker%2Eteam@firm.example"];
+    for (const email of carrying) {
+      const [b] = listingTeamOf(deal({ listingTeam: [{ name: "A Broker", title: "", firm: "Firm", phone: "", email, page: "" }] } as never));
+      expect(b.email, email).toBeNull();
+      expect(b.emailText, email).toBe(email);
+      expect(mailtoAddressOf(email), email).toBeNull();
+      expect(mailtoAddressOf(`mailto:${email}`), email).toBeNull();
+    }
+    expect(mailtoAddressOf(" mailto:jane.doe@firm.example ")).toBe("jane.doe@firm.example");
+    expect(mailtoAddressOf("jane+om@firm.example")).toBe("jane+om@firm.example");
+    expect(mailtoAddressOf("not an email")).toBeNull();
+    // Words with no address in them are no email to print.
+    const [none] = listingTeamOf(deal({ listingTeam: [{ name: "C Broker", title: "", firm: "Firm", phone: "", email: "not an email", page: "" }] } as never));
+    expect(none).toMatchObject({ email: null, emailText: "" });
+
+    // On the card: the plain address is a link, the other printed and never one.
+    const team = listingTeamOf(
+      deal({
+        listingTeam: [
+          { name: "A Broker", title: "", firm: "Firm", phone: "", email: carrying[0], page: "" },
+          { name: "B Broker", title: "", firm: "Firm", phone: "", email: "b.broker@firm.example", page: "" },
+        ],
+      } as never),
+    );
+    const html = renderToStaticMarkup(React.createElement(ListingTeam, { team, offersDue: null }));
+    expect(html).toContain('href="mailto:b.broker@firm.example"');
+    expect(html.match(/href="mailto:/g)).toHaveLength(1);
+    expect(html).toContain('data-qa="email-unlinked"');
+    expect(visibleText(html)).toContain(carrying[0]);
+    expect(a11yIssues(html)).toEqual([]);
+  });
 });
 
 describe("the call for offers in a calendar (#467)", () => {
@@ -108,6 +157,47 @@ describe("the call for offers in a calendar (#467)", () => {
     expect(lines.every((l) => !/[\r\n]/.test(l))).toBe(true);
     expect(lines.some((l) => l.startsWith("ATTENDEE"))).toBe(false);
     expect(ics).toContain("SUMMARY:Offers due — The Maddox\\nATTENDEE:mailto:someone@example.test\r\n");
+  });
+
+  // Research pass 35, F14: the file was an all-day event whose description
+  // was the deal's link alone, so a deadline at 5:00 PM ET — which the deal
+  // page prints — was dropped from the file a bidder keeps.
+  it("reads the time of day the memorandum's words give, with its zone, and none from a window", () => {
+    expect(offersDueTimeOf("Thursday, October 22, 2026 at 5:00 PM ET")).toBe("5:00 PM ET");
+    expect(offersDueTimeOf("October 22, 2026 by 3 p.m. Eastern Time")).toBe("3 p.m. Eastern Time");
+    expect(offersDueTimeOf("10/22/2026, 12:00 noon (EST)")).toBe("12:00 noon (EST)");
+    expect(offersDueTimeOf("October 22, 2026 at 17:00 local time")).toBe("17:00 local time");
+    expect(offersDueTimeOf("October 22, 2026 at 5pm")).toBe("5pm");
+    // No time, or two different ones: none.
+    expect(offersDueTimeOf("October 22, 2026")).toBeNull();
+    expect(offersDueTimeOf("October 22, 2026, between 9:00 AM and 5:00 PM ET")).toBeNull();
+    // The same time said twice is one.
+    expect(offersDueTimeOf("5:00 PM ET, October 22, 2026 (5:00 PM ET)")).toBe("5:00 PM ET");
+    // A word that only starts like a time is none.
+    expect(offersDueTimeOf("October 22, 2026; 5 amenity tours")).toBeNull();
+  });
+
+  it("puts the memorandum's own words, time and page in the event where its day is the deal's", () => {
+    const link = "https://underwrite.example/deals/d1";
+    const ex = deal({ metrics: [row("Offers due", "Thursday, October 22, 2026 at 5:00 PM ET")] });
+    expect(offersDueEventText("2026-10-22", "The Maddox", link, ex)).toEqual({
+      summary: "Offers due 5:00 PM ET — The Maddox",
+      description: `Offers due as the memorandum states it: Thursday, October 22, 2026 at 5:00 PM ET (OM p. 2)\n${link}`,
+    });
+    // A page the memorandum does not have is left off; no time, no time in
+    // the summary.
+    const noPage = deal({ metrics: [row("Offers due", "October 22, 2026", "p. 212")] });
+    expect(offersDueEventText("2026-10-22", "The Maddox", link, noPage)).toEqual({
+      summary: "Offers due — The Maddox",
+      description: `Offers due as the memorandum states it: October 22, 2026\n${link}`,
+    });
+    // A day the reader set that is not the memorandum's: the link alone.
+    expect(offersDueEventText("2026-10-29", "The Maddox", link, ex)).toEqual({ summary: "Offers due — The Maddox", description: link });
+    // No memorandum date at all: the link alone.
+    expect(offersDueEventText("2026-10-22", "The Maddox", link, null)).toEqual({ summary: "Offers due — The Maddox", description: link });
+    expect(
+      offersDueEventText("2026-10-22", "The Maddox", link, deal({ metrics: [row("Offers due", "Offers reviewed as received")] })),
+    ).toEqual({ summary: "Offers due — The Maddox", description: link });
   });
 
   it("escapes text and folds a long line at 75 octets without splitting a character", () => {

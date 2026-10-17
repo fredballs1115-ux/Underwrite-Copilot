@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { basisScale, compFigures, fmtBasis, subjectBasis } from "./comp-detail";
+import { basisScale, compBarsCaption, compFigures, fmtBasis, subjectBasis } from "./comp-detail";
 import { screenYearOf } from "./criteria";
 import { SAMPLE_DEAL } from "./sample-deal";
 
@@ -177,5 +177,31 @@ describe("fmtBasis", () => {
     expect(fmtBasis(274_194, "unit")).toBe("$274k/unit");
     expect(fmtBasis(2_100_000, "unit")).toBe("$2.1M/unit");
     expect(fmtBasis(410, "sf")).toBe("$410/SF");
+  });
+});
+
+// Audit C7, L6: the report's captions read "the 2 comps stating a price per
+// unit, per unit" (the basis said twice), "the 1 comp", and claimed a lone
+// bar was scaled to the widest in the set — itself.
+describe("compBarsCaption — the report's comp-bar captions", () => {
+  const unit = { unit: "unit" as const, noun: "unit", subjectValue: null };
+  const sf = { unit: "sf" as const, noun: "unit", subjectValue: null };
+
+  it("says 'each comp' only where every sale comp is on the track", () => {
+    expect(compBarsCaption(unit, 3, 3)).toBe("Bars: each comp's basis per unit, scaled to the widest in the set.");
+    expect(compBarsCaption(unit, 2, 3)).toBe("Bars: the basis per unit that 2 of the 3 comps state, scaled to the widest in the set.");
+  });
+
+  it("names the basis once, and a lone comp as one", () => {
+    const one = compBarsCaption(sf, 1, 3);
+    expect(one).toBe("Bars: the basis per SF that one of the 3 comps states.");
+    expect(one).not.toMatch(/per SF, per SF|the 1 comp|scaled/);
+    expect(compBarsCaption(unit, 2, 3)).not.toMatch(/per unit, per unit/);
+  });
+
+  it("puts the subject's tick on the track, in the class's noun", () => {
+    expect(compBarsCaption({ unit: "unit", noun: "key", subjectValue: 200_000 }, 1, 2)).toBe(
+      `Bars: the basis per key that one of the 2 comps states; the tick is the subject at ${fmtBasis(200_000, "unit", "key")}.`,
+    );
   });
 });

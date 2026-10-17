@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { abbrevState, type StructuredAddress } from "@/lib/address";
+import { AddressSearchCredit } from "./address-search-credit";
 
 /**
  * Live address suggestions via the Photon geocoder (photon.komoot.io) —
@@ -204,39 +205,46 @@ export function AddressAutocomplete({
         value={picked ? JSON.stringify(picked) : ""}
       />
       {open && (
-        <ul
-          id={`${idBase}-list`}
-          role="listbox"
-          aria-label="Address suggestions"
-          className="shadow-float absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-line bg-surface py-1"
-        >
-          {options.map((o, i) => (
-            <li
-              key={o.label}
-              id={`${idBase}-${i}`}
-              role="option"
-              aria-selected={i === active}
-            >
-              <button
-                type="button"
-                onMouseMove={() => setActive(i)}
-                onClick={() => choose(o)}
-                className={`w-full px-3 py-2 text-left text-sm ${
-                  i === active ? "bg-brand/10" : ""
-                }`}
+        <div className="shadow-float absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-line bg-surface">
+          <ul
+            id={`${idBase}-list`}
+            role="listbox"
+            aria-label="Address suggestions"
+            className="py-1"
+          >
+            {options.map((o, i) => (
+              <li
+                key={o.label}
+                id={`${idBase}-${i}`}
+                role="option"
+                aria-selected={i === active}
               >
-                <span className="block truncate">{o.label}</span>
-                {(o.county || o.submarket) && (
-                  <span className="block truncate text-xs text-muted">
-                    {[o.submarket, o.county && `${o.county} County`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
+                <button
+                  type="button"
+                  onMouseMove={() => setActive(i)}
+                  onClick={() => choose(o)}
+                  className={`w-full px-3 py-2 text-left text-sm ${
+                    i === active ? "bg-brand/10" : ""
+                  }`}
+                >
+                  <span className="block truncate">{o.label}</span>
+                  {(o.county || o.submarket) && (
+                    <span className="block truncate text-xs text-muted">
+                      {[o.submarket, o.county && `${o.county} County`]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {/* The suggestions are Photon's, on OpenStreetMap's data, and its
+              attribution guideline asks for this credit wherever an
+              application shows what such a geocoder found — under the list,
+              outside the listbox, whose children are its options alone. */}
+          <AddressSearchCredit className="border-t border-line px-3 py-1.5 text-[10px] text-muted" />
+        </div>
       )}
     </div>
   );

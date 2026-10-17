@@ -115,7 +115,11 @@ describe("sectorLeaderboard — one row a figure, ranked only where the sources 
     const nova = rowOf("industrial", "nova");
     expect(nova.rank).toBeNull();
     expect(nova.reason).toBe("publisher not recorded; undated; small-bay space only; a spread of two reads");
-    expect(rowOf("multifamily", "chicago").reason).toBe("undated; a spread of two reads");
+    // Chicago's apartment vacancy is one dated read now — Cushman &
+    // Wakefield's Q2 2026, the complement of its 94.9% occupancy, as the
+    // runner printed the page (zori run 37285890356) — so it is ranked.
+    expect(rowOf("multifamily", "chicago")).toMatchObject({ reason: null, vLow: 5.1, vHigh: 5.1 });
+    expect(rowOf("multifamily", "chicago").rank).not.toBeNull();
     expect(rowOf("retail", "newark_jc")).toMatchObject({ rank: null, reason: "2024, over a year old" });
     expect(rowOf("retail", "richmond")).toMatchObject({ rank: null, reason: "undated" });
     // Ranked rows first, then the unranked, then the rows with no vacancy figure.

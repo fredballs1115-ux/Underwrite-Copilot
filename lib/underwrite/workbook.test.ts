@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import ExcelJS from "exceljs";
 import { HyperFormula } from "hyperformula";
-import { buildUnderwriteWorkbook } from "./workbook";
+import { RENT_LINE_LABEL, YEAR1_YIELD_LABEL, buildUnderwriteWorkbook } from "./workbook";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import { buildSensitivityGrids } from "./sensitivity";
 import type { UnderwriteInputs } from "./engine";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { regulationForDeal } from "@/lib/rent-regulation";
+import { STRATEGY_READING } from "@/lib/deal-strategy";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
 
 /**
  * Proof that the generated workbook's formulas are LIVE and compute the same
@@ -384,8 +387,18 @@ describe("the Sensitivity tab stays centred on the inputs as they stand", () => 
 describe("Operating Metrics tab — the ratio ladder ties to the engine", () => {
   let hf: ReturnType<typeof HyperFormula.buildFromSheets>;
   let wb: ExcelJS.Workbook;
+  // The ladder's margins read the building's own expenses, so it runs on a
+  // T-12 here: on a class's default ratio the rows that would be struck on
+  // it are left out (research pass 40, M2; workbook-default-ratio.test.ts).
+  const t12Model = deriveUnderwriteInputs(extraction, "fallback", {
+    t12: {
+      periodEnd: "2026-06-30",
+      summary: { collectedRent: 4_200_000, vacancyLoss: null, otherIncome: null, egi: 4_200_000, opex: [], totalOpex: 1_200_000, noi: 3_000_000, noiDerived: false },
+    },
+  });
+  const t12Engine = computeUnderwrite(t12Model.inputs);
   beforeAll(async () => {
-    const buf = await buildUnderwriteWorkbook(model);
+    const buf = await buildUnderwriteWorkbook(t12Model);
     ({ hf, wb } = await loadIntoHf(buf));
   });
 
@@ -413,13 +426,14 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
       "Price / SF",
       "All-in Basis / SF (price + capital plan)",
       "Year-1 NOI / SF",
+      "Year-1 Potential Gross Revenue / SF / Year",
     ]) {
       expect(opsLabelRow(wb, lab), lab).toBeGreaterThan(0);
     }
   });
 
   it("Year-1 breakeven occupancy = (OpEx + Debt Service) / PGR, per the engine", () => {
-    const y1 = engine.cashFlow[0];
+    const y1 = t12Engine.cashFlow[0];
     const expected =
       (y1.operatingExpenses + y1.debtService) / y1.potentialGrossRevenue;
     const r = opsLabelRow(wb, "Breakeven Occupancy");
@@ -427,7 +441,7 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
   });
 
   it("Year-1 DSCR on the ladder matches the engine", () => {
-    const y1 = engine.cashFlow[0];
+    const y1 = t12Engine.cashFlow[0];
     const r = opsLabelRow(wb, "DSCR (NOI)");
     expect(Number(opsValue(hf, r, 2))).toBeCloseTo(y1.noi / y1.debtService, 6);
   });
@@ -585,7 +599,7 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
 
   it("keeps the stabilized pro forma out of year-1 income and says why", () => {
     const assum = wb.getWorksheet("Assumptions")!;
-    const row = findRow(assum, 1, "In-Place Rental Revenue (annual)");
+    const row = findRow(assum, 1, RENT_LINE_LABEL);
     expect(String(assum.getCell(row, 3).value)).toMatch(/does not anchor year 1/);
     // Year-1 NOI is the 6% screening default on a $20M price — not $21M.
     expect(planEngine.cashFlow[0].noi).toBeGreaterThan(0);
@@ -601,7 +615,7 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     // the cap on modelled year-1 income.
     const summary = wb.getWorksheet("Deal Summary")!;
     expect(() => findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)")).toThrow();
-    expect(() => findRow(summary, 4, "Stabilized Yield (on cost)")).toThrow();
+    expect(() => findRow(summary, 4, YEAR1_YIELD_LABEL)).toThrow();
     findRow(summary, 4, "Cap on Yr-1 Income (as modelled)");
     findRow(summary, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
     const noiRow = findRow(summary, 1, "OM Stabilized NOI (pro forma)");
@@ -700,6 +714,160 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
   });
 });
 
+// Research pass 34: on a note, a 49% share beside its entity's loan and a
+// preferred equity position, the book printed "Going-In Cap (Yr-1 NOI /
+// Price)" and "Price / Unit" struck on a price that did not buy the
+// building — the equity's whole over 200 units read $210,000 — while the
+// compare table and the deal page withhold them (`buildingPriceOf` answers
+// none). The caveat the cover prints now sits under the tiles too.
+describe("where the price did not buy the building, no building basis or cap is struck on it", () => {
+  const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+  const withUnits = (over: Partial<ExtractionResult>, rows: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    ...extraction,
+    ...over,
+    metrics: [...extraction.metrics, { label: "Units", value: "200", flagged: false, page: "p. 4" }, ...rows],
+  });
+  const opsLabels = (w: ExcelJS.Workbook): string[] => {
+    const ops = w.getWorksheet("Operating Metrics")!;
+    const out: string[] = [];
+    ops.eachRow((row) => out.push(String(row.getCell(1).value ?? "")));
+    return out;
+  };
+  const noErrors = (h: ReturnType<typeof HyperFormula.buildFromSheets>) => {
+    const errors: string[] = [];
+    for (const name of h.getSheetNames()) {
+      (h.getSheetValues(h.getSheetId(name)!) as unknown[][]).forEach((row, ri) =>
+        row.forEach((v, ci) => {
+          if (isErr(v)) errors.push(`${name}[${ri},${ci}]`);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+  };
+
+  it("a note: its caveat under the tiles, n/a where the cap, the yield and the per-unit and per-SF prices stood", async () => {
+    const m = deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "note" } }), "fallback");
+    expect(m.meta.interest?.basisWithheld).toEqual({ word: "note", why: "the price buys a note secured by the building, not the building" });
+    const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+    const summary = w.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE");
+    expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
+    expect(String(summary.getCell(tiles + 2, 1).value)).toContain("not the note's return");
+    expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe("n/a — note");
+    expect(summary.getCell(findRow(summary, 4, YEAR1_YIELD_LABEL), 5).value).toBe("n/a — note");
+    const labels = opsLabels(w);
+    expect(labels).not.toContain("Price / Unit");
+    expect(labels).not.toContain("Price / SF");
+    expect(labels).not.toContain("All-in Basis / SF (price + capital plan)");
+    expect(labels).toContain(
+      "Price / Unit and All-in Basis / Unit left out: the price buys a note secured by the building, not the building, so no building basis is struck on it.",
+    );
+    // The building's own income per unit and per foot stays.
+    expect(labels).toContain("Year-1 NOI / Unit");
+    expect(labels).toContain("Year-1 NOI / SF");
+    // The returns stay live; nothing is left pointing at a withheld cell.
+    expect(Number(named(h, "LeveredIRR"))).toBeCloseTo(computeUnderwrite(m.inputs).returns.leveredIrrPct!, 3);
+    noErrors(h);
+  }, 30000);
+
+  it("a share beside its entity's loan and a preferred equity position say n/a; a share of a stated percentage keeps its cap on the whole", async () => {
+    const loan = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" } }, [
+        { label: "Entity loan balance", value: "$56,500,000", flagged: false, page: "p. 9" },
+      ]),
+      "fallback",
+    );
+    expect(loan.meta.interest?.basisWithheld?.word).toBe("share");
+    const position = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "preferred_equity" } }, [
+        { label: "Preferred equity amount", value: "$8,000,000", flagged: false, page: "p. 2" },
+        { label: "Preferred return", value: "12%", flagged: false, page: "p. 2" },
+      ]),
+      "fallback",
+    );
+    expect(position.meta.interest?.basisWithheld?.word).toBe("position");
+    // The price tile names what the figure is: beside the entity's loan, the
+    // share's price grossed up is the equity's whole (the plan's own words);
+    // a position's price is the position's, as stated.
+    for (const [m, word, tile] of [
+      [loan, "share", "EQUITY'S WHOLE (49% SHARE GROSSED UP)"],
+      [position, "position", "PURCHASE PRICE"],
+    ] as const) {
+      const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+      const summary = w.getWorksheet("Deal Summary")!;
+      expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe(`n/a — ${word}`);
+      expect(opsLabels(w)).not.toContain("Price / Unit");
+      const tiles = findRow(summary, 1, tile);
+      expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
+      noErrors(h);
+    }
+    // A share of the general partner's interest (research pass 37): a share
+    // of a share, run at its price as stated, with no cap or basis struck on
+    // it — each cell "n/a — share", as a share of no stated percentage's.
+    const gp = deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "partial_interest", share: "50% of the general partner interest" } }), "fallback");
+    expect(gp.inputs.purchasePrice).toBe(50_000_000);
+    expect(gp.meta.priceLabel).toBeNull();
+    {
+      const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(gp));
+      const summary = w.getWorksheet("Deal Summary")!;
+      expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe("n/a — share");
+      expect(opsLabels(w)).toContain(
+        "Price / Unit and All-in Basis / Unit left out: the price buys a share of the general partner's interest, a share of a share that no figure grosses up to the building's price, so no building basis is struck on it.",
+      );
+      const tiles = findRow(summary, 1, "PURCHASE PRICE");
+      expect(summary.getCell(tiles + 2, 1).value).toBe(gp.meta.interest!.modelCaveat);
+      expect(gp.meta.interest!.modelCaveat).toMatch(/^A share of the general partner's interest is a share of a share/);
+      const assumptions = w.getWorksheet("Assumptions")!;
+      expect(String(assumptions.getCell(findRow(assumptions, 1, "Purchase Price"), 3).value)).toContain(
+        "The OM's price for a share of the GENERAL PARTNER'S interest — a share of a share, not of the owning entity: this model runs the whole building's cash flows at that price, so its cap and returns are not the stake's",
+      );
+      noErrors(h);
+    }
+    // A 49% share with no entity loan: the model runs at the whole the
+    // price implies, a building's price, so its cap and basis stand.
+    const share = deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" } }), "fallback");
+    expect(share.meta.interest?.basisWithheld ?? null).toBeNull();
+    const { wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(share));
+    const summary = w.getWorksheet("Deal Summary")!;
+    expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toMatchObject({ formula: expect.stringContaining("/PurchasePrice") });
+    expect(opsLabels(w)).toContain("Price / Unit");
+  }, 60000);
+
+  // Research pass 35 (F4): a 49% share's tab led with "PURCHASE PRICE
+  // $68,000,000" — the share costs $33,320,000; $68M is the whole grossed up
+  // — and the IRR, multiple and coverage beside it are the whole building's.
+  it("names a share's grossed-up price as the whole on the tile, wrapped, with the caveat under the band", async () => {
+    const share = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" } }),
+      "fallback",
+    );
+    expect(share.meta.priceLabel).toBe("Whole Price (49% share grossed up)");
+    const { wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(share));
+    const summary = w.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "WHOLE PRICE (49% SHARE GROSSED UP)");
+    expect(() => findRow(summary, 1, "PURCHASE PRICE")).toThrow();
+    // Live as before: the tile reads the one price cell the model runs at.
+    expect(summary.getCell(tiles + 1, 1).value).toMatchObject({ formula: "PurchasePrice" });
+    expect(summary.getCell(tiles, 1).alignment?.wrapText).toBe(true);
+    expect(summary.getRow(tiles).height).toBeGreaterThan(14);
+    // Whose returns the tiles' are, under them.
+    expect(summary.getCell(tiles + 2, 1).value).toBe(share.meta.interest!.modelCaveat);
+    expect(String(summary.getCell(tiles + 2, 1).value)).toContain("the share earns its 49% of those cash flows");
+    // All of the entity's interests beside its loan: the equity's whole.
+    const all = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "partial_interest", share: "100% of the membership interests" } }, [
+        { label: "Entity loan balance", value: "$30,000,000", flagged: false, page: "p. 9" },
+      ]),
+      "fallback",
+    );
+    expect(all.meta.priceLabel).toBe("Equity's Whole (all the entity's interests)");
+    // A price as stated keeps its name: the fixture's own fee simple, and a
+    // note, whose price is the note's.
+    expect(model.meta.priceLabel ?? null).toBeNull();
+    expect(deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "note" } }), "fallback").meta.priceLabel ?? null).toBeNull();
+  }, 30000);
+});
+
 // ── Labels and colours that say what their cells are ──────────────────────
 describe("the workbook's labels and colours say what their cells are", () => {
   /** Units and an occupancy, no size: the RSF is the count × a typical
@@ -758,6 +926,48 @@ describe("the workbook's labels and colours say what their cells are", () => {
     }
   });
 
+  // Research pass 34: an unpriced memorandum's book led with "PURCHASE PRICE
+  // $10,000,000 | LEVERED IRR 73.0%" and nothing under it, while the report
+  // left those returns out as the placeholder's; only the Assumptions tab's
+  // SOURCE said to enter the price.
+  it("marks a placeholder price on the headline tiles and says under them whose returns they are, the live model untouched", async () => {
+    const unpriced: ExtractionResult = {
+      ...extraction,
+      metrics: [
+        { label: "Asking price", value: "Call for offers", flagged: false, page: "p. 5" },
+        { label: "Net operating income", value: "$2,000,000", flagged: false, page: "p. 7" },
+        { label: "Rentable square feet", value: "300,000", flagged: false, page: "p. 4" },
+      ],
+    };
+    const m = deriveUnderwriteInputs(unpriced, "fallback");
+    expect(m.sources.purchasePrice?.provenance).toBe("assumption");
+    const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+    const summary = w.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE (ASSUMED)");
+    expect(summary.getCell(tiles + 1, 1).value).toMatchObject({ formula: "PurchasePrice" });
+    expect(summary.getCell(tiles + 2, 1).value).toBe(
+      "No price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns are the placeholder's. Enter the price you would pay as the Purchase Price on the Assumptions tab.",
+    );
+    expect(summary.getCell(tiles + 2, 1).alignment?.wrapText).toBe(true);
+    // The returns stay live formulas: the book is still a model to fill in.
+    expect(summary.getCell(tiles + 1, 2).value).toMatchObject({ formula: expect.stringContaining("IRR(") });
+    expect(Number(named(h, "LeveredIRR"))).toBeCloseTo(computeUnderwrite(m.inputs).returns.leveredIrrPct!, 3);
+    const errors: string[] = [];
+    for (const name of h.getSheetNames()) {
+      (h.getSheetValues(h.getSheetId(name)!) as unknown[][]).forEach((row, ri) =>
+        row.forEach((v, ci) => {
+          if (isErr(v)) errors.push(`${name}[${ri},${ci}]`);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+    // A priced book's tile is plain, with nothing under it.
+    const priced = (await book(model)).getWorksheet("Deal Summary")!;
+    const plain = findRow(priced, 1, "PURCHASE PRICE");
+    expect(priced.getCell(plain + 2, 1).value ?? null).toBeNull();
+    expect(() => findRow(priced, 1, "PURCHASE PRICE (ASSUMED)")).toThrow();
+  }, 30000);
+
   it("the Deal Summary marks a rentable SF that is an assumption, as the Operating Metrics tab does", async () => {
     expect(countedModel.sources.rsf?.provenance).toBe("assumption");
     const assumed = (await book(countedModel)).getWorksheet("Deal Summary")!;
@@ -810,6 +1020,18 @@ describe("the workbook's labels and colours say what their cells are", () => {
     expect(String(fallback.getCell(findRow(fallback, 1, "General Vacancy & Credit Loss %"), 3).value)).not.toMatch(/credit/);
   });
 
+  // Research pass 40, M3: the sample's T-12 expense load printed "OM — T-12
+  // actual expense load …", crediting the memorandum with the statement's
+  // figure. It is the T-12's, as a rent roll's rows are the rent roll's.
+  it("credits the T-12's expense load to the T-12, never the OM", async () => {
+    const sample = sampleDerivedInputs();
+    expect(sample.sources.expenseLines?.doc).toBe("T-12");
+    const assum = (await book(sample)).getWorksheet("Assumptions")!;
+    expect(String(assum.getCell(findRow(assum, 1, "Operating expenses"), 3).value)).toBe(
+      "T-12 actual expense load (TTM to 2026-05-31) — 45% of EGI",
+    );
+  });
+
   // A default of none is a claim: these rows printed $0 or 0.00% with an
   // empty SOURCE (research pass 27), and the transfer taxes' "Enter your
   // jurisdiction's transfer-tax rate" read as if every jurisdiction levied
@@ -821,7 +1043,7 @@ describe("the workbook's labels and colours say what their cells are", () => {
       return { value: assum.getCell(r, 2).value, source: String(assum.getCell(r, 3).value ?? "") };
     };
     const itemized = "Assumption — None itemized — the general hold stands in for it; enter it to itemize";
-    const folded = "Assumption — Folded into the in-place rental revenue — split it out of that line, never add it on top";
+    const folded = "Assumption — Folded into the potential gross revenue line — split it out of that line, never add it on top";
     expect(row("Acquisition Fee %")).toEqual({
       value: 0,
       source: "Assumption — None modelled — enter it with its cap: the fee is the lesser of the two",
@@ -844,6 +1066,18 @@ describe("the workbook's labels and colours say what their cells are", () => {
     for (const label of ["Expense Recoveries (annual)", "Other Revenue (annual)"]) {
       expect(row(label), label).toEqual({ value: 0, source: folded });
     }
+    // Leasing capital too (research pass 40, M4): each says its zero is a
+    // default of none, then how the Cash Flow tab charges it.
+    expect(row("TI $/SF/yr, whole building")).toEqual({
+      value: 0,
+      source:
+        "Assumption — None modelled — enter it to carry tenant improvements: the returns carry no leasing capital. Charged on every SF of the building, every year — not a per-lease allowance",
+    });
+    expect(row("Leasing Commission % of all rent, every year")).toEqual({
+      value: 0,
+      source:
+        "Assumption — None modelled — enter it to carry leasing commissions: the returns carry none. Charged on the year's whole rent, every year — not a commission on the leases that roll",
+    });
     // The named ranges the formulas read are where they were.
     for (const [label, name] of [
       ["Acquisition Fee %", "AcqFeePct"],
@@ -857,12 +1091,22 @@ describe("the workbook's labels and colours say what their cells are", () => {
     }
   });
 
+  // Research pass 40, L7: the cost of sale is struck on the sale price, which
+  // the SOURCE said and the label did not.
+  it("names the cost of sale a share of the sale price", async () => {
+    const assum = (await book(model)).getWorksheet("Assumptions")!;
+    expect(() => findRow(assum, 1, "Sale Costs % of price")).toThrow();
+    const r = findRow(assum, 1, "Sale Costs % of sale price");
+    expect(assum.getCell(r, 2).name).toBe("SaleCostPct");
+    expect(String(assum.getCell(r, 3).value)).toBe("Assumption — Default 2.0% of sale price");
+  });
+
   it("the TI input says it is charged on the whole building's SF every year, never a per-lease allowance", async () => {
     const wb = await book(model);
     const assum = wb.getWorksheet("Assumptions")!;
     const row = findRow(assum, 1, "TI $/SF/yr, whole building");
     expect(assum.getCell(row, 2).name).toBe("TIPSF");
-    expect(String(assum.getCell(row, 3).value)).toBe("Charged on every SF of the building, every year — not a per-lease allowance");
+    expect(String(assum.getCell(row, 3).value)).toMatch(/\. Charged on every SF of the building, every year — not a per-lease allowance$/);
     // What the label says is what the ladder does: TI × RSF in every year.
     const cf = wb.getWorksheet("Cash Flow")!;
     const ti = findRow(cf, 1, "Tenant Improvements");
@@ -884,7 +1128,15 @@ describe("the workbook's labels and colours say what their cells are", () => {
   });
 
   it("says what the breakeven occupancy covers — the expenses and the debt service, before reserves, capital and the fee", async () => {
-    const ws = (await book(model)).getWorksheet("Operating Metrics")!;
+    // The row prints where the expenses are a T-12's; on a class's default
+    // ratio it is left out (research pass 40, M2).
+    const withT12 = deriveUnderwriteInputs(extraction, "fallback", {
+      t12: {
+        periodEnd: "2026-06-30",
+        summary: { collectedRent: 4_200_000, vacancyLoss: null, otherIncome: null, egi: 4_200_000, opex: [], totalOpex: 1_200_000, noi: 3_000_000, noiDerived: false },
+      },
+    });
+    const ws = (await book(withT12)).getWorksheet("Operating Metrics")!;
     let note = "";
     ws.eachRow((row) => {
       const v = String(row.getCell(1).value ?? "");
@@ -960,13 +1212,42 @@ describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
     expect(labels).toContain("Keys");
     expect(labels).toContain("Price / Key");
     expect(labels).toContain("All-in Basis / Key (price + capital plan)");
-    expect(labels).toContain("Year-1 Rent / Key / Month");
+    expect(labels).toContain("Year-1 NOI / Key");
+    // The rent line a key is the potential gross revenue, left out here on
+    // the class's default expense ratio, and named so (research pass 40, M2).
+    expect(labels.some((l) => l.startsWith("Year-1 Potential Gross Revenue / Key / Month, OpEx / Key"))).toBe(true);
     expect(labels.some((l) => /\/ Unit\b|^Units$/.test(l))).toBe(false);
+  });
+
+  // Audit A, L2: a class with no noun of its own read its count as "units"
+  // whatever the memorandum called it.
+  it("names a count in the memorandum's own noun: a care home's beds, a marina's slips", async () => {
+    for (const [label, cls, one, many, title] of [
+      ["Licensed beds", "senior_housing", "bed", "beds", "Bed"],
+      ["Wet slips", "other", "slip", "slips", "Slip"],
+    ] as const) {
+      const ex: ExtractionResult = {
+        ...extraction,
+        assetClass: cls,
+        metrics: [...extraction.metrics.filter((x) => !/unit|sf|square/i.test(x.label)), { label, value: "120", flagged: false, page: "p. 4" }],
+      };
+      const m = deriveUnderwriteInputs(ex, "fallback");
+      expect(m.meta.units, label).toBe(120);
+      expect(m.meta.unitNoun, label).toEqual({ one, many });
+      const buf = await buildUnderwriteWorkbook(m);
+      const { wb } = await loadIntoHf(buf);
+      const ws = wb.getWorksheet("Operating Metrics")!;
+      const labels: string[] = [];
+      for (let r = 1; r <= ws.rowCount; r++) labels.push(String(ws.getCell(r, 1).value ?? ""));
+      expect(labels, label).toContain(`Price / ${title}`);
+      expect(labels.some((l) => /\/ Unit\b|^Units$/.test(l)), label).toBe(false);
+    }
   });
 });
 
 // ── The Market Read tab ─────────────────────────────────────────────────────
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 
 describe("the Market Read tab — the assumptions against the published figures, as built", () => {
   const read: ModelVsMarket = {
@@ -1045,6 +1326,11 @@ describe("the Market Read tab — the assumptions against the published figures,
     expect(ws.getCell(8, 5).value).toBe(4.94);
     expect(ws.getCell(8, 5).numFmt).toBe('0.00"%"');
     expect(ws.getCell(8, 8).value).toBe("spread widens at the exit");
+    // The providers' own notices under the figures (the batch-2 audit,
+    // LOW-7): FRED's for the 10-year, the BLS's for the rent index its own
+    // API answered — a row apart from the last check.
+    expect(ws.getCell(10, 1).value).toBe(FRED_NOTICE);
+    expect(ws.getCell(11, 1).value).toBe(BLS_NOTICE);
     // A data tab: nothing on it is a formula.
     ws.eachRow((row) => {
       row.eachCell((cell) => {
@@ -1216,6 +1502,185 @@ describe("the Portfolio tab — each property as the memorandum states it, the s
   });
 });
 
+// ── On paper (research pass 35, F13) ──────────────────────────────────────
+// Labels and formats only: the cover's labels sat at the foot of their tall
+// rows, a plan's yield-on-cost label was cut at its column's edge, a year-1
+// figure was called stabilized, multiples printed one place where the report
+// prints two, the Market Read printed some 300 characters wide at a few
+// points' type, and the Debt Schedule repeated the monthly header over the
+// annual rollup.
+describe("the workbook reads on paper", () => {
+  const read: ModelVsMarket = {
+    readOn: "2026-09-21",
+    metro: "Washington DC",
+    checks: [
+      {
+        key: "exit_cap",
+        title: "Exit cap",
+        model: "6.00%",
+        modelSource: "derived from the documents",
+        published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
+        tone: "widens",
+        toneLabel: "spread widens at the exit",
+        scope: "national",
+        read: "The exit cap 6.00% is 106 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year unchanged — the conservative direction.",
+      },
+    ],
+  };
+  const load = async (m: typeof model, mr?: ModelVsMarket) => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(m, null, mr)) as unknown as ArrayBuffer);
+    return wb;
+  };
+
+  it("sets the cover's labels at the top of their rows and wraps what runs past the band", async () => {
+    const note = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+        metrics: [...extraction.metrics, { label: "Unpaid principal balance", value: "$62,500,000", flagged: false, page: "p. 3" }],
+      },
+      "fallback",
+    );
+    const cover = (await load(note)).getWorksheet("Cover")!;
+    for (const lab of ["Asset class", "Prepared", "What is being sold"]) {
+      const row = findRow(cover, 2, lab);
+      expect(cover.getCell(row, 2).alignment?.vertical, lab).toBe("top");
+      expect(cover.getCell(row, 3).alignment?.vertical, lab).toBe("top");
+    }
+    // The note's line is longer than the column: wrapped, with its lines.
+    const sold = findRow(cover, 2, "What is being sold");
+    expect(String(cover.getCell(sold, 3).value).length).toBeGreaterThan(80);
+    expect(cover.getCell(sold, 3).alignment?.wrapText).toBe(true);
+    expect(cover.getRow(sold).height).toBeGreaterThanOrEqual(28);
+    // The Contents: a description longer than the column wraps inside the band.
+    const ops = findRow(cover, 2, "Operating Metrics");
+    expect(cover.getCell(ops, 3).alignment?.wrapText).toBe(true);
+    expect(cover.getRow(ops).height).toBeGreaterThanOrEqual(28);
+    // A short one is left on its line.
+    const summaryRow = findRow(cover, 2, "Deal Summary");
+    expect(cover.getCell(summaryRow, 3).alignment?.wrapText ?? false).toBe(false);
+  });
+
+  it("wraps the plan's yield-on-cost label whole, and names a stabilized deal's year-1 yield for what it is", async () => {
+    const plan = (await load(deriveUnderwriteInputs(conversion, "fallback"))).getWorksheet("Deal Summary")!;
+    const yoc = findRow(plan, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
+    expect(plan.getCell(yoc, 4).alignment?.wrapText).toBe(true);
+    expect(plan.getRow(yoc).height).toBe(26);
+    // The row's cells sit at its top, both blocks, beside the label's first line.
+    for (const c of [1, 2, 4, 5]) expect(plan.getCell(yoc, c).alignment?.vertical).toBe("top");
+    const stab = (await load(model)).getWorksheet("Deal Summary")!;
+    // Over the uses at closing, and said so: the year-1 capital is not in
+    // them (research pass 40, L6).
+    expect(YEAR1_YIELD_LABEL).toBe("Year-1 Yield on Total Uses (before yr-1 capital)");
+    expect(() => findRow(stab, 4, "Year-1 Yield on Total Cost")).toThrow();
+    const y1 = findRow(stab, 4, YEAR1_YIELD_LABEL);
+    expect(stab.getCell(y1, 5).value).toMatchObject({ formula: expect.stringContaining("/TotalUses") });
+    expect(() => findRow(stab, 4, "Stabilized Yield (on cost)")).toThrow();
+  });
+
+  // Research pass 40, L3: the unlevered IRR and multiple run on the
+  // property's flows before debt, and the asset management fee rides only in
+  // the levered flows — the rows said "Unlevered IRR" and nothing more, so a
+  // reader set 7.16% against a levered return that carries the fee.
+  it("says the unlevered pair is before the asset management fee, and prints the engine's figure", async () => {
+    const wb = await load(model);
+    const summary = wb.getWorksheet("Deal Summary")!;
+    expect(model.inputs.amFeePctEquity).toBeGreaterThan(0);
+    expect(() => findRow(summary, 4, "Unlevered IRR")).toThrow();
+    const irr = findRow(summary, 4, "Unlevered IRR (before AM fee)");
+    expect(summary.getCell(irr, 5).value).toMatchObject({ formula: expect.stringContaining("IRR(") });
+    expect(findRow(summary, 4, "Unlevered Equity Multiple (before AM fee)")).toBeGreaterThan(irr);
+  });
+
+  it("prints a multiple to two places, as the report does, on the tiles, the return block and the sensitivity grids", async () => {
+    const wb = await load(model);
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE");
+    expect(summary.getCell(tiles, 3).value).toBe("EQUITY MULTIPLE");
+    expect(summary.getCell(tiles + 1, 3).numFmt).toBe('0.00"x";"—";"—"');
+    for (const lab of ["Unlevered Equity Multiple (before AM fee)", "Levered Equity Multiple"]) {
+      expect(summary.getCell(findRow(summary, 4, lab), 5).numFmt, lab).toBe('0.00"x";"—";"—"');
+    }
+    const sens = wb.getWorksheet("Sensitivity")!;
+    let em = 0;
+    sens.eachRow((row) =>
+      row.eachCell((c) => {
+        const col = Number(c.col);
+        const formula = c.value && typeof c.value === "object" && "formula" in c.value ? String(c.value.formula) : "";
+        if (col >= 8 && col <= 12 && /Sensitivity Engine/.test(formula)) {
+          expect(c.numFmt).toBe('0.00"x";"—";"—"');
+          em++;
+        }
+      }),
+    );
+    expect(em).toBe(75);
+  });
+
+  it("prints the Market Read one page wide at a readable size, its words wrapped in their columns", async () => {
+    const ws = (await load(model, read)).getWorksheet("Market Read")!;
+    const widths = Array.from({ length: 9 }, (_, i) => ws.getColumn(i + 1).width ?? 0);
+    expect(widths.reduce((s, w) => s + w, 0)).toBeLessThanOrEqual(150);
+    expect(Math.max(...widths)).toBeLessThanOrEqual(44);
+    expect(ws.pageSetup.orientation).toBe("landscape");
+    expect(ws.pageSetup.fitToWidth).toBe(1);
+    // The sentence wraps in its column, its row as tall as its lines.
+    expect(ws.getCell(6, 9).alignment?.wrapText).toBe(true);
+    expect(ws.getRow(6).height).toBeGreaterThan(24);
+    // The lines across the top and the notices under the figures span the
+    // tab, wrapped, rather than running off its last column.
+    for (const row of [2, 3, 8]) {
+      expect(ws.getCell(row, 1).alignment?.wrapText, `row ${row}`).toBe(true);
+      expect(ws.getCell(row, 9).isMerged, `row ${row}`).toBe(true);
+    }
+    expect(ws.getCell(8, 1).value).toBe(FRED_NOTICE);
+  });
+
+  it("puts the Debt Schedule's annual rollup above the monthly table, whose header alone repeats on each page", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const ws = wb.getWorksheet("Debt Schedule")!;
+    const rollup = findRow(ws, 1, "ANNUAL ROLLUP");
+    const head = findRow(ws, 1, "Month");
+    expect(rollup).toBeLessThan(head);
+    expect(ws.pageSetup.printTitlesRow).toBe(`${head}:${head}`);
+    expect(ws.views[0]).toMatchObject({ state: "frozen", ySplit: head });
+    // Nothing follows the months but the tie check, so no page prints the
+    // monthly header over another block's rows.
+    const lastMonth = head + model.inputs.holdMonths;
+    expect(ws.getCell(lastMonth, 1).value).toBe(model.inputs.holdMonths);
+    for (let r = lastMonth + 1; r <= ws.rowCount; r++) {
+      expect(ws.getCell(r, 1).value ?? null, `row ${r}`).toBeNull();
+    }
+    // The same arithmetic: year 1's interest is its twelve months', and the
+    // exit balance still ties to the Deal Summary.
+    const id = hf.getSheetId("Debt Schedule")!;
+    const v = (row: number, col: number) => Number(hf.getCellValue({ sheet: id, row: row - 1, col: col - 1 }));
+    const months = Array.from({ length: 12 }, (_, i) => v(head + 1 + i, 5)).reduce((s, x) => s + x, 0);
+    expect(v(rollup + 2, 5)).toBeCloseTo(months, 2);
+    expect(named(hf, "CheckDebtTie")).toBe(true);
+  });
+});
+
+// Research pass 35, F18: the tab said its axes were "centred" above grids
+// whose key reads "Center row/column". One tab, one spelling — the site's
+// (CLAUDE.md: modelled, colour, centre), as the report spells it (audit
+// C3a, LOW-11: 0244ff7 had moved the tab to "centered").
+describe("the Sensitivity tab's words", () => {
+  it("spell centred one way, the site's", async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
+    const words: string[] = [];
+    wb.getWorksheet("Sensitivity")!.eachRow((row) =>
+      row.eachCell((c) => {
+        if (typeof c.value === "string") words.push(c.value);
+      }),
+    );
+    expect(words.some((w) => w.includes("its axes centred on the inputs as they stand"))).toBe(true);
+    expect(words.some((w) => w.startsWith("Centre row/column"))).toBe(true);
+    expect(words.filter((w) => /cent(er|ered)\b/i.test(w))).toEqual([]);
+  });
+});
+
 // ── When it was built ─────────────────────────────────────────────────────
 describe("the workbook says the day it was built, which its \"from today\" lines count from", () => {
   it("prints the build day on the cover and stamps the file's created and modified time with it, never 1970", async () => {
@@ -1223,13 +1688,32 @@ describe("the workbook says the day it was built, which its \"from today\" lines
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await buildUnderwriteWorkbook(model, null, null, null, builtAt)) as unknown as ArrayBuffer);
     const cover = wb.getWorksheet("Cover")!;
-    expect(cover.getCell(findRow(cover, 2, "Built"), 3).value).toBe("Sep 30, 2026");
+    // "Prepared": under the address, "Built" read as the year the building
+    // was built (research pass 35).
+    expect(cover.getCell(findRow(cover, 2, "Prepared"), 3).value).toBe("Sep 30, 2026");
+    expect(() => findRow(cover, 2, "Built")).toThrow();
     expect(wb.created?.toISOString()).toBe(builtAt.toISOString());
     expect(wb.modified?.toISOString()).toBe(builtAt.toISOString());
     // A caller that passes no time is stamped now, not with the epoch.
     const now = new ExcelJS.Workbook();
     await now.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
     expect(now.created!.getUTCFullYear()).toBeGreaterThanOrEqual(2026);
+  });
+
+  it("dates the cover on the reader's day and the file at the moment it is made, where the route passes both", async () => {
+    // The route builds on noon of the reader's day (audit C6, LOW-2), which
+    // is no moment anyone exported the file: the file's own time is the
+    // export's.
+    const readerNoon = new Date(Date.UTC(2026, 9, 5, 12));
+    const exportedAt = new Date(Date.UTC(2026, 9, 6, 3, 41));
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(
+      (await buildUnderwriteWorkbook(model, null, null, null, readerNoon, null, null, exportedAt)) as unknown as ArrayBuffer,
+    );
+    const cover = wb.getWorksheet("Cover")!;
+    expect(cover.getCell(findRow(cover, 2, "Prepared"), 3).value).toBe("Oct 5, 2026");
+    expect(wb.created?.toISOString()).toBe(exportedAt.toISOString());
+    expect(wb.modified?.toISOString()).toBe(exportedAt.toISOString());
   });
 });
 
@@ -1321,6 +1805,53 @@ describe("the cover says what is being sold, and what the model is and is not on
     // A price that buys the building keeps the label as it stands.
     expect(await labels(sold("fee_simple"))).toEqual(Array(3).fill("Stabilized"));
   });
+
+  // Research pass 35 (F4): a note's cover read "Deal type  Stabilized (the
+  // collateral)", then "An operating asset bought for its in-place income;
+  // NOI ÷ price is the going-in cap.", and two lines on that its cap rate
+  // and IRR "are not figures this buyer earns".
+  it("leaves the strategy's reading out where the deal type is the collateral's, and keeps it where the price buys the building", async () => {
+    const sold = (kind: "note" | "leased_fee" | "fee_simple", strategy: "stabilized" | "value_add" = "stabilized") =>
+      deriveUnderwriteInputs(
+        {
+          ...extraction,
+          strategy: { kind: strategy, summary: "", capitalBudget: "", timeline: "" },
+          interest: { kind, summary: "", share: "", groundLease: "", loan: "", page: "" },
+          metrics: [
+            ...extraction.metrics,
+            ...(kind === "note" ? [{ label: "Unpaid principal balance", value: "$62,500,000", flagged: false, page: "p. 3" }] : []),
+          ],
+        },
+        "fallback",
+      );
+    const read = async (m: ReturnType<typeof sold>) => {
+      const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+      const cover = wb.getWorksheet("Cover")!;
+      const assum = wb.getWorksheet("Assumptions")!;
+      const cr = findRow(cover, 2, "Deal type");
+      const cells: string[] = [];
+      for (const ws of [cover, assum]) ws.eachRow((row) => row.eachCell((c) => cells.push(String(c.value ?? ""))));
+      return { cover, cr, under: cover.getCell(cr + 1, 3).value, assumNote: assum.getCell(findRow(assum, 1, "Deal Type"), 3).value ?? null, cells };
+    };
+    const STABILIZED_READING = STRATEGY_READING.stabilized;
+    for (const kind of ["note", "leased_fee"] as const) {
+      const r = await read(sold(kind));
+      expect(r.cells.some((c) => c.includes(STABILIZED_READING)), kind).toBe(false);
+      expect(r.assumNote, kind).toBeNull();
+      // What is being sold follows the deal type, its caveat under it.
+      expect(findRow(r.cover, 2, "What is being sold"), kind).toBe(r.cr + 1);
+    }
+    // A plan on the collateral keeps what this model books, without the
+    // strategy's reading of a price over the building.
+    const plan = await read(sold("note", "value_add"));
+    expect(String(plan.under)).toMatch(/^This annual model books the capital budget in year 1/);
+    expect(plan.cells.some((c) => c.includes(STRATEGY_READING.value_add))).toBe(false);
+    expect(plan.assumNote).toBe("Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.");
+    // A price that buys the building reads as before, on both tabs.
+    const fee = await read(sold("fee_simple"));
+    expect(fee.under).toBe(STABILIZED_READING);
+    expect(fee.assumNote).toBe(STABILIZED_READING);
+  }, 60000);
 
   it("a covenant on the rents (#453): the restriction, then what the model's one growth rate is not on it", async () => {
     const units = extraction.metrics.find((m) => m.label === "Units")?.value;
@@ -1441,6 +1972,141 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The park")).toThrow();
   });
 
+  it("a forward purchase (lib/forward-purchase): the price at delivery and the clock, then the model's year-one NOI beside the memorandum's at delivery", async () => {
+    const forward = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "industrial",
+        strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+        metrics: [
+          { label: "Purchase price", value: "$48,000,000", flagged: false, page: "p. 2" },
+          { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "p. 4" },
+          { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "p. 4" },
+          { label: "Delivery date", value: "Q3 2027", flagged: false, page: "p. 4" },
+          { label: "Outside date", value: "March 31, 2028", flagged: false, page: "p. 4" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(forward));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The forward purchase");
+    expect(String(cover.getCell(r, 3).value)).toBe(
+      "Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's; 6.00% at delivery; outside date Mar 31, 2028",
+    );
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(
+      /^The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, Q3 2027\./,
+    );
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The forward purchase")).toThrow();
+  });
+
+  it("a mixed-use building (lib/mixed-use): its two incomes, then the one exit cap and growth rate the model runs both at", async () => {
+    const mixed = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "Retail / Multifamily",
+        metrics: [
+          ...extraction.metrics,
+          { label: "Residential income", value: "$1,520,000", flagged: false, page: "p. 9" },
+          { label: "Commercial income", value: "$610,000", flagged: false, page: "p. 9" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(mixed));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The two incomes");
+    expect(String(cover.getCell(r, 3).value)).toBe("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model capitalises the \$610k of commercial income at the same [\d.]+% exit cap as the residential/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The two incomes")).toThrow();
+  });
+
+  it("an operating business (lib/going-concern): what is sold and whose earnings, then the income the model capitalises as rent", async () => {
+    const station = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        dealName: "Route 9 Fuel & Market",
+        assetClass: "Gas Station / Convenience Store",
+        strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+        metrics: [
+          { label: "Asking price", value: "$3,200,000", flagged: false, page: "p. 2" },
+          { label: "NOI (in-place)", value: "$256,000", flagged: false, page: "p. 5" },
+          { label: "EBITDA (T-12)", value: "$410,000", flagged: false, page: "p. 5" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(station));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The operating business");
+    expect(String(cover.getCell(r, 3).value)).toBe("Fuel station and its store: sold with the business; EBITDA (T-12) $410k");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model capitalises its \$256k year-one income at a [\d.]+% exit cap as if it were rent/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The operating business")).toThrow();
+  });
+
+  it("condominium units (lib/condo): the units offered of the condominium's and a year of the dues, then the model's one building", async () => {
+    const bulk = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        dealName: "Harbor View",
+        assetClass: "Condominium Units (bulk sale)",
+        metrics: [
+          { label: "Asking price", value: "$16,800,000", flagged: false, page: "p. 2" },
+          { label: "Units", value: "42", flagged: false, page: "p. 4" },
+          { label: "NOI (in-place)", value: "$840,000", flagged: false, page: "p. 9" },
+          { label: "HOA dues", value: "$650 per unit per month", flagged: false, page: "p. 11" },
+          { label: "Units in building", value: "120", flagged: false, page: "p. 4" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(bulk));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The condominium units");
+    expect(String(cover.getCell(r, 3).value)).toBe("Condominium units: 42 of 120 units; dues $328k a year");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model sells the 42 units as one building at its [\d.]+% exit cap/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The condominium units")).toThrow();
+  });
+
+  it("a sandwich position (lib/sandwich-lease): the two rents and the master lease's end, then the model's perpetuity against the lease", async () => {
+    const position = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        dealName: "Founders Plaza",
+        assetClass: "Office",
+        interest: {
+          kind: "leasehold",
+          summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+          share: "",
+          groundLease: "Master lease of the building from its owner",
+          loan: "",
+          page: "",
+        },
+        metrics: [
+          { label: "Asking price", value: "$6,500,000", flagged: false, page: "p. 2" },
+          { label: "Master lease rent", value: "$1,100,000 a year", flagged: false, page: "p. 6" },
+          { label: "Sublease income", value: "$1,820,000", flagged: false, page: "p. 6" },
+          { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "p. 9" },
+          { label: "Master lease expiration", value: "December 31, 2091", flagged: false, page: "p. 6" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(position));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The sandwich position");
+    expect(String(cover.getCell(r, 3).value)).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2091");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(
+      /^The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2091, [\d.]+ years after the model's sale/,
+    );
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The sandwich position")).toThrow();
+  });
+
   it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
     const storage = deriveUnderwriteInputs(
       {
@@ -1462,6 +2128,36 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model grows today's rent, the rate increases' premium included/);
     const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The facility")).toThrow();
+  });
+
+  it("the rent rules (lib/rent-regulation): the regime, the regulated share and the allowance in force, then the model's growth beside it", async () => {
+    const walkUp: ExtractionResult = {
+      ...extraction,
+      assetClass: "multifamily",
+      metrics: [
+        ...extraction.metrics,
+        { label: "Units", value: "48", flagged: false, page: "p. 3" },
+        { label: "Year built", value: "1931", flagged: false, page: "p. 3" },
+        { label: "Rent-regulated units", value: "41", flagged: false, page: "p. 9" },
+      ],
+    };
+    const regulation = regulationForDeal(
+      { extraction: walkUp, address: { state: "NY", city: "Brooklyn", county: "Kings County" }, siteFlags: null, assetClass: "multifamily" },
+      "2026-10-05",
+    );
+    const regulated = deriveUnderwriteInputs(walkUp, "fallback", undefined, undefined, { regulation });
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(regulated));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The rent rules");
+    expect(String(cover.getCell(r, 3).value)).toBe(
+      "Rent regulation: NYC rent stabilization applies; 41 of the 48 units rent-regulated as stated (85%); 0% on a one-year lease for leases commencing Oct 1, 2026 to Sep 30, 2027",
+    );
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model grows every rent [\d.]+% a year; NYC rent stabilization allows 0% on a one-year lease/);
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("The model's one growth rate is the market-rate units', not the regulated ones'.");
+    // The model's Rent Growth input is the same with the rules read or not.
+    expect(regulated.inputs.rentGrowthPct).toBe(deriveUnderwriteInputs(walkUp, "fallback").inputs.rentGrowthPct);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The rent rules")).toThrow();
   });
 
   it("the third-party reports (#465): what they found, then what the model does with the immediate repairs", async () => {
@@ -1539,8 +2235,12 @@ describe("the cover says what is being sold, and what the model is and is not on
       {
         ...extraction,
         sale: { method: "auction", terms: "", condition: "", page: "" },
+        // An NOI the auction's floor can carry: the ceiling is the model's
+        // read of the memorandum's figures. On an NOI the model had to assume
+        // the read is left out (lib/model-reads-gate.test.ts).
         metrics: [
-          ...extraction.metrics.filter((m) => !/price|cap rate/i.test(m.label)),
+          ...extraction.metrics.filter((m) => !/price|cap rate|operating income/i.test(m.label)),
+          { label: "Net operating income", value: "$150,000", flagged: false, page: "p. 7" },
           { label: "Starting bid", value: "$2,500,000", flagged: false, page: "p. 3" },
           { label: "Buyer's premium", value: "5%", flagged: false, page: "p. 3" },
         ],

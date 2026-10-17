@@ -3,8 +3,9 @@ import metrosSeed from "@/data/research/metros.json";
 import { metroView } from "@/lib/metro-imagery";
 import { MARKET_COUNT, marketsResearch, metroFact } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
-import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
-import { GalleryCreditText } from "./photo-credit";
+import { OVERHEAD_GRID_CREDIT } from "@/lib/skyline";
+import { ShownCreditGrid } from "./shown-credit";
+import { gridPictures } from "./market/grid-credit";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
@@ -26,9 +27,9 @@ function galleryToday(): string {
  * where none is chosen, a USGS frame of its business district from above
  * (see lib/metro-imagery for why USGS is sharp at this scale and needs no
  * key), carrying the same research fact the marquee shows, each figure with
- * its own period (dated research, not a feed) and the tile's title naming
- * who published it, and linking to the same market brief. It is navigation
- * with a picture on it, not decoration.
+ * its own period (dated research, not a feed), who published it said under
+ * the tile and the whole citation on its title, and linking to the same
+ * market brief. It is navigation with a picture on it, not decoration.
  *
  * A tile whose image 404s still renders: the name and the fact are the
  * content, the photograph is the context. That is also why the <img> sits
@@ -43,6 +44,7 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
         id: entry.id,
         name: entry.name,
         fact: fact?.text ?? entry.region ?? "covered market",
+        houses: fact?.houses ?? null,
         cite: fact?.cite ?? null,
         readOn: fact?.readOn ?? null,
         place: metroView(entry.id)?.place ?? null,
@@ -55,9 +57,10 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
 
   // The one attribution line this grid owes, built from the table itself
   // (lib/skyline) so a market added or a photograph swapped can never leave
-  // a photographer's name behind on the page.
-  const credit = galleryCredit(items.map((m) => m.id));
-  const anyOverhead = items.some((m) => !hasSkyline(m.id));
+  // a photographer's name behind on the page — and from what each tile
+  // actually shows (app/shown-credit, audit C10, M3): a photograph that
+  // fails hands its tile to the USGS overhead, and the line follows it.
+  const pictures = gridPictures(items.map((m) => m.id));
   // The heading counts markets and the grid shows briefs: the Washington
   // area is one market with four briefs (the District, two Maryland counties
   // and Northern Virginia, itself several jurisdictions), so the line under
@@ -94,65 +97,75 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
         </p>
       )}
 
-      <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {items.map((m) => (
-          <li key={m.id}>
-            <Link
-              href={`/market?metro=${m.id}`}
-              title={m.cite ?? undefined}
-              className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-            >
-              {/* A 4:3 tile filled by a panorama up to 2.5:1 wide is covered by
-                  its height, so the width a tile must be drawn at is up to
-                  1.9 times the tile's own (#446): a phone's two columns, a
-                  tablet's three, a laptop's four inside the 72rem column.
-                  Measured in Chromium at seven screens against a 2.5:1 file:
-                  no tile is drawn more than 1.09 times its pixels, where the
-                  one 480px file had been stretched 1.9 to 2.2 times on every
-                  phone and dense laptop. */}
-              <CityPhoto
-                metro={m.id}
-                width={480}
-                height={360}
-                sizes="(min-width: 1200px) 400px, (min-width: 1024px) calc(37.5vw - 32px), (min-width: 640px) calc(50vw - 36px), calc(94vw - 56px)"
-                // What the tile shows, following its fallback: never
-                // "skyline" over an overhead.
-                describe
-                showCredit={false}
-                className="aspect-[4/3] w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-              {/* The scrim is what keeps the label legible over a photograph
-                  whose brightness we do not control. */}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">
-                <p className="text-sm font-semibold leading-tight text-white">
-                  {m.name}
-                </p>
-                {/* Each figure with its own period, never the day the
-                    research was read. */}
-                <p className="mt-0.5 font-mono text-[11px] leading-snug text-white/80" data-qa="fact">
-                  {m.fact}
-                </p>
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
-
       {/* One credit line for the whole grid rather than eighteen captions.
           Each Creative Commons photograph obliges us to name its
           photographer AND its licence; naming them together under the grid
           discharges both and keeps the tiles clean, which is how every
           publication that runs a photo grid handles it. The USGS line stays
-          only while some market still shows its overhead frame. */}
-      <p className="mt-4 text-[11px] leading-relaxed text-muted">
-        {credit ? (
-            <>
-              <GalleryCreditText ids={items.map((m) => m.id)} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />{" "}
-            </>
-          ) : null}
-        {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
-      </p>
+          only while some tile shows its overhead frame. */}
+      <ShownCreditGrid
+        pictures={pictures}
+        overheadLine={OVERHEAD_GRID_CREDIT}
+        qa="gallery-credit"
+        className="mt-4 text-[11px] leading-relaxed text-muted"
+        linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink"
+      >
+        <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {items.map((m) => (
+            <li key={m.id}>
+              <Link
+                href={`/market?metro=${m.id}`}
+                title={m.cite ?? undefined}
+                className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              >
+                {/* A 4:3 tile filled by a panorama up to 2.5:1 wide is covered by
+                    its height, so the width a tile must be drawn at is up to
+                    1.9 times the tile's own (#446): a phone's two columns, a
+                    tablet's three, a laptop's four inside the 72rem column.
+                    Measured in Chromium at seven screens against a 2.5:1 file:
+                    no tile is drawn more than 1.09 times its pixels, where the
+                    one 480px file had been stretched 1.9 to 2.2 times on every
+                    phone and dense laptop. */}
+                <CityPhoto
+                  metro={m.id}
+                  width={480}
+                  height={360}
+                  sizes="(min-width: 1200px) 400px, (min-width: 1024px) calc(37.5vw - 32px), (min-width: 640px) calc(50vw - 36px), calc(94vw - 56px)"
+                  // What the tile shows, following its fallback: never
+                  // "skyline" over an overhead.
+                  describe
+                  showCredit={false}
+                  reportShown
+                  className="aspect-[4/3] w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                {/* The scrim is what keeps the label legible over a photograph
+                    whose brightness we do not control. */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">
+                  <p className="text-sm font-semibold leading-tight text-white">
+                    {m.name}
+                  </p>
+                  {/* Each figure with its own period, never the day the
+                      research was read. */}
+                  <p className="mt-0.5 font-mono text-[11px] leading-snug text-white/80" data-qa="fact">
+                    {m.fact}
+                  </p>
+                </div>
+              </Link>
+              {/* Who published the tile's figures, under the photograph in the
+                  page's own flow (research pass 31, C5): a phone shows no
+                  title, and a phone's two-column tile holds the figures alone
+                  over its photograph — about five lines of them before its
+                  top is clipped, where the longest house would add two. */}
+              {m.houses && (
+                <p className="mt-1.5 text-[11px] leading-snug text-muted" data-qa="fact-houses">
+                  {m.houses}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </ShownCreditGrid>
     </section>
   );
 }

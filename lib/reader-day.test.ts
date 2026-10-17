@@ -11,6 +11,7 @@ import {
   TZ_COOKIE,
   cookieValueOf,
   dayIn,
+  readerDateLong,
   readerTimeZone,
   readerToday,
   tzCookieUpdate,
@@ -66,6 +67,31 @@ describe("dayIn and readerToday — a day near midnight", () => {
     expect(readerToday("America/Los_Angeles", at("2026-10-05T06:30:00Z"))).toBe("2026-10-04");
     expect(readerToday("not a zone", at("2026-10-05T06:30:00Z"))).toBe("2026-10-05");
     expect(readerToday("Europe/London", lateEvening)).toBe("2026-10-05");
+  });
+});
+
+// Research pass 35 (F5): the letter of intent, the memo and the report were
+// dated by the server's clock, which runs UTC — from 8 pm Eastern a letter
+// was dated tomorrow, and "open for acceptance for 7 days from the date
+// above" ran from a day that had not come.
+describe("readerDateLong — a document's date, on the reader's day", () => {
+  it("at 11:30 pm in New York is that evening's date, though UTC has turned", () => {
+    const lateEvening = at("2026-10-06T03:30:00Z");
+    expect(lateEvening.toISOString().slice(0, 10)).toBe("2026-10-06");
+    expect(readerDateLong("America/New_York", lateEvening)).toBe("October 5, 2026");
+    expect(readerDateLong("America%2FNew_York", lateEvening)).toBe("October 5, 2026");
+    // No cookie (a reader's first page): Eastern's day.
+    expect(readerDateLong(undefined, lateEvening)).toBe("October 5, 2026");
+    // 8:30 pm in Los Angeles; past midnight in London and in UTC.
+    expect(readerDateLong("America/Los_Angeles", lateEvening)).toBe("October 5, 2026");
+    expect(readerDateLong("Europe/London", lateEvening)).toBe("October 6, 2026");
+    expect(readerDateLong("UTC", lateEvening)).toBe("October 6, 2026");
+  });
+
+  it("writes the long form the documents print, across a month's and a year's end", () => {
+    expect(readerDateLong("America/New_York", at("2026-11-01T03:30:00Z"))).toBe("October 31, 2026");
+    expect(readerDateLong("America/New_York", at("2027-01-01T04:30:00Z"))).toBe("December 31, 2026");
+    expect(readerDateLong("Pacific/Honolulu", at("2026-10-05T20:00:00Z"))).toBe("October 5, 2026");
   });
 });
 
@@ -138,6 +164,82 @@ describe("the signed-in pages count from the reader's day", () => {
     const deal = read("app/(app)/deals/[id]/page.tsx");
     expect(deal).toContain("today={todayIso}");
     expect(deal).toContain("todayIso={todayIso}");
+    // Every deal-type panel that says "today", counts the days to a date or
+    // reads a date as passed reads the reader's noon — the sale's bid
+    // deadline, a lease's or a restriction's end, the abatement's, the
+    // franchise's, a Phase I's age (audit C2 named the first reads; these
+    // had kept the server's clock).
+    for (const call of [
+      "readSale(extraction, readerNoon)",
+      "readAffordable(extraction, readerNoon)",
+      "readSingleTenant(extraction, readerNoon)",
+      "readRoster(extraction, readerNoon)",
+      "readTaxAbatement(extraction, readerNoon)",
+      "readHotelDeal(extraction, readerNoon)",
+      "readSiteReports(extraction, readerNoon)",
+      "readSandwichLease(extraction, readerNoon)",
+      "readForwardPurchase(extraction, readerNoon, strategy)",
+      "readGoingConcern(extraction, readerNoon)",
+      "readMixedUse(extraction, readerNoon)",
+      "readCondo(extraction, readerNoon)",
+      "exchangeForDeal(buyBox?.exchange, extraction, offersDue, readerNoon)",
+    ]) {
+      expect(deal, call).toContain(call);
+    }
+    expect(deal.match(/new Date\(`\$\{todayIso\}T12:00:00Z`\)/g) ?? [], "the reader's noon is built once").toHaveLength(1);
+    // The model's lines read the same day as the panels beside them: the
+    // derivation's dated readers (DealForModel.asOf) and the sale panel's
+    // ceiling (research pass 40, item 14).
+    expect(deal).toMatch(/deriveUnderwriteInputs\([\s\S]*?\{ regulation, asOf: readerNoon \},?\s*\)/);
+    expect(deal).toContain("saleCeiling(extraction, shown.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT, readerNoon)");
+    // The report reads its model on the day it is dated, at its noon.
+    const report = read("app/api/deals/[id]/report/route.ts");
+    expect(report).toContain("const readerNoon = new Date(`${readerDay}T12:00:00Z`);");
+    expect(report).toContain("{ regulation: regulationRead, asOf: readerNoon }");
+    for (const call of [
+      "readAssumable(extraction, derived.inputs, readerNoon)",
+      "readLeaseholdExit(extraction, derived.inputs, readerNoon)",
+      "saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT, readerNoon)",
+    ]) {
+      expect(report, call).toContain(call);
+    }
+    // The rent-roll workbook's model reads the reader's day it counts from.
+    expect(read("app/api/deals/[id]/rent-roll.xlsx/route.ts")).toContain("new Date(`${readerDay}T12:00:00Z`)");
+    // And the underwriting workbook reads the reader's day as the report
+    // does, its cover's dated lines, its rent rules and its interest read
+    // on it: it had read the UTC day, so a Los Angeles reader at 8 pm saw a
+    // lease ending today read "ended" in the workbook beside a page saying
+    // it ends today (audit C4, L8).
+    const workbook = read("app/api/deals/[id]/underwrite.xlsx/route.ts");
+    expect(workbook).toMatch(/const readerDay = readerToday\(\(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value\);/);
+    expect(workbook).toContain("const asOf = new Date(`${readerDay}T12:00:00Z`);");
+    expect(workbook).toMatch(/assetClass: deal\.asset_class as string \| null \},\s*readerDay,\s*\)/);
+    expect(workbook).not.toContain("toISOString().slice(0, 10)");
+    // Its cover's "Prepared" day is the reader's day the "from today" lines
+    // count from, never the server's UTC day (audit C6, LOW-2).
+    expect(workbook).toMatch(/buildUnderwriteWorkbook\(model, branding, marketRead, readPortfolio\(extraction\), asOf, findings, interest,/);
+  });
+
+  // The documents' own date, read once per request from the cookie the
+  // signed-in layout writes: the letter of intent, the memo and the report.
+  it("the letter of intent, the memo and the report are dated through readerDateLong, never the server's clock", () => {
+    for (const rel of ["app/api/deals/[id]/loi/route.ts", "app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts"]) {
+      const src = read(rel);
+      expect(src, rel).toMatch(/const dateStr = readerDateLong\(\s*(?:\(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value|tz, now)\s*\)/);
+      expect(src, rel).not.toMatch(/new Date\(\)\.toLocaleDateString\(/);
+    }
+    // The memo's and the report's files are named for the day they are
+    // dated, and the rent rules they print are read on it: the filenames and
+    // the regulation read had kept the server's UTC day (the audit of
+    // 2026-10-05).
+    for (const rel of ["app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts"]) {
+      const src = read(rel);
+      expect(src, rel).toMatch(/const tz = \(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value;/);
+      expect(src, rel).toMatch(/const readerDay = readerToday\(tz, now\);/);
+      expect(src, rel).toMatch(/filename="\$\{safe\}-[a-z-]+-\$\{readerDay\}\.pdf"/);
+      expect(src, rel).not.toContain("toISOString().slice(0, 10)");
+    }
+    expect(read("app/api/deals/[id]/report/route.ts")).toMatch(/assetClass: deal\.asset_class as string \| null,\s*\},\s*readerDay,\s*\)/);
   });
 
   it("the signed-in layout writes the cookie", () => {
@@ -156,6 +258,10 @@ describe("the signed-in pages count from the reader's day", () => {
       // The day an imported pipeline file's rows are stored as of: shared
       // data, dated as every job and feed dates its rows.
       "app/(app)/submarkets/actions.ts": "the import's stored as-of day",
+      // The day Ask's deal context reads the rent allowance in force on: a
+      // Claude step's day, the UTC day every step is told it is
+      // (lib/anthropic/today), as the screen's own steps read it.
+      "app/(app)/deals/[id]/ask-actions.ts": "the rent rules in Ask's context, on a Claude step's UTC day",
     };
     const found = files(join(root, "app/(app)"))
       .map((p) => p.slice(root.length + 1))

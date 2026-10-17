@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { ExchangeFields } from "./exchange-fields";
 import { getActiveBuyBox } from "@/lib/criteria-server";
 import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
 import {
@@ -13,6 +17,10 @@ import { PendingButton } from "../pending-button";
 import { GeoPicker } from "./geo-picker";
 import { coveredMarketGeoTargets } from "@/lib/market-match";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
+import { pipelineCard, type PipelineCardRow } from "@/lib/pipeline-card";
+import { isOpenStage, normalizeStage } from "@/lib/stages";
+import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem, OPEN_STAGE_FILTER } from "./box-preview";
+import type { JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Buy box" };
 
@@ -52,10 +60,72 @@ export default async function CriteriaPage({
   const box = activeNamed?.box ?? {};
   const boxId = activeNamed?.id ?? "";
   const db = box.dealbreakers ?? {};
+  // The reader's own day (lib/reader-day), read once per request: the
+  // exchange's clock is said on it, as the deal header's chip says it.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+
+  // What the box as saved says about the reader's own deals (signed-in
+  // gaps, M12): the deals it judges — the team's under a team box, the
+  // reader's own off a team — each built by the pipeline's own card
+  // builder, so the chip here is the card's. One read, the newest few live
+  // deals — the closed and the dead left out in the query, so "more" is
+  // said only where a live deal past the few exists (audit C10, L3: it had
+  // been said wherever 24 rows were read, live or not).
+  const preview = await (async () => {
+    if (!user || !active.box) return { items: [], more: false };
+    let q = supabase
+      .from("deals")
+      .select("id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample")
+      .or(OPEN_STAGE_FILTER)
+      .order("created_at", { ascending: false })
+      .limit(BOX_PREVIEW_MAX + 1);
+    q = active.scope === "team" && active.teamId ? q.eq("team_id", active.teamId) : q.eq("user_id", user.id).is("team_id", null);
+    const { data, error: readError } = await q;
+    if (readError || !data) return { items: [], more: false };
+    const live = (data as PipelineCardRow[]).filter((d) => isOpenStage(normalizeStage(d.stage)));
+    const shown = live.slice(0, BOX_PREVIEW_MAX);
+    // Each deal's latest run, read as the pipeline page reads it: a
+    // re-screen, or a stalled or failed run, is said beside the chip, as
+    // the pipeline card says it over its call. A failed read leaves the
+    // chips as they are on file.
+    const jobs = new Map<string, JobLike>();
+    if (shown.length) {
+      const { data: jobRows } = await supabase
+        .from("analysis_jobs")
+        .select("deal_id, status, step, updated_at, created_at")
+        .in(
+          "deal_id",
+          shown.map((d) => d.id),
+        )
+        .order("created_at", { ascending: false })
+        .limit(Math.max(100, shown.length * 3));
+      for (const j of (jobRows ?? []) as ({ deal_id: string } & JobLike)[]) {
+        if (j?.deal_id && !jobs.has(j.deal_id)) jobs.set(j.deal_id, j);
+      }
+    }
+    const items = shown.map((d) =>
+      boxPreviewItem(
+        pipelineCard(d, {
+          viewerId: user.id,
+          onTeam: active.scope === "team",
+          box: active.box,
+          job: jobs.get(d.id),
+          offersDue: null,
+          today: todayIso,
+          googleEnabled: false,
+        }),
+      ),
+    );
+    return { items, more: live.length > BOX_PREVIEW_MAX };
+  })();
 
   const banner = saved
     ? {
         cls: "bg-pass/10 text-pass",
+        // A saved box sends the reader back where they came from: the
+        // pipeline's checklist links here and the page had no way back
+        // (research pass 32).
+        back: saved === "1",
         text:
           saved === "box"
             ? "New mandate added — fill it in and save."
@@ -91,10 +161,20 @@ export default async function CriteriaPage({
       </div>
 
       {banner && (
-        <p className={`rounded-lg px-3 py-2 text-sm ${banner.cls}`}>
+        <p className={`rounded-lg px-3 py-2 text-sm ${banner.cls}`} role="status">
           {banner.text}
+          {"back" in banner && banner.back && (
+            <>
+              {" "}
+              <Link href="/deals" className="font-medium underline decoration-dotted underline-offset-2">
+                Back to your pipeline →
+              </Link>
+            </>
+          )}
         </p>
       )}
+
+      <BoxPreview items={preview.items} more={preview.more} />
 
       {!active.editable ? (
         <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
@@ -383,6 +463,11 @@ export default async function CriteriaPage({
                 </div>
               </div>
             </section>
+
+            {/* The buyer's 1031 exchange (lib/exchange-window): the day the
+                relinquished property transferred, who files the return and
+                whether it is extended — each deal's deadlines read off it. */}
+            <ExchangeFields exchange={box.exchange} today={todayIso} />
 
             <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
               <label htmlFor="notes" className="text-sm font-semibold tracking-tight">

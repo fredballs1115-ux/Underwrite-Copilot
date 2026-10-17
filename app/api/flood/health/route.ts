@@ -9,16 +9,33 @@
 // drawings fall back on, the overlay (and whether FEMA sent it at its own
 // 30%), the aerial — and live-verify prints it after every deploy. Public:
 // nothing here is a deal's; the answer is kept ten minutes a process.
+//
+// Which process answered, and how long it has been up, goes to the site's
+// operators alone (OPERATOR_EMAILS, lib/operator-server; research pass 39):
+// live-verify's read, made with no session, never printed it, and nobody
+// else needs it.
 
 import { NextResponse } from "next/server";
 import { floodHealth } from "@/lib/flood-map";
+import { getCurrentUser } from "@/lib/supabase/server";
+import { isSiteOperator } from "@/lib/operator-server";
 
 export const dynamic = "force-dynamic";
 
+/** Whether the caller is one of the site's operators; a session that cannot
+ *  be read is no operator's. */
+async function operatorAsking(): Promise<boolean> {
+  try {
+    return isSiteOperator(await getCurrentUser());
+  } catch {
+    return false;
+  }
+}
+
 export async function GET() {
-  const health = await floodHealth();
+  const [health, operator] = await Promise.all([floodHealth(), operatorAsking()]);
   return NextResponse.json(
-    { ...health, process: { pid: process.pid, uptimeS: Math.round(process.uptime()) } },
+    operator ? { ...health, process: { pid: process.pid, uptimeS: Math.round(process.uptime()) } } : health,
     { headers: { "cache-control": "no-store" } },
   );
 }

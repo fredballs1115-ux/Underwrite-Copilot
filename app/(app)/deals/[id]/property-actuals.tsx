@@ -1,71 +1,49 @@
-import type { RentRollSummary, T12Summary, NoiComparison } from "@/lib/actuals/types";
-import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
+import type { NoiComparison } from "@/lib/actuals/types";
+import { rentQuotedMonthly } from "@/lib/asset-words";
+import {
+  OM_NOI_LABEL,
+  actualsUsd,
+  actualsWalt,
+  avgRentOf,
+  rentRollDateWords,
+  statedDay,
+  t12DateWords,
+  type ActualsRead,
+} from "@/lib/actuals/actuals-read";
+
+// The card, the report's actuals page and the memo's line read one reader
+// (lib/actuals/actuals-read): its day, its dollar figure and its rent.
+export { statedDay };
 
 const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
-  in_line: { label: "In line", cls: "bg-pass/10 text-pass" },
-  material: { label: "Material", cls: "bg-caution/10 text-caution" },
+  // A 5% tint, since the chip sits on the faint comparison box: at 10%
+  // the 10px label read 4.37:1 (pass) and 4.39:1 (caution), at 5% 4.67:1
+  // and 4.69:1. Kill reads 4.85:1 at 10% and keeps it.
+  in_line: { label: "In line", cls: "bg-pass/5 text-pass" },
+  material: { label: "Material", cls: "bg-caution/5 text-caution" },
   red_flag: { label: "Red flag", cls: "bg-kill/10 text-kill" },
 };
 
-const usd = (n: number | null | undefined): string => {
-  if (n == null || !Number.isFinite(n)) return "—";
-  const sign = n < 0 ? "−" : "";
-  const a = Math.abs(n);
-  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `${sign}$${Math.round(a / 1e3)}k`;
-  return `${sign}$${Math.round(a)}`;
-};
+const usd = actualsUsd;
 const pct = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;
-const num = (n: number | null | undefined, digits = 1): string =>
-  n == null || !Number.isFinite(n) ? "—" : n.toFixed(digits);
 
-/** "May 31, 2026" — the way the rest of the deal page writes a day, read in
- *  UTC so the server's render and the browser's agree. A month alone is
- *  "May 2026" and a year alone the year: read as a day, "2026-05" had
- *  printed "May 1, 2026" and "2026" "Jan 1, 2026", a day nobody stated. A
- *  day that does not exist ("2026-02-30", which the parser rolls to Mar 2)
- *  and anything else is printed as it came. */
-export function statedDay(iso: string): string {
-  const m = iso.trim().match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$/);
-  if (!m) return iso;
-  const [, y, mo, d] = m;
-  if (!mo) return y;
-  const year = Number(y);
-  const month = Number(mo);
-  if (month < 1 || month > 12) return iso;
-  if (!d) {
-    return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-      timeZone: "UTC",
-    });
-  }
-  const t = new Date(Date.UTC(year, month - 1, Number(d)));
-  if (t.getUTCFullYear() !== year || t.getUTCMonth() !== month - 1 || t.getUTCDate() !== Number(d)) return iso;
-  return t.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
-const day = statedDay;
-
-export interface ActualsData {
-  rentRoll: { asOf: string | null; summary: RentRollSummary } | null;
-  t12: { periodEnd: string | null; summary: T12Summary } | null;
-  noiComparison: NoiComparison | null;
-  /** On a plan deal: which OM figure the T-12 is held against and why the
-   *  stabilized pro forma is not — or, when the OM states only the finished
-   *  project's NOI, why there is no comparison at all. Null otherwise. */
+/** The card's data: lib/actuals/actuals-read's `readActuals`, the note and
+ *  the class optional for a caller that builds it by hand. */
+export type ActualsData = Omit<ActualsRead, "noiNote" | "assetClass"> & {
   noiNote?: string | null;
-  /** the deal's class as the page shows it (shownAssetClass): a roll of a
-   *  class whose rent is quoted a month a unit is read that way */
   assetClass?: string | null;
+};
+
+/** Where the card's figures come from: the deal's own documents, named by
+ *  which of the two it holds. */
+export function actualsSourceLine(hasRentRoll: boolean, hasT12: boolean): string {
+  if (hasRentRoll && hasT12) return "From the deal's rent roll and T-12";
+  return hasRentRoll ? "From the deal's rent roll" : "From the deal's T-12";
 }
 
 /** The OM figure's name on the card, by what it is. */
-const OM_LABEL: Record<NonNullable<NoiComparison["omBasis"]>, string> = {
-  in_place: "OM in-place NOI",
-  year1: "OM Year-1 NOI",
-  stabilized: "OM pro forma NOI",
-};
+const OM_LABEL = OM_NOI_LABEL;
 
 /**
  * PROPERTY ACTUALS (Feature 1): what the rent roll and T-12 actually say —
@@ -84,25 +62,19 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
   // office's is. A summary stored before the monthly figure was read keeps
   // its per-foot figure, said with its period.
   const monthly = rentQuotedMonthly(data.assetClass);
-  // What one is called in this class: a pad, a bed, a home, a space.
-  const noun = assetWords(data.assetClass).noun ?? { one: "unit", many: "units" };
-  const avgRent =
-    monthly && rr?.avgRentMonthly != null
-      ? `$${Math.round(rr.avgRentMonthly).toLocaleString("en-US")}/${noun.one}/mo`
-      : rr?.weightedAvgRentPsf != null
-        ? `$${num(rr.weightedAvgRentPsf, 2)}/SF${monthly ? "/yr" : ""}`
-        : "—";
   // An average over fewer units than are occupied says so.
-  const rentBasis =
-    monthly && rr?.avgRentMonthly != null && rr.rentUnits != null && rr.rentUnits < rr.occupiedUnits
-      ? `over ${rr.rentUnits} of ${rr.occupiedUnits} occupied ${noun.many}`
-      : null;
+  const { text: avgRent, basis: rentBasis } = rr ? avgRentOf(rr, data.assetClass) : { text: "—", basis: null };
+  const walt = rr ? actualsWalt(rr, data.assetClass) : null;
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">Property actuals</h2>
-        <p className="text-xs text-muted">From the rent roll and T-12 you uploaded</p>
+        {/* The deal's documents, named by what is here: never "you
+            uploaded", which is untrue on the sample deal and on a teammate's
+            documents, nor both documents where one was given (research pass
+            32). */}
+        <p className="text-xs text-muted">{actualsSourceLine(!!rentRoll, !!t12)}</p>
       </div>
 
       {/* Headline: OM assumed NOI vs T-12 actual. */}
@@ -142,19 +114,17 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
                 Rent roll
               </h3>
-              {rentRoll?.asOf ? (
-                <span className="text-[11px] text-muted">as of {day(rentRoll.asOf)}</span>
-              ) : rr.asOfUsed ? (
-                // The roll stated no as-of date — WALT/expiry were measured
-                // from the screen date, and that basis must be visible.
-                <span className="text-[11px] text-muted">
-                  no stated as-of — measured at screen date {day(rr.asOfUsed)}
-                </span>
-              ) : null}
+              {/* The report's and the memo's own words (lib/actuals
+                  `rentRollDateWords`): a roll that stated no as-of says the
+                  screen date it was measured from, or that it is undated —
+                  never undated silently (audit C8, L2). */}
+              <span className="text-[11px] text-muted">{rentRollDateWords(rentRoll)}</span>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <Stat k="Occupancy" v={pct(rr.sfWeightedOccupancy)} />
-              <Stat k="WALT" v={rr.waltYears != null ? `${num(rr.waltYears)} yr` : "—"} />
+              {/* By the rent-roll page's rule: an apartment roll is read for
+                  loss to lease, never by its WALT (lib/actuals `actualsWalt`). */}
+              <Stat k="WALT" v={walt?.text ?? "—"} sub={walt?.note ?? null} />
               <Stat k="Avg rent" v={avgRent} sub={rentBasis} />
               <Stat k="Units" v={`${rr.occupiedUnits} / ${rr.unitCount}`} />
             </dl>
@@ -190,9 +160,9 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
                 T-12 actual operating statement
               </h3>
-              {t12?.periodEnd && (
-                <span className="text-[11px] text-muted">TTM to {day(t12.periodEnd)}</span>
-              )}
+              {/* "period not stated" where the T-12 states none, as the
+                  report says it (lib/actuals `t12DateWords`). */}
+              <span className="text-[11px] text-muted">{t12DateWords(t12)}</span>
             </div>
             <table className="mt-3 w-full text-sm">
               <tbody>

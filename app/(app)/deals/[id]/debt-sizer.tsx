@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ScrollRegion } from "@/app/scroll-region";
 import { findMetric, parseMoney, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
@@ -10,17 +11,23 @@ import {
   isPlanDeal,
   noiFigures,
   planSummary,
+  type DealStrategy,
+  type StrategyKind,
 } from "@/lib/deal-strategy";
 import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { statedModelRate } from "@/lib/model/stated-rate";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { yearOneNoi } from "@/lib/underwrite/playground";
+import type { ModelSources } from "@/lib/underwrite/report-grid";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 import { interestOf } from "@/lib/interest";
-import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
+import { assumableLevyRows, assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 import { assetWords } from "@/lib/asset-words";
 import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
+import { compactUsd } from "@/lib/money";
+import { BarRow, BarRows, Key, KeyItem, Tick } from "@/app/panel-parts";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -38,17 +45,11 @@ import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/si
  * else sensible screening defaults — every figure stays editable.
  */
 
-const fmtUsd = (n: number) =>
-  n >= 1e6
-    ? `$${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const fmtUsd = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 
 // Tabular contexts keep a fixed two decimals so columns don't jitter
 // ($2.26M / $2.23M / $2.20M, never $2.2M).
-const fmtUsdCol = (n: number) =>
-  n >= 1e6
-    ? `$${(n / 1e6).toFixed(2)}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const fmtUsdCol = (n: number) => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
 
 // Inputs seed with exact dollars ("$3,456,000"), not the compact display
 // form — "$3.46M" would silently shave the sizing by the rounding.
@@ -131,9 +132,11 @@ type OmTerm = { label: string; value: string; page?: string };
  * under whose loan it is. The seller's loan offered for assumption (#417)
  * and the note the seller offers to carry (#462) are read by their own
  * finders and listed as theirs, never as the buyer's new financing. On a
- * note the loan's terms are the asset being sold (#416), and on a leased
- * fee the property's debt is the leaseholder's building's (`assumableApplies`)
- * — neither is financing this buyer takes, so neither lists any.
+ * note the loan's terms are the asset being sold (#416), on a leased fee
+ * the property's debt is the leaseholder's building's (`assumableApplies`),
+ * and on a preferred equity position the senior loan and its maturity are
+ * the owning entity's, ahead of the position (lib/position) — none is
+ * financing this buyer takes, so none lists any.
  */
 export function omLoanTerms(extraction: ExtractionResult | null): {
   offered: OmTerm[];
@@ -142,12 +145,15 @@ export function omLoanTerms(extraction: ExtractionResult | null): {
 } {
   const none = { offered: [], assumable: [], seller: [] };
   const { kind } = interestOf(extraction);
-  if (kind === "note" || kind === "leased_fee") return none;
+  if (kind === "note" || kind === "leased_fee" || kind === "preferred_equity") return none;
   const metrics = extraction?.metrics ?? [];
   const as = (term: string, m: { value: string; page?: string }): OmTerm => ({ label: term, value: m.value, page: m.page });
   const assumableRows = assumableStatedRows(metrics);
   const sellerRows = sellerNoteStatedRows(metrics);
-  const claimed = new Set<unknown>([...assumableRows, ...sellerRows].map((e) => e.row));
+  // A PACE assessment or a special district's levy filed under the seller's
+  // loan's labels is neither that loan nor the buyer's financing: it is
+  // listed nowhere here (research pass 37).
+  const claimed = new Set<unknown>([...[...assumableRows, ...sellerRows].map((e) => e.row), ...assumableLevyRows(metrics)]);
   // The rest is what the OM states of a loan with no owner named: its own
   // financing assumptions (the LTV it underwrites, the rate it quotes).
   const rest = metrics.filter((m) => !claimed.has(m));
@@ -175,6 +181,8 @@ interface Seed {
   ratePct: number;
   amortYears: number;
   seededFrom: "model" | "extraction" | "defaults";
+  /** the NOI is the screening model's year-1 NOI (the derived inputs) */
+  noiFromScreening: boolean;
   /** the rate is the first-draft model's, as a loan's own paper states it */
   rateStated: boolean;
   /** the amortization is the first-draft model's own, not the 30-year default */
@@ -194,6 +202,10 @@ function deriveSeed(
   extraction: ExtractionResult | null,
   today: RateSeed | null,
   underwrite: UnderwriteInputs | null,
+  /** where the derived inputs came from: an assumed year-1 NOI seeds none */
+  underwriteSources: ModelSources | null,
+  /** the deal's kind, as the page reads it (the first signal included) */
+  strategyKind: StrategyKind,
 ): Seed {
   const rate = (statedPct: number | null) =>
     sizerStartingRate({
@@ -229,6 +241,7 @@ function deriveSeed(
       ratePct: r.pct,
       amortYears: modelAmort ?? 30,
       seededFrom: "model",
+      noiFromScreening: false,
       rateStated: r.from === "stated",
       amortFromModel: modelAmort != null,
       rateNote: r.note,
@@ -239,19 +252,32 @@ function deriveSeed(
   // the price the building's own figures describe (#415): a lender sizes
   // the whole asset, so a share's price is grossed up, and a note's or a
   // leased fee's seeds no price the property's loan could be tested on.
-  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind, screenYearOf(extraction));
+  // The deal's kind is the page's, the first signal included.
+  const priceMetric = findPriceMetric(metrics, strategyKind, screenYearOf(extraction));
   const price = buildingPriceOf(extraction, priceMetric ? parsePrice(priceMetric.value) : null);
-  // The in-place or Year-1 NOI, never the stabilized pro forma.
+  // The NOI the screening model runs — the playground's and the workbook's,
+  // a T-12's where one was uploaded, the rate's own source — so the sizer
+  // and the playground's coverage test one NOI (research pass 34: it had
+  // read the OM's in-place NOI beside a playground running the T-12's).
+  // Never an assumed one: a model that had to assume its NOI seeds none,
+  // and a caller that hands no sources cannot say, so it is not read.
+  const screeningNoi =
+    underwrite && underwriteSources && underwriteSources.inPlaceRentAnnual?.provenance !== "assumption"
+      ? plausible(yearOneNoi(underwrite), price)
+      : null;
+  // Else the OM's in-place or Year-1 NOI, never the stabilized pro forma —
+  // the read before the model's, kept where the model had none to give.
   const figs = noiFigures(metrics);
   const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;
-  const noi = plausible(going?.value ?? null, price);
+  const omNoi = screeningNoi == null ? plausible(going?.value ?? null, price) : null;
   const r = rate(null);
   return {
     price,
-    noi,
+    noi: screeningNoi ?? omNoi,
     ratePct: r.pct,
     amortYears: 30,
-    seededFrom: price != null || noi != null ? "extraction" : "defaults",
+    seededFrom: price != null || omNoi != null ? "extraction" : "defaults",
+    noiFromScreening: screeningNoi != null,
     rateStated: false,
     amortFromModel: false,
     rateNote: r.note,
@@ -281,33 +307,87 @@ function SubHead({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The breakeven occupancy as a picture: a track from 0% to 100% of the
+ * potential rent (the breakeven is a share of gross potential rent, an
+ * economic occupancy, not a count of doors), filled to the share the
+ * expenses, reserves and debt service need, with the breakeven and the
+ * model's own occupancy as ticks and the cushion between them shaded. A
+ * figure past either end sits at the end; the key keeps the figure as
+ * computed, and past 100% says what the workbook says: "not reached at full
+ * occupancy" (lib/underwrite/workbook).
+ */
+function BreakevenTrack({ occ, underwritten }: { occ: number; underwritten: number }) {
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  const be = clamp(occ);
+  const uw = clamp(underwritten);
+  const cushion = uw > be;
+  return (
+    <div className="mt-2 max-w-md" data-qa="breakeven-track">
+      <div className="relative h-3 rounded-full bg-faint" aria-hidden>
+        <div className="absolute inset-y-0 left-0 rounded-l-full bg-kill/20" style={{ width: `${be}%` }} data-bar="breakeven-need" />
+        {cushion && (
+          <div className="absolute inset-y-0 bg-pass/30" style={{ left: `${be}%`, width: `${uw - be}%` }} data-bar="breakeven-cushion" />
+        )}
+        <Tick at={`${be}%`} bar="breakeven" tone="bg-kill" />
+        <Tick at={`${uw}%`} bar="model-occupancy" tone="border-ink" dashed />
+      </div>
+      <div className="mt-1 flex justify-between font-mono text-[10px] tabular-nums text-muted" aria-hidden>
+        <span>0%</span>
+        <span>100% of potential rent</span>
+      </div>
+      <Key>
+        <KeyItem mark="tick" tone="bg-kill">
+          {occ > 100 ? `Breakeven not reached at full occupancy (${occ.toFixed(1)}% of potential rent)` : `Breakeven ${occ.toFixed(1)}%`}
+        </KeyItem>
+        <KeyItem mark="dashed" tone="border-ink">{`The model's ${underwritten.toFixed(0)}%`}</KeyItem>
+        {cushion && (
+          <KeyItem mark="swatch" tone="bg-pass/30">The cushion</KeyItem>
+        )}
+      </Key>
+    </div>
+  );
+}
+
 export function DebtSizer({
   model,
   extraction,
   underwrite = null,
+  underwriteSources = null,
   rateSeeds = null,
+  strategy: pageStrategy = null,
 }: {
   model: UnderwritingModel | null;
   extraction: ExtractionResult | null;
   /** the derived screening model — carries the capital plan (reserves, TI,
-   *  LC, year-1 capex) that rounds out the FINANCING & CAPITAL card */
+   *  LC, year-1 capex) that rounds out the FINANCING & CAPITAL card, and,
+   *  with no first-draft model, the year-1 NOI the sizer starts from */
   underwrite?: UnderwriteInputs | null;
+  /** where the derived model's inputs came from: an assumed year-1 NOI is
+   *  no NOI to start a loan from */
+  underwriteSources?: ModelSources | null;
   /** today's starting rates off the rates table (lib/debt-index): the
    *  permanent loan's, which is the screening model's own seeded rate, and
    *  the construction loan's; null starts the sizer from the derived
    *  model's own rate (`underwrite`), and the construction panel from its
    *  flat placeholder */
   rateSeeds?: DealRateSeeds | null;
+  /** the deal's kind as the page reads it, the first signal included
+   *  (lib/deal-strategy `inferStrategy(extraction, firstSignal)`); absent,
+   *  the extraction's alone */
+  strategy?: DealStrategy | null;
 }) {
-  const seed = useMemo(
-    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null, underwrite),
-    [model, extraction, rateSeeds, underwrite],
-  );
-  const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
   // A plan deal's debt is construction or bridge debt sized to cost, paid off
   // at stabilization: the plan block above the permanent sizer, seeded from
-  // the OM's own budget, NOI and timeline.
-  const strategy = useMemo(() => inferStrategy(extraction), [extraction]);
+  // the OM's own budget, NOI and timeline. The deal's kind is the page's —
+  // the header's, which reads the first signal too — so a deal the header
+  // calls a value-add gets its plan block here as well (research pass 34).
+  const strategy = useMemo(() => pageStrategy ?? inferStrategy(extraction), [pageStrategy, extraction]);
+  const seed = useMemo(
+    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null, underwrite, underwriteSources, strategy.kind),
+    [model, extraction, rateSeeds, underwrite, underwriteSources, strategy],
+  );
+  const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
   const plan = useMemo(
     () => (isPlanDeal(strategy.kind) ? planSummary(extraction, strategy) : null),
     [extraction, strategy],
@@ -385,6 +465,12 @@ export function DebtSizer({
   }, [price, noi, ratePct, amortYears, io, maxLtvPct, minDscr, minDebtYieldPct]);
 
   const { rows, maxLoan, binding, k } = sized;
+  // One scale for the three tests' bars: the price where no test's loan
+  // passes it (so each bar reads as a share of the price), else the largest
+  // test's loan.
+  const loansDrawn = rows.map((r) => r.loan).filter((l): l is number => l != null && isFinite(l) && l > 0);
+  const sizerScaleIsPrice = price != null && price > 0 && loansDrawn.every((l) => l <= price);
+  const sizerScale = sizerScaleIsPrice ? price! : loansDrawn.length ? Math.max(...loansDrawn) : 0;
   const equity = maxLoan != null && price != null && price > 0 ? price - maxLoan : null;
   const effLtv = maxLoan != null && price != null && price > 0 ? (maxLoan / price) * 100 : null;
   const effDscr =
@@ -509,13 +595,15 @@ export function DebtSizer({
             noi: seed.noi != null,
             rate: seed.rateStated,
             amortization: seed.amortFromModel,
+            noiFromScreening: seed.noiFromScreening,
           })}
         </p>
 
         {/* What the OM states of a loan, under whose loan it is: its own
             financing assumptions, the seller's loan offered for assumption,
-            the note the seller offers to carry. A note's terms and a leased
-            fee's debt are never listed here (omLoanTerms). */}
+            the note the seller offers to carry. A note's terms, a leased
+            fee's debt and the senior loan ahead of a preferred equity
+            position are never listed here (omLoanTerms). */}
         {omTerms.offered.length > 0 && (
           <>
             <SubHead>Financing stated in the OM</SubHead>
@@ -609,31 +697,55 @@ export function DebtSizer({
           </p>
         )}
 
-        <ul className="mt-4 space-y-1.5">
-          {rows.map((r) => (
-            <li
-              key={r.key}
-              className={`flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-lg border px-3 py-2 text-sm ${
-                binding === r.key ? "border-brand/40 bg-brand/5" : "border-line"
-              }`}
-            >
-              <span className="font-medium">{r.label}</span>
-              <span className="text-xs text-muted">{r.detail}</span>
-              <span className="ml-auto font-mono text-sm tabular-nums">
-                {r.loan != null && isFinite(r.loan) ? (
-                  fmtUsd(r.loan)
-                ) : (
-                  <span className="text-muted">—</span>
+        {/* The three lender tests as one picture: each test's loan on one
+            track, so the binding one — the smallest, the loan a lender
+            gives — is the shortest bar, filled in the brand tone, and the
+            max loan is a dashed tick on every row. */}
+        <BarRows className="mt-4 space-y-2 text-xs" qa="sizer-tests">
+          {rows.map((r) => {
+            const has = r.loan != null && isFinite(r.loan);
+            const isBinding = binding === r.key;
+            return (
+              <BarRow
+                key={r.key}
+                label={
+                  <span className="block">
+                    <span className={`font-medium ${isBinding ? "text-ink" : ""}`}>{r.label}</span>
+                    {isBinding && (
+                      <>
+                        {" "}
+                        <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-brand">
+                          Binding
+                        </span>
+                      </>
+                    )}
+                    <span className="block text-[11px]">{r.detail}</span>
+                  </span>
+                }
+                figure={has ? fmtUsd(r.loan!) : <span className="text-muted">—</span>}
+              >
+                {has && sizerScale > 0 && (
+                  <div
+                    className={`absolute inset-y-0 left-0 rounded-full ${isBinding ? "bg-brand" : "bg-muted/35"}`}
+                    style={{ width: `${Math.min(100, (r.loan! / sizerScale) * 100)}%` }}
+                    data-bar={isBinding ? "sizer-binding" : "sizer-test"}
+                  />
                 )}
-              </span>
-              {binding === r.key && (
-                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
-                  Binding
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+                {maxLoan != null && sizerScale > 0 && (
+                  <Tick at={`${Math.min(100, (maxLoan / sizerScale) * 100)}%`} bar="sizer-max" tone="border-ink" dashed track="secondary" />
+                )}
+              </BarRow>
+            );
+          })}
+        </BarRows>
+        {maxLoan != null && sizerScale > 0 && (
+          <Key qa="sizer-key">
+            <KeyItem mark="swatch" tone="bg-brand">The binding test, the smallest loan</KeyItem>
+            <KeyItem mark="swatch" tone="bg-muted/35">{"Another test's loan"}</KeyItem>
+            <KeyItem mark="dashed" tone="border-ink">The max loan</KeyItem>
+            <KeyItem>{sizerScaleIsPrice ? `Track: $0 to the ${fmtUsd(sizerScale)} price` : `Track: $0 to ${fmtUsd(sizerScale)}`}</KeyItem>
+          </Key>
+        )}
 
         {maxLoan != null && pay != null ? (
           <>
@@ -679,7 +791,7 @@ export function DebtSizer({
             {rateStrip.length > 0 && (
               <>
                 <SubHead>If rates move</SubHead>
-                <div className="scroll-shadows-x mt-2 overflow-x-auto">
+                <ScrollRegion label="If rates move" className="scroll-shadows-x mt-2">
                   <table className="w-full min-w-105 text-sm">
                     <thead>
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -710,7 +822,7 @@ export function DebtSizer({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollRegion>
               </>
             )}
 
@@ -718,13 +830,28 @@ export function DebtSizer({
               <>
                 <SubHead>Breakeven occupancy</SubHead>
                 <p className="mt-2 text-sm">
-                  <span className="font-mono font-semibold tabular-nums">
-                    {breakeven.occ.toFixed(1)}%
-                  </span>{" "}
-                  <span className="text-muted">
-                    occupancy covers expenses, reserves, and this debt service —
-                    the model underwrites {breakeven.underwritten.toFixed(0)}%.
-                  </span>
+                  {breakeven.occ > 100 ? (
+                    // Past the whole potential rent no occupancy covers it:
+                    // the workbook's own words.
+                    <>
+                      <span className="font-semibold">Not reached at full occupancy:</span>{" "}
+                      <span className="text-muted">
+                        expenses, reserves, and this debt service need{" "}
+                        <span className="font-mono tabular-nums">{breakeven.occ.toFixed(1)}%</span> of the potential rent —
+                        the model underwrites {breakeven.underwritten.toFixed(0)}%.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono font-semibold tabular-nums">
+                        {breakeven.occ.toFixed(1)}%
+                      </span>{" "}
+                      <span className="text-muted">
+                        occupancy covers expenses, reserves, and this debt service —
+                        the model underwrites {breakeven.underwritten.toFixed(0)}%.
+                      </span>
+                    </>
+                  )}
                   {breakeven.occ >= breakeven.underwritten && (
                     <span className="font-medium text-kill">
                       {" "}
@@ -732,6 +859,7 @@ export function DebtSizer({
                     </span>
                   )}
                 </p>
+                <BreakevenTrack occ={breakeven.occ} underwritten={breakeven.underwritten} />
               </>
             )}
 
@@ -740,7 +868,7 @@ export function DebtSizer({
                 <summary className="cursor-pointer list-none text-sm font-medium text-brand transition-colors hover:text-brand-strong [&::-webkit-details-marker]:hidden [&::marker]:content-none">
                   Amortization preview ({amortRows.length} years)
                 </summary>
-                <div className="scroll-shadows-x mt-2 overflow-x-auto">
+                <ScrollRegion label="Amortization preview" className="scroll-shadows-x mt-2">
                   <table className="w-full min-w-105 text-sm">
                     <thead>
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -763,7 +891,7 @@ export function DebtSizer({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollRegion>
               </details>
             )}
           </>

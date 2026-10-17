@@ -51,7 +51,11 @@
  * their MSA's row, and the row's note says so — the page repeats it.
  */
 
-import { ageDays } from "@/lib/live-rates";
+// The table-free core: lib/live-rates parses the series table at its top,
+// and nothing here needs it.
+import { ageDays, monthOf } from "@/lib/live-rates-core";
+
+export { monthOf };
 
 /**
  * How long a Zillow figure is current. Zillow dates a month's figure its
@@ -193,9 +197,3 @@ export function zillowFileMonths(rows: readonly BenchRow[], metroName: string): 
   }));
 }
 
-/** "Aug 2026" — a month, since the figure is a month's. */
-export function monthOf(asOf: string): string {
-  const at = Date.parse(`${asOf}T00:00:00Z`);
-  if (!Number.isFinite(at)) return asOf;
-  return new Date(at).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
-}

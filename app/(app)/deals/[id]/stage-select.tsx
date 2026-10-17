@@ -18,12 +18,39 @@ function StageField({
   onPick: () => void;
 }) {
   const { pending } = useFormStatus();
+  // A stage picked with the pointer saves at once. One reached with the keys
+  // saves when the reader leaves the control: on Windows and Linux an arrow
+  // key changes a closed select without opening it, so saving on every change
+  // moved the deal a stage — and wrote it to the team's history — at each
+  // press of a key that was only browsing the options (WCAG 3.2.2, research
+  // pass 33).
+  const byKeys = useRef(false);
+  const unsaved = useRef(false);
   return (
     <select
       name="stage"
       defaultValue={normalizeStage(stage)}
       disabled={pending}
-      onChange={onPick}
+      onPointerDown={() => {
+        byKeys.current = false;
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && unsaved.current) {
+          unsaved.current = false;
+          onPick();
+          return;
+        }
+        if (e.key !== "Tab" && e.key !== "Shift") byKeys.current = true;
+      }}
+      onChange={() => {
+        if (byKeys.current) unsaved.current = true;
+        else onPick();
+      }}
+      onBlur={() => {
+        if (!unsaved.current) return;
+        unsaved.current = false;
+        onPick();
+      }}
       onClick={(e) => e.stopPropagation()}
       aria-label="Deal stage"
       title="Track where this deal sits in your process"
@@ -49,7 +76,8 @@ function StageField({
   );
 }
 
-/** Where this deal sits in YOUR process — saves on change. Independent of the
+/** Where this deal sits in YOUR process — a pick saves at once, a stage
+ *  reached with the arrow keys when the reader moves on. Independent of the
  *  screen's verdict, shared with the team when the deal is shared. Used on the
  *  deal page and (compact) on each pipeline row. */
 export function StageSelect({

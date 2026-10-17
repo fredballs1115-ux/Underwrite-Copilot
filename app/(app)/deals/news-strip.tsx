@@ -1,39 +1,54 @@
 import Link from "next/link";
+import type { RankedHeadline } from "@/lib/news/feeds";
 import { dayOf } from "@/lib/utc-day";
+import { Picture } from "../news/live-headlines";
 
-/** One story the weekday intel sweep scored, as the pipeline's strip reads
- *  it (a row of market_intel_items, migration 0024). */
-export interface NewsStripItem {
-  url: string;
-  title: string;
-  source: string | null;
-  relevance: number | null;
-  /** the story's own date, as its feed stated it; null where it stated none */
-  published_at: string | null;
-}
+/** How many headlines the strip draws: one row of three on a laptop. */
+export const STRIP_SIZE = 3;
 
-/** "Sep 29, 2026 UTC" — the day as the /news page reads days, in UTC and
- *  said so (lib/utc-day, the helper every feed's date prints through); null
- *  for a value that is not a date. */
+/** "Sep 29, 2026 UTC" — a story's day as the /news page reads days, in UTC
+ *  and said so (lib/utc-day, the helper every feed's date prints through);
+ *  null for a value that is not a date. */
 export function storyDate(iso: string | null): string | null {
   return dayOf(iso);
 }
 
+/** The strip's headlines: the live layer's own ranking (lib/news/feeds
+ *  `rankHeadlines`, recency and what each touches), the ones whose feed
+ *  carries the publisher's picture first, so a row of three is a row of
+ *  pictures wherever the press allows; a story with none fills a slot only
+ *  where too few have one. Ranked order is kept within the pick. */
+export function stripHeadlines(headlines: readonly RankedHeadline[], n = STRIP_SIZE): RankedHeadline[] {
+  const pictured = headlines.filter((h) => h.image);
+  const picked = new Set(pictured.slice(0, n));
+  for (const h of headlines) {
+    if (picked.size >= n) break;
+    picked.add(h);
+  }
+  return headlines.filter((h) => picked.has(h));
+}
+
 /**
- * The newest high-scored stories from the weekday sweep, under the pipeline.
- * The sweep's watch list is fixed (scripts/daily-intel.mjs: DC, Maryland,
- * Virginia and East Coast rules, and national sectors) and its rows carry no
- * market, so every account sees the same stories: the strip is "CRE news",
- * never "news for your markets". Each story carries its own date where its
- * feed stated one, so an old story does not read as today's. Pure: the page
- * reads the rows and hands them in; nothing renders without a story.
+ * The newest live headlines under the pipeline, drawn as the News page's
+ * live layer draws them (app/(app)/news/live-headlines.tsx): the picture
+ * the story's feed carries, the headline as its link, and the publisher and
+ * the story's day under it. It had listed the weekday sweep's stories with
+ * their relevance scores and a line saying whose buyer profile scored them
+ * (a small East Coast 2–4 unit buyer, never the reader's box), which read as
+ * broken on a new reader's first screen (signed-in gaps, H6): the live
+ * layer is everyone's news, scored for nobody. Pure: the page fetches
+ * (lib/news/live) and hands the headlines in; nothing renders until a
+ * publisher has answered.
  */
-export function NewsStrip({ items }: { items: NewsStripItem[] }) {
-  if (items.length === 0) return null;
+export function NewsStrip({ headlines }: { headlines: readonly RankedHeadline[] }) {
+  const shown = stripHeadlines(headlines);
+  if (shown.length === 0) return null;
   return (
-    <section className="mt-6 rounded-xl border border-line bg-surface p-4">
+    <section aria-labelledby="pipeline-news" className="mt-6 rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">CRE news</h2>
+        <h2 id="pipeline-news" className="text-sm font-semibold">
+          CRE news
+        </h2>
         <Link
           href="/news"
           className="text-xs font-medium text-brand underline decoration-dotted underline-offset-2"
@@ -41,40 +56,51 @@ export function NewsStrip({ items }: { items: NewsStripItem[] }) {
           All stories →
         </Link>
       </div>
-      <ul className="mt-2 space-y-1.5">
-        {items.map((it) => {
-          const date = storyDate(it.published_at);
+      <ul className="mt-3 grid gap-4 sm:grid-cols-3" data-qa="news-strip">
+        {shown.map((h) => {
+          const date = storyDate(h.publishedAt);
           return (
-            <li key={it.url} className="text-sm leading-snug">
-              {it.relevance !== null && (
-                <>
-                  <span className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted">
-                    {it.relevance}/10
-                  </span>{" "}
-                </>
+            <li key={h.url} className="min-w-0">
+              {h.image ? (
+                <Picture src={h.image} className="mb-2 aspect-[16/9]" />
+              ) : (
+                // No picture in the feed: the publisher's name on a plate
+                // of the same shape, so the row keeps one line of tops.
+                <div
+                  aria-hidden
+                  className="mb-2 flex aspect-[16/9] items-center justify-center rounded-sm bg-faint px-3 text-center font-serif text-sm font-semibold text-muted"
+                >
+                  {h.publisher}
+                </div>
               )}
-              <a
-                href={it.url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-brand"
-              >
-                {it.title}
-              </a>
-              {(it.source || date) && (
-                <>
-                  {" "}
-                  <span className="ml-1.5 text-[11px] text-muted">
-                    {it.source}
-                    {it.source && date ? " · " : null}
-                    {date && it.published_at && <time dateTime={it.published_at}>{date}</time>}
-                  </span>
-                </>
-              )}
+              <p className="font-serif text-[15px] font-semibold leading-snug text-ink">
+                <a href={h.url} target="_blank" rel="noreferrer" className="hover:text-brand">
+                  {h.title}
+                </a>
+              </p>
+              <p className="mt-1 text-[11px] text-muted">
+                {h.publisherUrl ? (
+                  <a href={h.publisherUrl} target="_blank" rel="noreferrer" className="hover:text-brand">
+                    {h.publisher}
+                  </a>
+                ) : (
+                  h.publisher
+                )}
+                {date && h.publishedAt ? (
+                  <>
+                    {" · "}
+                    <time dateTime={h.publishedAt}>{date}</time>
+                  </>
+                ) : null}
+              </p>
             </li>
           );
         })}
       </ul>
+      {/* A picture is the one the story's feed carries: the publisher's, or
+          a search host's thumbnail of it (Bing News's `News:Image`), so the
+          line claims no more than that (audit C9, L8). */}
+      <p className="mt-3 text-[11px] text-muted">Headlines and pictures as the feeds carry them, nothing written here.</p>
     </section>
   );
 }

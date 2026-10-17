@@ -7,6 +7,7 @@ import { getActiveBuyBox, saveBuyBoxStore } from "@/lib/criteria-server";
 import { ASSET_CLASS_KEYS } from "@/lib/asset-words";
 import {
   hasNoDealbreakers,
+  sanitizeExchange,
   sanitizeGeoTargets,
   type BuyBox,
   type BuyBoxStore,
@@ -76,6 +77,13 @@ function buildBox(formData: FormData): BuyBox {
     minIrrPct: num(formData, "minIrrPct"),
     dealbreakers: hasNoDealbreakers(dealbreakers) ? undefined : dealbreakers,
     notes: String(formData.get("notes") ?? "").trim().slice(0, 600) || undefined,
+    // The buyer's 1031 exchange (lib/exchange-window), each field optional:
+    // a blank transfer day is no exchange, whatever else is set.
+    exchange: sanitizeExchange({
+      relinquishedTransferOn: String(formData.get("exchangeTransferOn") ?? ""),
+      filer: String(formData.get("exchangeFiler") ?? ""),
+      returnExtended: formData.get("exchangeExtended") === "on",
+    }),
   };
 }
 

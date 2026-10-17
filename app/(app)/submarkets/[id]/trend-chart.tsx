@@ -1,4 +1,23 @@
 import type { TrendPoint, TrendSegment } from "@/lib/market/metrics";
+import { chartWidthStyle } from "@/lib/chart-bounds";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A period (a full date, "2025-03-31") on the axis, as its month and year:
+ *  "Mar 2025" — the axis had printed the raw "2025-03". Anything else is
+ *  shown as stored. */
+export function periodMonth(period: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(period);
+  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
+  return m && month ? `${month} ${m[1]}` : period;
+}
+
+/** A period's full day for a mark's title: "Mar 31, 2025". */
+export function periodDay(period: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(period);
+  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
+  return m && month ? `${month} ${Number(m[3])}, ${m[1]}` : periodMonth(period);
+}
 
 /**
  * A dual-axis trend: one series as bars, one as a line, sharing an x of
@@ -46,7 +65,7 @@ export function DualAxisTrend({
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: Math.min(W, 560) }} role="img"
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={chartWidthStyle(W, 560)} role="img"
         aria-label={`${barLabel} and ${lineLabel} by period`}>
         <line x1={PAD_L} x2={W - PAD_L} y1={PAD_T + PLOT_H} y2={PAD_T + PLOT_H} stroke="var(--color-line)" />
 
@@ -56,7 +75,7 @@ export function DualAxisTrend({
           const negative = b.value < 0;
           return (
             <g key={`bar-${b.period}`}>
-              <title>{`${b.period} — ${barLabel}: ${formatBar(b.value)} (${b.source}${b.unverified ? ", unverified" : ""})`}</title>
+              <title>{`${periodDay(b.period)} — ${barLabel}: ${formatBar(b.value)} (${b.source}${b.unverified ? ", unverified" : ""})`}</title>
               <rect
                 x={cx - 16}
                 y={negative ? PAD_T + PLOT_H : top}
@@ -83,7 +102,7 @@ export function DualAxisTrend({
             ) : null}
             {s.points.map((p) => (
               <g key={`pt-${p.period}`}>
-                <title>{`${p.period} — ${lineLabel}: ${formatLine(p.value)} (${s.basisLabel}; ${p.source}${
+                <title>{`${periodDay(p.period)} — ${lineLabel}: ${formatLine(p.value)} (${s.basisLabel}; ${p.source}${
                   p.unverified ? ", unverified" : ""
                 })`}</title>
                 {/* An unverified (web-sourced) point is drawn hollow, so it
@@ -119,7 +138,7 @@ export function DualAxisTrend({
             fontSize={10}
             fill="var(--color-muted)"
           >
-            {p.slice(0, 7)}
+            {periodMonth(p)}
           </text>
         ))}
         {bars.map((b) => (

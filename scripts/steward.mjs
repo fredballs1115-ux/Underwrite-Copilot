@@ -53,6 +53,8 @@ import { RESEARCH_STALE_DAYS } from "../lib/research-age.ts";
 // A fair market rent holds for its fiscal year (lib/fmr): it is stale once
 // that year has ended, never 180 days after it was read.
 import { fmrLabel, fyEnd, readFmrMetric } from "../lib/fmr.ts";
+// Every row of a table past the project's max rows (no imports of its own).
+import { readAll } from "../lib/read-all.ts";
 
 const LINKS_PER_NIGHT = 25;
 const RECHECK_CLAIMS = 5;
@@ -147,8 +149,19 @@ const checkUrl = async (u) => {
 try {
   const sources = new Set();
   for (const table of ["benchmarks", "regulatory_rules"]) {
-    const { data } = await supabase.from(table).select("source");
-    for (const row of data ?? []) {
+    // Every row's source, a page at a time in the id's order: one read
+    // answers at most the project's max rows, so the window had rolled over
+    // the first 1,000 alone; and a failed read is no list of sources, so it
+    // stops the sweep and says so rather than checking part of the set.
+    let failure = null;
+    const rows = await readAll(
+      (from, to) => supabase.from(table).select("id, source").order("id").range(from, to),
+      (e) => {
+        failure = e;
+      },
+    );
+    if (!rows) throw new Error(`${table} read failed: ${failure?.message ?? String(failure)}`);
+    for (const row of rows) {
       const s = String(row.source ?? "");
       if (s.startsWith("http")) sources.add(s);
     }

@@ -44,6 +44,81 @@ describe("plan deals are judged on their own terms", () => {
     }
   });
 
+  it("a forward purchase's paragraph stands where the plan's construction paragraph would: the buyer carries no construction (research pass 28)", () => {
+    for (const cls of ["industrial", "sfr_btr", "auto"] as const) {
+      const p = challengerInstruction(cls, [], true);
+      expect(p, cls).toContain("THIS OM SELLS A FORWARD PURCHASE");
+      expect(p, cls).toContain("no construction or bridge loan, no interest reserve and no carry through the works is the buyer's");
+      expect(p, cls).toContain("never the price plus the developer's budget");
+      expect(p, cls).not.toContain("IF THE OM DESCRIBES A PLAN");
+      expect(p, cls).not.toContain("DEBT becomes construction or bridge financing, the interest reserve and carry through the works");
+      // Everything else the challenger is told stands as it was.
+      expect(p, cls).toContain("Give 3–6 challenges, most severe first.");
+    }
+    expect(challengerInstruction("industrial", [], false)).toBe(challengerInstruction("industrial"));
+    expect(challengerInstruction("industrial", ["cold_storage"], true)).toContain("COLD-STORAGE TRAPS");
+  });
+
+  // Research pass 41: the comps, the market check and the verdict kept the
+  // construction plan's words on a forward purchase — "price plus the full
+  // construction or renovation budget", "the construction or renovation
+  // budget against typical costs", "debt is the construction or bridge
+  // financing and the carry through the works" — beside a deal context that
+  // says the price is the buyer's whole cost.
+  it("a forward purchase's comps, market check and verdict read the purchase's terms in the plan's place (research pass 41)", () => {
+    const comps = brokerCompsInstruction("Deal type: Development.", true);
+    expect(comps).toContain("THIS OM SELLS A FORWARD PURCHASE");
+    expect(comps).toContain("the buyer's whole cost at delivery, never the price plus the developer's budget");
+    expect(comps).toContain("no construction budget, carry or construction loan is the buyer's");
+    expect(comps).toContain("the yield struck at delivery");
+    expect(comps).not.toContain("IF THE OM DESCRIBES A PLAN");
+    expect(comps).not.toContain("price plus the full construction or renovation budget");
+    // The context still rides last, after the paragraph.
+    expect(comps).toContain("<deal_context>\nDeal type: Development.\n</deal_context>");
+
+    for (const cls of ["industrial", "sfr_btr", "auto"] as const) {
+      const market = marketCheckInstruction(cls, null, null, true);
+      expect(market, cls).toContain("This OM sells a forward purchase");
+      expect(market, cls).toContain("the price is the buyer's whole cost and no construction budget, carry or construction loan is the buyer's");
+      expect(market, cls).toContain("The yield is struck at delivery");
+      expect(market, cls).not.toContain("If the OM describes a plan");
+      expect(market, cls).not.toContain("the construction or renovation budget against typical costs");
+      expect(market, cls).not.toContain("do not compare the stabilized NOI to the acquisition price");
+    }
+
+    const verdict = verdictInstruction(true);
+    expect(verdict).toContain("The brief names a forward purchase");
+    expect(verdict).toContain("no construction or bridge loan, no interest reserve and no carry through the works is the buyer's");
+    expect(verdict).toContain("exit is the yield struck at delivery");
+    expect(verdict).toContain("the PRICE per unit or per SF — the buyer's whole cost at delivery, never the price plus the developer's budget");
+    expect(verdict).not.toContain("debt is the construction or bridge financing and the carry through the works");
+    expect(verdict).not.toContain("TOTAL COST per unit or per SF, never the shell's or the land's price alone");
+
+    // Any other deal is told exactly what it was told before.
+    expect(brokerCompsInstruction("ctx", false)).toBe(brokerCompsInstruction("ctx"));
+    expect(brokerCompsInstruction("ctx")).toContain("IF THE OM DESCRIBES A PLAN");
+    expect(marketCheckInstruction("industrial", "ctx", "live", false)).toBe(marketCheckInstruction("industrial", "ctx", "live"));
+    expect(verdictInstruction(false)).toBe(verdictInstruction());
+    expect(verdictInstruction()).toContain("debt is the construction or bridge financing and the carry through the works");
+  });
+
+  // Research pass 41 (M4): the challenger asked every interest whether "the
+  // asking price per unit / per SF" is defensible and named negative
+  // leverage on "the going-in cap", beside notes saying a note's, a
+  // position's or a leased fee's price buys no building — the verdict's
+  // instruction already said so.
+  it("the challenger tests no basis and no negative leverage on a price the notes say is not the building's", () => {
+    for (const cls of ["multifamily", "office", "hospitality_str", "auto"] as const) {
+      const p = challengerInstruction(cls);
+      expect(p, cls).toContain(
+        "Where the notes on this deal say the price is not the building's — a note's price is a loan's, a preferred equity position's buys a rate and a redemption, a share's price buys the share and the building's is the whole it implies, a leased fee's price buys the land — or that a figure is not a price at all — an auction's starting bid is where the bidding opens — the price per unit or per SF and a going-in cap on that figure are not this deal's",
+      );
+      expect(p, cls).toContain("test the basis on the figure the notes compute, or say there is none and why, and set no cap struck on that figure against the cost of the debt");
+    }
+    // The verdict's instruction says the same of the brief.
+    expect(verdictInstruction()).toContain("never strike a basis, a cap or a return on that figure");
+  });
+
   it("the market check tests the figures BEHIND the stabilized pro forma, not NOI ÷ price", () => {
     const p = marketCheckInstruction("multifamily");
     expect(p).toContain("If the OM describes a plan");
@@ -464,6 +539,11 @@ describe("trap lists keyed on the memorandum's own words", () => {
     for (const trap of ["(a) FEDERAL LAW AND THE FINANCING", "(b) THE LICENSE", "(c) THE RENT PREMIUM", "(d) THE BUILDING WITHOUT THE TENANT"]) {
       expect(p, trap).toContain(trap);
     }
+    // Research pass 28: the screen's own model finances such a building as
+    // it does any other — said, and the model unchanged.
+    expect(p).toContain(
+      "The screen's own model finances the building with an ordinary loan at its default loan-to-cost, as if any lender would make it: its levered returns rest on financing a cannabis-tenant building may not get.",
+    );
     const sp = challengerInstruction("auto", ["special_purpose"]);
     for (const trap of ["(a) THE USE PERMIT AND THE ZONING", "(b) LANDMARK OR HISTORIC STATUS", "(c) DEED RESTRICTIONS", "(d) THE TAX EXEMPTION"]) {
       expect(sp, trap).toContain(trap);
@@ -474,9 +554,84 @@ describe("trap lists keyed on the memorandum's own words", () => {
     expect(cold).toContain("(a) THE REFRIGERATION");
     expect(cold).toContain("(c) THE CAPITAL RESERVE — a cold-storage building's reserve runs above a dry warehouse's");
     // Questions to check, never a statement of law or a figure.
-    for (const k of ["cannabis", "special_purpose", "lab", "cold_storage"] as const) {
+    for (const k of ["cannabis", "special_purpose", "lab", "cold_storage", "qof", "easement"] as const) {
       const text = challengerInstruction("retail", [k]).slice(challengerInstruction("retail").length);
       expect(text, k).not.toMatch(/\billegal\b|\bunlawful\b|\d/);
+    }
+  });
+});
+
+// Research pass 28: an interest in a qualified opportunity fund filed as a
+// share of no stated percentage, and nothing said whose the tax benefit is.
+describe("a qualified opportunity fund's interest, keyed on its own class or interest words", () => {
+  const ex = (over: Partial<ExtractionResult>): ExtractionResult => ({ dealName: "Subject", assetClass: "multifamily", metrics: [], ...over });
+  const interest = (summary: string, share = "") => ({ kind: "partial_interest" as const, summary, share, groundLease: "", loan: "", page: "" });
+
+  it("keys the line on the fund's own name, never on a property in an Opportunity Zone", () => {
+    for (const over of [
+      { assetClass: "Qualified Opportunity Fund interest" },
+      { interest: interest("Limited partnership interests in Harbor View Qualified Opportunity Fund, LP") },
+      { interest: interest("Units in a QOF that owns the property") },
+      { interest: interest("", "LP interests in the Opportunity Zone Fund") },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual(["qof"]);
+    }
+    for (const over of [
+      { assetClass: "Multifamily in a Qualified Opportunity Zone" },
+      { strategy: { kind: "development", summary: "Ground-up apartments in an Opportunity Zone tract", capitalBudget: "", timeline: "" } },
+      // The deal's name is no class or interest word.
+      { dealName: "QOF Fund I | Garden Apartments" },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual([]);
+    }
+  });
+
+  it("says the deferral and the ten-year exclusion are the investor's, never the property's returns", () => {
+    const p = challengerInstruction("multifamily", ["qof"]);
+    expect(p.startsWith(challengerInstruction("multifamily"))).toBe(true);
+    expect(p).toContain("QUALIFIED OPPORTUNITY FUND TRAP");
+    expect(p).toContain(
+      "the deferral of a capital gain and the ten-year exclusion of the interest's own appreciation belong to an investor who puts an eligible gain into the fund in time",
+    );
+    expect(p).toContain("never count either in the property's returns");
+  });
+});
+
+// Research pass 28: a portfolio of easements under wireless towers or
+// billboards filed as a net lease, its easements read as no lease at all.
+describe("a tower or billboard easement portfolio, keyed on an easement named with its gear", () => {
+  const ex = (over: Partial<ExtractionResult>): ExtractionResult => ({ dealName: "Subject", assetClass: "net_lease", metrics: [], ...over });
+  const interest = (summary: string, groundLease = "") => ({ kind: "leased_fee" as const, summary, share: "", groundLease, loan: "", page: "" });
+
+  it("keys the list on an easement beside a tower's, a carrier's or a billboard's words, and never on an access easement", () => {
+    for (const over of [
+      { assetClass: "Cell Tower Easement Portfolio" },
+      { dealName: "Billboard Easement Portfolio" },
+      { interest: interest("Perpetual easements beneath 42 wireless towers across 9 states") },
+      { interest: interest("Fee interests in the land", "Perpetual easement for a monopole carrying Verizon and T-Mobile antennas") },
+      { assetClass: "Tower easements" },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual(["easement"]);
+    }
+    for (const over of [
+      { assetClass: "Cell tower site" },
+      { assetClass: "Office", interest: interest("Fee simple, subject to a recorded access easement. The roof carries cell antennas.") },
+      {
+        assetClass: "Retail",
+        singleTenant: { tenant: "Verizon Wireless", guarantor: "", leaseType: "NNN", landlordObligations: "", tenantRights: "", page: "" },
+        interest: interest("Fee simple with a shared access easement"),
+      },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual([]);
+    }
+  });
+
+  it("asks the easement's term, the fee owner's mortgage and non-disturbance, and the carriers' concentration", () => {
+    const p = challengerInstruction("net_lease", ["easement"]);
+    expect(p.startsWith(challengerInstruction("net_lease"))).toBe(true);
+    expect(p).toContain("TOWER AND BILLBOARD EASEMENT TRAPS");
+    for (const trap of ["(a) THE EASEMENT'S TERM — ask whether each easement is perpetual or for a term", "(b) THE FEE OWNER'S MORTGAGE", "non-disturbance agreement", "(c) THE CARRIERS' CONCENTRATION"]) {
+      expect(p, trap).toContain(trap);
     }
   });
 });

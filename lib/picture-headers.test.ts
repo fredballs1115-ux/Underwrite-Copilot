@@ -17,8 +17,15 @@ const state = vi.hoisted(() => ({
   row: null as Record<string, unknown> | null,
   reads: [] as string[],
   bytes: Buffer.alloc(0) as Buffer,
+  /** what the route left to run after its response */
+  after: [] as (() => unknown)[],
+  uploads: [] as string[],
 }));
 
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (fn: () => unknown) => void state.after.push(fn),
+}));
 vi.mock("@/lib/supabase/server", () => ({
   getCurrentUser: async () => ({ id: "u1" }),
   createSupabaseServerClient: async () => ({
@@ -27,6 +34,13 @@ vi.mock("@/lib/supabase/server", () => ({
         eq: (_k: string, id: string) => ({
           maybeSingle: async () => ({ data: state.row && state.row.id === id ? state.row : null }),
         }),
+      }),
+      // What a jsonb column keeps: the object as JSON.
+      update: (patch: Record<string, unknown>) => ({
+        eq: async () => {
+          state.row = { ...state.row!, ...JSON.parse(JSON.stringify(patch)) };
+          return { error: null };
+        },
       }),
     }),
   }),
@@ -40,7 +54,9 @@ vi.mock("@/lib/storage", () => ({
   downloadOmPdf: async () => {
     throw new Error("no memorandum here");
   },
-  uploadDealPhoto: async () => {},
+  uploadDealPhoto: async (path: string) => {
+    state.uploads.push(path);
+  },
   removeStorageFiles: async () => {},
 }));
 
@@ -64,6 +80,8 @@ const ask = (query: string) =>
 
 beforeEach(async () => {
   state.reads = [];
+  state.after = [];
+  state.uploads = [];
   state.bytes = await sharp({ create: { width: 8, height: 6, channels: 3, background: "#806040" } }).jpeg().toBuffer();
 });
 
@@ -108,5 +126,85 @@ describe("GET /api/deals/[id]/picture?g=N — what the stored row puts in its he
       expect(res.status, String(hero)).toBe(404);
     }
     expect(state.reads).toEqual([]);
+  });
+});
+
+describe("GET /api/deals/[id]/picture — a URL that names the picture's version is kept (research pass 25)", () => {
+  it("answers the version the stored files carry as never changing, and anything else as before", async () => {
+    state.row = { id: DEAL, photo: { picture: photo("lk2x9a"), gallery: [photo("lk2x9ag1", 4)] }, om_storage_path: null, is_sample: false };
+    const pinned = await ask("size=thumb&v=lk2x9a");
+    expect(pinned.status).toBe(200);
+    expect(pinned.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    // A gallery photograph carries its own stamp.
+    expect((await ask("size=hero&g=1&v=lk2x9ag1")).headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    // No version, or a picture since replaced: revalidated, never kept.
+    expect((await ask("size=thumb")).headers.get("cache-control")).toBe("private, no-cache");
+    expect((await ask("size=thumb&v=older1")).headers.get("cache-control")).toBe("private, no-cache");
+    expect((await ask("size=hero&g=1&v=lk2x9a")).headers.get("cache-control")).toBe("private, no-cache");
+  });
+});
+
+describe("GET /api/deals/[id]/picture?size=card — the copy a pipeline card's srcset offers (research pass 29)", () => {
+  const hero1600 = () => sharp({ create: { width: 1600, height: 1067, channels: 3, background: "#5f7f9a" } }).jpeg().toBuffer();
+
+  it("serves a stored card copy as its own file, kept for a year under the picture's version", async () => {
+    const stored = { ...photo("lk2x9a"), card: `photos/${DEAL}/lk2x9a-card.jpg`, cardWidth: 800, cardHeight: 533 };
+    state.row = { id: DEAL, photo: { picture: stored }, om_storage_path: null, is_sample: false };
+    const res = await ask("size=card&v=lk2x9a");
+    expect(res.status).toBe(200);
+    expect(state.reads).toEqual([`photos/${DEAL}/lk2x9a-card.jpg`]);
+    expect(res.headers.get("etag")).toBe(`W/"photos/${DEAL}/lk2x9a-card.jpg"`);
+    expect(res.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    expect(state.after).toEqual([]);
+  });
+
+  it("makes the copy of a photograph stored before from its hero, serves it under the copy's own name, and stores it after the response", async () => {
+    state.bytes = await hero1600();
+    state.row = { id: DEAL, photo: { picture: photo("lk2x9a"), pictureSearchV: 6 }, om_storage_path: null, is_sample: false };
+    const res = await ask("size=card&v=lk2x9a");
+    expect(res.status).toBe(200);
+    // Read from the hero, and 800px on its long side, never enlarged.
+    expect(state.reads).toEqual([`photos/${DEAL}/lk2x9a-hero.jpg`]);
+    const served = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    expect({ w: served.width, h: served.height }).toEqual({ w: 800, h: 534 });
+    // Named as the copy from its first ask: the version the URL carries is
+    // the hero's stamp, the copy's own.
+    expect(res.headers.get("etag")).toBe(`W/"photos/${DEAL}/lk2x9a-card.jpg"`);
+    expect(res.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    // Stored after the response, onto the photograph still stored.
+    expect(state.uploads).toEqual([]);
+    expect(state.after).toHaveLength(1);
+    await state.after[0]();
+    expect(state.uploads).toEqual([`photos/${DEAL}/lk2x9a-card.jpg`]);
+    const after = (state.row as { photo: { picture: DealPicture; pictureSearchV: number } }).photo;
+    expect(after.picture).toMatchObject({ card: `photos/${DEAL}/lk2x9a-card.jpg`, cardWidth: 800, cardHeight: 534 });
+    expect(after.pictureSearchV).toBe(6);
+    // The next ask reads the stored copy.
+    state.reads = [];
+    state.after = [];
+    await ask("size=card&v=lk2x9a");
+    expect(state.reads).toEqual([`photos/${DEAL}/lk2x9a-card.jpg`]);
+    expect(state.after).toEqual([]);
+  });
+
+  it("answers a hero no longer than a copy as itself, and a gallery photograph's copy at its place", async () => {
+    // A hero 800px long: its own card, served as itself under its own name.
+    state.row = { id: DEAL, photo: { picture: { ...photo("lk2x9a"), width: 800, height: 533 } }, om_storage_path: null, is_sample: false };
+    const own = await ask("size=card&v=lk2x9a");
+    expect(own.status).toBe(200);
+    expect(own.headers.get("etag")).toBe(`W/"photos/${DEAL}/lk2x9a-hero.jpg"`);
+    expect(state.after).toEqual([]);
+    // A gallery photograph stored before: its copy goes onto its own place.
+    state.bytes = await hero1600();
+    state.reads = [];
+    state.row = { id: DEAL, photo: { picture: photo("lk2x9a"), gallery: [photo("lk2x9ag1", 3), photo("lk2x9ag2", 5)] }, om_storage_path: null, is_sample: false };
+    const g2 = await ask("size=card&g=2&v=lk2x9ag2");
+    expect(g2.headers.get("etag")).toBe(`W/"photos/${DEAL}/lk2x9ag2-card.jpg"`);
+    expect(g2.headers.get("x-image-credit")).toBe("From the offering memorandum, page 5");
+    await state.after[0]();
+    const kept = (state.row as { photo: { picture: DealPicture; gallery: DealPicture[] } }).photo;
+    expect(kept.gallery[1].card).toBe(`photos/${DEAL}/lk2x9ag2-card.jpg`);
+    expect(kept.gallery[0].card).toBeUndefined();
+    expect(kept.picture.card).toBeUndefined();
   });
 });

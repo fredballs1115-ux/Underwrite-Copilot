@@ -118,8 +118,9 @@ export function CostCard({
             </>
           )}
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            The one cache write of the OM is most of a screen; the levers that cut it are named in
-            order in <code className="rounded bg-faint px-1">lib/anthropic/models.ts</code>.
+            Writing the OM to the prompt cache is most of a screen — once, or once a step, as the cache
+            write and read above say; the levers that cut it are named in order in{" "}
+            <code className="rounded bg-faint px-1">lib/anthropic/models.ts</code>.
           </p>
         </div>
       )}

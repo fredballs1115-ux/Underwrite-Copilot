@@ -3,7 +3,15 @@ import metrosSeed from "@/data/research/metros.json";
 import { datedLong } from "@/lib/debt-index";
 import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
 import { MARKET_COUNT } from "@/lib/market-count";
-import { blockCitations, figuresTitle, rentOf, rentText, snapshotReadOn } from "@/lib/tracker-read";
+import {
+  blockCitations,
+  figuresTitle,
+  houseShort,
+  rentOf,
+  rentText,
+  snapshotReadOn,
+  type CitedFigure,
+} from "@/lib/tracker-read";
 import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
 import { sharedAreaFor } from "@/lib/sector-leaderboard";
 import { PausableTicker } from "./pausable-ticker";
@@ -43,6 +51,17 @@ export interface MetroFact {
    *  "Office 21.3–22.2% vac (Q2 2026) · 3 rules on file" — or HUD's fair
    *  market rent with its fiscal year, or the rules count alone */
   text: string;
+  /** `text` with each tracker figure's house beside its period — "Office
+   *  21.3–22.2% vac (Colliers and CBRE, Q2 2026) · 3 rules on file" — the
+   *  words a surface with room for them prints (the band); `text` itself
+   *  where it carries no tracker figure */
+  credited: string;
+  /** who published the tracker figures in `text`, as a line of its own —
+   *  "Vacancy: Colliers and CBRE", "Vacancy and rent: Matthews", "Vacancy:
+   *  Newmark · Rent: CBRE" — for a surface that sets the figures where
+   *  their houses will not fit (the gallery's tiles); null where `text`
+   *  carries no tracker figure */
+  houses: string | null;
   /** who published each figure in `text`, for what area and when — a
    *  title's words; null where `text` carries no tracker figure */
   cite: string | null;
@@ -65,7 +84,7 @@ export function researchReadOn(day: string): string {
  * stale. Null `stale` while every read is current. One reading for both.
  */
 export function marketsResearch(
-  facts: readonly (MetroFact | null)[],
+  facts: readonly (Pick<MetroFact, "readOn"> | null)[],
   today: string,
 ): { span: string | null; stale: string | null } {
   const sorted = [...new Set(facts.map((f) => f?.readOn ?? null).filter((d): d is string => d !== null))].sort();
@@ -122,17 +141,26 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     // reads a figure it shares with others, whose figure it is ("Suburban
     // Maryland, Q1 2026"), never the county's own.
     const shared = sharedAreaFor(sector, entry.id);
-    const when = (label: string) => {
+    // `credited` puts each figure's house first among its words (research
+    // pass 31, C5): who published it, then where and when.
+    const when = (label: string, credited: boolean) => {
       const read = shown.find((f) => f.label === label)?.read;
-      return [shared, read?.slice, read?.period ?? "undated"].filter(Boolean).join(", ");
+      const house = credited ? houseShort(read ?? { house: null }) : null;
+      return [house, shared, read?.slice, read?.period ?? "undated"].filter(Boolean).join(", ");
     };
     // A band as the file states it ("$10–15/SF"), never a point made of one.
     const rentBand = rentOf(b);
-    const rent = rentBand ? ` · ${rentText(rentBand)}/SF (${when("Rent")})` : "";
-    return {
-      text: [`${SECTOR_LABEL[sector]} ${vac} vac (${when("Vacancy")})${rent}`, rulesPart]
+    const line = (credited: boolean) =>
+      [
+        `${SECTOR_LABEL[sector]} ${vac} vac (${when("Vacancy", credited)})${rentBand ? ` · ${rentText(rentBand)}/SF (${when("Rent", credited)})` : ""}`,
+        rulesPart,
+      ]
         .filter((x): x is string => x !== null)
-        .join(" · "),
+        .join(" · ");
+    return {
+      text: line(false),
+      credited: line(true),
+      houses: housesLine(shown),
       cite: figuresTitle(shown),
       readOn: snapshotReadOn(entry.sector_snapshot),
     };
@@ -148,7 +176,24 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     fmr && twoBed !== null && inForce ? `${fmrLabel(fmr.fy)} 2BR FMR $${twoBed.toLocaleString("en-US")}/mo` : null,
     rulesPart,
   ].filter((x): x is string => x !== null);
-  return parts.length ? { text: parts.join(" · "), cite: null, readOn: null } : null;
+  if (parts.length === 0) return null;
+  const text = parts.join(" · ");
+  return { text, credited: text, houses: null, cite: null, readOn: null };
+}
+
+/**
+ * The houses behind a tile's figures, as one line: "Vacancy: Colliers and
+ * CBRE", "Vacancy and rent: Matthews" where one house published both, and
+ * "Vacancy: Newmark · Rent: CBRE" where two did. Null with no figure.
+ */
+function housesLine(shown: readonly CitedFigure[]): string | null {
+  if (shown.length === 0) return null;
+  const houses = shown.map((f) => houseShort(f.read));
+  if (houses.every((h) => h === houses[0])) {
+    const labels = shown.map((f) => f.label.toLowerCase()).join(" and ");
+    return `${labels.charAt(0).toUpperCase()}${labels.slice(1)}: ${houses[0]}`;
+  }
+  return shown.map((f, i) => `${f.label}: ${houses[i]}`).join(" · ");
 }
 
 export function MarketsMarquee({ today = todayIso() }: { today?: string }) {
@@ -163,8 +208,11 @@ export function MarketsMarquee({ today = todayIso() }: { today?: string }) {
     facts.map((f) => f.fact),
     today,
   );
+  // Each figure with its house in the words the band shows (`credited`):
+  // the band never wraps, so the house fits beside its figure at any width,
+  // and the title keeps the whole citation for a pointer.
   const items = facts.map(({ entry, fact }) => {
-    const text = fact ? fact.text : (entry.region ?? "covered market");
+    const text = fact ? fact.credited : (entry.region ?? "covered market");
     return [entry.id, entry.name, text, fact?.cite ?? undefined] as const;
   });
   // Each item is a real link into that market's brief — the marquee is a

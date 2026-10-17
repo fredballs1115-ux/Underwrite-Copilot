@@ -5,6 +5,7 @@ import { AppShell } from "./app-shell";
 import { coveredMarketNav } from "@/lib/market-match";
 import { RegulatoryAlertBanner } from "./regulatory-alert-banner";
 import { TimeZoneCookie } from "./time-zone-cookie";
+import { viewerName } from "@/lib/person";
 
 // Wraps every signed-in screen: real auth check (proxy.ts is the fast gate)
 // plus the app chrome (deep-teal sidebar / mobile top bar). getCurrentUser is
@@ -22,7 +23,12 @@ export default async function AppLayout({
   }
 
   return (
-    <AppShell userEmail={user.email ?? ""} markets={coveredMarketNav()}>
+    <AppShell
+      userEmail={user.email ?? ""}
+      userId={user.id}
+      userName={viewerName(user)}
+      markets={coveredMarketNav()}
+    >
       {/* The reader's time zone, written to the cookie every signed-in page
           reads its day from (lib/reader-day): draws nothing. */}
       <TimeZoneCookie />

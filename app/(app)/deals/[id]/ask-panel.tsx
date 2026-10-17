@@ -1,11 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
-import type { AskEntry } from "@/lib/deals";
+import { askAnsweredLine, type AskEntry } from "@/lib/deals";
 import { parsePageNumber } from "@/lib/facts";
 import { askDeal, type AskState } from "./ask-actions";
+import { askCountLine } from "@/lib/ask-cap";
+import { ASK_STARTERS_NOTE } from "@/lib/ask-starters";
+import { PersonBadge } from "../../person-badge";
 
 // UTC-pinned so server and client render identical strings (hydration).
 const WHEN_FMT = new Intl.DateTimeFormat("en-US", {
@@ -21,14 +24,26 @@ const safeWhen = (at: string) => {
 
 function AskButton() {
   const { pending } = useFormStatus();
+  // While it reads, the button stays focusable (aria-disabled, a second press
+  // refused) and says so once: a focused button that disables itself sent
+  // focus to the page, and "Reading the OM…" was never heard (research
+  // pass 33).
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="shrink-0 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:opacity-60"
-    >
-      {pending ? "Reading the OM…" : "Ask"}
-    </button>
+    <>
+      <button
+        type="submit"
+        aria-disabled={pending || undefined}
+        onClick={pending ? (e) => e.preventDefault() : undefined}
+        className={`shrink-0 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong ${
+          pending ? "cursor-progress opacity-60" : ""
+        }`}
+      >
+        {pending ? "Reading the OM…" : "Ask"}
+      </button>
+      <span role="status" className="sr-only">
+        {pending ? "Reading the OM…" : ""}
+      </span>
+    </>
   );
 }
 
@@ -45,6 +60,7 @@ export function AskPanel({
   isPro,
   omUrl = null,
   askers = null,
+  starters = [],
 }: {
   dealId: string;
   qa: AskEntry[];
@@ -57,17 +73,39 @@ export function AskPanel({
   omUrl?: string | null;
   /** a team deal's askers: the reader's own user id, and each teammate's
    *  name by user id, the way the pipeline names who added a deal
-   *  (`full_name`, else the email). Null on a personal deal, which names
-   *  no one. */
+   *  (`full_name`, else the email's local part) — the reader's own among
+   *  them, for the badge on their questions. Null on a personal deal,
+   *  which names no one. */
   askers?: { me: string | null; names: Record<string, string> } | null;
+  /** the challenger's questions for the broker on this deal, the most
+   *  severe first and none already asked (lib/ask-starters): a chip each
+   *  that fills the input; none where the deal has none */
+  starters?: string[];
 }) {
   const [state, action] = useActionState<AskState, FormData>(askDeal, null);
   const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const startersId = useId();
+  // A starter fills the box and hands it the focus, the cursor at its end,
+  // for the reader to send or edit — it never sends by itself.
+  const fill = (q: string) => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.value = q;
+    el.focus();
+    el.setSelectionRange(q.length, q.length);
+  };
 
   // A successful answer re-renders the thread via revalidate — clear the box.
   useEffect(() => {
     if (state?.ok) formRef.current?.reset();
   }, [state]);
+  // The answer lands in the thread with no word to a screen reader; one
+  // polite line says it has (research pass 33), keyed to the answer by its
+  // place in the thread so a second answer is said too (lib/deals
+  // `askAnsweredLine`). The thread itself is not a live region, which would
+  // read every answer again.
+  const answered = state?.ok ? askAnsweredLine(qa.length) : "";
 
   const askable = hasOm && !isSample;
   // Who asked, on a team deal, after the date: the reader as "you", a
@@ -78,12 +116,19 @@ export function AskPanel({
     const who = !askers || !by ? null : by === askers.me ? "you" : (askers.names[by] ?? null);
     return who ? ` · asked by ${who}` : "";
   };
+  // The name the asker's badge wears: a teammate's, or the reader's own
+  // where the page names them too (the words still say "you"). None where
+  // the name is not the reader's to see, so no badge says "?".
+  const askerName = (by: string | undefined): string | null =>
+    !askers || !by ? null : (askers.names[by] ?? null);
 
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold tracking-tight">Ask this deal</h2>
-        {!isPro && (
+        {/* No Pro mark on the sample, which the public pages promise whole
+            (lib/sample-exports); the line below says what Ask needs. */}
+        {!isPro && !isSample && (
           <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
             Pro
           </span>
@@ -98,53 +143,62 @@ export function AskPanel({
       {qa.length > 0 && (
         <ol className="mt-4 space-y-4">
           {qa.map((e, i) => (
-            <li key={`${e.at}-${i}`} data-qa={e.earlier ? "ask-earlier" : undefined}>
-              <p className="text-sm font-medium">
-                {e.q}
-                <span className="ml-2 text-xs font-normal text-muted">
-                  {safeWhen(e.at)}
-                  {askedBy(e.by)}
-                </span>
-                {/* The deck has been replaced since: this answer, and its
-                    pages, are the earlier memorandum's (lib/deals). */}
-                {e.earlier && (
-                  <span className="ml-2 rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-medium text-caution">
-                    asked of the earlier memorandum
+            <li
+              key={`${e.at}-${i}`}
+              data-qa={e.earlier ? "ask-earlier" : undefined}
+              className={askerName(e.by) ? "flex gap-2.5" : undefined}
+            >
+              {/* The asker's badge, on a team deal, where their name is
+                  the reader's to see: said in words after the date. */}
+              {askerName(e.by) && <PersonBadge name={askerName(e.by)} id={e.by} size="sm" decorative className="mt-px" />}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">
+                  {e.q}
+                  <span className="ml-2 text-xs font-normal text-muted">
+                    {safeWhen(e.at)}
+                    {askedBy(e.by)}
                   </span>
-                )}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted">
-                {e.answer}
-              </p>
-              {e.cites.length > 0 && (
-                <p className="mt-1.5 flex flex-wrap gap-1.5">
-                  {e.cites.map((c, j) => {
-                    // A chip opens the OM at its page, as the fact chips do —
-                    // only where the answer was asked of the OM the link opens.
-                    const page = !e.earlier && omUrl ? parsePageNumber(c.page) : null;
-                    return page != null ? (
-                      <a
-                        key={j}
-                        href={`${omUrl}#page=${page}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={c.note ? `${c.note} — open the OM at this page` : "Open the OM at this page"}
-                        className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted underline-offset-2 transition-colors hover:bg-line/60 hover:text-ink"
-                      >
-                        {c.page}
-                      </a>
-                    ) : (
-                      <span
-                        key={j}
-                        title={c.note}
-                        className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted"
-                      >
-                        {c.page}
-                      </span>
-                    );
-                  })}
+                  {/* The deck has been replaced since: this answer, and its
+                      pages, are the earlier memorandum's (lib/deals). */}
+                  {e.earlier && (
+                    <span className="ml-2 rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-medium text-caution">
+                      asked of the earlier memorandum
+                    </span>
+                  )}
                 </p>
-              )}
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted">
+                  {e.answer}
+                </p>
+                {e.cites.length > 0 && (
+                  <p className="mt-1.5 flex flex-wrap gap-1.5">
+                    {e.cites.map((c, j) => {
+                      // A chip opens the OM at its page, as the fact chips do —
+                      // only where the answer was asked of the OM the link opens.
+                      const page = !e.earlier && omUrl ? parsePageNumber(c.page) : null;
+                      return page != null ? (
+                        <a
+                          key={j}
+                          href={`${omUrl}#page=${page}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={c.note ? `${c.note} — open the OM at this page` : "Open the OM at this page"}
+                          className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted underline-offset-2 transition-colors hover:bg-line/60 hover:text-ink"
+                        >
+                          {c.page}
+                        </a>
+                      ) : (
+                        <span
+                          key={j}
+                          title={c.note}
+                          className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted"
+                        >
+                          {c.page}
+                        </span>
+                      );
+                    })}
+                  </p>
+                )}
+              </div>
             </li>
           ))}
         </ol>
@@ -152,8 +206,13 @@ export function AskPanel({
 
       {!askable ? (
         <p className="mt-3 text-sm text-muted">
+          {/* Said with the plan it needs: "ask away" had told a free reader
+              they could, where Ask is Pro on their own deal (research pass
+              32). */}
           {isSample
-            ? "The sample deal has no OM behind it — upload a real deal and ask away."
+            ? isPro
+              ? "The sample deal has no OM behind it — upload a real deal and ask away."
+              : "The sample deal has no OM behind it. On Pro, you can put questions to a real deal's memorandum."
             : "Upload the OM first — answers come from the document itself."}
         </p>
       ) : !isPro ? (
@@ -169,9 +228,30 @@ export function AskPanel({
         </p>
       ) : (
         <form ref={formRef} action={action} className="mt-3">
+          {starters.length > 0 && (
+            <div className="mb-2" data-qa="ask-starters">
+              <p id={startersId} className="text-[11px] text-muted">
+                {ASK_STARTERS_NOTE}
+              </p>
+              <ul aria-labelledby={startersId} className="mt-1.5 flex flex-wrap gap-1.5">
+                {starters.map((q) => (
+                  <li key={q} className="max-w-full">
+                    <button
+                      type="button"
+                      onClick={() => fill(q)}
+                      className="max-w-full rounded-full border border-line bg-paper px-2.5 py-1 text-left text-xs text-ink transition-colors hover:border-brand/40 hover:bg-brand/5 pointer-coarse:py-2"
+                    >
+                      {q}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex items-start gap-2">
             <input type="hidden" name="dealId" value={dealId} />
             <textarea
+              ref={inputRef}
               name="question"
               aria-label="Your question about the offering memorandum"
               required
@@ -183,15 +263,23 @@ export function AskPanel({
               key={state?.error ? `err-${state.question}` : "fresh"}
               defaultValue={state?.error ? (state.question ?? "") : ""}
               placeholder="e.g. What does the OM say about the tax abatement schedule?"
-              className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30"
+              className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
             />
             <AskButton />
           </div>
+          {/* The cap, said before it refuses a question (lib/ask-cap): the
+              questions asked of the memorandum the deal holds now. */}
+          <p data-qa="ask-count" className="mt-1.5 text-[11px] text-muted">
+            {askCountLine(qa.filter((e) => !e.earlier).length)}
+          </p>
           {state?.error && (
             <p className="mt-2 text-sm text-kill" role="alert">
               {state.error}
             </p>
           )}
+          <p role="status" className="sr-only">
+            {answered}
+          </p>
         </form>
       )}
     </section>

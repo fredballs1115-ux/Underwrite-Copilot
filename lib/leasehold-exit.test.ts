@@ -11,6 +11,7 @@ import {
   leaseholdOptionsLine,
   readLeaseholdExit,
   subordinationOf,
+  termReadFor,
   termShare,
 } from "@/lib/leasehold-exit";
 import { gluedWords } from "@/lib/render-lint";
@@ -161,6 +162,24 @@ describe("readLeaseholdExit — the model's exit on the term left at its sale", 
     expect(readLeaseholdExit(noTerm, modelOf(noTerm), AS_OF)).toBeNull();
     expect(readLeaseholdExit(ex, null, AS_OF)).toBeNull();
     expect(readLeaseholdExit(null, modelOf(ex), AS_OF)).toBeNull();
+  });
+
+  it("reads the term's levered IRR at other inputs by its own read, for the report's max bid (research pass 35)", () => {
+    const ex = leasehold([row("Ground lease expiration", "December 31, 2071")]);
+    const inputs = modelOf(ex);
+    const at = termReadFor(ex, AS_OF)!;
+    // At the model's own inputs: the block's own figure.
+    expect(at(inputs)).toEqual({ irr: readLeaseholdExit(ex, inputs, AS_OF)!.onTerm!.leveredIrrPct! / 100 });
+    // At a lower price the term returns more, by the same read.
+    const lower = { ...inputs, purchasePrice: inputs.purchasePrice * 0.85 };
+    expect(at(lower)!.irr!).toBeCloseTo(readLeaseholdExit(ex, lower, AS_OF)!.onTerm!.leveredIrrPct! / 100, 12);
+    expect(at(lower)!.irr!).toBeGreaterThan(at(inputs)!.irr!);
+    // A lease that ends inside the hold leaves no term to price at the sale.
+    const short = leasehold([row("Ground lease expiration", "December 31, 2028")]);
+    expect(termReadFor(short, AS_OF)!(modelOf(short))).toBeNull();
+    // Anything but a leasehold reads nothing.
+    expect(termReadFor({ ...ex, interest: { ...ex.interest!, kind: "fee_simple" } }, AS_OF)).toBeNull();
+    expect(termReadFor(null)).toBeNull();
   });
 
   it("hands the card plain data whose sentences read clean", () => {

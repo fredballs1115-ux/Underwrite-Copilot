@@ -46,7 +46,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
     h: "What it does",
     body: [
       "Upload an OM. The app reads it and returns a screen: the key terms, a red-team of the assumptions, the comps inside the deck, a reconciliation across your documents, a market check, and a verdict.",
-      "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call. It exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
+      "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call, or says which criteria it could not check. On Pro, it exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
     ],
   },
   {
@@ -74,14 +74,14 @@ const SECTIONS: { h: string; body: string[] }[] = [
     h: "It knows the ground",
     body: [
       `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and ${MAJOR_MARKET_COUNT} of the largest US markets, DC to Brooklyn to LA to Chicago. It answers with its source linked where the rule cites one, or names the exact open question — year built, whether you'll live in a unit — and takes your answer right on the deal. Unknown jurisdictions say so — never a silent pass.`,
-      `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today. Public records, clearly labeled. Not an appraisal.`,
-      `And every covered market carries an asset-type read — office, industrial, multifamily, and retail vacancy where a named research house prints one, with asking rents and cap bands where they are sourced, each figure dated and source-linked. Where the trackers disagree the brief shows the spread instead of averaging it away, and a gap stays a recorded gap. Deal pages benchmark against the same rows automatically, your sector first.`,
+      `Recorded sales nearby pull automatically from government records — live public property-record APIs in ${COVERAGE_SUMMARY} today. Public records, clearly labeled. Not an appraisal.`,
+      `And every covered market carries an asset-type read — office, industrial, multifamily, and retail vacancy where a named research house prints one, with asking rents and cap bands where they are sourced, each figure with its period and source where the research recorded them, and “undated” where it did not. Where the trackers disagree the brief shows the spread instead of averaging it away, and a gap stays a recorded gap. Deal pages benchmark against the same rows automatically, your sector first.`,
     ],
   },
   {
     h: "Your data stays yours",
     body: [
-      "Documents are private to your account and, if you create one, your team. The market data built from your past screens is private to you alone.",
+      "Documents are private to your account and, if you create or join one, your team. The market data built from your past screens is private to you alone.",
       "Nothing you upload is used to train AI models. The security page has the full detail.",
     ],
   },

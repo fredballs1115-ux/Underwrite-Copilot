@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
+import { TZ_COOKIE, readerDateLong } from "@/lib/reader-day";
 import { buildLoiDocx } from "@/lib/loi";
 import { getBrandingForDeal } from "@/lib/branding-server";
 import { parseUsd } from "@/lib/money";
@@ -146,15 +148,22 @@ export async function GET(
     firmName = null;
   }
 
+  // The letter's date, which its offer runs from ("open for acceptance for
+  // N days from the date above"): the reader's own day (lib/reader-day),
+  // never the server's UTC day, which is tomorrow from 8 pm Eastern.
+  const dateStr = readerDateLong((await cookies()).get(TZ_COOKIE)?.value);
+
   try {
     const buffer = await buildLoiDocx({
       plan: terms.plan,
       // What the memorandum states the sale is, where it is not the
       // property from its owner: each line marked in the letter for review
-      // — and a short sale's closing conditioned on its lender's approval.
+      // — a short sale's closing conditioned on its lender's approval, and a
+      // flagged hotel's franchisor noted under the Closing clause.
       leasehold: terms.leasehold,
       seller: terms.seller,
       shortSale: terms.shortSale,
+      hotel: terms.hotel,
       properties: terms.properties,
       buyerName,
       firmName,
@@ -173,11 +182,7 @@ export async function GET(
           ? null
           : clampInt(url.searchParams.get("ltv"), 30, 85, 60),
       openDays: clampInt(url.searchParams.get("open"), 2, 30, 7),
-      dateStr: new Date().toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
+      dateStr,
     });
 
     const safe =

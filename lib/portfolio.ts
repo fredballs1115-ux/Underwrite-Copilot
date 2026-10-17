@@ -35,7 +35,7 @@ import { placeOf } from "@/lib/address";
 import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
 import { marketForAddress } from "@/lib/market-match";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 
 export type { PortfolioProperty };
 
@@ -223,14 +223,7 @@ const one = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 /** A portfolio's money, the one format every surface prints it in. Rounded
  *  on integer tenths, not by toFixed on a float ((2.05).toFixed(1) is
  *  "2.0"); a hundred million and up to the million. */
-export const portfolioMoney = (n: number) =>
-  n >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : n >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : n >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+export const portfolioMoney = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const money = portfolioMoney;
 
 type Noun = { one: string; many: string };

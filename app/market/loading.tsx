@@ -13,8 +13,9 @@ export default function MarketLoading() {
       </div>
 
       {/* The metro explorer: its heading, a row of market chips, the
-          market's band (15rem, 21rem from sm, as MarketBand draws it) and
-          the lines of its brief. */}
+          market's band (on a phone its 14rem strip with a one-line name
+          under it, 300px; 21rem from sm, as MarketBand draws it) and the
+          lines of its brief. */}
       <div className="shadow-card rounded-2xl border border-line bg-surface p-5">
         <div className="skeleton h-3.5 w-32 rounded" />
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -22,7 +23,7 @@ export default function MarketLoading() {
             <div key={i} className="skeleton h-7 w-24 rounded-full" />
           ))}
         </div>
-        <div className="skeleton mt-4 h-60 w-full rounded-2xl sm:h-84" />
+        <div className="skeleton mt-4 h-75 w-full rounded-2xl sm:h-84" />
         <div className="mt-4 space-y-2">
           <div className="skeleton h-3 w-full rounded" />
           <div className="skeleton h-3 w-11/12 rounded" />

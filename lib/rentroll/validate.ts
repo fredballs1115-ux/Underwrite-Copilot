@@ -7,6 +7,7 @@
  *
  * Pure.
  */
+import { compactUsd } from "@/lib/money";
 import { assetWords } from "@/lib/asset-words";
 import type { ParseResult } from "./parse";
 import type { Lease } from "./schema";
@@ -33,8 +34,7 @@ export function rentPsfCeiling(assetClass: string | null | undefined): number {
 }
 
 /** "$1.36M", "$2,150" — a figure in a message. */
-const dollars = (n: number): string =>
-  Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+const dollars = (n: number): string => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
 
 /** "info" says what the import did on purpose (a totals line left out), so
  *  the page shows it without calling it a problem. */

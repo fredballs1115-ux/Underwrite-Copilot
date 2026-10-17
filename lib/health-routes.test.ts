@@ -1,19 +1,24 @@
 /**
- * The three diagnostic routes (research pass 22), each driven as a caller
- * with no session, a signed-in account that is not one of the site's
- * operators, and an operator (OPERATOR_EMAILS, lib/operator-server). The
- * costly part of each runs for the operator alone: the Google probes on the
- * site's own key (the Static Maps one billed), the news route's refresh of
- * every feed, and the probes of every public-records portal. live-verify's
- * read of the news route, made with no session, keeps working as it was.
+ * The diagnostic routes (research pass 22), each driven as a caller with no
+ * session, a signed-in account that is not one of the site's operators,
+ * and an operator (OPERATOR_EMAILS, lib/operator-server). The costly part
+ * of each runs for the operator alone: the Google probes on the site's own
+ * key (the Static Maps one billed), the news route's refresh of every feed,
+ * and the probes of every public-records portal. live-verify's read of the
+ * news route, made with no session, keeps working as it was. The flood
+ * route's process id and uptime are the operator's alone (research pass 39;
+ * live-verify never printed them, while it prints the news route's).
  * Only the session and the network are faked.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const session = vi.hoisted(() => ({ user: null as Record<string, unknown> | null, reads: 0 }));
+const session = vi.hoisted(() => ({ user: null as Record<string, unknown> | null, reads: 0, fails: false }));
 vi.mock("@/lib/supabase/server", () => ({
   getCurrentUser: async () => {
     session.reads++;
+    if (session.fails) throw new Error("the auth service did not answer");
     return session.user;
   },
 }));
@@ -32,9 +37,23 @@ vi.mock("@/lib/news/live", () => ({
   lastWarmUp: () => null,
 }));
 
+// The flood check's own work is FEMA's and USGS's, kept ten minutes a
+// process; here it answers at once, as a kept answer does.
+vi.mock("@/lib/flood-map", () => ({
+  floodHealth: async () => ({
+    checkedAt: "2026-10-05T06:00:00Z",
+    summary: "every step answered",
+    layer: { ok: true, ms: 10, id: 28 },
+    legend: { ok: true, ms: 10, entries: 3, values: 3, matchesCopy: true, added: [], removed: [] },
+    overlay: { ok: true, ms: 10, bytes: 2048, scale: 1, classes: [] },
+    aerial: { ok: true, ms: 10, bytes: 4096 },
+  }),
+}));
+
 import { GET as imageryHealth } from "@/app/api/imagery/health/route";
 import { GET as newsHealth } from "@/app/api/news/health/route";
 import { GET as compsHealth } from "@/app/api/comps/health/route";
+import { GET as floodHealthRoute } from "@/app/api/flood/health/route";
 import { PROVIDERS } from "./public-comps/core";
 
 const OPERATOR = { id: "op", email: "ops@underwrite.example", email_confirmed_at: "2026-01-02T00:00:00Z" };
@@ -51,6 +70,7 @@ beforeEach(() => {
   process.env.GOOGLE_MAPS_API_KEY = "test-maps-key";
   session.user = null;
   session.reads = 0;
+  session.fails = false;
   news.forgets = 0;
   fetched.length = 0;
   vi.stubGlobal(
@@ -146,6 +166,57 @@ describe("/api/news/health", () => {
     // Without `refresh=1`, not even an operator's read drops them.
     await ask();
     expect(news.forgets).toBe(1);
+  });
+});
+
+describe("/api/flood/health", () => {
+  it("answers everyone the check, the process that answered only to an operator", async () => {
+    for (const user of [null, CUSTOMER, UNCONFIRMED]) {
+      session.user = user;
+      const res = await floodHealthRoute();
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      const body = await res.json();
+      // What live-verify prints is there for every caller.
+      expect(body.summary).toBe("every step answered");
+      expect(body.layer.id).toBe(28);
+      expect(body).not.toHaveProperty("process");
+    }
+    session.user = OPERATOR;
+    const body = await (await floodHealthRoute()).json();
+    expect(body.summary).toBe("every step answered");
+    expect(body.process).toEqual({ pid: process.pid, uptimeS: expect.any(Number) });
+  });
+
+  it("serves a caller whose session cannot be read as no operator, and still answers", async () => {
+    session.user = OPERATOR;
+    session.fails = true;
+    const res = await floodHealthRoute();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.summary).toBe("every step answered");
+    expect(body).not.toHaveProperty("process");
+  });
+});
+
+describe("whose read prints a health route's process line", () => {
+  // live-verify prints the news route's process from its read with no
+  // session, so that one stays public; it never reads the flood route's,
+  // which is the operator's now. A step that starts or stops reading one
+  // fails here first.
+  const lv = readFileSync(join(__dirname, "..", ".github/workflows/live-verify.yml"), "utf8");
+  const stepOf = (route: string) => {
+    const at = lv.indexOf(route);
+    expect(at, route).toBeGreaterThan(-1);
+    const next = lv.indexOf("- name:", at);
+    return lv.slice(at, next === -1 ? undefined : next);
+  };
+
+  it("the news route's is public, as live-verify prints it; the flood route's is not read there", async () => {
+    expect(stepOf("/api/news/health")).toMatch(/j\.process\.pid/);
+    expect(stepOf("/api/flood/health")).not.toMatch(/j\.process/);
+    const body = await (await newsHealth(new Request("https://site.test/api/news/health"))).json();
+    expect(body.process).toEqual({ pid: process.pid, uptimeS: expect.any(Number) });
   });
 });
 

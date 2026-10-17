@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { ReconciledMetric } from "./types";
 import {
+  builtFromKinds,
   builtSentence,
   changedSinceSentence,
   documentLabel,
@@ -110,6 +111,24 @@ describe("modelProvenance — when, from what, and what changed since", () => {
     expect(p.added).toEqual([]);
     expect(p.removed).toEqual(["Rent roll: rr.xlsx"]);
     expect(sourcingSentence(p)).toBe("Built from your documents: every assumption below names the document it came from, and conflicts are listed below.");
+  });
+
+  it("says the sample's undated fixture as the sample deal's model, built from the sample deal's documents", () => {
+    const p = modelProvenance({ metrics: [row("T-12")], generatedFrom: ["Offering memorandum: Harbor-OM.pdf", "T-12: t12.pdf"] }, []);
+    expect(builtSentence(p, { sample: true })).toBe("The sample deal's model, built from Harbor-OM.pdf (Offering memorandum), t12.pdf (T-12).");
+    expect(sourcingSentence(p, { sample: true })).toBe(
+      "Built from the sample deal's documents: every assumption below names the document it came from, and conflicts are listed below.",
+    );
+    expect(sourcingSentence({ stated: 1, assumed: 2 }, { sample: true })).toMatch(/^Built from the sample deal's documents where they state a figure/);
+    // A dated build says its day whoever's it is.
+    expect(builtSentence({ builtOn: "Sep 30, 2026", builtFrom: [] }, { sample: true })).toBe("Built Sep 30, 2026.");
+  });
+
+  it("reads the kinds a model was built from off its labels, a kind's name or the start of it", () => {
+    expect([...builtFromKinds(["Offering memorandum: a.pdf", "Rent roll: b.xlsx", "T-12: c.pdf"])]).toEqual(["om", "rent_roll", "t12"]);
+    expect([...builtFromKinds(["T-12 / operating statement: c.pdf", "Loan terms: q.pdf"])]).toEqual(["t12", "loan_terms"]);
+    expect([...builtFromKinds(["plain.pdf", "Mystery: x.pdf", "T: y.pdf"])]).toEqual([]);
+    expect([...builtFromKinds(undefined)]).toEqual([]);
   });
 
   it("shows a document as its file, then its kind", () => {

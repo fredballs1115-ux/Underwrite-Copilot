@@ -2,7 +2,7 @@ import "server-only";
 import ExcelJS from "exceljs";
 import { isIsoDate, type Lease } from "@/lib/rentroll/schema";
 import type { WorkbookInputs } from "./cashflow";
-import { buildRentRollCashFlow } from "./cashflow";
+import { buildRentRollCashFlow, noRateText } from "./cashflow";
 
 /**
  * The rent-roll model workbook (Phase 3) — four tabs, LIVE FORMULAS.
@@ -49,7 +49,15 @@ const FMT = {
   int: "#,##0",
   num1: "#,##0.0",
   mult: '0.00"x"',
+  /** a price that is none (lib/underwrite/workbook's own): the model's
+   *  figure stays in the cell and reads as no price until one is typed */
+  usdNoPrice: '$#,##0;"no price: enter one";"no price: enter one"',
   date: "mm/dd/yyyy",
+  /** a calendar year, never "2,027" */
+  year: "0",
+  /** a 1/0 indicator shown as Yes/No: the cell keeps its number, which the
+   *  roll statistics' SUMPRODUCTs read */
+  flag: '"Yes";"Yes";"No"',
 } as const;
 
 /** Excel serial for an ISO date, off the 1899-12-30 epoch — null for a day
@@ -189,13 +197,14 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
   });
   // What the export assumes and leaves to the reader, said before any figure
   // is read — words only: the cells below and every formula are unchanged.
+  const priceNote = inputs.notes?.price ?? null;
   label(
     ws.getCell(3, 1),
     `Before you read the IRR: general vacancy (row ${A.vacancy}) comes off every year's revenue on top of the space the lease-up leaves empty${
       inputs.reimbursementPct === 0
         ? `, and expense recovery (row ${A.reimbursement}) is 0% — no tenant reimburses an expense`
         : ""
-    }. Set both to your own view.`,
+    }. Set both to your own view.${priceNote ? ` ${priceNote}` : ""}`,
     { bold: true, color: CAUTION },
   );
   const notes = inputs.notes ?? {};
@@ -229,7 +238,7 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
   // a roll that states none starts from the day the file was made.
   row(A.asOf, "Analysis start date", isoToSerial(inputs.asOf), FMT.date, notes.asOf ?? "Years to expiry are counted from it.");
   row(A.holdYears, "Hold period (years)", inputs.holdYears, FMT.int, "Sale at the end of this year, on forward NOI.");
-  row(A.price, "Purchase price", inputs.purchasePrice, FMT.usd, "");
+  row(A.price, "Purchase price", inputs.purchasePrice, notes.priceIsNone ? FMT.usdNoPrice : FMT.usd, notes.price ?? "");
   row(A.closingPct, "Closing costs (% of price)", inputs.closingCostPct, FMT.pct2, "");
 
   sectionHeader(ws, 11, "Market leasing assumptions", 1, 3);
@@ -341,12 +350,15 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
     FMT.int,
     "Zero while the loan is still interest-only at sale.",
   );
+  // The closed form divides by the monthly rate, so a 0% loan takes the
+  // mirror's own branch (lib/export/cashflow `balanceAfter`): the loan less
+  // the level payments made, never #DIV/0!.
   derived(
     A.balanceAtExit,
     "Loan balance at exit",
-    `MAX(0,${AR(A.loanAmount)}*(1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-${AR(A.monthlyPayment)}*((1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-1)/${AR(A.monthlyRate)})`,
+    `IF(${AR(A.monthlyRate)}=0,MAX(0,${AR(A.loanAmount)}-${AR(A.monthlyPayment)}*${AR(A.amortizingMonths)}),MAX(0,${AR(A.loanAmount)}*(1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-${AR(A.monthlyPayment)}*((1+${AR(A.monthlyRate)})^${AR(A.amortizingMonths)}-1)/${AR(A.monthlyRate)}))`,
     FMT.usd,
-    "Closed form, so no FV sign ambiguity.",
+    "Closed form, so no FV sign ambiguity; at a 0% rate, the loan less the payments made.",
   );
 }
 
@@ -375,7 +387,9 @@ function buildRentRoll(
   leases: Lease[],
   inputs: WorkbookInputs,
 ): RentRollAnchors {
-  const widths = [10, 30, 11, 12, 12, 14, 10, 8, 10, 10, 12, 10, 10, 9];
+  // Column A carries the suites and, under the roll, the statistics' labels
+  // ("WALT — rent weighted (yrs)"), which a 10-wide column cut off.
+  const widths = [28, 30, 11, 12, 12, 14, 10, 8, 10, 10, 12, 10, 10, 9];
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w));
 
   titleRow(ws, `RENT ROLL — ${inputs.dealName}`);
@@ -425,16 +439,16 @@ function buildRentRoll(
     f(7, `IF(N(C${r})=0,"",F${r}/C${r})`, FMT.psf);
     v(8, l.rentBasis === "unknown" ? "" : l.rentBasis);
     v(9, l.escalationPct, FMT.pct2);
-    f(10, `IF(E${r}="","",YEAR(E${r}))`, FMT.int);
+    f(10, `IF(E${r}="","",YEAR(E${r}))`, FMT.year);
     // 0, not "", so the SUMPRODUCT weightings below stay numeric.
     f(11, `IF(E${r}="",0,MAX(0,(E${r}-${AR(A.asOf)})/365.25))`, FMT.num1);
     f(12, `IF(${AR(A.nra)}=0,"",C${r}/${AR(A.nra)})`, FMT.pct1);
     // Two indicator columns, so every roll statistic is a SUMPRODUCT over
     // numbers rather than a criteria string a reader might interpret its own
     // way: M = the space is occupied, N = it is occupied AND carries a date
-    // (the WALT basis).
-    f(13, `IF(B${r}="",0,1)`, FMT.int);
-    f(14, `IF(OR(E${r}="",M${r}=0),0,1)`, FMT.int);
+    // (the WALT basis). Each shows Yes or No and holds its 1 or 0.
+    f(13, `IF(B${r}="",0,1)`, FMT.flag);
+    f(14, `IF(OR(E${r}="",M${r}=0),0,1)`, FMT.flag);
     if (i % 2 === 1) {
       for (let c = 1; c <= 14; c++) {
         ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
@@ -567,7 +581,7 @@ function buildRollover(
       else styleFormula(cell, fmt);
     };
 
-    f(2, `YEAR(${AR(A.asOf)})+A${r}-1`, FMT.int);
+    f(2, `YEAR(${AR(A.asOf)})+A${r}-1`, FMT.year);
     // Analysis year 1 absorbs anything already expired (holdover) as well as
     // its own calendar year; later years take their year alone.
     const criteria = n === 1 ? `"<="&B${r}` : `B${r}`;
@@ -896,7 +910,16 @@ function buildCashFlow(
   const revCol = colLetter(reversionCol);
   const lastCol = colLetter(lastYearCol);
   single(CF.reversionNoi, "Reversion NOI (forward year)", `${revCol}${CF.noi}`, FMT.usd);
-  single(CF.grossSale, "Gross sale proceeds", `B${CF.reversionNoi}/${AR(A.exitCap)}`, FMT.usd);
+  // No price is struck on an exit cap of 0% or below: the cell reads zero, as
+  // the mirror's `grossSaleProceeds` does, where it had read #DIV/0! and
+  // carried the error into every return below it.
+  single(
+    CF.grossSale,
+    "Gross sale proceeds",
+    `IF(${AR(A.exitCap)}>0,B${CF.reversionNoi}/${AR(A.exitCap)},0)`,
+    FMT.usd,
+  );
+  ws.getCell(CF.grossSale, 2).note = "Forward NOI over the exit cap; zero where the exit cap is 0% or below, which strikes no price.";
   single(CF.saleCosts, "Costs of sale", `-B${CF.grossSale}*${AR(A.saleCostPct)}`, FMT.usd);
   single(CF.loanPayoff, "Loan payoff", `-${AR(A.balanceAtExit)}`, FMT.usd);
   single(
@@ -966,24 +989,20 @@ function buildCashFlow(
   }
 
   sectionHeader(ws, 41, "Returns", 1, reversionCol);
-  single(
-    CF.unleveredIrr,
-    "Unlevered IRR",
-    `IRR(B${CF.unleveredVector}:${lastCol}${CF.unleveredVector})`,
-    FMT.pct2,
-    true,
-  );
-  single(
-    CF.leveredIrr,
-    "Levered IRR",
-    `IRR(B${CF.leveredVector}:${lastCol}${CF.leveredVector})`,
-    FMT.pct2,
-    true,
-  );
+  // A rate is a formula still, wrapped so flows no rate solves read a
+  // sentence instead of #NUM! (Excel) or Err:523 (LibreOffice): "never turn
+  // positive" only where MAX of the flows says so (lib/export/cashflow
+  // `noRateText`, the mirror's own words).
+  const rateOr = (fn: string, range: string, measure: "IRR" | "XIRR", flows: "levered" | "unlevered") =>
+    `IFERROR(${fn},IF(MAX(${range})<=0,"${noRateText(measure, flows, true)}","${noRateText(measure, flows, false)}"))`;
+  const unleveredRange = `B${CF.unleveredVector}:${lastCol}${CF.unleveredVector}`;
+  const leveredRange = `B${CF.leveredVector}:${lastCol}${CF.leveredVector}`;
+  single(CF.unleveredIrr, "Unlevered IRR", rateOr(`IRR(${unleveredRange})`, unleveredRange, "IRR", "unlevered"), FMT.pct2, true);
+  single(CF.leveredIrr, "Levered IRR", rateOr(`IRR(${leveredRange})`, leveredRange, "IRR", "levered"), FMT.pct2, true);
   single(
     CF.leveredXirr,
     "Levered XIRR (dated)",
-    `XIRR(B${CF.leveredVector}:${lastCol}${CF.leveredVector},B${CF.date}:${lastCol}${CF.date})`,
+    rateOr(`XIRR(${leveredRange},B${CF.date}:${lastCol}${CF.date})`, leveredRange, "XIRR", "levered"),
     FMT.pct2,
   );
   single(

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import rulesFile from "@/data/research/regulatory_rules.json";
 import {
   evaluateRules,
   jurisdictionMatches,
+  OPEN_QUESTION_LABELS,
+  RULE_UNVERIFIED,
   vsRange,
   type RegulatoryRule,
   type RuleSubject,
@@ -96,6 +99,27 @@ describe("jurisdictionMatches", () => {
   });
 });
 
+// The batch-2 audit: the regulation panel said an unverified rule possibly
+// applies while the rules panel beside it said "Applies" with an
+// "unverified" badge. The evaluation itself now says it, for every surface.
+describe("evaluateRules — a rule the site has not verified", () => {
+  it("possibly applies where it would apply, and says why; a verified rule is unchanged", () => {
+    const subject = { ...dcRowhouse, building_permit_year: 1960 };
+    const unverified = { ...dcCoverage, id: "unverified-coverage", status: "unverified_not_found" as const };
+    const sourceless = { ...dcCoverage, id: "sourceless-coverage", source: "" };
+    const out = evaluateRules([dcCoverage, unverified, sourceless], subject);
+    expect(out.find((r) => r.rule.id === dcCoverage.id)).toMatchObject({ outcome: "applies" });
+    for (const id of ["unverified-coverage", "sourceless-coverage"]) {
+      const e = out.find((r) => r.rule.id === id)!;
+      expect(e.outcome, id).toBe("possibly_applies");
+      expect(e.unknowns[0], id).toBe(RULE_UNVERIFIED);
+    }
+    expect(OPEN_QUESTION_LABELS[RULE_UNVERIFIED]).toBe("the ordinance itself, which the site has not verified");
+    // A rule that reaches no deal stays not applicable, verified or not.
+    expect(evaluateRules([unverified], { ...dcRowhouse, building_permit_year: 1994 })[0].outcome).toBe("not_applicable");
+  });
+});
+
 describe("evaluateRules — DC rent stabilization", () => {
   it("pre-1976 + natural person + registered → exemption rule says exempt", () => {
     const out = evaluateRules([dcCoverage, dcSmallLandlord], {
@@ -182,5 +206,75 @@ describe("ranges", () => {
     expect(vsRange(700, 400, 600)).toBe("above");
     expect(vsRange(700, null, null)).toBe("no_range");
     expect(vsRange(700, 400, null)).toBe("within");
+  });
+});
+
+describe("an open question is named as the question it asks", () => {
+  const rules = (Array.isArray(rulesFile) ? rulesFile : (rulesFile as { rules: RegulatoryRule[] }).rules) as RegulatoryRule[];
+
+  it("labels every condition a rule in the file can leave open", () => {
+    const keys = new Set<string>();
+    const walk = (c: unknown) => {
+      if (!c || typeof c !== "object") return;
+      for (const [k, v] of Object.entries(c as Record<string, unknown>)) {
+        if (k === "any_of" && Array.isArray(v)) v.forEach(walk);
+        else keys.add(k);
+      }
+    };
+    for (const r of rules) {
+      walk(r.applies_if);
+      walk(r.exempt_if);
+    }
+    expect(keys.size).toBeGreaterThan(10);
+    for (const k of keys) expect(OPEN_QUESTION_LABELS[k], k).toBeTruthy();
+  });
+
+  it("names an open any-of by the questions inside it, never as 'any of'", () => {
+    const moco = rules.find((r) => r.id === "md-moco-rent-stabilization")!;
+    // A duplex in the county with no year built and no answer on
+    // owner-occupancy: both exemptions are open.
+    const [e] = evaluateRules([moco], {
+      state: "MD",
+      locality: ["Montgomery County"],
+      units: 2,
+      property_type: "rental_housing",
+      current_year: 2026,
+      today: "2026-10-05",
+    });
+    expect(e.unknowns).not.toContain("any_of");
+    expect(e.unknowns).toEqual(expect.arrayContaining(["building_age_years_lt", "owner_occupied_with_units_lte"]));
+    // One branch answered yes: nothing is open.
+    const [old] = evaluateRules([moco], {
+      state: "MD",
+      locality: ["Montgomery County"],
+      units: 40,
+      property_type: "rental_housing",
+      built_year: 2015,
+      current_year: 2026,
+      today: "2026-10-05",
+    });
+    expect(old.unknowns).not.toContain("building_age_years_lt");
+  });
+
+  // The audit of 2026-10-05: a building over an owner-occupancy exemption's
+  // unit limit was still asked whether the buyer would live in it, so the
+  // cap "possibly applied" where it applies.
+  it("never asks a building over an owner-occupancy exemption's unit limit whether the buyer will live in it", () => {
+    const rule = (id: string) => rules.find((r) => r.id === id)!;
+    const subject = { property_type: "rental_housing", current_year: 2026, today: "2026-10-05" };
+    const [seattle] = evaluateRules([rule("wa-rent-cap-hb1217")], { ...subject, state: "WA", locality: ["Seattle"], units: 48, built_year: 1990 });
+    expect(seattle.unknowns).not.toContain("owner_occupied_with_units_lte");
+    expect(seattle.outcome).toBe("applies");
+    const [newark] = evaluateRules([rule("nj-newark-rent-control")], { ...subject, state: "NJ", locality: ["Newark"], units: 120, built_year: 1960 });
+    expect(newark.unknowns).toEqual([]);
+    expect(newark.outcome).toBe("applies");
+    // MoCo's 40-unit building of no stated year: only its age is open.
+    const [moco] = evaluateRules([rule("md-moco-rent-stabilization")], { ...subject, state: "MD", locality: ["Montgomery County"], units: 40 });
+    expect(moco.unknowns).toEqual(["building_age_years_lt"]);
+    // At or under the limit the question stays open; with no count, open too.
+    const [duplex] = evaluateRules([rule("nj-newark-rent-control")], { ...subject, state: "NJ", locality: ["Newark"], units: 4 });
+    expect(duplex.unknowns).toEqual(["owner_occupied_with_units_lte"]);
+    const [uncounted] = evaluateRules([rule("nj-newark-rent-control")], { ...subject, state: "NJ", locality: ["Newark"] });
+    expect(uncounted.outcome).toBe("possibly_applies");
   });
 });

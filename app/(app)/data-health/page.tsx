@@ -9,6 +9,7 @@ import { SAMPLE_METRO, SAMPLE_STATE, feedHealth, type FeedStatus } from "@/lib/f
 import { isSiteOperator } from "@/lib/operator-server";
 import { CostCard, type UsageRow } from "./cost-card";
 import { FeedsCard } from "./feeds-card";
+import { ISSUES_LISTED, openIssuesCount, openIssuesCutLine } from "@/lib/open-issues";
 
 export const metadata: Metadata = { title: "Data health" };
 
@@ -95,13 +96,17 @@ export default async function DataHealthPage() {
   const supabase = await createSupabaseServerClient();
   let runs: RunRow[] = [];
   let issues: IssueRow[] = [];
+  // Every open issue, counted (the list is the newest ISSUES_LISTED), and
+  // whether the read failed — a failed read is said, never "Nothing open".
+  let issueTotal: number | null = null;
+  let issuesFailed = false;
   let changes: ChangeRow[] = [];
   let migrated = true;
   try {
     // The corrections are everyone's, and so is the newest run's date (the
     // page's opening sentence says when the steward last ran); the runs'
     // detail and the open issues are read only for the operator.
-    const [r, i, c] = await Promise.all([
+    const [r, i, c, n] = await Promise.all([
       supabase
         .from("steward_runs")
         .select(operator ? "id, started_at, finished_at, checks_run, issues_found, notes" : "id, started_at, finished_at")
@@ -113,14 +118,20 @@ export default async function DataHealthPage() {
             .select("id, kind, subject, detail, detected_at")
             .is("resolved_at", null)
             .order("detected_at", { ascending: false })
-            .limit(50)
+            .order("id")
+            .limit(ISSUES_LISTED)
         : null,
       supabase
         .from("data_changelog")
         .select("id, subject, old_value, new_value, reason, source_url, changed_at")
         .order("changed_at", { ascending: false })
         .limit(20),
+      operator
+        ? supabase.from("data_issues").select("id", { count: "exact", head: true }).is("resolved_at", null)
+        : null,
     ]);
+    issuesFailed = !!i?.error;
+    issueTotal = n && !n.error ? (n.count ?? null) : null;
     if (r.error) migrated = false;
     runs = (r.data as unknown as RunRow[] | null) ?? [];
     issues = (i?.data as IssueRow[] | null) ?? [];
@@ -258,9 +269,13 @@ export default async function DataHealthPage() {
           <section className="rounded-xl border border-line bg-surface p-4">
             <h2 className="text-sm font-semibold">
               Open issues{" "}
-              <span className="ml-1 font-normal text-muted">({issues.length})</span>
+              {!issuesFailed && (
+                <span className="ml-1 font-normal text-muted">({openIssuesCount(issues.length, issueTotal)})</span>
+              )}
             </h2>
-            {issues.length === 0 ? (
+            {issuesFailed ? (
+              <p className="mt-1 text-sm text-caution">Couldn’t read the open issues just now — refresh in a moment.</p>
+            ) : issues.length === 0 ? (
               <p className="mt-1 text-sm text-muted">
                 Nothing open. Issues appear here the night something breaks — a
                 source link dies, a feed goes quiet, an invariant fails, a claim
@@ -284,6 +299,11 @@ export default async function DataHealthPage() {
                   );
                 })}
               </ul>
+            )}
+            {!issuesFailed && openIssuesCutLine(issues.length, issueTotal) && (
+              <p data-qa="issues-cut" className="mt-2 text-[11px] text-muted">
+                {openIssuesCutLine(issues.length, issueTotal)}
+              </p>
             )}
           </section>
         </>

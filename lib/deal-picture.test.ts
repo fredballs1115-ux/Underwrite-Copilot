@@ -62,7 +62,11 @@ import {
   PHOTO_RULES_SINCE,
   PICTURE_SEARCH_VERSION,
   RETRY_AFTER_MS,
+  backfillCard,
   backfillPreview,
+  cardCopyDue,
+  cardOf,
+  cardPathOf,
   clearOmPicture,
   currentPicture,
   derivePicture,
@@ -78,6 +82,7 @@ import {
   searchedRecently,
 } from "./deal-picture";
 import { PREVIEW_PX, isPreview } from "./photo-preview";
+import { CARD_PX } from "./photo-srcset";
 import sharp from "sharp";
 
 // These tests build real memoranda and read them through pdfjs and sharp: a
@@ -90,16 +95,40 @@ vi.setConfig({ testTimeout: 30_000 });
 /** A deals table of one row's photo cache, read and written as the code does. */
 function fakeDb(photo: DealVisualCache | null) {
   const db = { photo };
+  // What a filter on a jsonb path reads ("photo->picture->>hero",
+  // "photo->gallery->1->>hero"): the value at that path, as stored.
+  const at = (path: string): unknown => {
+    let v: unknown = { photo: db.photo };
+    for (const k of path.split(/->>?/)) v = v == null ? undefined : (v as Record<string, unknown>)[k];
+    return v;
+  };
   const client = {
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { photo: db.photo } }) }) }),
-      update: (row: { photo: DealVisualCache }) => ({
-        eq: async () => {
+      update: (row: { photo: DealVisualCache }) => {
+        const filters: ((col: string) => boolean)[] = [];
+        const write = async () => {
+          // A filter the stored row no longer meets matches no row.
+          if (filters.some((meets) => !meets("d1"))) return { data: [], error: null };
           // What a jsonb column keeps: the object as JSON, undefined dropped.
           db.photo = JSON.parse(JSON.stringify(row.photo));
-          return { error: null };
-        },
-      }),
+          return { data: [{ id: "d1" }], error: null };
+        };
+        const chain = {
+          eq: (col: string, v: unknown) => {
+            if (col !== "id") filters.push(() => at(col) === v);
+            return chain;
+          },
+          // `is null` on a jsonb path: no value there, or a JSON null.
+          is: (col: string, v: null) => {
+            filters.push(() => (v === null ? at(col) == null : at(col) === v));
+            return chain;
+          },
+          select: () => write(),
+          then: (ok: (r: unknown) => unknown, fail?: (e: unknown) => unknown) => write().then(ok, fail),
+        };
+        return chain;
+      },
     }),
   } as unknown as SupabaseClient;
   return { client, db };
@@ -133,8 +162,9 @@ describe("a memorandum photograph lifted under older rules, judged again (#444)"
     expect({ w: got!.width, h: got!.height, source: got!.source }).toEqual({ w: 1200, h: 750, source: "om" });
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
     expect(db.photo?.picture?.hero).toBe(got!.hero);
-    expect(store.uploads).toHaveLength(2);
-    expect(store.removed).toEqual([OLD.hero, OLD.thumb]);
+    // The hero, the thumbnail and the card copy (research pass 29).
+    expect(store.uploads).toHaveLength(3);
+    expect(store.removed).toEqual([OLD.hero, OLD.thumb, "photos/d1/old-card.jpg"]);
   });
 
   it("is dropped where the first pages hold no photograph, so the card shows the next picture", async () => {
@@ -144,7 +174,7 @@ describe("a memorandum photograph lifted under older rules, judged again (#444)"
     expect(got).toBeNull();
     expect(db.photo?.picture).toBeUndefined();
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
-    expect(store.removed).toEqual([OLD.hero, OLD.thumb]);
+    expect(store.removed).toEqual([OLD.hero, OLD.thumb, "photos/d1/old-card.jpg"]);
     expect(store.uploads).toEqual([]);
   });
 
@@ -262,7 +292,7 @@ describe("a read the time budget cut short writes no verdict", () => {
     expect(db.photo?.picture).toBeUndefined();
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
     expect(currentPicture(db.photo)).toBeNull();
-    expect(store.removed).toEqual([OLD.hero, OLD.thumb]);
+    expect(store.removed).toEqual([OLD.hero, OLD.thumb, "photos/d1/old-card.jpg"]);
     expect(store.uploads).toEqual([]);
   });
 
@@ -326,7 +356,7 @@ describe("a cover stored as JPEG 2000", () => {
     expect(got).toMatchObject({ source: "om", width: 1200, height: 750 });
     expect(db.photo?.picture?.hero).toBe(got!.hero);
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
-    expect(store.uploads).toHaveLength(2);
+    expect(store.uploads).toHaveLength(3);
   });
 });
 
@@ -362,8 +392,8 @@ describe("a full-size copy, where the source is larger than the hero", () => {
     expect(got).toMatchObject({ width: 1600, height: 1000, fullWidth: 2560, fullHeight: 1600, derivedV: DERIVED_VERSION });
     expect(got!.full).toMatch(/^photos\/d1\/[a-z0-9]+-full\.jpg$/);
     expect(db.photo?.picture).toEqual(got);
-    expect(store.uploads).toHaveLength(3);
-    expect(picturePaths(db.photo)).toEqual([got!.hero, got!.thumb, got!.full]);
+    expect(store.uploads).toHaveLength(4);
+    expect(picturePaths(db.photo)).toEqual([got!.hero, got!.thumb, got!.card, got!.full]);
     // What the route serves for each size: the full copy where one is
     // stored, the hero where none is.
     expect(picturePathFor(got!, "full")).toBe(got!.full);
@@ -400,7 +430,7 @@ describe("a memorandum's photograph derived before the full-size copy, made agai
     expect(db.photo?.picture).toMatchObject({ source: "om", width: 1600, height: 1000, fullWidth: 2560 });
     expect(db.photo?.picture?.hero).not.toBe(was.hero);
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
-    expect(store.removed).toEqual([was.hero, was.thumb]);
+    expect(store.removed).toEqual([was.hero, was.thumb, was.hero.replace("-hero", "-card")]);
     // Made again once: the next view reads nothing.
     const uploads = store.uploads.length;
     await ask(client, db.photo);
@@ -441,7 +471,7 @@ describe("a memorandum's photograph derived before the full-size copy, made agai
     const own: DealPicture = { ...OLD, hero: "photos/d1/own-hero.jpg", thumb: "photos/d1/own-thumb.jpg", source: "upload" };
     db.photo = { ...db.photo!, picture: own };
     open();
-    await vi.waitFor(() => expect(store.removed).toHaveLength(3), { timeout: 15_000 });
+    await vi.waitFor(() => expect(store.removed).toHaveLength(4), { timeout: 15_000 });
     expect(db.photo?.picture).toEqual(own);
     expect([...store.removed].sort()).toEqual([...store.uploads].sort());
   });
@@ -472,8 +502,8 @@ describe("the memorandum's bytes a caller already holds (the screen's lift)", ()
     expect(got?.source).toBe("om");
     expect(db.photo?.picture?.hero).toBe(got!.hero);
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
-    // The cover and its thumbnail, and the caller's buffer untouched.
-    expect(store.uploads).toHaveLength(2);
+    // The cover, its thumbnail and its card copy, and the caller's buffer untouched.
+    expect(store.uploads).toHaveLength(3);
     expect(Buffer.from(pdf).equals(before)).toBe(true);
   });
 });
@@ -508,8 +538,8 @@ describe("the memorandum's other photographs, read behind the cover (#448)", () 
       expect(g.hero).toMatch(/^photos\/d1\/[a-z0-9]+-hero\.jpg$/);
       expect(g.thumb).toMatch(/^photos\/d1\/[a-z0-9]+-thumb\.jpg$/);
     }
-    expect(store.uploads).toHaveLength(6);
-    expect(picturePaths(db.photo)).toHaveLength(6);
+    expect(store.uploads).toHaveLength(9);
+    expect(picturePaths(db.photo)).toHaveLength(9);
   });
 
   it("reads the gallery of a deal whose cover is current, behind the render, passing over the cover", async () => {
@@ -526,7 +556,7 @@ describe("the memorandum's other photographs, read behind the cover (#448)", () 
     expect(got).toEqual(cache.picture);
     await vi.waitFor(() => expect(db.photo?.galleryV).toBe(GALLERY_VERSION), { timeout: 15_000 });
     expect(db.photo?.gallery?.map((g) => g.page)).toEqual([2, 4]);
-    expect(store.removed).toEqual(before.flatMap((h) => [h, h.replace("-hero", "-thumb")]));
+    expect(store.removed).toEqual(before.flatMap((h) => [h, h.replace("-hero", "-thumb"), h.replace("-hero", "-card")]));
   });
 
   it("a gallery read the time cut short is counted and waits its turn, never stamped as the gallery until the third", async () => {
@@ -570,7 +600,7 @@ describe("the memorandum's other photographs, read behind the cover (#448)", () 
     expect(db.photo?.picture).toEqual(own);
     expect(db.photo?.gallery).toBeUndefined();
     expect(db.photo?.galleryV).toBeUndefined();
-    expect(store.removed).toEqual(["photos/d1/xg1-hero.jpg", "photos/d1/xg1-thumb.jpg"]);
+    expect(store.removed).toEqual(["photos/d1/xg1-hero.jpg", "photos/d1/xg1-thumb.jpg", "photos/d1/xg1-card.jpg"]);
   });
 
   it("is left to the deal's first view where the caller asks for the cover alone (#464, the worker)", async () => {
@@ -581,12 +611,12 @@ describe("the memorandum's other photographs, read behind the cover (#448)", () 
     await new Promise((r) => setTimeout(r, 300));
     expect(db.photo?.gallery).toBeUndefined();
     expect(db.photo?.galleryV).toBeUndefined();
-    // The cover and its thumb, nothing else.
-    expect(store.uploads).toHaveLength(2);
+    // The cover, its thumb and its card copy, nothing else.
+    expect(store.uploads).toHaveLength(3);
     // Current now, the cover is answered with no gallery started behind it.
     await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: db.photo, gallery: false });
     await new Promise((r) => setTimeout(r, 300));
-    expect(store.uploads).toHaveLength(2);
+    expect(store.uploads).toHaveLength(3);
     // The deal's first view reads it.
     await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: db.photo });
     await vi.waitFor(() => expect(db.photo?.galleryV).toBe(GALLERY_VERSION), { timeout: 15_000 });
@@ -660,5 +690,147 @@ describe("the blur-up preview each stored photograph carries (#463)", () => {
     const third = fakeDb({ picture: { ...OLD, preview: kept } });
     await backfillPreview(third.client, "d1", OLD, Buffer.from(hero));
     expect(third.db.photo?.picture?.preview).toBe(kept);
+  });
+});
+
+describe("the card copy a pipeline card's srcset offers beside the hero (research pass 29)", () => {
+  beforeEach(resetStore);
+
+  it("is 800px on its long side wherever the hero is longer, made from the photograph itself and never enlarged", async () => {
+    const big = await derivePicture(await testPicture(3200, 2000, "jpeg", 1));
+    expect(big.card && { w: big.card.width, h: big.card.height }).toEqual({ w: CARD_PX, h: 500 });
+    expect((await sharp(big.card!.bytes).metadata()).format).toBe("jpeg");
+    // A portrait photograph's long side is its height.
+    const tall = await derivePicture(await testPicture(2000, 3000, "jpeg", 2));
+    expect(tall.card && { w: tall.card.width, h: tall.card.height }).toEqual({ w: 533, h: CARD_PX });
+    // A small cover's hero is enlarged for the deal page (#446); its card
+    // copy is its own pixels, never enlarged.
+    const small = await derivePicture(await testPicture(700, 438, "jpeg", 3));
+    expect(small.width).toBe(1200);
+    expect(small.card && { w: small.card.width, h: small.card.height }).toEqual({ w: 700, h: 438 });
+    // A hero no longer than a card copy is its own card.
+    const tiny = await derivePicture(await testPicture(380, 240, "jpeg", 4));
+    expect(tiny.width).toBe(760);
+    expect(tiny.card).toBeNull();
+  });
+
+  it("is swept by its path even where a later write lost its record", () => {
+    // A copy stored after a response can be written over by another write
+    // to the photo cache made from an earlier read; the deletion sweep still
+    // reaches it, by the hero's own path with its size changed.
+    const unrecorded: DealPicture = {
+      hero: "photos/d1/abc-hero.jpg",
+      thumb: "photos/d1/abc-thumb.jpg",
+      source: "om",
+      width: 1600,
+      height: 1000,
+      at: "2026-10-05T00:00:00.000Z",
+    };
+    expect(picturePaths({ picture: unrecorded })).toEqual([unrecorded.hero, unrecorded.thumb, "photos/d1/abc-card.jpg"]);
+    expect(picturePaths({ gallery: [unrecorded] })).toContain("photos/d1/abc-card.jpg");
+    // A recorded copy is listed once.
+    const recorded = { ...unrecorded, card: "photos/d1/abc-card.jpg" };
+    expect(picturePaths({ picture: recorded }).filter((p) => p.endsWith("-card.jpg"))).toHaveLength(1);
+  });
+
+  it("is stored beside the hero under its stamp, served as the `card` size, and swept with the rest", async () => {
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await testPicture(3200, 2000, "jpeg", 1)] }]));
+    const { client, db } = fakeDb(null);
+    const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: null, waitMs: 5_000, gallery: false });
+    expect(got).toMatchObject({ width: 1600, height: 1000, cardWidth: CARD_PX, cardHeight: 500 });
+    expect(got!.card).toBe(got!.hero.replace("-hero.jpg", "-card.jpg"));
+    expect(cardPathOf(got!)).toBe(got!.card);
+    expect(cardCopyDue(got!)).toBe(false);
+    expect(picturePathFor(got!, "card")).toBe(got!.card);
+    expect((await sharp(await readPictureBytes("d1", got!, "card")).metadata()).width).toBe(CARD_PX);
+    expect(picturePaths(db.photo)).toContain(got!.card);
+  });
+
+  it("is made from a stored hero for a photograph stored before, and stored onto it after the route's response", async () => {
+    // OLD: a 1600 x 1100 hero, stored before card copies.
+    expect(cardCopyDue(OLD)).toBe(true);
+    expect(cardCopyDue({ ...OLD, width: 800, height: 550 })).toBe(false);
+    // Until it is stored, the `card` size reads the hero.
+    expect(picturePathFor(OLD, "card")).toBe(OLD.hero);
+    const made = await cardOf(await testPicture(1600, 1100, "jpeg", 5));
+    expect(made && { w: made.width, h: made.height }).toEqual({ w: CARD_PX, h: 550 });
+    // Never enlarged: a hero no longer than a card copy makes none.
+    expect(await cardOf(await testPicture(800, 550, "jpeg", 5))).toBeNull();
+    expect(await cardOf(Buffer.from("not a picture"))).toBeNull();
+    const cache: DealVisualCache = { picture: OLD, pictureSearchV: PICTURE_SEARCH_VERSION, galleryV: GALLERY_VERSION };
+    const { client, db } = fakeDb(cache);
+    await backfillCard(client, "d1", OLD, made!);
+    expect(store.uploads).toEqual(["photos/d1/old-card.jpg"]);
+    expect(db.photo?.picture).toEqual({ ...OLD, card: "photos/d1/old-card.jpg", cardWidth: CARD_PX, cardHeight: 550 });
+    // Everything else in the cache as it was.
+    expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
+    expect(db.photo?.galleryV).toBe(GALLERY_VERSION);
+    // Stored once: a second ask finds it in place and puts nothing.
+    await backfillCard(client, "d1", OLD, made!);
+    expect(store.uploads).toHaveLength(1);
+    // A gallery photograph's copy goes onto its own place in the gallery.
+    const g2: DealPicture = { ...OLD, hero: "photos/d1/oldg2-hero.jpg", thumb: "photos/d1/oldg2-thumb.jpg", page: 4 };
+    const withGallery = fakeDb({ picture: OLD, gallery: [{ ...OLD, hero: "photos/d1/oldg1-hero.jpg", page: 2 }, g2] });
+    await backfillCard(withGallery.client, "d1", g2, made!, 2);
+    expect(withGallery.db.photo?.gallery?.[1]).toEqual({ ...g2, card: "photos/d1/oldg2-card.jpg", cardWidth: CARD_PX, cardHeight: 550 });
+    expect(withGallery.db.photo?.gallery?.[0].card).toBeUndefined();
+    expect(withGallery.db.photo?.picture).toEqual(OLD);
+  });
+
+  it("never puts the copy onto a photograph replaced meanwhile, and takes its own file away again", async () => {
+    const made = (await cardOf(await testPicture(1600, 1100, "jpeg", 6)))!;
+    // Replaced before the copy was put: nothing is put.
+    const replaced: DealPicture = { ...OLD, hero: "photos/d1/new-hero.jpg", thumb: "photos/d1/new-thumb.jpg", source: "upload" };
+    const gone = fakeDb({ picture: replaced });
+    await backfillCard(gone.client, "d1", OLD, made);
+    expect(gone.db.photo?.picture).toEqual(replaced);
+    expect(store.uploads).toEqual([]);
+    // Replaced while the copy was put: the copy is taken away again.
+    const racing = fakeDb({ picture: OLD });
+    const put = store.uploads.length;
+    const real = racing.client.from;
+    let reads = 0;
+    (racing.client as unknown as { from: typeof real }).from = (...args: Parameters<typeof real>) => {
+      const q = real(...args);
+      return {
+        ...q,
+        select: (...s: Parameters<typeof q.select>) => {
+          // The second read, just before the write, finds the photograph replaced.
+          if (++reads === 2) racing.db.photo = { picture: replaced };
+          return q.select(...s);
+        },
+      } as typeof q;
+    };
+    await backfillCard(racing.client, "d1", OLD, made);
+    expect(store.uploads.slice(put)).toEqual(["photos/d1/old-card.jpg"]);
+    expect(store.removed).toEqual(["photos/d1/old-card.jpg"]);
+    expect(racing.db.photo?.picture).toEqual(replaced);
+  });
+
+  it("never undoes a replacement that lands between its last read and its write (the batch-2 audit)", async () => {
+    const made = (await cardOf(await testPicture(1600, 1100, "jpeg", 7)))!;
+    const replaced: DealPicture = { ...OLD, hero: "photos/d1/new-hero.jpg", thumb: "photos/d1/new-thumb.jpg", source: "upload" };
+    const late = fakeDb({ picture: OLD });
+    const real = late.client.from;
+    (late.client as unknown as { from: typeof real }).from = (...args: Parameters<typeof real>) => {
+      const q = real(...args);
+      return {
+        ...q,
+        update: (...u: Parameters<typeof q.update>) => {
+          // The reader's upload is stored after both reads, before the write.
+          late.db.photo = { picture: replaced };
+          return q.update(...u);
+        },
+      } as typeof q;
+    };
+    await backfillCard(late.client, "d1", OLD, made);
+    expect(late.db.photo?.picture).toEqual(replaced);
+    // The copy it put is nobody's, and goes.
+    expect(store.removed).toContain("photos/d1/old-card.jpg");
+  });
+
+  it("sweeps a picture's card copy with it wherever the picture goes, recorded or not (the batch-2 audit)", () => {
+    // The deletion sweep and every replacement's sweep list the same files.
+    expect(picturePaths({ picture: OLD })).toEqual([OLD.hero, OLD.thumb, "photos/d1/old-card.jpg"]);
   });
 });

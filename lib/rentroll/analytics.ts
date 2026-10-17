@@ -170,6 +170,55 @@ export function rolloverSchedule(
   return { years, nra, vacantSf, undatedSf, totalSfExpiring };
 }
 
+/** One column of the rollover chart: a calendar year — one with no expiries
+ *  drawn as one, at zero — or, last, the later years folded into one. */
+export interface RolloverBar extends RolloverYear {
+  /** the folded bar's span, first year to last; absent on a single year */
+  through?: number;
+  /** how many calendar years the folded bar holds */
+  foldedYears?: number;
+}
+
+/** The most columns the rollover chart draws before it folds the rest. */
+export const ROLLOVER_CHART_COLUMNS = 12;
+
+/**
+ * The rollover chart's columns: every calendar year from the first expiry to
+ * the last, a year nothing expires in drawn at zero — 2026, 2027 and 2029 side
+ * by side had hidden that 2028 rolls nothing — and, past `columns`, the later
+ * years folded into one last bar that says how many it holds, never dropped
+ * (the chart had cut every year past the twelfth without a word).
+ */
+export function rolloverBars(years: readonly RolloverYear[], columns = ROLLOVER_CHART_COLUMNS): RolloverBar[] {
+  if (!years.length) return [];
+  const byYear = new Map(years.map((y) => [y.year, y]));
+  const first = Math.min(...years.map((y) => y.year));
+  const last = Math.max(...years.map((y) => y.year));
+  // A share of the NRA where the schedule states one; a year at zero is 0% of it.
+  const zeroPct = years.some((y) => y.pctOfNra != null) ? 0 : null;
+  const yearOf = (year: number): RolloverYear =>
+    byYear.get(year) ?? { year, sfExpiring: 0, pctOfNra: zeroPct, rentExpiring: 0, leaseCount: 0, tenants: [] };
+  const span = last - first + 1;
+  if (span <= columns) return Array.from({ length: span }, (_, i) => yearOf(first + i));
+  const shown = Array.from({ length: columns - 1 }, (_, i) => yearOf(first + i));
+  const foldFrom = first + columns - 1;
+  const folded = Array.from({ length: last - foldFrom + 1 }, (_, i) => yearOf(foldFrom + i));
+  const sum = (f: (y: RolloverYear) => number) => folded.reduce((s, y) => s + f(y), 0);
+  return [
+    ...shown,
+    {
+      year: foldFrom,
+      through: last,
+      foldedYears: folded.length,
+      sfExpiring: sum((y) => y.sfExpiring),
+      pctOfNra: zeroPct == null ? null : sum((y) => y.pctOfNra ?? 0),
+      rentExpiring: sum((y) => y.rentExpiring),
+      leaseCount: sum((y) => y.leaseCount),
+      tenants: folded.flatMap((y) => y.tenants),
+    },
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Mark to market
 // ---------------------------------------------------------------------------

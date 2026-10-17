@@ -1,12 +1,56 @@
-import type { PlanSummary } from "@/lib/deal-strategy";
+import { compactUsd } from "@/lib/money";
+import type { PlanSummary, StrategyKind } from "@/lib/deal-strategy";
+import { withArticle } from "@/lib/article";
 
-/** $21.0M / $850k / $400 — the compact money the plan's facts print in. */
-export const moneyCompact = (n: number): string =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(1)}M`
-    : Math.abs(n) >= 1e3
-      ? `$${Math.round(n / 1e3)}k`
-      : `$${Math.round(n)}`;
+/**
+ * Why a plan deal's cap slot holds its yield on total cost, as a tooltip on
+ * the pipeline's card and list and the internal comps. A value-add, a
+ * lease-up or a conversion of an occupied building can carry an in-place
+ * cap — the memorandum's key terms print it — so the words never say the
+ * deal has none: they had read "a plan deal has no going-in cap".
+ */
+export const PLAN_YOC_TITLE =
+  "Yield on total cost — a plan deal is judged on its stabilized NOI over everything the plan costs, not on its in-place cap";
+
+/**
+ * How a plan deal is read, in one sentence under its facts on the shared
+ * screen: judged on its yield on total cost. "A value-add deal has no
+ * going-in cap" had stood beside the key terms' "Going-in cap rate 5.50%",
+ * the memorandum's in-place cap, and a lender reads both lines; the
+ * sentence now says which one the plan is judged on. A development has no
+ * income in place to strike a cap on, so it is not named for one.
+ */
+export function planReadLine(kind: StrategyKind, label: string, landPrice: boolean): string {
+  const notCap = kind === "development" ? "" : ", not on its in-place cap";
+  return `${withArticle(label.toLowerCase(), true)} deal is judged on its yield on total cost${notCap}: the stabilized NOI is the finished project's figure, set over everything the plan costs — never a cap rate on the ${landPrice ? "land" : "acquisition"} price.`;
+}
+
+/** $21.0M / $850k / $400 — the compact money the plan's facts print in,
+ *  rounded as every surface rounds it (lib/money `compactUsd`). */
+export const moneyCompact = (n: number): string => compactUsd(n);
+
+/**
+ * The plan's NOI as every surface that prints it says it: where the
+ * memorandum states it a month at a time (lib/deal-strategy `noiOfRow`,
+ * research pass 40), the year it makes, written to the hundredth of a
+ * million so the twelve visibly ties, with the month beside it —
+ * "$1.32M (twelve times the $110k a month stated)" — never a year bare
+ * beside a key term that says "(monthly)" (audit C4, M2). A year the
+ * memorandum states is written as the facts write every figure.
+ */
+export function planNoiText(f: { value: number; month?: number }, money: (n: number) => string = moneyCompact): string {
+  if (f.month == null) return money(f.value);
+  return `${compactUsd(f.value, { millions: "auto", trim: true })} (twelve times the ${money(f.month)} a month stated)`;
+}
+
+/**
+ * A percent figure — a going-in cap, a yield on cost — as every surface that
+ * shows a deal prints it: to two decimals, the precision an offering
+ * memorandum states a cap in. The pipeline card prints the memorandum's
+ * "5.45%"; the compare table had printed the same cap "5.5%", and the
+ * meeting workbook a plan's "6.27%" yield as "6.30%".
+ */
+export const pctText = (pct: number): string => `${pct.toFixed(2)}%`;
 
 /**
  * A plan's yield on cost as every surface that shows the deal prints it, and
@@ -16,7 +60,34 @@ export const moneyCompact = (n: number): string =>
  * verdict quoting "8.75%" beside a strip's "8.8%" showed one number rounded
  * two ways on one page.
  */
-export const yieldOnCostText = (d: number): string => `${(d * 100).toFixed(2)}%`;
+export const yieldOnCostText = (d: number): string => pctText(d * 100);
+
+/**
+ * A yield on cost's cell where none is struck past the ceiling (lib/deal-
+ * strategy `planSummary`'s `yieldWithheld`, research pass 38): the plan's
+ * facts, the pipeline's CSV and the compare table say it in these words, the
+ * sentence why beside them — never a dash, which reads as a figure the
+ * memorandum did not state.
+ */
+export const YOC_WITHHELD = "n/a — figures don't tie";
+
+/** The ceiling a yield on cost is refused at, percent: lib/deal-strategy's
+ *  IMPLIED_CAP_CEILING, which this import-free module cannot load into the
+ *  pipeline's and the Model tab's client bundles — a test holds the two
+ *  equal. */
+export const YOC_CEILING_PCT = 25;
+
+/**
+ * A first-draft model's own yield on cost at or past the ceiling, refused in
+ * one sentence that never prints the figure — the compare table's cell and
+ * the Model tab's tile, which read the same model, say it alike (research
+ * pass 38); null under it.
+ */
+export function modelYieldWithheld(yieldOnCostPct: number | null | undefined): string | null {
+  return yieldOnCostPct != null && Number.isFinite(yieldOnCostPct) && yieldOnCostPct >= YOC_CEILING_PCT
+    ? `No yield on cost is shown: the first-draft model's stabilized NOI over its total cost is at or past the ${YOC_CEILING_PCT}% the screen holds as a misread, so its total cost or its NOI was most likely misread.`
+    : null;
+}
 
 /**
  * The facts a plan is judged on, as label/value pairs — identical on every
@@ -29,8 +100,10 @@ export const yieldOnCostText = (d: number): string => `${(d * 100).toFixed(2)}%`
 export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] {
   return [
     [
-      "Stabilized NOI",
-      plan.stabilizedNoi ? moneyCompact(plan.stabilizedNoi.value) : "not stated",
+      // A forward purchase's NOI is the one the OM states at delivery (on a
+      // build-to-suit, the lease's first year).
+      plan.forward ? "NOI at delivery" : "Stabilized NOI",
+      plan.stabilizedNoi ? planNoiText(plan.stabilizedNoi) : "not stated",
     ],
     // A price the OM states for something other than the project — a
     // note, the land under a ground lease, a share of no stated percentage
@@ -41,7 +114,10 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
     [
       plan.priceLabel,
       (plan.price ?? plan.equityWhole) != null
-        ? `${moneyCompact((plan.price ?? plan.equityWhole)!)}${plan.entityLoan != null ? `, the entity's ${moneyCompact(plan.entityLoan)} loan on top` : ""}`
+        ? `${moneyCompact((plan.price ?? plan.equityWhole)!)}${
+            // A tenancy in common's loan is the property's (research pass 37).
+            plan.entityLoan != null ? `, ${plan.loanOnProperty ? "the property's" : "the entity's"} ${moneyCompact(plan.entityLoan)} loan on top` : ""
+          }`
         : (plan.priceWithheld ?? "not stated"),
     ],
     [
@@ -49,20 +125,30 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
       // the doors times a door's cost, and the label says it was multiplied.
       plan.budget?.allIn ? "Budget (total cost less price)" : plan.budget?.program ? "Budget (doors × cost a door)" : "Budget",
       // An all-in total with no price stated: the works are inside it and
-      // cannot be split out — the total cost row carries the figure.
+      // cannot be split out — the total cost row carries the figure. On a
+      // forward purchase the developer funds the works: a budget the OM
+      // states is the developer's, never added to the price.
       plan.budget
         ? plan.budget.isTotal
           ? "inside the stated total"
           : moneyCompact(plan.budget.budget)
-        : "not stated",
+        : plan.forward
+          ? plan.developerBudget
+            ? `${moneyCompact(plan.developerBudget.budget)}, the developer's`
+            : "the developer's"
+          : "not stated",
     ],
     ["Total cost", plan.totalCost != null ? moneyCompact(plan.totalCost) : "—"],
-    ["Yield on cost", plan.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : "—"],
+    // A yield no project earns is refused, its sentence under the facts.
+    ["Yield on cost", plan.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : plan.yieldWithheld ? YOC_WITHHELD : "—"],
     // The basis a comp is held against on a plan deal — what a finished
     // unit costs all-in, in the class's own noun (a hotel's per key). Only
-    // when the OM states the planned count.
+    // when the OM states the planned count; none outside the band any
+    // market delivers at, its sentence under the facts (`basisWithheld`).
     ...(plan.costPerUnit != null
       ? [[`Basis per ${noun} (all-in)`, moneyCompact(plan.costPerUnit)] as [string, string]]
-      : []),
+      : plan.basisWithheld
+        ? [[`Basis per ${noun} (all-in)`, YOC_WITHHELD] as [string, string]]
+        : []),
   ];
 }

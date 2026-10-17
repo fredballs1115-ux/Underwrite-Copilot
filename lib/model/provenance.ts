@@ -123,24 +123,34 @@ export function shownDocument(label: string): string {
   return at > 0 ? `${label.slice(at + 2).trim()} (${label.slice(0, at).trim()})` : label.trim();
 }
 
+/** Whose documents a banner speaks of: the reader's own, or the sample
+ *  deal's (the public sample and the reader's own copy of it, whose model
+ *  is a fixture no reader built and which carries no build day). */
+export interface WhoseDocuments {
+  sample?: boolean;
+}
+
 /** When the model was built and from what — "undated" for a model stored
- *  before builds were dated. */
-export function builtSentence(p: Pick<ModelProvenance, "builtOn" | "builtFrom">): string {
+ *  before builds were dated. The sample's fixture was never built on a day,
+ *  so it is said as the sample deal's model, never "undated". */
+export function builtSentence(p: Pick<ModelProvenance, "builtOn" | "builtFrom">, whose: WhoseDocuments = {}): string {
   const from = p.builtFrom.map(shownDocument).join(", ");
+  if (!p.builtOn && whose.sample) return from ? `The sample deal's model, built from ${from}.` : "The sample deal's model.";
   if (!p.builtOn) return from ? `Undated — built from ${from}.` : "Undated.";
   return from ? `Built ${p.builtOn} from ${from}.` : `Built ${p.builtOn}.`;
 }
 
 /** The banner's sentence on where the figures come from — true by count. */
-export function sourcingSentence(p: Pick<ModelProvenance, "stated" | "assumed">): string {
+export function sourcingSentence(p: Pick<ModelProvenance, "stated" | "assumed">, whose: WhoseDocuments = {}): string {
   const total = p.stated + p.assumed;
-  if (total === 0) return "Built from your documents; conflicts are listed below.";
-  if (p.assumed === 0) return "Built from your documents: every assumption below names the document it came from, and conflicts are listed below.";
+  const docs = whose.sample ? "the sample deal's documents" : "your documents";
+  if (total === 0) return `Built from ${docs}; conflicts are listed below.`;
+  if (p.assumed === 0) return `Built from ${docs}: every assumption below names the document it came from, and conflicts are listed below.`;
   if (p.stated === 0) {
     return `No document states the ${total === 1 ? "assumption" : `${total} assumptions`} below: ${total === 1 ? "it is" : "each is"} the model's own, marked “assumed”. Conflicts are listed below.`;
   }
   const others = p.assumed === 1 ? "the other one, which no document states, is" : `the other ${p.assumed}, which no document states, are`;
-  return `Built from your documents where they state a figure: ${p.stated} of the ${total} assumptions below ${p.stated === 1 ? "comes" : "come"} from them, and ${others} the model's own, marked “assumed”. Conflicts are listed below.`;
+  return `Built from ${docs} where they state a figure: ${p.stated} of the ${total} assumptions below ${p.stated === 1 ? "comes" : "come"} from them, and ${others} the model's own, marked “assumed”. Conflicts are listed below.`;
 }
 
 /** What changed in the deal's documents since the build, in a sentence —
@@ -151,4 +161,27 @@ export function changedSinceSentence(p: Pick<ModelProvenance, "added" | "removed
     p.removed.length ? `${p.removed.map(shownDocument).join(", ")} ${p.removed.length === 1 ? "was" : "were"} removed` : "",
   ].filter(Boolean);
   return parts.length ? `Since it was built, ${parts.join(" and ")} — these figures do not reflect that.` : "";
+}
+
+/**
+ * The kinds of document a model was built from, read off the labels
+ * `generatedFrom` kept ("Rent roll: Maddox-RentRoll.xlsx"): a label naming
+ * a kind exactly, or the start of its name ("T-12" for "T-12 / operating
+ * statement"). A label naming no kind names none.
+ */
+export function builtFromKinds(generatedFrom: string[] | undefined): Set<string> {
+  const kinds = new Set<string>();
+  for (const label of generatedFrom ?? []) {
+    const at = label.indexOf(": ");
+    if (at <= 0) continue;
+    const named = label.slice(0, at).trim().toLowerCase();
+    for (const [kind, name] of Object.entries(DOC_KIND_LABEL)) {
+      const n = name.toLowerCase();
+      if (n === named || n.startsWith(`${named} `)) {
+        kinds.add(kind);
+        break;
+      }
+    }
+  }
+  return kinds;
 }

@@ -4,6 +4,7 @@ import {
   hotelContextLine,
   hotelModelLine,
   hotelNote,
+  hotelSaleFacts,
   hotelShortLine,
   hotelTag,
   hotelTermRows,
@@ -96,6 +97,13 @@ describe("readHotelDeal — what a hotel is sold with", () => {
     expect(hotelTag(rooms, TODAY)).toBe("Mgmt encumbered, PIP $12.5k/room");
   });
 
+  it("reads a PIP total and a PIP a key with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no PIP.
+    expect(readHotelDeal(ex([row("PIP cost", "$4,200,000 (brand-mandated)")]), TODAY)?.pipTotal).toBe(4_200_000);
+    expect(readHotelDeal(ex([row("PIP cost per key", "$35,000 (brand-mandated)")]), TODAY)?.pipPerKey).toBe(35_000);
+    expect(readHotelDeal(ex([row("PIP cost", "$4.2M-$5M")]), TODAY)?.pipTotal).toBeNull();
+  });
+
   it("a RevPAR that does not tie to its ADR and occupancy is said, never chosen between", () => {
     const off = ex([row("ADR", "$189.50"), row("Occupancy", "74%"), row("RevPAR", "$155.00")]);
     const r = readHotelDeal(off, TODAY)!;
@@ -104,6 +112,13 @@ describe("readHotelDeal — what a hotel is sold with", () => {
       "The memorandum's RevPAR of $155.00 does not tie to its ADR and occupancy — $189.50 × 74.0% is $140.23 — so one of the three is wrong; ask which.",
     );
     expect(hotelNote(r)).toContain("(d) THE ROOM REVENUE — the memorandum's RevPAR does not tie");
+  });
+
+  it("reads an ADR or a RevPAR with its year or its change after a dash, to the cent (audit C3a)", () => {
+    const r = readHotelDeal(ex([row("ADR", "$189.50 – 2025 actual"), row("Occupancy", "74%"), row("RevPAR", "$140.23 — 3.5% over 2024")]), TODAY)!;
+    expect(r.adr).toBe(189.5);
+    expect(r.revpar).toBe(140.23);
+    expect(readHotelDeal(ex([row("ADR", "$180 – $195")]), TODAY)!.adr).toBeNull();
   });
 
   it("a pro forma ADR or RevPAR is the sponsor's and never read as today's", () => {
@@ -221,5 +236,39 @@ describe("the hotel against the model, and on every summary", () => {
     const r = readHotelDeal(COURTYARD, TODAY)!;
     expect([r.pipTotal, r.franchiseEnds, r.managementEnds, r.adr, r.revpar, r.revparIndex, r.ffeReservePct].every((v) => v != null)).toBe(true);
     expect(readHotelDeal(ex([row("PIP cost per key", "$35,000")]), TODAY)?.pipPerKey).toBe(35_000);
+  });
+});
+
+// Research pass 35 (F15): the letter of intent said nothing about a hotel's
+// flag. Its note is built from what the memorandum states, and only where a
+// franchisor has a transfer to approve.
+describe("hotelSaleFacts — what the letter of intent notes a flagged hotel's sale carries", () => {
+  const facts = (e: ExtractionResult) => hotelSaleFacts(readHotelDeal(e, TODAY)!);
+
+  it("says the flag, the encumbrance and the PIP as stated", () => {
+    expect(facts(COURTYARD)).toBe("the hotel is flagged Courtyard by Marriott and sold encumbered by management, with a $4.2M PIP");
+    // A PIP a key as stated, never the total derived from it.
+    expect(facts(ex([row("PIP cost per key", "$35,000")], { hotel: hotel({ brand: "Hilton Garden Inn", encumbrance: "brand" }) }))).toBe(
+      "the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a PIP of $35k a key",
+    );
+    // The figure decides the article.
+    expect(facts(ex([row("PIP cost", "$8,000,000")], { hotel: hotel({ encumbrance: "brand_and_management" }) }))).toBe(
+      "the hotel is flagged Courtyard by Marriott and sold encumbered by the franchise and management, with an $8.0M PIP",
+    );
+    // A PIP in words alone is quoted.
+    expect(facts(ex([], { hotel: hotel({ pip: "Brand-mandated renovation of all guestrooms by 2028." }) }))).toBe(
+      "the hotel is flagged Courtyard by Marriott and sold encumbered by management, with a PIP stated as “Brand-mandated renovation of all guestrooms by 2028”",
+    );
+    // A flag with no PIP stated says so; a PIP with no flag named is the sale's.
+    expect(facts(ex([], { hotel: hotel({ encumbrance: "unknown" }) }))).toBe("the hotel is flagged Courtyard by Marriott, and states no PIP");
+    expect(facts(ex([row("PIP cost", "$4,200,000")], { hotel: hotel({ brand: "", encumbrance: "unknown" }) }))).toBe("the sale carries a $4.2M PIP");
+  });
+
+  it("is null where no franchisor has a transfer to approve", () => {
+    // Independent, sold unencumbered (the buyer chooses its flag), or no
+    // flag, brand encumbrance or PIP named.
+    expect(facts(ex([row("PIP cost", "$4,200,000")], { hotel: hotel({ brand: "Independent" }) }))).toBeNull();
+    expect(facts(ex([row("PIP cost", "$4,200,000")], { hotel: hotel({ encumbrance: "unencumbered" }) }))).toBeNull();
+    expect(facts(ex([], { hotel: hotel({ brand: "" }) }))).toBeNull();
   });
 });

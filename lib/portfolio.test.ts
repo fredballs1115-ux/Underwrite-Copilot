@@ -121,6 +121,15 @@ describe("readPortfolio — a portfolio OM's properties, read into shares, conce
     expect(p.allocationTotal).toBeNull();
     expect(p.allocationGapPct).toBeNull();
   });
+
+  it("reads a property's NOI and allocation with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no figure, so a portfolio of five
+    // stated NOIs read as a partial set.
+    const hyphenated = FIVE.map((x, i) => (i === 0 ? { ...x, noi: "$1,420,000 (T-12)", allocatedPrice: "$28,000,000 (seller-allocated)" } : x));
+    const p = readPortfolio(ex(hyphenated))!;
+    expect(p.assets[0]).toMatchObject({ noi: 1_420_000, allocated: 28_000_000 });
+    expect(p.allocationTotal).toBe(readPortfolio(ex(FIVE))!.allocationTotal);
+  });
 });
 
 describe("what the portfolio says to the rest of the screen", () => {

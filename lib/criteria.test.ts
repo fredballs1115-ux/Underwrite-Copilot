@@ -10,6 +10,7 @@ import {
   findPriceRow,
   METRIC_FIND,
   foldBuyBoxChecks,
+  isCountLabel,
   isEmptyBuyBox,
   buyBoxLines,
   parseMoney,
@@ -17,6 +18,7 @@ import {
   pastYearSource,
   priceExclude,
   resolveBuyBoxStore,
+  sanitizeExchange,
   sanitizeGeoTargets,
   screenStamp,
   screenYearOf,
@@ -24,9 +26,20 @@ import {
   unitCountFromMetrics,
   UNSTAMPED_SCREEN_YEAR,
   activeBox,
+  buyBoxCoverage,
+  countNounOf,
+  figureRange,
+  parsePrice,
+  priceRefusal,
   type BuyBox,
   type BuyBoxStore,
 } from "./criteria";
+import { budgetFromText } from "./deal-strategy";
+import { countNoun } from "./asset-words";
+import { basisTag, statedCapSlot } from "./pipeline-slots";
+import { evalDealbreakers, scoreMandateFit } from "./mandate";
+import { dealCheckSource } from "./buy-box-chip";
+import type { ExtractionResult, FirstSignal } from "./anthropic/types";
 
 /** The year the bare rows in these cases were screened in. A label that
  *  carries a year of its own is read against it; the cases that turn on
@@ -234,6 +247,48 @@ describe("the count band — units, keys, pads, in the deal's own noun", () => {
     expect(unitCountFromMetrics([{ label: "RV sites", value: "220" }])).toBe(220);
   });
 
+  // Research pass 28: a skilled-nursing facility's licensed beds, a marina's
+  // slips and a campground's campsites were no count, so no per-bed or
+  // per-slip basis was ever struck.
+  it("a care facility's licensed beds, a marina's slips and a campground's campsites are each the count, in its own noun", () => {
+    for (const [label, value, n, noun] of [
+      ["Licensed beds", "120", 120, "beds"],
+      ["Certified beds", "120 certified beds", 120, "beds"],
+      ["Wet slips", "250", 250, "slips"],
+      ["Slips", "180 slips", 180, "slips"],
+      ["Campsites", "180", 180, "campsites"],
+      ["Camp sites", "180 campsites", 180, "campsites"],
+    ] as const) {
+      expect(isCountLabel(label), label).toBe(true);
+      expect(unitCountFromMetrics([{ label, value }]), label).toBe(n);
+      expect(countNoun(label, null), label).toBe(noun);
+    }
+    expect(check(evaluateBuyBox("auto", ex([["Wet slips", "250"]]), box), "Slips")?.detail).toContain("this is 250 slips");
+    // A row about the beds or the slips is still no count.
+    for (const label of ["Licensed beds per unit", "Slip rent", "Slips (Phase I)", "Campsite rent", "Bed mix"]) {
+      expect(isCountLabel(label), label).toBe(false);
+    }
+    // The deal's basis in its own noun: the price over the beds, the slips.
+    const snf = { dealName: "Lakeside SNF", assetClass: "Skilled Nursing Facility", metrics: [{ label: "Asking price", value: "$18,000,000", flagged: false, page: "p. 2" }, { label: "Licensed beds", value: "120", flagged: false, page: "p. 2" }] };
+    expect(basisTag(snf, "stabilized")).toBe("$150k/bed");
+    const marina = { dealName: "Harbor Marina", assetClass: "Marina", metrics: [{ label: "Asking price", value: "$14,000,000", flagged: false, page: "p. 2" }, { label: "Wet slips", value: "250", flagged: false, page: "p. 2" }] };
+    expect(basisTag(marina, "stabilized")).toBe("$56k/slip");
+  });
+
+  // Research pass 34: the plan's basis said "key" on a hotel counting rooms,
+  // beside the card's and the workbook's "room".
+  it("names what the count counts in the counting row's own noun, else the class's", () => {
+    expect(countNounOf([{ label: "Asking price", value: "$26,000,000" }, { label: "Rooms (proposed)", value: "160" }], "hospitality_str")).toEqual({ one: "room", many: "rooms" });
+    expect(countNounOf([{ label: "Keys", value: "160" }], "hospitality_str")).toEqual({ one: "key", many: "keys" });
+    // A row about the rooms is no count: the class's noun stands in.
+    expect(countNounOf([{ label: "Rooms renovated", value: "40" }], "hospitality_str")).toEqual({ one: "key", many: "keys" });
+    expect(countNounOf([], "hospitality_str")).toEqual({ one: "key", many: "keys" });
+    expect(countNounOf([{ label: "Pads", value: "150" }, { label: "RV sites", value: "40" }], "manufactured_housing")).toEqual({ one: "pad", many: "pads" });
+    expect(countNounOf([{ label: "Doors", value: "248" }], "multifamily")).toEqual({ one: "unit", many: "units" });
+    expect(countNounOf([], "office")).toEqual({ one: "unit", many: "units" });
+    expect(countNounOf([], null)).toEqual({ one: "unit", many: "units" });
+  });
+
   it("the class's noun stands in where the OM stated no count, and the check is unknown", () => {
     const c = check(evaluateBuyBox("hospitality_str", ex([["Total SF", "120,000 SF"]]), box), "Keys")!;
     expect(c.status).toBe("unknown");
@@ -394,6 +449,47 @@ describe("sanitizeGeoTargets — the save keeps what the picker builds", () => {
   });
 });
 
+describe("the buy box's 1031 exchange (lib/exchange-window) — a blank is no exchange", () => {
+  it("keeps a real transfer day, a filer from the list and a ticked extension, and nothing else", () => {
+    expect(sanitizeExchange({ relinquishedTransferOn: "2026-09-15", filer: "partnership", returnExtended: true })).toEqual({
+      relinquishedTransferOn: "2026-09-15",
+      filer: "partnership",
+      returnExtended: true,
+    });
+    // A filer that is not one of the list's, or an extension not ticked, is not kept.
+    expect(sanitizeExchange({ relinquishedTransferOn: " 2026-09-15 ", filer: "llc", returnExtended: "on" })).toEqual({ relinquishedTransferOn: "2026-09-15" });
+    // No day, or no calendar day, is no exchange — whatever else the form sent.
+    for (const day of ["", "2026-02-31", "09/15/2026", "1999-12-31", "2101-01-01"]) {
+      expect(sanitizeExchange({ relinquishedTransferOn: day, filer: "partnership", returnExtended: true }), day).toBeUndefined();
+    }
+    expect(sanitizeExchange(null)).toBeUndefined();
+    expect(sanitizeExchange("2026-09-15")).toBeUndefined();
+  });
+
+  it("counts as the box's content, round-trips through the store, and is listed for the read-only view, never the verdict", () => {
+    const box: BuyBox = { exchange: { relinquishedTransferOn: "2026-09-15", filer: "partnership" } };
+    expect(isEmptyBuyBox(box)).toBe(false);
+    expect(isEmptyBuyBox({ exchange: { relinquishedTransferOn: null } })).toBe(true);
+    const stored = serializeBuyBoxStore({ boxes: [{ id: "default", name: "Mandate", box }], activeId: "default" });
+    expect(activeBox(resolveBuyBoxStore(JSON.parse(JSON.stringify(stored))))?.exchange).toEqual(box.exchange);
+    expect(buyBoxLines(box)).toEqual([
+      "1031 exchange: the relinquished property transferred Sep 15, 2026; a partnership files the return (Form 1065)",
+    ]);
+    expect(buyBoxLines({ exchange: { relinquishedTransferOn: "2026-10-01", returnExtended: true } })).toEqual([
+      "1031 exchange: the relinquished property transferred Oct 1, 2026; who files the return is not set, so it is read as an individual's; the return is extended",
+    ]);
+    // Only the article is lowercased: the corporation's letter stays a
+    // capital (the pre-merge audit: "an s corporation", "a c corporation").
+    expect(buyBoxLines({ exchange: { relinquishedTransferOn: "2026-09-15", filer: "s_corporation" } })).toEqual([
+      "1031 exchange: the relinquished property transferred Sep 15, 2026; an S corporation files the return (Form 1120-S)",
+    ]);
+    expect(buyBoxLines({ exchange: { relinquishedTransferOn: "2026-09-15", filer: "c_corporation" } })[0]).toContain("; a C corporation files the return (Form 1120)");
+    // The lines a Claude step reads leave it out: the verdict's words reach
+    // a shared screen.
+    expect(buyBoxLines(box, { exchange: false })).toEqual([]);
+  });
+});
+
 describe("geography — market-level territory chips", () => {
   it("an aliased chip matches every city in its market, and only those", () => {
     const box: BuyBox = {
@@ -428,38 +524,76 @@ describe("geography — market-level territory chips", () => {
 // forma on a conversion reads as "105%" here, and a buy-box check on that
 // would be confidently wrong.
 describe("buyBoxCheckSource — the first signal's cap only when it can be a cap", () => {
-  const signal = (goingInCap: string) => ({
-    dealName: "1200 K Street — Office-to-Residential Conversion",
-    assetClass: "multifamily",
-    market: "Washington, DC",
-    askPrice: "$20,000,000",
-    goingInCap,
-    perUnit: "$62,500 per unit",
-  });
+  const signal = (goingInCap: string) =>
+    ({
+      dealName: "1200 K Street — Office-to-Residential Conversion",
+      assetClass: "multifamily",
+      market: "Washington, DC",
+      askPrice: "$20,000,000",
+      goingInCap,
+      perUnit: "$62,500 per unit",
+      size: "",
+      take: "",
+    }) as FirstSignal;
   const capRow = (src: ReturnType<typeof buyBoxCheckSource>) =>
     src?.metrics.find((m) => /going-in cap/i.test(m.label)) ?? null;
+  // Every page builds its source through the deal page's own builder, which
+  // reads the signal's cap with the header's reader (lib/deal-strategy
+  // `signalGoingInCap`).
+  const source = (extraction: unknown, s: FirstSignal) => dealCheckSource(extraction as ExtractionResult | null, s, null);
 
   it("keeps a plausible going-in cap", () => {
-    const src = buyBoxCheckSource(null, signal("6.2%"), null);
+    const src = source(null, signal("6.2%"));
     expect(capRow(src)?.value).toBe("6.2%");
     expect(src?.metrics.find((m) => m.label === "Asking price")?.value).toBe("$20,000,000");
   });
 
   it("drops a figure that cannot be a cap on the price — a yield on cost, a garbled read, a blank", () => {
-    expect(capRow(buyBoxCheckSource(null, signal("105%"), null))).toBeNull();
-    expect(capRow(buyBoxCheckSource(null, signal("0%"), null))).toBeNull();
-    expect(capRow(buyBoxCheckSource(null, signal(""), null))).toBeNull();
+    expect(capRow(source(null, signal("105%")))).toBeNull();
+    expect(capRow(source(null, signal("0%")))).toBeNull();
+    expect(capRow(source(null, signal("")))).toBeNull();
     // The price still stands in either way.
-    expect(buyBoxCheckSource(null, signal("105%"), null)?.metrics.length).toBeGreaterThan(0);
+    expect(source(null, signal("105%"))?.metrics.length).toBeGreaterThan(0);
   });
 
-  it("the full extraction, when present, is used as-is", () => {
+  it("the full extraction's own cap, when it states one, is the cap", () => {
     const extraction = {
       assetClass: "multifamily",
       market: "Washington, DC",
       metrics: [{ label: "Going-in cap rate", value: "5.9%" }],
     };
-    expect(capRow(buyBoxCheckSource(extraction, signal("105%"), null))?.value).toBe("5.9%");
+    expect(capRow(source(extraction, signal("5.6%")))?.value).toBe("5.9%");
+    expect(source(extraction, signal("5.6%"))?.metrics).toHaveLength(1);
+  });
+
+  // The audit of 2026-10-05 (MED-3): the header printed the first signal's
+  // 5.6% where the memorandum states no cap, while the fit beside it said
+  // the cap could not be checked.
+  it("where the memorandum states no cap, the first signal's — the cap the header prints — is the cap the box judges", () => {
+    const extraction = {
+      dealName: "X",
+      assetClass: "multifamily",
+      market: "Dallas, TX",
+      metrics: [
+        { label: "Asking price", value: "$24,000,000" },
+        { label: "In-place NOI", value: "$1,344,000" },
+        { label: "Units", value: "120" },
+      ],
+    };
+    const s = { ...signal("5.6%"), dealName: "X", market: "Dallas, TX", askPrice: "$24,000,000", take: "A stabilized garden community." };
+    const box: BuyBox = { assetClasses: ["multifamily"], minCapPct: 5.5 };
+    const checks = evaluateBuyBox("multifamily", source(extraction, s), box);
+    expect(check(checks, "Going-in cap")).toMatchObject({
+      status: "pass",
+      detail: "Mandate wants ≥5.5% going-in — the deal shows 5.60%. Clears the floor.",
+    });
+    // The header's own slot, by the same reader.
+    expect(statedCapSlot(extraction as unknown as ExtractionResult, false, s)).toBe("5.6%");
+    // Not on a plan deal, whose slot carries its yield on cost, and not
+    // where the signal's figure cannot be a cap.
+    const plan = { ...extraction, strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" } };
+    expect(capRow(source(plan, s))).toBeNull();
+    expect(capRow(source(extraction, { ...s, goingInCap: "105%" }))).toBeNull();
   });
 });
 
@@ -486,6 +620,16 @@ describe("findGoingInCap — never the finished project's figure", () => {
     expect(findGoingInCap(rows([["Cap rate at completion", "7.0%"]]))).toBeNull();
   });
 
+  it("never reads a forward purchase's cap at delivery as a going-in cap (research pass 28)", () => {
+    // The extraction files it as "Delivery cap rate": the cap the price is
+    // struck at on the rent at delivery, on a building not yet standing.
+    expect(findGoingInCap(rows([["Delivery cap rate", "5.75%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Cap rate at delivery", "5.75%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Going-in cap rate (at delivery)", "5.75%"]]))).toBeNull();
+    // A going-in cap beside it is still the going-in cap.
+    expect(findGoingInCap(rows([["Delivery cap rate", "5.75%"], ["Going-in cap rate", "6.10%"]]))?.value).toBe("6.10%");
+  });
+
   it("evaluateBuyBox: a conversion with only a stabilized cap is 'unknown' and says why, never a pass", () => {
     const box: BuyBox = { minCapPct: 5.0 };
     const conversion = {
@@ -498,8 +642,11 @@ describe("findGoingInCap — never the finished project's figure", () => {
     };
     const c = check(evaluateBuyBox("multifamily", conversion, box), "Going-in cap")!;
     expect(c.status).toBe("unknown");
-    expect(c.detail).toMatch(/a conversion deal has no going-in cap/);
-    expect(c.detail).toMatch(/yield on total cost/);
+    // Judged on its yield on total cost — never "has no going-in cap", which
+    // a value-add's in-place cap in its key terms contradicts (research
+    // pass 34).
+    expect(c.detail).toMatch(/a conversion deal is judged on its yield on total cost, not on a going-in cap/);
+    expect(c.detail).not.toMatch(/has no going-in cap/);
     // A stabilized asset with the same missing figure keeps the plain wording.
     const plain = check(evaluateBuyBox("multifamily", ex([["Purchase price", "$20,000,000"]]), box), "Going-in cap")!;
     expect(plain.status).toBe("unknown");
@@ -1018,6 +1165,55 @@ describe("the fifth review's price, per-unit, cap, size, occupancy and money cas
     expect(parseMoney("Call for offers")).toBeNull();
     expect(parseMoney("$0")).toBe(0);
   });
+
+  it("parseMoney reads a scale only where it ends its word, never the next word's first letter", () => {
+    // Every space had been dropped before the scale was read, so the next
+    // word's first letter multiplied the figure.
+    expect(parseMoney("$450,000 more or less")).toBe(450_000);
+    expect(parseMoney("$600,000 base rent")).toBe(600_000);
+    expect(parseMoney("$1,200,000 before reserves")).toBe(1_200_000);
+    expect(parseMoney("$91,667 monthly")).toBe(91_667);
+    expect(parseMoney("$2,500,000 budgeted")).toBe(2_500_000);
+    expect(parseMoney("500 keys")).toBe(500);
+    expect(parseMoney("1,200 beds")).toBe(1_200);
+    // The shorthand an OM writes still reads, spaced or not, with words after.
+    expect(parseMoney("$3.2M total")).toBe(3_200_000);
+    expect(parseMoney("$450K per year")).toBe(450_000);
+    expect(parseMoney("$68.5 million")).toBe(68_500_000);
+    expect(parseMoney("63 million")).toBe(63_000_000);
+    expect(parseMoney("1.2mm")).toBe(1_200_000);
+    expect(parseMoney("$2bn")).toBe(2_000_000_000);
+    expect(parseMoney("$1.5 billion")).toBe(1_500_000_000);
+    expect(parseMoney("$300 thousand")).toBe(300_000);
+    expect(parseMoney("$1.5M/yr")).toBe(1_500_000);
+    expect(parseMoney("$45k-$50k")).toBe(45_000);
+    expect(parseMoney("$ 42,000,000")).toBe(42_000_000);
+  });
+
+  it("parseMoney never gives back a decimal to a word glued after the figure, and reads mil, mn and bil (audit C3a)", () => {
+    // The trailing word boundary let the digits backtrack to their integer
+    // part, so a $12.5M ask read as $12.50 and reached the model unfloored.
+    expect(parseMoney("$12.5 mil")).toBe(12_500_000);
+    expect(parseMoney("$12.5mil")).toBe(12_500_000);
+    expect(parseMoney("$2.5Mn")).toBe(2_500_000);
+    expect(parseMoney("USD 25mn")).toBe(25_000_000);
+    expect(parseMoney("$1.2 bil")).toBe(1_200_000_000);
+    expect(parseMoney("1.25x")).toBe(1.25);
+    expect(parseMoney("$32.50psf")).toBe(32.5);
+    expect(parseMoney("$425psf")).toBe(425);
+    // An ordinal is no figure, and a scale is still one only where it ends
+    // its word.
+    expect(parseMoney("2nd lien $5,000,000")).toBeNull();
+    expect(parseMoney("21st Street lot")).toBeNull();
+    expect(parseMoney("$450,000 mileage reimbursement")).toBe(450_000);
+    expect(parseMoney("$450,000 more or less")).toBe(450_000);
+    expect(parseMoney("$12.5M")).toBe(12_500_000);
+    // The price reader and its range read the same table.
+    expect(parsePrice("$12.5 mil")).toBe(12_500_000);
+    expect(figureRange("$40–42 mil")).toEqual({ low: 40_000_000, high: 42_000_000 });
+    expect(priceRefusal("$12.5 mil per unit")).toBe("a figure per unit, per foot or per acre");
+    expect(budgetFromText("$12.5 mil hard and soft costs", 40_000_000)?.budget).toBe(12_500_000);
+  });
 });
 
 // The sixth review read the reader layer again after the fifth's fixes and
@@ -1228,5 +1424,142 @@ describe("evaluateBuyBox — the basis check in the deal's own noun (lib/asset-w
     expect(check(park, "Basis / pad")?.status).toBe("pass");
     const apts = evaluateBuyBox("multifamily", ex([["Price per unit", "$150,000"]]), box);
     expect(check(apts, "Basis / unit")?.status).toBe("pass");
+  });
+
+  // Research pass 41 (M5): a value-add's verdict brief read "Basis / unit —
+  // fits: Mandate caps basis at $300k/unit — this is $217k/unit" beside the
+  // plan's all-in basis of $229k per planned unit — two bases, one of them
+  // the price alone.
+  it("on a plan deal labels the check by what it divides: the price over the units, never a second basis", () => {
+    const plan = (kind: string, rows: [string, string][]) => ({ ...ex(rows), strategy: { kind } });
+    const va = evaluateBuyBox("multifamily", plan("value_add", [["Price per unit", "$217,000"]]), { maxPerUnitK: 300 });
+    expect(check(va, "Basis / unit")).toBeUndefined();
+    expect(check(va, "Price / unit")).toMatchObject({
+      status: "pass",
+      onPrice: true,
+      detail: "Mandate caps the price at $300k/unit — this is $217k/unit. Inside.",
+    });
+    const rich = evaluateBuyBox("hospitality_str", plan("conversion", [["Price per key", "$252,000"]]), box);
+    expect(check(rich, "Price / key")?.detail).toBe("Mandate caps the price at $200k/key — this is $252k/key. Rich for the mandate.");
+    expect(check(evaluateBuyBox("multifamily", plan("development", []), box), "Price / unit")?.detail).toBe(
+      "Mandate caps the price at $200k/unit; no parseable per-unit price yet.",
+    );
+    // A stabilized deal, or one whose kind is not known, keeps its basis.
+    for (const kind of ["stabilized", "unknown"]) {
+      expect(check(evaluateBuyBox("multifamily", plan(kind, [["Price per unit", "$150,000"]]), box), "Basis / unit")?.detail).toBe(
+        "Mandate caps basis at $200k/unit — this is $150k/unit. Inside.",
+      );
+    }
+    // The hard ceiling says the same figure the same way.
+    const hard = { dealbreakers: { maxPerUnitK: 200 } };
+    expect(evalDealbreakers("multifamily", plan("value_add", [["Price per unit", "$252,000"]]), hard).tripped).toEqual([
+      "price $252k/unit over the $200k/unit ceiling",
+    ]);
+    expect(evalDealbreakers("multifamily", plan("stabilized", [["Price per unit", "$252,000"]]), hard).tripped).toEqual([
+      "basis $252k/unit over the $200k/unit ceiling",
+    ]);
+  });
+});
+
+// Research pass 35: a note read "Fit 100 · Pursue" and "Fits" on its asset
+// class and its unit count, the box's cap and return never judged. Every
+// surface that draws the fit now says how much of the box it stands on, from
+// one count beside the fold.
+describe("buyBoxCoverage — how much of the box a fit stands on", () => {
+  const FULL: BuyBox = {
+    assetClasses: ["multifamily"],
+    markets: "Philadelphia",
+    sfMin: 100_000,
+    unitsMin: 100,
+    priceMaxM: 80,
+    maxPerUnitK: 300,
+    minCapPct: 5.75,
+    minIrrPct: 13,
+  };
+
+  it("marks exactly the criteria the price decides: the price band, the basis, the going-in cap, the target return", () => {
+    const checks = evaluateBuyBox("multifamily", ex([], { market: "Philadelphia, PA" }), FULL);
+    expect(checks.filter((c) => c.onPrice).map((c) => c.label)).toEqual(["Price", "Basis / unit", "Going-in cap", "Target return"]);
+    expect(checks.filter((c) => !c.onPrice).map((c) => c.label)).toEqual(["Asset class", "Geography", "Size", "Units"]);
+    // Whatever each one's status: a pass on the price is still a price criterion.
+    const passed = evaluateBuyBox(
+      "multifamily",
+      ex([["Asking price", "$60,000,000"], ["Going-in cap rate", "6.00%"], ["Levered IRR", "14%"], ["Price per unit", "$250,000"]]),
+      FULL,
+    );
+    expect(passed.filter((c) => c.onPrice).map((c) => `${c.label}:${c.status}`)).toEqual([
+      "Price:pass",
+      "Basis / unit:pass",
+      "Going-in cap:pass",
+      "Target return:pass",
+    ]);
+  });
+
+  it("counts what could be judged, names what could not, and says when the price is among them", () => {
+    const note = {
+      ...ex([["Asking price", "$68,000,000"], ["Going-in cap rate", "5.45%"], ["Units", "248"]], { assetClass: "multifamily" }),
+      interest: { kind: "note" },
+    };
+    const box: BuyBox = { assetClasses: ["multifamily"], unitsMin: 100, unitsMax: 400, minCapPct: 5.75, minIrrPct: 13 };
+    const checks = evaluateBuyBox("multifamily", note, box);
+    // The fold calls it "fits" on its two passes alone.
+    expect(foldBuyBoxChecks(checks)).toBe("fits");
+    expect(buyBoxCoverage(checks, null)).toEqual({
+      checked: 2,
+      total: 4,
+      unchecked: ["Going-in cap", "Target return"],
+      priceUnchecked: true,
+    });
+    // Unknown on something the price does not decide: counted, never priced.
+    const placeOnly = evaluateBuyBox("multifamily", ex([["Units", "248"]]), { markets: "Philadelphia", unitsMin: 100 });
+    expect(buyBoxCoverage(placeOnly, null)).toEqual({ checked: 1, total: 2, unchecked: ["Geography"], priceUnchecked: false });
+    // A box judged whole, and no box at all.
+    expect(buyBoxCoverage(evaluateBuyBox("multifamily", ex([["Units", "248"]]), { unitsMin: 100 }), null)).toEqual({
+      checked: 1,
+      total: 1,
+      unchecked: [],
+      priceUnchecked: false,
+    });
+    expect(buyBoxCoverage([], null)).toEqual({ checked: 0, total: 0, unchecked: [], priceUnchecked: false });
+  });
+
+  // The audit of 2026-10-05 (HIGH-2): the score judges the box's cash-on-
+  // cash floor and its red lines, which no check lists, so a fit whose
+  // cash-on-cash or whose cap-rate dealbreaker could not be checked read a
+  // green "Fit 100 · Pursue" with no count.
+  it("counts the score's cash-on-cash floor and each red line, and the price decides all but the class and the place", () => {
+    const deal = ex([["Asking price", "$15,000,000"], ["NOI (in-place)", "$900,000"], ["Units", "100"]], { assetClass: "multifamily" });
+    const coc: BuyBox = { assetClasses: ["multifamily"], minCoCPct: 8 };
+    const checks = evaluateBuyBox("multifamily", deal, coc);
+    expect(buyBoxCoverage(checks, scoreMandateFit("multifamily", deal, coc))).toEqual({
+      checked: 1,
+      total: 2,
+      unchecked: ["Cash-on-cash"],
+      priceUnchecked: true,
+    });
+    // A stated cash-on-cash is a criterion checked, counted all the same.
+    const stated = ex([["Cash-on-cash (Yr 1)", "8.5%"]], { assetClass: "multifamily" });
+    expect(buyBoxCoverage(evaluateBuyBox("multifamily", stated, coc), scoreMandateFit("multifamily", stated, coc))).toEqual({
+      checked: 2,
+      total: 2,
+      unchecked: [],
+      priceUnchecked: false,
+    });
+    // Each red line is a criterion of its own: a class it could judge, a
+    // cap the memorandum does not state.
+    const red: BuyBox = { assetClasses: ["multifamily"], dealbreakers: { requireAssetClass: true, minCapPct: 6, requireGeography: true } };
+    const lines = buyBoxCoverage(evaluateBuyBox("multifamily", deal, red), scoreMandateFit("multifamily", deal, red));
+    // (No geography target is set, so the location red line means nothing
+    // and is not counted.)
+    expect(lines).toEqual({ checked: 2, total: 3, unchecked: ["Cap-rate dealbreaker"], priceUnchecked: true });
+    // Unchecked on the class alone, nothing about the price was left.
+    const unread = { ...deal, assetClass: "" };
+    const classOnly: BuyBox = { assetClasses: ["multifamily"], dealbreakers: { requireAssetClass: true } };
+    expect(buyBoxCoverage(evaluateBuyBox("auto", unread, classOnly), scoreMandateFit("auto", unread, classOnly))).toEqual({
+      checked: 0,
+      total: 2,
+      unchecked: ["Asset class", "Asset-class dealbreaker"],
+      priceUnchecked: false,
+    });
   });
 });

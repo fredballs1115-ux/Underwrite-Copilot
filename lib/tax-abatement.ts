@@ -50,7 +50,7 @@ import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { noiFigures } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import type { MetricRow } from "@/lib/ground-lease-term";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 import { monthsBetween, yearsBetween } from "@/lib/note-yield";
 
 const isRow = (m: unknown): m is MetricRow =>
@@ -81,11 +81,12 @@ export function taxAbatementTermRows<M extends { label: string; value: string }>
   return [pick(PROGRAM), pick(END, PHASE), pick(UNABATED), pick(SAVINGS)].filter((m): m is M => m != null);
 }
 
-/** A year's tax bill as stated, to the dollar: never a range, never a
- *  figure per unit or per foot. */
+/** A year's tax bill as stated, to the dollar: never a range (lib/money
+ *  `statesRange`, so "$520,500 – 2026 estimate" is the bill it states),
+ *  never a figure per unit or per foot. */
 export function taxBillOf(value: string | null | undefined): number | null {
   const v = (value ?? "").trim();
-  if (!v || PER_SOMETHING.test(v) || /\d\s*[–—]\s*\$?\d|\d\s+to\s+\$?\d/i.test(v)) return null;
+  if (!v || PER_SOMETHING.test(v) || statesRange(v)) return null;
   return parseUsd(v, 500);
 }
 
@@ -165,9 +166,8 @@ export interface TaxAbatementRead {
   headline: string;
 }
 
-const money = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `$${Math.round(n).toLocaleString("en-US")}`;
-const compact = (n: number) => (n >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`);
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
+const compact = (n: number) => compactUsd(n, { trim: true });
 const years1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)} years`;
 /** The years an abatement has left, said: "4.3 years", or inside its last
  *  month, where whole months count none, "under a month". */

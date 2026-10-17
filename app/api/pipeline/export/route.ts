@@ -7,7 +7,11 @@ import {
   buildPipelineWorkbook,
   type PipelineExportRow,
 } from "@/lib/pipeline-workbook";
-import { pipelineExportRow } from "@/lib/pipeline-export-row";
+import { exportOwnerName, pipelineExportRow } from "@/lib/pipeline-export-row";
+import { readAll, readByIds } from "@/lib/read-all";
+import { weekActivity, type PackTask } from "@/lib/meeting-pack";
+import { parseStageHistory } from "@/lib/stages";
+import { personName } from "@/lib/person";
 
 // exceljs needs the Node runtime.
 export const runtime = "nodejs";
@@ -31,19 +35,6 @@ export async function GET(req: Request) {
     );
   }
 
-  const [{ data, error }, team] = await Promise.all([
-    supabase
-      .from("deals")
-      // The first signal and the address too: the row reads the deal's kind
-      // and its buy-box fit on the pipeline page's own inputs.
-      .select(
-        "id, name, asset_class, created_at, verdict, extraction, first_signal, address, user_id, team_id, stage, is_sample",
-      )
-      .order("created_at", { ascending: false }),
-    getTeam(supabase, user.id).catch(() => null),
-  ]);
-  if (error) return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
-
   type Row = {
     id: string;
     name: string;
@@ -53,74 +44,162 @@ export async function GET(req: Request) {
     extraction: unknown;
     first_signal: unknown;
     address: unknown;
+    site_flags: unknown;
     user_id: string;
     team_id: string | null;
     stage: string | null;
+    stage_history: unknown;
     is_sample: boolean | null;
   };
-  const rows = ((data ?? []) as Row[]).filter((d) => !d.is_sample);
+  // Every deal, a page at a time, newest first (lib/read-all), with the
+  // exact count after it: "the whole pipeline" had been the newest 1,000 —
+  // one read's most — and the meeting's totals short with no sign (research
+  // pass 42). A read that fails, or reads fewer deals than the count says
+  // there are, builds no workbook: the page says so and the reader asks again.
+  // The count is taken once the rows are read, and a deal that lands between
+  // the two (a batch upload while the meeting exports) is read again once
+  // before the export fails (audit C5, LOW-11).
+  const readPipeline = async (): Promise<Row[] | null> => {
+    const rows = await readAll<Row>((from, to) =>
+      supabase
+        .from("deals")
+        // The first signal and the address too: the row reads the deal's kind
+        // and its buy-box fit on the pipeline page's own inputs.
+        .select(
+          "id, name, asset_class, created_at, verdict, extraction, first_signal, address, site_flags, user_id, team_id, stage, stage_history, is_sample",
+        )
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    );
+    if (!rows) return null;
+    const { count, error } = await supabase.from("deals").select("id", { count: "exact", head: true });
+    if (error || (count != null && count > rows.length)) return null;
+    return rows;
+  };
+  const [data, team] = await Promise.all([
+    readPipeline().then((rows) => rows ?? readPipeline()),
+    getTeam(supabase, user.id).catch(() => null),
+  ]);
+  if (!data) {
+    return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
+  }
+  const rows = data.filter((d) => !d.is_sample);
 
   // Deadlines, teammate names, and both buy boxes are mutually independent —
-  // one parallel batch instead of four sequential round trips.
-  const mateIds = Array.from(
-    new Set(
-      rows.filter((d) => d.team_id && d.user_id !== user.id).map((d) => d.user_id),
-    ),
+  // one parallel batch instead of four sequential round trips. Each list of
+  // ids goes a hundred a request (lib/read-all): the whole pipeline's ids in
+  // one URL ran past what a request line carries, and the jobs' one read past
+  // the project's max rows (research pass 42).
+  const dealIds = rows.map((d) => d.id);
+  const failedRead = (what: string) => (e: unknown) => console.error(`[pipeline export] ${what} read failed:`, e);
+  // Every deal's open tasks, for its next step and who owns it (research
+  // pass 24, B1) — read first, since their owners are named beside the
+  // teammates who added deals. A read that fails builds no workbook, as for
+  // the deals: "no next step" would be a claim the route could not make.
+  type TaskRow = {
+    deal_id: string;
+    title: string;
+    assignee_user_id: string | null;
+    due_date: string | null;
+    done: boolean;
+    completed_at: string | null;
+    created_at: string;
+  };
+  const taskRows = await readByIds<TaskRow>(
+    dealIds,
+    (chunk) =>
+      supabase
+        .from("deal_tasks")
+        .select("deal_id, title, assignee_user_id, due_date, done, completed_at, created_at")
+        .in("deal_id", chunk)
+        .eq("done", false),
+    failedRead("task"),
   );
-  const [{ data: dueRows }, { data: mates }, personalBox, teamBox, { data: jobRows }] =
-    await Promise.all([
-      rows.length
-        ? supabase
-            .from("deals")
-            .select("id, offers_due")
-            .in(
-              "id",
-              rows.map((d) => d.id),
-            )
-        : Promise.resolve({ data: [] as { id: string; offers_due: string | null }[] }),
-      mateIds.length
-        ? supabase.from("profiles").select("id, email, full_name").in("id", mateIds)
-        : Promise.resolve({
-            data: [] as { id: string; email: string | null; full_name: string | null }[],
-          }),
-      getBuyBoxForDeal(user.id, null).catch(() => null),
-      team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
-      // Each deal's latest job, as the pipeline page reads it: a re-screen
-      // running, or one that failed before its verdict, leaves the call on
-      // file the previous screen's beside this run's terms (lib/screen-run).
-      rows.length
-        ? supabase
-            .from("analysis_jobs")
-            .select("deal_id, status, step, created_at")
-            .in(
-              "deal_id",
-              rows.map((d) => d.id),
-            )
-            .order("created_at", { ascending: false })
-            .limit(Math.max(100, rows.length * 3))
-        : Promise.resolve({ data: [] as ({ deal_id: string } & JobLike)[] }),
-    ]);
-  // The newest job per deal (rows arrive newest first).
+  if (!taskRows) {
+    return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
+  }
+  const tasksByDeal = new Map<string, PackTask[]>();
+  for (const t of taskRows) {
+    const list = tasksByDeal.get(t.deal_id) ?? [];
+    list.push({
+      title: t.title,
+      assigneeUserId: t.assignee_user_id,
+      dueDate: t.due_date,
+      done: t.done,
+      completedAt: t.completed_at,
+      createdAt: t.created_at,
+    });
+    tasksByDeal.set(t.deal_id, list);
+  }
+  const mateIds = Array.from(
+    new Set([
+      ...rows.filter((d) => d.team_id && d.user_id !== user.id).map((d) => d.user_id),
+      ...taskRows.map((t) => t.assignee_user_id).filter((id): id is string => !!id && id !== user.id),
+    ]),
+  );
+  const [dueRows, mates, personalBox, teamBox, jobRows] = await Promise.all([
+    readByIds<{ id: string; offers_due: string | null }>(
+      dealIds,
+      (chunk) => supabase.from("deals").select("id, offers_due").in("id", chunk),
+      failedRead("offers-due"),
+    ),
+    // The teammates' names, and the exporter's own: a task's owner is
+    // named in the workbook, never "You" (audit C8, L5).
+    readByIds<{ id: string; email: string | null; full_name: string | null }>(
+      [...mateIds, user.id],
+      (chunk) => supabase.from("profiles").select("id, email, full_name").in("id", chunk),
+      failedRead("teammate name"),
+    ),
+    getBuyBoxForDeal(user.id, null).catch(() => null),
+    team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
+    // Each deal's latest job, as the pipeline page reads it: a re-screen
+    // running, or one that failed before its verdict, leaves the call on
+    // file the previous screen's beside this run's terms (lib/screen-run).
+    readByIds<{ deal_id: string } & JobLike>(
+      dealIds,
+      (chunk) =>
+        supabase
+          .from("analysis_jobs")
+          // Its last write too: a run that stopped making progress is
+          // said as stalled, never as a re-screen (lib/screen-run).
+          .select("deal_id, status, step, created_at, updated_at")
+          .in("deal_id", chunk)
+          .order("created_at", { ascending: false })
+          .limit(Math.max(100, chunk.length * 3)),
+      failedRead("job"),
+    ),
+  ]);
+  // A deadline, a screen's state or a teammate's name the route could not
+  // read is not "none": the meeting's file would say no deal is due, no call
+  // is being re-screened, and "Teammate" for whoever added a deal. It builds
+  // no workbook, as for the deals themselves, and the page says so.
+  if (!dueRows || !mates || !jobRows) {
+    return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
+  }
+  // The newest job per deal (each chunk's rows arrive newest first, and a
+  // deal's rows all sit in its own chunk).
   const jobByDeal = new Map<string, JobLike>();
-  for (const j of (jobRows ?? []) as ({ deal_id: string } & JobLike)[]) {
+  for (const j of jobRows) {
     if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
   }
-  // Offers-due dates are best-effort (column arrived in migration 0013).
   const dueById = new Map<string, string>();
-  for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
+  for (const r of dueRows) {
     if (r.offers_due) dueById.set(r.id, r.offers_due);
   }
   const nameById = new Map<string, string>();
-  for (const m of (mates ?? []) as {
-    id: string;
-    email: string | null;
-    full_name: string | null;
-  }[]) {
-    nameById.set(m.id, m.full_name || m.email || "Teammate");
+  for (const m of mates) {
+    // A name, never an address (lib/person): the name set, else the
+    // email's local part — the workbook is passed round the room.
+    nameById.set(m.id, personName(m.full_name, m.email || (m.id === user.id ? user.email : null)));
   }
 
   // Each row read through the readers every other surface uses
-  // (lib/pipeline-export-row, pure and tested).
+  // (lib/pipeline-export-row, pure and tested), on the route's UTC day —
+  // the day the file is named for — which decides the rent allowance in
+  // force.
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const exportRows: PipelineExportRow[] = rows.map((d) =>
     pipelineExportRow(d, {
       box: d.team_id ? teamBox : personalBox,
@@ -130,7 +209,23 @@ export async function GET(req: Request) {
         d.team_id && d.user_id !== user.id
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
+      today,
+      now: now.getTime(),
+      tasks: tasksByDeal.get(d.id) ?? [],
+      ownerName: exportOwnerName(nameById, { id: user.id, email: user.email ?? null }),
     }),
+  );
+  // What moved in the week before the export: the "This week" sheet.
+  const week = weekActivity(
+    rows.map((d) => ({
+      id: d.id,
+      name: d.name,
+      stage: d.stage,
+      createdAt: d.created_at,
+      history: parseStageHistory(d.stage_history),
+      verdict: (d.verdict as { verdict?: string; generatedAt?: string } | null) ?? null,
+    })),
+    now.getTime(),
   );
 
   // Firm branding (Feature 6) — the caller's own identity (this is an
@@ -142,8 +237,7 @@ export async function GET(req: Request) {
     branding = null;
   }
 
-  const now = new Date();
-  const buffer = await buildPipelineWorkbook(exportRows, now, branding);
+  const buffer = await buildPipelineWorkbook(exportRows, now, branding, week);
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type":

@@ -1,10 +1,11 @@
 import "server-only";
-import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { answeredSiteFlags, floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { withArticle } from "@/lib/article";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
-import { describeRunFailure, ScreenError } from "./failure";
+import { DATABASE_READ_FAILURE, describeRunFailure, ScreenError } from "./failure";
+import { NO_FIGURES_FAILURE, NO_OM_FAILURE, pageCapFailure } from "./document-failures";
 import { RunGate, concurrencyFromEnv } from "./run-gate";
 import { newLedger, summarizeUsage, usageLogLine, withUsageLedger, type UsageLedger } from "./usage";
 import { omSourceFor, omFromText, releaseOmSource, type OmSource } from "./om-source";
@@ -24,6 +25,7 @@ import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
 import { MAX_OM_PAGES, countPdfPages } from "@/lib/pdf";
+import { checkPdfOpens } from "@/lib/pdf-open";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
@@ -39,7 +41,7 @@ import {
   plausibilityNote,
   type StrategyKind,
 } from "@/lib/deal-strategy";
-import { dealContextFor } from "@/lib/deal-context";
+import { dealContextFor, priceRangeLine } from "@/lib/deal-context";
 import { interestNote, readInterest } from "@/lib/interest";
 import { assumableNote, readAssumable } from "@/lib/assumable-debt";
 import { affordableNote, readAffordable } from "@/lib/affordable";
@@ -59,10 +61,17 @@ import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageNote } from "@/lib/self-storage";
+import { regulationForDeal, regulationNote, regulationSaidByPark, type RegulationRead } from "@/lib/rent-regulation";
+import { forwardNote, isForwardPurchase, readForwardPurchase, readsConstructionLending } from "@/lib/forward-purchase";
+import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
+import { condoNote, readCondo } from "@/lib/condo";
+import { readSandwichLease, sandwichNote } from "@/lib/sandwich-lease";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { countyOf, placeDeal } from "@/lib/market-county";
+import { isStateMarket } from "@/lib/market-match";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
 import { debtSeeds, isDebtSeedSeries, ratesPromptLine } from "@/lib/debt-index";
@@ -83,10 +92,11 @@ import {
   type BuyBoxCheck,
 } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
-import { evalDealbreakers } from "@/lib/mandate";
+import { evalDealbreakers, scoreMandateFit, type MandateScore } from "@/lib/mandate";
 import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
 import { requesterOf } from "@/lib/jobs";
 import { omFingerprint } from "@/lib/om-fingerprint";
+import { READER_ROUND } from "@/lib/reader-round";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import type {
@@ -139,6 +149,45 @@ async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
   }
 }
 
+/** The five results a screen writes, and the reconciler's, as the deal page
+ *  names them in a failure's sentence. */
+const RESULT_NAME = {
+  extraction: "terms",
+  challenges: "challenger's questions",
+  comps: "comp read",
+  market: "market check",
+  verdict: "verdict",
+  reconciliation: "reconciliation",
+} as const;
+
+/**
+ * Write one of the run's results to the deal, or fail the run there. The
+ * writes' errors were never read: a statement timeout on the verdict's write
+ * left the previous screen's call on the deal, undashed and unmarked, under
+ * a job that ended "done" and a toast saying the verdict was ready; a failed
+ * write of the terms sent every later step to read the old ones (research
+ * pass 30). Thrown, the job ends "error" at the step that wrote, and every
+ * surface's previous-screen rule (lib/screen-run) marks what is the last
+ * screen's.
+ */
+async function writeResult(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+  column: keyof typeof RESULT_NAME,
+  value: unknown,
+): Promise<void> {
+  const { error } = await admin
+    .from("deals")
+    .update({ [column]: value, updated_at: new Date().toISOString() })
+    .eq("id", dealId);
+  if (error) {
+    throw new ScreenError(
+      `We couldn't save the ${RESULT_NAME[column]} to the deal — our database didn't take the write. Try again in a minute.`,
+      error.message,
+    );
+  }
+}
+
 // In-process runs wrote the job row only at step boundaries. A slow step —
 // the SDK retries a 529 twice with backoff inside one call, so one step can
 // run past ten minutes — let the row go stale with the run still alive, and
@@ -160,10 +209,14 @@ const runGate = new RunGate(concurrencyFromEnv);
 // The provider reads a PDF of up to about 600 pages in one request
 // (MAX_OM_PAGES, lib/pdf); a longer deck came back as a raw 400. The upload
 // refuses one first (lib/pdf-open); this stop catches a deck uploaded before
-// that check. The byte counter mostly under-counts, but an incrementally
-// saved file reads high by the pages it revised (lib/pdf), so a count just
-// past the cap could be such a file; the upload's own count is pdfjs's,
-// which reads the page tree.
+// that check. The byte counter is the cheap first look, and it mostly
+// under-counts, but an incrementally saved file reads high by every page it
+// revised (lib/pdf): a 350-page deck annotated and saved in Acrobat read as
+// 700 and was refused, with a false sentence and a retry that failed the
+// same way forever (research pass 30). So a count past the cap is only a
+// reason to ask pdfjs, which reads the page tree — the upload check's own
+// count — and only its count refuses. Where pdfjs cannot open the file the
+// screen goes on, and the service decides.
 
 /** Keep the job row fresh while a run is alive; returns the stop function. */
 function startHeartbeat(dealId: string): () => void {
@@ -364,6 +417,48 @@ async function todaysRatesLine(
 }
 
 /**
+ * The deal's rent regulation for a screen step (lib/rent-regulation), through
+ * the one call every surface makes (`regulationForDeal`), on the UTC day the
+ * worker keeps (lib/reader-day): the regimes the site's rules say reach the
+ * building at the address the deal page reads it at (a blank one the
+ * memorandum's, a typed line its own fields — `addressUpgrade`), the Census
+ * place and county only from site flags answered for that address, and the
+ * deal's one class (the analyst's, else the deck's). Null where no regime
+ * reaches the building and the memorandum names none.
+ */
+function screenRegulation(
+  row: { extraction?: unknown; address?: unknown; asset_class?: unknown } | null | undefined,
+  flags: SiteFlagsResult | null,
+): RegulationRead | null {
+  const ex = (row?.extraction as ExtractionResult | null | undefined) ?? null;
+  const raw = row?.address;
+  const address: Partial<StructuredAddress> | null =
+    addressUpgrade(raw, ex) ??
+    (raw && typeof raw === "object"
+      ? (raw as Partial<StructuredAddress>)
+      : typeof raw === "string"
+        ? parseStructuredAddress(raw)
+        : null);
+  return regulationForDeal(
+    { extraction: ex, address, siteFlags: flags, assetClass: (row?.asset_class as string | null | undefined) ?? null },
+    new Date().toISOString().slice(0, 10),
+  );
+}
+
+/** What the screen established, for the steps after the extraction. */
+interface ScreenContext {
+  /** the deal context (lib/deal-context), or null with nothing to say */
+  text: string | null;
+  /** a forward purchase (lib/forward-purchase): the comps and the market
+   *  check read its paragraph where a plan's would, as the challenger and
+   *  the verdict do (research pass 41) */
+  forward: boolean;
+  /** the extraction the context was built from — the class the deck turned
+   *  out to be is read off it for the market check, as for the challenger */
+  extraction: ExtractionResult | null;
+}
+
+/**
  * What the screen established about the deal — its kind and, on a plan deal,
  * the plan's figures — for the steps that read the OM after the extraction.
  * Best-effort: with no extraction stored, the step runs on the OM alone.
@@ -372,19 +467,29 @@ async function dealContextFromDb(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
   flags: SiteFlagsResult | null,
-): Promise<string | null> {
+): Promise<ScreenContext> {
   try {
-    const { data } = await admin.from("deals").select("extraction, first_signal").eq("id", dealId).single();
+    const { data } = await admin
+      .from("deals")
+      .select("extraction, first_signal, address, asset_class")
+      .eq("id", dealId)
+      .single();
+    const ex = (data?.extraction as ExtractionResult | null) ?? null;
+    const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
     // Where the FEMA lookup has answered (`siteFlagsForScreen`), the step
     // reads the flood zone too (#426). The deal's kind is read with the
     // first signal beside the extraction, as the market figures read it.
-    return dealContextFor(
-      (data?.extraction as ExtractionResult | null) ?? null,
-      flags && flags.status !== "pending" ? { flood: flags.flood } : null,
-      (data?.first_signal as FirstSignal | null | undefined) ?? null,
+    // The rent rules are read after the lookup, so a city's regime reads the
+    // building's own municipality where the Census geocoder named it.
+    const text = dealContextFor(
+      ex,
+      flags && flags.status !== "pending" ? { flood: flags.flood, pointIsBuilding: flags.pointIsBuilding } : null,
+      firstSignal,
+      screenRegulation(data, flags),
     );
+    return { text, forward: !!ex && isForwardPurchase(ex, inferStrategy(ex, firstSignal)), extraction: ex };
   } catch {
-    return null;
+    return { text: null, forward: false, extraction: null };
   }
 }
 
@@ -411,6 +516,18 @@ interface LiveMarketRead {
   primary: LiveMarketBrief | null;
   /** a portfolio's other markets, in the order read */
   others: LiveMarketBrief[];
+  /** the deal sits in a market the site reads figures for and none could be
+   *  read — a read of the figures, or of the deal's address, failed — so the
+   *  check says it reasoned from rules of thumb that day, never that the
+   *  market has no figures (lib/market-read-failed, research pass 30) */
+  failed: { market: string | null; grain: "metro" | "state" } | null;
+}
+
+/** A failed read, said for the market it was for where the deal was placed. */
+function readFailedFor(market: { id: string; name: string } | null): NonNullable<LiveMarketRead["failed"]> {
+  return market
+    ? { market: market.name, grain: isStateMarket(market.id) ? "state" : "metro" }
+    : { market: null, grain: "metro" };
 }
 
 async function liveMarketFromDb(
@@ -419,12 +536,26 @@ async function liveMarketFromDb(
   flags: SiteFlagsResult | null = null,
   now: Date = new Date(),
 ): Promise<LiveMarketRead> {
+  // The market whose figures are being read, once the deal is placed, and
+  // how many of its reads failed: a covered market's check that read none
+  // of its figures for a failure says so.
+  let placed: { id: string; name: string } | null = null;
+  let failures = 0;
+  const failedRead = () => {
+    failures++;
+  };
   try {
-    const { data } = await admin
+    const { data, error: dealErr } = await admin
       .from("deals")
       .select("address, asset_class, extraction, first_signal")
       .eq("id", dealId)
-      .single();
+      .maybeSingle();
+    // The deal's own address could not be read: where it sits is unknown,
+    // and no figure was read for it.
+    if (dealErr) {
+      console.warn(`[pipeline] the deal's address could not be read for the market check of ${dealId}: ${dealErr.message}`);
+      return { primary: null, others: [], failed: readFailedFor(null) };
+    }
     // The column holds the structured object the deal form saved (the deals
     // list and the compare page read it the same way); a row that still
     // carries the form's JSON string is parsed the form's way.
@@ -448,6 +579,7 @@ async function liveMarketFromDb(
     // under `state:PA`), said as the state's. A deal with no readable state
     // or county reads nothing of its own, as before.
     const metro = placeDeal(address, countyOf(address, flags)).live;
+    placed = metro ?? null;
     // The debt-market lines read the deal's class, and whether the deal is
     // a plan, so the lending-standards series is the one a bank reports for
     // this kind of loan. The class is the one every page shows
@@ -460,26 +592,42 @@ async function liveMarketFromDb(
     // a deal only the first signal calls a development or a conversion is a
     // plan here too, and reads what building costs (the audit of 2026-09-30).
     const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
-    const kind = inferStrategy(ex, firstSignal).kind;
-    const plan = isPlanDeal(kind);
+    const strategy = inferStrategy(ex, firstSignal);
+    const kind = strategy.kind;
+    // The construction lenders' standards on a plan deal, never a forward
+    // purchase's: its developer funds the works (research pass 41).
+    const plan = readsConstructionLending(ex, strategy);
     // What building costs is read only where the deal builds something — a
     // development, a conversion, a value-add with a stated budget — never a
     // lease-up's finished building (lib/deal-strategy buildsSomething).
     const builds = buildsSomething(ex, kind);
     const others = otherPortfolioMarkets(ex, metro?.id ?? null);
-    if (!metro && !others) return { primary: null, others: [] };
-    const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)));
+    if (!metro && !others) return { primary: null, others: [], failed: null };
+    const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)), failedRead);
     const national = readRates(nationalRows, now);
+    // Whether the reads of the market's OWN figures failed — its series and
+    // its benchmarks — apart from the national lines, every one of them or
+    // enough to leave no line of its own: a brief left holding only the
+    // nation's lines is no read of the market (the batch-2 audit, and the
+    // pre-merge audit's case of a read that answered empty).
+    let ownReadFailed = false;
     const readMarket = async (
       market: { id: string; name: string; placedBy?: { county: string; area: string } },
       withNational: boolean,
       portfolio: Parameters<typeof liveMarketBrief>[0]["portfolio"],
     ): Promise<LiveMarketBrief | null> => {
+      const metas = metroSeriesFor(market.id).series;
+      const attempts = metas.reduce((n, m) => n + (m.moe ? 2 : 1), 0) + 1;
+      let own = 0;
+      const ownFailed = () => {
+        own++;
+        failedRead();
+      };
       const [rateRows, bench] = await Promise.all([
-        fetchSeriesRows(admin, metroSeriesFor(market.id).series),
-        fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS]),
+        fetchSeriesRows(admin, metas, ownFailed),
+        fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS], ownFailed),
       ]);
-      return liveMarketBrief({
+      const brief = liveMarketBrief({
         metro: market,
         rates: readMetroRates(market.id, rateRows, now),
         zori: zoriFor(bench, market.name, now),
@@ -494,6 +642,14 @@ async function liveMarketFromDb(
         plan,
         builds,
       });
+      // Reads of the market's own figures failed and left no line of its
+      // own: the reads that answered held nothing for this deal (a state
+      // has no Zillow or Realtor.com rows, and their read "succeeds" empty;
+      // a commercial deal reads no housing line), so a block of the
+      // nation's lines alone is a failed read of the market, never a read
+      // of it (the pre-merge audit).
+      ownReadFailed = own > 0 && (own >= attempts || brief == null || brief.national >= brief.lines.length);
+      return ownReadFailed ? null : brief;
     };
     const whole = portfolioFor(ex, metro?.id ?? "");
     // The other markets are read FIRST, so the address's header names only
@@ -510,13 +666,21 @@ async function liveMarketFromDb(
       if (b) read.push(b);
     }
     const unread = (others?.read.length ?? 0) - read.length + (others?.notRead ?? 0);
+    ownReadFailed = false;
     const primary = metro
       ? await readMarket(metro, true, whole ? { ...whole, othersRead: read.map((b) => b.metro), notRead: unread } : null)
       : null;
-    return { primary, others: read };
+    // The deal's market was wanted, nothing came back, and reads failed — or
+    // every read of its own figures failed, whatever the nation's lines did:
+    // a failed read, never a market with no figures to read.
+    return {
+      primary,
+      others: read,
+      failed: metro && !primary && (failures > 0 || ownReadFailed) ? readFailedFor(metro) : null,
+    };
   } catch (err) {
     console.warn(`[pipeline] live market figures unavailable for deal ${dealId}:`, err instanceof Error ? err.message : err);
-    return { primary: null, others: [] };
+    return { primary: null, others: [], failed: readFailedFor(placed) };
   }
 }
 
@@ -537,11 +701,20 @@ async function regenerateVerdict(
   dealId: string,
   dealContext: string | null,
 ): Promise<void> {
-  const { data } = await admin
+  const { data, error: readErr } = await admin
     .from("deals")
     .select("asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
+  // A verdict synthesized over a read that failed would judge a deal with
+  // no terms, no challenger and no market check — and be written as this
+  // run's call (research pass 30).
+  if (readErr || !data) {
+    throw new ScreenError(
+      "We couldn't read this deal's results back from our database just now — try again in a minute.",
+      readErr?.message ?? "no row",
+    );
+  }
   const extraction = (data?.extraction as ExtractionResult | null | undefined) ?? null;
   const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
 
@@ -555,7 +728,9 @@ async function regenerateVerdict(
       (data?.user_id as string) ?? "",
       (data?.team_id as string) ?? null,
     );
-    buyBox = box ? buyBoxLines(box) : null;
+    // The box without the buyer's 1031 exchange: the verdict's words reach a
+    // shared screen, and the exchange is the reader's own (lib/criteria).
+    buyBox = box ? buyBoxLines(box, { exchange: false }) : null;
   } catch {
     buyBox = null;
   }
@@ -565,7 +740,7 @@ async function regenerateVerdict(
   // the verdict is handed the calls the chip shows, never left to re-derive
   // a fit from the bare criteria. Best-effort on its own: a read that fails
   // leaves the criteria in the brief, as before.
-  let buyBoxChecks: { checks: BuyBoxCheck[]; tripped: string[] } | null = null;
+  let buyBoxChecks: { checks: BuyBoxCheck[]; tripped: string[]; mandate: MandateScore | null } | null = null;
   if (box && buyBox) {
     try {
       const address =
@@ -575,11 +750,18 @@ async function regenerateVerdict(
       buyBoxChecks = {
         checks: evaluateBuyBox(filedAs, source, box),
         tripped: source && !hasNoDealbreakers(box.dealbreakers) ? evalDealbreakers(filedAs, source, box).tripped : [],
+        // The score beside them, as the chip reads it: its cash-on-cash
+        // floor and its red lines are criteria the coverage counts.
+        mandate: source ? scoreMandateFit(filedAs, source, box) : null,
       };
     } catch {
       buyBoxChecks = null;
     }
   }
+  // The buyer's 1031 exchange is never handed to the verdict: its words reach
+  // the shared screen, and a counterparty who learns the buyer must close by
+  // a date holds the price. The deadlines stay on the reader's own surfaces
+  // (the deal header's chip, the pipeline's tag, the memo).
 
   const verdict = await synthesizeVerdict({
     extraction,
@@ -603,15 +785,9 @@ async function regenerateVerdict(
     ratesLine: await todaysRatesLine(admin, extraction),
   });
 
-  await admin
-    .from("deals")
-    .update({
-      // generatedAt lets consumers (the weekly digest) know when THIS verdict
-      // landed — deals.updated_at bumps on any edit and can't be trusted.
-      verdict: { ...verdict, generatedAt: new Date().toISOString() },
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", dealId);
+  // generatedAt lets consumers (the weekly digest) know when THIS verdict
+  // landed — deals.updated_at bumps on any edit and can't be trusted.
+  await writeResult(admin, dealId, "verdict", { ...verdict, generatedAt: new Date().toISOString() });
 }
 
 /**
@@ -714,9 +890,13 @@ async function runAnalysisSteps(
       .from("deals")
       .select("id, name, asset_class, om_storage_path, extraction, qa, verdict")
       .eq("id", dealId)
-      .single();
+      .maybeSingle();
 
-    if (error || !deal) throw new Error("Deal not found.");
+    // A read that failed is not a deal that is gone: one blip had told the
+    // reader looking at the deal it was "no longer available" (research
+    // pass 30). Only a read that answered with no row says that.
+    if (error) throw new ScreenError(DATABASE_READ_FAILURE, error.message);
+    if (!deal) throw new Error("Deal not found.");
     // Manual deals have no OM — the stored extraction (the buyer's typed
     // facts) is the source, and a synthesized fact sheet stands in for the
     // document. No extraction either means there's nothing to screen.
@@ -725,9 +905,7 @@ async function runAnalysisSteps(
       : null;
     const manual = manualExtraction != null;
     if (!deal.om_storage_path && !manual) {
-      throw new Error(
-        "No OM file is attached to this deal — upload one, or enter the deal's facts by hand.",
-      );
+      throw new ScreenError(NO_OM_FAILURE);
     }
 
     const assetClass = (deal.asset_class as AssetClass) ?? "auto";
@@ -805,11 +983,12 @@ async function runAnalysisSteps(
         ? await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId })
         : null;
     if (pdf) {
-      const pages = countPdfPages(pdf);
-      if (pages != null && pages > MAX_OM_PAGES) {
-        throw new ScreenError(
-          `This OM runs ${pages.toLocaleString("en-US")} pages — the analysis service reads up to about ${MAX_OM_PAGES} in one pass. Split off the financial sections and upload those.`,
-        );
+      const counted = countPdfPages(pdf);
+      if (counted != null && counted > MAX_OM_PAGES) {
+        const opened = await checkPdfOpens(pdf);
+        if (opened.verdict === "too_long" && opened.pages != null) {
+          throw new ScreenError(pageCapFailure(opened.pages));
+        }
       }
     }
     // Inline for anything the request cap carries; one Files-API upload for
@@ -868,9 +1047,12 @@ async function runAnalysisSteps(
     // Step 0 — first signal: the fast headline read, stored the moment it
     // lands so the deal page shows what the deal IS while the deep pass runs.
     // Best-effort: a failure here (or a pre-0009 schema without the column)
-    // must never sink the real screen. This call also warms the prompt cache
-    // for the OM, so extraction and the later steps read it cheaply. Manual
-    // deals derive the signal from the typed facts — no model call.
+    // must never sink the real screen. This call also writes the OM to the
+    // prompt cache; whether the extraction and the later steps read it back
+    // — each sends a structured-output format of its own, which Anthropic's
+    // documentation says invalidates the cache — is the ledger's to say
+    // (./models). Manual deals derive the signal from the typed facts — no
+    // model call.
     if (!completed.has("signal")) {
       await patchJob(dealId, {
         status: "running",
@@ -927,9 +1109,7 @@ async function runAnalysisSteps(
       // never read — stop here. (A scan is read as pictures, and a file that
       // needs a password to open is refused at the upload, lib/pdf-open.)
       if (extraction.metrics.length === 0) {
-        throw new ScreenError(
-          "We couldn't read any figures out of this PDF, from its text or its pages — check it is the offering memorandum rather than a teaser or a cover letter, or upload a clearer copy with Replace OM.",
-        );
+        throw new ScreenError(NO_FIGURES_FAILURE);
       }
       // The memorandum's page count, as exact as this run can make it: the
       // text layer's own (pdfjs walked the pages); else the model's count of
@@ -980,12 +1160,11 @@ async function runAnalysisSteps(
           !memorandumReplacedSince(deal.qa, typeof lastScreen === "string" ? lastScreen : null, fingerprint),
       });
       // A reading kept with no stamp is stored with none, never an invented day.
-      extraction = { ...extraction, omFingerprint: fingerprint, screenedOn: stamp };
+      // The readers it was read under are this run's, whatever the day kept
+      // (lib/reader-round): a deal re-screened reads every field asked today.
+      extraction = { ...extraction, omFingerprint: fingerprint, screenedOn: stamp, readerRound: READER_ROUND };
       if (!stamp) delete extraction.screenedOn;
-      await admin
-        .from("deals")
-        .update({ extraction, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      await writeResult(admin, dealId, "extraction", extraction);
       // Place the deal by its address (#441): a deal uploaded with the
       // address box empty takes the one the memorandum states, and a typed
       // line gets the street, city and state it names — so the market check
@@ -1083,10 +1262,13 @@ async function runAnalysisSteps(
       // lists the memorandum's own words call for.
       let challengeEx: ExtractionResult | null = null;
       let challengeKind: StrategyKind | null = null;
+      // A forward purchase (lib/forward-purchase), set where its note is
+      // among the notes: the challenger's plan paragraph is the purchase's.
+      let challengeForward = false;
       try {
         const { data: dr } = await admin
           .from("deals")
-          .select("discrepancies, extraction, first_signal")
+          .select("discrepancies, extraction, first_signal, address, site_flags")
           .eq("id", dealId)
           .single();
         const disc = (dr?.discrepancies as {
@@ -1107,6 +1289,13 @@ async function runAnalysisSteps(
         challengeEx = ex;
         const strategy = inferStrategy(ex, (dr?.first_signal as FirstSignal | null | undefined) ?? null);
         challengeKind = strategy.kind;
+
+        // A price stated as a range (#466): which end every figure is struck
+        // at, as the deal context tells every step after this one — the
+        // instruction's BASIS test reads the same "$40–42M" in the
+        // memorandum (research pass 41).
+        const range = priceRangeLine(ex, strategy.kind);
+        if (range) notes.push(range);
 
         // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
         // first-order fact — a material (>5%) or red-flag (>10%) delta means
@@ -1163,6 +1352,17 @@ async function runAnalysisSteps(
           ex,
         );
         if (plausibility) notes.push(plausibility);
+        // A forward purchase or a build-to-suit bought at delivery
+        // (lib/forward-purchase): the price at delivery, the clock to it and
+        // to the outside date, the deposit and the yield at delivery, then
+        // the forward-purchase traps by name — in place of the construction
+        // paragraph a development gets, since the buyer carries no
+        // construction (the instruction's own plan paragraph is swapped too).
+        const forward = readForwardPurchase(ex, new Date(), strategy);
+        if (forward) {
+          notes.push(forwardNote(forward));
+          challengeForward = true;
+        }
 
         // A portfolio: what the extraction established about the properties
         // (the markets, the income's concentration, the allocation against
@@ -1174,7 +1374,10 @@ async function runAnalysisSteps(
         // interest's own traps by name, ahead of everything the challenger
         // reads the figures through (lib/interest).
         const interest = readInterest(ex, askingPriceOf(ex));
-        if (interest) notes.unshift(interestNote(interest));
+        // A sandwich position's own read (below) says the master lease's
+        // end: the interest's note leaves it to that one, said once.
+        const sandwich = readSandwichLease(ex);
+        if (interest) notes.unshift(interestNote(interest, { term: !sandwich?.term }));
 
         // The seller's loan offered for assumption (#417): its terms and the
         // assumable-debt traps by name.
@@ -1195,6 +1398,21 @@ async function runAnalysisSteps(
         // pro forma that marks restricted units to market is a misread.
         const affordable = readAffordable(ex);
         if (affordable) notes.push(affordableNote(affordable));
+
+        // The rent rules that reach the building (lib/rent-regulation): the
+        // regime, the regulated share as stated and the allowance in force,
+        // then the regulation traps by name. The challenger runs BEFORE the
+        // site flags are read (the comps step reads them), so this read is
+        // the address's alone, with no Census place or county: a city's
+        // regime it cannot place inside the city's limits reads "possibly
+        // applies", that question named — the deal context, built after the
+        // lookup, reads the building's own municipality.
+        const regulation = screenRegulation({ extraction: ex, address: dr?.address, asset_class: assetClass }, null);
+        // A park's own read says its "Rent control" row (below): where the
+        // regulation's line would only say it again, the park's stands alone
+        // (lib/rent-regulation `regulationSaidByPark`).
+        const park = readManufacturedHousing(ex);
+        if (regulation && !regulationSaidByPark(regulation, park)) notes.push(regulationNote(regulation));
 
         // One tenant leases the whole property (#454): the lease's facts,
         // then the single-tenant traps keyed to them by name — the
@@ -1233,6 +1451,21 @@ async function runAnalysisSteps(
         // seismic PML and the zoning — the site-report traps by name.
         const reports = readSiteReports(ex);
         if (reports) notes.push(siteReportsNote(reports));
+        // FEMA's flood zone, where the site lookup has already answered by
+        // now — a re-screen, or a deal whose page was viewed first. Nothing
+        // waits for it here: the lookup a new deal needs runs before the
+        // comps, as it did (research pass 41: the challenger tests the
+        // insurance line and had never been told the zone).
+        const challengeFlags = answeredSiteFlags(
+          (dr?.site_flags as SiteFlagsResult | null | undefined) ?? null,
+          (dr?.address as { label?: string } | null | undefined)?.label?.trim() ?? "",
+        );
+        // On a portfolio the address is no one building's: the point it was
+        // placed at, never "the building's point" (research pass 41, L11).
+        const flood = challengeFlags
+          ? floodContextLine(challengeFlags.flood, challengeFlags.pointIsBuilding === true && !portfolio)
+          : null;
+        if (flood) notes.push(flood);
 
         // A student building (#468): the pre-lease pace, the beds still to
         // sign against the model's vacancy, the rent per bed, the walk.
@@ -1241,13 +1474,32 @@ async function runAnalysisSteps(
         // A manufactured-housing park (#470): the lot rent against the
         // comparable parks', the park-owned homes, the water and sewer the
         // park runs, the rent rules and the age restriction's compliance.
-        const park = readManufacturedHousing(ex);
         if (park) notes.push(mhNote(park));
         // A self-storage facility (#471): the street rate against recent
         // move-ins, the premium sitting tenants pay, the economic
         // occupancy's definition, new supply and the platform's income.
         const storage = readSelfStorage(ex);
         if (storage) notes.push(storageNote(storage));
+        // A mixed-use building (lib/mixed-use): the two incomes as stated,
+        // then the traps the two add after the class's own MIXED_USE_TRAPS
+        // (a)–(c) — the agency limit, the meters and CAM, the zoning.
+        const mixedUse = readMixedUse(ex);
+        if (mixedUse) notes.push(mixedUseNote(mixedUse));
+        // An operating business on its real estate (lib/going-concern): the
+        // operator's earnings, the rent and its coverage, the split and the
+        // contracts as stated, then the operating-business traps by name —
+        // a care operation's own after them.
+        const goingConcern = readGoingConcern(ex);
+        if (goingConcern) notes.push(goingConcernNote(goingConcern));
+        // Condominium units bought in bulk (lib/condo): the buyer's share of
+        // the association, its dues and a lender's limit on a single owner as
+        // stated, then the condo traps by name.
+        const condo = readCondo(ex);
+        if (condo) notes.push(condoNote(condo));
+        // A sandwich position (lib/sandwich-lease): the sublease income
+        // against the master rent, the spread, its cover and the master
+        // lease's end as stated, then the sandwich-lease traps by name.
+        if (sandwich) notes.push(sandwichNote(sandwich));
 
         if (flagged.length) {
           notes.push(
@@ -1281,11 +1533,8 @@ async function runAnalysisSteps(
       // class's (research pass 23): a cannabis tenant, a special-purpose
       // building sold to be converted, a lab, a cold-storage building.
       const keyed = keyedTrapsFor(challengeEx, challengeKind);
-      const challenges = await challengeAssumptions(om(), challengeClass, reconNote, keyed);
-      await admin
-        .from("deals")
-        .update({ challenges, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      const challenges = await challengeAssumptions(om(), challengeClass, reconNote, keyed, challengeForward);
+      await writeResult(admin, dealId, "challenges", challenges);
       await markDone("challenge");
     }
 
@@ -1304,14 +1553,12 @@ async function runAnalysisSteps(
         : await storedSiteFlags(admin, dealId);
     // What the screen established, built ONCE for the comps, the market
     // check and the verdict, so the three are told the same thing.
-    const dealContext = await dealContextFromDb(admin, dealId, siteFlags);
+    const screen = await dealContextFromDb(admin, dealId, siteFlags);
+    const dealContext = screen.text;
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
-      const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext);
-      await admin
-        .from("deals")
-        .update({ comps, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext, screen.forward);
+      await writeResult(admin, dealId, "comps", comps);
       await markDone("comps");
     }
 
@@ -1321,11 +1568,23 @@ async function runAnalysisSteps(
     // page can say what the check read.
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const { primary, others } = await liveMarketFromDb(admin, dealId, siteFlags);
+      const { primary, others, failed } = await liveMarketFromDb(admin, dealId, siteFlags);
       // One block a market, the address's first: a portfolio's other
       // markets follow in blocks of their own (#413).
       const handed = [primary, ...others].filter((b): b is LiveMarketBrief => !!b).map((b) => b.text);
-      const checked = await checkMarket(om(), assetClass, dealContext, handed.length > 0 ? handed.join("\n\n") : null);
+      // The class the deck turned out to be, where the deal was filed
+      // "Auto" — the challenger's own rule (above): the check's "detect the
+      // asset class" and its every sector's norms are for a deal no class
+      // has been read for yet (research pass 41).
+      const marketClass =
+        (assetClassKey(shownAssetClass(assetClass, screen.extraction)) as AssetClass | null) ?? assetClass;
+      const checked = await checkMarket(
+        om(),
+        marketClass,
+        dealContext,
+        handed.length > 0 ? handed.join("\n\n") : null,
+        screen.forward,
+      );
       const record = (b: LiveMarketBrief) => ({
         metro: b.metro,
         grain: b.grain,
@@ -1340,11 +1599,11 @@ async function runAnalysisSteps(
         ...checked,
         liveBrief: primary ? record(primary) : null,
         ...(others.length > 0 ? { otherBriefs: others.map(record) } : {}),
+        // Stored so the page says the figures were not read that day, and
+        // that a re-screen reads them (lib/market-read-failed).
+        ...(failed ? { liveReadFailed: failed } : {}),
       };
-      await admin
-        .from("deals")
-        .update({ market, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      await writeResult(admin, dealId, "market", market);
       await markDone("market");
     }
 
@@ -1421,11 +1680,12 @@ async function runReconciliationSteps(
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
-      .select("id, om_storage_path, extraction, first_signal")
+      .select("id, om_storage_path, extraction, first_signal, address, asset_class")
       .eq("id", dealId)
-      .single();
+      .maybeSingle();
 
-    if (error || !deal) throw new Error("Deal not found.");
+    if (error) throw new ScreenError(DATABASE_READ_FAILURE, error.message);
+    if (!deal) throw new Error("Deal not found.");
     if (!deal.om_storage_path) {
       throw new Error("No OM file is attached to this deal.");
     }
@@ -1448,15 +1708,14 @@ async function runReconciliationSteps(
     const flags = await storedSiteFlags(admin, dealId);
     const dealContext = dealContextFor(
       (deal.extraction as ExtractionResult | null) ?? null,
-      flags ? { flood: flags.flood } : null,
+      flags ? { flood: flags.flood, pointIsBuilding: flags.pointIsBuilding } : null,
       (deal.first_signal as FirstSignal | null | undefined) ?? null,
+      // The rent rules, read as the screen's own context reads them.
+      screenRegulation(deal, flags),
     );
     const reconciliation = await reconcileModel(omSource, parsed, dealContext);
 
-    await admin
-      .from("deals")
-      .update({ reconciliation, updated_at: new Date().toISOString() })
-      .eq("id", dealId);
+    await writeResult(admin, dealId, "reconciliation", reconciliation);
 
     // Fold the reconciliation into the verdict so the headline reflects it.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 80 });

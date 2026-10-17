@@ -2,47 +2,23 @@
 
 import Link from "next/link";
 import { FileField } from "../../file-field";
-import { useMemo, useState, type ReactNode } from "react";
-import { withArticle } from "@/lib/article";
+import { type ReactNode } from "react";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
-import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
-import type {
-  UnderwritingModel,
-  ReconciledMetric,
-} from "@/lib/model/types";
-import { computeModel, type CashFlowYear } from "@/lib/model/compute";
-import {
-  builtSentence,
-  changedSinceSentence,
-  modelProvenance,
-  sourcingSentence,
-  statedByDocument,
-} from "@/lib/model/provenance";
-import {
-  computeSensitivityGrid,
-  SENSITIVITY_PRICE_FACTORS,
-} from "@/lib/model/sensitivity";
+import { fileKindOf } from "@/lib/file-kind";
+import { FileKindIcon, SAMPLE_ACTUALS_WORDS } from "./source-documents";
+import type { UnderwritingModel } from "@/lib/model/types";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import {
   addDealDocument,
   removeDealDocument,
   generateModel,
 } from "./model-actions";
-
-const usd = (n: number | null | undefined) =>
-  n == null
-    ? "—"
-    : (n < 0 ? "−$" : "$") + Math.abs(Math.round(n)).toLocaleString();
-const pct = (n: number | null | undefined) =>
-  n == null ? "—" : n.toFixed(2) + "%";
-const mult = (n: number | null | undefined) =>
-  n == null ? "—" : n.toFixed(2) + "x";
-
-const CONF: Record<string, { label: string; cls: string }> = {
-  high: { label: "High", cls: "bg-pass/10 text-pass" },
-  medium: { label: "Med", cls: "bg-caution/10 text-caution" },
-  low: { label: "Low", cls: "bg-kill/10 text-kill" },
-};
+// The returns headline and its tiles live in returns-headline.tsx, the
+// card's views in model-panels.tsx and the card's body in model-body.tsx
+// (none with a server action); importers keep reading them here.
+import { DownloadRow, InputsNeeded, ModelBody } from "./model-body";
+export { ReturnsHeadline } from "./returns-headline";
+export { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow } from "./model-panels";
 
 export function ModelView({
   dealId,
@@ -50,6 +26,7 @@ export function ModelView({
   documents,
   active,
   isPro,
+  downloadsOpen = isPro,
   isSample = false,
   interest = null,
 }: {
@@ -58,32 +35,29 @@ export function ModelView({
   documents: DealDocument[];
   active: boolean;
   isPro: boolean;
+  /** the workbook download: Pro, or the reader's own sample deal, which
+   *  the public pages promise free (lib/sample-exports) */
+  downloadsOpen?: boolean;
   /** the sample deal, whose model lists the fixture's documents and which
    *  has no document rows of its own to compare them with */
   isSample?: boolean;
   /** what the price buys, read by the compare table's rule (lib/compare-
-   *  interest `modelReturnsRead`): a note's or a share's returns withheld */
+   *  interest `modelReturnsRead`): a note's, a share's or a preferred
+   *  equity position's returns withheld */
   interest?: ModelReturnsRead | null;
 }) {
-  // Returns the price did not buy are withheld — and so are the stress
-  // panel's and the grid's, which recompute the same returns.
-  const withheld = interest?.withheld ?? null;
   return (
     <div className="flex flex-col gap-6">
       {model ? (
-        <>
-          <FirstDraftBanner model={model} documents={documents} compare={!isSample} />
-          <ReturnsHeadline model={model} interest={interest} />
-          {!withheld && <StressPanel model={model} />}
-          {!withheld && <Sensitivity model={model} />}
-          <Conflicts conflicts={model.conflicts} />
-          <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />
-          <CapexPanel model={model} />
-          <CashFlow cashFlow={model.cashFlow} />
-          <SummaryCaveats summary={model.summary} caveats={model.caveats} />
-          <div className="flex flex-col gap-1.5">
-            {isPro ? (
-              <DownloadRow dealId={dealId} />
+        <ModelBody
+          model={model}
+          documents={documents}
+          compare={!isSample}
+          sample={isSample}
+          interest={interest}
+          download={
+            downloadsOpen ? (
+              <DownloadRow href={`/api/deals/${dealId}/underwrite.xlsx`} />
             ) : (
               <Link
                 href="/billing?upsell=underwrite"
@@ -91,28 +65,35 @@ export function ModelView({
               >
                 Upgrade to Pro to download the OM underwrite model (.xlsx)
               </Link>
-            )}
-            {/* Two models, said as two: the card's returns are this
-                first draft's; the workbook's are the OM underwrite's. */}
-            <p data-qa="workbook-note" className="max-w-2xl text-xs leading-relaxed text-muted">
-              The workbook is a separate model, built from the memorandum’s
-              terms — its returns can differ from the ones above.
-            </p>
-          </div>
-        </>
+            )
+          }
+        />
       ) : (
         <Intro />
       )}
-      <InputsNeeded documents={documents} />
+      {/* The sample has no document rows of its own: the kinds its model
+          was built from are ticked as in, as the public sample's are. */}
+      <InputsNeeded documents={documents} builtFrom={isSample ? model?.generatedFrom : undefined} />
       <DocumentsPanel
         dealId={dealId}
         documents={documents}
         active={active}
         hasModel={!!model}
         isPro={isPro}
+        isSample={isSample}
+        builtFrom={model?.generatedFrom ?? []}
       />
     </div>
   );
+}
+
+/** A document as the model keeps it ("Rent roll: Maddox-RentRoll.xlsx"):
+ *  its kind and its file name. */
+function sampleDocument(label: string): { label: string; kind: string; filename: string } {
+  const at = label.indexOf(": ");
+  return at > 0
+    ? { label, kind: label.slice(0, at).trim(), filename: label.slice(at + 2).trim() }
+    : { label, kind: "Document", filename: label.trim() };
 }
 
 function Intro() {
@@ -129,895 +110,59 @@ function Intro() {
   );
 }
 
-function InputsNeeded({ documents }: { documents: DealDocument[] }) {
-  const have = new Set(documents.map((d) => d.kind));
-  return (
-    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
-      <h2 className="text-sm font-semibold tracking-tight">
-        Add more to the model
-      </h2>
-      {/* One chip per input, ticked when it is in: what each one adds to the
-          model is the tooltip, not a line of copy under every row. */}
-      <ul className="mt-3 flex flex-wrap gap-2">
-        {MODEL_INPUTS.map((inp) => {
-          const ok = have.has(inp.kind);
-          return (
-            <li
-              key={inp.kind}
-              title={`${inp.fills} — ${ok ? "added" : "optional"}`}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                ok ? "border-pass/30 bg-pass/10 text-pass" : "border-line bg-paper text-ink"
-              }`}
-            >
-              <span aria-hidden className="font-bold">
-                {ok ? "✓" : "+"}
-              </span>
-              {inp.label}
-              <span className="sr-only">{ok ? "— added" : "— optional"}</span>
-            </li>
-          );
-        })}
-        {MODEL_PASTES.map((p, i) => (
-          <li
-            key={i}
-            title={`${p.fills} — optional`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1 text-xs font-medium text-ink"
-          >
-            <span aria-hidden className="font-bold">+</span>
-            {p.label}
-            <span className="sr-only">— optional</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-// The first-draft workbook this card once exported, and its Conflicts sheet,
-// were retired (2d036c4): the one Excel download is the OM underwrite
-// (lib/underwrite/workbook.ts), a separate model built from the
-// memorandum's figures. The card says so beside its download button.
-//
-// What the banner says is counted, never claimed (lib/model/provenance):
-// how many assumptions a document states and how many the model chose where
-// none does, when the model was built and from which documents, and what
-// the deal's documents gained or lost since — with the way to rebuild.
-function FirstDraftBanner({
-  model,
-  documents,
-  compare,
-}: {
-  model: UnderwritingModel;
-  documents: DealDocument[];
-  /** compare the deal's documents with the model's — never on the sample */
-  compare: boolean;
-}) {
-  const read = modelProvenance(model, documents);
-  const changed = compare ? changedSinceSentence(read) : "";
-  return (
-    <div className="rounded-xl border border-line border-l-4 border-l-caution bg-caution/5 px-4 py-3">
-      <p className="text-sm font-medium">First-draft model — verify before relying on it</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-muted">{sourcingSentence(read)}</p>
-      <p data-qa="model-built" className="mt-1 text-xs leading-relaxed text-muted">
-        {builtSentence(read)}
-      </p>
-      {changed && (
-        <p data-qa="model-changed" className="mt-1 text-xs font-medium leading-relaxed text-caution">
-          {changed}{" "}
-          <a href="#model-documents" className="underline underline-offset-2 transition-colors hover:text-ink">
-            Regenerate the model
-          </a>{" "}
-          to build from the documents the deal has now.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  /** colour the figure when it is a warning rather than a result */
-  tone?: "kill" | "caution";
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-      <p className="text-[11px] uppercase tracking-wide text-muted">{label}</p>
-      <p
-        className={`mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums ${
-          tone === "kill" ? "text-kill" : tone === "caution" ? "text-caution" : ""
-        }`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-/** Past this, NOI ÷ price is not a cap rate: no operating US property yields
- *  a quarter of its price a year. The figure is a stabilized pro forma on a
- *  different basis (the finished conversion, the renovated building) or a
- *  misread — either way not a return. Mirrors lib/deal-strategy. */
-const IMPLAUSIBLE_CAP = 0.25;
-
-export function ReturnsHeadline({
-  model,
-  interest = null,
-}: {
-  model: UnderwritingModel;
-  /** what the price buys (lib/compare-interest `modelReturnsRead`): a
-   *  note's or a share's returns are withheld, with the reason */
-  interest?: ModelReturnsRead | null;
-}) {
-  const r = model.returns;
-  const withheld = interest?.withheld ?? null;
-  // The building's NOI over a loan's or a share's price is no misread plan:
-  // the price is not the building's, and the line above the figures says so.
-  const implausible = !withheld && r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
-  return (
-    <section>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Projected returns
-        </h2>
-        <span className="font-mono text-xs tabular-nums text-muted">
-          {model.holdYears}-yr hold
-        </span>
-      </div>
-      {implausible && (
-        <div className="mt-3 rounded-xl border border-kill/30 border-l-4 border-l-kill bg-kill/5 px-4 py-3">
-          <p className="text-sm font-semibold text-kill">
-            This model books the finished project’s NOI as year-1 income
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            {usd(r.year1Noi)} of NOI against {withArticle(usd(r.purchasePrice))} price is{" "}
-            {withArticle(pct(r.goingInCapPct))} cap rate, which no operating property yields. The
-            figure is the stabilized pro forma — what the building earns once
-            the plan is complete and leased — but this model carries no
-            construction budget, downtime or lease-up, so every return below is
-            computed against the acquisition price alone and overstates the
-            deal. Regenerate the model: the screen now reads the plan and
-            reports yield on total cost with the years it takes to get there.
-          </p>
-        </div>
-      )}
-      {/* A deal with a plan is judged on what the finished building earns
-          against everything it cost to get there — the yield on cost — and
-          its going-in cap is whatever year 1 really is, dark or not. Models
-          stored before the plan existed carry no yardsticks (undefined) and
-          render as before. */}
-      {r.yieldOnCostPct != null && (
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat
-            label={r.stabilizedYear ? `Yield on cost (Yr ${r.stabilizedYear}, incl. carry)` : "Yield on cost"}
-            value={pct(r.yieldOnCostPct)}
-          />
-          <Stat
-            label={r.worksCarry != null && r.worksCarry > 0 ? "Total cost (incl. carry)" : "Total cost"}
-            value={usd(r.totalCost)}
-          />
-          <Stat label="Capital budget" value={usd(r.capitalBudget)} />
-          <Stat
-            label={r.stabilizedYear ? `Stabilized NOI (Yr ${r.stabilizedYear})` : "Stabilized NOI"}
-            value={r.stabilizedNoi != null ? usd(r.stabilizedNoi) : "—"}
-          />
-        </div>
-      )}
-      {interest?.line && (
-        <p data-qa="returns-withheld" className="mt-3 max-w-2xl text-xs leading-relaxed text-muted">
-          {interest.line}
-        </p>
-      )}
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Levered IRR" value={withheld ? `n/a — ${withheld}` : pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Cash-on-cash (Yr 1)" value={withheld ? `n/a — ${withheld}` : pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Equity multiple" value={withheld ? `n/a — ${withheld}` : mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
-        {withheld === "note" ? (
-          // A note has no cap: its yield to maturity at its price where it
-          // pays or may, the deal header's own slot (lib/compare-interest).
-          interest?.noteYtmPct != null ? (
-            <Stat label="Yield to maturity" value={pct(interest.noteYtmPct)} />
-          ) : (
-            <Stat label="Going-in cap" value="n/a — note" />
-          )
-        ) : interest?.share ? (
-          // A share's cap is struck on the whole its price implies.
-          <Stat
-            label="Going-in cap (on the whole)"
-            value={interest.cap != null ? pct(interest.cap) : "n/a — share"}
-          />
-        ) : (
-          <Stat
-            label={r.yieldOnCostPct != null ? "Going-in cap (Yr 1)" : "Going-in cap"}
-            value={pct(r.goingInCapPct)}
-            tone={implausible ? "kill" : r.goingInCapPct < 0 ? "caution" : undefined}
-          />
-        )}
-        <Stat label="Purchase price" value={usd(r.purchasePrice)} />
-        <Stat label="Equity" value={usd(r.equity)} />
-        <Stat
-          label="Year-1 NOI"
-          value={usd(r.year1Noi)}
-          tone={implausible ? "kill" : r.year1Noi < 0 ? "caution" : undefined}
-        />
-        <Stat label="Exit value" value={usd(r.exitValue)} tone={implausible ? "kill" : undefined} />
-      </div>
-    </section>
-  );
-}
-
-function compactUsd(n: number): string {
-  if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return "$" + Math.round(n / 1_000) + "k";
-  return "$" + Math.round(n).toLocaleString();
-}
-
-function irrTone(v: number | null): string {
-  if (v == null) return "text-muted";
-  if (v >= 15) return "text-pass";
-  if (v >= 8) return "text-ink";
-  if (v >= 0) return "text-caution";
-  return "text-kill";
-}
-
-// Live exit-cap × price IRR grid — re-runs this model's own cash-flow engine
-// (lib/model/compute) at each grid point. The Excel download is the OM
-// underwrite (lib/underwrite), a separate model with its own grids.
-export function Sensitivity({ model }: { model: UnderwritingModel }) {
-  const base = model.inputs;
-  if (!base?.exitCapPct || !base?.purchasePrice) return null;
-
-  // The grid definition lib/model/sensitivity keeps once for this card.
-  const rows = computeSensitivityGrid(base).map((g) => ({
-    exit: g.exitCapPct,
-    cells: g.cells.map((c) => ({ irr: c.irrPct, isBase: c.isBase })),
-  }));
-
-  return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-tight">
-        Return sensitivity{" "}
-        <span className="font-normal text-muted">· levered IRR</span>
-      </h2>
-      <p className="mt-1 text-sm leading-relaxed text-muted">
-        IRR by exit cap and price; your base case is highlighted.
-      </p>
-      <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-        <table className="w-full min-w-[34rem] text-sm">
-          <thead>
-            <tr className="border-b border-line text-right text-[10px] uppercase tracking-wide text-muted">
-              <th className="px-3 py-2.5 text-left font-medium">
-                Exit cap ↓ / price →
-              </th>
-              {SENSITIVITY_PRICE_FACTORS.map((pf) => (
-                <th
-                  key={pf}
-                  className={`px-3 py-2.5 font-mono font-medium tabular-nums ${
-                    pf === 1 ? "text-ink" : ""
-                  }`}
-                >
-                  {compactUsd(base.purchasePrice * pf)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.exit} className="border-b border-line last:border-0">
-                <td className="px-3 py-2.5 font-mono text-xs font-medium tabular-nums">
-                  {r.exit.toFixed(2)}%
-                </td>
-                {r.cells.map((c, i) => (
-                  <td
-                    key={i}
-                    className={`px-3 py-2.5 text-right font-mono tabular-nums ${
-                      c.isBase
-                        ? "bg-brand/10 font-semibold text-brand"
-                        : irrTone(c.irr)
-                    }`}
-                  >
-                    {c.irr == null ? "—" : c.irr.toFixed(1) + "%"}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Stress the assumptions — the four levers a screen turns on,         */
-/* recomputed live through this model's own engine (lib/model/compute; */
-/* the Excel download is lib/underwrite's, a separate model).          */
-/* ------------------------------------------------------------------ */
-
-type StressAdjust = {
-  exitCapPct: number;
-  rentGrowthPct: number;
-  ratePct: number;
-  holdYears: number;
-};
-
-const STRESS_CONTROLS: {
-  key: keyof StressAdjust;
-  label: string;
-  step: number;
-  lo: number;
-  hi: number;
-  fmt: (v: number) => string;
-}[] = [
-  { key: "exitCapPct", label: "Exit cap", step: 0.25, lo: 3, hi: 12, fmt: (v) => v.toFixed(2) + "%" },
-  { key: "rentGrowthPct", label: "Rent growth", step: 0.25, lo: -5, hi: 10, fmt: (v) => v.toFixed(2) + "%" },
-  { key: "ratePct", label: "Interest rate", step: 0.25, lo: 0, hi: 12, fmt: (v) => v.toFixed(2) + "%" },
-  { key: "holdYears", label: "Hold period", step: 1, lo: 1, hi: 15, fmt: (v) => v + (v === 1 ? " year" : " years") },
-];
-
-function clampStep(v: number, lo: number, hi: number): number {
-  // Steps are quarter-points — round away float drift so 5.25 stays 5.25.
-  return Math.min(hi, Math.max(lo, Math.round(v * 100) / 100));
-}
-
-/** "+1.3pt" / "−0.21x" deltas, colored by whether the move helps returns. */
-function StressDelta({
-  now,
-  was,
-  unit,
-}: {
-  now: number | null;
-  was: number | null;
-  unit: "pt" | "x";
-}) {
-  if (now == null || was == null) return null;
-  const d = now - was;
-  if (Math.abs(d) < 0.005) return null;
-  const text =
-    (d > 0 ? "+" : "−") +
-    Math.abs(d).toFixed(unit === "pt" ? 1 : 2) +
-    (unit === "pt" ? "pt" : "x");
-  return (
-    <span
-      className={`ml-1.5 font-mono text-[11px] font-medium tabular-nums ${
-        d > 0 ? "text-pass" : "text-kill"
-      }`}
-    >
-      {text}
-    </span>
-  );
-}
-
-export function StressPanel({ model }: { model: UnderwritingModel }) {
-  const base = model.inputs;
-  const ok = !!base?.purchasePrice && !!base?.exitCapPct && !!base?.loan;
-  const initial: StressAdjust = {
-    exitCapPct: base?.exitCapPct ?? 5,
-    rentGrowthPct: base?.rentGrowthPct ?? 3,
-    ratePct: base?.loan?.ratePct ?? 6,
-    holdYears: base?.holdYears ?? 5,
-  };
-  const [adj, setAdj] = useState<StressAdjust>(initial);
-
-  const baseline = useMemo(() => (ok ? computeModel(base) : null), [base, ok]);
-  const stressed = useMemo(() => {
-    if (!ok) return null;
-    return computeModel({
-      ...base,
-      exitCapPct: adj.exitCapPct,
-      rentGrowthPct: adj.rentGrowthPct,
-      holdYears: adj.holdYears,
-      loan: { ...base.loan, ratePct: adj.ratePct },
-    });
-  }, [base, adj, ok]);
-
-  if (!ok || !baseline || !stressed) return null;
-
-  const dirty = STRESS_CONTROLS.some((c) => adj[c.key] !== initial[c.key]);
-  const r = stressed.returns;
-  const b = baseline.returns;
-  const dscr = (cf: CashFlowYear[] | undefined): number | null => {
-    const y1 = cf?.[0];
-    if (!y1 || y1.debtService <= 0) return null;
-    return y1.noi / y1.debtService;
-  };
-  const dscrNow = dscr(stressed.cashFlow);
-  const dscrBase = dscr(baseline.cashFlow);
-
-  return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Stress the assumptions{" "}
-          <span className="font-normal text-muted">
-            · live, on this model
-          </span>
-        </h2>
-        {dirty && (
-          <button
-            type="button"
-            onClick={() => setAdj(initial)}
-            className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
-          >
-            Reset to model
-          </button>
-        )}
-      </div>
-      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
-        Live — the saved model doesn&apos;t change.
-      </p>
-
-      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {STRESS_CONTROLS.map((c) => {
-          const v = adj[c.key];
-          const changed = v !== initial[c.key];
-          return (
-            <div
-              key={c.key}
-              className="rounded-xl border border-line bg-surface p-3 shadow-sm"
-            >
-              <p className="text-[11px] uppercase tracking-wide text-muted">
-                {c.label}
-              </p>
-              <div className="mt-1.5 flex items-center justify-between gap-1">
-                <button
-                  type="button"
-                  aria-label={`Decrease ${c.label.toLowerCase()}`}
-                  disabled={v - c.step < c.lo}
-                  onClick={() =>
-                    setAdj((a) => ({
-                      ...a,
-                      [c.key]: clampStep(a[c.key] - c.step, c.lo, c.hi),
-                    }))
-                  }
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-sm font-semibold transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  −
-                </button>
-                <span
-                  className={`whitespace-nowrap font-mono text-sm font-semibold tabular-nums ${
-                    changed ? "text-brand" : ""
-                  }`}
-                >
-                  {c.fmt(v)}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Increase ${c.label.toLowerCase()}`}
-                  disabled={v + c.step > c.hi}
-                  onClick={() =>
-                    setAdj((a) => ({
-                      ...a,
-                      [c.key]: clampStep(a[c.key] + c.step, c.lo, c.hi),
-                    }))
-                  }
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-sm font-semibold transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div
-        aria-live="polite"
-        className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"
-      >
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-[11px] uppercase tracking-wide text-muted">
-            Levered IRR
-          </p>
-          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
-            {pct(r.leveredIrrPct)}
-            <StressDelta now={r.leveredIrrPct} was={b.leveredIrrPct} unit="pt" />
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-[11px] uppercase tracking-wide text-muted">
-            Equity multiple
-          </p>
-          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
-            {mult(r.equityMultiple)}
-            <StressDelta now={r.equityMultiple} was={b.equityMultiple} unit="x" />
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-[11px] uppercase tracking-wide text-muted">
-            Cash-on-cash (Yr 1)
-          </p>
-          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
-            {pct(r.cashOnCashPct)}
-            <StressDelta now={r.cashOnCashPct} was={b.cashOnCashPct} unit="pt" />
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-[11px] uppercase tracking-wide text-muted">
-            DSCR (Yr 1)
-          </p>
-          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
-            {dscrNow == null ? "—" : dscrNow.toFixed(2) + "x"}
-            <StressDelta now={dscrNow} was={dscrBase} unit="x" />
-          </p>
-        </div>
-      </div>
-      {dscrNow != null && dscrNow < 1.2 && (
-        <p className="mt-2 text-xs font-medium text-caution">
-          DSCR under 1.20x — most agency lenders won&apos;t size to this.
-          Coverage, not the equity story, is the binding constraint here.
-        </p>
-      )}
-    </section>
-  );
-}
-
-function sourceLine(m: ReconciledMetric): string {
-  return m.sources
-    .map((s) => `${s.doc}: ${s.value}${s.basis ? ` (${s.basis})` : ""}`)
-    .join("  ·  ");
-}
-
-export function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
-  if (conflicts.length === 0) {
-    return (
-      <section>
-        <h2 className="text-sm font-semibold tracking-tight">
-          Source conflicts
-        </h2>
-        <p className="mt-2 text-sm text-muted">
-          No material disagreements between your documents — the sources lined
-          up.
-        </p>
-      </section>
-    );
-  }
-  return (
-    <section>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Source conflicts
-        </h2>
-        <span className="rounded-full bg-kill/10 px-2 py-0.5 text-[11px] font-medium text-kill">
-          {conflicts.length} reconciled
-        </span>
-      </div>
-      <div className="mt-3 space-y-2">
-        {conflicts.map((m, i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-line border-l-4 border-l-kill bg-surface p-4 shadow-sm"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold">{m.label}</span>
-              <span className="ml-auto rounded-full bg-pass/10 px-2 py-0.5 text-[10px] font-medium uppercase text-pass">
-                {m.chosenValue}
-              </span>
-            </div>
-            <p className="mt-1.5 font-mono text-xs tabular-nums text-muted">
-              {sourceLine(m)}
-            </p>
-            <p className="mt-2 text-sm leading-relaxed">
-              <span className="font-medium">Chose {m.authority} — </span>
-              <span className="text-muted">{m.rationale}</span>
-            </p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export function Assumptions({
-  metrics,
-  generatedFrom = [],
-}: {
-  metrics: ReconciledMetric[];
-  /** the documents the model was built from, which a row's source may cite
-   *  by file name (lib/model/provenance) */
-  generatedFrom?: string[];
-}) {
-  const [open, setOpen] = useState(false);
-  const shown = open ? metrics : metrics.slice(0, 8);
-  // Counted, never claimed: a row no document states is the model's own.
-  const assumed = metrics.filter((m) => !statedByDocument(m, generatedFrom)).length;
-  return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-tight">
-        Assumptions{" "}
-        <span className="font-normal text-muted">
-          {assumed === 0
-            ? "· each from your documents"
-            : `· ${metrics.length - assumed} from your documents, ${assumed} assumed`}
-        </span>
-      </h2>
-      <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-        <table className="w-full min-w-[40rem] text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
-              <th className="px-4 py-2.5 font-medium">Assumption</th>
-              <th className="px-4 py-2.5 font-medium">Value</th>
-              <th className="px-4 py-2.5 font-medium">Source</th>
-              <th className="px-4 py-2.5 font-medium">Conf.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((m, i) => {
-              const c = CONF[m.confidence] ?? CONF.medium;
-              return (
-                <tr
-                  key={i}
-                  className="border-b border-line align-top last:border-0"
-                >
-                  <td className="px-4 py-3">
-                    <span
-                      className={`font-medium ${m.isConflict ? "text-kill" : ""}`}
-                    >
-                      {m.label}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 font-mono tabular-nums">
-                    {m.chosenValue}
-                  </td>
-                  <td className="px-4 py-3 text-muted">
-                    {m.authority}
-                    {!statedByDocument(m, generatedFrom) && (
-                      <>
-                        {" "}
-                        <span
-                          data-qa="assumed"
-                          title="No document states this figure — the model chose it"
-                          className="ml-1 inline-flex rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-medium uppercase text-caution"
-                        >
-                          assumed
-                        </span>
-                      </>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${c.cls}`}
-                    >
-                      {c.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {metrics.length > 8 && (
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="mt-2 text-xs font-medium text-brand transition-colors hover:text-brand-strong"
-        >
-          {open ? "Show fewer" : `Show all ${metrics.length} assumptions`}
-        </button>
-      )}
-    </section>
-  );
-}
-
-/** Capital plan — every figure derived from the model itself (reserve input,
- *  units, cash-flow rows), never invented: annual reserve, per-unit funding,
- *  the total set aside across the hold, and the bite out of year-1 NOI. */
-export function CapexPanel({ model }: { model: UnderwritingModel }) {
-  const annual = model.inputs?.capexReserveAnnual ?? 0;
-  if (!annual || annual <= 0) return null;
-  const units = model.inputs?.units ?? 0;
-  const totalOverHold = model.cashFlow.reduce(
-    (sum, y) => sum + (y.capexReserve ?? 0),
-    0,
-  );
-  const noi1 = model.cashFlow[0]?.noi ?? 0;
-  const stats: [string, string][] = [
-    ["Annual reserve", compactUsd(annual)],
-    ...(units > 0
-      ? ([["Per unit / yr", `$${Math.round(annual / units).toLocaleString("en-US")}`]] as [string, string][])
-      : []),
-    [`Funded over ${model.holdYears}-yr hold`, compactUsd(totalOverHold)],
-    ...(noi1 > 0
-      ? ([["Share of year-1 NOI", `${((annual / noi1) * 100).toFixed(1)}%`]] as [string, string][])
-      : []),
-  ];
-  return (
-    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-      <h2 className="text-sm font-semibold tracking-tight">
-        Capital plan{" "}
-        <span className="font-normal text-muted">· reserved below NOI</span>
-      </h2>
-      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {stats.map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-line px-3 py-2">
-            <dt className="text-[10px] uppercase tracking-wide text-muted">
-              {label}
-            </dt>
-            <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
-              {value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-3 text-xs leading-relaxed text-muted">
-        Deducted below NOI in every year — a screening reserve, not an
-        engineering budget.
-      </p>
-    </section>
-  );
-}
-
-export function CashFlow({
-  cashFlow,
-  defaultOpen = false,
-}: {
-  cashFlow: CashFlowYear[];
-  /** the demo slideshow shows the table straight away */
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  if (cashFlow.length === 0) return null;
-  // The plan's spend gets its own line only when there is one — models
-  // stored before the plan existed carry no capitalSpend and read as before.
-  const hasPlanSpend = cashFlow.some((c) => (c.capitalSpend ?? 0) > 0);
-  const rows: [string, (c: CashFlowYear) => number][] = [
-    ["Gross potential rent", (c) => c.gpr],
-    ["Vacancy loss", (c) => -c.vacancyLoss],
-    ["Other income", (c) => c.otherIncome],
-    ["Effective gross income", (c) => c.egi],
-    ["Operating expenses", (c) => -c.opex],
-    ["Net operating income", (c) => c.noi],
-    ["Capital reserve", (c) => -(c.capexReserve ?? 0)],
-    ...(hasPlanSpend
-      ? ([["Capital spend (the plan)", (c) => -(c.capitalSpend ?? 0)]] as [string, (c: CashFlowYear) => number][])
-      : []),
-    ["Debt service", (c) => -c.debtService],
-    ["Levered cash flow", (c) => c.cashFlow],
-  ];
-  const bold = new Set([
-    "Effective gross income",
-    "Net operating income",
-    "Levered cash flow",
-  ]);
-  return (
-    <section>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 text-sm font-semibold tracking-tight"
-      >
-        Operating cash flow
-        <span className="text-xs font-normal text-brand">
-          {open ? "hide" : "show"}
-        </span>
-      </button>
-      {open && (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-          <table className="w-full min-w-[34rem] text-sm">
-            <thead>
-              <tr className="border-b border-line text-right text-[10px] uppercase tracking-wide text-muted">
-                <th className="px-4 py-2.5 text-left font-medium">Line</th>
-                {cashFlow.map((c) => (
-                  <th key={c.year} className="px-4 py-2.5 font-medium">
-                    Yr {c.year}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(([label, pick]) => (
-                <tr key={label} className="border-b border-line last:border-0">
-                  <td
-                    className={`px-4 py-2.5 text-left ${bold.has(label) ? "font-semibold" : "text-muted"}`}
-                  >
-                    {label}
-                  </td>
-                  {cashFlow.map((c) => (
-                    <td
-                      key={c.year}
-                      className={`px-4 py-2.5 text-right font-mono tabular-nums ${bold.has(label) ? "font-semibold" : ""}`}
-                    >
-                      {usd(pick(c))}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function SummaryCaveats({
-  summary,
-  caveats,
-}: {
-  summary: string;
-  caveats: string[];
-}) {
-  return (
-    <section className="grid gap-3 sm:grid-cols-2">
-      {summary && (
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">
-            How it reconciled
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-muted">{summary}</p>
-        </div>
-      )}
-      {caveats.length > 0 && (
-        <div className="rounded-xl border border-line bg-paper p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">
-            Verify before relying on this
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {caveats.map((c, i) => (
-              <li
-                key={i}
-                className="flex gap-2 text-sm leading-relaxed text-muted"
-              >
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-caution" />
-                <span>{c}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function DownloadRow({ dealId }: { dealId: string }) {
-  return (
-    <a
-      href={`/api/deals/${dealId}/underwrite.xlsx`}
-      className="inline-flex w-fit items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-4 w-4"
-        aria-hidden
-      >
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <path d="m7 10 5 5 5-5" />
-        <path d="M12 15V3" />
-      </svg>
-      Download the OM underwrite model (.xlsx)
-    </a>
-  );
-}
-
 function DocumentsPanel({
   dealId,
   documents,
   active,
   hasModel,
   isPro,
+  isSample = false,
+  builtFrom = [],
 }: {
   dealId: string;
   documents: DealDocument[];
   active: boolean;
   hasModel: boolean;
   isPro: boolean;
+  /** the sample deal: no upgrade prompt is drawn on it — the public pages
+   *  promise the sample whole (lib/sample-exports) */
+  isSample?: boolean;
+  /** the documents the model names as built from (`generatedFrom`) */
+  builtFrom?: string[];
 }) {
+  // Only the sample lists the model's documents in place of rows: a real
+  // deal's rows are its documents, and its banner says what changed since.
+  const sampleRows = isSample && documents.length === 0 ? builtFrom.map(sampleDocument) : [];
   return (
     // The banner's "Regenerate the model" lands here, at the control.
     <section id="model-documents" className="scroll-mt-24 rounded-xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">
-        Documents <span className="font-normal text-muted">· {documents.length}</span>
+        Documents <span className="font-normal text-muted">· {documents.length + sampleRows.length}</span>
       </h2>
+
+      {/* The sample holds no document rows: its model was built from the
+          three documents it names (`generatedFrom`), which were read into
+          it with no file behind them. They are listed as the model names
+          them, the Documents tab's way, never as "0" under a model built
+          from three. */}
+      {sampleRows.length > 0 && (
+        <>
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line" data-qa="model-sample-documents">
+            {sampleRows.map((d) => (
+              <li key={d.label} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                <FileKindIcon kind={fileKindOf(d.filename)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{d.filename}</span>
+                  <span className="block text-xs text-muted">{d.kind}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-xs text-muted">
+            {`The model was built from these ${sampleRows.length === 1 ? "document" : `${sampleRows.length} documents`}, ${SAMPLE_ACTUALS_WORDS}.`}
+          </p>
+        </>
+      )}
 
       {documents.length > 0 && (
         <ul className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line">
@@ -1026,10 +171,11 @@ function DocumentsPanel({
               key={d.id}
               className="flex items-center gap-3 px-3 py-2.5 text-sm"
             >
-              <span className="rounded bg-faint px-2 py-0.5 text-[10px] font-medium uppercase text-muted">
-                {DOC_KIND_LABEL[d.kind] ?? d.kind}
+              <FileKindIcon kind={fileKindOf(d.filename, d.content_type)} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{d.filename}</span>
+                <span className="block text-xs text-muted">{DOC_KIND_LABEL[d.kind] ?? d.kind}</span>
               </span>
-              <span className="min-w-0 flex-1 truncate">{d.filename}</span>
               <form action={removeDealDocument}>
                 <input type="hidden" name="dealId" value={dealId} />
                 <input type="hidden" name="docId" value={d.id} />
@@ -1098,7 +244,7 @@ function DocumentsPanel({
             </p>
           )}
         </form>
-      ) : (
+      ) : isSample ? null : (
         <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
             Building this model from your documents is a{" "}

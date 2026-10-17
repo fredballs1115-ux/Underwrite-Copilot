@@ -8,6 +8,7 @@
 // a percentage with no "cap" beside it, or a cap stated as a range is not a
 // basis or a cap, and reads as nothing — the same honesty as the report's
 // rangeRead.
+import { compactUsd } from "@/lib/money";
 import { buildingSfFromMetrics, parsePrice } from "@/lib/criteria";
 import { findPricedMetric, isOutdoorStorageYard, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
 import type { InterestKind } from "@/lib/interest";
@@ -148,16 +149,22 @@ export function subjectBasis(
    *  read for an outdoor-storage yard (lib/deal-strategy
    *  `isOutdoorStorageYard`) */
   assetClass?: string | null,
+  /** the units a bulk condominium purchase buys (lib/condo-units
+   *  `condoUnitsOffered`): its price a unit divides by them, never by the
+   *  condominium's whole count (research pass 38) */
+  unitsOffered?: number | null,
 ): SubjectBasis {
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
-  if (interest?.kind === "note" || interest?.kind === "leased_fee") return none;
+  // A preferred equity position's price buys a rate and a redemption,
+  // nobody's basis (lib/position).
+  if (interest?.kind === "note" || interest?.kind === "leased_fee" || interest?.kind === "preferred_equity") return none;
   if (interest?.kind === "partial_interest" && (interest.sharePct == null || interest.entityLoan != null)) return none;
   const row = findPricedMetric(metrics, kind, screenYear);
   const stated = row ? parsePrice(row.value) : null;
   if (stated == null || stated < 10_000) return none;
   const price = interest?.sharePct != null ? stated / (interest.sharePct / 100) : stated;
-  const units = unitCountFromMetrics(metrics);
+  const units = unitsOffered != null && unitsOffered > 0 ? unitsOffered : unitCountFromMetrics(metrics);
   const sf = isOutdoorStorageYard(assetClass) ? null : buildingSfFromMetrics(metrics);
   return {
     perUnit: units != null && units > 0 ? Math.round(price / units) : null,
@@ -212,11 +219,79 @@ export function basisScale(
   };
 }
 
+/** Every comp on the track of the basis it states: a comp stating a price a
+ *  unit on the per-unit track, one stating only a price a foot on the
+ *  per-SF track, each track with the subject's tick where the subject has
+ *  that basis. `basisScale` puts the set on ONE track and drops a comp that
+ *  states only the other yardstick (the comps research pass's M14); the
+ *  deal page's bars draw from this so no comp that states a basis goes
+ *  undrawn. Null where no comp states a basis. */
+export interface BasisTracks {
+  /** one scale a yardstick some comp states, per unit first */
+  tracks: BasisScale[];
+  /** each comp's track (an index into `tracks`), null where it states none */
+  trackOf: (number | null)[];
+  /** how many comps each track draws */
+  counts: number[];
+}
+
+export function basisTracks(
+  comps: ReadonlyArray<{ detail?: string | null }>,
+  subject: SubjectBasis | null,
+  noun = "unit",
+): BasisTracks | null {
+  const figures = comps.map((c) => compFigures(c.detail));
+  const unitOf = figures.map((f): "unit" | "sf" | null => (f.perUnit != null ? "unit" : f.perSf != null ? "sf" : null));
+  const tracks: BasisScale[] = [];
+  const counts: number[] = [];
+  for (const unit of ["unit", "sf"] as const) {
+    const values = figures.map((f, i) => (unitOf[i] === unit ? (unit === "unit" ? f.perUnit : f.perSf) : null));
+    const drawn = values.filter((v) => v != null).length;
+    if (drawn === 0) continue;
+    const subjectValue = subject ? (unit === "unit" ? subject.perUnit : subject.perSf) : null;
+    const max = Math.max(...values.map((v) => v ?? 0), subjectValue ?? 0);
+    if (max <= 0) continue;
+    tracks.push({
+      unit,
+      noun,
+      max,
+      shares: values.map((v) => (v != null ? Math.min(1, v / max) : null)),
+      subjectShare: subjectValue != null ? Math.min(1, subjectValue / max) : null,
+      subjectValue,
+    });
+    counts.push(drawn);
+  }
+  if (tracks.length === 0) return null;
+  return { tracks, trackOf: unitOf.map((u) => (u ? tracks.findIndex((t) => t.unit === u) : null)).map((i) => (i != null && i >= 0 ? i : null)), counts };
+}
+
+/**
+ * The caption under one track of the report's comp bars: which comps the
+ * bars draw, on what basis, and what the tick or the scale is (audit C7,
+ * L6). "each comp" only where every sale comp is on this track; a lone bar
+ * with no subject tick is scaled to nothing but itself, so no scale is
+ * claimed for it. `drawn` is the track's count (`BasisTracks.counts`),
+ * `total` the sale comps in the set.
+ */
+export function compBarsCaption(track: Pick<BasisScale, "unit" | "noun" | "subjectValue">, drawn: number, total: number): string {
+  const per = track.unit === "unit" ? track.noun : "SF";
+  const which =
+    drawn >= total
+      ? `each comp's basis per ${per}`
+      : drawn === 1
+        ? `the basis per ${per} that one of the ${total} comps states`
+        : `the basis per ${per} that ${drawn} of the ${total} comps state`;
+  if (track.subjectValue != null) {
+    return `Bars: ${which}; the tick is the subject at ${fmtBasis(track.subjectValue, track.unit, track.noun)}.`;
+  }
+  return drawn > 1 ? `Bars: ${which}, scaled to the widest in the set.` : `Bars: ${which}.`;
+}
+
 /** "$274k/unit", "$410/SF" or, given the class's noun, "$274k/key" — the
  *  caption a bar's tooltip uses. */
 export function fmtBasis(value: number, unit: "unit" | "sf", noun = "unit"): string {
   if (unit === "sf") return `$${Math.round(value).toLocaleString("en-US")}/SF`;
-  return value >= 1_000_000
-    ? `$${(value / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M/${noun}`
-    : `$${Math.round(value / 1_000).toLocaleString("en-US")}k/${noun}`;
+  // The pipeline card's own basis writer (lib/pipeline-slots `basisTag`):
+  // one figure, one rounding, on the card and beside the comps.
+  return `${compactUsd(value, { trim: true })}/${noun}`;
 }

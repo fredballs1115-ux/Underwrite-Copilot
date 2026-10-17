@@ -2,9 +2,13 @@
 //
 // The deal's flood frame (lib/flood-map): the USGS aerial, calmed, with
 // FEMA's National Flood Hazard Layer drawn over it in the site's palette,
-// drawn once a deal and kept — cut here, from its centre, to the `w`×`h`
-// asked for, never larger than the frame gives in that shape. A US federal
-// work over another, public domain both, no key.
+// drawn once a deal and kept — cut here, from its centre, to the crop its
+// pages ask for nearest the `w`×`h` asked (lib/image-frames `FLOOD_FRAMES`:
+// the view's 16:9 at 1x and 2x, the filmstrip's, the viewer's whole frame,
+// the report's band; research pass 39), never larger than the frame gives in
+// that shape. Each crop is cut once a process and kept, a couple at a time.
+// Any other size was a decode, a resize and an encode of its own. A US
+// federal work over another, public domain both, no key.
 //
 // The first ask for a deal whose frame is not drawn yet draws it, and waits
 // up to WAIT_MS for it; a draw that takes longer goes on behind the request,
@@ -21,16 +25,9 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { StructuredAddress } from "@/lib/address";
 import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 import { ensureFloodFrame, floodCrop } from "@/lib/flood-map";
-import { FLOOD_FRAME } from "@/lib/flood-frame-core";
+import { FLOOD_FRAMES, FLOOD_VIEW, nearestFrame } from "@/lib/image-frames";
 
-const SIZE = { min: 48, maxW: FLOOD_FRAME.width * FLOOD_FRAME.scale, maxH: FLOOD_FRAME.height * FLOOD_FRAME.scale };
 const WAIT_MS = 50_000;
-
-function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
-  const n = Number(raw);
-  if (raw === null || !Number.isFinite(n)) return fallback;
-  return Math.min(hi, Math.max(lo, Math.round(n)));
-}
 
 const nothing = () => new NextResponse(null, { status: 404 });
 
@@ -60,10 +57,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (q.get("meta")) {
     return NextResponse.json({ classes: record.classes, at: record.at }, { headers: { "cache-control": "private, max-age=300" } });
   }
-  const w = clamp(q.get("w"), SIZE.min, SIZE.maxW, FLOOD_FRAME.width);
-  const h = clamp(q.get("h"), SIZE.min, SIZE.maxH, Math.round((FLOOD_FRAME.width * 9) / 16));
+  // A size no page asks for is the listed crop nearest it; none at all is the
+  // view's own, as it always was.
+  const frame = nearestFrame(FLOOD_FRAMES, q.get("w"), q.get("h"), FLOOD_VIEW);
   try {
-    const jpeg = await floodCrop(id, record, w, h);
+    const jpeg = await floodCrop(id, record, frame.w, frame.h);
     return new NextResponse(new Uint8Array(jpeg), {
       headers: {
         "content-type": "image/jpeg",

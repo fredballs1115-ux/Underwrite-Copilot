@@ -1,11 +1,16 @@
+import { compactUsd } from "@/lib/money";
 import {
   DEFAULT_LEASE_UP_MONTHS,
+  rolloverBars,
+  type RolloverBar,
   type RentRollAnalytics,
   type MarkToMarket,
   type RolloverCostForecast,
   type LeaseUpCurve,
 } from "@/lib/rentroll/analytics";
 import type { ValidationIssue } from "@/lib/rentroll/validate";
+import { ScrollRegion } from "@/app/scroll-region";
+import { chartWidthStyle } from "@/lib/chart-bounds";
 
 /**
  * The rent roll dashboard. Server-rendered — every figure is deterministic and
@@ -13,13 +18,7 @@ import type { ValidationIssue } from "@/lib/rentroll/validate";
  * charting dependency.
  */
 
-const usd = (n: number): string => {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "−" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs)}`;
-};
+const usd = (n: number): string => compactUsd(n, { millions: 2 });
 const sf = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
 const pct1 = (n: number | null) => (n == null ? "—" : `${(n * 100).toFixed(1)}%`);
 const psf = (n: number | null) => (n == null ? "—" : `$${n.toFixed(2)}`);
@@ -67,61 +66,136 @@ function RolloverChart({
   analytics: RentRollAnalytics;
   cost: RolloverCostForecast;
 }) {
-  const years = analytics.rollover.years.slice(0, 12);
+  // Every year from the first expiry to the last, at zero where nothing
+  // expires, and past the twelfth column the rest folded into one, said.
+  const years = rolloverBars(analytics.rollover.years);
   if (!years.length) {
     return <p className="text-sm text-muted">No dated expiries to schedule.</p>;
   }
+  const fold = years.at(-1)?.through != null ? years.at(-1)! : null;
   const COL_W = 74;
   const BAR_W = 40;
-  const PAD_T = 26;
+  // The folded bar's share takes two lines above it ("45.0%", "over 9 yrs").
+  const PAD_T = fold ? 38 : 26;
   const PLOT_H = 170;
   const AXIS_H = 52;
   const W = 16 + years.length * COL_W;
   const H = PAD_T + PLOT_H + AXIS_H;
-  const maxSf = Math.max(...years.map((y) => y.sfExpiring), 1);
+  // The scale is a single year's: the folded bar is several years' sum, and
+  // set by it every real year drew at a fraction of its height. Where the
+  // sum runs past the tallest year it is cut at the plot's top with a break.
+  const single = years.filter((y) => y.through == null);
+  const maxSf = Math.max(...(single.length ? single : years).map((y) => y.sfExpiring), 1);
+  const foldCapped = fold != null && fold.sfExpiring > maxSf;
   const costByYear = new Map(cost.years.map((y) => [y.year, y.totalCost]));
+  const costOf = (y: RolloverBar) => {
+    let total = 0;
+    for (let yr = y.year; yr <= (y.through ?? y.year); yr++) total += costByYear.get(yr) ?? 0;
+    return total;
+  };
+  const yearLabel = (y: RolloverBar) => (y.through == null ? String(y.year) : `${y.year}+`);
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: Math.min(W, 560) }} role="img"
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={chartWidthStyle(W, 560)} role="img"
         aria-label="SF expiring by year">
+        {fold ? (
+          <defs>
+            <pattern id="rollover-fold-hatch" width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width={6} height={6} fill="var(--color-brand)" opacity={0.15} />
+              <line x1={0} y1={0} x2={0} y2={6} stroke="var(--color-brand)" strokeWidth={2.5} opacity={0.75} />
+            </pattern>
+          </defs>
+        ) : null}
         <line x1={8} x2={W - 8} y1={PAD_T + PLOT_H} y2={PAD_T + PLOT_H} stroke="var(--color-line)" />
         {years.map((y, i) => {
           const x = 8 + i * COL_W + (COL_W - BAR_W) / 2;
-          const h = Math.max(2, (y.sfExpiring / maxSf) * PLOT_H);
+          const none = y.leaseCount === 0;
+          const folded = y.through != null;
+          const capped = folded && y.sfExpiring > maxSf;
+          const h = none ? 0 : Math.max(2, Math.min(PLOT_H, (y.sfExpiring / maxSf) * PLOT_H));
           const top = PAD_T + PLOT_H - h;
-          // A year's expiries on a roll of one-year leases is no cliff.
-          const heavy = !analytics.leasesShort && (y.pctOfNra ?? 0) > 0.3;
+          // A year's expiries on a roll of one-year leases is no cliff, and
+          // the folded bar is several years', never one year's cliff.
+          const heavy = !analytics.leasesShort && y.through == null && (y.pctOfNra ?? 0) > 0.3;
+          const span = y.through == null ? String(y.year) : `${y.year}–${y.through}`;
           return (
-            <g key={y.year}>
-              <title>{`${y.year}: ${sf(y.sfExpiring)}, ${usd(y.rentExpiring)} rent, ${y.leaseCount} lease${
-                y.leaseCount === 1 ? "" : "s"
-              }, ${usd(costByYear.get(y.year) ?? 0)} leasing capital`}</title>
-              <rect
-                x={x}
-                y={top}
-                width={BAR_W}
-                height={h}
-                rx={2}
-                fill={heavy ? "var(--color-caution)" : "var(--color-brand)"}
-                opacity={0.9}
-              />
-              <text x={x + BAR_W / 2} y={top - 6} textAnchor="middle" fontSize={10} fill="var(--color-ink)">
-                {pct1(y.pctOfNra)}
-              </text>
+            <g key={y.year} data-roll-year={y.year} data-roll-none={none ? "" : undefined}>
+              <title>
+                {none
+                  ? `${span}: no leases expire`
+                  : `${span}: ${sf(y.sfExpiring)}, ${usd(y.rentExpiring)} rent, ${y.leaseCount} lease${
+                      y.leaseCount === 1 ? "" : "s"
+                    }, ${usd(costOf(y))} leasing capital`}
+              </title>
+              {none ? null : folded ? (
+                // Several years' expiries: hatched and outlined, never a
+                // solid bar that reads as one year's cliff.
+                <g data-roll-folded="" data-roll-capped={capped ? "" : undefined}>
+                  <rect
+                    x={x}
+                    y={top}
+                    width={BAR_W}
+                    height={h}
+                    rx={2}
+                    fill="url(#rollover-fold-hatch)"
+                    stroke="var(--color-brand)"
+                    strokeWidth={1.5}
+                  />
+                  {capped ? (
+                    // The break: the sum runs past the plot's top.
+                    <path
+                      d={`M${x - 3} ${top + 12} L${x + BAR_W + 3} ${top + 6} L${x + BAR_W + 3} ${top + 11} L${x - 3} ${top + 17} Z`}
+                      fill="var(--color-surface)"
+                      stroke="var(--color-brand)"
+                      strokeWidth={1}
+                    />
+                  ) : null}
+                </g>
+              ) : (
+                <rect
+                  x={x}
+                  y={top}
+                  width={BAR_W}
+                  height={h}
+                  rx={2}
+                  fill={heavy ? "var(--color-caution)" : "var(--color-brand)"}
+                  opacity={0.9}
+                />
+              )}
+              {none ? null : folded ? (
+                // The share is the folded years' together, said so.
+                <text x={x + BAR_W / 2} y={top - 17} textAnchor="middle" fontSize={10} fill="var(--color-ink)">
+                  {y.pctOfNra == null ? null : <tspan>{pct1(y.pctOfNra)}</tspan>}{" "}
+                  <tspan x={x + BAR_W / 2} dy={11}>{`over ${y.foldedYears} yrs`}</tspan>
+                </text>
+              ) : (
+                <text x={x + BAR_W / 2} y={top - 6} textAnchor="middle" fontSize={10} fill="var(--color-ink)">
+                  {pct1(y.pctOfNra)}
+                </text>
+              )}
               <text x={x + BAR_W / 2} y={PAD_T + PLOT_H + 16} textAnchor="middle" fontSize={11} fill="var(--color-muted)">
-                {y.year}
+                {yearLabel(y)}
               </text>
               <text x={x + BAR_W / 2} y={PAD_T + PLOT_H + 30} textAnchor="middle" fontSize={10} fill="var(--color-muted)">
-                {Math.round(y.sfExpiring / 1000)}k SF
+                {none ? "none" : `${Math.round(y.sfExpiring / 1000)}k SF`}
               </text>
-              <text x={x + BAR_W / 2} y={PAD_T + PLOT_H + 44} textAnchor="middle" fontSize={10} fill="var(--color-muted)">
-                {usd(y.rentExpiring)}
-              </text>
+              {none ? null : (
+                <text x={x + BAR_W / 2} y={PAD_T + PLOT_H + 44} textAnchor="middle" fontSize={10} fill="var(--color-muted)">
+                  {usd(y.rentExpiring)}
+                </text>
+              )}
             </g>
           );
         })}
       </svg>
+      {fold ? (
+        <p data-qa="rollover-folded" className="mt-1 text-xs text-muted">
+          {`The last bar, ${fold.year}+, folds the ${fold.foldedYears} years from ${fold.year} to ${fold.through} into one, hatched and drawn on a single year's scale${
+            foldCapped ? ", cut at the top where the sum runs past the tallest year" : ""
+          }; the table lists each year that rolls.`}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -289,7 +363,7 @@ export function RentRollDashboard({
         <div className="mt-3">
           <RolloverChart analytics={analytics} cost={cost} />
         </div>
-        <div className="mt-3 overflow-x-auto">
+        <ScrollRegion label="Rollover schedule" className="mt-3">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
@@ -317,7 +391,7 @@ export function RentRollDashboard({
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
         {analytics.rollover.undatedSf > 0 ? (
           <p className="mt-2 text-xs text-muted">
             {sf(analytics.rollover.undatedSf)} of occupied space carries no expiry date and is not

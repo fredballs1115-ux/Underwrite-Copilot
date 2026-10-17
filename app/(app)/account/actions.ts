@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   removeStorageFiles,
+  listDealPictureFiles,
   modelTmpPath,
   omStoragePath,
   brandingLogoPath,
@@ -33,6 +34,7 @@ import { sanitizeBranding, LOGO_MAX_BYTES } from "@/lib/branding";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { picturePaths } from "@/lib/deal-picture";
 import { floodFramePaths } from "@/lib/flood-frame-core";
+import { readFullName } from "@/lib/person";
 
 export type PwState = { error?: string; ok?: boolean } | null;
 
@@ -59,6 +61,49 @@ export async function setEmailPrefs(formData: FormData) {
 
   revalidatePath("/account");
   redirect("/account");
+}
+
+/**
+ * Save the signed-in reader's name (signed-in gaps, H2). Nothing wrote
+ * `profiles.full_name` before, so every person read as their email. The
+ * write goes through the reader's OWN session, never the service role:
+ * migration 0008 grants `update (full_name)` to authenticated users and
+ * 0001's "own profile" policy holds the row to `auth.uid() = id`, so the
+ * database itself refuses any row but the reader's. An empty field clears
+ * the name (the email's local part shows again).
+ *
+ * The name is copied into the account's own metadata too, best-effort, so
+ * the app's chrome can name the reader from the sign-in check it already
+ * makes, with no read of its own on every page. The profile is the record
+ * teammates read; the copy only ever names the reader to themselves.
+ */
+export async function saveFullName(formData: FormData) {
+  const read = readFullName(formData.get("fullName"));
+  if (!read.ok) redirect(`/account?error=${read.why === "email" ? "nameemail" : "namelong"}#name`);
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ full_name: read.name })
+    .eq("id", user.id)
+    .select("id");
+  // No row back is a write the policy refused, or a profile that is not
+  // there: said, never taken for saved.
+  if (error || !data?.length) redirect("/account?error=namesave#name");
+
+  try {
+    await supabase.auth.updateUser({ data: { full_name: read.name } });
+  } catch {
+    // The chrome falls back to the email's local part; the record is saved.
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/account?name=saved#name");
 }
 
 /**
@@ -358,7 +403,10 @@ export async function deleteAccount(formData: FormData) {
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
   if (delErr) redirect(deletionStopHref("delete", done));
   for (const [dealId, paths] of byDeal) {
-    await removeStorageFiles(paths, { kind: "deal", dealId });
+    // Each deal's picture folders listed too, not only what its photo cache
+    // names (lib/storage `listDealPictureFiles`, research pass 39).
+    const listed = await listDealPictureFiles(dealId).catch(() => [] as string[]);
+    await removeStorageFiles([...new Set([...paths, ...listed])], { kind: "deal", dealId });
   }
   if (logoPath) {
     await removeStorageFiles([logoPath], { kind: "branding", userId: user.id, teamId: null });

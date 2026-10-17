@@ -7,10 +7,142 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { SAMPLE_COMP_PREMIUM_LINE } from "@/lib/marketing-constants";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { computeModel } from "@/lib/model/compute";
 import type { SampleLegal } from "@/lib/sample-legal";
+import type { BoxCriterion } from "@/lib/buy-box-chip";
+import type { SampleBuyBoxData } from "./sample-buy-box";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import type { ModelSources } from "@/lib/underwrite/report-grid";
+import type { DealRateSeeds } from "@/lib/debt-index";
+import type { DealStrategy } from "@/lib/deal-strategy";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
+import type { MetroDemand } from "@/lib/metro-demand";
+import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
+import {
+  CardListSkeleton,
+  StatGridSkeleton,
+  TableSkeleton,
+  VerdictSkeleton,
+} from "./(app)/deals/[id]/skeletons";
+
+// The tabs past the Overview — the deal page's other sections and the
+// model's returns (deal-sections-view, returns-headline), with the comps'
+// subject tick — are one chunk of their own (./walkthrough-tabs), loaded once
+// the walkthrough nears the screen or a tab is reached for: the homepage's
+// first load carries the Overview alone.
+type Walkthrough = typeof import("./walkthrough-tabs");
+let walkthrough: Walkthrough | null = null;
+let walkthroughLoad: Promise<Walkthrough> | null = null;
+
+/** Loads the tabs past the Overview, once (exported for the render test,
+ *  which draws every tab). */
+export function loadWalkthrough(): Promise<Walkthrough> {
+  walkthroughLoad ??= import("./walkthrough-tabs").then((m) => (walkthrough = m));
+  return walkthroughLoad;
+}
+
+/** The tabs past the Overview, once their chunk has landed: a panel that
+ *  draws them asks for the chunk itself (the homepage asks earlier, as the
+ *  walkthrough nears the screen; /demo asks when a tab opens) and draws
+ *  again when it arrives. */
+function useWalkthrough(): Walkthrough | null {
+  const [w, setW] = useState<Walkthrough | null>(walkthrough);
+  useEffect(() => {
+    if (w) return;
+    let live = true;
+    void loadWalkthrough().then((m) => {
+      if (live) setW(m);
+    });
+    return () => {
+      live = false;
+    };
+  }, [w]);
+  return w;
+}
+
+/** A tab opened before its chunk has landed: the shape of the panel it
+ *  opens, in the deal page's own skeletons (./(app)/deals/[id]/skeletons),
+ *  never an empty panel, and a polite word for a screen reader. The word is
+ *  set after the region mounts, so a reader that announces only a change in
+ *  a live region hears it. */
+function TabLoading({ what, children }: { what: string; children: ReactNode }) {
+  const [said, setSaid] = useState("");
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setSaid(`Loading ${what}…`));
+    return () => cancelAnimationFrame(id);
+  }, [what]);
+  return (
+    <div aria-busy="true" data-qa="walkthrough-loading">
+      <p role="status" className="sr-only">
+        {said}
+      </p>
+      <div aria-hidden>{children}</div>
+    </div>
+  );
+}
+
+/** The skeleton each analysis draws while the deal page's screen runs it
+ *  (deal-view's AnalysesPanel: the verdict's hero, a list of cards), and
+ *  a table for the two whose views are tables. */
+const ANALYSIS_SKELETON: Record<AnalysisKey, () => ReactNode> = {
+  verdict: () => <VerdictSkeleton />,
+  challenger: () => <CardListSkeleton />,
+  comps: () => <TableSkeleton />,
+  market: () => <CardListSkeleton />,
+  reconciler: () => <TableSkeleton />,
+};
+
+/** The sample's fit against its demo buy box, read on the server through
+ *  the deal header's own reader (lib/buy-box-chip `buyBoxRead`), so the
+ *  walkthrough's call is the header's, never a word typed here. */
+export interface SampleFit {
+  label: string;
+  /** the chip's colours, the header's (`BUY_BOX_CHIP_CLS`) */
+  cls: string;
+  /** which criteria could not be checked, as the chip's tooltip says it */
+  note?: string;
+  /** every criterion the box sets (`boxCriteria`), as the count counts them */
+  criteria: BoxCriterion[];
+}
+
+/** The Financials tab's server reads, made as /demo makes them
+ *  (app/demo/demo-data): the derived screening model the debt sizer starts
+ *  from and where its inputs came from, the sizer's rate seeds (none for the
+ *  sample, which is never seeded from today's rates: lib/model-market), the
+ *  deal's kind, and what the price buys against the model card's returns. */
+export interface SampleFinancials {
+  underwrite: UnderwriteInputs;
+  underwriteSources: ModelSources | null;
+  rateSeeds: DealRateSeeds;
+  strategy: DealStrategy;
+  modelInterest: ModelReturnsRead | null;
+}
+
+const CRITERION_MARK: Record<BoxCriterion["status"], [string, string, string]> = {
+  pass: ["✓", "text-pass border-line", "met"],
+  near: ["~", "text-caution border-caution/30", "just short"],
+  miss: ["✕", "text-kill border-kill/30 bg-kill/[0.04]", "missed"],
+  unknown: ["—", "text-muted border-line", "not checked"],
+};
+
+/** The box's criteria as a row of chips: each one's mark, its name, and
+ *  for a screen reader what the mark says. */
+export function CriteriaChips({ criteria }: { criteria: BoxCriterion[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 text-[10px] font-medium">
+      {criteria.map(({ label, status }) => {
+        const [mark, cls, said] = CRITERION_MARK[status];
+        return (
+          <span key={label} className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}>
+            <span aria-hidden>{mark}</span>
+            <span className="text-ink">{label}</span>
+            <span className="sr-only">{`: ${said}`}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 function prefersReducedMotion(): boolean {
   return (
@@ -83,470 +215,463 @@ export function CountUp({
 }
 
 /* ------------------------------------------------------------------ */
-/* Interactive demo — a faithful MINIATURE of the real deal page.      */
-/* The tab bar is the deal page's actual section list, the analyses    */
-/* sub-pills are its actual analysis names, and every figure derives   */
-/* from the same sample fixture + live engine the demo renders.        */
-/* All data is an ILLUSTRATIVE SAMPLE, clearly labeled in the UI.      */
+/* The walkthrough — the signed-in sample deal's own tabs, on the       */
+/* homepage. Each tab draws the deal page's REAL components             */
+/* (app/(app)/deals/[id]/deal-sections) over the sample fixture, so its */
+/* words, chips and figures are the product's, never a re-drawing of    */
+/* them. All data is an ILLUSTRATIVE SAMPLE, labelled so in the UI.     */
 /* ------------------------------------------------------------------ */
 
-// Derived once from the sample fixture through the SAME computeModel the
-// product ships — this widget cannot disagree with the engine or the demo.
-const INPUTS = SAMPLE_DEAL.model.inputs;
-const RETURNS = computeModel(INPUTS).returns;
-const VERDICT_WORD =
-  SAMPLE_DEAL.verdict.verdict === "pass"
-    ? "Go"
-    : SAMPLE_DEAL.verdict.verdict === "pass_on"
-      ? "No-go"
-      : "Caution";
-const pct1 = (n: number | null) =>
-  n == null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`;
+/** The sample's stored results, as the deal page hands them to its tabs. */
+const RESULTS = {
+  extraction: SAMPLE_DEAL.extraction,
+  challenges: SAMPLE_DEAL.challenges,
+  comps: SAMPLE_DEAL.comps,
+  reconciliation: SAMPLE_DEAL.reconciliation,
+  market: SAMPLE_DEAL.market,
+  verdict: SAMPLE_DEAL.verdict,
+};
 
-// The REAL deal page's section list (deal-view.tsx SECTIONS) — the homepage
-// walkthrough uses the product's own information architecture, not a
-// marketing rewrite of it.
+// The REAL deal page's section list and analyses (deal-view.tsx SECTIONS
+// and ANALYSES) — the product's own information architecture.
 const TABS = ["Overview", "Financials", "Buy box", "Analyses", "Documents"] as const;
 type Tab = (typeof TABS)[number];
-// The REAL analyses sub-tabs (deal-view.tsx ANALYSES), shown as pills.
-const ANALYSIS_PILLS = ["Verdict", "Challenger", "Comps", "Market", "Reconciler"] as const;
+/** A tab's id, its label with no space in it ("Buy box" read as two). */
+const tabId = (t: Tab) => `demo-tab-${t.toLowerCase().replace(/\s+/g, "-")}`;
+const ANALYSES = [
+  { key: "verdict", label: "Verdict", result: "verdict" },
+  { key: "challenger", label: "Challenger", result: "challenges" },
+  { key: "comps", label: "Comps", result: "comps" },
+  { key: "market", label: "Market", result: "market" },
+  { key: "reconciler", label: "Reconciler", result: "reconciliation" },
+] as const;
+export type AnalysisKey = (typeof ANALYSES)[number]["key"];
 
-function RangeRow({
-  label,
-  low,
-  base,
-  high,
-  src,
-}: {
-  label: string;
-  low: string;
-  base: string;
-  high: string;
-  src: string;
-}) {
+/** Where the Overview's jump links land (deal-view's LEGACY_TABS): the
+ *  terms are the Financials tab's, each analysis its own sub-tab. */
+function landing(key: string): { tab: Tab; analysis?: AnalysisKey } | null {
+  if (key === "terms") return { tab: "Financials" };
+  const a = ANALYSES.find((x) => x.key === key);
+  return a ? { tab: "Analyses", analysis: a.key } : null;
+}
+
+/** The finding counts the deal page's tabs carry (deal-view's
+ *  `analysisCounts` and `sectionCounts`), counted on the sample. */
+const ANALYSIS_COUNTS: Record<AnalysisKey, number> = {
+  verdict: 0,
+  challenger: RESULTS.challenges.challenges.filter((c) => c.severity === "high").length,
+  comps:
+    RESULTS.comps.redFlags.length +
+    [...RESULTS.comps.saleComps, ...RESULTS.comps.leaseComps].filter((c) => c.support === "stretched").length,
+  market: RESULTS.market.checks.filter((c) => c.assessment === "aggressive").length,
+  reconciler: RESULTS.reconciliation.rows.filter((r) => r.direction === "unfavorable").length,
+};
+
+/** The deal page's tab dot (deal-view's TabDot): a finished section's,
+ *  or an idle one's ring. */
+function TabDot({ done, active }: { done: boolean; active: boolean }) {
+  const base = "h-1.5 w-1.5 rounded-full";
+  if (done) return <span aria-hidden className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
   return (
-    <div className="rounded-lg border border-line p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium">{label}</span>
-        <span className="font-mono text-[10px] text-muted">range</span>
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line">
-        {[
-          ["Low", low, false],
-          ["Base", base, true],
-          ["High", high, false],
-        ].map(([k, v, e]) => (
-          <div
-            key={k as string}
-            className={`px-2.5 py-1.5 ${e ? "bg-brand/5" : "bg-surface"}`}
-          >
-            <p className="text-[9px] uppercase tracking-wide text-muted">
-              {k as string}
-            </p>
-            <p
-              className={`mt-0.5 font-mono tabular-nums ${
-                e ? "text-sm font-semibold text-brand" : "text-xs"
-              }`}
-            >
-              {v as string}
-            </p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
-        <span className="font-medium text-ink">Source:</span> {src}
-      </p>
-    </div>
+    <span
+      aria-hidden
+      className={`${base} ${active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"}`}
+    />
   );
 }
 
-function Killer({
-  n,
-  name,
-  read,
-  severity,
+/** The Analyses tab's own sub-tabs and the view each opens — the deal
+ *  page's AnalysesPanel, its classes and its components, on the sample. */
+function AnalysesView({
+  analysis,
+  onSelect,
+  demand = null,
 }: {
-  n: number;
-  name: string;
-  read: string;
-  severity: "kill" | "caution" | "pass";
+  analysis: AnalysisKey;
+  onSelect: (key: AnalysisKey) => void;
+  /** the metro area's payrolls by sector, read today, which the market
+   *  check draws where the deal page draws it; null where none was read */
+  demand?: MetroDemand | null;
 }) {
-  const border =
-    severity === "kill"
-      ? "border-l-kill"
-      : severity === "caution"
-        ? "border-l-caution"
-        : "border-l-pass";
-  const chip =
-    severity === "kill"
-      ? "bg-kill/10 text-kill"
-      : severity === "caution"
-        ? "bg-caution/10 text-caution"
-        : "bg-pass/10 text-pass";
+  // The sections, once their chunk has loaded (`loadWalkthrough`).
+  const w = useWalkthrough();
+  const label = ANALYSES.find((a) => a.key === analysis)!.label;
   return (
-    <div className={`rounded-lg border border-line border-l-4 ${border} bg-paper p-3`}>
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-xs tabular-nums text-muted">{n}</span>
-        <span className="text-xs font-medium">{name}</span>
-        <span
-          className={`ml-auto rounded-full px-2 py-0.5 text-[9px] font-medium uppercase ${chip}`}
-        >
-          {severity === "kill"
-            ? "Deal-killer"
-            : severity === "caution"
-              ? "Stress it"
-              : "Holds up"}
-        </span>
-      </div>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted">{read}</p>
-    </div>
-  );
-}
-
-function CompRow({
-  name,
-  meta,
-  rating,
-}: {
-  name: string;
-  meta: string;
-  rating: "stretched" | "leans" | "support";
-}) {
-  const chip =
-    rating === "stretched"
-      ? ["Stretched", "bg-kill/10 text-kill"]
-      : rating === "leans"
-        ? ["Leans favorable", "bg-caution/10 text-caution"]
-        : ["Genuine support", "bg-pass/10 text-pass"];
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
-      <div className="min-w-0">
-        <p className="truncate text-xs font-medium">{name}</p>
-        <p className="truncate text-[10px] text-muted">{meta}</p>
-      </div>
-      <span
-        className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${chip[1]}`}
+    <div className="flex flex-col gap-5">
+      <div
+        role="tablist"
+        aria-label="Analyses"
+        onKeyDown={(e) => {
+          const at = ANALYSES.findIndex((a) => a.key === analysis);
+          const n = ANALYSES.length;
+          const next =
+            e.key === "ArrowRight" ? (at + 1) % n : e.key === "ArrowLeft" ? (at - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+          if (next < 0) return;
+          e.preventDefault();
+          onSelect(ANALYSES[next].key);
+          document.getElementById(`demo-analysis-tab-${ANALYSES[next].key}`)?.focus();
+        }}
+        className="flex flex-wrap gap-1.5"
       >
-        {chip[0]}
-      </span>
-    </div>
-  );
-}
-
-/** The deal page's three-figure summary strip, in miniature. */
-function SummaryFigures() {
-  return (
-    <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-line px-3 py-2.5">
-      {(
-        [
-          ["Price", `$${(INPUTS.purchasePrice / 1e6).toFixed(0)}M`],
-          ["Size", `${INPUTS.units} units`],
-          ["Going-in cap", `${RETURNS.goingInCapPct.toFixed(2)}%`],
-        ] as const
-      ).map(([k, v]) => (
-        <div key={k}>
-          <dt className="text-[9px] uppercase tracking-wide text-muted">{k}</dt>
-          <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
-            {v}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-/** The deal page's Regulation & benchmarks panel, in miniature — same
- *  engine, same outcome chips, same dormancy explainer, fed by the derived
- *  SampleLegal struct so this can never drift from the real screen. */
-function LegalBlock({ legal }: { legal: SampleLegal }) {
-  const rule = legal.rules[0];
-  return (
-    <div className="rounded-lg border border-line bg-paper p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-          Regulation &amp; benchmarks
-        </p>
-        {legal.metroName && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2 py-0.5 text-[9px] font-medium text-brand">
-            <span aria-hidden className="h-1 w-1 rounded-full bg-brand" />
-            Covered market: {legal.metroName}
-          </span>
-        )}
-      </div>
-      <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
-        Screened: {legal.screenedCount} rule
-        {legal.screenedCount === 1 ? "" : "s"} on file for {legal.jurisdiction} —{" "}
-        {legal.triggeredCount === 0
-          ? "none triggered by this deal's facts"
-          : `${legal.triggeredCount} triggered`}
-        .
-      </p>
-      {rule && (
-        <div className="mt-2 rounded-md border border-line/70 p-2.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded bg-line/60 px-1.5 py-px text-[9px] font-semibold text-muted">
-              {rule.outcomeLabel}
-            </span>
-            <span className="text-[9px] uppercase tracking-wide text-muted">
-              {rule.typeLabel}
-            </span>
-            {/* Past the research rule's limit the date keeps its place, with
-                its age and the stale mark (lib/research-age via sampleLegal). */}
-            <span
-              className={`ml-auto rounded px-1.5 py-px text-[9px] font-medium ${
-                rule.stale ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"
+        {ANALYSES.map((a) => {
+          const on = a.key === analysis;
+          const count = ANALYSIS_COUNTS[a.key];
+          return (
+            <button
+              key={a.key}
+              id={`demo-analysis-tab-${a.key}`}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              aria-controls="demo-analysis-tabpanel"
+              tabIndex={on ? 0 : -1}
+              onClick={() => onSelect(a.key)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                on ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-ink hover:bg-faint"
               }`}
             >
-              {`${rule.status} · ${rule.asOf}${rule.stale ? ` · ${rule.stale}` : ""}`}
-            </span>
-          </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-muted">
-            {rule.effect.length > 150
-              ? rule.effect.slice(0, 149).trimEnd() + "…"
-              : rule.effect}
-          </p>
-          {/* A window the rule states its figure for, ended, or a date it
-              gives, come (lib/dated-window via sampleLegal) — never clamped. */}
-          {rule.dated.length > 0 && (
-            <p className="mt-1 text-[9px] font-medium text-caution" data-qa="window-ended">
-              {rule.dated.join(" ")}
-            </p>
-          )}
-          {rule.dormantNote && (
-            <p className="mt-1 text-[9px] font-medium text-caution">{rule.dormantNote}</p>
-          )}
-        </div>
-      )}
-      {legal.stateFact && (
-        <p className="mt-1.5 text-[9px] text-muted">{legal.stateFact}</p>
-      )}
+              {a.label}
+              {count > 0 && (
+                <span className="rounded-full bg-kill/10 px-1.5 py-px font-mono text-[10px] tabular-nums text-kill">
+                  {count}
+                  <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        key={analysis}
+        id="demo-analysis-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`demo-analysis-tab-${analysis}`}
+        className="animate-fade flex flex-col gap-6"
+      >
+        {!w && <TabLoading what={`the ${label.toLowerCase()}`}>{ANALYSIS_SKELETON[analysis]()}</TabLoading>}
+        {w && analysis === "verdict" && <w.VerdictView result={RESULTS.verdict} />}
+        {w && analysis === "challenger" && (
+          <w.ChallengerView
+            result={RESULTS.challenges}
+            dealName={SAMPLE_DEAL.name}
+            totalPages={RESULTS.extraction.totalPages ?? null}
+            sample
+          />
+        )}
+        {w && analysis === "comps" && (
+          // No map: the deal page's comps map geocodes each comp in the
+          // visitor's browser, which a homepage section has no business
+          // doing; /demo's comps tab draws none either.
+          <w.BrokerComps
+            result={RESULTS.comps}
+            dealId="sample"
+            compSearch={null}
+            active={false}
+            isPro={false}
+            publicDemo
+            subject={w.COMP_SUBJECT}
+            noun={w.COMP_NOUN}
+          />
+        )}
+        {w && analysis === "market" && <w.MarketCheck result={RESULTS.market} demand={demand} />}
+        {w && analysis === "reconciler" && <w.Reconciliation result={RESULTS.reconciliation} />}
+      </div>
     </div>
   );
 }
 
-function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
+/** The deal page's Financials tab on the sample, in its order: the
+ *  extracted terms, the debt sizer, then the first-draft model card
+ *  (app/sample-model-card, the card's own body). The model's read against
+ *  the published figures, which the deal page draws between the two, needs
+ *  today's figures the homepage does not read, and is left out rather than
+ *  imitated (/demo draws it). The terms' tiles are held to three across:
+ *  four of them in this column left "$68,000,000" wider than its tile.
+ *  Drawn once its chunk has loaded (`useWalkthrough`), its shape until then. */
+function FinancialsView({ financials }: { financials?: SampleFinancials }) {
+  const w = useWalkthrough();
+  if (!w) {
+    return (
+      <TabLoading what="the financials">
+        <div className="flex flex-col gap-6">
+          <StatGridSkeleton />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-xl border border-line bg-surface p-4">
+                <div className="skeleton h-2.5 w-16 rounded" />
+                <div className="skeleton mt-3 h-6 w-24 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </TabLoading>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="[&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
+        <w.TermsView result={RESULTS.extraction} />
+      </div>
+      {financials && (
+        <w.DebtSizer
+          model={SAMPLE_DEAL.model}
+          extraction={RESULTS.extraction}
+          underwrite={financials.underwrite}
+          underwriteSources={financials.underwriteSources}
+          rateSeeds={financials.rateSeeds}
+          strategy={financials.strategy}
+        />
+      )}
+      {/* The walkthrough's Overview draws no sensitivity playground, so
+          the card's note does not name one (audit C10, L2). */}
+      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} playground={false} />
+    </div>
+  );
+}
+
+/** The deal page's Buy box tab on the sample (app/sample-buy-box), drawn
+ *  once its chunk has loaded, its shape until then. */
+function BuyBoxTab({ data }: { data?: SampleBuyBoxData }) {
+  const w = useWalkthrough();
+  if (!data) return null;
+  if (!w) {
+    return (
+      <TabLoading what="the buy box">
+        <CardListSkeleton />
+      </TabLoading>
+    );
+  }
+  return <w.SampleBuyBox data={data} />;
+}
+
+/** One tab's panel (exported for the homepage's render test). The
+ *  Overview's jump links move the walkthrough as they move the deal page. */
+export function DemoPanel({
+  tab,
+  buyBox,
+  financials,
+  demand = null,
+  analysis = "verdict",
+  onAnalysis = () => {},
+  onNavigate = () => {},
+}: {
+  tab: Tab;
+  /** no longer drawn: the deal page's research panel sits under its tabs,
+   *  in none of them (accepted until the page stops passing it) */
+  legal?: SampleLegal;
+  /** the Buy box tab's panel and the sample's box, read on the server */
+  buyBox?: SampleBuyBoxData;
+  /** the Financials tab's server reads */
+  financials?: SampleFinancials;
+  /** the market check's demand card's rows, read today (/demo reads them;
+   *  the homepage reads none) */
+  demand?: MetroDemand | null;
+  /** the Analyses tab's open sub-tab */
+  analysis?: AnalysisKey;
+  onAnalysis?: (key: AnalysisKey) => void;
+  /** a jump from the Overview, by the deal page's own tab keys */
+  onNavigate?: (key: string) => void;
+}) {
   switch (tab) {
     case "Overview":
-      return (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-line p-3">
-            <div>
-              <p className="text-xs font-medium">Screening verdict</p>
-              <p className="mt-0.5 text-[10px] text-muted">
-                one rubric — the work shown on every call
-              </p>
-            </div>
-            <span className="rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution">
-              {VERDICT_WORD}
-            </span>
-          </div>
-          <SummaryFigures />
-          <Killer n={1} name="Basis" read={SAMPLE_COMP_PREMIUM_LINE} severity="kill" />
-          <Killer
-            n={2}
-            name="Exit"
-            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — a return that leans on cap compression."
-            severity="caution"
-          />
-          <LegalBlock legal={legal} />
-        </div>
-      );
+      return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} />;
     case "Financials":
-      return (
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
-            {(
-              [
-                ["Levered IRR", pct1(RETURNS.leveredIrrPct)],
-                ["Equity multiple", RETURNS.equityMultiple ? `${RETURNS.equityMultiple.toFixed(2)}x` : "—"],
-                ["Cash-on-cash", pct1(RETURNS.cashOnCashPct)],
-              ] as const
-            ).map(([k, v]) => (
-              <div key={k} className="bg-surface px-2 py-2">
-                <p className="text-[9px] uppercase tracking-wide text-muted">{k}</p>
-                <p className="mt-0.5 font-mono text-xs font-semibold tabular-nums">{v}</p>
-              </div>
-            ))}
-          </div>
-          <RangeRow
-            label="Exit cap"
-            low="5.25%"
-            base={`${INPUTS.exitCapPct.toFixed(2)}%`}
-            high="5.75%"
-            src="the market check's typical range, a rule of thumb; the OM holds 5.25%."
-          />
-          <RangeRow
-            label="Market rent / unit"
-            low="$2,400"
-            base="$2,480"
-            high="$2,600"
-            src="rent roll actuals · OM p.12 pro forma flagged +8%."
-          />
-        </div>
-      );
+      return <FinancialsView financials={financials} />;
     case "Buy box":
-      return (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-line p-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium">Mandate fit</p>
-              <span className="rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution">
-                WATCH
-              </span>
-            </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted">
-              Your saved criteria, checked in code on every screen — cap floor,
-              return targets, geographies, hard dealbreakers.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-1.5 text-[10px] font-medium">
-            {(
-              [
-                // The sample deal's own checks against its demo buy box
-                // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
-                ["✓", "Asset class", "text-pass border-line"],
-                ["✓", "Units", "text-pass border-line"],
-                ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
-                ["—", "Target return", "text-muted border-line"],
-              ] as const
-            ).map(([mark, label, cls]) => (
-              <span
-                key={label}
-                className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}
-              >
-                <span aria-hidden>{mark}</span>
-                <span className="text-ink">{label}</span>
-              </span>
-            ))}
-          </div>
-          <p className="text-[10px] leading-relaxed text-muted">
-            A deal can be well-underwritten and still be outside the box — it
-            says so, from the first signal onward, and the verdict judges the
-            fit out loud.
-          </p>
-        </div>
-      );
+      // The deal page's own Buy box tab, against the sample's example box,
+      // said so over it (app/sample-buy-box).
+      return <BuyBoxTab data={buyBox} />;
     case "Analyses":
-      return (
-        <div className="space-y-3">
-          {/* The real analyses sub-tabs, verbatim (Verdict shown active). */}
-          <div className="flex flex-wrap gap-1" aria-hidden>
-            {ANALYSIS_PILLS.map((p, i) => (
-              <span
-                key={p}
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${
-                  i === 0 ? "bg-faint text-ink shadow-sm" : "text-muted"
-                }`}
-              >
-                {p}
-              </span>
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
-            {(
-              [
-                ["Conservative", "No-go", "text-kill"],
-                ["Base", VERDICT_WORD, "text-caution"],
-                ["Sponsor", "Go", "text-pass"],
-              ] as const
-            ).map(([k, v, c]) => (
-              <div key={k} className="bg-surface px-2 py-2">
-                <p className="text-[9px] uppercase tracking-wide text-muted">{k}</p>
-                <p className={`mt-0.5 text-xs font-semibold ${c}`}>{v}</p>
-              </div>
-            ))}
-          </div>
-          <CompRow name="The Brixton" meta="comparable vintage · 2.1 mi" rating="support" />
-          <CompRow name="Vue at Girard" meta="newer, amenitized · 4.0 mi" rating="stretched" />
-          <p className="text-[10px] leading-relaxed text-muted">
-            Five analyses, one rubric — the verdict flips across scenarios, and
-            that spread <em>is</em> the finding.
-          </p>
-        </div>
-      );
+      return <AnalysesView analysis={analysis} onSelect={onAnalysis} demand={demand} />;
     case "Documents":
-      return (
-        <div className="space-y-2.5">
-          {(
-            [
-              ["offering-memorandum.pdf", "screened — all six stages, page-cited", "bg-pass/10 text-pass", "Screened"],
-              ["rent-roll.csv", "actuals beat pro forma in every conflict", "bg-brand/10 text-brand", "Reconciled"],
-              ["t12-operating.pdf", "expense load anchored to the trailing twelve", "bg-brand/10 text-brand", "Reconciled"],
-            ] as const
-          ).map(([file, meta, cls, chip]) => (
-            <div
-              key={file}
-              className="flex items-center justify-between gap-3 rounded-lg border border-line p-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-mono text-xs">{file}</p>
-                <p className="truncate text-[10px] text-muted">{meta}</p>
-              </div>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${cls}`}>
-                {chip}
-              </span>
-            </div>
-          ))}
-          <p className="text-[10px] leading-relaxed text-muted">
-            Add a rent roll, T-12, or loan terms any time — the screen
-            re-anchors itself and flags where the OM&apos;s pro forma drifts.
-          </p>
-        </div>
-      );
+      return <DocumentsTab />;
   }
 }
 
-/** Tabbed walkthrough mirroring the real deal page's sections — sample data. */
-export function DemoTabs({ legal }: { legal: SampleLegal }) {
+/** The deal page's Documents tab on the sample (deal-view's
+ *  DocumentsPanel, through the same SourceDocumentsView the signed-in
+ *  sample draws): the memorandum's row saying the sample's is fictional,
+ *  the rent roll and the T-12 the sample was read with, each with its own
+ *  date and no file to open, and the memo the verdict makes — the public
+ *  sample's (audit C10, M4). Never a file name it has not. Drawn once its
+ *  chunk has loaded, its shape until then. */
+function DocumentsTab() {
+  const w = useWalkthrough();
+  if (!w) {
+    return (
+      <TabLoading what="the documents">
+        <CardListSkeleton />
+      </TabLoading>
+    );
+  }
+  return (
+    <w.SourceDocumentsView
+      data={{
+        dealId: "sample",
+        hasOm: false,
+        omUrl: null,
+        sample: true,
+        typedFacts: false,
+        documents: [],
+        sampleActuals: w.SAMPLE_DOCUMENT_ACTUALS,
+        memo: { href: "/api/demo/memo" },
+      }}
+    />
+  );
+}
+
+/** The walkthrough: the deal page's section bar — its segmented control,
+ *  each tab's dot and finding count — over the sample deal's own tabs. */
+export function DemoTabs({
+  buyBox,
+  financials,
+}: {
+  legal?: SampleLegal;
+  buyBox: SampleBuyBoxData;
+  financials: SampleFinancials;
+}) {
   const [tab, setTab] = useState<Tab>("Overview");
+  const [analysis, setAnalysis] = useState<AnalysisKey>("verdict");
+  // The deal page's count on its Buy box tab: the criteria missed outright.
+  const missed = buyBox.panel.checks.filter((c) => c.status === "miss").length;
+  const counts: Record<Tab, number> = {
+    Overview: 0,
+    Financials: 0,
+    "Buy box": missed,
+    Analyses: ANALYSIS_COUNTS.challenger + ANALYSIS_COUNTS.comps + ANALYSIS_COUNTS.market + ANALYSIS_COUNTS.reconciler,
+    Documents: 0,
+  };
+  // Every section but the documents holds a finished result on the sample,
+  // so its dot is the deal page's "done" (deal-view's `sectionState`).
+  const done = (t: Tab) => t !== "Documents";
+
+  // The tabs past the Overview arrive in a chunk of their own: asked for
+  // once the walkthrough nears the screen, or a tab is reached for, and drawn
+  // by the panel that shows them when they land (`useWalkthrough`; a tab
+  // opened before then draws its shape, `TabLoading`).
+  const box = useRef<HTMLDivElement>(null);
+  const want = () => {
+    if (!walkthrough) void loadWalkthrough();
+  };
+  useEffect(() => {
+    if (walkthrough) return;
+    const el = box.current;
+    const load = () => void loadWalkthrough();
+    if (!el || typeof IntersectionObserver === "undefined") {
+      load();
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          load();
+        }
+      },
+      { rootMargin: "800px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   function onKeys(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    e.preventDefault();
     const i = TABS.indexOf(tab);
     const next =
       e.key === "ArrowRight"
-        ? TABS[(i + 1) % TABS.length]
-        : TABS[(i - 1 + TABS.length) % TABS.length];
-    setTab(next);
-    document.getElementById(`demo-tab-${next}`)?.focus();
+        ? (i + 1) % TABS.length
+        : e.key === "ArrowLeft"
+          ? (i - 1 + TABS.length) % TABS.length
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? TABS.length - 1
+              : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    setTab(TABS[next]);
+    document.getElementById(tabId(TABS[next]))?.focus();
+  }
+
+  function navigate(key: string) {
+    const to = landing(key);
+    if (!to) return;
+    if (to.analysis) setAnalysis(to.analysis);
+    setTab(to.tab);
+    requestAnimationFrame(() => document.getElementById(tabId(to.tab))?.focus());
   }
 
   return (
-    <div className="shadow-float overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex items-center justify-between gap-2 border-b border-line bg-faint px-3 py-2">
-        <div
-          role="tablist"
-          aria-label="Screen walkthrough"
-          onKeyDown={onKeys}
-          className="flex min-w-0 gap-1 overflow-x-auto"
-        >
-          {TABS.map((t) => (
-            <button
-              key={t}
-              id={`demo-tab-${t}`}
-              role="tab"
-              aria-selected={tab === t}
-              tabIndex={tab === t ? 0 : -1}
-              onClick={() => setTab(t)}
-              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                tab === t
-                  ? "bg-surface text-ink shadow-sm"
-                  : "text-muted hover:text-ink"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+    <div
+      ref={box}
+      onPointerEnter={want}
+      onFocus={want}
+      className="shadow-float overflow-hidden rounded-2xl border border-line bg-surface"
+    >
+      <div className="flex items-center gap-2 border-b border-line bg-faint p-2">
+        {/* The deal page's section bar, class for class (deal-view). It
+            scrolls sideways where the column is narrower than the five
+            tabs, under the same fade at its edge. */}
+        <div className="min-w-0 flex-1 overflow-x-auto [mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]">
+          <div
+            role="tablist"
+            aria-label="Sample deal sections"
+            onKeyDown={onKeys}
+            className="mr-8 flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm"
+          >
+            {TABS.map((t) => {
+              const on = tab === t;
+              const count = counts[t];
+              return (
+                <button
+                  key={t}
+                  id={tabId(t)}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  aria-controls="demo-tabpanel"
+                  tabIndex={on ? 0 : -1}
+                  onClick={() => setTab(t)}
+                  className={`relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                    on ? "bg-brand text-white shadow-sm" : "text-muted hover:bg-faint hover:text-ink"
+                  }`}
+                >
+                  <TabDot done={done(t)} active={on} />
+                  {t}
+                  {count > 0 && (
+                    <span
+                      title={`${count} finding${count === 1 ? "" : "s"}`}
+                      className={`rounded-full px-1.5 py-px font-mono text-[10px] tabular-nums ${
+                        on ? "bg-white/20 text-white" : "bg-kill/10 text-kill"
+                      }`}
+                    >
+                      {count}
+                      <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <span className="hidden shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted sm:block">
+        <span className="hidden shrink-0 pr-1 text-[10px] font-medium uppercase tracking-wide text-muted sm:block">
           Sample data
         </span>
       </div>
-      {/* min-h pinned to the tallest panel so switching tabs never reflows
-          the section — clicking around must feel solid, not jumpy. */}
-      <div role="tabpanel" className="animate-fade min-h-[24rem] p-4" key={tab}>
-        <DemoPanel tab={tab} legal={legal} />
+      <div
+        key={tab}
+        id="demo-tabpanel"
+        role="tabpanel"
+        aria-labelledby={tabId(tab)}
+        className="animate-rise min-h-[24rem] p-4"
+      >
+        <DemoPanel
+          tab={tab}
+          buyBox={buyBox}
+          financials={financials}
+          analysis={analysis}
+          onAnalysis={setAnalysis}
+          onNavigate={navigate}
+        />
       </div>
     </div>
   );

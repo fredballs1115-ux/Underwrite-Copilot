@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import Link from "next/link";
 import type { AssumableView } from "@/lib/assumable-debt";
 
@@ -16,15 +17,8 @@ import type { AssumableView } from "@/lib/assumable-debt";
  * sale costs, so only the difference between them is a figure worth
  * printing beside the model's own.
  */
-// Rounded on the tenths, never a float's toFixed.
-const money = (n: number) =>
-  Math.abs(n) >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : Math.abs(n) >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : Math.abs(n) >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+const money = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const pct2 = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}%`;
 const times = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}×`;
 const width = (share: number) => `${Math.max(1.5, Math.min(1, share) * 100)}%`;
@@ -119,7 +113,8 @@ export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
               marker="assume-rate"
               format={pct2}
               rows={[
-                { label: theirs, value: v.couponPct, tone: "bg-brand/70" },
+                // A stated mortgage insurance premium is in the coupon priced.
+                { label: v.mipPct != null ? `${theirs}, with its MIP` : theirs, value: v.couponPct, tone: "bg-brand/70" },
                 { label: "A new loan today", value: v.marketPct, tone: "bg-ink/40" },
               ]}
             />

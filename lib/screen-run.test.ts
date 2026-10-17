@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { readingMemorandum } from "./screen-reading";
 import {
   STALE_MS,
   isLiveJob,
+  isStalled,
+  jobAgeMs,
   listJobStatus,
   previousScreenResults,
+  screenStopped,
   screenedOn,
   staleAfterFailure,
   staleWhileRunning,
+  storedPreviousResults,
   verdictBehind,
 } from "./screen-run";
 
@@ -117,6 +122,31 @@ describe("a screen still running — its results are this run's only once their 
     expect(isLiveJob({ status: "done", step: "verdict" })).toBe(false);
   });
 
+  it("only a stored result is the previous screen's: a first screen marks nothing it never reached (research pass 30)", () => {
+    const failedAtExtract = { status: "error", step: "extract" };
+    // A first screen: nothing stored, nothing marked.
+    expect(storedPreviousResults(failedAtExtract, {})).toEqual([]);
+    expect(storedPreviousResults(failedAtExtract, { extraction: null, verdict: undefined })).toEqual([]);
+    // A re-screen: the previous screen's results the run never reached.
+    expect(storedPreviousResults({ status: "error", step: "comps" }, { extraction: {}, challenges: {}, comps: {}, verdict: {} })).toEqual([
+      "comps",
+      "verdict",
+    ]);
+    expect(storedPreviousResults({ status: "running", step: "market" }, { market: {}, verdict: {} })).toEqual(["market", "verdict"]);
+    expect(storedPreviousResults({ status: "done", step: "verdict" }, { verdict: {} })).toEqual([]);
+  });
+
+  it("screenStopped is a screen that failed before its end — never a finished run, a live one or a side job", () => {
+    expect(screenStopped({ status: "error", step: "extract" })).toBe("failed");
+    expect(screenStopped({ status: "error", step: "verdict" })).toBe("failed");
+    expect(screenStopped({ status: "error", step: null })).toBe("failed");
+    expect(screenStopped({ status: "done", step: "verdict" })).toBeNull();
+    expect(screenStopped({ status: "running", step: "comps" })).toBeNull();
+    expect(screenStopped({ status: "error", step: "comps_search" })).toBeNull();
+    expect(screenStopped({ status: "error", step: "model" })).toBeNull();
+    expect(screenStopped(null)).toBeNull();
+  });
+
   it("verdictBehind says why the stored call is the previous screen's, or nothing", () => {
     expect(verdictBehind({ status: "error", step: "comps" })).toBe("failed");
     expect(verdictBehind({ status: "running", step: "challenge" })).toBe("running");
@@ -128,6 +158,50 @@ describe("a screen still running — its results are this run's only once their 
     expect(verdictBehind({ status: "running", step: "comps_search" })).toBeNull();
     expect(verdictBehind({ status: "error", step: "model" })).toBeNull();
     expect(verdictBehind(null)).toBeNull();
+  });
+});
+
+describe("a run that stopped making progress — one stall rule for every surface (research pass 30)", () => {
+  const now = Date.parse("2026-10-05T12:00:00Z");
+  const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
+  const STALLED = { status: "running", step: "challenge", updated_at: iso(STALE_MS + 60_000) };
+
+  it("isStalled: a live row past the stale line, read on the age the server measured where the job carries one", () => {
+    expect(isStalled(STALLED, now)).toBe(true);
+    expect(isStalled({ status: "queued", step: "signal", updated_at: iso(STALE_MS + 1) }, now)).toBe(true);
+    expect(isStalled({ status: "running", step: "challenge", updated_at: iso(30_000) }, now)).toBe(false);
+    // A finished or failed row is never stalled, however old.
+    expect(isStalled({ status: "error", step: "comps", updated_at: iso(STALE_MS * 3) }, now)).toBe(false);
+    expect(isStalled({ status: "done", step: "verdict", updated_at: iso(STALE_MS * 3) }, now)).toBe(false);
+    // The server's own age wins over a caller's clock running ten minutes fast…
+    expect(isStalled({ status: "running", step: "comps", updated_at: iso(30_000), ageMs: 30_000 }, now + STALE_MS)).toBe(false);
+    expect(jobAgeMs({ status: "running", step: "comps", updated_at: iso(30_000), ageMs: 30_000 }, now + STALE_MS)).toBe(30_000);
+    // …and is all a page needs, reading no clock during its render.
+    expect(isStalled({ status: "running", step: "comps", ageMs: STALE_MS + 1 })).toBe(true);
+    // No age carried and no clock handed in: no stall is claimed.
+    expect(isStalled({ status: "running", step: "comps", updated_at: iso(STALE_MS * 3) })).toBe(false);
+    expect(jobAgeMs({ status: "running", step: "comps" }, now)).toBeNull();
+  });
+
+  it("verdictBehind says stalled where the pipeline card says Stalled — never running", () => {
+    expect(listJobStatus(STALLED, true, now)).toBe("stalled");
+    expect(verdictBehind(STALLED, now)).toBe("stalled");
+    expect(verdictBehind({ ...STALLED, ageMs: STALE_MS + 60_000, updated_at: null })).toBe("stalled");
+    expect(verdictBehind({ status: "queued", step: "signal", updated_at: iso(STALE_MS + 1) }, now)).toBe("stalled");
+    expect(verdictBehind({ ...STALLED, updated_at: iso(30_000) }, now)).toBe("running");
+    // A failure stays a failure, and a stalled side job leaves the verdict alone.
+    expect(verdictBehind({ status: "error", step: "comps", updated_at: iso(STALE_MS * 3) }, now)).toBe("failed");
+    expect(verdictBehind({ status: "running", step: "comps_search", updated_at: iso(STALE_MS * 2) }, now)).toBeNull();
+  });
+
+  it("a stalled screen has stopped; the header's shimmer agrees it is reading nothing", () => {
+    expect(screenStopped(STALLED, now)).toBe("stalled");
+    expect(screenStopped({ ...STALLED, updated_at: iso(1_000) }, now)).toBeNull();
+    expect(screenStopped({ status: "running", step: "model", updated_at: iso(STALE_MS * 2) }, now)).toBeNull();
+    expect(screenStopped({ status: "running", step: "extract", ageMs: STALE_MS + 1 })).toBe("stalled");
+    expect(readingMemorandum({ status: "running", step: "extract", updated_at: iso(STALE_MS + 1) }, now)).toBe(false);
+    expect(readingMemorandum({ status: "running", step: "extract", ageMs: STALE_MS + 1 }, now)).toBe(false);
+    expect(readingMemorandum({ status: "running", step: "extract", updated_at: iso(1_000) }, now)).toBe(true);
   });
 });
 

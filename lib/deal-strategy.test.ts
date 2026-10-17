@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import {
+  FORWARD_READING,
   IMPLIED_CAP_CEILING,
+  STRATEGY_READING,
   assessPlausibility,
   budgetFromText,
   capitalBudgetFromMetrics,
   classifyNoi,
   findPriceMetric,
   inferStrategy,
+  isForwardPurchase,
   isOutdoorStorageYard,
   isPlanDeal,
   buildsSomething,
@@ -20,6 +23,7 @@ import {
   timelineFromMetrics,
 } from "./deal-strategy";
 import { parseMoney, screenYearOf } from "./criteria";
+import { planFacts } from "./plan-facts";
 
 /** The year the bare rows below were screened in; none carries a year. */
 const SCREEN_YEAR = 2026;
@@ -415,6 +419,12 @@ describe("renovationProgramBudget — a value-add program stated a door at a tim
     expect(renovationCostPerDoor("$12,000–$15,000")).toBeNull();
     expect(renovationCostPerDoor("$2,880,000")).toBeNull();
     expect(renovationCostPerDoor("$15k per unit")).toBe(15_000);
+    // The doors or the turn after the cost are no range (audit C5, MED-4).
+    expect(renovationCostPerDoor("$15,000 per unit (units 1-48)")).toBe(15_000);
+    expect(renovationCostPerDoor("$15,000 (2-3 week turn)")).toBe(15_000);
+    // A year after a dash is words after the cost, never a range (audit C3a).
+    expect(renovationCostPerDoor("$15,000 – 2025 pricing, per unit")).toBe(15_000);
+    expect(renovationCostPerDoor("$12,000 to $15,000")).toBeNull();
     expect(renovationProgramBudget(without("Units to renovate"), 48_000_000)).toBeNull();
     expect(renovationProgramBudget(without("Renovation cost per unit"), 48_000_000)).toBeNull();
     // An interior line that states no "per unit" is not a door's cost.
@@ -644,10 +654,11 @@ describe("plausibilityNote", () => {
       const s = inferStrategy(e);
       return plausibilityNote([], s, planSummary(e, s), e);
     };
-    expect(noteFor("note")).toMatch(/^DEAL STRATEGY: Value-add \(the collateral\) /);
-    expect(noteFor("leased_fee")).toMatch(/^DEAL STRATEGY: Value-add \(the leaseholder's building\) /);
+    // The type ends its own sentence before the reading (research pass 41).
+    expect(noteFor("note")).toMatch(/^DEAL STRATEGY: Value-add \(the collateral\)\. In-place income/);
+    expect(noteFor("leased_fee")).toMatch(/^DEAL STRATEGY: Value-add \(the leaseholder's building\)\. /);
     // A price that buys the building keeps the label as it stands.
-    expect(noteFor("fee_simple")).toMatch(/^DEAL STRATEGY: Value-add /);
+    expect(noteFor("fee_simple")).toMatch(/^DEAL STRATEGY: Value-add\. /);
     expect(noteFor("fee_simple")).not.toMatch(/\(the /);
   });
 
@@ -676,6 +687,179 @@ describe("plausibilityNote", () => {
     expect(note).toMatch(/THE PLAN AS THE OM STATES IT/);
     expect(note).toMatch(/FIGURES THAT DO NOT TIE/);
     expect(note).toMatch(/label/);
+  });
+});
+
+// A forward purchase or a build-to-suit bought at delivery (research pass
+// 28): the developer funds the works, so the plan's total cost is the price,
+// a budget the memorandum states is the developer's, and the yield on cost
+// is the NOI at delivery over the price — the buyer carries no construction.
+describe("planSummary / plausibilityNote — a forward purchase", () => {
+  const dev = { kind: "development" as const, summary: "", capitalBudget: "", timeline: "" };
+  const bts = ex(
+    [
+      metric("Purchase price", "$48,000,000"),
+      metric("NOI (Year 1)", "$2,880,000"),
+      metric("Cap rate", "6.00%"),
+      metric("Construction budget", "$31,000,000"),
+      metric("Delivery date", "Q3 2027"),
+    ],
+    {
+      assetClass: "industrial",
+      strategy: { ...dev, summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion" },
+    },
+  );
+  const btr = ex([metric("Purchase price", "$72,000,000"), metric("Homes", "180"), metric("NOI (stabilized, pro forma)", "$3,960,000")], {
+    assetClass: "sfr_btr",
+    strategy: { ...dev, summary: "Forward purchase of a 180-home build-to-rent community, purchase at certificate of occupancy" },
+  });
+
+  it("builds nothing the buyer pays for: what building costs is the developer's to bear", () => {
+    // The market check reads the construction cost indexes only where the
+    // deal builds something; a forward purchase's works are the developer's.
+    expect(buildsSomething(bts, "development")).toBe(false);
+    expect(buildsSomething(btr, "development")).toBe(false);
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    expect(buildsSomething(own, "development")).toBe(true);
+  });
+
+  it("strikes the total cost at the price, says the stated budget is the developer's, and reads the yield at delivery", () => {
+    const plan = planSummary(bts, inferStrategy(bts))!;
+    expect(plan).toMatchObject({ forward: true, price: 48_000_000, budget: null, totalCost: 48_000_000 });
+    expect(plan.developerBudget?.budget).toBe(31_000_000);
+    // A build-to-suit's NOI at delivery is the lease's first year.
+    expect(plan.stabilizedNoi).toMatchObject({ label: "NOI (Year 1)", value: 2_880_000 });
+    expect(plan.yieldOnCost).toBeCloseTo(0.06, 10);
+    // A community's is its stabilized figure, over the price alone.
+    const community = planSummary(btr, inferStrategy(btr))!;
+    expect(community).toMatchObject({ forward: true, budget: null, developerBudget: null, totalCost: 72_000_000 });
+    expect(community.yieldOnCost).toBeCloseTo(0.055, 10);
+    // The same deck the buyer builds is a development: price plus budget.
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    const ownPlan = planSummary(own, inferStrategy(own))!;
+    expect(ownPlan.forward).toBeUndefined();
+    expect(ownPlan.totalCost).toBe(79_000_000);
+    expect(ownPlan.stabilizedNoi).toBeNull();
+  });
+
+  it("says the plan's facts as a forward purchase: the NOI at delivery and the developer's budget", () => {
+    expect(planFacts(planSummary(bts, inferStrategy(bts))!)).toEqual([
+      ["NOI at delivery", "$2.9M"],
+      ["Price", "$48.0M"],
+      ["Budget", "$31.0M, the developer's"],
+      ["Total cost", "$48.0M"],
+      ["Yield on cost", "6.00%"],
+    ]);
+    expect(planFacts(planSummary(btr, inferStrategy(btr))!)[2]).toEqual(["Budget", "the developer's"]);
+  });
+
+  // The audit of 2026-10-05: a lender's forward or take-out commitment was
+  // read as a purchase at delivery, so a LIHTC development financed with one
+  // struck its plan's cost at the land price — a 57.8% yield on cost where
+  // the stated total makes it 4.2%.
+  it("reads a lender's forward or take-out commitment as a loan, and never strikes a plan's cost at a land price", () => {
+    const lihtc = ex(
+      [
+        metric("Land cost", "$4,500,000"),
+        metric("Total development cost", "$62,000,000"),
+        metric("NOI (stabilized, pro forma)", "$2,600,000"),
+        metric("Units (proposed)", "180"),
+      ],
+      {
+        assetClass: "Affordable Housing (LIHTC)",
+        strategy: { ...dev, summary: "New construction of 180 LIHTC units, financed with tax-exempt bonds and a Freddie Mac forward commitment.", timeline: "24-month construction" },
+      },
+    );
+    const lifeCo = ex(
+      [
+        metric("Land price", "$6,000,000"),
+        metric("Total development cost", "$48,000,000"),
+        metric("NOI (stabilized, pro forma)", "$3,100,000"),
+        metric("Units (proposed)", "240"),
+      ],
+      {
+        assetClass: "Multifamily",
+        strategy: { ...dev, summary: "Entitled site for a 240-unit ground-up development; the sponsor has a construction loan with a take-out commitment from a life company." },
+      },
+    );
+    for (const [what, deal, total] of [
+      ["a forward commitment", lihtc, 62_000_000],
+      ["a take-out commitment", lifeCo, 48_000_000],
+    ] as const) {
+      const s = inferStrategy(deal);
+      expect(isForwardPurchase(deal, s), what).toBe(false);
+      expect(buildsSomething(deal, s.kind), what).toBe(true);
+      const plan = planSummary(deal, s)!;
+      expect(plan.forward, what).toBeUndefined();
+      expect(plan.totalCost, what).toBe(total);
+      expect(plan.yieldOnCost!, what).toBeLessThan(0.07);
+    }
+    expect(planSummary(lihtc, inferStrategy(lihtc))!.yieldOnCost).toBeCloseTo(2.6 / 62, 6);
+    // A purchase at completion priced at the land is the buyer's own build.
+    const atLand = ex([metric("Land cost", "$6,000,000"), metric("Total development cost", "$48,000,000")], {
+      assetClass: "industrial",
+      strategy: { ...dev, summary: "Forward purchase of a distribution center at completion" },
+    });
+    expect(isForwardPurchase(atLand, inferStrategy(atLand))).toBe(false);
+    // The words of a purchase still read one beside the whole asset's price.
+    expect(isForwardPurchase(bts, inferStrategy(bts))).toBe(true);
+    expect(isForwardPurchase(btr, inferStrategy(btr))).toBe(true);
+  });
+
+  it("hands the challenger the purchase's plan text in place of the construction paragraph", () => {
+    const s = inferStrategy(bts);
+    const note = plausibilityNote(assessPlausibility(bts, s), s, planSummary(bts, s), bts);
+    expect(note).toMatch(/^DEAL STRATEGY: Development/);
+    expect(note).toContain("NOI at delivery $2.9M (NOI (Year 1))");
+    expect(note).toContain("the $31.0M budget (Construction budget) is the developer's, who funds the works — never added to the price");
+    expect(note).toContain("total cost $48.0M, the price");
+    expect(note).toContain("yield on total cost 6.00%");
+    expect(note).toContain("A FORWARD PURCHASE: the buyer pays the price at delivery and the developer funds the works, so the buyer carries no construction");
+    expect(note).not.toContain("against the cost of construction debt");
+    // The community states no budget: none is the buyer's.
+    const sb = inferStrategy(btr);
+    expect(plausibilityNote([], sb, planSummary(btr, sb), btr)).toContain("no construction budget is the buyer's: the developer funds the works");
+    // A development the buyer builds keeps the construction paragraph: here
+    // its budget, tested, and its stabilized NOI said to be unstated — a
+    // year-1 NOI is no finished project's pro forma.
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    const so = inferStrategy(own);
+    const ownNote = plausibilityNote([], so, planSummary(own, so), own);
+    expect(ownNote).toContain("Test the budget it states and its schedule against comparable projects");
+    expect(ownNote).toContain("The memorandum states no stabilized NOI");
+    expect(ownNote).not.toContain("A FORWARD PURCHASE");
+  });
+
+  it("opens on the purchase's own line, never a development's budget (research pass 41)", () => {
+    const s = inferStrategy(bts);
+    const note = plausibilityNote(assessPlausibility(bts, s), s, planSummary(bts, s), bts);
+    expect(note).toMatch(/^DEAL STRATEGY: Development — Forward purchase of a 300,000 SF build-to-suit distribution center at completion/);
+    expect(note).toContain(FORWARD_READING);
+    expect(note).not.toContain("only a budget");
+    expect(note).not.toContain(STRATEGY_READING.development);
+    // Read from the deck's words alone, the purchase's line is the inferred
+    // summary too, and said once.
+    const inferred = ex(bts.metrics, {
+      assetClass: "industrial",
+      dealName: "Forward purchase of a to-be-built distribution center",
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    });
+    const si = inferStrategy(inferred);
+    expect(si.kind).toBe("development");
+    expect(si.summary).toBe(FORWARD_READING);
+    const inferredNote = plausibilityNote([], si, planSummary(inferred, si), inferred);
+    expect(inferredNote.split(FORWARD_READING)).toHaveLength(2);
+    expect(inferredNote).not.toContain(STRATEGY_READING.development);
+    // A development the buyer builds keeps its own line.
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    const so = inferStrategy(own);
+    expect(plausibilityNote([], so, planSummary(own, so), own)).toContain(STRATEGY_READING.development);
+    const ownInferred = ex(bts.metrics, {
+      assetClass: "industrial",
+      dealName: "A to-be-built distribution center",
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    });
+    expect(inferStrategy(ownInferred).summary).toBe(STRATEGY_READING.development);
   });
 });
 
@@ -898,5 +1082,219 @@ describe("the seventh review's budget and plausibility cases", () => {
     // A plan deal with no total cost has nothing to judge — no finding.
     const noCost = exx([mm("Land price", "$5,000,000"), mm("Units (proposed)", "420")], { strategy: dev });
     expect(assessPlausibility(noCost).map((f) => f.code)).not.toContain("basis_out_of_band");
+  });
+});
+
+describe("an implied going-in cap under the floor is a finding, said as the rule of thumb it is (research pass 38)", () => {
+  // The pass's fixtures, row for row.
+  const rows = (assetClass: string, list: [string, string, string?][]) =>
+    ex(
+      list.map(([label, value, basis]) => metric(label, value, { page: "p. 3", ...(basis ? { basis: basis as ExtractedMetric["basis"] } : {}) })),
+      { assetClass, address: "", market: "" },
+    );
+  const RULE =
+    "Under 2% of the price is under the going-in cap a stabilized building trades at — a rule of thumb, not a market figure: an NOI that low is, most often, a price for land or a redevelopment, a figure stated a month at a time or in thousands, or a misread.";
+
+  it("reads an NOI stated a month at a time as twelve times the month, and finds no misread in it (research pass 40)", () => {
+    // It had read $45,000 a month as a year's and found a 0.69% cap.
+    const monthly = rows("Retail", [["Asking price", "6,500,000"], ["NOI (monthly)", "45,000", "in_place"], ["Total SF", "28,000 SF"]]);
+    expect(assessPlausibility(monthly)).toEqual([]);
+    // The value's own words count too: beside its stated 8.30% cap, the
+    // year it makes ties.
+    const perMonth = rows("Retail", [["Asking price", "6,500,000"], ["NOI (in-place)", "45,000 per month", "in_place"], ["Going-in cap rate", "8.30%"], ["Total SF", "28,000 SF"]]);
+    expect(assessPlausibility(perMonth)).toEqual([]);
+    // A month that, twelve times over, is still under the floor is named
+    // with its month, and read as the year it makes.
+    const thin = rows("Retail", [["Asking price", "6,500,000"], ["NOI (monthly)", "5,000", "in_place"], ["Total SF", "28,000 SF"]]);
+    const [f] = assessPlausibility(thin);
+    expect(f).toEqual({
+      code: "implied_cap_low",
+      severity: "medium",
+      title: "NOI (monthly) of $60k (twelve times the $5k a month stated) implies a 0.92% cap rate on the $6.5M price",
+      detail: `${RULE} The row reads “NOI (monthly): 5,000” — a month's figure, read here as twelve times the month. Check the source page before relying on any return built from these two figures.`,
+    });
+  });
+
+  it("names an NOI stated in thousands, which every return ran as dollars", () => {
+    const thousands = rows("Office", [["Asking price", "45,000,000"], ["NOI (in-place)", "2,450 ($000s)", "in_place"], ["Total SF", "310,000 SF"]]);
+    const [f] = assessPlausibility(thousands);
+    expect(f.code).toBe("implied_cap_low");
+    expect(f.title).toBe("NOI (in-place) of $2k implies a 0.01% cap rate on the $45.0M price");
+    expect(f.detail).toContain("The row reads “NOI (in-place): 2,450 ($000s)” — a figure in thousands of dollars, which every return here runs as dollars.");
+  });
+
+  it("says the rule alone where the row's words say neither, and only on a deal read as stabilized", () => {
+    const low = rows("Multifamily", [["Asking price", "50,000,000"], ["NOI (in-place)", "600,000", "in_place"], ["Units", "100"]]);
+    const [f] = assessPlausibility(low);
+    expect(f.code).toBe("implied_cap_low");
+    expect(f.title).toBe("NOI (in-place) of $600k implies a 1.20% cap rate on the $50.0M price");
+    expect(f.detail).toBe(`${RULE} Check the source page before relying on any return built from these two figures.`);
+    // A 3%-occupied office earning $45k on $8.5M.
+    const occ3 = rows("Office", [["Asking price", "8,500,000"], ["Total SF", "42,000 SF"], ["Occupancy", "3%", "in_place"], ["NOI (in-place)", "45,000", "in_place"]]);
+    expect(assessPlausibility(occ3).map((x) => x.code)).toEqual(["implied_cap_low"]);
+    // At the floor and over it, nothing; a plan deal's in-place income is the plan's to judge.
+    const atFloor = rows("Multifamily", [["Asking price", "50,000,000"], ["NOI (in-place)", "1,000,000", "in_place"], ["Units", "100"]]);
+    expect(assessPlausibility(atFloor).map((x) => x.code)).not.toContain("implied_cap_low");
+    const plan = { ...low, strategy: { kind: "value_add" as const, summary: "", capitalBudget: "", timeline: "" } };
+    expect(assessPlausibility(plan).map((x) => x.code)).not.toContain("implied_cap_low");
+    // No income at all is rule 5's, never a cap under the floor.
+    const negative = rows("Office", [["Asking price", "8,500,000"], ["NOI (in-place)", "(310,000)", "in_place"]]);
+    expect(assessPlausibility(negative).map((x) => x.code)).toEqual(["no_income_in_place"]);
+  });
+});
+
+describe("a plan's own figures are held to each other, with or without a price row (research pass 38)", () => {
+  // The pass's fixtures, row for row.
+  const DEV = { kind: "development" as const, summary: "Ground-up 240-unit apartment development", capitalBudget: "", timeline: "" };
+  const VA = { kind: "value_add" as const, summary: "Interior renovation of 200 units", capitalBudget: "", timeline: "" };
+  const plan = (strategy: ExtractionResult["strategy"], list: [string, string, ExtractedMetric["basis"]?][], assetClass = "Multifamily") =>
+    ex(
+      list.map(([label, value, basis]) => metric(label, value, { page: "p. 3", ...(basis ? { basis } : {}) })),
+      { assetClass, strategy, address: "", market: "" },
+    );
+  const devTotalThousands = plan(DEV, [["Total project cost", "48,500 ($000s)"], ["NOI (stabilized, pro forma)", "3,200,000"], ["Units (proposed)", "200"]]);
+  const vaBudgetTiny = plan(VA, [
+    ["Asking price", "20,000,000"],
+    ["Units", "200"],
+    ["NOI (in-place)", "1,100,000", "in_place"],
+    ["NOI (stabilized, pro forma)", "1,500,000"],
+    ["Renovation budget", "2,500"],
+  ]);
+  const REFUSED =
+    "No yield on cost is struck: the $3.2M stabilized NOI over the $49k total cost is at or past the 25% the screen holds as a misread, so the total cost or the NOI was most likely misread.";
+
+  it("refuses a yield on cost at or past the ceiling, as the cap reader refuses a cap, and says why wherever the yield would stand", () => {
+    const s = inferStrategy(devTotalThousands);
+    const p = planSummary(devTotalThousands, s)!;
+    expect(p.totalCost).toBe(48_500);
+    expect(p.yieldOnCost).toBeNull();
+    expect(p.yieldWithheld).toBe(REFUSED);
+    // The plan's facts say so in the cell, never 6597.94% and never a dash;
+    // the challenger's and the verdict's paragraph says the sentence.
+    expect(planFacts(p)).toContainEqual(["Yield on cost", "n/a — figures don't tie"]);
+    const note = plausibilityNote(assessPlausibility(devTotalThousands, s), s, p, devTotalThousands);
+    expect(note).not.toMatch(/6597|6,597/);
+    expect(note).toContain(
+      "no yield on cost is struck: the $3.2M stabilized NOI over the $49k total cost is at or past the 25% the screen holds as a misread, so the total cost or the NOI was most likely misread",
+    );
+    // At the ceiling it is refused; under it, it stands as it did.
+    const at = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$2,500,000"]]);
+    expect(planSummary(at)).toMatchObject({ totalCost: 10_000_000, yieldOnCost: null });
+    expect(planSummary(at)!.yieldWithheld).toContain("$2.5M stabilized NOI over the $10.0M total cost is at or past the 25%");
+    const under = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$2,499,000"]]);
+    expect(planSummary(under)!.yieldOnCost).toBeCloseTo(0.2499, 10);
+    expect(planSummary(under)!.yieldWithheld).toBeNull();
+    const sound = plan(DEV, [["Land cost", "6,000,000"], ["Total project cost", "72,000,000"], ["NOI (stabilized, pro forma)", "4,600,000"], ["Units (proposed)", "240"]]);
+    expect(planFacts(planSummary(sound)!)).toContainEqual(["Yield on cost", "6.39%"]);
+    // A forward purchase's yield is the NOI at delivery over the price.
+    const forward = plan(
+      { ...DEV, summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion" },
+      [["Purchase price", "$10,000,000"], ["NOI (Year 1)", "$3,000,000"]],
+      "industrial",
+    );
+    expect(planSummary(forward)).toMatchObject({ forward: true, yieldOnCost: null });
+    expect(planSummary(forward)!.yieldWithheld).toBe(
+      "No yield on cost is struck: the $3.0M NOI at delivery over the $10.0M price is at or past the 25% the screen holds as a misread, so the price or the NOI was most likely misread.",
+    );
+  });
+
+  it("runs the plan's total-cost basis band whether or not the memorandum states a price", () => {
+    expect(assessPlausibility(devTotalThousands)).toEqual([
+      {
+        code: "basis_out_of_band",
+        severity: "medium",
+        title: "$49k of total cost over 200 units is $243 per unit",
+        detail:
+          "No multifamily market delivers there. The total cost or the unit count was most likely misread — check both against their source pages before the all-in basis is used anywhere. The row reads “Total project cost: 48,500 ($000s)” — a figure in thousands of dollars, which the plan's cost here reads as dollars.",
+      },
+    ]);
+    // A sound plan with no price row says nothing; a stabilized deal with
+    // none says nothing, as before; what the price buys still decides.
+    const sound = plan(DEV, [["Total project cost", "48,500,000"], ["NOI (stabilized, pro forma)", "3,200,000"], ["Units (proposed)", "200"]]);
+    expect(assessPlausibility(sound)).toEqual([]);
+    expect(assessPlausibility(ex([metric("NOI (Year 1)", "$21,000,000")]))).toEqual([]);
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    expect(assessPlausibility({ ...devTotalThousands, interest: { ...blank, kind: "note" } })).toEqual([]);
+  });
+
+  it("names a works budget under about $1,000 a unit or 1% of the price, said as the rule of thumb it is", () => {
+    expect(assessPlausibility(vaBudgetTiny)).toEqual([
+      {
+        code: "budget_low",
+        severity: "medium",
+        title: "Renovation budget of $2,500 is $12.50 per unit and 0.01% of the $20.0M price",
+        detail:
+          "A works budget under about $1,000 a unit or 1% of the price is under what a renovation or construction program costs — a rule of thumb, not a market figure: a budget that small is, most often, a figure in thousands, one unit's cost entered as the whole program's, or a misread. Check the source page before the total cost, the yield on cost or any return built on the budget is relied on.",
+      },
+    ]);
+    // A row in thousands is quoted.
+    const thousands = plan(VA, [["Asking price", "20,000,000"], ["Units", "200"], ["NOI (stabilized, pro forma)", "1,500,000"], ["Renovation budget", "2,500 ($000s)"]]);
+    expect(assessPlausibility(thousands)[0].detail).toContain(
+      "The row reads “Renovation budget: 2,500 ($000s)” — a figure in thousands of dollars, which the plan's cost here reads as dollars.",
+    );
+    // Either floor alone: a unit's on a cheap building, the price's with no count.
+    const perUnit = plan(VA, [["Asking price", "4,000,000"], ["Units", "200"], ["Renovation budget", "150,000"]]);
+    expect(assessPlausibility(perUnit).map((f) => f.title)).toEqual(["Renovation budget of $150k is $750 per unit"]);
+    const share = plan(VA, [["Asking price", "20,000,000"], ["Renovation budget", "150,000"]], "Office");
+    expect(assessPlausibility(share).map((f) => f.title)).toEqual(["Renovation budget of $150k is 0.75% of the $20.0M price"]);
+    // A sound budget, a lease-up's leasing capital and a development with
+    // its land as the price are held to nothing they meet.
+    const fine = plan(VA, [["Asking price", "20,000,000"], ["Units", "200"], ["Renovation budget", "3,000,000"]]);
+    expect(assessPlausibility(fine)).toEqual([]);
+    const leaseUp = plan({ ...VA, kind: "lease_up" }, [["Asking price", "20,000,000"], ["Units", "200"], ["Capital budget", "150,000"]]);
+    expect(assessPlausibility(leaseUp).map((f) => f.code)).not.toContain("budget_low");
+  });
+
+  it("never flags a budget at or over the per-unit floor by its share of the price alone (audit C3a)", () => {
+    // $1.2M over 600 doors is $2,000 a door, a light value-add program; at
+    // 0.8% of a $150M price it had read as a likely misread, and every Claude
+    // step was told the figures do not tie.
+    const light = plan(VA, [["Asking price", "150,000,000"], ["Units", "600"], ["NOI (stabilized, pro forma)", "9,000,000"], ["Renovation budget", "1,200,000"]]);
+    expect(assessPlausibility(light).map((f) => f.code)).not.toContain("budget_low");
+    const s = inferStrategy(light);
+    expect(plausibilityNote(assessPlausibility(light, s), s, planSummary(light, s), light) ?? "").not.toContain("FIGURES THAT DO NOT TIE");
+    // Under the per-unit floor too, both are said.
+    const tiny = plan(VA, [["Asking price", "150,000,000"], ["Units", "600"], ["Renovation budget", "300,000"]]);
+    expect(assessPlausibility(tiny).map((f) => f.title)).toEqual(["Renovation budget of $300k is $500 per unit and 0.20% of the $150.0M price"]);
+  });
+
+  it("calls the stabilized NOI \"not a misread\" only where no finding stands and no yield was refused", () => {
+    const tied = (e: ExtractionResult) => {
+      const s = inferStrategy(e);
+      return plausibilityNote(assessPlausibility(e, s), s, planSummary(e, s), e);
+    };
+    expect(tied(CONVERSION)).toMatch(/not a misread/);
+    for (const e of [devTotalThousands, vaBudgetTiny]) {
+      expect(tied(e)).not.toMatch(/not a misread/);
+      expect(tied(e)).toContain("But the plan's figures do not all tie, as said here, so it or the cost it is set against may be a misread");
+      expect(tied(e)).toMatch(/FIGURES THAT DO NOT TIE/);
+    }
+    // A yield refused past the ceiling with no other finding says so too.
+    const refusedOnly = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$3,000,000"]]);
+    expect(assessPlausibility(refusedOnly)).toEqual([]);
+    expect(tied(refusedOnly)).not.toMatch(/not a misread/);
+    expect(tied(refusedOnly)).toContain("may be a misread");
+  });
+});
+
+describe("the basis finding names the class as its label writes it (audit C3b item 20)", () => {
+  const deal = (assetClass: string, count: [string, string], price: string): ExtractionResult =>
+    ({
+      dealName: "Test",
+      assetClass,
+      totalPages: 40,
+      metrics: [
+        { label: "Asking price", value: price, flagged: false, page: "p. 2", basis: "na" },
+        { label: count[0], value: count[1], flagged: false, page: "p. 2", basis: "na" },
+        { label: "NOI (in-place)", value: "$50,000", flagged: false, page: "p. 2", basis: "in_place" },
+      ],
+    }) as ExtractionResult;
+  const detail = (e: ExtractionResult) => assessPlausibility(e).find((f) => f.code === "basis_out_of_band")?.detail ?? "";
+
+  it("keeps an acronym in the class's label as written, and lowercases its words", () => {
+    // It had read "No hospitality / str market" and "No sfr / btr market".
+    expect(detail(deal("hospitality_str", ["Keys", "200"], "$1,000,000"))).toMatch(/^No hospitality \/ STR market trades there\./);
+    expect(detail(deal("sfr_btr", ["Homes", "200"], "$1,000,000"))).toMatch(/^No SFR \/ BTR market trades there\./);
+    expect(detail(deal("multifamily", ["Units", "200"], "$1,000,000"))).toMatch(/^No multifamily market trades there\./);
   });
 });

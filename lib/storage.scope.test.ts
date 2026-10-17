@@ -7,6 +7,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls: { op: string; args: unknown[] }[] = [];
+type Listed = { data: { name: string }[] | null; error: { message: string } | null };
+const EMPTY = (): Listed => ({ data: [], error: null });
+/** What the bucket lists for a folder at an offset: its objects' names. */
+const listing: { of: (folder: string, offset: number) => Listed } = { of: EMPTY };
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => ({
@@ -28,6 +32,10 @@ vi.mock("@/lib/supabase/admin", () => ({
           calls.push({ op: "sign", args });
           return { data: { signedUrl: `https://storage.example/${String(args[0])}?sig` }, error: null };
         },
+        list: async (...args: unknown[]) => {
+          calls.push({ op: "list", args });
+          return listing.of(String(args[0]), (args[1] as { offset?: number } | undefined)?.offset ?? 0);
+        },
       }),
     },
   }),
@@ -37,6 +45,7 @@ import {
   StoragePathError,
   downloadDealFile,
   downloadOmPdf,
+  listDealPictureFiles,
   omStoragePath,
   removeStorageFiles,
   removeSupplementFile,
@@ -95,5 +104,46 @@ describe("a path outside its scope never reaches the bucket", () => {
       downloadDealFile(MINE, { kind: "branding", userId: USER, teamId: null }),
     ).rejects.toBeInstanceOf(StoragePathError);
     expect(calls).toEqual([{ op: "download", args: [logo] }]);
+  });
+});
+
+describe("listDealPictureFiles — a deal's picture folders, for the deletion sweeps (research pass 39)", () => {
+  afterEach(() => {
+    listing.of = EMPTY;
+  });
+
+  it("lists both folders a page at a time, and answers only the layout's own files of this deal", async () => {
+    const page = (n: number, stamp: string) => Array.from({ length: n }, (_, i) => ({ name: `${stamp}${i}-hero.jpg` }));
+    listing.of = (folder, offset) => {
+      if (folder === `photos/${DEAL}`) {
+        if (offset === 0) return { data: [...page(999, "a"), { name: "notes.txt" }], error: null };
+        return { data: [{ name: "b1-thumb.jpg" }, { name: "c1-card.jpg" }], error: null };
+      }
+      if (folder === `flood/${DEAL}`) return { data: [{ name: "f1.jpg" }, { name: "f2.png" }], error: null };
+      return { data: [], error: null };
+    };
+    const files = await listDealPictureFiles(DEAL);
+    expect(files).toHaveLength(999 + 2 + 1);
+    expect(files).toContain(`photos/${DEAL}/a0-hero.jpg`);
+    expect(files).toContain(`photos/${DEAL}/b1-thumb.jpg`);
+    expect(files).toContain(`flood/${DEAL}/f1.jpg`);
+    expect(files).not.toContain(`photos/${DEAL}/notes.txt`);
+    expect(files).not.toContain(`flood/${DEAL}/f2.png`);
+    expect(calls.filter((c) => c.op === "list").map((c) => [c.args[0], (c.args[1] as { offset: number }).offset])).toEqual([
+      [`photos/${DEAL}`, 0],
+      [`photos/${DEAL}`, 1000],
+      [`flood/${DEAL}`, 0],
+    ]);
+  });
+
+  it("lists nothing for an id the layout would never mint folders under", async () => {
+    for (const id of ["../" + DEAL, `${DEAL}/x`, "", ".."]) expect(await listDealPictureFiles(id)).toEqual([]);
+    expect(calls.filter((c) => c.op === "list")).toEqual([]);
+  });
+
+  it("ends a folder's listing at a page that fails, keeping what it read", async () => {
+    listing.of = (folder) =>
+      folder === `photos/${DEAL}` ? { data: null, error: { message: "down" } } : { data: [{ name: "f1.jpg" }], error: null };
+    expect(await listDealPictureFiles(DEAL)).toEqual([`flood/${DEAL}/f1.jpg`]);
   });
 });

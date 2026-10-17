@@ -45,6 +45,186 @@ describe("deriveUnderwriteInputs — NOI anchor", () => {
   });
 });
 
+// Research pass 37: a vacant 42,000 SF office stated "Occupancy 0%" and no
+// NOI, and the note said "No NOI or cap in the OM — assumed 6% going-in"
+// beside a rent line of $92.7M a year; 22 acres of farmland in rezoning read
+// the same. The notes now say what the 6% is. Words only: every figure is the
+// model's as before (the model on such deals is the owner's call).
+describe("deriveUnderwriteInputs — a building with no income today, and land, say the 6% is a placeholder", () => {
+  const office = (occupancy: string | null, over: Partial<ExtractionResult> = {}): ExtractionResult => ({
+    dealName: "1200 Corporate Drive",
+    assetClass: "Office",
+    metrics: [
+      { label: "Asking price", value: "8,500,000", flagged: false, page: "p. 2" },
+      { label: "Total SF", value: "42,000 SF", flagged: false, page: "p. 2" },
+      ...(occupancy != null ? [{ label: "Occupancy", value: occupancy, flagged: false, page: "p. 3", basis: "in_place" as const }] : []),
+      { label: "Year built", value: "1999", flagged: false, page: "p. 3" },
+    ],
+    ...over,
+  });
+
+  it("a building stated 0% occupied with no NOI: no income in place, the 6% a placeholder, and its rent line no building's rent", () => {
+    const d = deriveUnderwriteInputs(office("0%"), "x");
+    expect(d.sources.inPlaceRentAnnual?.provenance).toBe("assumption");
+    expect(d.sources.inPlaceRentAnnual?.note).toBe(
+      "The memorandum states the building 0% occupied and no NOI: no income is in place, and the 6% is a placeholder. The $92.7M of gross potential rent on this line is backed out of that placeholder at the stated 0% occupancy, which the model runs as a 99% vacancy — it is no building's rent",
+    );
+    // The figures are the model's as before: the 6% NOI, grossed up through 99%.
+    expect(computeUnderwrite(d.inputs).cashFlow[0].noi).toBeCloseTo(510_000, 0);
+    expect(d.inputs.vacancyPct).toBeCloseTo(0.99, 6);
+    expect(d.inputs.inPlaceRentAnnual).toBeCloseTo(92_727_273, -1);
+    // Above 0% the note is as it was: where a lease-up begins is the owner's call.
+    expect(deriveUnderwriteInputs(office("15%"), "x").sources.inPlaceRentAnnual?.note).toBe("No NOI or cap in the OM — assumed 6% going-in");
+    expect(deriveUnderwriteInputs(office(null), "x").sources.inPlaceRentAnnual?.note).toBe("No NOI or cap in the OM — assumed 6% going-in");
+  });
+
+  it("a building stated 0% occupied that states a pro forma NOI keeps its reading, and the model's year 1 stays that NOI", () => {
+    // Read as a lease-up, its model would run the price × a stated cap or the
+    // assumed 6% in place of the stated figure: the model's math, which is
+    // the owner's call, so the deal stays as it was read.
+    const vacantWithProForma: ExtractionResult = {
+      dealName: "1200 Corporate Drive (vacant)",
+      assetClass: "Office",
+      metrics: [
+        { label: "Asking price", value: "8,500,000", flagged: false, page: "p. 2" },
+        { label: "Total SF", value: "42,000 SF", flagged: false, page: "p. 2" },
+        { label: "Occupancy", value: "0%", flagged: false, page: "p. 3", basis: "in_place" },
+        { label: "NOI (stabilized, pro forma)", value: "$650,000", flagged: false, page: "p. 4", basis: "pro_forma" },
+      ],
+    };
+    const d = deriveUnderwriteInputs(vacantWithProForma, "x");
+    expect(d.meta.strategy).toBe("stabilized");
+    expect(computeUnderwrite(d.inputs).cashFlow[0].noi).toBeCloseTo(650_000, 0);
+    expect(d.sources.inPlaceRentAnnual?.note).toMatch(/^Grossed up from the OM's NOI \(stabilized, pro forma\) — the only NOI stated/);
+  });
+
+  it("land with no NOI: the 6% and the loan beside it are placeholders, and the returns are not the land's", () => {
+    const land: ExtractionResult = {
+      dealName: "Cypress Creek 22-acre site",
+      assetClass: "Land",
+      strategy: { kind: "development", summary: "22.4-acre site in rezoning to a planned unit development", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Land price", value: "14,500,000", flagged: false, page: "p. 2" },
+        { label: "Acres", value: "22.4", flagged: false, page: "p. 2" },
+      ],
+    };
+    const d = deriveUnderwriteInputs(land, "x");
+    expect(d.sources.inPlaceRentAnnual?.note).toBe("Land earns no income: the 6% and the loan beside it are placeholders, and the returns are not the land's");
+    expect(computeUnderwrite(d.inputs).cashFlow[0].noi).toBeCloseTo(14_500_000 * 0.06, 0);
+    // The land under a ground lease earns its ground rent: not said to earn nothing.
+    const leasedFee = deriveUnderwriteInputs(
+      {
+        ...land,
+        strategy: undefined,
+        interest: { kind: "leased_fee", summary: "", share: "", groundLease: "Ground lease to 2071", loan: "", page: "" },
+        metrics: [{ label: "Asking price", value: "$10,000,000", flagged: false, page: "p. 2" }, { label: "Ground rent", value: "$600,000", flagged: false, page: "p. 4" }],
+      },
+      "x",
+    );
+    expect(leasedFee.sources.inPlaceRentAnnual?.note).not.toContain("Land earns no income");
+  });
+});
+
+// Research pass 28: a skilled-nursing deck stating "EBITDAR (T-12) $2.8M",
+// or a car wash stating its EBITDA, ran on "No NOI or cap in the OM —
+// assumed 6% going-in" — a note that read as if the memorandum stated no
+// earnings at all. The note now says what it states and that it is not
+// used; the model's figures do not move.
+describe("deriveUnderwriteInputs — an operating business's EBITDA is said, never used", () => {
+  const snf = (metrics: ExtractionResult["metrics"]): ExtractionResult => ({
+    dealName: "Lakeside Skilled Nursing",
+    assetClass: "Skilled Nursing Facility",
+    metrics: [
+      { label: "Asking price", value: "$18,000,000", flagged: false, page: "p. 2" },
+      { label: "Licensed beds", value: "120", flagged: false, page: "p. 2" },
+      { label: "Occupancy", value: "84%", flagged: false, page: "p. 3" },
+      ...metrics,
+    ],
+  });
+  const EBITDAR = { label: "EBITDAR (T-12)", value: "$2,800,000", flagged: true, page: "p. 9" };
+
+  it("names the stated EBITDAR in the NOI note, and every figure is the model's as before", () => {
+    const withIt = deriveUnderwriteInputs(snf([EBITDAR]), "x");
+    const without = deriveUnderwriteInputs(snf([]), "x");
+    // Not one number moves: the NOI is still the assumed 6% of the price.
+    expect(withIt.inputs).toEqual(without.inputs);
+    expect(computeUnderwrite(withIt.inputs).returns).toEqual(computeUnderwrite(without.inputs).returns);
+    expect(computeUnderwrite(withIt.inputs).cashFlow[0].noi).toBeCloseTo(18_000_000 * 0.06, 0);
+    expect(withIt.sources.inPlaceRentAnnual?.provenance).toBe("assumption");
+    expect(withIt.sources.inPlaceRentAnnual?.note).toBe(
+      "The OM states the business's EBITDAR (T-12) of $2,800,000, which is not the real estate's NOI and is not used; with no NOI or cap in the OM, the model assumed 6% going-in",
+    );
+    // With none stated, the note is as it was.
+    expect(without.sources.inPlaceRentAnnual?.note).toBe("No NOI or cap in the OM — assumed 6% going-in");
+    // A car wash's EBITDA, by the same rule.
+    const wash = deriveUnderwriteInputs(
+      { dealName: "Express Car Wash", assetClass: "Car Wash", metrics: [{ label: "Asking price", value: "$9,000,000", flagged: false, page: "p. 1" }, { label: "EBITDA", value: "$900,000", flagged: false, page: "p. 4" }] },
+      "x",
+    );
+    expect(wash.sources.inPlaceRentAnnual?.note).toBe(
+      "The OM states the business's EBITDA of $900,000, which is not the real estate's NOI and is not used; with no NOI or cap in the OM, the model assumed 6% going-in",
+    );
+    expect(computeUnderwrite(wash.inputs).cashFlow[0].noi).toBeCloseTo(540_000, 0);
+  });
+
+  it("no NOI reader takes an EBITDA row, and a margin, a multiple or a coverage is no EBITDA", async () => {
+    const { classifyNoi, ebitdaFigure, noiFigures } = await import("@/lib/deal-strategy");
+    const labels = ["EBITDA", "EBITDAR", "EBITDAR (T-12)", "EBITDARM", "Adjusted EBITDA", "Store-level EBITDA (TTM)"];
+    for (const label of labels) {
+      expect(classifyNoi({ label, value: "$900,000" }), label).toBeNull();
+      expect(ebitdaFigure([{ label, value: "$900,000" }])?.value, label).toBe(900_000);
+    }
+    expect(noiFigures(labels.map((label) => ({ label, value: "$900,000" })))).toEqual([]);
+    for (const [label, value] of [
+      ["EBITDA margin", "32%"],
+      ["EBITDA multiple", "6.5x"],
+      ["EBITDAR coverage", "1.40x"],
+      ["EBITDA per unit", "$7,500"],
+      ["EBITDAR", "1.4x"],
+      ["EBITDA", "18%"],
+    ]) {
+      expect(ebitdaFigure([{ label, value }]), label).toBeNull();
+    }
+    expect(ebitdaFigure([])).toBeNull();
+    // The extraction is asked to file it where this reads it, never as an NOI.
+    const { extractionInstruction } = await import("@/lib/anthropic/prompts");
+    const prompt = extractionInstruction("auto");
+    expect(prompt).toContain('under "EBITDA" or "EBITDAR" exactly as stated, with its period (like "EBITDAR (T-12)"), and never under an NOI label');
+  });
+
+  it("beside an NOI that cannot anchor year 1, the note names the EBITDA too", () => {
+    const d = deriveUnderwriteInputs(snf([{ label: "NOI (in-place)", value: "$0", flagged: false, page: "p. 9" }, EBITDAR]), "x");
+    expect(d.sources.inPlaceRentAnnual?.note).toBe(
+      "The OM's NOI (in-place) is $0 — no income in place to anchor year 1 on. No going-in cap in the OM either — assumed 6% going-in; enter the year-1 NOI you would run. The OM states the business's EBITDAR (T-12) of $2,800,000, which is not the real estate's NOI and is not used",
+    );
+    expect(d.inputs).toEqual(deriveUnderwriteInputs(snf([{ label: "NOI (in-place)", value: "$0", flagged: false, page: "p. 9" }]), "x").inputs);
+  });
+});
+
+// Research pass 28: a dialysis center filed as no class ran on the generic
+// defaults; filed as medical office it runs on the class's own. The model is
+// anchored on the stated NOI, so its returns do not move — the expense line
+// it reconstructs and the default vacancy do.
+describe("deriveUnderwriteInputs — a dialysis center runs on medical office's defaults", () => {
+  it("takes medical office's 42% expense ratio and 8% vacancy where it took 40% and 7%", () => {
+    const deck = (assetClass: string): ExtractionResult => ({
+      dealName: "Riverside Dialysis",
+      assetClass,
+      metrics: [
+        { label: "Asking price", value: "$5,000,000", flagged: false, page: "p. 2" },
+        { label: "NOI (in-place)", value: "$350,000", flagged: false, page: "p. 2" },
+        { label: "Total SF", value: "8,000 SF", flagged: false, page: "p. 2" },
+      ],
+    });
+    const dialysis = deriveUnderwriteInputs(deck("Dialysis Center"), "x");
+    expect(dialysis.inputs.vacancyPct).toBe(0.08);
+    expect(dialysis.inputs).toEqual(deriveUnderwriteInputs(deck("medical_office"), "x").inputs);
+    const generic = deriveUnderwriteInputs(deck("Something else entirely"), "x");
+    expect(generic.inputs.vacancyPct).toBe(0.07);
+    expect(computeUnderwrite(dialysis.inputs).returns.leveredIrrPct).toBeCloseTo(computeUnderwrite(generic.inputs).returns.leveredIrrPct!, 10);
+  });
+});
+
 describe("deriveUnderwriteInputs — the cap the workbook reads is the going-in cap the page shows", () => {
   it("a residual or at-completion cap never backs a price out, and never seeds the exit cap", () => {
     for (const label of ["Residual cap rate", "Cap rate at completion", "Cap rate (Year 3)"]) {

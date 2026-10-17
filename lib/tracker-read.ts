@@ -281,6 +281,26 @@ export function figureCitation(read: Pick<FigureRead, "house" | "area" | "period
 }
 
 /**
+ * Who published a figure, short enough to stand beside it in a line a
+ * phone shows: the file's own house words with their parentheticals taken
+ * off — "Colliers (21.3%) and CBRE (22.2%)" is "Colliers and CBRE",
+ * "Northmarq (citing Fannie Mae)" is "Northmarq" — and "publisher not
+ * recorded" where the file names none, as `figureCitation` says it. The
+ * whole citation stays on the figure's title; this is the part a reader
+ * must see without one (research pass 31, C5: the homepage's band and
+ * gallery and /demo showed brokerage figures whose house only a tooltip
+ * named, which a phone cannot open).
+ */
+export function houseShort(read: Pick<FigureRead, "house">): string {
+  if (!read.house) return "publisher not recorded";
+  const bare = read.house
+    .replace(/\s*\([^()]*\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return bare || read.house;
+}
+
+/**
  * The citation with what the file says the figure is, for a line that
  * carries no sentence around it (a benchmark row): "Essex Realty, Chicago,
  * April 2026; a transaction average of 175 sales, not a quoted band; for

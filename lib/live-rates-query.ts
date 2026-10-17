@@ -22,6 +22,9 @@ import type { BenchRow } from "@/lib/zori";
 export async function fetchSeriesRows(
   supabase: SupabaseClient,
   metas: readonly SeriesMeta[],
+  /** told of each series whose read failed — the screen's market check says
+   *  a failed read as one, never as a market with no figures */
+  onFailure?: (id: string) => void,
 ): Promise<RateRow[]> {
   const ids = metas.flatMap((s) => (s.moe ? [s.id, s.moe] : [s.id]));
   if (ids.length === 0) return [];
@@ -38,6 +41,7 @@ export async function fetchSeriesRows(
         return (data as RateRow[] | null) ?? [];
       } catch (err) {
         console.warn(`live rates: ${id} unavailable:`, err instanceof Error ? err.message : err);
+        onFailure?.(id);
         return [];
       }
     }),
@@ -75,6 +79,8 @@ export async function fetchBenchRows(
   supabase: SupabaseClient,
   metroName: string,
   metrics: readonly string[],
+  /** told when the read failed, as `fetchSeriesRows` is */
+  onFailure?: () => void,
 ): Promise<BenchRow[]> {
   if (metrics.length === 0) return [];
   try {
@@ -87,6 +93,7 @@ export async function fetchBenchRows(
     return (data as BenchRow[] | null) ?? [];
   } catch (err) {
     console.warn(`benchmarks: ${metroName} unavailable:`, err instanceof Error ? err.message : err);
+    onFailure?.();
     return [];
   }
 }

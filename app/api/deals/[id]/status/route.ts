@@ -1,5 +1,6 @@
 import { type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { jobAgeMs } from "@/lib/screen-run";
 
 // Returns the current analysis-job state for a deal. RLS makes sure a user can
 // only ever read jobs for their own deals.
@@ -47,7 +48,14 @@ export async function GET(
     );
   }
 
+  // The row's age on THIS server's clock (research pass 30): the page judges
+  // a stall by it (lib/screen-run `isStalled`), never by the browser's own
+  // clock against the database's timestamp — a computer running ten minutes
+  // fast had seen every live screen as stalled, and its "Start it again"
+  // then met a live run.
   return Response.json(
-    data ?? { status: "none", step: null, progress: 0, error: null, updated_at: null, created_at: null },
+    data
+      ? { ...data, ageMs: jobAgeMs(data, Date.now()) }
+      : { status: "none", step: null, progress: 0, error: null, updated_at: null, created_at: null, ageMs: null },
   );
 }

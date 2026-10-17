@@ -27,8 +27,9 @@ export const SPREAD_BPS = (SPREAD_HIGH_IRR_PCT - SPREAD_LOW_IRR_PCT) * 100; // 4
 // wallMs) and said only from three of their own finished screens.
 
 // ── Product shape facts (countable in the codebase) ─────────────────────────
-// Six checkpointed analysis stages per OM: extract, challenge, comps,
-// reconcile, market, verdict (lib/anthropic/pipeline.ts).
+// Six stages per OM, as the deal page's rail names them: signal, extract,
+// challenge, comps, market, verdict (lib/screen-stages, held to the rail by
+// its test; reconciling the buyer's model is a run of its own).
 export const ANALYSIS_STAGES = 6;
 // The three deal-killers the challenger stresses first: basis, exit, debt.
 export const DEAL_KILLERS = 3;
@@ -42,7 +43,8 @@ export const SLIDER_SWEEP_BPS = 200;
 // Public-record comp jurisdictions: RE-EXPORTED from the provider registry
 // itself (lib/public-comps/core.ts COVERAGE_SUMMARY, derived from configured
 // providers) so marketing copy can never claim coverage the code doesn't have.
-export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS } from "@/lib/public-comps/core";
+import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
+export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS };
 // The FRED series the weekday cron tracks are counted from the one table
 // both the cron and the page read (data/fred-series.json via
 // lib/live-rates.ts SERIES) — nothing here restates the number.
@@ -68,7 +70,11 @@ export const DEEP_TOOLS: readonly DeepTool[] = [
       "Re-run a deal with a lower price and a tighter exit cap and the return jumps — but which change did the work? The bridge attributes the move to each input by Shapley value, so the answer doesn't depend on the order you'd have applied them, and the bars sum to the headline change exactly.",
   },
   {
-    title: "Two brokers, one asset, a $6.5M gap",
+    // No dollar figure: the gap this card once named ($6.5M) was the
+    // valuation tests' grounding case, not the sample's — the sample deal
+    // holds no BOVs, so there is no gap of its own to quote (lib/deep-tools
+    // test holds the cards to figures of none).
+    title: "Two brokers, one asset, the gap explained",
     where: "Deal → Valuations",
     blurb:
       "Upload both BOVs and the gap gets decomposed into Year-1 NOI, cap rate and capex treatment — with anything the identity can't explain shown as unexplained rather than smoothed over. Then each broker's price runs through your own model, so you see the levered IRR each one actually implies.",
@@ -83,7 +89,7 @@ export const DEEP_TOOLS: readonly DeepTool[] = [
     title: "Exit cap and rent growth, checked against the submarket",
     where: "Market data → Submarkets",
     blurb:
-      "The two assumptions that swing returns most are usually just typed in. Link a submarket and they get measured against what it has actually done — months of supply under construction, trailing rent CAGR on a consistent basis, trough vacancy. Overriding a warning is normal; it just needs a one-line reason, and that reason lands in the memo.",
+      "The two assumptions that swing returns most are usually just typed in. Import your submarket's own export (CSV or XLSX) and link it, and they get measured against what it has actually done — months of supply under construction, trailing rent CAGR on a consistent basis, trough vacancy. Overriding a warning is normal; it just needs a one-line reason, and that reason lands in the memo.",
   },
 ] as const;
 
@@ -120,7 +126,15 @@ export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
 export const FREE_PLAN: readonly string[] = [
   `Up to ${FREE_DEALS} deals, the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers",
-  "Recorded-sales comps + local rent-rule check by address",
+  // Each said where it holds: the card had promised recorded-sales comps and
+  // a local rule check by every address, where the comps run only where a
+  // county publishes its sales to the registry and local rules only in the
+  // covered markets (research pass 32). The statewide rules are on file for
+  // ten states and no others — Oregon's statewide cap among the missing — so
+  // the line counts them; lib/plan-features.test.ts holds the count to the
+  // rules file (the batch-2 audit: it had said "statewide elsewhere").
+  "Rent-rule check by address: local in the covered markets, and the statewide rules on file for 10 states",
+  `Recorded-sales comps in ${COVERAGE_SUMMARY}`,
   "Risk digest and side-by-side deal comparison",
   "Reconcile your own underwriting model",
 ];
@@ -172,6 +186,8 @@ export const SAMPLE_COMP_PREMIUM_LINE =
   "$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it.";
 
 // NOTE deliberately absent: the Excel-preview IRR figures. Those are COMPUTED
-// from the live engine on the sample model at render time (app/page.tsx
-// imports computeModel + SAMPLE_DEAL) — hardcoding them here is exactly how
-// they drifted (7.1% vs the engine's 6.9%).
+// at render time by the screening engine (lib/underwrite/engine) on the
+// sample's one derivation, the demo workbook's (lib/sample-derive's
+// `sampleWorkbookPreview`, which app/page.tsx reads; the homepage's stress
+// bench runs the same derivation) — hardcoding them here is exactly how they
+// drifted (7.1% vs the engine's 6.9%).

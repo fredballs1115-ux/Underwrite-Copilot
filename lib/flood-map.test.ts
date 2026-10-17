@@ -90,15 +90,39 @@ function fetchers(overlayAlpha = SFHA_ALPHA): FloodFetchers & { seen: { aerial: 
 /** A deals table of one row's photo cache, read and written as the code does. */
 function fakeDb(photo: DealVisualCache | null) {
   const db = { photo };
+  // What a filter on a jsonb path reads ("photo->floodFrame->>path"): the
+  // value at that path, as stored.
+  const at = (path: string): unknown => {
+    let v: unknown = { photo: db.photo };
+    for (const k of path.split(/->>?/)) v = v == null ? undefined : (v as Record<string, unknown>)[k];
+    return v;
+  };
   const client = {
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { photo: db.photo } }) }) }),
-      update: (row: { photo: DealVisualCache }) => ({
-        eq: async () => {
+      update: (row: { photo: DealVisualCache }) => {
+        const filters: (() => boolean)[] = [];
+        const write = async () => {
+          // A write held to the record it read matches no row once that
+          // record has changed (lib/deal-location `onPhotoRecord`).
+          if (filters.some((meets) => !meets())) return { data: [], error: null };
           db.photo = JSON.parse(JSON.stringify(row.photo));
-          return { error: null };
-        },
-      }),
+          return { data: [{ id: "d1" }], error: null };
+        };
+        const chain = {
+          eq: (col: string, v: unknown) => {
+            if (col !== "id") filters.push(() => at(col) === v);
+            return chain;
+          },
+          is: (col: string, v: null) => {
+            filters.push(() => (v === null ? at(col) == null : at(col) === v));
+            return chain;
+          },
+          select: () => write(),
+          then: (ok: (r: unknown) => unknown, fail?: (e: unknown) => unknown) => write().then(ok, fail),
+        };
+        return chain;
+      },
     }),
   } as unknown as SupabaseClient;
   return { client, db };
@@ -240,8 +264,12 @@ describe("floodCrop — the frame cut to a surface's shape", { timeout: 60_000 }
     const record = (await ensureFloodFrame(client, "deal-6", LOC, db.photo, { fetchers: fetchers() }))!;
     const page = await floodCrop("deal-6", record, 1280, 720);
     expect(await sharp(page).metadata()).toMatchObject({ format: "jpeg", width: 1280, height: 720 });
+    const dense = await floodCrop("deal-6", record, 2560, 1440);
+    expect(await sharp(dense).metadata()).toMatchObject({ width: OW, height: Math.round((OW * 9) / 16) });
+    // A size no page asks for is the listed crop nearest it (research pass
+    // 39) — never more pixels than the frame holds.
     const huge = await floodCrop("deal-6", record, 5120, 2880);
-    expect(await sharp(huge).metadata()).toMatchObject({ width: OW, height: Math.round((OW * 9) / 16) });
+    expect(await sharp(huge).metadata()).toMatchObject({ width: OW, height: OH });
     const whole = await floodCrop("deal-6", record, OW, OH);
     expect(await sharp(whole).metadata()).toMatchObject({ width: OW, height: OH });
   });
@@ -299,6 +327,10 @@ describe("floodMapFor — the report's flood page reads the zone looked up for t
     const view = await floodMapFor(fakeDb(null).client, "deal-elm", address, null, lookedUpFor(ELM));
     expect(view?.image).toBeNull();
     expect(view?.line).toMatch(/Zone AE/);
+    // No point placed at the house for this address: the zone is said at
+    // the point the address was placed at, never the building's (the
+    // pre-merge audit, C1 L10).
+    expect(view?.line).toMatch(/^FEMA's map puts the point the address was placed at in Zone AE/);
   });
 
   it("says nothing where the lookup was made for an address the deal has since changed from, as for a pending one", async () => {

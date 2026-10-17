@@ -7,6 +7,7 @@
 
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import type { PlaygroundLevers } from "./playground";
+import { compactUsd } from "@/lib/money";
 
 /** Return floors as DECIMALS (0.13 = a 13% IRR floor). The buy box stores
  *  percent-points (minIrrPct: 13) — callers divide by 100. */
@@ -76,20 +77,38 @@ export interface MaxBidSolution {
   /** The floor with the thinnest margin at the solution — the one that gives
    *  first if you pay a dollar more. */
   binding: keyof BidFloors | null;
-  /** True when every floor still clears at the search ceiling (2× the modeled
-   *  price): the box isn't the constraint, and `price` holds the ceiling. */
+  /** True when every floor still clears at the top of the range searched
+   *  (`MAX_BID_SEARCH_X` times the modeled price): the box isn't the
+   *  constraint, and `price` holds that top — the bid is AT LEAST it, and the
+   *  model's own ceiling lies above the range searched. */
   unbounded: boolean;
   /** Engine metrics at the solved price (what you'd underwrite to there). */
   at: BidMetrics | null;
 }
 
-// Search window and resolution. The grid pass brackets the feasibility edge
-// (robust even if a metric wiggles locally); bisection then sharpens the
-// bracket to well under $1k on any realistic deal size.
+// Search window and resolution. The window opens at twice the modelled
+// price and doubles while every floor still clears at its top (research pass
+// 40, H2: an auction's modelled price is its opening floor, and a model whose
+// own ceiling at the hurdle was $7.31M all-in was said to set none past
+// $5.25M, twice the floor), up to `MAX_BID_SEARCH_X`. The grid pass then
+// brackets the feasibility edge inside the last doubling (robust even if a
+// metric wiggles locally); bisection sharpens the bracket to well under $1k
+// on any realistic deal size. A window that never doubles is searched
+// exactly as before.
 const FLOOR_X = 0.05;
 const CEILING_X = 2;
+/** The top of the range the max bid is searched over, as a multiple of the
+ *  modelled price: past it, the bid is said as "at least" the top, never as
+ *  a ceiling the model does not set. */
+export const MAX_BID_SEARCH_X = 64;
 const GRID = 48;
 const BISECT_ITERS = 40;
+
+/** A multiple of the modelled price in words: "twice", "64 times". */
+export function timesWords(x: number): string {
+  const n = Number(x.toFixed(x < 10 ? 1 : 0));
+  return n === 2 ? "twice" : `${n} times`;
+}
 
 function metricsAt(
   base: UnderwriteInputs,
@@ -170,20 +189,29 @@ export function solveMaxBid(
     return none;
   }
 
-  const lo0 = base.purchasePrice * FLOOR_X;
-  const hi0 = base.purchasePrice * CEILING_X;
+  let lo0 = base.purchasePrice * FLOOR_X;
+  let hi0 = base.purchasePrice * CEILING_X;
+  const top = base.purchasePrice * MAX_BID_SEARCH_X;
   const at = (p: number) => metricsAt(base, levers, p);
 
-  // Still feasible at the ceiling → the box isn't the constraint.
-  const ceilingMetrics = at(hi0);
-  if (clears(ceilingMetrics, floors)) {
-    return {
-      price: hi0,
-      deltaPct: (hi0 - base.purchasePrice) / base.purchasePrice,
-      binding: null,
-      unbounded: true,
-      at: ceilingMetrics,
-    };
+  // Still feasible at the window's top → double it, until a top fails or the
+  // range reaches its stated maximum. A top that fails brackets the edge
+  // between it and the last top that cleared; the maximum still clearing
+  // means the box isn't the constraint inside the range searched.
+  let ceilingMetrics = at(hi0);
+  while (clears(ceilingMetrics, floors)) {
+    if (hi0 >= top) {
+      return {
+        price: hi0,
+        deltaPct: (hi0 - base.purchasePrice) / base.purchasePrice,
+        binding: null,
+        unbounded: true,
+        at: ceilingMetrics,
+      };
+    }
+    lo0 = hi0;
+    hi0 = Math.min(hi0 * 2, top);
+    ceilingMetrics = at(hi0);
   }
 
   // Grid pass: find the LAST feasible stop so bisection brackets the highest
@@ -219,4 +247,101 @@ export function solveMaxBid(
     unbounded: false,
     at: solvedMetrics,
   };
+}
+
+/**
+ * Where no price clears the buy box's floors together, which floor never
+ * clears and which clear on their own (research pass 35: the hotel's report
+ * listed three floors and named none, under a grid whose IRR cleared at 10%
+ * off). Each floor solved alone, over the same range and under the same
+ * levers as the bid; and the one reason the engine can prove for a
+ * cash-on-cash floor: year 1's cash flow before debt service negative
+ * whatever the price, since neither its NOI nor its capital spending moves
+ * with the price. Beside the solve, so the deal page's max-bid card and the
+ * report read one sentence for one deal (audit C3a, MED-7).
+ */
+export interface NoBidRead {
+  alone: { key: keyof BidFloors; price: number | null; unbounded: boolean }[];
+  /** year 1's NOI is under its capital spending and reserves, so its cash
+   *  flow is negative at every price */
+  yearOneNegative: boolean;
+  /** year 1's capital budget where it is what turns year 1 negative — the
+   *  year's NOI covers its other capital lines; null otherwise */
+  yearOneCapital: number | null;
+}
+
+const FLOOR_ORDER = ["minIrr", "minCoc", "minCap"] as const;
+
+export function noBidRead(inputs: UnderwriteInputs, floors: BidFloors, levers: Partial<PlaygroundLevers>): NoBidRead {
+  const set = FLOOR_ORDER.filter((k) => floors[k] != null);
+  const alone = set.map((key) => {
+    const one = set.length === 1 ? { price: null, unbounded: false } : solveMaxBid(inputs, { [key]: floors[key] }, levers);
+    return { key, price: one.price, unbounded: one.unbounded };
+  });
+  const y1 = computeUnderwrite({ ...inputs, expenseLines: inputs.expenseLines.map((l) => ({ ...l })), ...levers }).cashFlow[0];
+  const yearOneNegative = !!y1 && y1.noi - y1.totalCapEx < 0;
+  const yearOneCapital =
+    yearOneNegative && y1.capitalImprovements > 0 && y1.noi - (y1.totalCapEx - y1.capitalImprovements) >= 0 ? y1.capitalImprovements : null;
+  return { alone, yearOneNegative, yearOneCapital };
+}
+
+/**
+ * Where no price clears the box's floors together, the sentence that names
+ * them from each floor's own solve (`noBidRead`): the floor that clears at
+ * no tested price, with the reason the engine proves for a cash-on-cash
+ * floor, then how far each other floor clears on its own. Null where there
+ * is nothing to name beyond the floors themselves — every floor fails even
+ * alone — and the caller's sentence stands.
+ */
+export function noBidSentence(
+  floors: BidFloors,
+  nb: NoBidRead | null,
+  opts: {
+    /** the price the bid was solved against, in words: "the modelled
+     *  price", or "the price entered" where the model's is a placeholder and
+     *  the playground solves on the reader's own (audit C6, LOW-6) */
+    vs?: string;
+    /** a partial interest's stated share, where the model runs the whole
+     *  its price grosses up to: a floor-alone price is the whole's, and the
+     *  share's is said beside it, as the max-bid card says it */
+    share?: { pct: number; noun: "share" | "interest" } | null;
+  } = {},
+): string | null {
+  if (!nb || nb.alone.length === 0) return null;
+  const words = (k: keyof BidFloors) => floorWords(k, floors);
+  const vs = opts.vs ?? "the modelled price";
+  const share = opts.share;
+  const shareOf = (whole: number, atLeast: boolean) =>
+    share
+      ? ` (the whole's price, the ${share.noun} grossed up; the ${Number(share.pct.toFixed(2))}% ${share.noun}'s is ${atLeast ? "at least " : ""}${fmtBid(whole * (share.pct / 100))})`
+      : "";
+  const never = nb.alone.filter((a) => a.price == null);
+  const alone = nb.alone.filter((a) => a.price != null);
+  const clearsAlone = alone.map(
+    (a, i) =>
+      `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${
+        a.unbounded ? `at every price searched, up to ${timesWords(MAX_BID_SEARCH_X)} ${vs}` : `up to ${fmtBid(a.price!)}`
+      }${shareOf(a.price!, a.unbounded)}`,
+  );
+  const aloneLine = clearsAlone.length > 0 ? `${clearsAlone.join(", and ").replace(/^y/, "Y")}.` : "";
+  if (never.length === 0) {
+    // Each floor clears on its own, never all of them at one price.
+    return `No price inside the tested range clears your buy box's floors together. ${aloneLine}`;
+  }
+  if (never.length > 1 && alone.length === 0) return null;
+  const because =
+    never.some((a) => a.key === "minCoc") && nb.yearOneNegative
+      ? nb.yearOneCapital != null
+        ? `year 1 carries ${compactUsd(nb.yearOneCapital)} of capital, which leaves its cash flow negative at any price`
+        : "year 1's cash flow is negative at any price"
+      : "";
+  const list = never.map((a) => words(a.key));
+  const named = list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} or ${list[list.length - 1]}`;
+  const head = `No price inside the tested range clears your ${named} floor`;
+  const why = because ? (never.length === 1 ? `: ${because}` : ` (the cash-on-cash because ${because})`) : "";
+  if (alone.length === 0) {
+    // The box's one floor: the reason where the engine proves one.
+    return because ? `${head}${why}.` : null;
+  }
+  return `${head}${why}. ${aloneLine}`;
 }

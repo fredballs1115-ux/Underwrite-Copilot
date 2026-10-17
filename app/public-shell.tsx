@@ -5,6 +5,7 @@ import { AppShell } from "@/app/(app)/app-shell";
 import { RegulatoryAlertBanner } from "@/app/(app)/regulatory-alert-banner";
 import { coveredMarketNav } from "@/lib/market-match";
 import { LogoMark } from "@/app/logo";
+import { DataNotices } from "@/app/data-notices";
 
 /**
  * A page that opens for a prospect AND for a signed-in analyst.
@@ -86,6 +87,11 @@ export async function PublicShell({ children }: { children: ReactNode }) {
               Home
             </Link>
           </span>
+          {/* The data providers' notices, a row of their own in the
+              footer's type: FRED's terms ask for theirs prominently on
+              the application, and /tools and /market draw FRED's figures
+              (app/data-notices). */}
+          <DataNotices className="basis-full" />
         </div>
       </footer>
     </div>

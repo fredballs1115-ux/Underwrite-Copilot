@@ -26,6 +26,8 @@
  * on total cost in year four. That is what this now computes.
  */
 
+import { compactUsd } from "@/lib/money";
+
 export interface LoanTerms {
   ltvPct: number;
   ratePct: number;
@@ -308,8 +310,7 @@ export function planCaveats(inp: ModelInputs): string[] {
   return out;
 }
 
-const fmtMoney = (n: number) =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+const fmtMoney = (n: number) => compactUsd(n, { thousandsFrom: Infinity });
 
 // ── One operating year ───────────────────────────────────────────────────
 

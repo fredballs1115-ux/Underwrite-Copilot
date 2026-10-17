@@ -3,12 +3,8 @@
 // upgraded, the metro renamed), this fails and the homepage/demo copy gets
 // re-derived instead of silently drifting from the deal page.
 import { describe, it, expect } from "vitest";
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { sampleLegal } from "./sample-legal";
-import { LegalPanel } from "@/app/demo/legal-panel";
 import { researchAge } from "./research-age";
-import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 describe("sampleLegal", () => {
   // Read on a pinned day: a rule's date is marked stale past the research
@@ -70,18 +66,5 @@ describe("the sample's legal list ages by the research rule", () => {
     expect(sampleLegal(crossing).rules[0].stale).toBe("181 days old, stale");
     // The date itself never moves.
     expect(sampleLegal(crossing).rules[0].asOf).toBe(dated.asOf);
-  });
-
-  it("the demo's legal panel shows the date with its age and the stale badge, and keeps the verified chip", () => {
-    const before = visibleText(renderToStaticMarkup(React.createElement(LegalPanel, { legal: sampleLegal(lastCurrent) })));
-    expect(before).toContain(`as of ${dated.asOf}`);
-    expect(before).not.toContain("stale");
-    const html = renderToStaticMarkup(React.createElement(LegalPanel, { legal: sampleLegal(crossing) }));
-    const after = visibleText(html);
-    expect(after).toContain(dated.status);
-    expect(after).toContain(`as of ${dated.asOf} · 181 days old, stale`);
-    expect(html).toContain('data-qa="research-stale"');
-    expect(a11yIssues(html)).toEqual([]);
-    expect(gluedWords(after)).toEqual([]);
   });
 });

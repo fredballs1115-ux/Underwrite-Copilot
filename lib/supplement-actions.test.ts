@@ -20,7 +20,12 @@ class Redirect extends Error {
 
 const state = vi.hoisted(() => ({
   supplements: null as unknown,
-  updates: [] as { supplements?: Record<string, { notes: { text: string }[]; files: { name: string; path: string }[] }> }[],
+  updates: [] as {
+    supplements?: Record<
+      string,
+      { notes: { text: string; byId?: string }[]; files: { name: string; path: string; byId?: string }[] }
+    >;
+  }[],
   uploads: [] as string[],
 }));
 
@@ -104,6 +109,8 @@ describe("the Documents tab's note and file", () => {
     expect(state.updates[0].supplements?.documents.notes.map((n) => n.text)).toEqual([
       "Roof replaced in 2019, per the seller's broker.",
     ]);
+    // who added it, so a move between pipelines can tell whose it is
+    expect(state.updates[0].supplements?.documents.notes[0].byId).toBe("11111111-1111-4111-8111-111111111111");
   });
 
   it("stores the file in the deal's own folder and lists it under the documents tab", async () => {
@@ -115,6 +122,7 @@ describe("the Documents tab's note and file", () => {
     expect(state.uploads[0]).toMatch(new RegExp(`^supplements/${DEAL}/[0-9a-f-]+-rent-roll\\.pdf$`));
     const files = state.updates[0].supplements?.documents.files ?? [];
     expect(files.map((f) => [f.name, f.path])).toEqual([["rent-roll.pdf", state.uploads[0]]]);
+    expect(files[0].byId).toBe("11111111-1111-4111-8111-111111111111");
   });
 });
 

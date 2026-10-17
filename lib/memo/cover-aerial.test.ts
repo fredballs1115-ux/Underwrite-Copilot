@@ -75,6 +75,17 @@ describe("coverFrom", () => {
     expect(cover?.credit).toBe("Imagery: USGS The National Map");
   });
 
+  // The batch-2 audit, LOW-8: an overhead framed on a point Photon placed
+  // is drawn on OpenStreetMap's data, and its credit says so.
+  it("names OpenStreetMap after the USGS credit where Photon placed the point, and never on a photograph", async () => {
+    const osm = await coverFrom(async () => ({ source: "aerial", response: image("image/png"), placedBy: "photon" }));
+    expect(osm?.credit).toBe("Imagery: USGS The National Map · location © OpenStreetMap contributors (openstreetmap.org/copyright)");
+    const census = await coverFrom(async () => ({ source: "aerial", response: image("image/png"), placedBy: "census" }));
+    expect(census?.credit).toBe("Imagery: USGS The National Map");
+    const photo = await coverFrom(async () => ({ source: "photo", response: image("image/png") }), 4_000, "From the offering memorandum");
+    expect(photo?.credit).toBe("From the offering memorandum");
+  });
+
   it("keeps the JPEG type and drops the charset suffix", async () => {
     const cover = await coverFrom(async () => ({
       source: "aerial",

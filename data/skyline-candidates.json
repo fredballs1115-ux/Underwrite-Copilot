@@ -6612,6 +6612,2930 @@
           "note": "Pittsfield, MA — Protophobic, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37237349944)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:29420",
+      "city": "Lake Havasu City, Arizona",
+      "area": "Lake Havasu City-Kingman, AZ",
+      "wikipedia": [
+        "Lake Havasu City, Arizona",
+        "London Bridge (Lake Havasu City)",
+        "Kingman, Arizona"
+      ],
+      "categories": [
+        "London Bridge (Lake Havasu City)",
+        "Lake Havasu",
+        "Lake Havasu City, Arizona"
+      ],
+      "queries": [
+        "Lake Havasu City London Bridge",
+        "Lake Havasu City skyline",
+        "Lake Havasu aerial"
+      ],
+      "candidates": [
+        {
+          "file": "20251127 LondonBridge.jpg",
+          "note": "Lake Havasu City-Kingman, AZ — Guninvalid, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:26300",
+      "city": "Hot Springs, Arkansas",
+      "area": "Hot Springs, AR",
+      "wikipedia": [
+        "Hot Springs, Arkansas",
+        "Bathhouse Row",
+        "Hot Springs National Park"
+      ],
+      "categories": [
+        "Bathhouse Row",
+        "Views of Hot Springs, Arkansas",
+        "Hot Springs, Arkansas"
+      ],
+      "queries": [
+        "Hot Springs Arkansas Bathhouse Row",
+        "Hot Springs Arkansas downtown",
+        "Hot Springs Arkansas skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Hot Springs, Arkansas (aerial).jpg",
+          "note": "Hot Springs, AR — Samuel Grant, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:16180",
+      "city": "Carson City, Nevada",
+      "area": "Carson City, NV",
+      "wikipedia": [
+        "Carson City, Nevada",
+        "Nevada State Capitol"
+      ],
+      "categories": [
+        "Nevada State Capitol",
+        "Views of Carson City, Nevada",
+        "Carson City, Nevada"
+      ],
+      "queries": [
+        "Carson City Nevada downtown",
+        "Carson City Nevada skyline",
+        "Carson City Nevada capitol"
+      ],
+      "candidates": [
+        {
+          "file": "Nevada State Capitol Building - Carson City.jpg",
+          "note": "Carson City, NV — Quintin Soloviev, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:25740",
+      "city": "Helena, Montana",
+      "area": "Helena, MT",
+      "wikipedia": [
+        "Helena, Montana",
+        "Last Chance Gulch",
+        "Montana State Capitol"
+      ],
+      "categories": [
+        "Views of Helena, Montana",
+        "Last Chance Gulch",
+        "Helena, Montana"
+      ],
+      "queries": [
+        "Helena Montana skyline",
+        "Helena Montana downtown",
+        "Helena Montana cathedral"
+      ]
+    },
+    {
+      "metroId": "cbsa:24500",
+      "city": "Great Falls, Montana",
+      "area": "Great Falls, MT",
+      "wikipedia": [
+        "Great Falls, Montana",
+        "Great Falls of the Missouri River"
+      ],
+      "categories": [
+        "Views of Great Falls, Montana",
+        "Great Falls of the Missouri River",
+        "Great Falls, Montana"
+      ],
+      "queries": [
+        "Great Falls Montana skyline",
+        "Great Falls Montana downtown",
+        "Great Falls Montana Missouri River"
+      ],
+      "candidates": [
+        {
+          "file": "Great Falls of the Missouri River (1).jpg",
+          "note": "Great Falls, MT — Chris06, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37279768946, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:16220",
+      "city": "Casper, Wyoming",
+      "area": "Casper, WY",
+      "wikipedia": [
+        "Casper, Wyoming",
+        "Casper Mountain"
+      ],
+      "categories": [
+        "Views of Casper, Wyoming",
+        "Downtown Casper, Wyoming",
+        "Casper, Wyoming"
+      ],
+      "queries": [
+        "Casper Wyoming downtown",
+        "Casper Wyoming skyline",
+        "Casper Wyoming North Platte River"
+      ],
+      "candidates": [
+        {
+          "file": "Casper from Casper Mountain.jpg",
+          "note": "Casper, WY — Milonica, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:12620",
+      "city": "Bangor, Maine",
+      "area": "Bangor, ME",
+      "wikipedia": [
+        "Bangor, Maine",
+        "Penobscot River"
+      ],
+      "categories": [
+        "Views of Bangor, Maine",
+        "Downtown Bangor, Maine",
+        "Bangor, Maine"
+      ],
+      "queries": [
+        "Bangor Maine downtown",
+        "Bangor Maine Penobscot River",
+        "Bangor Maine skyline"
+      ],
+      "candidates": [
+        {
+          "file": "BangorSkyline.jpg",
+          "note": "Bangor, ME — GambitMG at English Wikipedia, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:24020",
+      "city": "Glens Falls, New York",
+      "area": "Glens Falls, NY",
+      "wikipedia": [
+        "Glens Falls, New York",
+        "Lake George (New York)",
+        "Lake George, New York"
+      ],
+      "categories": [
+        "Views of Glens Falls, New York",
+        "Lake George (New York)",
+        "Glens Falls, New York"
+      ],
+      "queries": [
+        "Glens Falls New York downtown",
+        "Lake George New York",
+        "Glens Falls Hudson River"
+      ],
+      "candidates": [
+        {
+          "file": "Lake George aerial view 2025.jpg",
+          "note": "Glens Falls, NY — Hayden Soloviev, CC BY 4.0; Lake George, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:11200",
+      "city": "Northampton, Massachusetts",
+      "area": "Amherst Town-Northampton, MA",
+      "wikipedia": [
+        "Northampton, Massachusetts",
+        "Amherst, Massachusetts",
+        "Mount Holyoke Range"
+      ],
+      "categories": [
+        "Views of Northampton, Massachusetts",
+        "Northampton, Massachusetts",
+        "Amherst, Massachusetts"
+      ],
+      "queries": [
+        "Northampton Massachusetts downtown",
+        "Amherst Massachusetts downtown",
+        "Connecticut River Oxbow from Mount Holyoke"
+      ],
+      "candidates": [
+        {
+          "file": "UMass Amherst campus aerial view.jpg",
+          "note": "Amherst Town-Northampton, MA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:23900",
+      "city": "Gettysburg, Pennsylvania",
+      "area": "Gettysburg, PA",
+      "wikipedia": [
+        "Gettysburg, Pennsylvania",
+        "Gettysburg Battlefield",
+        "Gettysburg National Military Park"
+      ],
+      "categories": [
+        "Gettysburg Battlefield",
+        "Little Round Top",
+        "Gettysburg, Pennsylvania"
+      ],
+      "queries": [
+        "Gettysburg battlefield panorama",
+        "Gettysburg Pennsylvania downtown",
+        "view from Little Round Top Gettysburg"
+      ],
+      "candidates": [
+        {
+          "file": "15-23-0291, artillery on seminary ridge - panoramio.jpg",
+          "note": "Gettysburg, PA — David Dugan, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37279345706, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:20220",
+      "city": "Dubuque, Iowa",
+      "area": "Dubuque, IA",
+      "wikipedia": [
+        "Dubuque, Iowa",
+        "Fenelon Place Elevator"
+      ],
+      "categories": [
+        "Views of Dubuque, Iowa",
+        "Fenelon Place Elevator",
+        "Dubuque, Iowa"
+      ],
+      "queries": [
+        "Dubuque Iowa skyline",
+        "Dubuque Iowa downtown",
+        "Dubuque Iowa Mississippi River"
+      ],
+      "candidates": [
+        {
+          "file": "Dubuque IA - overview.jpg",
+          "note": "Dubuque, IA — Dirk, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:29100",
+      "city": "La Crosse, Wisconsin",
+      "area": "La Crosse-Onalaska, WI-MN",
+      "wikipedia": [
+        "La Crosse, Wisconsin",
+        "Grandad Bluff",
+        "Onalaska, Wisconsin"
+      ],
+      "categories": [
+        "Grandad Bluff",
+        "Views of La Crosse, Wisconsin",
+        "La Crosse, Wisconsin"
+      ],
+      "queries": [
+        "La Crosse Wisconsin skyline",
+        "La Crosse from Grandad Bluff",
+        "La Crosse Wisconsin downtown"
+      ],
+      "candidates": [
+        {
+          "file": "La Crosse panoramic aerial.jpg",
+          "note": "La Crosse, WI — Wikideas1, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:15260",
+      "city": "Brunswick, Georgia",
+      "area": "Brunswick-St. Simons, GA",
+      "wikipedia": [
+        "Brunswick, Georgia",
+        "St. Simons, Georgia",
+        "Jekyll Island"
+      ],
+      "categories": [
+        "St. Simons Island",
+        "Sidney Lanier Bridge",
+        "Jekyll Island",
+        "Brunswick, Georgia"
+      ],
+      "queries": [
+        "St. Simons Island Georgia",
+        "Brunswick Georgia downtown",
+        "Jekyll Island Driftwood Beach"
+      ],
+      "candidates": [
+        {
+          "file": "Sidney Lanier Bridge Aerial.jpg",
+          "note": "Brunswick-St. Simons, GA — Devin Morris, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278486927)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:27620",
+      "city": "Jefferson City, Missouri",
+      "area": "Jefferson City, MO",
+      "wikipedia": [
+        "Jefferson City, Missouri",
+        "Missouri State Capitol"
+      ],
+      "categories": [
+        "Missouri State Capitol",
+        "Views of Jefferson City, Missouri",
+        "Jefferson City, Missouri"
+      ],
+      "queries": [
+        "Jefferson City Missouri skyline",
+        "Jefferson City Missouri River capitol",
+        "Jefferson City Missouri downtown"
+      ],
+      "candidates": [
+        {
+          "file": "AP of Missouri State Capitol Building.jpg",
+          "note": "Jefferson City, MO — KTrimble at English Wikipedia, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37279496897, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22900",
+      "city": "Fort Smith, Arkansas",
+      "area": "Fort Smith, AR-OK",
+      "wikipedia": [
+        "Fort Smith, Arkansas",
+        "Fort Smith National Historic Site"
+      ],
+      "categories": [
+        "Views of Fort Smith, Arkansas",
+        "Downtown Fort Smith, Arkansas",
+        "Fort Smith, Arkansas"
+      ],
+      "queries": [
+        "Fort Smith Arkansas skyline",
+        "Fort Smith Arkansas downtown",
+        "Fort Smith Arkansas River"
+      ]
+    },
+    {
+      "metroId": "cbsa:21820",
+      "city": "Fairbanks, Alaska",
+      "area": "Fairbanks-College, AK",
+      "wikipedia": [
+        "Fairbanks, Alaska",
+        "Chena River"
+      ],
+      "categories": [
+        "Views of Fairbanks, Alaska",
+        "Downtown Fairbanks, Alaska",
+        "Fairbanks, Alaska"
+      ],
+      "queries": [
+        "Fairbanks Alaska downtown",
+        "Fairbanks Alaska skyline",
+        "Fairbanks Alaska Chena River"
+      ],
+      "candidates": [
+        {
+          "file": "Aerial view of Fairbanks Alaska skyline (Quintin Soloviev).jpg",
+          "note": "Fairbanks-College, AK — Quintin Soloviev, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278486927)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:18700",
+      "city": "Corvallis, Oregon",
+      "area": "Corvallis, OR",
+      "wikipedia": [
+        "Corvallis, Oregon",
+        "Marys Peak"
+      ],
+      "categories": [
+        "Views of Corvallis, Oregon",
+        "Downtown Corvallis, Oregon",
+        "Corvallis, Oregon"
+      ],
+      "queries": [
+        "Corvallis Oregon downtown",
+        "Corvallis Oregon Willamette River",
+        "Corvallis Oregon skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:20740",
+      "city": "Eau Claire, Wisconsin",
+      "area": "Eau Claire, WI",
+      "wikipedia": [
+        "Eau Claire, Wisconsin",
+        "Chippewa River (Wisconsin)"
+      ],
+      "categories": [
+        "Views of Eau Claire, Wisconsin",
+        "Downtown Eau Claire, Wisconsin",
+        "Eau Claire, Wisconsin"
+      ],
+      "queries": [
+        "Eau Claire Wisconsin downtown",
+        "Eau Claire Wisconsin skyline",
+        "Eau Claire Wisconsin river"
+      ],
+      "candidates": [
+        {
+          "file": "Eau Claire, Wisconsin downtown zoomed.jpg",
+          "note": "Eau Claire, WI — Wikideas1, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278486927)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:38660",
+      "city": "Ponce, Puerto Rico",
+      "area": "Ponce, PR",
+      "wikipedia": [
+        "Ponce, Puerto Rico",
+        "Parque de Bombas",
+        "Plaza Las Delicias",
+        "Castillo Serrallés"
+      ],
+      "categories": [
+        "Views of Ponce, Puerto Rico",
+        "Parque de Bombas (Ponce)",
+        "Plaza Las Delicias",
+        "Cruceta El Vigía",
+        "Ponce, Puerto Rico"
+      ],
+      "queries": [
+        "Ponce Puerto Rico skyline",
+        "Ponce Puerto Rico aerial view",
+        "Ponce from Cruceta del Vigia"
+      ],
+      "candidates": [
+        {
+          "file": "Ponce Puerto Rico port aerial view.jpg",
+          "note": "Ponce, PR — Tony Santana, U.S. Army Corps of Engineers, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37288646346, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10380",
+      "city": "Aguadilla, Puerto Rico",
+      "area": "Aguadilla, PR",
+      "wikipedia": [
+        "Aguadilla, Puerto Rico",
+        "Crash Boat Beach",
+        "Rincón, Puerto Rico",
+        "Punta Higuera Light"
+      ],
+      "categories": [
+        "Views of Aguadilla, Puerto Rico",
+        "Crash Boat Beach",
+        "Punta Higuera Light",
+        "Aguadilla, Puerto Rico",
+        "Rincón, Puerto Rico"
+      ],
+      "queries": [
+        "Aguadilla Puerto Rico aerial view",
+        "Aguadilla Puerto Rico panorama",
+        "Rincon Puerto Rico aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Aguadilla Pueblo.jpg",
+          "note": "Aguadilla, PR — U.S. Corps of Engineers, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37287443715)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:33740",
+      "city": "Monroe, Louisiana",
+      "area": "Monroe, LA",
+      "wikipedia": [
+        "Monroe, Louisiana",
+        "West Monroe, Louisiana",
+        "University of Louisiana at Monroe"
+      ],
+      "categories": [
+        "Views of Monroe, Louisiana",
+        "Downtown Monroe, Louisiana",
+        "Monroe, Louisiana",
+        "West Monroe, Louisiana"
+      ],
+      "queries": [
+        "Monroe Louisiana skyline",
+        "Monroe Louisiana downtown",
+        "Monroe Louisiana aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:23580",
+      "city": "Gainesville, Georgia",
+      "area": "Gainesville, GA",
+      "wikipedia": [
+        "Gainesville, Georgia",
+        "Lake Lanier",
+        "Lake Lanier Olympic Park"
+      ],
+      "categories": [
+        "Views of Gainesville, Georgia",
+        "Downtown Gainesville, Georgia",
+        "Lake Lanier Olympic Park",
+        "Lake Sidney Lanier",
+        "Gainesville, Georgia"
+      ],
+      "queries": [
+        "Gainesville Georgia downtown",
+        "Gainesville Georgia skyline",
+        "Lake Lanier Gainesville aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:30500",
+      "city": "Lexington Park, Maryland",
+      "area": "Lexington Park, MD",
+      "wikipedia": [
+        "Lexington Park, Maryland",
+        "Solomons, Maryland",
+        "Drum Point Light",
+        "Calvert Cliffs State Park",
+        "St. Mary's City, Maryland"
+      ],
+      "categories": [
+        "Solomons, Maryland",
+        "Drum Point Lighthouse",
+        "Calvert Cliffs State Park",
+        "Point Lookout State Park",
+        "Lexington Park, Maryland"
+      ],
+      "queries": [
+        "Solomons Maryland aerial view",
+        "Calvert Cliffs Chesapeake Bay",
+        "Patuxent River Solomons"
+      ],
+      "candidates": [
+        {
+          "file": "2016-07-20 10 10 04 Cliffs to the north of Grays Creek in Calvert Cliffs State Park, Calvert County, Maryland.jpg",
+          "note": "Lexington Park, MD — Famartin, CC BY-SA 4.0; Calvert Cliffs, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37288974243, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:27340",
+      "city": "Jacksonville, North Carolina",
+      "area": "Jacksonville, NC",
+      "wikipedia": [
+        "Jacksonville, North Carolina",
+        "Hammocks Beach State Park",
+        "Swansboro, North Carolina",
+        "New River (North Carolina)"
+      ],
+      "categories": [
+        "Views of Jacksonville, North Carolina",
+        "Jacksonville, North Carolina",
+        "Hammocks Beach State Park",
+        "Swansboro, North Carolina",
+        "North Topsail Beach, North Carolina"
+      ],
+      "queries": [
+        "Jacksonville North Carolina downtown",
+        "Jacksonville North Carolina New River",
+        "Jacksonville North Carolina aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:32420",
+      "city": "Mayagüez, Puerto Rico",
+      "area": "Mayagüez, PR",
+      "wikipedia": [
+        "Mayagüez, Puerto Rico",
+        "Los Morrillos Light",
+        "Cabo Rojo, Puerto Rico",
+        "Teatro Yagüez"
+      ],
+      "categories": [
+        "Views of Mayagüez, Puerto Rico",
+        "Los Morrillos Light",
+        "Cabo Rojo Light",
+        "Mayagüez, Puerto Rico",
+        "Cabo Rojo, Puerto Rico"
+      ],
+      "queries": [
+        "Mayaguez Puerto Rico aerial view",
+        "Mayaguez Puerto Rico panorama",
+        "Cabo Rojo Puerto Rico aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Faro de Los Morrillos, Cabo Rojo.jpg",
+          "note": "Mayagüez, PR — Jerjes Medina Albino, CC BY-SA 3.0; Cabo Rojo, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37288750601, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:49740",
+      "city": "Yuma, Arizona",
+      "area": "Yuma, AZ",
+      "wikipedia": [
+        "Yuma, Arizona",
+        "Ocean-to-Ocean Bridge",
+        "Yuma Territorial Prison State Historic Park"
+      ],
+      "categories": [
+        "Views of Yuma, Arizona",
+        "Downtown Yuma, Arizona",
+        "Ocean-to-Ocean Bridge",
+        "Yuma, Arizona"
+      ],
+      "queries": [
+        "Yuma Arizona downtown",
+        "Yuma Arizona aerial view",
+        "Yuma Arizona Colorado River"
+      ]
+    },
+    {
+      "metroId": "cbsa:21140",
+      "city": "Elkhart, Indiana",
+      "area": "Elkhart-Goshen, IN",
+      "wikipedia": [
+        "Elkhart, Indiana",
+        "Goshen, Indiana",
+        "Elkhart County Courthouse"
+      ],
+      "categories": [
+        "Views of Elkhart, Indiana",
+        "Downtown Elkhart, Indiana",
+        "Downtown Goshen, Indiana",
+        "Elkhart, Indiana",
+        "Goshen, Indiana"
+      ],
+      "queries": [
+        "Elkhart Indiana downtown",
+        "Elkhart Indiana aerial view",
+        "Goshen Indiana downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:44100",
+      "city": "Springfield, Illinois",
+      "area": "Springfield, IL",
+      "wikipedia": [
+        "Springfield, Illinois",
+        "Illinois State Capitol",
+        "Old State Capitol State Historic Site"
+      ],
+      "categories": [
+        "Skyline of Springfield, Illinois",
+        "Views of Springfield, Illinois",
+        "Illinois State Capitol",
+        "Downtown Springfield, Illinois",
+        "Springfield, Illinois"
+      ],
+      "queries": [
+        "Springfield Illinois skyline",
+        "Springfield Illinois downtown",
+        "Springfield Illinois aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:41060",
+      "city": "St. Cloud, Minnesota",
+      "area": "St. Cloud, MN",
+      "wikipedia": [
+        "St. Cloud, Minnesota",
+        "Quarry Park and Nature Preserve",
+        "Munsinger Gardens"
+      ],
+      "categories": [
+        "Views of St. Cloud, Minnesota",
+        "Downtown St. Cloud, Minnesota",
+        "Quarry Park and Nature Preserve",
+        "St. Cloud, Minnesota",
+        "Saint Cloud, Minnesota"
+      ],
+      "queries": [
+        "St. Cloud Minnesota downtown",
+        "St. Cloud Minnesota Mississippi River",
+        "St. Cloud Minnesota aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:27900",
+      "city": "Joplin, Missouri",
+      "area": "Joplin, MO-KS",
+      "wikipedia": [
+        "Joplin, Missouri",
+        "Grand Falls (Missouri)"
+      ],
+      "categories": [
+        "Views of Joplin, Missouri",
+        "Downtown Joplin, Missouri",
+        "Grand Falls (Missouri)",
+        "Joplin, Missouri"
+      ],
+      "queries": [
+        "Joplin Missouri downtown",
+        "Joplin Missouri Main Street",
+        "Joplin Missouri panorama"
+      ]
+    },
+    {
+      "metroId": "cbsa:47580",
+      "city": "Warner Robins, Georgia",
+      "area": "Warner Robins, GA",
+      "wikipedia": [
+        "Warner Robins, Georgia",
+        "Museum of Aviation (Warner Robins, Georgia)",
+        "Robins Air Force Base",
+        "Perry, Georgia"
+      ],
+      "categories": [
+        "Warner Robins, Georgia",
+        "Museum of Aviation (Warner Robins)",
+        "Robins Air Force Base",
+        "Perry, Georgia"
+      ],
+      "queries": [
+        "Warner Robins Georgia",
+        "Robins Air Force Base aerial view",
+        "Museum of Aviation Warner Robins"
+      ]
+    },
+    {
+      "metroId": "cbsa:26380",
+      "city": "Houma, Louisiana",
+      "area": "Houma-Bayou Cane-Thibodaux, LA",
+      "wikipedia": [
+        "Houma, Louisiana",
+        "Thibodaux, Louisiana",
+        "Bayou Terrebonne",
+        "Bayou Lafourche"
+      ],
+      "categories": [
+        "Views of Houma, Louisiana",
+        "Houma, Louisiana",
+        "Thibodaux, Louisiana",
+        "Bayou Terrebonne",
+        "Bayou Lafourche"
+      ],
+      "queries": [
+        "Houma Louisiana downtown",
+        "Houma Louisiana bayou",
+        "Thibodaux Louisiana downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:22500",
+      "city": "Florence, South Carolina",
+      "area": "Florence, SC",
+      "wikipedia": [
+        "Florence, South Carolina",
+        "Darlington Raceway"
+      ],
+      "categories": [
+        "Views of Florence, South Carolina",
+        "Downtown Florence, South Carolina",
+        "Florence, South Carolina",
+        "Darlington Raceway"
+      ],
+      "queries": [
+        "Florence South Carolina downtown",
+        "Florence South Carolina skyline",
+        "Florence South Carolina aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:39540",
+      "city": "Racine, Wisconsin",
+      "area": "Racine-Mount Pleasant, WI",
+      "wikipedia": [
+        "Racine, Wisconsin",
+        "Wind Point Light",
+        "Johnson Wax Headquarters",
+        "Racine Harbor Lighthouse and Life Saving Station"
+      ],
+      "categories": [
+        "Views of Racine, Wisconsin",
+        "Downtown Racine, Wisconsin",
+        "Wind Point Lighthouse",
+        "Racine, Wisconsin"
+      ],
+      "queries": [
+        "Racine Wisconsin skyline",
+        "Racine Wisconsin harbor",
+        "Racine Wisconsin lakefront"
+      ],
+      "candidates": [
+        {
+          "file": "Aerial view of Wind Point Lighthouse, Wisconsin, US julesvernex2.jpg",
+          "note": "Racine-Mount Pleasant, WI — Jules Verne Times Two, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37287680216)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:40980",
+      "city": "Saginaw, Michigan",
+      "area": "Saginaw, MI",
+      "wikipedia": [
+        "Saginaw, Michigan",
+        "Saginaw River",
+        "Castle Museum of Saginaw County History"
+      ],
+      "categories": [
+        "Views of Saginaw, Michigan",
+        "Downtown Saginaw, Michigan",
+        "Saginaw, Michigan",
+        "Saginaw River"
+      ],
+      "queries": [
+        "Saginaw Michigan downtown",
+        "Saginaw Michigan skyline",
+        "Saginaw Michigan aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Saginaw, Michigan Skyline (2022).jpg",
+          "note": "Saginaw, MI — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37287680216)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:28450",
+      "city": "Kenosha, Wisconsin",
+      "area": "Kenosha, WI",
+      "wikipedia": [
+        "Kenosha, Wisconsin",
+        "Kenosha North Pier Light",
+        "Southport Light Station",
+        "Kenosha Streetcar"
+      ],
+      "categories": [
+        "Views of Kenosha, Wisconsin",
+        "Downtown Kenosha, Wisconsin",
+        "Kenosha North Pier Light",
+        "Kenosha, Wisconsin"
+      ],
+      "queries": [
+        "Kenosha Wisconsin skyline",
+        "Kenosha Wisconsin harbor",
+        "Kenosha Wisconsin lakefront"
+      ],
+      "candidates": [
+        {
+          "file": "Kenosha North Pier Lighthouse.jpg",
+          "note": "Kenosha, WI — Wrongdave at English Wikipedia, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37287680216)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:13220",
+      "city": "Beckley, West Virginia",
+      "area": "Beckley, WV",
+      "wikipedia": [
+        "Beckley, West Virginia",
+        "New River Gorge Bridge",
+        "New River Gorge National Park and Preserve",
+        "Fayetteville, West Virginia"
+      ],
+      "categories": [
+        "New River Gorge Bridge",
+        "New River Gorge National Park and Preserve",
+        "Views of Beckley, West Virginia",
+        "Beckley, West Virginia"
+      ],
+      "queries": [
+        "New River Gorge Bridge autumn",
+        "New River Gorge Bridge view",
+        "Beckley West Virginia downtown"
+      ],
+      "candidates": [
+        {
+          "file": "2017-09-08 13 59 38 View northwest down the New River towards the New River Gorge Bridge (U.S. Route 19) from the Tunney Hunsaker Bridge (Fayette County Route 82) over the New River between Fayette and South Fayette in Fayette County, West Virginia.jpg",
+          "note": "Beckley, WV — Famartin, CC BY-SA 4.0; the New River Gorge Bridge, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37313470791)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:46300",
+      "city": "Twin Falls, Idaho",
+      "area": "Twin Falls, ID",
+      "wikipedia": [
+        "Twin Falls, Idaho",
+        "Shoshone Falls",
+        "Perrine Bridge",
+        "Snake River Canyon (Idaho)"
+      ],
+      "categories": [
+        "Shoshone Falls",
+        "Perrine Bridge",
+        "Snake River Canyon (Idaho)",
+        "Twin Falls, Idaho"
+      ],
+      "queries": [
+        "Shoshone Falls Idaho",
+        "Perrine Bridge Snake River Canyon",
+        "Twin Falls Idaho aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "2013-07-07 17 41 52 Shoshone Falls in Idaho viewed from the northwest.jpg",
+          "note": "Twin Falls, ID — Famartin, CC BY-SA 3.0; Shoshone Falls, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37313470791)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:18020",
+      "city": "Columbus, Indiana",
+      "area": "Columbus, IN",
+      "wikipedia": [
+        "Columbus, Indiana",
+        "First Christian Church (Columbus, Indiana)",
+        "Bartholomew County Courthouse",
+        "Miller House (Columbus, Indiana)"
+      ],
+      "categories": [
+        "Architecture of Columbus, Indiana",
+        "Downtown Columbus, Indiana",
+        "First Christian Church (Columbus, Indiana)",
+        "Columbus, Indiana"
+      ],
+      "queries": [
+        "Columbus Indiana architecture",
+        "Columbus Indiana downtown",
+        "Columbus Indiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:11020",
+      "city": "Altoona, Pennsylvania",
+      "area": "Altoona, PA",
+      "wikipedia": [
+        "Altoona, Pennsylvania",
+        "Horseshoe Curve (Pennsylvania)",
+        "Cathedral of the Blessed Sacrament (Altoona, Pennsylvania)"
+      ],
+      "categories": [
+        "Horseshoe Curve (Pennsylvania)",
+        "Views of Altoona, Pennsylvania",
+        "Altoona, Pennsylvania"
+      ],
+      "queries": [
+        "Horseshoe Curve Altoona train",
+        "Altoona Pennsylvania skyline",
+        "Altoona Pennsylvania aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Altoona, Pennsylvania.jpg",
+          "note": "Altoona, PA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37313470791)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:48540",
+      "city": "Wheeling, West Virginia",
+      "area": "Wheeling, WV",
+      "wikipedia": [
+        "Wheeling, West Virginia",
+        "Wheeling Suspension Bridge",
+        "Wheeling Island"
+      ],
+      "categories": [
+        "Wheeling Suspension Bridge",
+        "Views of Wheeling, West Virginia",
+        "Downtown Wheeling, West Virginia",
+        "Wheeling, West Virginia"
+      ],
+      "queries": [
+        "Wheeling Suspension Bridge Ohio River",
+        "Wheeling West Virginia skyline",
+        "Wheeling West Virginia downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Wheeling, WV - 20200628 - 14 - Skyline from Wheeling Island.jpg",
+          "note": "Wheeling, WV — Andre Carrotflower, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37313470791)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:41780",
+      "city": "Sandusky, Ohio",
+      "area": "Sandusky, OH",
+      "wikipedia": [
+        "Sandusky, Ohio",
+        "Cedar Point",
+        "Marblehead Lighthouse (Ohio)",
+        "Kelleys Island, Ohio"
+      ],
+      "categories": [
+        "Cedar Point",
+        "Marblehead Lighthouse (Ohio)",
+        "Views of Sandusky, Ohio",
+        "Sandusky, Ohio"
+      ],
+      "queries": [
+        "Cedar Point skyline Lake Erie",
+        "Marblehead Lighthouse Lake Erie",
+        "Sandusky Ohio waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Cedar Point from the air.jpg",
+          "note": "Sandusky, OH — Nyttend, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37313470791)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:24260",
+      "city": "Grand Island, Nebraska",
+      "area": "Grand Island, NE",
+      "wikipedia": [
+        "Grand Island, Nebraska",
+        "Stuhr Museum of the Prairie Pioneer",
+        "Platte River"
+      ],
+      "categories": [
+        "Grand Island, Nebraska",
+        "Downtown Grand Island, Nebraska",
+        "Stuhr Museum of the Prairie Pioneer",
+        "Platte River"
+      ],
+      "queries": [
+        "Grand Island Nebraska downtown",
+        "Platte River sandhill cranes Grand Island",
+        "Grand Island Nebraska aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:34580",
+      "city": "Mount Vernon, Washington",
+      "area": "Mount Vernon-Anacortes, WA",
+      "wikipedia": [
+        "Mount Vernon, Washington",
+        "Anacortes, Washington",
+        "Skagit Valley Tulip Festival",
+        "Deception Pass"
+      ],
+      "categories": [
+        "Skagit Valley Tulip Festival",
+        "Anacortes, Washington",
+        "Mount Vernon, Washington",
+        "Deception Pass"
+      ],
+      "queries": [
+        "Skagit Valley tulip fields",
+        "Anacortes Washington harbor",
+        "Deception Pass bridge"
+      ],
+      "candidates": [
+        {
+          "file": "Skagit Valley 1.JPG",
+          "note": "Mount Vernon-Anacortes, WA — Gina from Kent, WA, USA, CC BY-SA 3.0; the Skagit Valley's tulip fields, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37313645151)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:48300",
+      "city": "Wenatchee, Washington",
+      "area": "Wenatchee-East Wenatchee, WA",
+      "wikipedia": [
+        "Wenatchee, Washington",
+        "Ohme Gardens",
+        "Lake Chelan"
+      ],
+      "categories": [
+        "Wenatchee, Washington",
+        "Views of Wenatchee, Washington",
+        "Ohme Gardens",
+        "Lake Chelan"
+      ],
+      "queries": [
+        "Wenatchee Washington Columbia River",
+        "Wenatchee Washington aerial view",
+        "Lake Chelan view"
+      ],
+      "candidates": [
+        {
+          "file": "Uplake from the south shore Lake Chelan.jpg",
+          "note": "Wenatchee-East Wenatchee, WA — Themerganser, CC BY 3.0; Lake Chelan, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37313645151)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22140",
+      "city": "Farmington, New Mexico",
+      "area": "Farmington, NM",
+      "wikipedia": [
+        "Farmington, New Mexico",
+        "Shiprock",
+        "Bisti/De-Na-Zin Wilderness",
+        "Aztec Ruins National Monument"
+      ],
+      "categories": [
+        "Shiprock (rock formation)",
+        "Bisti/De-Na-Zin Wilderness",
+        "Farmington, New Mexico",
+        "Aztec Ruins National Monument"
+      ],
+      "queries": [
+        "Shiprock New Mexico",
+        "Bisti Badlands New Mexico",
+        "Farmington New Mexico Animas River"
+      ],
+      "candidates": [
+        {
+          "file": "Shiprock NM viewed from the north.jpg",
+          "note": "Farmington, NM — Dave Bunnell (the name inside the printed \"Dave Bunnell redirect\"), CC BY-SA 4.0; Shiprock, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37313645151)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:30020",
+      "city": "Lawton, Oklahoma",
+      "area": "Lawton, OK",
+      "wikipedia": [
+        "Lawton, Oklahoma",
+        "Wichita Mountains",
+        "Mount Scott (Oklahoma)",
+        "Wichita Mountains Wildlife Refuge"
+      ],
+      "categories": [
+        "Wichita Mountains",
+        "Wichita Mountains Wildlife Refuge",
+        "Mount Scott (Oklahoma)",
+        "Lawton, Oklahoma"
+      ],
+      "queries": [
+        "Wichita Mountains Oklahoma",
+        "Mount Scott Oklahoma view",
+        "Lawton Oklahoma skyline"
+      ],
+      "candidates": [
+        {
+          "file": "A sunrise in winter, Wichita Mountains Wildlife Refuge, SW Oklahoma, U.S.jpg",
+          "note": "Lawton, OK — Larry Smith, CC BY 2.0; the Wichita Mountains Wildlife Refuge, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37321853635, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:26140",
+      "city": "Homosassa Springs, Florida",
+      "area": "Homosassa Springs, FL",
+      "wikipedia": [
+        "Homosassa Springs, Florida",
+        "Ellie Schiller Homosassa Springs Wildlife State Park",
+        "Crystal River, Florida",
+        "Three Sisters Springs"
+      ],
+      "categories": [
+        "Homosassa Springs Wildlife State Park",
+        "Crystal River, Florida",
+        "Three Sisters Springs",
+        "Homosassa River"
+      ],
+      "queries": [
+        "Homosassa Springs manatee",
+        "Crystal River Florida springs",
+        "Homosassa River Florida"
+      ],
+      "candidates": [
+        {
+          "file": "Three Sister Springs.jpg",
+          "note": "Homosassa Springs, FL — CityofCrystalRiver, CC BY-SA 4.0; Three Sisters Springs, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37321374937, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:33140",
+      "city": "Michigan City, Indiana",
+      "area": "Michigan City-La Porte, IN",
+      "wikipedia": [
+        "Michigan City, Indiana",
+        "Michigan City East Pierhead Light",
+        "Old Michigan City Light"
+      ],
+      "categories": [
+        "Michigan City East Pierhead Light",
+        "Old Michigan City Light",
+        "Michigan City, Indiana",
+        "Washington Park (Michigan City, Indiana)"
+      ],
+      "queries": [
+        "Michigan City lighthouse Lake Michigan",
+        "Michigan City Indiana pier",
+        "Michigan City Indiana beach"
+      ],
+      "candidates": [
+        {
+          "file": "Michigan City East Lighthouse aerial 2021 - Michigan City, Indiana.jpg",
+          "note": "Michigan City-La Porte, IN — Dan Previte, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37314140256)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:34740",
+      "city": "Muskegon, Michigan",
+      "area": "Muskegon-Norton Shores, MI",
+      "wikipedia": [
+        "Muskegon, Michigan",
+        "Muskegon South Pierhead Light",
+        "Muskegon Lake"
+      ],
+      "categories": [
+        "Muskegon South Pierhead Light",
+        "Muskegon, Michigan",
+        "Muskegon Lake",
+        "Pere Marquette Park (Muskegon)"
+      ],
+      "queries": [
+        "Muskegon lighthouse Lake Michigan",
+        "Muskegon Michigan waterfront",
+        "Muskegon Lake sunset"
+      ],
+      "candidates": [
+        {
+          "file": "Muskegon skyline and lake.jpg",
+          "note": "Muskegon-Norton Shores, MI — bigmikesndtech, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37314140256)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:27780",
+      "city": "Johnstown, Pennsylvania",
+      "area": "Johnstown, PA",
+      "wikipedia": [
+        "Johnstown, Pennsylvania",
+        "Johnstown Inclined Plane",
+        "Stone Bridge (Johnstown, Pennsylvania)"
+      ],
+      "categories": [
+        "Johnstown Inclined Plane",
+        "Views of Johnstown, Pennsylvania",
+        "Johnstown, Pennsylvania"
+      ],
+      "queries": [
+        "Johnstown Inclined Plane view",
+        "Johnstown Pennsylvania skyline",
+        "Johnstown Pennsylvania aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Johnstown, Pennsylvania from the Inclined Plane, 09-12-2026 3.jpg",
+          "note": "Johnstown, PA — Cutlass, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37314140256)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:47460",
+      "city": "Walla Walla, Washington",
+      "area": "Walla Walla, WA",
+      "wikipedia": [
+        "Walla Walla, Washington",
+        "Whitman College",
+        "Walla Walla Valley AVA"
+      ],
+      "categories": [
+        "Walla Walla, Washington",
+        "Downtown Walla Walla, Washington",
+        "Walla Walla Valley AVA",
+        "Whitman College"
+      ],
+      "queries": [
+        "Walla Walla vineyards",
+        "Walla Walla Washington downtown",
+        "Walla Walla wheat fields"
+      ]
+    },
+    {
+      "metroId": "cbsa:43580",
+      "city": "Sioux City, Iowa",
+      "area": "Sioux City, IA",
+      "wikipedia": [
+        "Sioux City, Iowa",
+        "Sergeant Floyd Monument",
+        "Stone State Park"
+      ],
+      "categories": [
+        "Views of Sioux City, Iowa",
+        "Downtown Sioux City, Iowa",
+        "Sioux City, Iowa",
+        "Sergeant Floyd Monument"
+      ],
+      "queries": [
+        "Sioux City Iowa skyline",
+        "Sioux City Missouri River",
+        "Sioux City Iowa aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:30300",
+      "city": "Lewiston, Idaho",
+      "area": "Lewiston, ID",
+      "wikipedia": [
+        "Lewiston, Idaho",
+        "Clarkston, Washington",
+        "Snake River"
+      ],
+      "categories": [
+        "Lewiston, Idaho",
+        "Clarkston, Washington",
+        "Snake River in Idaho"
+      ],
+      "queries": [
+        "Lewiston Idaho Snake River",
+        "Lewiston Clarkston confluence",
+        "Lewiston Idaho aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:24780",
+      "city": "Greenville, North Carolina",
+      "area": "Greenville, NC",
+      "wikipedia": [
+        "Greenville, North Carolina",
+        "East Carolina University",
+        "Tar River (North Carolina)"
+      ],
+      "categories": [
+        "Greenville, North Carolina",
+        "Downtown Greenville, North Carolina",
+        "East Carolina University"
+      ],
+      "queries": [
+        "Greenville North Carolina downtown",
+        "East Carolina University campus",
+        "Tar River Greenville"
+      ],
+      "candidates": [
+        {
+          "file": "Greenville, North Carolina - 2026 9.jpg",
+          "note": "Greenville, NC — Aaron Hines/City of Greenville, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37330328150)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:13980",
+      "city": "Blacksburg, Virginia",
+      "area": "Blacksburg-Christiansburg-Radford, VA",
+      "wikipedia": [
+        "Blacksburg, Virginia",
+        "Virginia Tech",
+        "Burruss Hall",
+        "Radford, Virginia"
+      ],
+      "categories": [
+        "Blacksburg, Virginia",
+        "Virginia Tech campus",
+        "Burruss Hall",
+        "Radford, Virginia"
+      ],
+      "queries": [
+        "Virginia Tech Burruss Hall",
+        "Blacksburg Virginia mountains",
+        "Virginia Tech drillfield"
+      ],
+      "candidates": [
+        {
+          "file": "Virginia Tech Burruss Hall from Drillfield.JPG",
+          "note": "Blacksburg-Christiansburg-Radford, VA — Eric T Gunther, CC BY 3.0; Virginia Tech's Burruss Hall. The chosen file, in lib/skyline.ts (skyline-sheet run 37330328150)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10180",
+      "city": "Abilene, Texas",
+      "area": "Abilene, TX",
+      "wikipedia": [
+        "Abilene, Texas",
+        "Paramount Theatre (Abilene, Texas)"
+      ],
+      "categories": [
+        "Abilene, Texas",
+        "Downtown Abilene, Texas",
+        "Buildings in Abilene, Texas"
+      ],
+      "queries": [
+        "Abilene Texas downtown skyline",
+        "Abilene Texas Paramount Theatre",
+        "Abilene Texas sunset"
+      ]
+    },
+    {
+      "metroId": "cbsa:48660",
+      "city": "Wichita Falls, Texas",
+      "area": "Wichita Falls, TX",
+      "wikipedia": [
+        "Wichita Falls, Texas",
+        "Lake Wichita"
+      ],
+      "categories": [
+        "Wichita Falls, Texas",
+        "Downtown Wichita Falls, Texas"
+      ],
+      "queries": [
+        "Wichita Falls Texas waterfall",
+        "Wichita Falls Texas downtown",
+        "Wichita River Wichita Falls"
+      ]
+    },
+    {
+      "metroId": "cbsa:41660",
+      "city": "San Angelo, Texas",
+      "area": "San Angelo, TX",
+      "wikipedia": [
+        "San Angelo, Texas",
+        "Concho River",
+        "Fort Concho"
+      ],
+      "categories": [
+        "San Angelo, Texas",
+        "Downtown San Angelo, Texas",
+        "Concho River",
+        "Fort Concho"
+      ],
+      "queries": [
+        "San Angelo Texas Concho River",
+        "San Angelo Texas downtown",
+        "Fort Concho San Angelo"
+      ],
+      "candidates": [
+        {
+          "file": "San Angelo September 2019 66 (Concho River).jpg",
+          "note": "San Angelo, TX — Michael Barera, CC BY-SA 4.0; the Concho River. The chosen file, in lib/skyline.ts (skyline-sheet run 37330183778)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:36220",
+      "city": "Odessa, Texas",
+      "area": "Odessa, TX",
+      "wikipedia": [
+        "Odessa, Texas"
+      ],
+      "categories": [
+        "Odessa, Texas",
+        "Downtown Odessa, Texas",
+        "Buildings in Odessa, Texas"
+      ],
+      "queries": [
+        "Odessa Texas downtown skyline",
+        "Odessa Texas Ector County",
+        "Odessa Texas aerial"
+      ]
+    },
+    {
+      "metroId": "cbsa:46660",
+      "city": "Valdosta, Georgia",
+      "area": "Valdosta, GA",
+      "wikipedia": [
+        "Valdosta, Georgia",
+        "Lowndes County Courthouse (Georgia)",
+        "Valdosta State University"
+      ],
+      "categories": [
+        "Valdosta, Georgia",
+        "Valdosta State University",
+        "Lowndes County Courthouse (Georgia)"
+      ],
+      "queries": [
+        "Valdosta Georgia courthouse",
+        "Valdosta State University campus",
+        "Valdosta Georgia downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Front of Lowndes County Courthouse.JPG",
+          "note": "Valdosta, GA — Daniel Mayer, CC BY-SA 3.0; the Lowndes County Courthouse. The chosen file, in lib/skyline.ts (skyline-sheet run 37382707897, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10500",
+      "city": "Albany, Georgia",
+      "area": "Albany, GA",
+      "wikipedia": [
+        "Albany, Georgia",
+        "Flint River (Georgia)"
+      ],
+      "categories": [
+        "Albany, Georgia",
+        "Downtown Albany, Georgia",
+        "Flint River (Georgia)"
+      ],
+      "queries": [
+        "Albany Georgia Flint River",
+        "Albany Georgia downtown",
+        "Albany Georgia riverfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:22520",
+      "city": "Florence, Alabama",
+      "area": "Florence-Muscle Shoals, AL",
+      "wikipedia": [
+        "Florence, Alabama",
+        "Muscle Shoals, Alabama",
+        "Wilson Dam",
+        "O'Neal Bridge"
+      ],
+      "categories": [
+        "Florence, Alabama",
+        "Wilson Dam",
+        "Muscle Shoals, Alabama",
+        "Tennessee River in Alabama"
+      ],
+      "queries": [
+        "Florence Alabama Tennessee River",
+        "Wilson Dam Muscle Shoals",
+        "Florence Alabama downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Florence, Alabama O'Neal Bridge by Noah McDonald.jpg",
+          "note": "Florence-Muscle Shoals, AL — Noahmcdonald1, CC BY-SA 4.0; the O'Neal Bridge. The chosen file, in lib/skyline.ts (skyline-sheet run 37382918468, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:37140",
+      "city": "Paducah, Kentucky",
+      "area": "Paducah, KY",
+      "wikipedia": [
+        "Paducah, Kentucky",
+        "Paducah Wall to Wall murals"
+      ],
+      "categories": [
+        "Paducah, Kentucky",
+        "Downtown Paducah, Kentucky",
+        "Paducah floodwall murals"
+      ],
+      "queries": [
+        "Paducah Kentucky riverfront",
+        "Paducah Kentucky downtown",
+        "Paducah floodwall murals Ohio River"
+      ]
+    },
+    {
+      "metroId": "cbsa:45460",
+      "city": "Terre Haute, Indiana",
+      "area": "Terre Haute, IN",
+      "wikipedia": [
+        "Terre Haute, Indiana",
+        "Vigo County Courthouse",
+        "Indiana State University"
+      ],
+      "categories": [
+        "Terre Haute, Indiana",
+        "Vigo County Courthouse",
+        "Downtown Terre Haute, Indiana"
+      ],
+      "queries": [
+        "Terre Haute Indiana courthouse",
+        "Terre Haute Indiana downtown",
+        "Wabash River Terre Haute"
+      ]
+    },
+    {
+      "metroId": "cbsa:11180",
+      "city": "Ames, Iowa",
+      "area": "Ames, IA",
+      "wikipedia": [
+        "Ames, Iowa",
+        "Iowa State University",
+        "Iowa State University Campanile"
+      ],
+      "categories": [
+        "Ames, Iowa",
+        "Iowa State University Campanile",
+        "Central Campus (Iowa State University)"
+      ],
+      "queries": [
+        "Iowa State University Campanile",
+        "Ames Iowa central campus",
+        "Ames Iowa downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:47940",
+      "city": "Waterloo, Iowa",
+      "area": "Waterloo-Cedar Falls, IA",
+      "wikipedia": [
+        "Waterloo, Iowa",
+        "Cedar Falls, Iowa",
+        "Cedar River (Iowa River tributary)"
+      ],
+      "categories": [
+        "Waterloo, Iowa",
+        "Cedar Falls, Iowa",
+        "Downtown Waterloo, Iowa"
+      ],
+      "queries": [
+        "Waterloo Iowa Cedar River",
+        "Cedar Falls Iowa downtown",
+        "Waterloo Iowa downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Waterloo, Iowa (2014) (cropped).jpg",
+          "note": "Waterloo-Cedar Falls, IA — David Wilson from Oak Park, Illinois, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37330877189)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:24220",
+      "city": "Grand Forks, North Dakota",
+      "area": "Grand Forks, ND",
+      "wikipedia": [
+        "Grand Forks, North Dakota",
+        "University of North Dakota",
+        "Red River of the North"
+      ],
+      "categories": [
+        "Grand Forks, North Dakota",
+        "Downtown Grand Forks, North Dakota",
+        "University of North Dakota"
+      ],
+      "queries": [
+        "Grand Forks North Dakota Red River",
+        "Grand Forks downtown",
+        "University of North Dakota campus"
+      ]
+    },
+    {
+      "metroId": "cbsa:39380",
+      "city": "Pueblo, Colorado",
+      "area": "Pueblo, CO",
+      "wikipedia": [
+        "Pueblo, Colorado",
+        "Historic Arkansas Riverwalk of Pueblo"
+      ],
+      "categories": [
+        "Pueblo, Colorado",
+        "Historic Arkansas Riverwalk of Pueblo",
+        "Downtown Pueblo, Colorado"
+      ],
+      "queries": [
+        "Pueblo Colorado Riverwalk",
+        "Pueblo Colorado downtown",
+        "Pueblo Colorado mountains"
+      ],
+      "candidates": [
+        {
+          "file": "Historic Arkansas Riverwalk of Pueblo.JPG",
+          "note": "Pueblo, CO — Jeffrey Beall, CC BY 4.0; the Historic Arkansas Riverwalk. The chosen file, in lib/skyline.ts (skyline-sheet run 37340733360, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:31740",
+      "city": "Manhattan, Kansas",
+      "area": "Manhattan, KS",
+      "wikipedia": [
+        "Manhattan, Kansas",
+        "Kansas State University",
+        "Konza Prairie Biological Station"
+      ],
+      "categories": [
+        "Manhattan, Kansas",
+        "Kansas State University",
+        "Konza Prairie"
+      ],
+      "queries": [
+        "Manhattan Kansas Flint Hills",
+        "Kansas State University campus Anderson Hall",
+        "Konza Prairie"
+      ]
+    },
+    {
+      "metroId": "cbsa:48140",
+      "city": "Wausau, Wisconsin",
+      "area": "Wausau, WI",
+      "wikipedia": [
+        "Wausau, Wisconsin",
+        "Rib Mountain State Park",
+        "Wisconsin River"
+      ],
+      "categories": [
+        "Wausau, Wisconsin",
+        "Rib Mountain State Park",
+        "Downtown Wausau, Wisconsin"
+      ],
+      "queries": [
+        "Wausau Wisconsin Wisconsin River",
+        "Rib Mountain Wausau view",
+        "Wausau Wisconsin downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Wausau, Wisconsin downtown.jpg",
+          "note": "Wausau, WI — Wikideas1, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37330877189)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:43100",
+      "city": "Sheboygan, Wisconsin",
+      "area": "Sheboygan, WI",
+      "wikipedia": [
+        "Sheboygan, Wisconsin",
+        "Sheboygan Breakwater Light"
+      ],
+      "categories": [
+        "Sheboygan, Wisconsin",
+        "Sheboygan Breakwater Light",
+        "Sheboygan River"
+      ],
+      "queries": [
+        "Sheboygan breakwater lighthouse",
+        "Sheboygan Wisconsin harbor",
+        "Sheboygan Lake Michigan"
+      ],
+      "candidates": [
+        {
+          "file": "Sheboygan Riverfront.jpg",
+          "note": "Sheboygan, WI — AsherHeimermann, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37330877189)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:14010",
+      "city": "Bloomington, Illinois",
+      "area": "Bloomington, IL",
+      "wikipedia": [
+        "Bloomington, Illinois",
+        "Normal, Illinois",
+        "Illinois State University"
+      ],
+      "categories": [
+        "Bloomington, Illinois",
+        "Downtown Bloomington, Illinois",
+        "Normal, Illinois"
+      ],
+      "queries": [
+        "Bloomington Illinois downtown",
+        "Uptown Normal Illinois",
+        "McLean County Museum of History"
+      ],
+      "candidates": [
+        {
+          "file": "Bloomington, IL city hall 1 (cropped).jpg",
+          "note": "Bloomington, IL — Daniel Schwen, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37349000346)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:36780",
+      "city": "Oshkosh, Wisconsin",
+      "area": "Oshkosh-Neenah, WI",
+      "wikipedia": [
+        "Oshkosh, Wisconsin",
+        "Neenah, Wisconsin",
+        "Lake Winnebago"
+      ],
+      "categories": [
+        "Oshkosh, Wisconsin",
+        "Neenah, Wisconsin",
+        "Lake Winnebago"
+      ],
+      "queries": [
+        "Oshkosh Wisconsin downtown",
+        "Fox River Oshkosh",
+        "Lake Winnebago sunset"
+      ]
+    },
+    {
+      "metroId": "cbsa:31860",
+      "city": "Mankato, Minnesota",
+      "area": "Mankato, MN",
+      "wikipedia": [
+        "Mankato, Minnesota",
+        "North Mankato, Minnesota",
+        "Minnesota River"
+      ],
+      "categories": [
+        "Mankato, Minnesota",
+        "Minnesota River",
+        "Minneopa State Park"
+      ],
+      "queries": [
+        "Mankato Minnesota downtown",
+        "Minneopa Falls",
+        "Mankato Minnesota River"
+      ],
+      "candidates": [
+        {
+          "file": "2009-0805-Mankato-UnionDepot.jpg",
+          "note": "Mankato, MN — Bobak Ha'Eri, CC BY 3.0; the Union Depot. The chosen file, in lib/skyline.ts (skyline-sheet run 37349000346)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:33220",
+      "city": "Midland, Michigan",
+      "area": "Midland, MI",
+      "wikipedia": [
+        "Midland, Michigan",
+        "The Tridge",
+        "Dow Gardens"
+      ],
+      "categories": [
+        "Midland, Michigan",
+        "The Tridge",
+        "Dow Gardens"
+      ],
+      "queries": [
+        "Midland Michigan Tridge",
+        "Dow Gardens Midland",
+        "Midland Michigan downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Tridge At Dusk.jpg",
+          "note": "Midland, MI — Phil Squattrito, CC BY 2.0; the Tridge. The chosen file, in lib/skyline.ts (skyline-sheet run 37381601175, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:34620",
+      "city": "Muncie, Indiana",
+      "area": "Muncie, IN",
+      "wikipedia": [
+        "Muncie, Indiana",
+        "Ball State University",
+        "White River (Indiana)"
+      ],
+      "categories": [
+        "Muncie, Indiana",
+        "Downtown Muncie, Indiana",
+        "Ball State University"
+      ],
+      "queries": [
+        "Muncie Indiana downtown",
+        "Ball State University campus",
+        "Muncie Indiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:27500",
+      "city": "Janesville, Wisconsin",
+      "area": "Janesville-Beloit, WI",
+      "wikipedia": [
+        "Janesville, Wisconsin",
+        "Beloit, Wisconsin",
+        "Rock River (Mississippi River tributary)"
+      ],
+      "categories": [
+        "Janesville, Wisconsin",
+        "Beloit, Wisconsin",
+        "Beloit College"
+      ],
+      "queries": [
+        "Janesville Wisconsin downtown",
+        "Beloit Wisconsin Rock River",
+        "Rotary Botanical Gardens Janesville"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Beloit, Wisconsin.jpg",
+          "note": "Janesville-Beloit, WI — Visit Beloit, CC BY-SA 4.0; downtown Beloit. The chosen file, in lib/skyline.ts (skyline-sheet run 37349000346)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:27180",
+      "city": "Jackson, Tennessee",
+      "area": "Jackson, TN",
+      "wikipedia": [
+        "Jackson, Tennessee",
+        "Union University"
+      ],
+      "categories": [
+        "Jackson, Tennessee",
+        "Downtown Jackson, Tennessee"
+      ],
+      "queries": [
+        "Jackson Tennessee downtown",
+        "Jackson Tennessee courthouse",
+        "Casey Jones Village"
+      ]
+    },
+    {
+      "metroId": "cbsa:36980",
+      "city": "Owensboro, Kentucky",
+      "area": "Owensboro, KY",
+      "wikipedia": [
+        "Owensboro, Kentucky",
+        "Glover Cary Bridge",
+        "William H. Natcher Bridge"
+      ],
+      "categories": [
+        "Owensboro, Kentucky",
+        "Glover Cary Bridge",
+        "William H. Natcher Bridge"
+      ],
+      "queries": [
+        "Owensboro Kentucky riverfront",
+        "Owensboro Kentucky downtown",
+        "Blue Bridge Owensboro"
+      ],
+      "candidates": [
+        {
+          "file": "US 231 Natcher Bridge - Up River.jpg",
+          "note": "Owensboro, KY — Thomas Hughes, CC BY-SA 4.0; the Natcher Bridge. The chosen file, in lib/skyline.ts (skyline-sheet run 37349135113)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:45500",
+      "city": "Texarkana, Texas",
+      "area": "Texarkana, TX-AR",
+      "wikipedia": [
+        "Texarkana, Texas",
+        "Texarkana, Arkansas"
+      ],
+      "categories": [
+        "Texarkana, Texas",
+        "Texarkana, Arkansas"
+      ],
+      "queries": [
+        "Texarkana downtown",
+        "Texarkana State Line Avenue",
+        "Texarkana post office state line"
+      ]
+    },
+    {
+      "metroId": "cbsa:43300",
+      "city": "Sherman, Texas",
+      "area": "Sherman-Denison, TX",
+      "wikipedia": [
+        "Sherman, Texas",
+        "Denison, Texas",
+        "Lake Texoma"
+      ],
+      "categories": [
+        "Sherman, Texas",
+        "Denison, Texas",
+        "Lake Texoma"
+      ],
+      "queries": [
+        "Sherman Texas downtown",
+        "Denison Texas Main Street",
+        "Lake Texoma sunset"
+      ],
+      "candidates": [
+        {
+          "file": "DenisonTexas1.jpg",
+          "note": "Sherman-Denison, TX — Renelibrary, CC BY-SA 3.0; Denison's Main Street. The chosen file, in lib/skyline.ts (skyline-sheet run 37349135113)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:41140",
+      "city": "St. Joseph, Missouri",
+      "area": "St. Joseph, MO-KS",
+      "wikipedia": [
+        "St. Joseph, Missouri",
+        "Missouri River",
+        "Pony Express National Museum"
+      ],
+      "categories": [
+        "St. Joseph, Missouri",
+        "Downtown St. Joseph, Missouri",
+        "Buildings in St. Joseph, Missouri"
+      ],
+      "queries": [
+        "St. Joseph Missouri downtown",
+        "St. Joseph Missouri skyline",
+        "St Joseph Missouri river"
+      ]
+    },
+    {
+      "metroId": "cbsa:40660",
+      "city": "Rome, Georgia",
+      "area": "Rome, GA",
+      "wikipedia": [
+        "Rome, Georgia",
+        "Berry College"
+      ],
+      "categories": [
+        "Rome, Georgia",
+        "Berry College",
+        "Etowah River"
+      ],
+      "queries": [
+        "Rome Georgia downtown Broad Street",
+        "Rome Georgia clock tower",
+        "Berry College campus"
+      ]
+    },
+    {
+      "metroId": "cbsa:48700",
+      "city": "Williamsport, Pennsylvania",
+      "area": "Williamsport, PA",
+      "wikipedia": [
+        "Williamsport, Pennsylvania",
+        "West Branch Susquehanna River"
+      ],
+      "categories": [
+        "Williamsport, Pennsylvania",
+        "Downtown Williamsport, Pennsylvania",
+        "West Branch Susquehanna River"
+      ],
+      "queries": [
+        "Williamsport Pennsylvania downtown",
+        "Williamsport Susquehanna River",
+        "Millionaires Row Williamsport"
+      ]
+    },
+    {
+      "metroId": "cbsa:30340",
+      "city": "Lewiston, Maine",
+      "area": "Lewiston-Auburn, ME",
+      "wikipedia": [
+        "Lewiston, Maine",
+        "Auburn, Maine",
+        "Androscoggin River"
+      ],
+      "categories": [
+        "Lewiston, Maine",
+        "Auburn, Maine",
+        "Androscoggin River"
+      ],
+      "queries": [
+        "Lewiston Maine mills",
+        "Lewiston Auburn falls Androscoggin",
+        "Basilica of Saints Peter and Paul Lewiston"
+      ],
+      "candidates": [
+        {
+          "file": "Approaching the Lewiston-Auburn Railroad Bridge, Auburn ME.jpg",
+          "note": "Lewiston-Auburn, ME — John Phelan, CC BY 4.0; the Lewiston-Auburn Railroad Bridge. The chosen file, in lib/skyline.ts (skyline-sheet run 37389070836, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:30140",
+      "city": "Lebanon, Pennsylvania",
+      "area": "Lebanon, PA",
+      "wikipedia": [
+        "Lebanon, Pennsylvania",
+        "Lebanon County, Pennsylvania"
+      ],
+      "categories": [
+        "Lebanon, Pennsylvania",
+        "Lebanon County, Pennsylvania"
+      ],
+      "queries": [
+        "Lebanon Pennsylvania downtown",
+        "Lebanon Pennsylvania farmland",
+        "Cornwall Iron Furnace"
+      ]
+    },
+    {
+      "metroId": "cbsa:37620",
+      "city": "Parkersburg, West Virginia",
+      "area": "Parkersburg-Vienna, WV",
+      "wikipedia": [
+        "Parkersburg, West Virginia",
+        "Blennerhassett Island Historical State Park",
+        "Little Kanawha River"
+      ],
+      "categories": [
+        "Parkersburg, West Virginia",
+        "Blennerhassett Island",
+        "Vienna, West Virginia"
+      ],
+      "queries": [
+        "Parkersburg West Virginia downtown",
+        "Parkersburg Ohio River",
+        "Blennerhassett mansion"
+      ],
+      "candidates": [
+        {
+          "file": "Blennerhassett Mansion.JPG",
+          "note": "Parkersburg-Vienna, WV — WVhybrid, CC BY-SA 3.0; the Blennerhassett Mansion. The chosen file, in lib/skyline.ts (skyline-sheet run 37349271496)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:38540",
+      "city": "Pocatello, Idaho",
+      "area": "Pocatello, ID",
+      "wikipedia": [
+        "Pocatello, Idaho",
+        "Idaho State University",
+        "Portneuf River"
+      ],
+      "categories": [
+        "Pocatello, Idaho",
+        "Idaho State University",
+        "Portneuf River"
+      ],
+      "queries": [
+        "Pocatello Idaho downtown",
+        "Pocatello Idaho mountains",
+        "Idaho State University campus"
+      ]
+    },
+    {
+      "metroId": "cbsa:38240",
+      "city": "Pinehurst, North Carolina",
+      "area": "Pinehurst-Southern Pines, NC",
+      "wikipedia": [
+        "Pinehurst, North Carolina",
+        "Southern Pines, North Carolina",
+        "Pinehurst Resort"
+      ],
+      "categories": [
+        "Pinehurst, North Carolina",
+        "Southern Pines, North Carolina",
+        "Pinehurst Resort"
+      ],
+      "queries": [
+        "Pinehurst North Carolina village",
+        "Southern Pines downtown",
+        "Pinehurst No. 2 golf course"
+      ]
+    },
+    {
+      "metroId": "cbsa:10540",
+      "city": "Albany, Oregon",
+      "area": "Albany, OR",
+      "wikipedia": [
+        "Albany, Oregon",
+        "Willamette River",
+        "Linn County, Oregon"
+      ],
+      "categories": [
+        "Albany, Oregon",
+        "Downtown Albany, Oregon",
+        "Buildings in Albany, Oregon"
+      ],
+      "queries": [
+        "Albany Oregon downtown",
+        "Albany Oregon Willamette River",
+        "Albany Oregon historic district"
+      ],
+      "candidates": [
+        {
+          "file": "Albany - DPLA - 06f3bb247d96d8dcd93b6e575b04adc7.jpg",
+          "note": "Albany, OR — Gary Halvorson, Oregon State Archives, CC BY 4.0; a green truss bridge over the river. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10780",
+      "city": "Alexandria, Louisiana",
+      "area": "Alexandria, LA",
+      "wikipedia": [
+        "Alexandria, Louisiana",
+        "Red River (Mississippi watershed)",
+        "Pineville, Louisiana"
+      ],
+      "categories": [
+        "Alexandria, Louisiana",
+        "Buildings in Alexandria, Louisiana",
+        "Red River of the South"
+      ],
+      "queries": [
+        "Alexandria Louisiana downtown",
+        "Alexandria Louisiana Red River",
+        "Alexandria Louisiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:11500",
+      "city": "Anniston, Alabama",
+      "area": "Anniston-Oxford, AL",
+      "wikipedia": [
+        "Anniston, Alabama",
+        "Oxford, Alabama",
+        "Calhoun County, Alabama"
+      ],
+      "categories": [
+        "Anniston, Alabama",
+        "Buildings in Anniston, Alabama",
+        "Calhoun County, Alabama"
+      ],
+      "queries": [
+        "Anniston Alabama downtown",
+        "Anniston Alabama Noble Street",
+        "Oxford Alabama"
+      ],
+      "candidates": [
+        {
+          "file": "Anniston, Alabama.JPG",
+          "note": "Anniston-Oxford, AL — Rivers Langley; SaveRivers (as printed), CC BY-SA 3.0; a downtown Anniston street. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:12980",
+      "city": "Battle Creek, Michigan",
+      "area": "Battle Creek, MI",
+      "wikipedia": [
+        "Battle Creek, Michigan",
+        "Kalamazoo River",
+        "Calhoun County, Michigan"
+      ],
+      "categories": [
+        "Battle Creek, Michigan",
+        "Downtown Battle Creek, Michigan",
+        "Buildings in Battle Creek, Michigan"
+      ],
+      "queries": [
+        "Battle Creek Michigan downtown",
+        "Battle Creek Michigan skyline",
+        "Battle Creek Michigan river"
+      ]
+    },
+    {
+      "metroId": "cbsa:13020",
+      "city": "Bay City, Michigan",
+      "area": "Bay City, MI",
+      "wikipedia": [
+        "Bay City, Michigan",
+        "Saginaw River",
+        "Bay County, Michigan"
+      ],
+      "categories": [
+        "Bay City, Michigan",
+        "Downtown Bay City, Michigan",
+        "Saginaw River"
+      ],
+      "queries": [
+        "Bay City Michigan downtown",
+        "Bay City Michigan Saginaw River",
+        "Bay City Michigan skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Bay City, Michigan (2022).jpg",
+          "note": "Bay City, MI — WeaponizingArchitecture, CC BY-SA 4.0; the riverfront across the Saginaw River. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:15500",
+      "city": "Burlington, North Carolina",
+      "area": "Burlington, NC",
+      "wikipedia": [
+        "Burlington, North Carolina",
+        "Alamance County, North Carolina",
+        "Haw River"
+      ],
+      "categories": [
+        "Burlington, North Carolina",
+        "Buildings in Burlington, North Carolina",
+        "Alamance County, North Carolina"
+      ],
+      "queries": [
+        "Burlington North Carolina downtown",
+        "Burlington NC depot",
+        "Alamance County North Carolina"
+      ],
+      "candidates": [
+        {
+          "file": "Tallest building in Burlington.jpg",
+          "note": "Burlington, NC — Ak1047, CC BY-SA 4.0; the city's tallest building from the air. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:16020",
+      "city": "Cape Girardeau, Missouri",
+      "area": "Cape Girardeau, MO-IL",
+      "wikipedia": [
+        "Cape Girardeau, Missouri",
+        "Bill Emerson Memorial Bridge",
+        "Mississippi River"
+      ],
+      "categories": [
+        "Cape Girardeau, Missouri",
+        "Bill Emerson Memorial Bridge",
+        "Downtown Cape Girardeau, Missouri"
+      ],
+      "queries": [
+        "Cape Girardeau Missouri riverfront",
+        "Cape Girardeau Missouri downtown",
+        "Bill Emerson Memorial Bridge"
+      ],
+      "candidates": [
+        {
+          "file": "Bill Emerson Bridge.jpg",
+          "note": "Cape Girardeau, MO — Daniel Schwen, CC BY-SA 4.0; the Bill Emerson Memorial Bridge. The chosen file, in lib/skyline.ts (skyline-sheet run 37388585938, a one-market run)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:16540",
+      "city": "Chambersburg, Pennsylvania",
+      "area": "Chambersburg, PA",
+      "wikipedia": [
+        "Chambersburg, Pennsylvania",
+        "Franklin County, Pennsylvania",
+        "Cumberland Valley"
+      ],
+      "categories": [
+        "Chambersburg, Pennsylvania",
+        "Buildings in Chambersburg, Pennsylvania",
+        "Franklin County, Pennsylvania"
+      ],
+      "queries": [
+        "Chambersburg Pennsylvania downtown",
+        "Chambersburg Pennsylvania square",
+        "Franklin County Pennsylvania"
+      ]
+    },
+    {
+      "metroId": "cbsa:17420",
+      "city": "Cleveland, Tennessee",
+      "area": "Cleveland, TN",
+      "wikipedia": [
+        "Cleveland, Tennessee",
+        "Bradley County, Tennessee",
+        "Ocoee River"
+      ],
+      "categories": [
+        "Cleveland, Tennessee",
+        "Buildings in Cleveland, Tennessee",
+        "Bradley County, Tennessee"
+      ],
+      "queries": [
+        "Cleveland Tennessee downtown",
+        "Cleveland Tennessee courthouse",
+        "Ocoee River Tennessee"
+      ]
+    },
+    {
+      "metroId": "cbsa:19140",
+      "city": "Dalton, Georgia",
+      "area": "Dalton, GA",
+      "wikipedia": [
+        "Dalton, Georgia",
+        "Whitfield County, Georgia",
+        "Murray County, Georgia"
+      ],
+      "categories": [
+        "Dalton, Georgia",
+        "Buildings in Dalton, Georgia",
+        "Whitfield County, Georgia"
+      ],
+      "queries": [
+        "Dalton Georgia downtown",
+        "Dalton Georgia Hamilton Street",
+        "Dalton Georgia mountains"
+      ]
+    },
+    {
+      "metroId": "cbsa:19460",
+      "city": "Decatur, Alabama",
+      "area": "Decatur, AL",
+      "wikipedia": [
+        "Decatur, Alabama",
+        "Tennessee River",
+        "Wheeler National Wildlife Refuge"
+      ],
+      "categories": [
+        "Decatur, Alabama",
+        "Buildings in Decatur, Alabama",
+        "Wheeler National Wildlife Refuge"
+      ],
+      "queries": [
+        "Decatur Alabama downtown",
+        "Decatur Alabama Tennessee River",
+        "Decatur Alabama bridge"
+      ]
+    },
+    {
+      "metroId": "cbsa:19500",
+      "city": "Decatur, Illinois",
+      "area": "Decatur, IL",
+      "wikipedia": [
+        "Decatur, Illinois",
+        "Lake Decatur",
+        "Macon County, Illinois"
+      ],
+      "categories": [
+        "Decatur, Illinois",
+        "Lake Decatur",
+        "Buildings in Decatur, Illinois"
+      ],
+      "queries": [
+        "Decatur Illinois downtown",
+        "Lake Decatur Illinois",
+        "Decatur Illinois skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:20020",
+      "city": "Dothan, Alabama",
+      "area": "Dothan, AL",
+      "wikipedia": [
+        "Dothan, Alabama",
+        "Houston County, Alabama",
+        "Wiregrass Region"
+      ],
+      "categories": [
+        "Dothan, Alabama",
+        "Buildings in Dothan, Alabama",
+        "Houston County, Alabama"
+      ],
+      "queries": [
+        "Dothan Alabama downtown",
+        "Dothan Alabama murals",
+        "Dothan Alabama skyline"
+      ],
+      "candidates": [
+        {
+          "file": "DowntownDothan02 (cropped).jpg",
+          "note": "Dothan, AL — Prussian_Fool, CC BY-SA 4.0; downtown's tower. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:20940",
+      "city": "El Centro, California",
+      "area": "El Centro, CA",
+      "wikipedia": [
+        "El Centro, California",
+        "Imperial Valley",
+        "Imperial County, California"
+      ],
+      "categories": [
+        "El Centro, California",
+        "Imperial Valley",
+        "Buildings in El Centro, California"
+      ],
+      "queries": [
+        "El Centro California downtown",
+        "Imperial Valley California",
+        "El Centro California skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:21060",
+      "city": "Elizabethtown, Kentucky",
+      "area": "Elizabethtown, KY",
+      "wikipedia": [
+        "Elizabethtown, Kentucky",
+        "Hardin County, Kentucky",
+        "LaRue County, Kentucky"
+      ],
+      "categories": [
+        "Elizabethtown, Kentucky",
+        "Buildings in Elizabethtown, Kentucky",
+        "Hardin County, Kentucky"
+      ],
+      "queries": [
+        "Elizabethtown Kentucky downtown",
+        "Elizabethtown Kentucky courthouse",
+        "Hardin County Kentucky"
+      ],
+      "candidates": [
+        {
+          "file": "LaRue County Courthouse 2022a.jpg",
+          "note": "Elizabethtown, KY — Antony-22, CC BY-SA 4.0; the LaRue County Courthouse. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:21300",
+      "city": "Elmira, New York",
+      "area": "Elmira, NY",
+      "wikipedia": [
+        "Elmira, New York",
+        "Chemung River",
+        "Chemung County, New York"
+      ],
+      "categories": [
+        "Elmira, New York",
+        "Downtown Elmira, New York",
+        "Chemung River"
+      ],
+      "queries": [
+        "Elmira New York downtown",
+        "Elmira New York Chemung River",
+        "Elmira New York skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Chemung River Elmira.jpg",
+          "note": "Elmira, NY — DSKEO, CC BY-SA 4.0; the city on the Chemung River. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22540",
+      "city": "Fond du Lac, Wisconsin",
+      "area": "Fond du Lac, WI",
+      "wikipedia": [
+        "Fond du Lac, Wisconsin",
+        "Lake Winnebago",
+        "Fond du Lac County, Wisconsin"
+      ],
+      "categories": [
+        "Fond du Lac, Wisconsin",
+        "Lake Winnebago",
+        "Buildings in Fond du Lac, Wisconsin"
+      ],
+      "queries": [
+        "Fond du Lac Wisconsin downtown",
+        "Fond du Lac Lake Winnebago lighthouse",
+        "Fond du Lac Wisconsin skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:23460",
+      "city": "Gadsden, Alabama",
+      "area": "Gadsden, AL",
+      "wikipedia": [
+        "Gadsden, Alabama",
+        "Coosa River",
+        "Noccalula Falls Park"
+      ],
+      "categories": [
+        "Gadsden, Alabama",
+        "Noccalula Falls",
+        "Buildings in Gadsden, Alabama"
+      ],
+      "queries": [
+        "Gadsden Alabama downtown",
+        "Noccalula Falls Gadsden",
+        "Gadsden Alabama Coosa River"
+      ],
+      "candidates": [
+        {
+          "file": "View of Nocolulu falls from the shore in Godsden Alabama.jpg",
+          "note": "Gadsden, AL — Gentry George, U.S. Fish and Wildlife Service, public domain; Noccalula Falls. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:20580",
+      "city": "Eagle Pass, Texas",
+      "area": "Eagle Pass, TX",
+      "wikipedia": [
+        "Eagle Pass, Texas",
+        "Rio Grande",
+        "Maverick County, Texas"
+      ],
+      "categories": [
+        "Eagle Pass, Texas",
+        "Buildings in Eagle Pass, Texas",
+        "Maverick County, Texas"
+      ],
+      "queries": [
+        "Eagle Pass Texas downtown",
+        "Eagle Pass Texas Rio Grande",
+        "Eagle Pass Texas Main Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:21420",
+      "city": "Enid, Oklahoma",
+      "area": "Enid, OK",
+      "wikipedia": [
+        "Enid, Oklahoma",
+        "Garfield County, Oklahoma",
+        "Cherokee Strip"
+      ],
+      "categories": [
+        "Enid, Oklahoma",
+        "Downtown Enid, Oklahoma",
+        "Buildings in Enid, Oklahoma"
+      ],
+      "queries": [
+        "Enid Oklahoma downtown",
+        "Enid Oklahoma skyline",
+        "Enid Oklahoma grain elevators"
+      ]
+    },
+    {
+      "metroId": "cbsa:24140",
+      "city": "Goldsboro, North Carolina",
+      "area": "Goldsboro, NC",
+      "wikipedia": [
+        "Goldsboro, North Carolina",
+        "Wayne County, North Carolina",
+        "Neuse River"
+      ],
+      "categories": [
+        "Goldsboro, North Carolina",
+        "Buildings in Goldsboro, North Carolina",
+        "Wayne County, North Carolina"
+      ],
+      "queries": [
+        "Goldsboro North Carolina downtown",
+        "Goldsboro NC Center Street",
+        "Goldsboro North Carolina"
+      ]
+    },
+    {
+      "metroId": "cbsa:24420",
+      "city": "Grants Pass, Oregon",
+      "area": "Grants Pass, OR",
+      "wikipedia": [
+        "Grants Pass, Oregon",
+        "Rogue River (Oregon)",
+        "Josephine County, Oregon"
+      ],
+      "categories": [
+        "Grants Pass, Oregon",
+        "Rogue River (Oregon)",
+        "Buildings in Grants Pass, Oregon"
+      ],
+      "queries": [
+        "Grants Pass Oregon downtown",
+        "Grants Pass Rogue River",
+        "Grants Pass Oregon sign"
+      ]
+    },
+    {
+      "metroId": "cbsa:25220",
+      "city": "Hammond, Louisiana",
+      "area": "Hammond, LA",
+      "wikipedia": [
+        "Hammond, Louisiana",
+        "Tangipahoa Parish, Louisiana",
+        "Southeastern Louisiana University"
+      ],
+      "categories": [
+        "Hammond, Louisiana",
+        "Buildings in Hammond, Louisiana",
+        "Tangipahoa Parish, Louisiana"
+      ],
+      "queries": [
+        "Hammond Louisiana downtown",
+        "Hammond Louisiana historic district",
+        "Tangipahoa Parish Louisiana"
+      ]
+    },
+    {
+      "metroId": "cbsa:25260",
+      "city": "Hanford, California",
+      "area": "Hanford-Corcoran, CA",
+      "wikipedia": [
+        "Hanford, California",
+        "Kings County, California",
+        "Corcoran, California"
+      ],
+      "categories": [
+        "Hanford, California",
+        "Buildings in Hanford, California",
+        "Kings County, California"
+      ],
+      "queries": [
+        "Hanford California downtown",
+        "Hanford California courthouse",
+        "Kings County California"
+      ]
+    },
+    {
+      "metroId": "cbsa:25980",
+      "city": "Hinesville, Georgia",
+      "area": "Hinesville, GA",
+      "wikipedia": [
+        "Hinesville, Georgia",
+        "Liberty County, Georgia",
+        "Fort Stewart"
+      ],
+      "categories": [
+        "Hinesville, Georgia",
+        "Liberty County, Georgia",
+        "Buildings in Hinesville, Georgia"
+      ],
+      "queries": [
+        "Hinesville Georgia downtown",
+        "Hinesville Georgia",
+        "Liberty County Georgia"
+      ]
+    },
+    {
+      "metroId": "cbsa:27100",
+      "city": "Jackson, Michigan",
+      "area": "Jackson, MI",
+      "wikipedia": [
+        "Jackson, Michigan",
+        "Jackson County, Michigan",
+        "Grand River (Michigan)"
+      ],
+      "categories": [
+        "Jackson, Michigan",
+        "Downtown Jackson, Michigan",
+        "Buildings in Jackson, Michigan"
+      ],
+      "queries": [
+        "Jackson Michigan downtown",
+        "Jackson Michigan skyline",
+        "Jackson Michigan cascades"
+      ]
+    },
+    {
+      "metroId": "cbsa:27860",
+      "city": "Jonesboro, Arkansas",
+      "area": "Jonesboro, AR",
+      "wikipedia": [
+        "Jonesboro, Arkansas",
+        "Craighead County, Arkansas",
+        "Arkansas State University"
+      ],
+      "categories": [
+        "Jonesboro, Arkansas",
+        "Buildings in Jonesboro, Arkansas",
+        "Craighead County, Arkansas"
+      ],
+      "queries": [
+        "Jonesboro Arkansas downtown",
+        "Jonesboro Arkansas Main Street",
+        "Jonesboro Arkansas skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:28100",
+      "city": "Kankakee, Illinois",
+      "area": "Kankakee, IL",
+      "wikipedia": [
+        "Kankakee, Illinois",
+        "Kankakee River",
+        "Kankakee County, Illinois"
+      ],
+      "categories": [
+        "Kankakee, Illinois",
+        "Kankakee River",
+        "Buildings in Kankakee, Illinois"
+      ],
+      "queries": [
+        "Kankakee Illinois downtown",
+        "Kankakee River Illinois",
+        "Kankakee Illinois skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:29020",
+      "city": "Kokomo, Indiana",
+      "area": "Kokomo, IN",
+      "wikipedia": [
+        "Kokomo, Indiana",
+        "Howard County, Indiana",
+        "Wildcat Creek (Indiana)"
+      ],
+      "categories": [
+        "Kokomo, Indiana",
+        "Downtown Kokomo, Indiana",
+        "Buildings in Kokomo, Indiana"
+      ],
+      "queries": [
+        "Kokomo Indiana downtown",
+        "Kokomo Indiana courthouse",
+        "Kokomo Indiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:30620",
+      "city": "Lima, Ohio",
+      "area": "Lima, OH",
+      "wikipedia": [
+        "Lima, Ohio",
+        "Allen County, Ohio",
+        "Ottawa River (Lima, Ohio)"
+      ],
+      "categories": [
+        "Lima, Ohio",
+        "Downtown Lima, Ohio",
+        "Buildings in Lima, Ohio"
+      ],
+      "queries": [
+        "Lima Ohio downtown",
+        "Lima Ohio skyline",
+        "Lima Ohio Town Square"
+      ]
+    },
+    {
+      "metroId": "cbsa:31020",
+      "city": "Longview, Washington",
+      "area": "Longview-Kelso, WA",
+      "wikipedia": [
+        "Longview, Washington",
+        "Kelso, Washington",
+        "Lewis and Clark Bridge"
+      ],
+      "categories": [
+        "Longview, Washington",
+        "Lewis and Clark Bridge (Columbia River)",
+        "Buildings in Longview, Washington"
+      ],
+      "queries": [
+        "Longview Washington Lake Sacajawea",
+        "Longview Washington Columbia River",
+        "Kelso Washington"
+      ]
+    },
+    {
+      "metroId": "cbsa:31900",
+      "city": "Mansfield, Ohio",
+      "area": "Mansfield, OH",
+      "wikipedia": [
+        "Mansfield, Ohio",
+        "Richland County, Ohio",
+        "Ohio State Reformatory"
+      ],
+      "categories": [
+        "Mansfield, Ohio",
+        "Ohio State Reformatory",
+        "Buildings in Mansfield, Ohio"
+      ],
+      "queries": [
+        "Mansfield Ohio downtown",
+        "Mansfield Ohio Reformatory",
+        "Mansfield Ohio carrousel"
+      ]
+    },
+    {
+      "metroId": "cbsa:33500",
+      "city": "Minot, North Dakota",
+      "area": "Minot, ND",
+      "wikipedia": [
+        "Minot, North Dakota",
+        "Souris River",
+        "Ward County, North Dakota"
+      ],
+      "categories": [
+        "Minot, North Dakota",
+        "Buildings in Minot, North Dakota",
+        "Ward County, North Dakota"
+      ],
+      "queries": [
+        "Minot North Dakota downtown",
+        "Minot North Dakota skyline",
+        "Minot Scandinavian Heritage Park"
+      ]
+    },
+    {
+      "metroId": "cbsa:33780",
+      "city": "Monroe, Michigan",
+      "area": "Monroe, MI",
+      "wikipedia": [
+        "Monroe, Michigan",
+        "River Raisin",
+        "Monroe County, Michigan"
+      ],
+      "categories": [
+        "Monroe, Michigan",
+        "River Raisin",
+        "Buildings in Monroe, Michigan"
+      ],
+      "queries": [
+        "Monroe Michigan downtown",
+        "Monroe Michigan River Raisin",
+        "Monroe Michigan courthouse"
+      ]
+    },
+    {
+      "metroId": "cbsa:34100",
+      "city": "Morristown, Tennessee",
+      "area": "Morristown, TN",
+      "wikipedia": [
+        "Morristown, Tennessee",
+        "Hamblen County, Tennessee",
+        "Cherokee Lake"
+      ],
+      "categories": [
+        "Morristown, Tennessee",
+        "Buildings in Morristown, Tennessee",
+        "Hamblen County, Tennessee"
+      ],
+      "queries": [
+        "Morristown Tennessee downtown",
+        "Morristown Tennessee skywalk",
+        "Cherokee Lake Tennessee"
+      ]
+    },
+    {
+      "metroId": "cbsa:35660",
+      "city": "Niles, Michigan",
+      "area": "Niles, MI",
+      "wikipedia": [
+        "Niles, Michigan",
+        "St. Joseph River (Lake Michigan)",
+        "Berrien County, Michigan"
+      ],
+      "categories": [
+        "Niles, Michigan",
+        "Berrien County, Michigan",
+        "St. Joseph, Michigan"
+      ],
+      "queries": [
+        "Niles Michigan downtown",
+        "St. Joseph Michigan lighthouse",
+        "Berrien County Michigan Lake Michigan"
+      ]
     }
   ]
 }

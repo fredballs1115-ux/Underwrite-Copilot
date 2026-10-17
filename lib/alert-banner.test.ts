@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const rows: Record<string, unknown>[] = [];
 const state = vi.hoisted(() => ({
@@ -111,6 +112,16 @@ describe("RegulatoryAlertBanner", () => {
     const out = await html();
     expect(out).toContain('href="https://legistar.council.nyc.gov/x"');
     expect(out).toContain("LL97 amendment filed");
+  });
+
+  it("is drawn in the site's caution token, never a stock red, and lints clean", async () => {
+    rows.push({ id: "a3", rule_id: null, headline: "LL97 amendment filed", url: "https://legistar.council.nyc.gov/x", detail: null });
+    const out = await html();
+    expect(out).toContain('data-alert-tone="caution"');
+    expect(out).toMatch(/border-l-caution/);
+    expect(out).not.toMatch(/\b(bg|text|border)-red-\d/);
+    expect(a11yIssues(out)).toEqual([]);
+    expect(gluedWords(visibleText(out))).toEqual([]);
   });
 
   it("renders nothing without open alerts", async () => {

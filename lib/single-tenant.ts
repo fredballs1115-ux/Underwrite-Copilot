@@ -26,7 +26,9 @@
 //
 // AN EARLY TERMINATION IS THE LEASE'S END. A tenant who may leave on a date
 // gives the lease that date: the landlord cannot make it stay and a lender
-// will not count past it (the rollover card's rule for a break).
+// will not count past it (the rollover card's rule for a break). A firm
+// term's end is such a date — a government lease's tenant may leave on
+// notice once its firm term is over.
 //
 // THE INCREASES ARE THE GROWTH. Until the lease ends the rent grows as the
 // lease says, not as a market does: 10% every five years compounds to
@@ -47,6 +49,7 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { inferStrategy, notYetDelivered } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
+import { isMasterLeasehold } from "@/lib/interest";
 import {
   endHasPassed,
   endIsAhead,
@@ -71,10 +74,18 @@ const isRow = (m: unknown): m is MetricRow =>
 // The tenant's lease, never a ground lease's, the seller's loan's or a note's.
 const NOT_TENANT_LEASE = /ground|land\s*lease|assumable|\bloan\b|mortgage|\bnote\b|maturity/i;
 const END_ROW = /\blease\b.*\b(?:expir\w*|ends?|end\s+date|termination\s+date)\b|^(?:primary\s+|initial\s+|base\s+)?term\s+(?:expir\w*|ends?|end\s+date)\b|^expiration(?:\s+date)?$/i;
-const NOT_END = /option|renewal|extension|early|remaining|unexpired|\bleft\b|kick/i;
+// A firm term's end is when the tenant may first leave, never the lease's
+// own end (EARLY_ROW reads it).
+const NOT_END = /option|renewal|extension|early|remaining|unexpired|\bleft\b|kick|\bfirm\b/i;
 const LEFT_ROW = /\bterm\s+remaining\b|\bremaining\s+(?:lease\s+|primary\s+|base\s+|initial\s+)?term\b|\bunexpired\s+(?:lease\s+)?term\b|\blease\b.*\b(?:remaining|left)\b/i;
 const NOT_LEFT = /option|renewal|extension/i;
-const OPTION_ROW = /\b(?:renewal|extension)\s+options?\b|\boptions?\s+to\s+(?:renew|extend)\b|^(?:lease\s+)?options?$/i;
+// The tenant's renewal options, as the extraction labels them ("Renewal
+// options"), or a lease's extension options named as the lease's — never a
+// bare "Extension options", the label a preferred equity position's
+// extension of its redemption is filed under (lib/position, research pass
+// 41: a position in a single-tenant building had read it as the tenant's).
+const OPTION_ROW =
+  /\brenewal\s+options?\b|\brenewal\s+(?:and|or|\/)\s+extension\s+options?\b|\b(?:lease|tenant'?s?)\s+extension\s+options?\b|\boptions?\s+to\s+(?:renew|extend)\b|^(?:lease\s+)?options?$/i;
 const NOT_OPTION = /purchase|\bbuy\b|first\s+refusal|first\s+offer|\brofr\b|\brofo\b|terminat|kick/i;
 const INCREASE_ROW =
   /\brent(?:al)?\s+(?:increases?|escalations?|escalators?|bumps|steps|adjustments?)\b|^(?:annual\s+|scheduled\s+)?(?:increases|escalations?|escalators?|bumps)$/i;
@@ -84,15 +95,72 @@ const NOT_RENT = /per\s*(?:sf|square|foot)|psf|\/\s*(?:sf|ft)\b|\bmarket\b|pro\s
 // A monthly figure is not the year's rent; a per-foot one falls under the
 // reader's floor (a year's rent under $1,000 is not a building's).
 const RENT_VALUE_NOT_ANNUAL = /\/\s*mo(?:nth)?\b|per\s+month|monthly/i;
-const RATING_ROW = /\bcredit\s+rating\b|\brating\b/i;
-const EARLY_ROW = /\bearly\s+terminat\w*|\bterminat\w*\s+(?:option|right)s?\b|\bkick[- ]?out\b/i;
+// The tenant's or its guarantor's credit rating, as the extraction labels it
+// ("Tenant credit rating"), by an agency's name, or a bare "Rating" — never
+// another kind of rating: a nursing home's "CMS star rating" had been read
+// as the operator's credit (research pass 41).
+// A bare rating that names its agencies in brackets ("Rating (S&P / Moody's)")
+// and agencies named together ("Moody's / S&P Rating") are credit ratings
+// too — labels an older extraction carries, which the narrowing had dropped
+// (audit C4, L10); a bracket naming no agency stays another kind.
+const AGENCY = String.raw`(?:s&p|moody'?s|fitch)`;
+const RATING_ROW = new RegExp(
+  String.raw`\bcredit\s+ratings?\b|^\s*(?:tenant|guarantor|lessee|corporate)(?:'s)?\s+ratings?\b|` +
+    String.raw`^\s*${AGENCY}(?:\s*(?:\/|,|&|and)\s*${AGENCY})*(?:\s+credit)?\s+ratings?\b|` +
+    String.raw`^\s*ratings?\s*\(\s*${AGENCY}(?:\s*(?:\/|,|&|and)\s*${AGENCY})*\s*\)\s*$|^\s*ratings?\s*$`,
+  "i",
+);
+// The first date the tenant may leave: an early termination, a termination
+// option or a kick-out — and a firm term's end ("Firm term expiration",
+// "End of firm term"), since after its firm term a tenant such as the
+// government may leave on notice (research pass 28). A row naming the firm
+// term without its end ("Firm term: 10 years") is a length, not a date.
+const EARLY_ROW =
+  /\bearly\s+terminat\w*|\bterminat\w*\s+(?:option|right)s?\b|\bkick[- ]?out\b|\bfirm\s+term\b.*\b(?:expir\w*|ends?|end\s+date)\b|\b(?:expir\w*|end)\b.*\bfirm\s+term\b/i;
+
+// On a sandwich position (lib/interest `isMasterLeasehold`, research pass
+// 28) a master lease's rows — "Master lease expiration", "… term remaining"
+// — are the position's own lease from the building's owner, never the
+// subtenant's. A net lease's "master lease" on a building bought outright
+// is the tenant's own, and is read as before.
+const MASTER_LEASE_ROW = /\bmaster[\s-]*lease/i;
 
 function rowsOf(ex: ExtractionResult): MetricRow[] {
-  return (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_TENANT_LEASE.test(m.label));
+  const master = isMasterLeasehold(ex);
+  return (Array.isArray(ex.metrics) ? ex.metrics : [])
+    .filter(isRow)
+    .filter((m) => !NOT_TENANT_LEASE.test(m.label) && !(master && MASTER_LEASE_ROW.test(m.label)));
 }
 
-const find = (rows: MetricRow[], re: RegExp, not?: RegExp) =>
+const find = <M extends MetricRow>(rows: ReadonlyArray<M>, re: RegExp, not?: RegExp) =>
   rows.find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
+
+/** The rows the read takes, each by what it is read for — one finder for
+ *  the read and for `singleTenantRowsRead`. */
+function rowsRead<M extends MetricRow>(rows: ReadonlyArray<M>) {
+  return {
+    endRow: find(rows, END_ROW, NOT_END),
+    leftRow: find(rows, LEFT_ROW, NOT_LEFT),
+    optionRow: find(rows, OPTION_ROW, NOT_OPTION),
+    earlyRow: find(rows, EARLY_ROW),
+    incRow: find(rows, INCREASE_ROW, NOT_INCREASE),
+    rentRow: rows.find((m) => RENT_ROW.test(m.label) && !NOT_RENT.test(m.label) && !RENT_VALUE_NOT_ANNUAL.test(m.value)) ?? null,
+    ratingRow: find(rows, RATING_ROW),
+  };
+}
+
+/**
+ * Every row the read takes from a list — the lease's end or years left, its
+ * options, its first date to leave, its increases, its rent and its rating —
+ * through the read's own finder, never a ground lease's, a loan's or a
+ * note's row. For the test that holds the extraction's labels to their
+ * readers (lib/prompt-row-readers.test.ts, research pass 41).
+ */
+export function singleTenantRowsRead<M extends { label: string; value: string }>(metrics: ReadonlyArray<M>): M[] {
+  const rows = metrics.filter((m) => isRow(m) && !NOT_TENANT_LEASE.test(m.label));
+  const r = rowsRead(rows);
+  return [...new Set([r.endRow, r.leftRow, r.optionRow, r.earlyRow, r.incRow, r.rentRow, r.ratingRow])].filter((m): m is M => m != null);
+}
 
 /** The lease's own rows, for a key-terms block to lead with after the count
  *  (lib/key-terms): its end (or the years left where no end is stated), its
@@ -359,13 +427,9 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
   const kind = ex.interest?.kind;
   if (kind === "leased_fee" || kind === "note") return null;
   const rows = rowsOf(ex);
+  const { endRow, leftRow, optionRow, earlyRow, incRow, rentRow, ratingRow } = rowsRead(rows);
 
-  const term = readLeaseTerm(
-    { endRow: find(rows, END_ROW, NOT_END), leftRow: find(rows, LEFT_ROW, NOT_LEFT), optionRow: find(rows, OPTION_ROW, NOT_OPTION) },
-    ex.totalPages,
-    asOf,
-  );
-  const earlyRow = find(rows, EARLY_ROW);
+  const term = readLeaseTerm({ endRow, leftRow, optionRow }, ex.totalPages, asOf);
   const earlyRead = earlyRow ? earlyOf(earlyRow.value, asOf) : null;
   const startsAtDelivery = notYetDelivered(inferStrategy(ex).kind);
   // Early only where it comes before the term's end; a date at or after it
@@ -382,11 +446,8 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
       ? { ends: term.ends, from: term.from, yearsLeft: term.yearsLeft, early: false }
       : null;
 
-  const incRow = find(rows, INCREASE_ROW, NOT_INCREASE);
   const increasesStated = clean(incRow?.value);
-  const rentRow = rows.find((m) => RENT_ROW.test(m.label) && !NOT_RENT.test(m.label) && !RENT_VALUE_NOT_ANNUAL.test(m.value)) ?? null;
   const rent = rentRow ? parseUsd(rentRow.value, 1_000) : null;
-  const ratingRow = find(rows, RATING_ROW);
 
   const pageCount = typeof ex.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
   const n = parsePageNumber(st.page);
@@ -632,6 +693,10 @@ export function singleTenantTag(ex: ExtractionResult | null | undefined, asOf: D
   if (!r) return null;
   // A count with the renewal options in it is the lease's ceiling: "up to".
   const upTo = (years: number) => (r.term?.includesOptions && years >= 1 ? "up to " : "");
+  // So is a term stated as a count of years and counted from today, since
+  // the memorandum's own date is earlier (the sentence says it may be
+  // shorter) — never one counted from delivery, which runs from that day.
+  const upToToday = (years: number) => (r.term?.from === "remaining" && years >= 1 ? "up to " : upTo(years));
   // A lease that has not begun: its term from delivery, never years left
   // today (research pass 23).
   const fromDelivery = termFromDelivery(r);
@@ -644,7 +709,7 @@ export function singleTenantTag(ex: ExtractionResult | null | undefined, asOf: D
   if (!eff || !span || !endIsAhead(span)) return "Single tenant";
   const whole = Math.floor(eff.yearsLeft);
   const yrs = eff.yearsLeft < 1 ? "under 1 yr" : `${whole} ${whole === 1 ? "yr" : "yrs"}`;
-  return eff.early ? `Single tenant, may leave in ${yrs}` : `Single tenant, ${upTo(eff.yearsLeft)}${yrs} left`;
+  return eff.early ? `Single tenant, may leave in ${yrs}` : `Single tenant, ${upToToday(eff.yearsLeft)}${yrs} left`;
 }
 
 /** The lease as the steps that read the memorandum after the extraction

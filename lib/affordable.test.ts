@@ -164,6 +164,18 @@ describe("readAffordable — what a restricted building is", () => {
     );
   });
 
+  it("reads a tier's rent and its limit with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no rent, so the tier drew no
+    // headroom against its limit.
+    const r = readAffordable(
+      ex(affordable({ programs: ["lihtc"], tiers: [{ label: "60% AMI", units: "120", rent: "$1,310 (in-place)", maxRent: "$1,465 (gross, utility-adjusted)" }] })),
+      TODAY,
+    )!;
+    expect(r.tiers[0].rent).toBe(1_310);
+    expect(r.tiers[0].maxRent).toBe(1_465);
+    expect(r.tiers[0].headroom).toBe(155);
+  });
+
   it("says what the model is not: one growth rate across restricted and market units", () => {
     const r = readAffordable(MAPLE, TODAY)!;
     expect(r.modelCaveat).toContain(

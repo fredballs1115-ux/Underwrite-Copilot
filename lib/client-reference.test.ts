@@ -61,7 +61,7 @@ describe("a server file reads no value out of a client module", () => {
   it("reads the client modules and the values they export", () => {
     expect(clientModules).toBeGreaterThan(40);
     // A value exported beside a component, which a server file must not read.
-    expect(clientValues.get("app/(app)/deals/offers-due")?.has("daysUntil")).toBe(true);
+    expect(clientValues.get("app/(app)/deals/offers-due-bit")?.has("daysUntil")).toBe(true);
   });
 
   it("imports only components (and types) from a 'use client' module", () => {

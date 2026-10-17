@@ -81,10 +81,13 @@ export function LoginForm({
 
   return (
     <div className="mt-6">
-      {/* Mode toggle */}
+      {/* Mode toggle: two pressed-or-not buttons, as the pipeline's view
+          toggle is. It had promised tabs to a screen reader ("tab, 1 of 2")
+          that the arrow keys did not move and no panel was tied to
+          (research pass 33). */}
       {mode !== "reset" && mode !== "resend" && (
         <div
-          role="tablist"
+          role="group"
           aria-label="Sign in or create account"
           className="flex rounded-lg border border-line bg-faint p-0.5"
         >
@@ -97,8 +100,7 @@ export function LoginForm({
             <button
               key={key}
               type="button"
-              role="tab"
-              aria-selected={mode === key}
+              aria-pressed={mode === key}
               onClick={() => setMode(key)}
               className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 mode === key
@@ -211,12 +213,19 @@ export function LoginForm({
             <label htmlFor="email" className="text-sm font-medium">
               Email
             </label>
+            {/* React empties the form once its action runs; the field opens
+                again on the address it was sent with, so a refused sign-in or
+                a mistyped sign-up is corrected rather than typed again
+                (research pass 32). Keyed by the answer, so each one remounts
+                it on its own address. */}
             <input
+              key={`${state?.intent ?? ""}:${state?.email ?? ""}:${state?.error ?? state?.notice ?? ""}`}
               id="email"
               name="email"
               type="email"
               required
               autoComplete="email"
+              defaultValue={state?.intent === mode ? (state?.email ?? "") : ""}
               className={inputCls}
             />
           </div>

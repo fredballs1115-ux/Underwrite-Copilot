@@ -25,6 +25,7 @@ import { dataMetroForAddress, metroForAddress, metroForName } from "@/lib/market
 import { marketPageFor } from "@/lib/public-pages";
 import {
   areaSkylineId,
+  coverWidth,
   photographerLine,
   SKYLINE_WIDTH,
   skylineCredit,
@@ -55,12 +56,13 @@ export const CARD_DEVICE_HEIGHT = 672;
  * SKYLINE_SRCSET), where 1600 would leave a panorama cut to the card by its
  * height short of a phone card's 672 device pixels — Louisville's 4.2:1
  * river panorama is 383px tall at 1600 wide and 574 at 2400 — and 1600
- * otherwise, as for a photograph whose size is not recorded.
+ * otherwise, as for a photograph whose size is not recorded. The width that
+ * covers the card's height is lib/skyline's `coverWidth`, the arithmetic a
+ * band's `sizes` reads too (`bandSizes`).
  */
 export function marketPhotoWidth(shot: Pick<SkylineShot, "size">): number {
-  const [w, h] = shot.size ?? [0, 0];
-  if (!(w > 0 && h > 0)) return MARKET_PHOTO_WIDTH;
-  return Math.round((MARKET_PHOTO_WIDTH * h) / w) < CARD_DEVICE_HEIGHT && w > MARKET_PHOTO_WIDTH
+  const need = coverWidth(shot, CARD_DEVICE_HEIGHT);
+  return need !== null && need > MARKET_PHOTO_WIDTH && (shot.size?.[0] ?? 0) > MARKET_PHOTO_WIDTH
     ? SKYLINE_WIDTH.max
     : MARKET_PHOTO_WIDTH;
 }

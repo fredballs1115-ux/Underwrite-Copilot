@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
+import { andList, figureHolders } from "@/lib/region-line";
 import { firstSentence } from "@/lib/first-sentence";
-import { screenedOn } from "@/lib/screen-run";
+import { screenedOn, type BehindWhy } from "@/lib/screen-run";
+import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import type {
   BrokerCompsResult,
@@ -13,15 +15,16 @@ import type {
   VerdictScenario,
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
-import { assetWords } from "@/lib/asset-words";
-import { screenYearOf } from "@/lib/criteria";
-import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { countNounOf, screenYearOf } from "@/lib/criteria";
+import { askingPriceOf, inferStrategy, planSummary, planWithBasisChecked } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { sellerFinancingDocLine } from "@/lib/seller-financing";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
+import { RegulationPanel } from "@/app/regulation-panel";
+import type { RegulationRead } from "@/lib/rent-regulation";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { HotelPanel } from "@/app/hotel-panel";
@@ -31,6 +34,16 @@ import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
 import { readManufacturedHousing } from "@/lib/manufactured-housing";
 import { SelfStoragePanel } from "@/app/self-storage-panel";
 import { readSelfStorage } from "@/lib/self-storage";
+import { ForwardPanel } from "@/app/forward-panel";
+import { readForwardPurchase } from "@/lib/forward-purchase";
+import { MixedUsePanel } from "@/app/mixed-use-panel";
+import { readMixedUse } from "@/lib/mixed-use";
+import { GoingConcernPanel } from "@/app/going-concern-panel";
+import { readGoingConcern } from "@/lib/going-concern";
+import { CondoPanel } from "@/app/condo-panel";
+import { readCondo } from "@/lib/condo";
+import { SandwichPanel } from "@/app/sandwich-panel";
+import { readSandwichLease } from "@/lib/sandwich-lease";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -57,7 +70,10 @@ import { SharePicture, type SharePictureSource } from "./share-picture";
  *
  * Deliberately excluded: documents, notes, the buyer's buy box, and
  * anything editable — this is the page an analyst forwards to a partner or
- * lender.
+ * lender. The box has no section here, but the call's reason and risks are
+ * the verdict's own words, and the verdict is handed the box, so they can
+ * name where the deal misses it; the share control says so before a link
+ * is made (research pass 39).
  */
 export interface ShareViewProps {
   dealName: string;
@@ -65,10 +81,12 @@ export interface ShareViewProps {
   /** the link's expiry, ISO */
   expiresAt: string;
   /** the sender's latest screen has not rewritten the verdict: it failed
-   *  before reaching it, or is still running toward it (lib/screen-run) */
+   *  before reaching it, is still running toward it, or stopped making
+   *  progress on the way (lib/screen-run) */
   verdictStale: boolean;
-  /** why, when it is stale: a failed run, or a re-screen in progress */
-  staleWhy?: "failed" | "running";
+  /** why, when it is stale: a failed run, a re-screen in progress, or one
+   *  that stalled — never said to be running */
+  staleWhy?: BehindWhy;
   /** the comp and market reads the latest screen has not rewritten either —
    *  the previous screen's, beside this run's terms */
   staleReads?: ReadonlyArray<"comps" | "market">;
@@ -87,6 +105,13 @@ export interface ShareViewProps {
    *  `floodShortLine`, #426); null for minimal hazard, no digital map or a
    *  lookup that has not answered */
   floodLine?: string | null;
+  /** the rent rules that reach the building (lib/rent-regulation), read by
+   *  the loader through `regulationForDeal` on its UTC day; absent or null
+   *  where no rule reaches it and the memorandum names no regime */
+  regulation?: RegulationRead | null;
+  /** the loader's day, an ISO day: today's tick on a rent allowance's
+   *  period — the view itself reads no clock */
+  today?: string | null;
 }
 
 // A range's confidence, in the deal page's colours (RANGE_CONF there).
@@ -102,12 +127,12 @@ const VERDICT_META: Record<
   VerdictCall,
   { label: string; cls: string; border: string; disc: string; dot: string }
 > = {
-  pass: { label: "Go", cls: "text-pass", border: "border-pass", disc: "bg-pass/15 text-pass", dot: "bg-pass" },
+  pass: { label: "Go", cls: "text-pass", border: "border-pass", disc: "bg-pass/10 text-pass", dot: "bg-pass" },
   caution: {
     label: "Caution",
     cls: "text-caution",
     border: "border-caution",
-    disc: "bg-caution/15 text-caution",
+    disc: "bg-caution/10 text-caution",
     dot: "bg-caution",
   },
   pass_on: { label: "No-go", cls: "text-kill", border: "border-kill", disc: "bg-kill/15 text-kill", dot: "bg-kill" },
@@ -118,6 +143,15 @@ const UNKNOWN_VERDICT = {
   border: "border-line",
   disc: "bg-faint text-muted",
   dot: "bg-muted",
+};
+
+// The deal header's call pill (VERDICT_PILL on the deal page), colour for
+// colour, with its words above: the chip that says the call beside the
+// title. A call the header draws no pill for draws no chip.
+const CALL_PILL: Record<VerdictCall, string> = {
+  pass: "bg-pass/10 text-pass",
+  caution: "bg-caution/10 text-caution",
+  pass_on: "bg-kill/15 text-kill",
 };
 
 const LEVER_LABEL: Record<string, string> = { basis: "Basis", exit: "Exit", debt: "Debt" };
@@ -241,18 +275,37 @@ const figureCount = (n: number): string => `${n} published ${n === 1 ? "figure" 
  *  (the debt market, lessor rents, the insurance index, CRE prices), so a
  *  block ending in the 10-year is never called "each the metro's". */
 function splitOf(b: { lines: string[]; national?: number }, local: string, each: string, none: string): string {
-  const nat = Math.min(Math.max(b.national ?? 0, 0), b.lines.length);
-  return nat > 0 ? `${b.lines.length - nat} ${local} and ${nat} the nation's, ${none}` : each;
+  // A Census region's rental vacancy line is the region's, counted apart
+  // from the market's own (audit C4, L7).
+  const holders = figureHolders(b.lines, b.national, local);
+  return holders.length > 1 ? `${andList(holders)}, ${none}` : each;
+}
+
+/** Every line the nation's: none of the market's own figures was current,
+ *  said so rather than "for the state of …" over the nation's lines. */
+const noneOwnOf = (b: { lines: string[]; national?: number }): boolean => b.lines.length > 0 && (b.national ?? 0) >= b.lines.length;
+
+/** Why the call on file is the previous completed screen's — one sentence
+ *  for each way the sender's latest run did not reach it, said by the
+ *  verdict below and carried by the call's chip beside the title. */
+function previousCallNote(why: BehindWhy): string {
+  return why === "running"
+    ? "From the previous completed screen — the sender is re-screening this deal, and this call is replaced when the run reaches its verdict."
+    : why === "stalled"
+      ? "From the previous completed screen — the sender’s latest run of this deal stopped before it finished."
+      : "From the previous completed screen — the sender’s latest run of this deal did not finish.";
 }
 
 /** A read the sender's latest screen has not rewritten: the previous
  *  screen's, beside this run's terms, and said so. */
-function PreviousRead({ why }: { why: "failed" | "running" }) {
+function PreviousRead({ why }: { why: BehindWhy }) {
   return (
     <p className="mt-1 text-xs text-caution" data-qa="previous-read">
       {why === "running"
         ? "From the previous screen — the sender\u2019s re-screen has not reached it yet."
-        : "From the previous screen — the sender\u2019s latest run did not reach it."}
+        : why === "stalled"
+          ? "From the previous screen — the sender\u2019s latest run stopped before it."
+          : "From the previous screen — the sender\u2019s latest run did not reach it."}
     </p>
   );
 }
@@ -271,9 +324,14 @@ export function ShareView({
   market,
   verdict,
   floodLine = null,
+  regulation = null,
+  today = null,
 }: ShareViewProps) {
   const vmeta = VERDICT_META[verdict.verdict] ?? UNKNOWN_VERDICT;
   const call: VerdictCall | null = VERDICT_META[verdict.verdict] ? verdict.verdict : null;
+  // The day the call was written ("Sep 12, 2026"), or none for a call saved
+  // before the pipeline dated one.
+  const on = screenedOn(verdict.generatedAt);
 
   const screen = verdict.screen;
   // The deal's kind first — a partner reading "$21M stabilized NOI" beside a
@@ -284,7 +342,7 @@ export function ShareView({
     ? { ...extraction, metrics: extraction.metrics ?? [] }
     : null;
   const strategy = inferStrategy(safeExtraction, firstSignal);
-  const plan = planSummary(safeExtraction, strategy);
+  const plan = planWithBasisChecked(safeExtraction, strategy, planSummary(safeExtraction, strategy));
   // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
   // Its price row is read against the year the screen read the memorandum.
   const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, screenYearOf(safeExtraction), 8, interestOf(safeExtraction).kind);
@@ -320,7 +378,32 @@ export function ShareView({
         </p>
       </header>
 
-      <h1 className="mt-6 text-3xl font-semibold tracking-tight">{dealName}</h1>
+      {/* The call beside the name (research pass 36): the deal-kind panels
+          and the building's picture come before the verdict below — up to
+          eight phone screens of them — and the partner or lender the call is
+          for had read every one before it. The deal header's own pill, its
+          words and colours, with the day it was written; drawn dashed and
+          said to be the previous screen's wherever the verdict below says
+          so, never as current. */}
+      <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">{dealName}</h1>
+        {call && (
+          <p data-qa="share-call" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <span
+              className={`rounded-full px-2.5 py-0.5 font-semibold ${CALL_PILL[call]}${verdictStale ? " border border-dashed border-current" : ""}`}
+              title={verdictStale ? previousCallNote(staleWhy) : undefined}
+            >
+              <span className="sr-only">First-pass verdict: </span>
+              {vmeta.label}
+            </span>
+            {verdictStale ? (
+              <span className="text-caution">{on ? `From the previous screen, ${on}` : "From the previous screen"}</span>
+            ) : on ? (
+              <span className="text-muted">{`Screened ${on}`}</span>
+            ) : null}
+          </p>
+        )}
+      </div>
       <p className="mt-1 text-sm text-muted">
         {[
           extraction?.market,
@@ -334,16 +417,45 @@ export function ShareView({
       </p>
 
       {/* What is being sold (#414) — a note, a share, a leasehold changes
-          what every figure below means; nothing for a plain fee simple. */}
-      <InterestPanel interest={readInterest(safeExtraction, askingPriceOf(safeExtraction))} />
+          what every figure below means; nothing for a plain fee simple.
+          Read on the loader's day, as the panels below are: a note's yield
+          to maturity and a position's to redemption run from it. */}
+      <InterestPanel
+        interest={readInterest(safeExtraction, askingPriceOf(safeExtraction), today ? new Date(`${today}T12:00:00Z`) : undefined)}
+      />
+
+      {/* A sandwich position (lib/sandwich-lease): the sublease income
+          against the master rent, its cover and the master lease's term —
+          the model's hold and read need the model, which the sender's deal
+          page carries. Read on the loader's day. */}
+      <SandwichPanel sandwich={readSandwichLease(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
 
       {/* How it is sold (#456): the starting bid, the premium on top, the
           reserve and the deadline — or who is selling, and as-is. */}
       <SalePanel sale={readSale(safeExtraction)} />
 
+      {/* A forward purchase (lib/forward-purchase): the price at delivery,
+          the clock to it and to the outside date, the deposit and the yield
+          at delivery — the model's exit cap beside it needs the model, which
+          the sender's deal page carries. Read on the loader's day. */}
+      <ForwardPanel
+        forward={readForwardPurchase(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined, strategy)}
+        today={today}
+      />
+
+      {/* An operating business on its real estate (lib/going-concern): the
+          operator's earnings against its rent, the split and the contracts. */}
+      <GoingConcernPanel goingConcern={readGoingConcern(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
+
       {/* A covenant or a contract that sets the rents (#453): how much of the
           building is restricted, until when, and what the model is not. */}
       <AffordablePanel affordable={readAffordable(safeExtraction)} />
+
+      {/* The rent rules that reach the building (lib/rent-regulation): each
+          regime, the regulated share as stated and the allowance in force —
+          the model's growth beside it needs the model, which the sender's
+          deal page carries. */}
+      <RegulationPanel regulation={regulation} today={today} />
 
       {/* One tenant leases the whole property (#454): the guarantor, the
           term left and the options, the increases — the lease is the deal. */}
@@ -376,6 +488,15 @@ export function ShareView({
       {/* A self-storage facility (#471): its occupancies and the in-place
           rent against the street rate. */}
       <SelfStoragePanel storage={readSelfStorage(safeExtraction)} />
+
+      {/* A mixed-use building (lib/mixed-use): the residential and
+          commercial incomes and the commercial share of the area. */}
+      <MixedUsePanel mixedUse={readMixedUse(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
+
+      {/* Condominium units bought in bulk (lib/condo): the buyer's share of
+          the association, a year of its dues and a lender's limit on a single
+          owner. */}
+      <CondoPanel condo={readCondo(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
 
       {/* What the third-party reports found (#465): a tile a report, the
           Phase I's age and the seismic PML against the lenders' lines. */}
@@ -417,10 +538,10 @@ export function ShareView({
       >
         <p className="text-xs font-medium uppercase tracking-wider text-muted">
           First-pass verdict
-          {screenedOn(verdict.generatedAt) ? (
+          {on ? (
             <span className="normal-case tracking-normal" data-qa="verdict-date">
               {" · "}
-              {screenedOn(verdict.generatedAt)}
+              {on}
             </span>
           ) : null}
         </p>
@@ -434,13 +555,7 @@ export function ShareView({
             {vmeta.label}
           </p>
         </div>
-        {verdictStale && (
-          <p className="mt-2 text-xs text-caution">
-            {staleWhy === "running"
-              ? "From the previous completed screen — the sender is re-screening this deal, and this call is replaced when the run reaches its verdict."
-              : "From the previous completed screen — the sender\u2019s latest run of this deal did not finish."}
-          </p>
-        )}
+        {verdictStale && <p className="mt-2 text-xs text-caution">{previousCallNote(staleWhy)}</p>}
         {verdict.reason && (
           <p className="mt-3 text-sm leading-relaxed">{verdict.reason}</p>
         )}
@@ -459,7 +574,10 @@ export function ShareView({
         )}
       </section>
 
-      <SharePlan strategy={strategy} plan={plan} noun={assetWords(assetClass).noun?.one} />
+      {/* The basis per the counting row's own noun (a hotel counting "Rooms"
+          is per room), as the deal page's plan strip says it — else the
+          class's; on a conversion or a development the proposed row's. */}
+      <SharePlan strategy={strategy} plan={plan} noun={countNounOf(safeExtraction?.metrics ?? [], assetClass, strategy.kind).one} />
 
       {ranges.length > 0 && (
         <section className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -495,7 +613,9 @@ export function ShareView({
                       <p className="text-[10px] uppercase tracking-wide text-muted">Low</p>
                       <p className="mt-0.5 text-sm tabular-nums">{r.low}</p>
                     </div>
-                    <div className="bg-brand/10 px-2 py-1.5">
+                    {/* Opaque, so the grid's line colour never shows through
+                        the tint (research pass 33). */}
+                    <div className="bg-[color-mix(in_oklab,var(--color-brand)_10%,var(--color-surface))] px-2 py-1.5">
                       <p className="text-[10px] uppercase tracking-wide text-muted">Base</p>
                       <p className="mt-0.5 text-sm font-semibold tabular-nums text-brand">{r.base}</p>
                     </div>
@@ -609,11 +729,22 @@ export function ShareView({
               <h2 className="text-sm font-semibold tracking-tight">Market read</h2>
               {staleReads.includes("market") && <PreviousRead why={staleWhy} />}
               <Fold text={market.summary} className="mt-2 text-sm leading-relaxed text-muted" />
+              {/* A covered market's figures that could not be read that day
+                  (lib/market-read-failed), said rather than left out. */}
+              {!market.liveBrief && liveReadFailedLine(market.liveReadFailed) && (
+                <p className="mt-2 text-xs text-caution" data-qa="live-read-failed">
+                  {liveReadFailedLine(market.liveReadFailed)}
+                </p>
+              )}
               {market.liveBrief && market.liveBrief.lines.length > 0 && (
                 <p className="mt-2 text-xs text-muted">
-                  {market.liveBrief.grain === "state"
-                    ? `Checked beside ${figureCount(market.liveBrief.lines.length)} for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the state's", "each the state's, not any metro's and not the building's", "none any metro's or the building's")}.`
-                    : `Checked beside ${figureCount(market.liveBrief.lines.length)} for the ${market.liveBrief.metro} market${placedByClause(market.liveBrief.placedBy)}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the metro's", "each the metro's, not the building's", "none the building's")}.`}
+                  {noneOwnOf(market.liveBrief)
+                    ? market.liveBrief.grain === "state"
+                      ? `Checked beside ${figureCount(market.liveBrief.lines.length)}, read on ${market.liveBrief.readOn} — each the nation's: none of the state of ${market.liveBrief.metro}'s own was current.`
+                      : `Checked beside ${figureCount(market.liveBrief.lines.length)}, read on ${market.liveBrief.readOn} — each the nation's: none of the ${market.liveBrief.metro} market's own was current${placedByClause(market.liveBrief.placedBy)}.`
+                    : market.liveBrief.grain === "state"
+                      ? `Checked beside ${figureCount(market.liveBrief.lines.length)} for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the state's", "each the state's, not any metro's and not the building's", "none any metro's or the building's")}.`
+                      : `Checked beside ${figureCount(market.liveBrief.lines.length)} for the ${market.liveBrief.metro} market${placedByClause(market.liveBrief.placedBy)}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the metro's", "each the metro's, not the building's", "none the building's")}.`}
                 </p>
               )}
               {/* A portfolio across markets (#413): each other market's own
@@ -627,9 +758,11 @@ export function ShareView({
                     : "";
                   return (
                     <p key={b.metro} className="mt-1 text-xs text-muted">
-                      {b.grain === "state"
-                        ? `${lead} ${b.lines.length} for the state of ${b.metro}${where}, read on ${b.readOn} — the state's, never the portfolio's.`
-                        : `${lead} ${b.lines.length} for the ${b.metro} market${where}, read on ${b.readOn} — the metro's, never the portfolio's.`}
+                      {noneOwnOf(b)
+                        ? `${lead} ${b.lines.length} of the nation's, read on ${b.readOn} — none of ${b.grain === "state" ? `the state of ${b.metro}'s` : `the ${b.metro} market's`} own was current${where}.`
+                        : b.grain === "state"
+                          ? `${lead} ${b.lines.length} for the state of ${b.metro}${where}, read on ${b.readOn} — the state's, never the portfolio's.`
+                          : `${lead} ${b.lines.length} for the ${b.metro} market${where}, read on ${b.readOn} — the metro's, never the portfolio's.`}
                     </p>
                   );
                 })}

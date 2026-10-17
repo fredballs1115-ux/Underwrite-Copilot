@@ -10,9 +10,12 @@ import {
   supplementPath,
 } from "@/lib/storage";
 
+// `byId`: who added it, so moving the deal between pipelines can tell the
+// creator's own notes and files from a teammate's (lib/personal-deal
+// `moveBlock`). Older entries carry none.
 type Supp = {
-  notes: { id: string; text: string; createdAt: string }[];
-  files: { id: string; name: string; path: string; createdAt: string }[];
+  notes: { id: string; text: string; createdAt: string; byId?: string }[];
+  files: { id: string; name: string; path: string; createdAt: string; byId?: string }[];
 };
 type SuppMap = Record<string, Supp>;
 
@@ -45,7 +48,7 @@ async function loadDeal(dealId: string) {
     .eq("id", dealId)
     .maybeSingle();
   if (!data) return null;
-  return { supabase, map: (data.supplements as SuppMap | null) ?? {} };
+  return { supabase, userId: user.id, map: (data.supplements as SuppMap | null) ?? {} };
 }
 
 function tabBucket(map: SuppMap, tab: string): Supp {
@@ -65,6 +68,7 @@ export async function addSupplementNote(formData: FormData) {
     id: crypto.randomUUID(),
     text: text.slice(0, 4000),
     createdAt: new Date().toISOString(),
+    byId: ctx.userId,
   });
   const { error } = await ctx.supabase
     .from("deals")
@@ -105,6 +109,7 @@ export async function addSupplementFile(formData: FormData) {
     name: file.name,
     path,
     createdAt: new Date().toISOString(),
+    byId: ctx.userId,
   });
   const { error } = await ctx.supabase
     .from("deals")

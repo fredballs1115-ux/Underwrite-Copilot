@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
+  analyticsScope,
   deriveAnalytics,
   fmtUsdCompact,
   middleRead,
@@ -10,16 +11,34 @@ import {
   parsedPhrase,
   stageCountLine,
   stageCounts,
+  marketRows,
+  unitTileSub,
   type AnalyticsRow,
-  type MiddleRead,
 } from "@/lib/analytics";
-import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
+import { STAGES, STAGE_LABEL, normalizeStage, parseStageHistory } from "@/lib/stages";
+import { deathReasons } from "@/lib/deal-outcome";
+import { brokerDealFit, brokerScorecard, dealFirms, partialText, rateText } from "@/lib/brokerage";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { evaluateBuyBox } from "@/lib/criteria";
+import { scoreMandateFit } from "@/lib/mandate";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { getTeam } from "@/lib/teams";
 import { isPlanDeal } from "@/lib/deal-strategy";
-import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
+import { pctText } from "@/lib/plan-facts";
+import { ANALYTICS_MIN_DEALS, AnalyticsEmptyPicture, DotTimeline, VerdictMix, StageFunnel } from "./charts";
+import { MarketTable } from "./market-table";
+import { scorecardNote } from "./scorecard-note";
+import { readAllResult } from "@/lib/read-all";
+import { typedByHand } from "@/lib/manual-deal";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 export const metadata: Metadata = { title: "Analytics" };
 
-const pct = (v: number) => `${v.toFixed(1)}%`;
+// A going-in cap and a yield on cost to two decimals, as each deal's own
+// header and pipeline card print it (lib/plan-facts): a dot labelled "5.5%"
+// was a deal whose card said "5.45%".
+const pct = pctText;
 
 /**
  * Portfolio analytics: what the user's own screens add up to. Every number
@@ -31,23 +50,49 @@ export default async function AnalyticsPage() {
   if (!user) redirect("/login?next=/analytics");
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("deals")
-    .select("id, name, asset_class, created_at, is_sample, stage, verdict, extraction")
-    .not("extraction", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(300);
-  if (error) {
-    throw new Error(`Couldn't load your portfolio: ${error.message}`);
+  // Every screened deal the reader can see — their own and their team's, as
+  // row-level security hands them over — newest first, a page at a time
+  // (lib/read-all). The read had been the OLDEST 300: past them every newer
+  // screen, the ones a reader looks for, was missing from every figure, and
+  // nothing said so (research pass 42).
+  const { data, error } = await readAllResult<
+    AnalyticsRow & { user_id?: string | null; stage_history?: unknown; address?: unknown; team_id?: string | null }
+  >((from, to) =>
+    supabase
+      .from("deals")
+      // The first signal too: the deal's kind is read with it, as on its page.
+      // The stage moves too: why each dead deal died (lib/deal-outcome).
+      // …and the address and the team, for each deal's buy-box fit by its
+      // brokerage, judged as the pipeline judges it.
+      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, team_id, address, stage_history, extraction, first_signal")
+      .not("extraction", "is", null)
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
+  if (error || !data) {
+    throw new Error(`Couldn't load your portfolio: ${(error as { message?: string } | null)?.message ?? "the read failed"}`);
   }
 
-  const deals = deriveAnalytics((data ?? []) as AnalyticsRow[]);
+  const deals = deriveAnalytics(data);
+  // Whose screens the figures are, as the read finds them: the page says
+  // the team's where any is among them, never "an OM you ran" over a
+  // teammate's deal. Counted as deriveAnalytics counts: screened, not the
+  // sample.
+  const pooled = data.filter((r) => !r.is_sample && r.extraction != null);
+  const own = pooled.filter((r) => r.user_id === user.id).length;
+  // A deal typed by hand was extracted from no OM, and the words say so.
+  const typed = pooled.filter((r) => typedByHand(r.extraction as ExtractionResult | null)).length;
   const capPoints = deals
     .filter((d) => d.capPct != null)
-    .map((d) => ({ at: d.at, value: d.capPct!, name: d.name }));
+    .map((d) => ({ at: d.at, value: d.capPct!, name: d.name, id: d.id }));
+  // A standing multifamily building's price per unit only: a plan deal's
+  // all-in cost per unit is another basis (lib/analytics
+  // `costPerUnit`), and the two pooled had read as one median.
   const unitPoints = deals
     .filter((d) => d.perUnit != null)
-    .map((d) => ({ at: d.at, value: d.perUnit!, name: d.name }));
+    .map((d) => ({ at: d.at, value: d.perUnit!, name: d.name, id: d.id }));
+  const planCostCount = deals.filter((d) => d.costPerUnit != null).length;
   // Plan deals have no going-in cap — their stabilized figure is the finished
   // project's, judged on yield on total cost — so they sit outside the cap
   // series and are counted, and read, on their own.
@@ -87,38 +132,66 @@ export default async function AnalyticsPage() {
     }))
     .filter((r) => r.count > 0);
 
-  // Markets table — the durable "table view" behind the charts.
-  const byMarket = new Map<string, typeof deals>();
-  for (const d of deals) {
-    const key = d.market.trim() || "Unlabeled";
-    byMarket.set(key, [...(byMarket.get(key) ?? []), d]);
-  }
-  const markets = [...byMarket.entries()]
-    .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 6)
-    .map(([market, list]) => ({
-      market,
-      n: list.length,
-      cap: middleRead(list.map((d) => d.capPct).filter((v): v is number => v != null)),
-      unit: middleRead(list.map((d) => d.perUnit).filter((v): v is number => v != null)),
-      go: list.filter((d) => d.verdict === "pass").length,
-    }));
+  // Markets table — the durable "table view" behind the charts — grouped as
+  // /market's own memory groups them (lib/analytics `marketRows`), so one
+  // market's spellings are one row on both pages.
+  const markets = marketRows(deals);
 
-  const enough = deals.length >= 3;
+  const enough = deals.length >= ANALYTICS_MIN_DEALS;
+
+  // Why deals die (research pass 24, B4): each reason's count over the dead
+  // deals, read off the move that killed each one; a dead deal with no
+  // reason recorded is counted as such, never folded into one.
+  const dying = deathReasons(
+    data.filter((r) => !r.is_sample).map((r) => ({ stage: r.stage ?? null, history: parseStageHistory(r.stage_history) })),
+  );
+  const recordedDeaths = dying.dead - dying.unrecorded;
+  const maxReason = Math.max(1, ...dying.reasons.map((r) => r.count));
+
+  // By brokerage (research pass 24, B13): the firms the memoranda name, the
+  // deals each sent, how many fit the buy box of the deal's own scope (its
+  // team's, else the reader's) and how many the screen called Go — the fit
+  // read off the pipeline card's check source (lib/buy-box-chip
+  // `dealCheckSource`) and, as the card says it, a call only on the whole
+  // box: a fit on part of the box is counted apart (lib/brokerage
+  // `brokerDealFit`). A box that cannot be read judges nothing.
+  const team = await getTeam(supabase, user.id).catch(() => null);
+  const [personalBox, teamBox] = await Promise.all([
+    getBuyBoxForDeal(user.id, null).catch(() => null),
+    team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
+  ]);
+  const brokers = brokerScorecard(
+    pooled.map((r) => {
+      const extraction = r.extraction as ExtractionResult | null;
+      const box = r.team_id ? teamBox : personalBox;
+      const address = addressUpgrade(r.address, extraction) ?? ((r.address as StructuredAddress | null | undefined) ?? null);
+      const source = box ? dealCheckSource(extraction, (r.first_signal as FirstSignal | null) ?? null, address) : null;
+      const judged =
+        box && source
+          ? brokerDealFit(evaluateBuyBox(r.asset_class ?? "auto", source, box), scoreMandateFit(r.asset_class ?? "", source, box))
+          : null;
+      return {
+        firms: dealFirms(extraction),
+        fit: judged?.fit ?? null,
+        partial: judged?.partial ?? false,
+        verdict: (r.verdict as { verdict?: string } | null)?.verdict ?? null,
+      };
+    }),
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Analytics</h1>
-        <p className="mt-1 text-sm text-muted">
-          What your own screens add up to — every figure below was extracted
-          from an OM you ran, never restated.
+        <p className="mt-1 text-sm text-muted" data-qa="analytics-scope">
+          {analyticsScope(own, pooled.length - own, typed)}
         </p>
       </div>
 
       {!enough ? (
         <section className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center shadow-sm">
-          <h2 className="text-lg font-semibold tracking-tight">
+          <AnalyticsEmptyPicture screened={deals.length} />
+          <h2 className="mt-5 text-lg font-semibold tracking-tight">
             Screen a few deals first
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
@@ -147,9 +220,9 @@ export default async function AnalyticsPage() {
                     : parsedPhrase(capPoints.length),
               },
               {
-                label: unitRead.kind === "median" ? "Median $/unit" : "$/unit",
+                label: unitRead.kind === "median" ? "Median price / unit" : "Price / unit",
                 value: middleText(unitRead, fmtUsdCompact) ?? "—",
-                sub: parsedPhrase(unitPoints.length),
+                sub: unitTileSub(unitPoints.length, planCostCount),
               },
               {
                 label: "Go rate",
@@ -174,12 +247,12 @@ export default async function AnalyticsPage() {
             {capPoints.length >= 3 && (
               <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-sm font-semibold tracking-tight">
-                  Going-in cap rate, by screen date
+                  Going-in cap rate, by date added
                 </h2>
                 <p className="mb-2 mt-0.5 text-xs text-muted">
-                  One dot per deal — hover for the name.
+                  One dot per deal; each opens its deal.
                   {planDeals.length > 0 &&
-                    " Plan deals have no going-in cap and are not plotted."}
+                    " Plan deals are judged on yield on total cost and are not plotted."}
                 </p>
                 <DotTimeline points={capPoints} format={pct} medianLabel="median" />
               </div>
@@ -187,12 +260,12 @@ export default async function AnalyticsPage() {
             {unitPoints.length >= 3 && (
               <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
                 <h2 className="text-sm font-semibold tracking-tight">
-                  Price per unit, by screen date
+                  Price per unit, by date added
                 </h2>
                 <p className="mb-2 mt-0.5 text-xs text-muted">
                   Multifamily deals where price and unit count both parsed.
-                  {planDeals.length > 0 &&
-                    " A plan deal plots its total cost per planned unit."}
+                  {planCostCount > 0 &&
+                    " A plan deal's all-in cost per unit is another basis and is not plotted."}
                 </p>
                 <DotTimeline
                   points={unitPoints}
@@ -228,65 +301,81 @@ export default async function AnalyticsPage() {
             )}
           </section>
 
-          {markets.length > 0 && (
-            <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-              <h2 className="text-sm font-semibold tracking-tight">By market</h2>
+          {dying.dead > 0 && (
+            <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="why-deals-die">
+              <h2 className="text-sm font-semibold tracking-tight">Why deals die</h2>
+              <p className="mb-3 mt-0.5 text-xs text-muted">
+                {recordedDeaths > 0
+                  ? `${recordedDeaths} of ${dying.dead} dead deal${dying.dead === 1 ? "" : "s"} with a reason recorded.`
+                  : `${dying.dead} dead deal${dying.dead === 1 ? "" : "s"}, none with a reason recorded yet — tap one on the deal's page.`}
+              </p>
+              {recordedDeaths > 0 && (
+                <ul className="space-y-1.5">
+                  {dying.reasons.map((r) => (
+                    <li key={r.reason} className="flex items-center gap-2 text-sm">
+                      <span className="w-40 shrink-0 truncate text-xs text-muted">{r.label}</span>
+                      <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-line" aria-hidden>
+                        <span
+                          data-bar="why-dead"
+                          className="absolute inset-y-0 left-0 rounded-full bg-kill"
+                          style={{ width: `${Math.round((r.count / maxReason) * 100)}%` }}
+                        />
+                      </span>
+                      <span className="w-8 shrink-0 text-right font-mono text-xs tabular-nums">{r.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {brokers.rows.length > 0 && (
+            <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="by-brokerage">
+              <h2 className="text-sm font-semibold tracking-tight">By brokerage</h2>
               <div className="scroll-shadows-x mt-3 overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-sm">
                   <thead>
                     <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
-                      <th className="py-2 pr-3 font-medium">Market</th>
-                      <th className="py-2 pr-3 text-right font-medium">Screens</th>
-                      <th className="py-2 pr-3 text-right font-medium">Cap</th>
-                      <th className="py-2 pr-3 text-right font-medium">$/unit</th>
+                      <th className="py-2 pr-3 font-medium">Brokerage</th>
+                      <th className="py-2 pr-3 text-right font-medium">Deals</th>
+                      <th className="py-2 pr-3 text-right font-medium">Fit the box</th>
                       <th className="py-2 text-right font-medium">Go calls</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {markets.map((m) => (
-                      <tr key={m.market} className="border-b border-line/60">
-                        <td className="max-w-[16rem] truncate py-2 pr-3 font-medium">
-                          {m.market}
+                    {brokers.rows.slice(0, 12).map((b) => (
+                      <tr key={b.key} className="border-b border-line/60">
+                        <td className="max-w-[16rem] py-2 pr-3">
+                          <Link href={`/deals?broker=${encodeURIComponent(b.key)}`} className="font-medium text-brand hover:underline">
+                            {b.name}
+                          </Link>
+                          {b.names.length > 1 && (
+                            <span className="block truncate text-[11px] text-muted" title={b.names.join(" · ")}>
+                              {`as ${b.names.join(" · ")}`}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-2 pr-3 text-right tabular-nums">{m.n}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{b.received}</td>
                         <td className="py-2 pr-3 text-right tabular-nums">
-                          <MiddleCell read={m.cap} fmt={pct} />
+                          {rateText(b.fits, b.judged)}
+                          {b.partial > 0 && " "}
+                          {b.partial > 0 && <span className="block text-[11px] text-muted">{partialText(b.partial)}</span>}
                         </td>
-                        <td className="py-2 pr-3 text-right tabular-nums">
-                          <MiddleCell read={m.unit} fmt={fmtUsdCompact} />
-                        </td>
-                        <td className="py-2 text-right tabular-nums">{m.go}</td>
+                        <td className="py-2 text-right tabular-nums">{rateText(b.go, b.decided)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <p className="mt-2 text-xs text-muted">
-                Each figure is the market&rsquo;s median from three deals up; a
-                market with one or two shows those deals&rsquo; own, marked.
-                Deals whose figures didn&rsquo;t parse are counted in Screens
-                but not in the figures.
-                {planDeals.length > 0 &&
-                  " Plan deals carry no going-in cap and sit outside the cap figures."}
+                {scorecardNote(brokers.unnamed)}
               </p>
             </section>
           )}
+
+          {markets.length > 0 && <MarketTable rows={markets} planNote={planDeals.length > 0} />}
         </>
       )}
     </div>
-  );
-}
-
-/** A market's cap or $/unit cell: its median from three deals, and under
- *  that the deals' own figures, marked with how many there are. */
-function MiddleCell({ read, fmt }: { read: MiddleRead; fmt: (n: number) => string }) {
-  const text = middleText(read, fmt);
-  if (text == null) return <>—</>;
-  if (read.kind === "median") return <>{text}</>;
-  return (
-    <>
-      {text}{" "}
-      <span className="text-[11px] text-muted">{read.kind === "one" ? "1 deal" : "2 deals"}</span>
-    </>
   );
 }

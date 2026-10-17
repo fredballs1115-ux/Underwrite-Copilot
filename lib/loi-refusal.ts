@@ -9,7 +9,7 @@
 // sells it some other way, that is the wrong document, and the page says so
 // rather than drafting it.
 
-export type LoiRefusalKind = "note" | "share" | "leased_fee" | "auction" | "bankruptcy" | "bids";
+export type LoiRefusalKind = "note" | "share" | "tic" | "tic_all" | "gp_stake" | "position" | "leased_fee" | "auction" | "bankruptcy" | "bids";
 
 /** One sentence a refusal: what the memorandum sells or how, and why this
  *  letter is not the document for it. */
@@ -17,6 +17,25 @@ export const LOI_REFUSAL: Record<LoiRefusalKind, string> = {
   note: "No LOI draft here: this memorandum sells a loan secured by the property, not the property — a note is bought under a loan sale agreement, not a property letter of intent.",
   share:
     "No LOI draft here: this memorandum sells a share of the owning entity, not the property — a share is bought under the entity's own agreements, not a property letter of intent.",
+  // An undivided interest held as a tenant in common (research pass 37): the
+  // real estate's, never an entity's share — but not the whole property, and
+  // held under the co-owners' agreement, which this draft has no terms for.
+  tic: "No LOI draft here: this memorandum sells an undivided interest in the property, held as a tenant in common beside its co-owners, and this draft is written to buy a property outright, with no terms for the co-owners' agreement the interest is held under.",
+  // All the tenant-in-common interests (the audit C3b LOW-1): together the
+  // whole property, but conveyed by each co-owner, while this draft buys from
+  // one owner.
+  tic_all:
+    "No LOI draft here: this memorandum sells all the tenant-in-common interests in the property, together the whole property, and every co-owner must sign and convey its own interest, while this draft is written to buy a property from one owner.",
+  // A share of the general partner's interest (research pass 37): a share of
+  // a share, bought under the partnership's and the general partner's own
+  // agreements.
+  gp_stake:
+    "No LOI draft here: this memorandum sells a share of the general partner's interest, not the property — a share of a share is bought under the partnership's and the general partner's own agreements, not a property letter of intent.",
+  // A preferred equity position (lib/position): capital put into the owning
+  // entity for a preferred return and a redemption — nothing is conveyed
+  // by the property's owner, so a property purchase is the wrong paper.
+  position:
+    "No LOI draft here: this memorandum sells a preferred equity position in the owning entity, not the property — a position is bought under the entity's own agreements, not a property letter of intent.",
   leased_fee:
     "No LOI draft here: this memorandum sells the leased fee — the land under a building someone else owns, with its ground lease — and this draft is written to buy a property outright, with no terms for the lease the land is sold with.",
   auction:
@@ -31,6 +50,10 @@ export const LOI_REFUSAL: Record<LoiRefusalKind, string> = {
 export const LOI_REFUSAL_CODE: Record<LoiRefusalKind, string> = {
   note: "loinote",
   share: "loishare",
+  tic: "loitic",
+  tic_all: "loiticall",
+  gp_stake: "loigpstake",
+  position: "loiposition",
   leased_fee: "loileasedfee",
   auction: "loiauction",
   bankruptcy: "loibankruptcy",

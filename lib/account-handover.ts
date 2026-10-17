@@ -15,26 +15,26 @@
 // team sets its deals' team_id null, and such a deal goes with the account.
 //
 // Every list is read a page at a time and every write names its rows a chunk
-// of ids at a time: PostgREST answers a read with at most its max-rows, and a
-// filter of a few hundred ids makes a URL tens of KB long. The caller stops
+// of ids at a time: a Supabase project answers a read with at most its max
+// rows — 1,000 by Supabase's own default, where PostgREST's is no limit
+// (lib/read-all) — and a filter of a few hundred ids makes a URL tens of KB
+// long. The caller stops
 // the deletion on any failure (`ok: false`), with the counts of what had
 // already moved, so the page can say so.
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ID_CHUNK, READ_PAGE, chunks, readAll } from "@/lib/read-all";
+
+// The paging and chunking live in lib/read-all, shared with every reader
+// that counts, totals or lists a whole table (research pass 42).
+export { READ_PAGE, chunks, readAll };
 
 /** The deal-scoped tables whose rows are a member's own work on a deal, each
  *  keyed by deal_id and user_id. */
 export const TEAM_WORK_TABLES = ["deal_versions", "valuations", "rent_roll_imports"] as const;
 
-/** Ids an `in` filter carries per request. A UUID takes 39 characters of the
- *  URL once the comma after it is encoded, so a hundred keep the request line
- *  near 4 KB, inside the 8 KB a proxy commonly allows. */
-export const HANDOVER_CHUNK = 100;
-
-/** Rows a read asks for per page — PostgREST's default max-rows. A server
- *  set to answer fewer is read correctly too: the next page starts after
- *  the rows that came back, and the read ends at an empty page. */
-export const READ_PAGE = 1000;
+/** Ids an `in` filter carries per request (lib/read-all `ID_CHUNK`). */
+export const HANDOVER_CHUNK = ID_CHUNK;
 
 /** What a handover did. */
 export interface Handover {
@@ -47,29 +47,6 @@ export interface Handover {
   deals: number;
   /** rows of the user's own work on team deals handed to the team's owner */
   work: number;
-}
-
-type Result<T> = PromiseLike<{ data: T[] | null; error: unknown }>;
-
-/** Every row a read matches, a page at a time — null if any page fails. The
- *  read must be ordered, so the pages do not overlap. */
-export async function readAll<T>(page: (from: number, to: number) => Result<T>): Promise<T[] | null> {
-  const rows: T[] = [];
-  for (let from = 0; ; ) {
-    const { data, error } = await page(from, from + READ_PAGE - 1);
-    if (error) return null;
-    const got = data ?? [];
-    if (got.length === 0) return rows;
-    rows.push(...got);
-    from += got.length;
-  }
-}
-
-/** A list in runs of at most `size`. */
-export function chunks<T>(list: readonly T[], size = HANDOVER_CHUNK): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
-  return out;
 }
 
 /** Ids grouped by the owner each is handed to; an id with no owner is left. */

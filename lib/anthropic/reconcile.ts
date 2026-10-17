@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import {
@@ -45,10 +45,16 @@ export async function reconcileModel(
 ): Promise<ReconciliationResult> {
   const client = getAnthropic();
 
-  // OM document FIRST with cache_control — byte-identical to the prefix the
-  // extract/challenge/comps/market steps send, so this step reads the OM from
-  // the prompt cache (and re-warms it) instead of paying a full re-read of a
-  // 150-200pp PDF. The label text moves after the document for that reason.
+  // OM document FIRST with cache_control, the step's label text after it, so
+  // nothing step-specific sits before the breakpoint. The document is the
+  // memorandum's pages — the caller builds its source without `textFirst`
+  // (./om-source) — where the screen's steps send the deck's own text layer
+  // whenever that layer is dense enough to stand in for the pages; so this
+  // prefix matches theirs only on a deck the screen also read as pages, and
+  // even then its structured-output format is its own, which Anthropic's
+  // documentation says invalidates the prompt cache. Whether it reads
+  // anything back from their cache is the ledger's to say (./models).
+  // Reading the text layer here is the owner's call (research pass 41, L7).
   const content: Anthropic.ContentBlockParam[] = [
     omDocument(om),
     {
@@ -82,7 +88,7 @@ export async function reconcileModel(
         max_tokens: MAX_TOKENS.analysis,
         system: ANALYST_SYSTEM,
         messages,
-        output_config: { format: zodOutputFormat(ReconciliationSchema) },
+        output_config: { format: screenOutputFormat(ReconciliationSchema) },
       }, anyOmRequestOptions(om, modelOm)),
     );
   } finally {

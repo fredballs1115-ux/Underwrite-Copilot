@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import { priceRange, priceRangeShort } from "@/lib/criteria";
+import type { HeroFigure } from "@/lib/hero-figure";
+import { ToolRow } from "./tool-row";
+
+// The figure a tile holds, and the price slot's reader, live in
+// lib/hero-figure so a page that draws this header outside the deal page
+// (the homepage's sample, lib/sample-header) reads the price the same way.
+export { priceFigureOf, type HeroFigure } from "@/lib/hero-figure";
 
 /**
  * The deal's header, laid out the way a listing opens (#433): the
@@ -20,31 +26,10 @@ import { priceRange, priceRangeShort } from "@/lib/criteria";
  * Pure: the page hands in the picture, the chips and the controls, and the
  * render test draws it on a fixture.
  */
-export interface HeroFigure {
-  label: string;
-  value: string | null;
-  /** a figure, set in the mono face; a word like the deal type is not */
-  figure?: boolean;
-  /** hover text — the deal type's one-line summary, or a price range as
-   *  the memorandum states it */
-  title?: string;
-}
-
-/**
- * The price slot's figure. A price the memorandum states as a range (#466)
- * is drawn the way the pipeline draws it — "$9–9.5M", `priceRangeShort` —
- * with the range as stated in its title: a tile holds one figure on one
- * line, and "$9,000,000 – $9,500,000" ran 192px in a phone's 121px tile,
- * cut to "$9,000,000 – $9". A single figure, or words, stay as stated. The
- * header and the bar that keeps the deal in view both draw this one figure,
- * so the two say the price word for word.
- */
-export function priceFigureOf(label: string, stated: string | null): HeroFigure {
-  const range = stated ? priceRange(stated) : null;
-  return range && stated
-    ? { label, value: priceRangeShort(range), title: `As stated: ${stated.trim()}`, figure: true }
-    : { label, value: stated, figure: true };
-}
+/** The deal's name: wraps anywhere it must (`overflow-wrap: anywhere`, which
+ *  also lets the flex row shrink it) and stops at three lines, the whole name
+ *  in its title. */
+export const HERO_TITLE = "line-clamp-3 min-w-0 text-xl font-semibold tracking-tight [overflow-wrap:anywhere] @3xl:text-2xl";
 
 // One column by default: the picture, the facts, the tools, the panels.
 // Split at the header's own 48rem, and only while a picture is there.
@@ -59,11 +44,13 @@ export function DealHero({
   chips,
   subtitle,
   figures,
+  facts: factsIn = [],
   picture,
   actions,
   controls,
   children,
   reading = false,
+  titleAs: Title = "h1",
 }: {
   title: string;
   /** the call and the buy-box fit, beside the name */
@@ -71,6 +58,10 @@ export function DealHero({
   /** the address and the asset class */
   subtitle: ReactNode;
   figures: HeroFigure[];
+  /** the building's own facts the memorandum states (lib/hero-figure
+   *  `buildingFacts`: the year built, today's occupancy), on a line under
+   *  the tiles; a fact with no value is left out */
+  facts?: HeroFigure[];
   /** the building's picture (PropertyVisual); null where the deal has no
    *  address and no photograph */
   picture?: ReactNode;
@@ -84,7 +75,12 @@ export function DealHero({
    *  a figure not read yet shimmers in place of the dash a finished screen
    *  gives a figure its memorandum does not state */
   reading?: boolean;
+  /** the name's heading level: the deal page's own heading, an h1; a page
+   *  that draws the header under a heading of its own (the homepage's
+   *  sample, lib/sample-header) keeps one h1 on the page */
+  titleAs?: "h1" | "h2";
 }) {
+  const facts = factsIn.filter((f) => f.value);
   return (
     // No overflow-hidden on the card: the share panel and the deal's menu open
     // out of the toolbar as popovers and must not be clipped by it. The
@@ -92,10 +88,20 @@ export function DealHero({
     // is the card's last row.
     <header data-deal-hero className="@container shadow-card rounded-2xl border border-line bg-surface">
       <div className={GRID}>
-        <div className="@container/facts flex min-w-0 flex-col justify-center gap-4 px-6 py-5 [grid-area:facts]">
+        {/* The name, the call and the figures: the block the bar that keeps
+            the deal in view watches (`DealStickyBar`), never the whole
+            header, whose deal-kind panels run on for screens below it. */}
+        <div data-deal-hero-facts className="@container/facts flex min-w-0 flex-col justify-center gap-4 px-6 py-5 [grid-area:facts]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight @3xl:text-2xl">{title}</h1>
+              {/* Focusable from script only: "Back to the top" lands here,
+                  out of the sticky bar that hides as it goes. A name wraps
+                  anywhere it must — a URL pasted as the name had widened a
+                  phone's page to 711px — and a long one stops at three
+                  lines, the whole name in its title (research pass 42). */}
+              <Title id="deal-title" tabIndex={-1} title={title} className={HERO_TITLE}>
+                {title}
+              </Title>
               {chips}
             </div>
             <p className="mt-1 line-clamp-2 text-sm text-muted">{subtitle}</p>
@@ -136,18 +142,37 @@ export function DealHero({
               </div>
             ))}
           </dl>
+          {/* The building's own facts the memorandum states — the year
+              built, today's occupancy — on one short line under the tiles,
+              never as tiles of their own: six tiles had run a phone's
+              header to three rows. Only where stated; nothing otherwise. */}
+          {facts.length > 0 && (
+            <dl data-qa="hero-facts" className="-mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {facts.map((f) => (
+                <div key={f.label} className="flex items-baseline gap-1.5" title={f.title}>
+                  <dt className="text-muted">{f.label}</dt>
+                  <dd className="font-mono font-semibold tabular-nums">{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
 
         {picture ? <div className="min-w-0 [grid-area:pic]">{picture}</div> : null}
 
+        {/* The tools, then the deal's state: on a phone a row each that
+            scrolls sideways (ToolRow), from `sm` one wrapping row. */}
         {actions || controls ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-line bg-faint/50 px-4 py-3 [grid-area:actions] [&:has(+_div:empty)]:rounded-b-[15px]">
-            {actions}
-            {controls ? <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">{controls}</div> : null}
+          <div className="flex flex-col gap-2 border-t border-line bg-faint/50 px-4 py-3 [grid-area:actions] sm:flex-row sm:flex-wrap sm:items-center [&:has(+_div:empty)]:rounded-b-[15px]">
+            {actions ? <ToolRow row="tools">{actions}</ToolRow> : null}
+            {controls ? <ToolRow row="controls">{controls}</ToolRow> : null}
           </div>
         ) : null}
 
-        <div className="px-6 pb-5 [grid-area:panels] empty:hidden">{children}</div>
+        {/* The panels' well: 12px inside the card on a phone, where 24px of
+            it, the card's border and each panel's own edge and padding left
+            a 263px column of text on a 390px screen (research pass 36). */}
+        <div className="px-3 pb-5 sm:px-6 [grid-area:panels] empty:hidden">{children}</div>
       </div>
     </header>
   );

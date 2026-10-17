@@ -30,18 +30,32 @@ describe("a team member's own deal, said as one", () => {
     expect(dealLanding("d-1", false)).toBe("/deals/d-1");
   });
 
+  it("the OM upload form lands through it too, so its notice is never dropped (research pass 32)", () => {
+    // The form calls createDealFromBatch and pushes the landing itself; it
+    // had pushed `/deals/<id>` and ignored `personal`.
+    const form = read("app/(app)/deals/pipeline.tsx");
+    expect(form).toContain("router.push(dealLanding(res.dealId, !!res.personal))");
+    expect(form).not.toMatch(/router\.push\(`\/deals\/\$\{res\.dealId\}`\)/);
+  });
+
   it("the deal page says it, counting the trial by the constant the action counts by, and only while it is so", () => {
     expect(filedPersonalNotice(TEAM_TRIAL_DEALS)).toContain(`the team's ${TEAM_TRIAL_DEALS} trial deals were in use`);
     const page = read("app/(app)/deals/[id]/page.tsx");
     expect(page).toContain("filedPersonalNotice(TEAM_TRIAL_DEALS)");
     // The reader's own deal, in no team's pipeline, the reader on a team.
-    expect(page).toContain("filed === FILED_PERSONAL && !!user && ownership.user_id === user.id && !ownership.team_id");
-    expect(page).toMatch(/\.from\("team_members"\)\.select\("team_id"\)\.eq\("user_id", user\.id\)\.maybeSingle\(\)/);
+    // The team read is shared with the deal menu's move (moveDeal), read for
+    // the creator of a deal that is not the sample.
+    expect(page).toContain("const isCreator = !!user && ownership.user_id === user.id;");
+    expect(page).toContain("filed === FILED_PERSONAL && isCreator && !ownership.team_id && !!readerTeam");
+    expect(page).toMatch(/\.from\("team_members"\)\s*\.select\("team_id, teams\(name\)"\)\s*\.eq\("user_id", user!\.id\)\s*\.maybeSingle\(\)/);
   });
 
   it("the pipeline page marks a deal no team holds as personal only for a reader on a team", () => {
     const page = read("app/(app)/deals/page.tsx");
-    expect(page).toContain("personal: !!billing?.team && !d.team_id,");
+    // The page hands its team to the card builder (lib/pipeline-card), and
+    // the list beside it.
+    expect(page).toContain("onTeam: !!billing?.team,");
+    expect(read("lib/pipeline-card.ts")).toContain("personal: ctx.onTeam && !d.team_id,");
     expect(page).toContain("onTeam={!!billing?.team}");
   });
 

@@ -1,22 +1,28 @@
-import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
+import { SAMPLE_EXPORT_PATH, exportGate, exportGateDealOf } from "@/lib/sample-exports";
 import {
-  MemoDocument,
+  renderMemoPdf,
   buildMemoData,
   type MemoData,
+  type MemoExchange,
 } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
-import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { verdictBehind } from "@/lib/screen-run";
 import { coverPictureFor } from "@/lib/memo/cover-aerial";
+import { actualsFromRows, actualsShortLine } from "@/lib/actuals/actuals-read";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { shownAssetClass } from "@/lib/asset-class";
+import { pdfSafe } from "@/lib/memo/pdf-text";
 import type { DealVisualCache } from "@/lib/deal-location";
 
 // PDF generation needs the Node runtime (not edge).
@@ -43,9 +49,20 @@ export async function GET(
     );
   }
 
-  // The PDF memo is a Pro feature. On Free, send the user straight to the
-  // upgrade path with an ?upsell tag so the billing page explains why they
-  // landed there (never a raw error page, never a silent/mystery redirect).
+  const { data, error } = await supabase
+    .from("deals")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return Response.redirect(new URL(`/deals/${id}?error=exportfail`, req.url), 302);
+  if (!data) return new Response("Not found", { status: 404 });
+
+  // The PDF memo is a Pro feature — except on the reader's own sample deal,
+  // which the public pages promise free (lib/sample-exports). On Free, send
+  // the user straight to the upgrade path with an ?upsell tag so the billing
+  // page explains why they landed there (never a raw error page, never a
+  // silent/mystery redirect).
+  const gateDeal = exportGateDealOf(data as { is_sample?: boolean | null; om_storage_path?: string | null });
   let pro = false;
   try {
     pro = await isPro(supabase, user.id);
@@ -57,17 +74,15 @@ export async function GET(
       302,
     );
   }
-  if (!pro) {
+  const gate = exportGate(pro, gateDeal);
+  // A free reader on the sample gets the public sample's own file, never one
+  // built from the row, which the reader can write (lib/sample-exports).
+  if (gate === "sample") {
+    return Response.redirect(new URL(SAMPLE_EXPORT_PATH.memo, req.url), 302);
+  }
+  if (gate === "upsell") {
     return Response.redirect(new URL(`/billing?upsell=memo`, req.url), 302);
   }
-
-  const { data, error } = await supabase
-    .from("deals")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) return Response.redirect(new URL(`/deals/${id}?error=exportfail`, req.url), 302);
-  if (!data) return new Response("Not found", { status: 404 });
 
   const deal = data as DealRow;
   // A memo without a verdict is a near-blank, brand-damaging PDF — refuse it.
@@ -83,7 +98,9 @@ export async function GET(
   // it until the run finishes, or is run again (lib/screen-run).
   const { data: latestJob } = await supabase
     .from("analysis_jobs")
-    .select("status, step")
+    // Its last write too: a run that stopped making progress is waited on
+    // by nothing, and the refusal says so (lib/screen-run `isStalled`).
+    .select("status, step, updated_at")
     .eq("deal_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -91,45 +108,51 @@ export async function GET(
   const behind = verdictBehind(latestJob);
   if (behind) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=${behind === "running" ? "memorunning" : "memostale"}`, req.url),
+      new URL(`/deals/${id}?error=${behind === "running" ? "memorunning" : behind === "stalled" ? "memostalled" : "memostale"}`, req.url),
       302,
     );
   }
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // The day the memo is dated: the reader's own (lib/reader-day), never the
+  // server's UTC day, which is tomorrow from 8 pm Eastern — and the day its
+  // file is named for and its dated lines (the rent allowance in force, a
+  // delivery's clock) are read on, read once so the three cannot differ.
+  const tz = (await cookies()).get(TZ_COOKIE)?.value;
+  const now = new Date();
+  const dateStr = readerDateLong(tz, now);
+  const readerDay = readerToday(tz, now);
 
   // The buyer's standing criteria, so the forwarded page carries the fit call.
   // Best-effort: no box (or a pre-0008 schema) just means no buy-box row.
   let buyBoxChecks: BuyBoxCheck[] = [];
+  // The reader's 1031 exchange, where the box holds one (lib/exchange-deal):
+  // its deadlines against this deal, read on the reader's own day
+  // (lib/reader-day) as the deal header's chip reads them.
+  let exchange: MemoExchange | null = null;
   try {
     const ownership = deal as unknown as {
       user_id: string;
       team_id: string | null;
     };
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
+    if (box?.exchange) exchange = { block: box.exchange, readerDay };
     if (box) {
-      // The same source the deal page judges: the extraction widened with the
-      // first signal and the deal's structured address, and the deal's kind
-      // as the page infers it — so a criterion the page calls "in territory"
-      // is never "unknown" on the PDF.
+      // The same source the deal page judges (lib/buy-box-chip
+      // `dealCheckSource`): the extraction widened with the first signal and
+      // the deal's structured address, the deal's kind as the page infers it
+      // and what the price buys — so a criterion the page calls "in
+      // territory" is never "unknown" on the PDF, nor a cap the page
+      // withholds held to the box's floor.
       const extraction = (deal.extraction as ExtractionResult | null) ?? null;
       const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
       buyBoxChecks = evaluateBuyBox(
         deal.asset_class,
-        buyBoxCheckSource(
-          extraction,
-          firstSignal,
-          (deal.address as StructuredAddress | null) ?? null,
-          inferStrategy(extraction, firstSignal).kind,
-        ),
+        dealCheckSource(extraction, firstSignal, (deal.address as StructuredAddress | null) ?? null),
         box,
       );
     }
   } catch {
     buyBoxChecks = [];
+    exchange = null;
   }
 
   // Custom firm branding (Feature 6) — best-effort; any failure (pre-0021
@@ -177,13 +200,47 @@ export async function GET(
       (deal.address as StructuredAddress | null) ?? null,
       ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
     );
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover);
-    // MemoDocument renders a <Document>; cast to the element type renderToBuffer
-    // expects (it's typed for a Document element, not a wrapping component).
-    const element = React.createElement(MemoDocument, {
-      data: memo,
-    }) as unknown as Parameters<typeof renderToBuffer>[0];
-    const buffer = await renderToBuffer(element);
+    // The rent allowance in force is read on the reader's day — the day the
+    // memo is dated and its file named for (lib/rent-regulation).
+    // The deal's rent roll and T-12 against the memorandum, in one line
+    // beside the key terms (research pass 24, B3) — the report's own read.
+    // A read that fails prints no line, never a claim the documents hold
+    // nothing.
+    const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+    const [rrRes, t12Res] = await Promise.all([
+      supabase
+        .from("deal_rent_rolls")
+        .select("as_of_date, summary")
+        .eq("deal_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("deal_t12_statements")
+        .select("period_end_date, summary")
+        .eq("deal_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const actualsLine =
+      rrRes.error || t12Res.error
+        ? ""
+        : pdfSafe(
+            actualsShortLine(
+              actualsFromRows(
+                extraction,
+                inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null),
+                shownAssetClass(deal.asset_class as string | null, extraction) || null,
+                rrRes.data,
+                t12Res.data,
+              ),
+            ),
+          );
+    const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange), actualsLine };
+    // The line rides where the page has room for it (`renderMemoPdf`): the
+    // one-page memo stays on one page.
+    const buffer = await renderMemoPdf(memo);
 
     const safe =
       (deal.name || "deal")
@@ -194,7 +251,7 @@ export async function GET(
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safe}-screening-memo-${new Date().toISOString().slice(0, 10)}.pdf"`,
+        "Content-Disposition": `attachment; filename="${safe}-screening-memo-${readerDay}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

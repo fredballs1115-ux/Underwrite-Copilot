@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { compareInterest, goingInCapFigure, modelReturnsRead, noteCapSlot } from "@/lib/compare-interest";
+import { compareInterest, goingInCapFigure, modelReturnsRead, noteCapSlot, withheldWord } from "@/lib/compare-interest";
 
 const row = (label: string, value: string, page = "p. 5") => ({ label, value, flagged: false, page });
 const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
@@ -65,6 +65,19 @@ describe("compareInterest — the compare table's model figures, read for what t
     expect(unstated.withheld).toBe("share");
   });
 
+  // Research pass 37: "50% of the general partner interest" had been grossed
+  // up 2× and its cap struck on a building price the memorandum never states.
+  it("a share of the general partner's interest is a share of a share: no cap, the returns withheld, each cell 'n/a — share'", () => {
+    const gp = deal({ ...blank, kind: "partial_interest", share: "50% of the general partner interest" }, []);
+    const r = modelReturnsRead(gp, MODEL);
+    expect(r).toMatchObject({ tag: "GP stake 50%", cap: null, withheld: "share", share: true });
+    expect(r.line).toBe(
+      "A share of the general partner's interest is a share of a share: this model ran the whole building's cash flows at its price, so its cap and returns are withheld.",
+    );
+    // Withheld whatever price the model ran at: nothing grosses the stake up.
+    expect(compareInterest(gp, { ...MODEL, purchasePrice: 40_000_000 }).withheld).toBe("share");
+  });
+
   it("a leasehold and a leased fee stand as the model runs them, with what the price buys beside it", () => {
     const AS_OF = new Date(Date.UTC(2026, 8, 25));
     const lease = [row("Ground lease expiration", "December 31, 2071")];
@@ -100,7 +113,7 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     const slot = noteCapSlot(note, AS_OF);
     expect(slot?.ytmPct).toBe(compareInterest(note, null, AS_OF).noteYtmPct);
     expect(slot?.ytmPct).not.toBeNull();
-    expect(noteCapSlot(npl, AS_OF)).toEqual({ ytmPct: null });
+    expect(noteCapSlot(npl, AS_OF)).toEqual({ ytmPct: null, of: "note" });
     // Anything but a note keeps its cap slot.
     expect(noteCapSlot(deal(undefined, terms), AS_OF)).toBeNull();
     expect(noteCapSlot(deal({ ...blank, kind: "leasehold" }, terms), AS_OF)).toBeNull();
@@ -120,11 +133,58 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     // The page is a loader over the Supabase row, so its wiring is held at
     // its source (as lib/memo/documents-review.test.ts holds the routes').
     const src = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
-    expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null\), figure: true \}/);
+    // On the reader's day (lib/reader-day), as the playground, the CSV and
+    // the workbook read a note's or a position's dates (the audit of
+    // 2026-10-05).
+    expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null, readerNoon\), figure: true \}/);
+    expect(src).toMatch(/const readerNoon = new Date\(`\$\{todayIso\}T12:00:00Z`\);/);
+    expect(src).toMatch(/readInterest\(extraction, askingPriceOf\(extraction\), readerNoon\)/);
+    expect(src).toMatch(/modelReturnsRead\(extraction, \{ \.\.\.model\.returns, holdYears: model\.holdYears \}, readerNoon\)/);
+    expect(src).toMatch(/modelReturnsRead\(extraction, screeningCompareModel\(derived\.inputs\), readerNoon\)/);
     expect(src).not.toMatch(/\{ label: "Going-in cap", value: summaryCap \?\? null, figure: true \}/);
-    expect(src).toMatch(/capText=\{noteCap \? null : summaryCap\}/);
-    expect(src).toMatch(/capWithheld=\{noteCap \? "note" : null\}/);
-    expect(readFileSync("app/(app)/deals/[id]/research-panel.tsx", "utf8")).toMatch(/capWithheld === "note"/);
+    // The slot's own kind, read by the one rule every surface reads
+    // (`capSlotWithheld`): a note's, a preferred equity position's, or a
+    // share's beside the loan its entity carries.
+    expect(src).toMatch(/const capWithheld = capSlotWithheld\(extraction\);/);
+    expect(src).toMatch(/capText=\{capWithheld \? null : summaryCap\}/);
+    expect(src).toMatch(/capWithheld=\{capWithheld\}/);
+    const panel = readFileSync("app/(app)/deals/[id]/research-panel.tsx", "utf8");
+    expect(panel).toMatch(/capWithheld === "note"/);
+    expect(panel).toMatch(/capWithheld === "position"/);
+    expect(panel).toMatch(/capWithheld === "share"/);
+  });
+});
+
+// A preferred equity position's price buys a rate and a redemption, never a
+// slice of the building (lib/position): the same slot as a note's, in its
+// own words — wherever the deal is summarized.
+describe("a preferred equity position's going-in cap slot, and its model returns", () => {
+  const AS_OF = new Date("2026-10-05T12:00:00Z");
+  // At par: the $20,000,000 asking price for a $20,000,000 position.
+  const terms = [
+    row("Going-in cap rate", "5.50%"),
+    row("Preferred equity amount", "$20,000,000"),
+    row("Preferred return", "12% preferred return, 8% current pay"),
+    row("Current pay rate", "8.0%"),
+    row("Mandatory redemption date", "June 2029"),
+  ];
+  const position = deal({ ...blank, kind: "preferred_equity" }, terms);
+
+  it("withholds the building's cap, with the position's yield to redemption in its place until the date goes by", () => {
+    const slot = noteCapSlot(position, AS_OF);
+    expect(slot?.of).toBe("position");
+    expect(slot?.ytmPct).not.toBeNull();
+    expect(goingInCapFigure(position, "5.50%", AS_OF)).toEqual({ label: "Yield to redemption", value: `${slot!.ytmPct!.toFixed(1)}%` });
+    // Past its redemption date there is no yield to state.
+    const late = new Date("2029-08-01T12:00:00Z");
+    expect(noteCapSlot(position, late)).toEqual({ ytmPct: null, of: "position" });
+    expect(goingInCapFigure(position, "5.50%", late)).toEqual({ label: "Going-in cap", value: "n/a — position" });
+  });
+
+  it("withholds the model's returns as the building's, and says why", () => {
+    const r = modelReturnsRead(position, MODEL, AS_OF);
+    expect(r).toMatchObject({ cap: null, withheld: "position", share: false });
+    expect(r.line).toMatch(/^A preferred equity position's price is a position's: this model runs the whole building as if bought outright at it/);
   });
 });
 
@@ -159,6 +219,49 @@ describe("modelReturnsRead — the Model tab under the table's rule", () => {
   });
 
   it("a fee simple says nothing and stands", () => {
-    expect(modelReturnsRead(deal(undefined, []), MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null, share: false, line: null });
+    expect(modelReturnsRead(deal(undefined, []), MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null, share: false, word: null, line: null });
+  });
+});
+
+// Research pass 38: a retail leasehold whose ground lease ends December 31,
+// 2028 printed "Levered IRR 17.7%" and a max bid on a year-5 sale of a
+// building that reverted in year 3, beside the leasehold card's own
+// sentence saying so.
+describe("a leasehold whose lease ends inside the model's hold has no sale to return on", () => {
+  const AS_OF = new Date(Date.UTC(2026, 9, 5, 12));
+  const HELD = { ...MODEL, holdYears: 5 };
+  const lease2 = deal({ ...blank, kind: "leasehold", groundLease: "Ground lease expires December 31, 2028; no extension options" }, [
+    row("Ground lease expiration", "December 31, 2028"),
+  ]);
+  const SENTENCE =
+    "The ground lease ends Dec 2028, in year 3 of the model's 5-year hold: the building reverts to the landowner before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.";
+
+  it("withholds the returns over the leasehold card's own sentence, said by when; the cap stands", () => {
+    const r = modelReturnsRead(lease2, HELD, AS_OF);
+    expect(r).toMatchObject({ tag: "Leasehold, 2 yrs left", cap: 9.5, withheld: "lease", word: "lease ends in year 3", line: SENTENCE, share: false });
+    expect(withheldWord(r)).toBe("lease ends in year 3");
+    // A sandwich position's master lease ending inside the hold: the
+    // position ends with it.
+    const sandwich = deal({ ...blank, kind: "leasehold", summary: "A master lease of the building, sublet to its tenants", groundLease: "Master lease from the owner through December 31, 2028" }, [
+      row("Master lease expiration", "December 31, 2028"),
+      row("Master lease rent", "$2,400,000"),
+      row("Sublease income", "$2,900,000"),
+    ]);
+    const s = modelReturnsRead(sandwich, HELD, AS_OF);
+    expect(s).toMatchObject({ withheld: "lease", word: "master lease ends in year 3" });
+    expect(s.line).toBe(
+      "The master lease ends Dec 2028, in year 3 of the model's 5-year hold: the position ends with it before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.",
+    );
+  });
+
+  it("stands where the lease outlasts the hold, where the model names no hold, and on a fee simple", () => {
+    const long = deal({ ...blank, kind: "leasehold" }, [row("Ground lease expiration", "December 31, 2071")]);
+    expect(modelReturnsRead(long, HELD, AS_OF)).toMatchObject({ withheld: null, word: null, line: null });
+    expect(compareInterest(lease2, MODEL, AS_OF).withheld).toBeNull();
+    expect(compareInterest(deal(undefined, [row("Ground lease expiration", "December 31, 2028")]), HELD, AS_OF).withheld).toBeNull();
+    // A ten-year hold reaches a lease ending in 2033; a five-year one does not.
+    const ten = deal({ ...blank, kind: "leasehold" }, [row("Ground lease expiration", "December 31, 2033")]);
+    expect(compareInterest(ten, HELD, AS_OF).withheld).toBeNull();
+    expect(withheldWord(compareInterest(ten, { ...MODEL, holdYears: 10 }, AS_OF))).toBe("lease ends in year 8");
   });
 });

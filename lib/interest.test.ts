@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtractedInterest, ExtractionResult } from "@/lib/anthropic/types";
 import {
   INTEREST_LABEL,
+  TIC_LABEL,
   dealTypeLabel,
   dealTypeLabelFor,
   groundRentOf,
@@ -11,15 +12,21 @@ import {
   interestOf,
   interestShortLine,
   interestTag,
+  isDst,
+  isMasterLeasehold,
+  isTenancyInCommon,
+  isWholeShare,
   noteCaption,
   noteCollateralSentence,
   parseSharePct,
   readInterest,
+  shareHoldingOf,
 } from "./interest";
 import { gluedWords } from "./render-lint";
 import { askingPriceOf, assessPlausibility, noiFigures } from "./deal-strategy";
 import { dealContextFor } from "./deal-context";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
+import { buildBrief } from "./anthropic/verdict";
 
 const interest = (over: Partial<ExtractedInterest>): ExtractedInterest => ({
   kind: "fee_simple",
@@ -52,7 +59,8 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct("a 49% LP interest and a 2% GP interest")).toBeNull();
     // The same percentage twice is still one.
     expect(parseSharePct("49% interest (49% of the LLC)")).toBe(49);
-    expect(parseSharePct("100% of the membership interests")).toBeNull();
+    // A stated 100% is all of the entity's interests (research pass 28).
+    expect(parseSharePct("100% of the membership interests")).toBe(100);
     expect(parseSharePct("the majority interest")).toBeNull();
     expect(parseSharePct("")).toBeNull();
     expect(parseSharePct(undefined)).toBeNull();
@@ -103,9 +111,37 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct("49%")).toBe(49);
     expect(parseSharePct(" 12.5 percent ")).toBe(12.5);
     expect(parseSharePct("49–51%")).toBeNull();
-    expect(parseSharePct("100%")).toBeNull();
+    expect(parseSharePct("100%")).toBe(100);
     // Two different shares remain two: withheld.
     expect(parseSharePct("a 49% LP interest (the sponsor keeps a 51% GP interest)")).toBeNull();
+  });
+
+  // The audit of 2026-10-05: admitting a stated 100% as a share left a share
+  // stated beside the entity's 100% holding with no percentage at all, so
+  // the model ran the whole building at the share's $24.5M.
+  it("reads the share sold beside the 100% the entity holds, and a 100% only alone", () => {
+    for (const text of [
+      "49% limited partnership interest in the entity that owns 100% of the fee simple interest",
+      "49% LP interest; the partnership owns 100% of the property",
+      "100% of the Class A membership interests, representing 49% of the LLC",
+    ]) {
+      expect(parseSharePct(text), text).toBe(49);
+    }
+    expect(parseSharePct("100% of the beneficial interests, offered in $100,000 units")).toBe(100);
+    // Two shares under 100 are still two.
+    expect(parseSharePct("a 49% LP interest and a 2% GP interest in the partnership that owns 100% of the property")).toBeNull();
+    const lp = ex(
+      interest({ kind: "partial_interest", summary: "A 49% limited partnership interest.", share: "49% limited partnership interest in the partnership that owns 100% of the fee simple interest" }),
+      [{ label: "NOI (in-place)", value: "$2,800,000", flagged: false, page: "p. 3", basis: "in_place" }],
+    );
+    const withPrice = { ...lp, metrics: lp.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$24,500,000" } : m)) };
+    const r = readInterest(withPrice, 24_500_000)!;
+    expect(r.sharePct).toBe(49);
+    expect(r.impliedWhole).toBeCloseTo(50_000_000, 0);
+    expect(r.headline).not.toContain("states no single percentage");
+    expect(interestTag(withPrice)).toBe("49% share");
+    expect(interestShortLine(r)).toBe("A 49% share of the owning entity — $24.5M for the share is $50.0M for the whole");
+    expect(deriveUnderwriteInputs(withPrice, "S").inputs.purchasePrice).toBeCloseTo(50_000_000, 0);
   });
 
   it("a preferred-equity price is never grossed up on its return", () => {
@@ -276,6 +312,106 @@ describe("readInterest — what the price buys, said", () => {
     expect(interestShortLine(bare)).toBe("The leased fee — the land under a building someone else owns, and its ground rent");
   });
 
+  // Research pass 28: a master lease of a building, sublet to its tenants (a
+  // sandwich position), was told it sells "the building and a lease on the
+  // land" — the buyer owns neither.
+  it("a master leasehold, by the memorandum's own words, is a lease of the building, never the building and a lease on the land", () => {
+    const sandwich = ex(
+      interest({
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building through 2041, sublet to 14 office tenants",
+        groundLease: "Master lease through December 31, 2041; master rent $1,100,000 a year",
+      }),
+    );
+    expect(isMasterLeasehold(sandwich)).toBe(true);
+    const r = readInterest(sandwich, 20_000_000)!;
+    expect(r.masterLease).toBe(true);
+    expect(r.leadSentences.slice(0, 2)).toEqual([
+      "This memorandum sells a LEASEHOLD: a master lease of the building, sublet to its tenants — not the building, and not the land.",
+      "The master rent is owed whatever the subtenants pay, and when the master lease ends the position ends with it — a capitalised NOI values a perpetuity that ends.",
+    ]);
+    expect(r.headline).not.toContain("a lease on the land");
+    expect(r.headline).not.toContain("ground rent");
+    expect(interestShortLine(r)).toBe("A leasehold — a master lease of the building, sublet to its tenants, not the building or the land");
+    expect(interestContextLine(r)).toContain("The master lease as stated: Master lease through December 31, 2041");
+    expect(interestContextLine(r)).not.toContain("The ground lease as stated");
+    expect(gluedWords(`${r.headline} ${interestShortLine(r)}`)).toEqual([]);
+    // Its words, however put: a sandwich lease, the master lessee's position.
+    for (const summary of ["Sandwich leasehold position in a 120,000 SF office building", "The master lessee's position, subleased to the tenants"]) {
+      expect(isMasterLeasehold(ex(interest({ kind: "leasehold", summary }))), summary).toBe(true);
+    }
+    // A cover stated beside it is the master rent's, never a ground rent's.
+    const covered = readInterest(
+      { ...sandwich, metrics: [...sandwich.metrics, { label: "Ground rent", value: "$1,100,000", flagged: false, page: "p. 4", basis: "in_place" }, { label: "Income before ground rent", value: "$1,820,000", flagged: false, page: "p. 6", basis: "in_place" }] },
+      20_000_000,
+    )!;
+    expect(covered.headline).toContain("Here the building's $1.8M of income before the master rent covers the $1.1M rent 1.7×.");
+  });
+
+  // The audit of 2026-10-05: the panel's heading, the context line and the
+  // report still called a master leasehold "Leasehold on a ground lease",
+  // the challenger grilled it on land-value resets and a building reverting
+  // to the landowner, and the master lease as stated ended "per year..".
+  it("a master leasehold is labelled and grilled as a master lease of the building, and its words end one sentence", () => {
+    const master = ex(
+      interest({
+        kind: "leasehold",
+        summary: "The offering is the master leasehold interest in the building, which the master lessee sublets to its office tenants.",
+        groundLease: "Master lease of the entire building from the fee owner, expiring December 31, 2041; master rent $2,000,000 per year.",
+        page: "4",
+      }),
+      [
+        { label: "Master lease expiration", value: "December 31, 2041", flagged: false, page: "p. 4", basis: "na" },
+        { label: "Ground rent", value: "$2,000,000", flagged: false, page: "p. 4", basis: "in_place" },
+        { label: "Income before ground rent", value: "$3,100,000", flagged: false, page: "p. 6", basis: "in_place" },
+      ],
+    );
+    const r = readInterest(master, 12_000_000, new Date("2026-10-05T12:00:00Z"))!;
+    expect(r.label).toBe("Master lease of the building, sublet");
+    const context = interestContextLine(r);
+    expect(context.startsWith("What is being sold: master lease of the building, sublet.")).toBe(true);
+    expect(context).not.toContain("leasehold on a ground lease");
+    expect(context).toContain("master rent $2,000,000 per year. The master lease ends Dec 2041");
+    expect(context).not.toContain("..");
+    const note = interestNote(r);
+    for (const trap of ["MASTER-LEASE TRAPS", "(a) THE TERM AND THE OPTIONS", "(b) THE SPREAD AND WHO PAYS FIRST", "(c) THE FEE OWNER'S LENDER", "(d) CONSENT TO ASSIGN AND SUBLET", "(e) THE END"]) {
+      expect(note, trap).toContain(trap);
+    }
+    for (const groundLeaseTrap of ["LEASEHOLD TRAPS", "then-current land value", "the building goes to the landowner"]) {
+      expect(note, groundLeaseTrap).not.toContain(groundLeaseTrap);
+    }
+    // A plain leasehold keeps its label and the ground lease's traps.
+    const plain = readInterest(ex(interest({ kind: "leasehold", summary: "Leasehold interest under a 99-year ground lease" })), 20_000_000)!;
+    expect(plain.label).toBe(INTEREST_LABEL.leasehold);
+    expect(interestNote(plain)).toContain("LEASEHOLD TRAPS");
+    expect(interestNote(plain)).not.toContain("MASTER-LEASE TRAPS");
+    // A loan as stated ends one sentence too.
+    expect(interestContextLine(readInterest(ex(interest({ kind: "note", loan: "$24.4M UPB, 5.25% coupon." })), 20_000_000)!)).toContain(
+      "The loan as stated: $24.4M UPB, 5.25% coupon.",
+    );
+    expect(interestContextLine(readInterest(ex(interest({ kind: "note", loan: "$24.4M UPB, 5.25% coupon." })), 20_000_000)!)).not.toContain("coupon..");
+  });
+
+  it("a plain leasehold keeps its sentence: a ground lease named, a seller's master lease of vacant space, or no master lease at all", () => {
+    const LEAD = "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land.";
+    for (const over of [
+      { summary: "Leasehold interest under a 99-year ground lease" },
+      // A master lease beside a ground lease is not a sandwich read off the words alone.
+      { summary: "Leasehold under a ground lease; the building is held under a master lease of the building to an affiliate" },
+      // A seller's master lease of vacant suites is a rent guarantee.
+      { summary: "Leasehold interest; the seller will master lease the vacant suites for 24 months" },
+      {},
+    ]) {
+      const e = ex(interest({ kind: "leasehold", ...over }));
+      expect(isMasterLeasehold(e), JSON.stringify(over)).toBe(false);
+      const r = readInterest(e, 20_000_000)!;
+      expect(r.leadSentences[0], JSON.stringify(over)).toBe(LEAD);
+      expect(interestShortLine(r), JSON.stringify(over)).toBe("A leasehold — the building and a lease on the land, not the land");
+    }
+    // Only a leasehold: the words on any other interest change nothing.
+    expect(isMasterLeasehold(ex(interest({ kind: "fee_simple", summary: "Sandwich leasehold position" })))).toBe(false);
+  });
+
   it("a leasehold states its cover where both figures are given, and a fee simple with a ground rent row still says so", () => {
     const rows = [
       { label: "Ground rent", value: "$1,200,000", flagged: false, page: "p. 4", basis: "in_place" as const },
@@ -312,6 +448,17 @@ describe("readInterest — what the price buys, said", () => {
     expect(incomeBeforeGroundRentOf(m("Income before ground rent", "$6,000,000"))).toBe(6_000_000);
     expect(incomeBeforeGroundRentOf(m("Leasehold operating income", "$6,000,000"))).toBe(6_000_000);
     expect(incomeBeforeGroundRentOf(m("Ground rent"))).toBeNull();
+  });
+
+  it("reads a ground rent and the income before it with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no rent: the leased fee's mismatch
+    // check, its coverage and its price note were silently skipped.
+    const m = (label: string, value: string) => ex(undefined, [{ label, value, flagged: false, page: "", basis: "na" }]);
+    expect(groundRentOf(m("Ground rent", "$900,000 (fixed until the 2031 fair-market reset)"))).toBe(900_000);
+    expect(incomeBeforeGroundRentOf(m("Income before ground rent", "$6,400,000 (T-12)"))).toBe(6_400_000);
+    // A range is still two figures, and a minus still no rent.
+    expect(groundRentOf(m("Ground rent", "$900,000 - $950,000"))).toBeNull();
+    expect(groundRentOf(m("Ground rent", "-$900,000"))).toBeNull();
   });
 
   it("cites the interest's page only inside the memorandum", () => {
@@ -467,7 +614,7 @@ describe("a note, underwritten as a note (#416)", () => {
 
   it("a note behind a senior loan: no loan-to-value, and every surface says why", () => {
     // $15M of mezzanine behind a $60M senior loan on a $70M value read "21%"
-    // when the stack is 107%. The memorandum states no senior balance.
+    // when the stack is 107%. The screen read no senior balance as a row.
     const mezz = ex(
       interest({ kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $60M senior loan", page: "p. 5" }),
       [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "11.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$70,000,000"), row("Payment status", "Performing")],
@@ -476,8 +623,12 @@ describe("a note, underwritten as a note (#416)", () => {
     expect(r.note!.terms.subordinate).toBe(true);
     expect(r.note!.ltvAtBalancePct).toBeNull();
     expect(r.note!.ltvAtPricePct).toBeNull();
+    // Research pass 28 (C4): the memorandum's own loan sentence states the
+    // $60M, so "which the memorandum does not state" was not true of it —
+    // what is true is that the screen did not read it as a figure.
     const WITHHELD =
-      "The collateral's stated $70.0M is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.";
+      "The collateral's stated $70.0M is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the screen did not read as a figure of its own.";
+    expect(r.headline).not.toContain("which the memorandum does not state");
     expect(noteCollateralSentence(r.note)).toBe(WITHHELD);
     expect(r.headline).toContain(WITHHELD);
     expect(r.headline).not.toMatch(/puts the balance at \d+%/);
@@ -490,6 +641,36 @@ describe("a note, underwritten as a note (#416)", () => {
     vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
     expect(dealContextFor(mezz)).toContain(WITHHELD);
     expect(interestNote(readInterest(mezz, askingPriceOf(mezz))!)).toContain(WITHHELD);
+  });
+
+  it("a note behind a senior loan whose balance the memorandum states: the stack, read off the stated figures", () => {
+    // $15M of mezzanine behind a $52M senior mortgage on a $70M value,
+    // bought for $12M: the senior is 74% of the value, the senior and the
+    // note's balance 96%, the senior and the price 91%.
+    const base = ex(
+      interest({ kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $52M senior mortgage", page: "p. 5" }),
+      [
+        row("Senior loan balance", "$52,000,000"),
+        row("Unpaid principal balance", "$15,000,000"),
+        row("Note rate", "11.0%"),
+        row("Maturity date", "March 31, 2028"),
+        row("Whole-asset value", "$70,000,000"),
+        row("Payment status", "Performing"),
+      ],
+    );
+    const mezz = { ...base, metrics: [row("Asking price", "$12,000,000"), ...base.metrics.filter((m) => m.label !== "Asking price")] };
+    expect(askingPriceOf(mezz)).toBe(12_000_000);
+    const r = readInterest(mezz, 12_000_000, AS_OF)!;
+    expect(r.balance).toBe(15_000_000);
+    const STACK =
+      "The collateral's stated $70.0M, with the senior loan's stated $52.0M ahead of this note, puts the senior loan at 74% of its value, the senior loan and the balance at 96%, and the senior loan and the price at 91%.";
+    expect(noteCollateralSentence(r.note)).toBe(STACK);
+    expect(r.headline).toContain(STACK);
+    expect(r.headline).not.toContain("needs that loan's balance");
+    expect(gluedWords(r.headline)).toEqual([]);
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
+    expect(dealContextFor(mezz)).toContain(STACK);
+    expect(interestNote(readInterest(mezz, askingPriceOf(mezz))!)).toContain(STACK);
   });
 
   it("a note named beside other debt with no order stated says so, and asserts no senior loan (the audit of 2026-10-01)", () => {
@@ -572,6 +753,15 @@ describe("what the price buys, read by the plausibility check, the deal context 
     );
     // The rent as the NOI: nothing to say.
     expect(assessPlausibility(ex(interest({ kind: "leased_fee" }), [rent, { ...noi, value: "$1,200,000" }]))).toEqual([]);
+    // A rent stated with its bumps after a dash is the rent it states (audit
+    // C3a): read as none, the finding could not fire and the building's
+    // income stood as the land's.
+    const bumps = { ...rent, value: "$450,000 – 10% bumps every 5 years" };
+    expect(groundRentOf(ex(interest({ kind: "leased_fee" }), [bumps]))).toBe(450_000);
+    const flagged = assessPlausibility(ex(interest({ kind: "leased_fee" }), [bumps, { ...noi, value: "$6,000,000" }]));
+    expect(flagged.find((f) => f.code === "ground_rent_mismatch")?.title).toBe(
+      "NOI (in-place) of $6.0M is 13.3× the $450k ground rent on a leased fee",
+    );
     // $2M of land over the building's 240 units is $8,333 a unit — a misread
     // on a fee simple, and simply the land's price on a leased fee.
     const land = (i: ExtractedInterest | undefined): ExtractionResult => ({
@@ -608,6 +798,151 @@ describe("what the price buys, read by the plausibility check, the deal context 
     expect(plain.sources.purchasePrice?.note).toBe("OM asking / purchase price");
     expect(plain.meta.interest).toBeNull();
   });
+
+  // Research pass 34: the leased fee's price note said "the model runs the
+  // ground rent as the income", and the caveat the same, while no NOI reader
+  // takes the "Ground rent" row — the model ran an assumed 6% of the price,
+  // or the price times the stated cap. Each now says what the model runs
+  // and names the rent the memorandum states beside it.
+  it("a leased fee's notes say the model reads no ground rent, and name the rent the memorandum states", () => {
+    const row = (label: string, value: string, page: string) => ({ label, value, flagged: false, page, basis: "in_place" as const });
+    const fee: ExtractionResult = {
+      ...ex(interest({ kind: "leased_fee" })),
+      metrics: [
+        { label: "Asking price", value: "$15,000,000", flagged: false, page: "p. 2", basis: "na" },
+        row("Ground rent", "$600,000", "p. 4"),
+        row("Income before ground rent", "$3,000,000", "p. 6"),
+      ],
+    };
+    const assumed = deriveUnderwriteInputs(fee, "x");
+    expect(assumed.sources.inPlaceRentAnnual?.provenance).toBe("assumption");
+    expect(assumed.sources.purchasePrice?.note).toBe(
+      "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease. The model reads no ground rent as its income: its year-1 NOI is an assumed 6% of this price, $900,000 a year, not the $600,000 ground rent the OM states, run with a building's assumptions",
+    );
+    expect(assumed.sources.inPlaceRentAnnual?.note).toBe(
+      "No NOI or cap in the OM — assumed 6% going-in. The OM's $600,000 ground rent is the leased fee's income; the model does not read it",
+    );
+    expect(assumed.sources.inPlaceRentAnnual?.notRun).toEqual({ label: "ground rent", value: 600_000 });
+    expect(assumed.meta.interest?.modelCaveat).toMatch(/^The screening model reads no ground rent as its income: its year-1 NOI is the one a building's model reads/);
+    // A stated cap: the model runs the price times it, which comes to the
+    // rent by arithmetic — said as that, never as the rent read.
+    const capped = deriveUnderwriteInputs({ ...fee, metrics: [...fee.metrics, row("Going-in cap rate", "4.00%", "p. 3")] }, "x");
+    expect(capped.sources.inPlaceRentAnnual?.provenance).toBe("derived");
+    expect(capped.sources.purchasePrice?.note).toContain(
+      "its year-1 NOI is this price × the stated going-in cap, $600,000 a year — equal to the $600,000 ground rent the OM states by arithmetic, not read from it",
+    );
+    for (const d of [assumed, capped]) {
+      expect(d.sources.purchasePrice?.note).not.toContain("runs the ground rent");
+      expect(d.meta.interest?.modelCaveat).not.toContain("runs the ground rent");
+    }
+    // No rent stated: nothing named, and the note still says what it runs.
+    const bare = deriveUnderwriteInputs({ ...fee, metrics: fee.metrics.filter((m) => !/rent/i.test(m.label)) }, "x");
+    expect(bare.sources.purchasePrice?.note).toMatch(/its year-1 NOI is an assumed 6% of this price, \$900,000 a year, run with a building's assumptions$/);
+    expect(bare.sources.inPlaceRentAnnual?.notRun).toBeUndefined();
+  });
+});
+
+// Research pass 28: a DST offering "100% of the beneficial interests,
+// offered in $100,000 units" read as no share at all — the panel said the
+// memorandum "states no single percentage", the model's note that it could
+// not gross the price up, and the report that there was no max bid.
+describe("a stated 100% is all of the entity's interests: the whole, nothing grossed up", () => {
+  const noi = { label: "NOI (in-place)", value: "$2,900,000", flagged: false, page: "p. 9", basis: "in_place" as const };
+  const dst = (over: Partial<ExtractedInterest> = {}, metrics: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    ...ex(
+      interest({
+        kind: "partial_interest",
+        share: "100% of the beneficial interests, offered in $100,000 units",
+        summary: "Beneficial interests in Harbor View DST",
+        ...over,
+      }),
+    ),
+    metrics: [
+      { label: "Asking price", value: "$52,450,000", flagged: false, page: "p. 2", basis: "na" },
+      { label: "Units", value: "240", flagged: false, page: "p. 2", basis: "na" },
+      ...metrics,
+    ],
+  });
+
+  it("reads 100% as the whole and says so on every line, never as no percentage", () => {
+    const e = dst();
+    expect(interestOf(e)).toEqual({ kind: "partial_interest", sharePct: 100, entityLoan: null });
+    expect([isWholeShare(100), isWholeShare(49), isWholeShare(null)]).toEqual([true, false, false]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.impliedWhole).toBe(52_450_000);
+    expect(r.label).toBe("All of the owning entity's interests");
+    expect(r.inUnits).toBe(true);
+    expect(r.headline).toBe(
+      "This memorandum sells all of the owning entity's interests — 100% as stated, offered in units — so its $52.5M price is the whole's, with nothing to gross up, and the whole building's income is set against it.",
+    );
+    expect(r.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $52.5M price, which buys all of the entity's interests, so nothing is grossed up; what the interests earn is the entity's cash flow after its own costs and fees, which the model does not carry.",
+    );
+    expect(interestTag(e)).toBe("All entity interests");
+    expect(interestShortLine(r)).toBe("All of the owning entity's interests, offered in units — $52.5M for the whole, nothing grossed up");
+    expect(interestNote(r)).toContain(
+      "(a) THE PRICE IS FOR ALL OF THE ENTITY'S INTERESTS — hold the whole asset's income against the price itself, with nothing to gross up;",
+    );
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${interestNote(r)} ${dealContextFor(e)}`;
+    expect(said).toContain("What is being sold: all of the owning entity's interests.");
+    expect(said).not.toContain("no single percentage");
+    expect(said).not.toMatch(/grossed up to|100% share|share grossed up/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("says units only where the memorandum's own words offer the interests in them", () => {
+    const llc = dst({ share: "100% of the membership interests in Harbor View LLC", summary: "The sale of the LLC that owns the 240 units" });
+    const r = readInterest(llc, askingPriceOf(llc))!;
+    expect(r.inUnits).toBe(false);
+    expect(r.headline).toContain("sells all of the owning entity's interests — 100% as stated — so its $52.5M price is the whole's");
+    expect(interestShortLine(r)).toBe("All of the owning entity's interests — $52.5M for the whole, nothing grossed up");
+    // No price stated: still the whole, and still never "no single percentage".
+    const unpriced = readInterest(llc, null)!;
+    expect(unpriced.headline).toBe("This memorandum sells all of the owning entity's interests — 100% as stated — so its price is the whole's, with nothing to gross up.");
+    expect(interestShortLine(unpriced)).toBe("All of the owning entity's interests");
+  });
+
+  it("beside the entity's stated loan, the price is the equity's whole and the loan sits on top of it", async () => {
+    const { buildingPriceOf, planSummary } = await import("./deal-strategy");
+    const loan = { label: "Entity loan balance", value: "$43,600,000", flagged: false, page: "p. 9", basis: "in_place" as const };
+    const e = dst({}, [loan]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.headline).toBe(
+      "This memorandum sells all of the owning entity's interests — 100% as stated, offered in units — so its $52.5M price is the equity's whole, with nothing to gross up, not the asset's: the entity's stated $43.6M loan sits on top of it, and the screen sets the whole building's income against the $52.5M alone.",
+    );
+    expect(interestShortLine(r)).toBe(
+      "All of the owning entity's interests, offered in units — $52.5M for the equity's whole; the entity's stated $43.6M loan sits on top of it",
+    );
+    expect(r.modelCaveat).toContain("the entity's stated $43.6M loan sits on top of it, and the model neither adds it to the price nor carries it");
+    expect(interestNote(r)).toContain("read that price as the equity's whole, not the asset's: the entity's stated $43.6M loan sits on top of it");
+    // The building's price is the equity's whole plus a loan nothing adds: no basis, as on any share beside its loan.
+    expect(buildingPriceOf(e, 52_450_000)).toBeNull();
+    const plan = planSummary({ ...e, strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" } })!;
+    expect(plan.priceLabel).toBe("Equity's whole, all the entity's interests");
+    expect(plan.equityWhole).toBe(52_450_000);
+    const plain = planSummary({ ...dst(), strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" } })!;
+    expect(plain.priceLabel).toBe("Price");
+    expect(plain.price).toBe(52_450_000);
+  });
+
+  it("the model runs at the stated price, as it would on the building bought outright, and its note says what it buys", async () => {
+    const { buildingPriceOf } = await import("./deal-strategy");
+    const e = dst({}, [noi]);
+    const d = deriveUnderwriteInputs(e, "x");
+    // Nothing grossed up: the model's figures are the fee simple's at the same price.
+    expect(d.inputs).toEqual(deriveUnderwriteInputs({ ...e, interest: undefined }, "x").inputs);
+    expect(d.inputs.purchasePrice).toBe(52_450_000);
+    expect(d.sources.purchasePrice?.provenance).toBe("extracted");
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $52,450,000 for all of the owning entity's interests — the whole, nothing grossed up; the model runs the whole building's cash flows, before the entity's own costs and fees",
+    );
+    expect(d.meta.interest?.line).toBe("All of the owning entity's interests, offered in units — $52.5M for the whole, nothing grossed up");
+    expect(buildingPriceOf(e, 52_450_000)).toBe(52_450_000);
+    // A share under 100% reads exactly as before.
+    const share = deriveUnderwriteInputs(ex(interest({ kind: "partial_interest", share: "49% LP interest" }), [noi]), "x");
+    expect(share.sources.purchasePrice?.note).toContain("for a 49% share, grossed up to the whole asset");
+    expect(interestTag(ex(interest({ kind: "partial_interest", share: "49% LP interest" })))).toBe("49% share");
+  });
 });
 
 // Research pass 23: a 4.5% share at $1.8M beside a stated $56.5M loan on the
@@ -635,6 +970,15 @@ describe("a share beside the loan its entity carries: the grossed-up figure is t
     expect(entityLoanOf(recap([], "65% LTV"))).toBeNull();
     expect(entityLoanOf(ex(interest({ kind: "partial_interest", share: "4.5% LP interest" })))).toBeNull();
     expect(entityLoanOf(null)).toBeNull();
+  });
+
+  it("entityLoanOf reads a balance with a hyphenated word beside it (research pass 37)", async () => {
+    // "$40,000,000 (non-recourse CMBS)" had read as no loan, so the share's
+    // grossed-up figure was printed as the asset's and a basis struck on it.
+    const { entityLoanOf } = await import("./interest");
+    expect(entityLoanOf(recap([], "$56,500,000 (non-recourse CMBS)"))).toBe(56_500_000);
+    expect(entityLoanOf(recap([], "$56,500,000 (floating-rate, 2028 maturity)"))).toBe(56_500_000);
+    expect(readInterest(recap([], "$56,500,000 (non-recourse CMBS)"), 1_800_000)!.entityLoan).toBe(56_500_000);
   });
 
   it("the panel's sentence, the short line, the caveat and the traps name both figures", () => {
@@ -1067,7 +1411,7 @@ describe("a share beside the loan its entity carries: no building figure is stru
     const { pickSlots } = await import("./pipeline-slots");
     const { compareInterest, modelReturnsRead } = await import("./compare-interest");
     expect(pickSlots(recap(), null).basis).toBeNull();
-    expect(pickSlots(recap([], {}, false), null).basis).toBe("$200k/unit");
+    expect(pickSlots(recap([], {}, false), null).basis).toBe("$200k/unit, the whole");
     // The model runs at the equity's whole (the owner's call); the table's
     // cap is struck on the building's price, which there is none of here.
     const model = { purchasePrice: 40_000_000, year1Noi: 5_000_000, goingInCapPct: 12.5 };
@@ -1233,5 +1577,547 @@ describe("a share beside the loan its entity carries: no building figure is stru
       "$100.0M all-in (Total project cost; the share's price grossed up is the equity's whole, not the building's, so the acquisition inside it is not separable)",
     );
     expect(note).not.toContain("the OM states no price");
+  });
+});
+
+// Research pass 28, round 5: a preferred equity position is its own kind —
+// what its price buys is a rate and a redemption, never a slice of the
+// building — wherever "what the price buys" is read (lib/position).
+describe("a preferred equity position, read as what its price buys", () => {
+  const m = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 4", basis: "na" as const });
+  const rows = [
+    m("Preferred equity amount", "$15,000,000"),
+    m("Preferred return", "12% preferred return, 8% current pay"),
+    m("Current pay rate", "8.0%"),
+    m("Mandatory redemption date", "June 2029"),
+    m("Senior loan balance", "$52,000,000"),
+    m("Whole-asset value", "$80,000,000"),
+  ];
+  const ON = new Date("2026-10-05T12:00:00Z");
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is its own kind, with its yield to redemption in the read, its tag and its short line", () => {
+    vi.useFakeTimers({ now: ON, toFake: ["Date"] });
+    const e = ex(interest({ kind: "preferred_equity", summary: "A $15M preferred equity investment in the owning entity" }), rows);
+    expect(interestOf(e).kind).toBe("preferred_equity");
+    const r = readInterest(e, askingPriceOf(e), ON)!;
+    expect(r.label).toBe(INTEREST_LABEL.preferred_equity);
+    expect(r.position?.terms.amount).toBe(15_000_000);
+    expect(r.lead).toMatch(/^This memorandum sells a PREFERRED EQUITY position in the owning entity, not the property/);
+    expect(r.headline).toContain("to redemption at its");
+    expect(r.modelCaveat).toMatch(/^The property model runs the whole building at the position's price; that is not this position's return/);
+    expect(interestTag(e, ON)).toBe("Pref equity, 12% to Jun 2029");
+    // Bought over its amount, the yield is what it is — negative here.
+    expect(interestShortLine(r)).toMatch(/^A preferred equity position in the owning entity, not the property, -\d+\.\d% to its Jun 2029 redemption at the \$20\.0M price$/);
+    expect(interestShortLine(readInterest(e, 14_000_000, ON)!)).toMatch(/, \d+\.\d% to its Jun 2029 redemption at the \$14\.0M price$/);
+    expect(dealTypeLabelFor("Stabilized", "preferred_equity")).toBe("Stabilized (the entity's property)");
+    // Its traps, by name; the shared two read for a position.
+    const note = interestNote(r);
+    expect(note).toContain("PREFERRED-EQUITY TRAPS, checked by name");
+    expect(note).toContain("THE TWO SHARED TRAPS, read for a preferred equity position");
+    for (const t of [r.headline, interestShortLine(r)]) expect(gluedWords(t)).toEqual([]);
+  });
+
+  it("reads a share filed before the kind was asked, whose rows say a position, as one; never a fee simple's rows", () => {
+    const share = ex(interest({ kind: "partial_interest", share: "" }), rows);
+    expect(interestOf(share).kind).toBe("preferred_equity");
+    const fee = ex(interest({ kind: "fee_simple" }), rows);
+    expect(interestOf(fee).kind).toBe("fee_simple");
+  });
+
+  it("strikes no building basis or price finding on the position's price, and runs the model saying so", () => {
+    const e = ex(interest({ kind: "preferred_equity" }), rows);
+    expect(assessPlausibility(e)).toEqual([]);
+    const derived = deriveUnderwriteInputs(e, "fallback");
+    expect(derived.sources.purchasePrice?.note).toMatch(/^The OM's price for a PREFERRED EQUITY position in the owning entity/);
+  });
+});
+
+// Research pass 37: "30% tenant-in-common interest" read as "a 30% share of
+// the owning entity" — the shared traps said the entity keeps the property,
+// the traps named a waterfall and a promote, and the 1031 flag called it a
+// share of the entity. A tenant in common holds title to an undivided share
+// of the property itself, and no entity owns it.
+describe("an undivided interest held as a tenant in common is the real estate's, never an entity's share", () => {
+  const row = (label: string, value: string, basis: ExtractionResult["metrics"][number]["basis"] = "na") => ({ label, value, flagged: false, page: "p. 3", basis });
+  const tic = (over: Partial<ExtractedInterest> = {}, metrics: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    dealName: "Summit MOB (TIC interest)",
+    assetClass: "Medical Office",
+    totalPages: 40,
+    interest: interest({
+      kind: "partial_interest",
+      summary: "An undivided 30% tenant-in-common interest in the fee simple of a medical office building, held under a TIC agreement",
+      share: "30% tenant-in-common interest",
+      page: "p. 2",
+      ...over,
+    }),
+    metrics: [
+      row("Asking price", "4,200,000"),
+      row("Total SF", "48,000 SF"),
+      row("NOI (in-place)", "980,000", "in_place"),
+      row("Going-in cap rate", "7.00%"),
+      ...metrics,
+    ],
+  });
+
+  it("reads the holding off the interest's own words, and only on a share", () => {
+    expect(shareHoldingOf(tic())).toBe("tic");
+    expect([isTenancyInCommon(tic()), isDst(tic())]).toEqual([true, false]);
+    for (const share of ["a 49% tenant in common interest", "TIC interest (49%)", "an undivided 35% interest", "a 49% co-tenancy interest", "49% as tenants-in-common"]) {
+      expect(isTenancyInCommon(tic({ share, summary: "" })), share).toBe(true);
+    }
+    // A retail lease's co-tenancy clause is an anchor's, and a center's
+    // co-tenants are other tenants: no co-ownership.
+    expect(shareHoldingOf(tic({ share: "49% LP interest", summary: "A JV interest in a center whose inline leases carry co-tenancy clauses" }))).toBeNull();
+    expect(shareHoldingOf(tic({ share: "49% LP interest", summary: "A JV interest in a center subject to co-tenancy; its co-tenants include a grocer" }))).toBeNull();
+    expect(isTenancyInCommon(tic({ share: "", summary: "Three co-owners holding title as co-tenants under a co-tenancy agreement" }))).toBe(true);
+    // Only a partial interest: the same words on a fee simple say nothing.
+    expect(shareHoldingOf(tic({ kind: "fee_simple" }))).toBeNull();
+    // The share itself reads as before: the gross-up is a share's arithmetic.
+    expect(interestOf(tic())).toEqual({ kind: "partial_interest", sharePct: 30, entityLoan: null });
+  });
+
+  it("says title to real estate on every line — the lead, the label, the caveat, the short line and the tag", async () => {
+    const { buildingPriceOf } = await import("./deal-strategy");
+    const e = tic();
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.label).toBe(TIC_LABEL);
+    expect(r.label).toBe("An undivided interest in the property, as a tenant in common");
+    expect(r.holding).toBe("tic");
+    expect(r.leadSentences).toEqual([
+      "This memorandum sells an undivided 30% of the property itself, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity: $4.2M for the interest is $14.0M for the whole, grossed up.",
+      "The screen sets the whole building's income against the $14.0M.",
+    ]);
+    expect(r.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $14.0M the interest's price implies; the interest earns its 30% of those cash flows before any fee the co-owners' agreement pays its manager.",
+    );
+    expect(interestShortLine(r)).toBe("An undivided 30% interest in the property, held as a tenant in common — $4.2M for the interest is $14.0M for the whole");
+    expect(interestTag(e)).toBe("TIC 30%");
+    expect(interestTag(tic({ share: "", summary: "An undivided interest held as tenants in common" }))).toBe("TIC");
+    // The gross-up, the basis and the model stand: they were right.
+    expect(r.impliedWhole).toBe(14_000_000);
+    expect(buildingPriceOf(e, 4_200_000)).toBe(14_000_000);
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${dealContextFor(e)}`;
+    expect(said).toContain("What is being sold: an undivided interest in the property, as a tenant in common.");
+    expect(said).not.toMatch(/owning entity|share of the entity|promote|waterfall|sponsor's fees/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("asks the co-owners' questions in place of a joint venture's, and reads the shared two for real property — naming no rule", () => {
+    const note = interestNote(readInterest(tic(), 4_200_000)!);
+    expect(note).toContain(
+      "TENANCY-IN-COMMON TRAPS, asked by name where the OM gives the inputs: (a) UNANIMITY — ask what the TIC agreement makes every co-owner approve: a sale, a lease, a refinancing, the manager; (b) PARTITION — ask whether each co-owner keeps a right to partition the property, and whether it has been waived to the lender; (c) THE LOAN — ask whether the property carries a loan, whether the co-owners are its co-borrowers, and whether its lender has consented to this transfer; (d) THE MANAGER AND ITS FEES — ask who manages the property under the TIC agreement, and what it is paid; (e) THE EXIT — ask whether the co-owners hold a right of first refusal on this interest, and whether the agreement carries a buy-sell.",
+    );
+    expect(note).toContain(
+      "the sale transfers real property — an undivided share of the title, not an interest in an entity — so whether it reassesses the property or this share of it, and whether it carries a transfer tax on the share, is the jurisdiction's rule to say, never assumed either way.",
+    );
+    expect(note).toContain("The insurance is the co-owners' policy on the whole building");
+    expect(note).not.toMatch(/PARTIAL-INTEREST TRAPS|WATERFALL|CAPITAL CALLS|owning entity keeps the property|interest in the entity that owns it/);
+    // Questions, never a statute, a procedure or a ruling.
+    expect(note).not.toMatch(/Rev\.|Revenue Procedure|Revenue Ruling|U\.S\.C|§|\bSection\b|\bIRC\b|2002-22/);
+    expect(gluedWords(note)).toEqual([]);
+  });
+
+  it("names a loan the memorandum states as the property's, never an entity's", () => {
+    const e = tic({}, [row("Entity loan balance", "$9,000,000")]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.leadSentences[0]).toBe(
+      "This memorandum sells an undivided 30% of the property itself, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity: $4.2M for the interest is $14.0M grossed up — the equity's whole, not the asset's, since the stated $9.0M loan on the property sits on top of it, and the screen sets the whole building's income against the $14.0M alone.",
+    );
+    expect(interestShortLine(r)).toBe(
+      "An undivided 30% interest in the property, held as a tenant in common — $4.2M for the interest is $14.0M for the equity's whole; the stated $9.0M loan on the property sits on top of it",
+    );
+    expect(r.modelCaveat).toContain("the stated $9.0M loan on the property sits on top of it, and the model neither adds it to the price nor carries it");
+    expect(interestNote(r)).toContain("(c) THE LOAN — ask whether the co-owners are co-borrowers on the stated $9.0M loan on the property, and whether its lender has consented to this transfer;");
+    const d = deriveUnderwriteInputs(e, "x");
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $4,200,000 for an undivided 30% interest held as a tenant in common, grossed up to $14,000,000 — the equity's whole, not the asset's: the stated $9,000,000 loan on the property sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the $14,000,000 instead; the model runs the whole building's cash flows, and the interest earns 30% of them before any fee the co-owners' agreement pays its manager",
+    );
+    expect(d.meta.priceLabel).toBe("Equity's Whole (30% TIC interest grossed up)");
+    expect(d.meta.interest?.basisWithheld?.why).toBe(
+      "the interest's price grossed up is the equity's whole, with the loan on the property on top of it, not the building's price",
+    );
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${d.sources.purchasePrice?.note}`;
+    expect(said).not.toMatch(/entity's|owning entity/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("names the loan the property's wherever it stands beside the equity's whole — the plan, the plausibility check, the model tab", async () => {
+    const { planSummary, plausibilityNote, inferStrategy: infer } = await import("./deal-strategy");
+    const { planFacts } = await import("./plan-facts");
+    const { modelReturnsRead } = await import("./compare-interest");
+    const loan = row("Entity loan balance", "$9,000,000");
+    // A value-add held as a tenant in common: the plan's facts and its line.
+    const valueAdd: ExtractionResult = {
+      ...tic({}, [loan, row("Renovation budget", "$1,000,000"), row("NOI (stabilized, pro forma)", "$1,250,000", "pro_forma")]),
+      strategy: { kind: "value_add", summary: "Renovate the suites", capitalBudget: "", timeline: "" },
+    };
+    const plan = planSummary(valueAdd)!;
+    expect(plan.loanOnProperty).toBe(true);
+    expect(planFacts(plan)).toContainEqual(["Equity's whole, the share grossed up", "$14.0M, the property's $9.0M loan on top"]);
+    expect(plan.costWithheld).toBe(
+      "No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the property's $9.0M loan, which the model does not add.",
+    );
+    expect(plausibilityNote([], infer(valueAdd), plan, valueAdd)).toContain(
+      "(the equity's whole, not the asset's: the stated $9.0M loan on the property sits on top of it)",
+    );
+    // A finding measured on the equity's whole names the loan the same way.
+    const mismatch: ExtractionResult = {
+      ...tic({}, [loan]),
+      metrics: [row("Asking price", "4,200,000"), row("Total SF", "48,000 SF"), row("NOI (in-place)", "980,000", "in_place"), row("Going-in cap rate", "5.00%"), loan],
+    };
+    const f = assessPlausibility(mismatch).find((x) => x.code === "cap_mismatch")!;
+    expect(f.detail).toContain("The $14.0M is the equity's whole, grossed up from the share's price — not the asset's: the stated $9.0M loan on the property sits on top of it.");
+    // The model tab's sentence over the withheld returns.
+    expect(modelReturnsRead(tic({}, [loan]), { purchasePrice: 14_000_000, year1Noi: 980_000, goingInCapPct: 7 }).line).toBe(
+      "An undivided interest's price is for the interest, and grossed up beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld.",
+    );
+    // A share's loan is still its entity's.
+    const share = planSummary({ ...valueAdd, interest: interest({ kind: "partial_interest", share: "30% LP interest" }) })!;
+    expect(share.loanOnProperty).toBeUndefined();
+    expect(planFacts(share)).toContainEqual(["Equity's whole, the share grossed up", "$14.0M, the entity's $9.0M loan on top"]);
+  });
+
+  it("says a percentage not stated as the interest's, never a share of an entity's", () => {
+    const e = tic({ share: "", summary: "An undivided interest held as tenants in common with three co-owners" });
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.sharePct).toBeNull();
+    expect(r.leadSentences[0]).toBe(
+      "This memorandum sells an undivided interest in the property itself, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity — and states no single percentage for it: the whole building's income cannot be set against the interest's price until its share is known.",
+    );
+    expect(interestShortLine(r)).toBe("An undivided interest in the property, held as a tenant in common, its percentage not stated");
+    expect(deriveUnderwriteInputs(e, "x").sources.purchasePrice?.note).toBe(
+      "The OM's price for an UNDIVIDED INTEREST held as a tenant in common that states no single percentage — the model cannot gross it up, so its returns are not the interest's",
+    );
+  });
+
+  it("runs the model at the whole as before, its note saying what the price buys", () => {
+    const d = deriveUnderwriteInputs(tic(), "x");
+    expect(d.inputs.purchasePrice).toBe(14_000_000);
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $4,200,000 for an undivided 30% interest held as a tenant in common, grossed up to the whole asset — the model runs the whole building's cash flows; the interest earns 30% of them before any fee the co-owners' agreement pays its manager",
+    );
+    expect(d.meta.priceLabel).toBe("Whole Price (30% TIC interest grossed up)");
+    expect(d.meta.interest?.line).toBe("An undivided 30% interest in the property, held as a tenant in common — $4.2M for the interest is $14.0M for the whole");
+  });
+});
+
+// Research pass 37: a Delaware statutory trust's sponsor-affiliate master
+// tenant, its load and its trustee's limits were asked nowhere.
+describe("a Delaware statutory trust's beneficial interests are asked their own questions beside a share's", () => {
+  const dst = (over: Partial<ExtractedInterest> = {}): ExtractionResult =>
+    ex(
+      interest({
+        kind: "partial_interest",
+        summary:
+          "Beneficial interests in a Delaware statutory trust that owns the property; 100% of the beneficial interests offered to accredited investors, minimum investment 100,000; property master leased to an affiliate of the sponsor",
+        share: "100% of the beneficial interests",
+        ...over,
+      }),
+    );
+
+  it("keeps the share's list and adds the trust's, as questions naming no ruling", () => {
+    const e = dst();
+    expect(shareHoldingOf(e)).toBe("dst");
+    const note = interestNote(readInterest(e, askingPriceOf(e))!);
+    expect(note).toContain("(a) THE PRICE IS FOR ALL OF THE ENTITY'S INTERESTS");
+    expect(note).toContain(
+      "DELAWARE STATUTORY TRUST TRAPS, asked by name where the OM gives the inputs: (a) WHAT THE TRUSTEE MAY NOT DO — ask for the trust agreement's limits on the trustee — on new capital, on refinancing, on new or renegotiated leases — as stated; (b) THE MASTER TENANT — ask whether the property is master leased and whether the master tenant is the sponsor's affiliate, and where it is master leased, read what the investors earn as the master lease rent, not the property's NOI, each as stated; (c) THE LOAD — ask for the offering costs and fees between the investor's cheque and the property, as stated; (d) THE SPRINGING LLC — ask whether the trust agreement provides for converting the trust to a limited liability company, and when that applies, as stated.",
+    );
+    expect(note).not.toMatch(/Rev\.|Revenue Ruling|Revenue Procedure|2004-86|§/);
+    expect(gluedWords(note)).toEqual([]);
+    // Named by "DST" or a trust's words alone, and never a tenancy in common.
+    expect(isDst(dst({ summary: "Interests in the Harbor View DST", share: "100%" }))).toBe(true);
+    expect(isTenancyInCommon(dst({ summary: "A DST or, at the investor's election, an undivided TIC interest" }))).toBe(false);
+    // A share of no trust asks the share's questions alone.
+    const lp = ex(interest({ kind: "partial_interest", share: "49% LP interest" }));
+    expect(interestNote(readInterest(lp, 20_000_000)!)).not.toContain("DELAWARE STATUTORY TRUST TRAPS");
+  });
+
+  it("asks a trust its words do not name a Delaware statutory trust the trust's own questions (audit C6, LOW-5)", () => {
+    // An Illinois land trust's beneficial interest had been asked the
+    // Delaware statutory trust's questions, while its 1031 flag says "the
+    // trust".
+    const land = dst({ summary: "100% of the beneficial interests in an Illinois land trust holding title", share: "100% of the beneficial interests" });
+    expect(isDst(land)).toBe(true);
+    const note = interestNote(readInterest(land, askingPriceOf(land))!);
+    expect(note).not.toMatch(/DELAWARE STATUTORY TRUST|SPRINGING LLC/);
+    expect(note).toContain("TRUST TRAPS, asked by name where the OM gives the inputs: (a) THE TRUST AGREEMENT");
+    expect(gluedWords(note)).toEqual([]);
+    // A trust its words name as one keeps the DST's list.
+    expect(interestNote(readInterest(dst(), askingPriceOf(dst()))!)).toContain("DELAWARE STATUTORY TRUST TRAPS");
+  });
+});
+
+// Research pass 37: "50% of the general partner interest" read as 50% of the
+// entity and grossed up 2×, so the pipeline card printed "$21k/unit" for a
+// building the memorandum values at $267k a unit, and the plausibility check
+// blamed the memorandum for the site's own misread.
+describe("a share of the general partner's interest is a share of a share, never the entity's", () => {
+  const row = (label: string, value: string, basis: ExtractionResult["metrics"][number]["basis"] = "na") => ({ label, value, flagged: false, page: "p. 3", basis });
+  const gp = (over: Partial<ExtractedInterest> = {}, metrics: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    dealName: "Crescent Ridge GP Interest",
+    assetClass: "Multifamily",
+    totalPages: 40,
+    interest: interest({
+      kind: "partial_interest",
+      summary: "50% of the general partner interest in the partnership that owns the property; the GP holds a 10% capital interest and a 20% promote over an 8% preferred return",
+      share: "50% of the general partner interest",
+      page: "p. 2",
+      ...over,
+    }),
+    metrics: [row("Asking price", "3,200,000"), row("Units", "300"), row("NOI (in-place)", "4,400,000", "in_place"), row("Whole-asset value", "80,000,000"), ...metrics],
+  });
+
+  it("parseSharePct reads a percentage of a partner's, a member's, a manager's or a sponsor's interest as no share of the entity", async () => {
+    const { shareOfSharePct } = await import("./interest");
+    for (const [text, stake] of [
+      ["50% of the general partner interest", 50],
+      ["50% of the general partner's interest", 50],
+      ["a 25% interest in the managing member", 25],
+      ["30% of the GP's interest", 30],
+      ["a 10% co-GP interest", 10],
+      ["40% of the sponsor's interest", 40],
+      ["10% of the GP promote", 10],
+      ["20% of the carried interest", 20],
+    ] as const) {
+      expect(parseSharePct(text), text).toBeNull();
+      expect(shareOfSharePct(text), text).toBe(stake);
+    }
+    // A partner's own stake in the partnership is the entity's share, and so
+    // is a general partnership's.
+    expect(parseSharePct("a 2% GP interest")).toBe(2);
+    expect(parseSharePct("49% interest in the general partnership")).toBe(49);
+    expect(parseSharePct("90% limited partner interest")).toBe(90);
+    expect(shareOfSharePct("90% limited partner interest")).toBeNull();
+    // An LP share beside the sponsor's GP interest kept is the LP's.
+    expect(parseSharePct("a 90% interest in the partnership, the sponsor retaining the general partner interest")).toBe(90);
+  });
+
+  it("reads the stake off its own words — the share as stated, else the sentence's first clause — and grosses nothing up", async () => {
+    const { buildingPriceOf } = await import("./deal-strategy");
+    const { isGpStake, gpStakePctOf } = await import("./interest");
+    const e = gp();
+    expect(isGpStake(e)).toBe(true);
+    expect(shareHoldingOf(e)).toBe("gp_stake");
+    expect(interestOf(e)).toEqual({ kind: "partial_interest", sharePct: null, entityLoan: null });
+    expect(gpStakePctOf(e)).toBe(50);
+    // A lone figure in the share's field is the stake's where the sentence says so.
+    const lone = gp({ share: "50%" });
+    expect([isGpStake(lone), interestOf(lone).sharePct, gpStakePctOf(lone)]).toEqual([true, null, 50]);
+    // An LP interest whose sentence goes on to name the sponsor's GP interest is the LP's.
+    const lp = gp({ share: "90% LP interest", summary: "A 90% LP interest; the sponsor retains 100% of the general partner interest" });
+    expect([isGpStake(lp), interestOf(lp).sharePct]).toEqual([false, 90]);
+    // No basis, no comps tick, no price finding.
+    expect(buildingPriceOf(e, 3_200_000)).toBeNull();
+    expect(assessPlausibility(e)).toEqual([]);
+  });
+
+  it("says a share of a share on every line — the label, the lead, the caveat, the short line, the tag — and asks the general partner's questions", () => {
+    const e = gp();
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.label).toBe("A share of the general partner's interest");
+    expect(r.holding).toBe("gp_stake");
+    expect(r.stakePct).toBe(50);
+    expect(r.impliedWhole).toBeNull();
+    expect(r.leadSentences).toEqual([
+      "This memorandum sells a share of the general partner's interest, not a share of the owning entity: its economics are the general partner's own capital and its promote, as stated, and the property model is not its return.",
+      "The memorandum's $3.2M buys 50% of the general partner's interest, as stated: no figure grosses that up to the building's price, so no basis or cap is struck on it.",
+    ]);
+    expect(r.modelCaveat).toBe(
+      "A share of the general partner's interest is a share of a share: the screening model runs the whole building's cash flows at its price, so its cap and returns are not the stake's, which earns the general partner's capital share and its promote as the waterfall states.",
+    );
+    expect(interestShortLine(r)).toBe("50% of the general partner's interest for $3.2M, as stated — a share of a share, not of the owning entity");
+    expect(interestTag(e)).toBe("GP stake 50%");
+    expect(interestTag(gp({ share: "", summary: "An interest in the general partner of the partnership" }))).toBe("GP stake");
+    const note = interestNote(r);
+    expect(note).toContain(
+      "GP-STAKE TRAPS, asked by name where the OM gives the inputs: (a) THE PROMOTE IS THE RETURN — it is paid only past the investors' preferred return, as the waterfall states: ask for each hurdle and the general partner's share above it; (b) THE GP'S CAPITAL AND ITS CALLS — ask what capital the general partner has put in and must still put in, and what this stake owes on a call; (c) THE FEES IT SHARES — ask which of the general partner's fees this stake shares, as stated; (d) THE GUARANTEES IT SHARES — ask which guarantees the general partner has given — non-recourse carve-outs, completion — and whether this stake shares them; (e) CONTROL AND REMOVAL — ask who controls the general partner, and on what terms the investors may remove it.",
+    );
+    expect(note).not.toMatch(/PARTIAL-INTEREST TRAPS|grossed up by the share|states no single percentage/);
+    expect(note).not.toMatch(/Rev\.|Revenue Ruling|U\.S\.C|§/);
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${note} ${dealContextFor(e)}`;
+    expect(said).not.toMatch(/\$6\.4M|for the whole, grossed up|states no single percentage/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("runs the model at the stake's price as a share of no stated percentage's runs, its notes saying what it is", () => {
+    const d = deriveUnderwriteInputs(gp(), "x");
+    expect(d.inputs.purchasePrice).toBe(3_200_000);
+    expect(d.sources.purchasePrice?.provenance).toBe("extracted");
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's price for a share of the GENERAL PARTNER'S interest — a share of a share, not of the owning entity: this model runs the whole building's cash flows at that price, so its cap and returns are not the stake's",
+    );
+    expect(d.meta.priceLabel).toBeNull();
+    // The building's stated income is not wrong: the price is not the building's.
+    expect(d.sources.inPlaceRentAnnual?.note).toBe(
+      "The OM's NOI (in-place) of $4,400,000 is 138% of price — the whole building's income against the price of a share of the general partner's interest, which is not the building's price, so it does not anchor year 1 here. No going-in cap in the OM either — assumed 6% going-in; enter the year-1 NOI you would run",
+    );
+    expect(d.meta.interest?.basisWithheld).toEqual({
+      word: "share",
+      why: "the price buys a share of the general partner's interest, a share of a share that no figure grosses up to the building's price",
+    });
+    expect(d.meta.interest?.line).toBe("50% of the general partner's interest for $3.2M, as stated — a share of a share, not of the owning entity");
+  });
+});
+
+// Research pass 37: a development joint venture's "$31,500,000 (LP equity
+// commitment)" for a 90% limited partner interest read "$35.0M for the
+// whole" beside a $95.0M project and a $60.0M construction loan read by
+// nothing.
+describe("a development joint venture's grossed-up equity is the equity's whole, never the whole", () => {
+  const row = (label: string, value: string, basis: ExtractionResult["metrics"][number]["basis"] = "na") => ({ label, value, flagged: false, page: "p. 3", basis });
+  const jv = (metrics: ExtractionResult["metrics"]): ExtractionResult => ({
+    dealName: "Riverline Phase II JV",
+    assetClass: "Multifamily",
+    totalPages: 40,
+    strategy: { kind: "development", summary: "LP equity for a ground-up 300-unit development: the investor funds 90% of the equity", capitalBudget: "", timeline: "26-month construction" },
+    interest: interest({ kind: "partial_interest", summary: "90% limited partner interest in the development joint venture", share: "90% limited partner interest", page: "p. 2" }),
+    metrics: [row("Asking price", "31,500,000 (LP equity commitment)"), row("Units (proposed)", "300"), row("NOI (stabilized, pro forma)", "6,300,000", "pro_forma"), ...metrics],
+  });
+
+  it("reads the entity's committed construction loan beside its drawn balance, the balance first", async () => {
+    const { entityLoanOf } = await import("./interest");
+    expect(entityLoanOf(jv([row("Entity construction loan", "60,000,000 (committed)")]))).toBe(60_000_000);
+    expect(entityLoanOf(jv([row("Entity construction loan commitment", "$60,000,000")]))).toBe(60_000_000);
+    expect(entityLoanOf(jv([row("Entity construction loan", "$60,000,000"), row("Entity loan balance", "$18,000,000")]))).toBe(18_000_000);
+    // A buyer's construction loan, or a rate, is no entity's loan.
+    expect(entityLoanOf(jv([row("Construction loan", "60,000,000 (committed)")]))).toBeNull();
+    expect(entityLoanOf(jv([row("Entity construction loan", "65% LTC")]))).toBeNull();
+    // Beside it, the existing rule's words: the equity's whole, the loan on top.
+    const r = readInterest(jv([row("Entity construction loan", "60,000,000 (committed)")]), 31_500_000)!;
+    expect(r.leadSentences[0]).toContain("$31.5M for the share is $35.0M grossed up — the equity's whole, not the asset's, since the entity's stated $60.0M loan sits on top of it");
+  });
+
+  it("the prompt asks for both entity-loan rows by the labels the reader reads", async () => {
+    const { extractionInstruction } = await import("./anthropic/prompts");
+    const prompt = extractionInstruction("multifamily");
+    for (const label of ["Entity loan balance", "Entity construction loan"]) expect(prompt, label).toContain(`"${label}"`);
+    const { entityLoanOf } = await import("./interest");
+    expect(entityLoanOf(jv([row("Entity loan balance", "$18,000,000")]))).toBe(18_000_000);
+    expect(entityLoanOf(jv([row("Entity construction loan", "$60,000,000")]))).toBe(60_000_000);
+  });
+
+  it("beside a stated total project cost above it, the grossed-up figure is the equity's whole on every line, the model's price unchanged", async () => {
+    const { planSummary, plausibilityNote, inferStrategy: infer, buildingPriceOf } = await import("./deal-strategy");
+    const e = jv([row("Total project cost", "95,000,000"), row("Construction loan", "60,000,000 (committed)")]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.projectCost).toBe(95_000_000);
+    expect(r.leadSentences[0]).toBe(
+      "This memorandum sells a 90% share of the owning entity, not the whole asset: $31.5M for the share is $35.0M grossed up — the equity's whole, not the project's, since the memorandum's stated $95.0M total project cost sits above it, and the screen sets the whole building's income against the $35.0M alone.",
+    );
+    expect(r.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $35.0M the share's price implies — the equity's whole, with the memorandum's stated $95.0M total project cost above it. The share earns its 90% of the cash flows only before the waterfall's promote and the sponsor's fees.",
+    );
+    expect(interestShortLine(r)).toBe("A 90% share of the owning entity — $31.5M for the share is $35.0M for the equity's whole; the stated $95.0M total project cost sits above it");
+    expect(interestNote(r)).toContain("read that grossed-up figure as the equity's whole, not the project's: the memorandum's stated $95.0M total project cost sits above it");
+    // The model's price is the grossed-up figure as before; its note and label say what it is.
+    const d = deriveUnderwriteInputs(e, "x");
+    expect(d.inputs.purchasePrice).toBe(35_000_000);
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $31,500,000 for a 90% share, grossed up to $35,000,000 — the equity's whole, not the project's: the memorandum's stated $95,000,000 total project cost sits above it; the model runs the whole building's cash flows, and the share earns 90% of them before the promote and the sponsor's fees",
+    );
+    expect(d.meta.priceLabel).toBe("Equity's Whole (90% share grossed up)");
+    // The plan's cost and yield read as before; its label says the equity's whole.
+    const plan = planSummary(e)!;
+    expect([plan.price, plan.totalCost, plan.priceLabel, plan.projectCostAbove]).toEqual([35_000_000, 95_000_000, "Equity's whole, the share grossed up", 95_000_000]);
+    expect(plausibilityNote([], infer(e), plan, e)).toContain(
+      "whole price, the share's grossed up, $35.0M (the equity's whole, not the project's: the memorandum's stated $95.0M total project cost sits above it)",
+    );
+    expect(buildingPriceOf(e, 31_500_000)).toBe(35_000_000);
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${d.sources.purchasePrice?.note}`;
+    expect(said).not.toMatch(/for the whole\b|whole asset —/);
+    expect(gluedWords(said)).toEqual([]);
+    // A total at or under the grossed-up figure says nothing new.
+    const allEquity = jv([row("Total project cost", "35,000,000")]);
+    expect(readInterest(allEquity, 31_500_000)!.projectCost).toBeNull();
+  });
+
+  it("the deal-strategy reader's total row and the interest's are one reader", async () => {
+    const { capitalBudgetFromMetrics } = await import("./deal-strategy");
+    const { statedProjectCostOf } = await import("./interest");
+    for (const label of ["Total project cost", "Total development cost", "Total development budget", "Total capitalization", "All-in cost", "All-in basis", "Total project cost per unit", "Annual total project cost", "Hard costs", "Construction budget"]) {
+      const rows = [row(label, "$95,000,000")];
+      const total = capitalBudgetFromMetrics(rows, null)?.isTotal === true;
+      expect(statedProjectCostOf(jv(rows)) != null, label).toBe(total);
+    }
+  });
+});
+
+// A term the memorandum states as a count of years is counted from today,
+// though the memorandum's own date is earlier: the sentence says the term
+// may be shorter, and the tag had said "Leasehold, 45 yrs left" as if it
+// were a date. At most that long, it says "up to"; the land comes back
+// "within" it. A term that already counts its options is a ceiling too.
+describe("interestTag — a counted or ceiling term is at most that long", () => {
+  const AS_OF = new Date(Date.UTC(2026, 9, 5, 12));
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 4", basis: "na" as const });
+  const held = (kind: "leasehold" | "leased_fee", rows: ReturnType<typeof row>[]) =>
+    ex(interest({ kind, summary: kind === "leasehold" ? "The leasehold interest in the building" : "The leased fee", groundLease: "Ground lease to the building's owner" }), rows);
+
+  it("says up to on a count of years and within on the land's return", () => {
+    expect(interestTag(held("leasehold", [row("Ground lease term remaining", "45 years")]), AS_OF)).toBe("Leasehold, up to 45 yrs left");
+    expect(interestTag(held("leased_fee", [row("Ground lease term remaining", "45 years")]), AS_OF)).toBe("Leased fee, reverts within 45 yrs");
+  });
+
+  it("reads a stated date as before", () => {
+    expect(interestTag(held("leasehold", [row("Ground lease expiration", "December 31, 2071")]), AS_OF)).toBe("Leasehold, 45 yrs left");
+    expect(interestTag(held("leased_fee", [row("Ground lease expiration", "December 31, 2071")]), AS_OF)).toBe("Leased fee, reverts in 45 yrs");
+  });
+});
+
+describe("all the tenant-in-common interests are the whole property, never an entity's (audit C3b LOW-1)", () => {
+  // "100% of the tenant-in-common interests" read as an undivided interest
+  // "beside its co-owners" in the lead, and as "all of the owning entity's
+  // interests" in the model's price note and the verdict.
+  const tic = (loan?: string): ExtractionResult => ({
+    ...ex(
+      interest({
+        kind: "partial_interest",
+        share: "100% of the tenant-in-common interests",
+        summary: "100% of the tenant-in-common interests in the property, sold together by the co-owners",
+      }),
+    ),
+    metrics: [
+      { label: "Asking price", value: "$30,000,000", flagged: false, page: "p. 2", basis: "na" },
+      { label: "Units", value: "200", flagged: false, page: "p. 2", basis: "na" },
+      { label: "NOI (in-place)", value: "1,650,000", flagged: false, page: "p. 2", basis: "in_place" },
+      ...(loan ? [{ label: "Entity loan balance", value: loan, flagged: false, page: "p. 2", basis: "na" as const }] : []),
+    ],
+  });
+
+  it("says it in the lead and the model caveat", () => {
+    const r = readInterest(tic(), 30_000_000)!;
+    expect(r.lead).toBe(
+      "This memorandum sells all the tenant-in-common interests in the property, together the whole property — title to real estate, not a share of an entity: its $30.0M price is the whole's, nothing grossed up.",
+    );
+    expect(r.modelCaveat).toBe("The screening model runs the whole asset at the $30.0M price for all the tenant-in-common interests, nothing grossed up.");
+    const withLoan = readInterest(tic("$14,000,000"), 30_000_000)!;
+    expect(withLoan.lead).toBe(
+      "This memorandum sells all the tenant-in-common interests in the property, together the whole property — title to real estate, not a share of an entity: its $30.0M price is the equity's whole, nothing grossed up, not the asset's, since the stated $14.0M loan on the property sits on top of it.",
+    );
+    expect(withLoan.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $30.0M price for all the tenant-in-common interests — the equity's whole: the stated $14.0M loan on the property sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on it instead.",
+    );
+    for (const s of [r.lead, withLoan.lead, r.modelCaveat ?? "", withLoan.modelCaveat ?? ""]) {
+      expect(s).not.toContain("beside its co-owners");
+      expect(s).not.toContain("entity's interests");
+    }
+  });
+
+  it("says it in the model's price note and the verdict's basis line", () => {
+    const note = deriveUnderwriteInputs(tic(), "x").sources.purchasePrice?.note ?? "";
+    expect(note).toContain("The OM's $30,000,000 for all the tenant-in-common interests in the property, together the whole property");
+    expect(note).not.toContain("entity");
+    const loanNote = deriveUnderwriteInputs(tic("$14,000,000"), "x").sources.purchasePrice?.note ?? "";
+    expect(loanNote).toContain("the stated $14,000,000 loan on the property sits on top of it");
+    expect(loanNote).not.toContain("entity");
+    const brief = buildBrief({ extraction: tic("$14,000,000"), assetClass: "auto" } as never);
+    const line = brief.slice(brief.indexOf("THE BUILDING'S BASIS")).split("\n")[0];
+    expect(line).toBe(
+      "THE BUILDING'S BASIS: none — the price for all the tenant-in-common interests is the equity's whole, not the building's: the building's cost is that plus the stated $14.0M loan on the property, which the model does not add, so no price per unit or per SF and no cap is struck on it.",
+    );
   });
 });

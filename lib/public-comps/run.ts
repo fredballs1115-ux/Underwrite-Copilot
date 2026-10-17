@@ -1,14 +1,24 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { abbrevState, type StructuredAddress } from "@/lib/address";
+import { RECORDED_SALES } from "@/lib/public-record-asks";
 import {
   compStats,
   finalizeComps,
   HONESTY_NOTE,
+  lastGoodOf,
   providerFor,
+  STORED_COMPS,
   type RecordComp,
   type RecordCompsResult,
 } from "./core";
+import { dbMarketForAddress } from "./db-markets";
+import { classFilterText, compsClassKey, DB_CLASS_FOR } from "./classes";
+import type { SubjectPoint } from "./subject-point";
+import { photonPrecision } from "@/lib/geocode";
+import { dealClassKey } from "@/lib/asset-words";
+import type { LocationPrecision } from "@/lib/imagery-plan";
+import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 
 // The background half of public-record comps: geocode the subject (Photon —
 // the same free OSM service the address autocomplete uses), pick the
@@ -17,10 +27,12 @@ import {
 // every failure mode lands as a stored status the panel renders honestly —
 // never a silent absence.
 
-const RADIUS_KM = 1.6; // 1 mile
-const WIDE_RADIUS_KM = 4.8; // 3 miles
-const MONTHS_BACK = 24;
-const WIDE_MONTHS_BACK = 36;
+// The asks, one place (lib/public-record-asks): migration 0037 caps the
+// nearby_sales lookup at the widest of them.
+const RADIUS_KM = RECORDED_SALES.radiusKm; // 1 mile
+const WIDE_RADIUS_KM = RECORDED_SALES.wideRadiusKm; // 3 miles
+const MONTHS_BACK = RECORDED_SALES.monthsBack;
+const WIDE_MONTHS_BACK = RECORDED_SALES.wideMonthsBack;
 const MIN_COMPS_BEFORE_WIDENING = 5;
 const PENDING_STALE_MS = 10 * 60 * 1000;
 
@@ -32,16 +44,12 @@ const PENDING_STALE_MS = 10 * 60 * 1000;
  *  this caller won and should schedule runRecordComps. */
 export async function claimRecordComps(dealId: string, force = false): Promise<boolean> {
   const admin = createSupabaseAdminClient();
-  const sentinel = {
+  const sentinel: RecordCompsResult = {
     status: "pending",
     comps: [],
     retrievedAt: new Date().toISOString(),
     note: HONESTY_NOTE,
   };
-  if (force) {
-    await admin.from("deals").update({ public_comps: sentinel }).eq("id", dealId);
-    return true;
-  }
   const { data: deal } = await admin
     .from("deals")
     .select("id, public_comps")
@@ -49,6 +57,14 @@ export async function claimRecordComps(dealId: string, force = false): Promise<b
     .maybeSingle();
   if (!deal) return false;
   const existing = deal.public_comps as RecordCompsResult | null;
+  // The last set that answered rides on the sentinel, so a refresh in flight
+  // — or one that fails — never loses the deal its sales.
+  const previous = lastGoodOf(existing);
+  if (previous) sentinel.previous = previous;
+  if (force) {
+    await admin.from("deals").update({ public_comps: sentinel }).eq("id", dealId);
+    return true;
+  }
   if (existing) {
     const stalePending =
       existing.status === "pending" &&
@@ -69,13 +85,21 @@ export async function claimRecordComps(dealId: string, force = false): Promise<b
   return (data?.length ?? 0) > 0;
 }
 
-/** Exported for lib/site-flags/run.ts — same Photon geocode, one behavior. */
-export async function geocode(label: string): Promise<{
+/** Exported for lib/site-flags/run.ts — same Photon geocode, one behavior.
+ *  `precision` is read off what Photon matched (lib/geocode's
+ *  `photonPrecision`): a house is the building's point, a street its
+ *  centreline, anything else an area — and an address that names no street
+ *  is an area whatever matched. */
+export async function geocode(
+  label: string,
+  hasStreet = true,
+): Promise<{
   lat: number;
   lng: number;
   state: string;
   city: string;
   county: string;
+  precision: LocationPrecision;
 } | null> {
   try {
     const res = await fetch(
@@ -86,7 +110,7 @@ export async function geocode(label: string): Promise<{
     const body = (await res.json()) as {
       features?: {
         geometry?: { coordinates?: [number, number] };
-        properties?: { state?: string; city?: string; county?: string };
+        properties?: { state?: string; city?: string; county?: string; type?: string };
       }[];
     };
     const f = body.features?.[0];
@@ -101,6 +125,7 @@ export async function geocode(label: string): Promise<{
       state: abbrevState(f?.properties?.state ?? ""),
       city: f?.properties?.city ?? "",
       county: f?.properties?.county ?? "",
+      precision: hasStreet ? photonPrecision(f?.properties?.type) : "area",
     };
   } catch {
     return null;
@@ -108,25 +133,29 @@ export async function geocode(label: string): Promise<{
 }
 
 /** DB-first comps: ingested deed records (migration 0028, nearby_sales RPC).
- *  Returns null when the table/RPC is absent or empty here — callers fall
- *  through to the live provider APIs. */
+ *  Returns null when the table or the lookup is absent or failed, and an
+ *  empty list when it answered with no sales — an answer, which the caller
+ *  widens once and, where the database holds the address's market, reports
+ *  as none found rather than as no source. */
 async function tryDbComps(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   subject: { lat: number; lng: number },
-  assetClass: string,
+  /** the class the database files the sales under (lib/public-comps/
+   *  classes `DB_CLASS_FOR`), or null for every sale */
+  dbClass: string | null,
   radiusKm: number,
   monthsBack: number
-): Promise<Omit<RecordComp, "distanceKm">[] | null> {
+): Promise<DbRow[] | null> {
   try {
     const { data, error } = await admin.rpc("nearby_sales", {
       in_lat: subject.lat,
       in_lng: subject.lng,
       in_radius_m: Math.round(radiusKm * 1000),
-      in_asset_class: assetClass.includes("multifamily") ? "multifamily" : null,
+      in_asset_class: dbClass,
       in_months: monthsBack,
-      in_limit: 80,
+      in_limit: RECORDED_SALES.limit,
     });
-    if (error || !Array.isArray(data) || data.length === 0) return null;
+    if (error || !Array.isArray(data)) return null;
     return (data as Record<string, unknown>[]).map((r) => ({
       address: String(r.address ?? r.parcel_id ?? "unknown"),
       lat: Number(r.lat),
@@ -136,7 +165,55 @@ async function tryDbComps(
       sqft: r.building_sf === null || r.building_sf === undefined ? null : Number(r.building_sf),
       propertyType: String(r.asset_class ?? "recorded sale"),
       sourceUrl: String(r.source_url ?? ""),
+      ingestedAt: typeof r.ingested_at === "string" ? r.ingested_at.slice(0, 10) : "",
+      // What the record states beyond the price, as the ingest wrote it; a
+      // blank is null, never zero or "unknown".
+      units: wholeCount(r.units),
+      buyer: statedText(r.buyer),
+      seller: statedText(r.seller),
+      deedType: statedText(r.deed_type),
     }));
+  } catch {
+    return null;
+  }
+}
+
+/** A count the record states (a positive whole number), else null. */
+const wholeCount = (v: unknown): number | null => {
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+/** Words the record states, trimmed, else null. */
+const statedText = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+/** A database row as read: a sale, and the day the ingest wrote it. */
+type DbRow = Omit<RecordComp, "distanceKm"> & { ingestedAt: string };
+
+/** The newest ingest day among rows read, or undefined. */
+const newestIngest = (rows: DbRow[]): string | undefined =>
+  rows.reduce<string | undefined>((m, r) => (r.ingestedAt && (!m || r.ingestedAt > m) ? r.ingestedAt : m), undefined);
+
+const DB_PROVIDER_NAME = "Ingested public deed records (property database)";
+
+/** Whether the property database holds any recorded sale filed under a
+ *  market, and the day its newest row was ingested — one row read, newest
+ *  ingest first. Null on none or a failed read: coverage is never claimed
+ *  on a read that did not answer. */
+async function dbMarketIngested(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  ingestMarket: string,
+): Promise<{ ingestedThrough?: string } | null> {
+  try {
+    const { data, error } = await admin
+      .from("recorded_sales")
+      .select("ingested_at")
+      .eq("market", ingestMarket)
+      .order("ingested_at", { ascending: false })
+      .limit(1);
+    if (error || !Array.isArray(data) || data.length === 0) return null;
+    const at = (data[0] as { ingested_at?: unknown }).ingested_at;
+    return typeof at === "string" ? { ingestedThrough: at.slice(0, 10) } : {};
   } catch {
     return null;
   }
@@ -151,45 +228,95 @@ export async function computeRecordComps(input: {
   city?: string;
   county?: string;
   assetClass?: string;
+  /** the deal's resolved location (lib/deal-location), the point its
+   *  pictures are drawn around: the search is measured from it where the
+   *  caller has one, and Photon is asked only for the jurisdiction the
+   *  structured address leaves blank */
+  point?: SubjectPoint | null;
+  /** whether the address names a street: without one, any point is the
+   *  area's, never the building's */
+  hasStreet?: boolean;
+  /** a radius or window the reader set (/comps): the search asks exactly
+   *  that, never widened. Absent — the deal panel's fixed ask — a thin set
+   *  is widened once to the wide radius and window. Each is held to
+   *  lib/public-record-asks' choices by the caller. */
+  ask?: { radiusKm?: number; monthsBack?: number } | null;
 }): Promise<RecordCompsResult> {
   const admin = createSupabaseAdminClient();
   const base = { comps: [], retrievedAt: new Date().toISOString(), note: HONESTY_NOTE };
-  const assetClass = (input.assetClass ?? "").toLowerCase();
+  // The class the search is held to, in the site's own key ("" for every
+  // sale), and the database's name for it (lib/public-comps/classes).
+  const cls = compsClassKey(input.assetClass);
+  const dbClass = cls ? DB_CLASS_FOR[cls] : null;
+  const hasStreet = input.hasStreet ?? true;
+  const asked = !!(input.ask && (input.ask.radiusKm || input.ask.monthsBack));
+  const firstRadiusKm = Math.min(input.ask?.radiusKm || RADIUS_KM, WIDE_RADIUS_KM);
+  const firstMonthsBack = input.ask?.monthsBack || MONTHS_BACK;
 
-  const subject = await geocode(input.label);
+  const point = input.point ?? null;
+  const placed = point && !input.state ? await geocode(input.label, hasStreet) : null;
+  const subject = point
+    ? {
+        lat: point.lat,
+        lng: point.lng,
+        precision: point.precision,
+        state: placed?.state ?? "",
+        city: placed?.city ?? "",
+        county: placed?.county ?? "",
+      }
+    : await geocode(input.label, hasStreet);
   if (!subject) {
     return { ...base, status: "geocode_failed", error: "Address did not geocode (Photon)." };
   }
+  const subjectOut = { lat: subject.lat, lng: subject.lng, label: input.label, precision: subject.precision };
 
   // 1) Ingested deed records (works in ANY ingested market, national included)
-  let radiusKm = RADIUS_KM;
-  let monthsBack = MONTHS_BACK;
-  let db = await tryDbComps(admin, subject, assetClass, radiusKm, monthsBack);
-  if (db && db.length < MIN_COMPS_BEFORE_WIDENING) {
-    const wide = await tryDbComps(admin, subject, assetClass, WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
-    if (wide && wide.length > db.length) {
+  let radiusKm = firstRadiusKm;
+  let monthsBack = firstMonthsBack;
+  let db = await tryDbComps(admin, subject, dbClass, radiusKm, monthsBack);
+  if (db && db.length < MIN_COMPS_BEFORE_WIDENING && !asked) {
+    const wide = await tryDbComps(admin, subject, dbClass, WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
+    // A widened answer is kept where it found more — or where both found
+    // none, so a search that came back empty says the widest it asked.
+    if (wide && (wide.length > db.length || (db.length === 0 && wide.length === 0))) {
       db = wide;
       radiusKm = WIDE_RADIUS_KM;
       monthsBack = WIDE_MONTHS_BACK;
     }
   }
   if (db && db.length > 0) {
-    const comps = finalizeComps(db, subject, radiusKm);
-    const stored = comps.slice(0, 40);
+    const ingestedThrough = newestIngest(db);
+    const comps = finalizeComps(
+      db.map((row) => {
+        const sale: Omit<RecordComp, "distanceKm"> & { ingestedAt?: string } = { ...row };
+        delete sale.ingestedAt;
+        return sale;
+      }),
+      subject,
+      radiusKm,
+    );
+    const stored = comps.slice(0, STORED_COMPS);
     return {
       ...base,
       status: stored.length ? "ok" : "no_sales",
       providerId: "ingested_db",
-      providerName: "Ingested public deed records (property database)",
+      providerName: DB_PROVIDER_NAME,
       datasetUrl: stored[0]?.sourceUrl ?? "",
-      subject: { lat: subject.lat, lng: subject.lng, label: input.label },
+      subject: subjectOut,
       params: {
         radiusKm,
         monthsBack,
-        classFilter: assetClass.includes("multifamily") ? "multifamily" : "all sales",
+        classFilter: cls ? classFilterText(cls) : "all sales",
+        ...(cls ? { classKey: cls } : {}),
       },
       comps: stored,
       stats: compStats(stored),
+      // The lookup answers its nearest sales, at most RECORDED_SALES.limit:
+      // a full answer is a set that stops short of the radius asked.
+      capped: db.length >= RECORDED_SALES.limit,
+      sourceOrder: "nearest",
+      found: comps.length,
+      ...(ingestedThrough ? { ingestedThrough } : {}),
     };
   }
 
@@ -202,15 +329,53 @@ export async function computeRecordComps(input: {
     city: input.city || subject.city,
     county: input.county || subject.county,
   });
-  if (!provider) return { ...base, status: "no_provider" };
+  if (!provider) {
+    // The database answered and found nothing: where it holds recorded sales
+    // for the address's market, that is a finding about this address — no
+    // sales within the widest search — never "no source wired".
+    const market =
+      db !== null
+        ? dbMarketForAddress({
+            state: input.state || subject.state,
+            city: input.city || subject.city,
+            county: input.county || subject.county,
+            label: input.label,
+          })
+        : null;
+    const held = market ? await dbMarketIngested(admin, market.ingestMarket) : null;
+    if (market && held) {
+      return {
+        ...base,
+        status: "no_sales",
+        providerId: "ingested_db",
+        providerName: DB_PROVIDER_NAME,
+        datasetUrl: "",
+        subject: subjectOut,
+        params: {
+          radiusKm,
+          monthsBack,
+          classFilter: cls ? classFilterText(cls) : "all sales",
+        ...(cls ? { classKey: cls } : {}),
+        },
+        comps: [],
+        found: 0,
+        dbMarket: market.name,
+        ...held,
+      };
+    }
+    return { ...base, status: "no_provider" };
+  }
   const nowIso = new Date().toISOString();
+  const filtersClass = !!cls && (provider.classFilters ?? []).includes(cls);
   const attempt = async (rKm: number, mBack: number) => {
     const url2 = provider.buildUrl({
       lat: subject.lat,
       lng: subject.lng,
       radiusKm: rKm,
       monthsBack: mBack,
-      assetClass,
+      // A provider's query is held to a class only where it filters by it
+      // (ProviderConfig `classFilters`); the result says which.
+      assetClass: filtersClass ? cls : "",
       nowIso,
     });
     const res = await fetch(url2, {
@@ -218,42 +383,53 @@ export async function computeRecordComps(input: {
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) {
-      throw new Error(`${provider.id}: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`);
+      // The source's own words go to the server log, never the page.
+      console.error(`recorded sales: ${provider.id} answered HTTP ${res.status}:`, (await res.text()).slice(0, 300));
+      throw new Error(`${provider.id}: HTTP ${res.status}`);
     }
-    return finalizeComps(provider.parse(await res.json()), subject, rKm);
+    const json = await res.json();
+    // How many rows came back, parsed or not: a full answer is a source that
+    // stopped at its limit, with more sales inside the radius and the window.
+    return { comps: finalizeComps(provider.parse(json), subject, rKm), returned: provider.rowCount(json) };
   };
   try {
-    let rKm = RADIUS_KM;
-    let mBack = MONTHS_BACK;
-    let comps = await attempt(rKm, mBack);
-    if (comps.length < MIN_COMPS_BEFORE_WIDENING) {
+    let rKm = firstRadiusKm;
+    let mBack = firstMonthsBack;
+    let { comps, returned } = await attempt(rKm, mBack);
+    if (comps.length < MIN_COMPS_BEFORE_WIDENING && !asked) {
       try {
         const widened = await attempt(WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
         rKm = WIDE_RADIUS_KM;
         mBack = WIDE_MONTHS_BACK;
-        comps = widened;
+        comps = widened.comps;
+        returned = widened.returned;
       } catch {
         if (comps.length === 0) throw new Error(`${provider.id}: widened query failed`);
       }
     }
-    const stored = comps.slice(0, 40);
+    const stored = comps.slice(0, STORED_COMPS);
     return {
       ...base,
       status: stored.length ? "ok" : "no_sales",
       providerId: provider.id,
       providerName: provider.name,
       datasetUrl: provider.datasetUrl,
-      subject: { lat: subject.lat, lng: subject.lng, label: input.label },
+      subject: subjectOut,
       params: {
         radiusKm: rKm,
         monthsBack: mBack,
-        classFilter: assetClass.includes("multifamily") ? "multifamily/mixed" : "all sales",
+        classFilter: filtersClass ? (cls === "multifamily" ? "multifamily/mixed" : classFilterText(cls)) : "all sales",
+        ...(filtersClass ? { classKey: cls } : {}),
       },
       comps: stored,
       stats: compStats(stored),
+      capped: returned >= RECORDED_SALES.limit,
+      sourceOrder: provider.order,
+      found: comps.length,
     };
   } catch (err) {
-    return { ...base, status: "provider_error", error: String(err).slice(0, 500) };
+    console.error("recorded sales: the live provider failed:", String(err).slice(0, 500));
+    return { ...base, status: "provider_error", error: `${provider.id}: no answer` };
   }
 }
 
@@ -262,8 +438,15 @@ export async function computeRecordComps(input: {
  *  tool), store the result on the deal. */
 export async function runRecordComps(dealId: string): Promise<void> {
   const admin = createSupabaseAdminClient();
+  // The last set that answered, read before the pull: a refresh that fails
+  // stores it back, said as the earlier pull's, rather than a failure over
+  // sales the deal already had (the comps research pass's M3).
+  let previous: RecordCompsResult | null = null;
   const store = async (result: RecordCompsResult) => {
-    await admin.from("deals").update({ public_comps: result }).eq("id", dealId);
+    const failed = result.status === "provider_error" || result.status === "geocode_failed";
+    const kept: RecordCompsResult =
+      failed && previous ? { ...previous, refreshFailed: { at: result.retrievedAt, status: result.status } } : result;
+    await admin.from("deals").update({ public_comps: kept }).eq("id", dealId);
   };
   const base = {
     comps: [],
@@ -274,16 +457,28 @@ export async function runRecordComps(dealId: string): Promise<void> {
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("id, address, asset_class")
+      .select("id, address, asset_class, photo, extraction, public_comps")
       .eq("id", dealId)
       .maybeSingle();
     const address = (deal?.address as StructuredAddress | null) ?? null;
     if (!deal) return;
+    previous = lastGoodOf(deal.public_comps as RecordCompsResult | null);
     if (!address?.label) {
       // Claimed but the address vanished — record why instead of a stuck
       // pending sentinel.
       await store({ ...base, status: "no_provider", error: "Deal has no address." });
       return;
+    }
+    // The deal's one point (lib/deal-location): the one its aerial, flood map
+    // and site flags are drawn around, so the sales are measured from where
+    // the page says the building is. Where it cannot be resolved the pull
+    // places the address itself, its precision read off the answer.
+    let point: SubjectPoint | null = null;
+    try {
+      const loc = await resolveDealLocation(admin, dealId, address, (deal.photo as DealVisualCache | null) ?? null);
+      if (loc) point = { lat: loc.lat, lng: loc.lng, precision: loc.precision };
+    } catch {
+      point = null;
     }
     await store(
       await computeRecordComps({
@@ -291,14 +486,23 @@ export async function runRecordComps(dealId: string): Promise<void> {
         state: address.state,
         city: address.city,
         county: address.county,
-        assetClass: (deal.asset_class as string) ?? "",
+        // The deal's one class (lib/asset-words `dealClassKey`): the class
+        // the analyst filed, else the deck's where they left "auto" — the
+        // class the readout's call is held to.
+        assetClass: dealClassKey(
+          deal.asset_class as string | null,
+          (deal.extraction as { assetClass?: string | null } | null) ?? null,
+        ),
+        point,
+        hasStreet: !!address.street?.trim(),
       })
     );
   } catch (err) {
+    console.error("recorded sales: the pull failed:", String(err).slice(0, 500));
     await store({
       ...base,
       status: "provider_error",
-      error: String(err).slice(0, 500),
+      error: "the pull failed",
     });
   }
 }

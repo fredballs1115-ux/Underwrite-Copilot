@@ -284,13 +284,21 @@ export async function runSiteFlags(dealId: string): Promise<void> {
     // The deal's own point (#472): the location its pictures are drawn
     // around, resolved (and cached) the way the aerial route resolves it.
     let point: { lat: number; lng: number } | null = null;
+    // Whether that point is the building's own (lib/deal-location
+    // `pointIsBuilding`'s rule): a street address placed at the house. The
+    // flood line the Claude steps read names the point by it (the audit's
+    // L10); a point from anywhere else is the address's, never the house's.
+    let pointIsBuilding = false;
     try {
       const loc = await resolveDealLocation(admin, dealId, address, (deal.photo as DealVisualCache | null) ?? null);
-      if (loc) point = { lat: loc.lat, lng: loc.lng };
+      if (loc) {
+        point = { lat: loc.lat, lng: loc.lng };
+        pointIsBuilding = !!address.street?.trim() && loc.precision === "street";
+      }
     } catch {
       // the comps pull's point, or a geocode of the line, instead
     }
-    await store(await computeSiteFlags({ label: address.label, point, subject }));
+    await store({ ...(await computeSiteFlags({ label: address.label, point, subject })), pointIsBuilding });
   } catch (err) {
     await store({
       status: "lookup_failed",

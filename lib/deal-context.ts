@@ -1,7 +1,8 @@
+import { compactUsd } from "@/lib/money";
 import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
-import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type StrategyKind } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, planWithBasisChecked, type StrategyKind } from "@/lib/deal-strategy";
 import { priceRange, priceRangeShort, screenYearOf } from "@/lib/criteria";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
@@ -24,10 +25,15 @@ import { readSiteReports, siteReportsContextLine } from "@/lib/site-reports";
 import { readStudentHousing, studentContextLine } from "@/lib/student-housing";
 import { mhContextLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageContextLine } from "@/lib/self-storage";
+import { regulationContextLine, regulationSaidByPark, type RegulationRead } from "@/lib/rent-regulation";
+import { forwardContextLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseContextLine, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernContextLine, readGoingConcern } from "@/lib/going-concern";
+import { condoContextLine, readCondo } from "@/lib/condo";
+import { readSandwichLease, sandwichContextLine } from "@/lib/sandwich-lease";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
-const compact = (n: number): string =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+const compact = (n: number): string => compactUsd(n);
 
 /**
  * A price the OM states as a range — pricing guidance, a whisper — said once,
@@ -35,8 +41,10 @@ const compact = (n: number): string =>
  * top (lib/criteria `parsePrice`), the end that does not flatter a return,
  * and a step that reads the memorandum's "$40–42M" would otherwise strike its
  * own cap or basis on either end. "" where the price row states one figure.
+ * The challenger's notes carry it too (lib/anthropic/pipeline, research pass
+ * 41): its BASIS test reads the same "$40–42M".
  */
-function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind): string {
+export function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind): string {
   const row = findPriceMetric(extraction?.metrics ?? [], kind, screenYearOf(extraction));
   const r = row ? priceRange(row.value) : null;
   if (!row || !r) return "";
@@ -64,11 +72,18 @@ function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind)
  * pipeline does; it had passed neither, so a deal the signal calls a
  * conversion read "Stabilized" there. A caller with no signal reads as
  * before.
+ *
+ * The rent regulation (lib/rent-regulation) is read by the caller, which
+ * holds what the extraction does not — the deal's address, the Census place
+ * and county its answered site flags carry, and its class — through
+ * `regulationForDeal`, and handed in: said beside a covenant on the rents,
+ * since a regime's allowance, not the market, sets a regulated unit's rent.
  */
 export function dealContextFor(
   extraction: ExtractionResult | null,
-  site?: { flood?: SiteFlagsResult["flood"] } | null,
+  site?: { flood?: SiteFlagsResult["flood"]; pointIsBuilding?: boolean } | null,
   signal?: { take?: string; dealName?: string | null } | null,
+  regulation?: RegulationRead | null,
 ): string | null {
   const strategy = inferStrategy(extraction, signal ?? null);
   // A portfolio is said whatever the strategy: several properties in one
@@ -77,6 +92,11 @@ export function dealContextFor(
   // What is being sold is said FIRST whatever the strategy (#414): a note's
   // price or a share's changes what every figure after it means.
   const interest = readInterest(extraction, askingPriceOf(extraction));
+  // A sandwich position (lib/sandwich-lease): a master lease of the
+  // building, sublet — the sublease income against the master rent, the
+  // spread and its cover, and the master lease's end, right after what is
+  // being sold, since the position is the income between the two rents.
+  const sandwich = readSandwichLease(extraction);
   // The seller's loan, where it is offered for assumption (#417): its terms
   // as stated and what its value turns on, right after what is being sold.
   const assumable = readAssumable(extraction, null);
@@ -94,6 +114,15 @@ export function dealContextFor(
   // How it is sold (#456): an auction's starting bid is not a price, and a
   // receiver, a trustee or a lender never ran the building.
   const sale = readSale(extraction);
+  // A forward purchase or a build-to-suit bought at delivery (research pass
+  // 28): the price is paid at delivery and the developer funds the works —
+  // the clock, the deposit and the yield at delivery, read with the kind
+  // the screen reads.
+  const forward = readForwardPurchase(extraction, new Date(), strategy);
+  // An operating business on its real estate (lib/going-concern): whether
+  // the business is sold with it or leased from it, the operator's earnings
+  // and their coverage of the rent, the split and the contracts as stated.
+  const goingConcern = readGoingConcern(extraction);
   // The listed tenants of a multi-tenant property (#457): how much of the
   // rent rolls before the model's sale, the anchors in and out of the
   // sale, and the rights that ride on them.
@@ -122,20 +151,40 @@ export function dealContextFor(
   // A self-storage facility (#471): its two occupancies, the rent sitting
   // tenants pay against the street rate and whose platform it rides on.
   const storage = readSelfStorage(extraction);
+  // A mixed-use building (lib/mixed-use): its residential and commercial
+  // incomes as stated, the commercial share of each and the shops' roll.
+  const mixedUse = readMixedUse(extraction);
+  // Condominium units bought in bulk (lib/condo): the buyer's share of the
+  // association, a year of its dues, a lender's limit on a single owner and
+  // the reserves and restrictions as stated.
+  const condo = readCondo(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
-  // premium in the expense line and a lender's condition.
-  const flood = floodContextLine(site?.flood);
+  // premium in the expense line and a lender's condition. The point is the
+  // building's only where the lookup recorded it was (the audit's L10).
+  // On a portfolio the address is no one building's, so its point is the
+  // point the address was placed at, never "the building's" (research pass
+  // 41, L11: "the building's point" beside "10 properties across 8 markets").
+  const flood = floodContextLine(site?.flood, site?.pointIsBuilding === true && !portfolio);
   // A price stated as a range (#466): which end every figure is struck at.
   const range = priceRangeLine(extraction, strategy.kind);
   const head = [
-    ...(interest ? [interestContextLine(interest)] : []),
+    // A sandwich position's own read says the master lease's end (and that
+    // the position ends with it): the interest's line leaves it to that one.
+    ...(interest ? [interestContextLine(interest, { term: !sandwich?.term })] : []),
+    ...(sandwich ? [sandwichContextLine(sandwich)] : []),
     ...(sale ? [saleContextLine(sale)] : []),
     ...(range ? [range] : []),
+    ...(forward ? [forwardContextLine(forward)] : []),
+    ...(goingConcern ? [goingConcernContextLine(goingConcern)] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
     ...(noteFinancing ? [notePurchaseFinancingContextLine(noteFinancing)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
+    // The rent rules that reach the building (lib/rent-regulation): the
+    // regime, the regulated share as stated and the allowance in force —
+    // never a park's own row said twice (`regulationSaidByPark`).
+    ...(regulation && !regulationSaidByPark(regulation, park) ? [regulationContextLine(regulation)] : []),
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(roster ? [rosterContextLine(roster)] : []),
     ...(valueAdd ? [valueAddContextLine(valueAdd)] : []),
@@ -144,27 +193,58 @@ export function dealContextFor(
     ...(student ? [studentContextLine(student)] : []),
     ...(park ? [mhContextLine(park)] : []),
     ...(storage ? [storageContextLine(storage)] : []),
+    ...(mixedUse ? [mixedUseContextLine(mixedUse)] : []),
+    ...(condo ? [condoContextLine(condo)] : []),
     ...(reports ? [siteReportsContextLine(reports)] : []),
     ...(flood ? [flood] : []),
   ];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];
   if (strategy.kind === "unknown") return head.length || tail.length ? [...head, ...tail].join(" ") : null;
-  const plan = planSummary(extraction, strategy);
+  // No all-in basis where the plausibility check finds it outside the band:
+  // its sentence goes to every step in its place (research pass 38).
+  const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   // Whose strategy it is on a note or a leased fee (the deal header's own
   // label): the steps read the type as the collateral's, never the price's.
-  const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
-  if (plan?.stabilizedNoi) {
+  // The summary ends its own sentence (research pass 41: a summary with no
+  // period of its own ran into "The OM's NOI at delivery…").
+  const summary = strategy.summary.trim().replace(/[.\s]+$/, "");
+  const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${summary ? ` — ${summary}.` : "."}`];
+  // A figure the memorandum states a month at a time is read as the year it
+  // makes, and said so (lib/deal-strategy `noiOfRow`, research pass 40).
+  const monthStated = (f: { month?: number }) => (f.month != null ? ` (twelve times the ${compact(f.month)} a month stated)` : "");
+  if (plan?.stabilizedNoi && plan.forward) {
+    // A forward purchase's NOI is the one stated at delivery (on a
+    // build-to-suit the lease's first year), over the price the buyer pays
+    // then — its whole cost, since the developer funds the works.
     lines.push(
-      `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${
+      `The OM's NOI at delivery (${plan.stabilizedNoi.label}) of ${compact(plan.stabilizedNoi.value)}${monthStated(plan.stabilizedNoi)} is the delivered building's figure${
+        plan.totalCost != null && plan.yieldOnCost != null
+          ? ` — over the ${compact(plan.totalCost)} price, the buyer's whole cost, it is ${withArticle(yieldOnCostText(plan.yieldOnCost))} yield on cost`
+          : ""
+      }, not today's income.`,
+    );
+  } else if (plan?.stabilizedNoi) {
+    lines.push(
+      `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)}${monthStated(plan.stabilizedNoi)} is the finished project's figure${
         plan.totalCost != null && plan.yieldOnCost != null
           ? ` — over ${compact(plan.totalCost)} of total cost it is ${withArticle(yieldOnCostText(plan.yieldOnCost))} yield on cost`
           : ""
       }, not today's income and not a cap rate on the price.`,
     );
   }
+  // A yield no project earns is refused, and said why (research pass 38):
+  // "over $49k of total cost it is a 6597.94% yield on cost" had gone to
+  // every step.
+  if (plan?.yieldWithheld) lines.push(plan.yieldWithheld);
   // A share's price grossed up beside its entity's loan is the equity's
   // whole: the plan strikes no total cost on it, and says why.
   if (plan?.costWithheld) lines.push(plan.costWithheld);
+  // A conversion or a development whose memorandum labels no count proposed
+  // or planned: no basis per unit, and why.
+  if (plan?.costPerUnitWithheld) lines.push(plan.costPerUnitWithheld);
+  // A basis outside the band any market delivers at: none, and why
+  // (lib/deal-strategy `planWithBasisChecked`).
+  if (plan?.basisWithheld) lines.push(plan.basisWithheld);
   if (plan?.costPerUnit != null && plan.units != null) {
     // The basis a comp or a per-unit norm is held against on a plan deal:
     // what a finished unit costs all-in — never the shell's or the land's
@@ -172,10 +252,20 @@ export function dealContextFor(
     // In the class's own noun (lib/asset-words): a hotel's plan is costed
     // per key, a student deal's per bed.
     const noun = assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" };
+    // What the price alone buys, by the kind of plan: a development's land,
+    // a conversion's shell, and a value-add's or a lease-up's standing
+    // building — never "the shell's" there (research pass 41). A forward
+    // purchase's price is the finished building's, the buyer's whole cost
+    // at delivery: no land price is stated beside it (audit C4, L6).
+    const against = plan.forward
+      ? "the price, the buyer's whole cost at delivery"
+      : `never ${plan.kind === "development" ? "the land price" : plan.kind === "conversion" ? "the shell's price" : "the price alone"}`;
+    // "Planned" only where the building is still to be delivered: a
+    // value-add's or a lease-up's units stand today (audit C4, L5, the
+    // memo's rule).
+    const per = `per ${notYetDelivered(plan.kind) ? "planned " : ""}${noun.one}`;
     lines.push(
-      `Total cost is ${compact(plan.costPerUnit)} per planned ${noun.one} (${plan.units.toLocaleString("en-US")} ${noun.many}) — the basis to hold sale comps and per-${noun.one} norms against, never the ${
-        plan.kind === "development" ? "land" : "shell's"
-      } price.`,
+      `Total cost is ${compact(plan.costPerUnit)} ${per} (${plan.units.toLocaleString("en-US")} ${noun.many}) — the basis to hold sale comps and per-${noun.one} norms against, ${against}.`,
     );
   }
   if (plan?.timeline) lines.push(`Timeline as stated: ${plan.timeline.replace(/\.\s*$/, "")}.`);

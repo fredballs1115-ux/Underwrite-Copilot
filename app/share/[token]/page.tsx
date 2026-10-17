@@ -13,12 +13,14 @@ import { shownAssetClass } from "@/lib/pipeline-slots";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
-import type { DealVisualCache } from "@/lib/deal-location";
+import { placedByOpenStreetMap, pointIsBuilding, type DealVisualCache } from "@/lib/deal-location";
+import { withOsmLocation } from "@/lib/basemaps";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { SHARE_AERIAL } from "@/lib/image-frames";
 import { SITE_NAME } from "@/lib/page-meta";
 import { PLAIN_CARD } from "@/lib/public-pages";
 import type { SharePictureSource } from "./share-picture";
+import { regulationForDeal } from "@/lib/rent-regulation";
 
 /** The aerial's credit on the public screen: The National Map is a US
  *  federal work in the public domain, and the line says so. */
@@ -78,9 +80,11 @@ export default async function SharePage({
   // or still be running toward it: the call shown then belongs to the
   // previous completed screen, and so may the comp and market reads — say
   // so, the same way the sender's own deal page does (lib/screen-run).
+  // Its last write too: a run that stopped making progress is said as
+  // stopped, never as a re-screen in progress (lib/screen-run `isStalled`).
   const { data: latestJob } = await admin
     .from("analysis_jobs")
-    .select("status, step")
+    .select("status, step, updated_at")
     .eq("deal_id", dealId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -105,13 +109,19 @@ export default async function SharePage({
           },
         ]
       : []),
-    // The one frame the aerial route draws (lib/image-frames).
+    // The one frame the aerial route draws (lib/image-frames), around the
+    // point the deal's location cache holds. Its centre is ringed only where
+    // that point is the building's — a street address placed at the house
+    // (`pointIsBuilding`) — never a street's centreline, a town's centre or
+    // a neighbourhood placement's.
     ...(address?.label
       ? [
           {
             kind: "aerial" as const,
             src: `/api/share/${token}/aerial?w=${SHARE_AERIAL.w}&h=${SHARE_AERIAL.h}`,
-            credit: SHARE_AERIAL_CREDIT,
+            // Photon placed the point: the credit names OpenStreetMap too.
+            credit: withOsmLocation(SHARE_AERIAL_CREDIT, placedByOpenStreetMap((deal.photo as DealVisualCache | null) ?? null, address)),
+            ring: pointIsBuilding((deal.photo as DealVisualCache | null) ?? null, address),
           },
         ]
       : []),
@@ -119,6 +129,21 @@ export default async function SharePage({
   const picture = sources.length > 0 ? { sources, place: address?.label || deal.name } : null;
   const behind = verdictBehind(latestJob);
   const previous = previousScreenResults(latestJob);
+  // The rent rules that reach the building (lib/rent-regulation), through the
+  // one call every surface makes, at the address the sender's page reads the
+  // deal at, on this page's UTC day — handed to the view with that day, since
+  // the view reads no clock.
+  const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const regulation = regulationForDeal(
+    {
+      extraction,
+      address: addressUpgrade(deal.address, extraction) ?? address,
+      siteFlags: (deal.site_flags as SiteFlagsResult | null) ?? null,
+      assetClass: (deal.asset_class as string | null) ?? null,
+    },
+    today,
+  );
 
   return (
     <ShareView
@@ -146,6 +171,8 @@ export default async function SharePage({
         (deal.site_flags as SiteFlagsResult | null) ?? null,
         (addressUpgrade(deal.address, (deal.extraction as ExtractionResult | null) ?? null) ?? address)?.label,
       )}
+      regulation={regulation}
+      today={today}
     />
   );
 }

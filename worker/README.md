@@ -30,6 +30,13 @@ deploy interrupted whatever screens were in flight**. This worker fixes that:
 - Jobs run ONE at a time, in order. A batch of four OMs completes serially
   (each screen a few minutes); the ones waiting show an honest "waiting for
   an open analyst slot" state rather than a fake progress bar.
+- The queue is not taken on trust (`lib/worker-queue`, `lib/worker-claim`):
+  a deal whose run is still going is skipped until it ends; a deal holds one
+  queued run — its newest — and any other queued row of it is closed as
+  superseded, never run; and once the worker has taken four of one
+  account's runs (the batch upload's limit) since another account's run was
+  asked for, that other run goes next. The job rows are the deal's owner's
+  to write, so these hold whatever was written to them.
 - A run wedged past 30 minutes is re-queued and the process exits nonzero so
   Render restarts it clean (that also kills the wedged request).
 - Reconciles: the web app parks the uploaded model file in the private

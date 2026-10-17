@@ -1,4 +1,5 @@
 import { LeaseTermBar } from "@/app/lease-term-bar";
+import { PanelHead, PanelNote, PanelRead } from "@/app/panel-parts";
 import { termEndLabel } from "@/lib/ground-lease-term";
 import {
   pct2,
@@ -71,6 +72,8 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
     r.leaseType ? { k: "Lease type", v: r.leaseType } : null,
     r.landlordObligations ? { k: "Landlord's obligations", v: r.landlordObligations } : null,
     r.tenantRights ? { k: "Tenant's rights", v: r.tenantRights } : null,
+    // The lease's base rent is one of its terms, checked against the
+    // memorandum: whole dollars, as stated, never written short.
     r.rent != null ? { k: "Annual base rent", v: `$${r.rent.toLocaleString("en-US")}` } : null,
   ].filter((f): f is { k: string; v: string } => f != null);
 
@@ -80,24 +83,14 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       data-qa="single-tenant-panel"
       className="mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">Single tenant</span>
+      <PanelHead title="Single tenant" tone="text-brand">
         <span className="text-sm font-semibold">{r.tenant}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       {/* Who leases it and who guarantees it lead; the term, the options
           and the increases are one click away and whole in the HTML, since
           the pictures below draw them. */}
-      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} />
 
       {fromDelivery != null ? (
         <div className="mt-2.5" data-qa="single-tenant-term">
@@ -134,7 +127,9 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
             <li key={g.key} className="text-[11px]">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span className="font-medium text-ink">{g.label}</span>
-                <span className="font-mono tabular-nums text-muted">{g.text}</span>
+                {/* The rate and the lease's words stay one phrase: where the row
+                    is too narrow for both, the phrase takes a line of its own. */}
+                <span className="whitespace-nowrap font-mono tabular-nums text-muted">{g.text}</span>
               </div>
               <div className="relative mt-0.5 h-2 rounded-full bg-faint" aria-hidden>
                 <div className={`absolute inset-y-0 left-0 rounded-full ${g.tone}`} data-bar={g.bar} style={{ width: pctOf(g.pct, scale) }} />
@@ -163,7 +158,7 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
         </div>
       )}
 
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

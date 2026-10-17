@@ -21,20 +21,51 @@
 //   that whole — within 2% of it; run at the share's price they set the
 //   whole building's cash flows against a fraction of its cost. Beside a
 //   loan its entity carries, the share grossed up is the equity's whole, no
-//   building's price: no cap is struck and the returns are withheld.
+//   building's price: no cap is struck and the returns are withheld. A share
+//   of the general partner's interest is a share of a share (research pass
+//   37): nothing grosses it up, so its cap and returns are withheld as a
+//   share's of no stated percentage are, each cell "n/a — share".
 //
-//   EVERYTHING ELSE STANDS. A leasehold's and a leased fee's model runs at
-//   what the price buys (the lease's building, the land's rent), and the
-//   price row says which, with the years to the lease's end.
+//   A PREFERRED EQUITY POSITION HAS NO CAP EITHER (lib/position). Its price
+//   buys a rate and a redemption, never a slice of the building: the cap row
+//   says its yield to redemption at its price — only where its redemption
+//   date has not gone by — and the model's returns are withheld as the
+//   building's, bought outright, not the position's.
+//
+//   A LEASE THAT ENDS INSIDE THE HOLD HAS NO SALE (research pass 38). A
+//   leasehold's model sells the building at the hold's end; where its lease
+//   ends first — the ground lease, or a sandwich position's master lease —
+//   the building has reverted by then, so the returns are withheld with the
+//   leasehold card's own sentence (lib/leasehold-exit `leaseEndInHold`),
+//   read against the hold of the model handed in. The cap stands: year 1 is
+//   inside the lease.
+//
+//   EVERYTHING ELSE STANDS, as the model runs it. A leasehold's model runs
+//   the lease's building at the leasehold's price. A leased fee's runs at
+//   the land's price but reads no ground rent as its income
+//   (lib/underwrite/inputs): year 1 runs on the NOI a building's model reads
+//   (a statement's or the memorandum's, else the price × the stated cap,
+//   else an assumed 6%), with a building's assumptions, and its price note
+//   names the stated ground rent beside it. The price row says which
+//   interest it is, with the years to the lease's end.
 //
 // The first rule reaches past the table (the audit of 2026-09-30): the deal
 // header, the pipeline card and the meeting workbook printed a note's
 // collateral cap as its going-in cap, and the deal page's leverage read ran
 // on it. `noteCapSlot` and `goingInCapFigure` say it for them.
+//
+// And a note UNDER WATER has no yield to show either (research pass 38): its
+// balance is over the collateral's stated value, so its contract yield
+// assumes a repayment the collateral does not cover — a $5M price for a $20M
+// note on an $8M building read "512.5%" in the cap slot. The slot reads "n/a
+// — under water" (`UNDER_WATER_WORDS`) wherever the yield would stand.
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
-import { interestOf, interestTag, readInterest } from "@/lib/interest";
+import { findGoingInCap, parsePct } from "@/lib/criteria";
+import { askingPriceOf, buildingPriceOf, signalGoingInCap } from "@/lib/deal-strategy";
+import { interestOf, interestTag, isGpStake, isTenancyInCommon, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
+import { leaseEndInHold, type LeaseEndInHold } from "@/lib/leasehold-exit";
+import { noteUnderWater } from "@/lib/note-yield";
 
 export interface CompareModel {
   purchasePrice?: number | null;
@@ -42,6 +73,9 @@ export interface CompareModel {
   year1Noi?: number | null;
   /** the model's going-in cap, percent */
   goingInCapPct?: number | null;
+  /** the model's hold, whole years: a leasehold whose lease ends inside it
+   *  has its returns withheld (research pass 38); absent, they stand */
+  holdYears?: number | null;
 }
 
 export interface CompareInterest {
@@ -52,12 +86,60 @@ export interface CompareInterest {
    *  which has none, and on a share with no stated percentage or beside the
    *  loan its entity carries (`buildingPriceOf` has no building's price) */
   cap: number | null;
-  /** a note's yield to maturity at its price, percent, where it pays or
-   *  may; null otherwise */
+  /** the buyer's own yield at the price, percent: a note's to maturity
+   *  where it pays or may and is not under water, a preferred equity
+   *  position's to redemption where the date has not gone by; null
+   *  otherwise */
   noteYtmPct: number | null;
+  /** a note whose balance is over the collateral's stated value (lib/note-
+   *  yield `noteUnderWater`): no yield stands in its cap slot, which reads
+   *  "n/a — under water"; absent otherwise (research pass 38) */
+  underWater?: boolean;
   /** why the model's returns are withheld; null where they stand */
-  withheld: "note" | "share" | null;
+  withheld: "note" | "share" | "position" | "lease" | null;
+  /** where they are withheld for the lease: the year of the model's hold it
+   *  ends in and the leasehold card's own sentence; absent otherwise */
+  leaseEnd?: LeaseEndInHold | null;
 }
+
+/**
+ * What a withheld return says after "n/a — ", in one place for every
+ * surface that withholds one: what the price buys ("note", "share",
+ * "position"), or where the lease ends inside the hold, when — "lease ends
+ * in year 3", "master lease ends in year 3", "lease has ended". Null where
+ * the returns stand.
+ */
+export function withheldWord(ci: Pick<CompareInterest, "withheld" | "leaseEnd">): string | null {
+  if (ci.withheld !== "lease") return ci.withheld;
+  const e = ci.leaseEnd;
+  const lease = e?.lease === "master lease" ? "master lease" : "lease";
+  return e == null ? lease : e.passed ? `${lease} has ended` : `${lease} ends in year ${e.year}`;
+}
+
+/** What has a yield of its own in the cap slot, where the price buys no
+ *  building's cap: a note, a preferred equity position. */
+export type OwnYield = "note" | "position";
+
+/** The words each says in a cap slot: the yield's label, the end it runs
+ *  to, and the slot where no yield can be stated. */
+export const OWN_YIELD_WORDS: Record<OwnYield, { label: string; to: string; na: string }> = {
+  note: { label: "Yield to maturity", to: "to maturity", na: "n/a — note" },
+  position: { label: "Yield to redemption", to: "to redemption", na: "n/a — position" },
+};
+
+/** A note under water's slot, in the words every surface says it in (lib/
+ *  cap-slot holds the client's copy, a test the two to each other). */
+export const UNDER_WATER_WORDS = {
+  label: "Yield to maturity",
+  na: "n/a — under water",
+  title:
+    "The note's balance is over the collateral's stated value: its contract yield assumes a repayment the collateral does not cover, so no yield stands in the cap's place. What the note fetches is a foreclosure's question.",
+} as const;
+
+/** A note's or a position's own yield as every summary prints it in the cap
+ *  slot — the deal header, the pipeline card and its CSV, the meeting
+ *  workbook: one decimal, "17.0%". */
+export const ownYieldText = (pct: number): string => `${pct.toFixed(1)}%`;
 
 /** How near the model's price must be to the whole's for its returns to be
  *  the whole asset's rather than a share's price against a building. */
@@ -76,7 +158,14 @@ export function compareInterest(
   if (kind === "note") {
     const n = readInterest(ex, askingPriceOf(ex), asOf)?.note ?? null;
     const pays = n != null && !n.matured && n.terms.status !== "non_performing";
-    return { tag, cap: null, noteYtmPct: pays ? n.ytmPct : null, withheld: "note" };
+    // Under water, the contract yield is not the buyer's figure either.
+    const underWater = noteUnderWater(n);
+    return { tag, cap: null, noteYtmPct: pays && !underWater ? n.ytmPct : null, withheld: "note", ...(underWater ? { underWater } : {}) };
+  }
+
+  if (kind === "preferred_equity") {
+    const p = readInterest(ex, askingPriceOf(ex), asOf)?.position ?? null;
+    return { tag, cap: null, noteYtmPct: p && !p.redeemedPast ? p.yieldPct : null, withheld: "position" };
   }
 
   if (kind === "partial_interest") {
@@ -86,6 +175,15 @@ export function compareInterest(
     const price = model?.purchasePrice ?? null;
     const atWhole = whole != null && price != null && price > 0 && Math.abs(price - whole) / whole <= SAME_PRICE;
     return { tag, cap, noteYtmPct: null, withheld: atWhole ? null : "share" };
+  }
+
+  // A lease that ends inside the model's hold: the sale the returns are
+  // built on is of a building that has reverted.
+  const hold = model?.holdYears ?? null;
+  if (kind === "leasehold" && hold != null && hold > 0) {
+    const { term, lease } = leaseholdTermOf(ex, asOf);
+    const leaseEnd = term ? leaseEndInHold(term, lease, hold) : null;
+    if (leaseEnd) return { tag, cap: modelCap, noteYtmPct: null, withheld: "lease", leaseEnd };
   }
 
   return { tag, cap: modelCap, noteYtmPct: null, withheld: null };
@@ -101,6 +199,8 @@ export function compareInterest(
 export interface ModelReturnsRead extends CompareInterest {
   /** a share of the owning entity: its cap is the whole's, said so */
   share: boolean;
+  /** what a withheld return says after "n/a — " (`withheldWord`) */
+  word: string | null;
   line: string | null;
 }
 
@@ -113,14 +213,42 @@ export function modelReturnsRead(
   const line =
     ci.withheld === "note"
       ? "A note's price is a loan's: this model runs the collateral as if bought outright at it, so its cap and returns are the collateral's, not the note's, and are withheld."
-      : ci.withheld === "share"
-        ? ci.cap != null
-          ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
-          : interestOf(ex).entityLoan != null
-            ? "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-            : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-        : null;
-  return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", line };
+      : ci.withheld === "position"
+        ? "A preferred equity position's price is a position's: this model runs the whole building as if bought outright at it, so its cap and returns are the building's, not the position's, and are withheld."
+        : ci.withheld === "share"
+          ? isGpStake(ex)
+            ? // A share of a share (research pass 37): no figure grosses its
+              // price up to the building's, so nothing of the model's stands.
+              "A share of the general partner's interest is a share of a share: this model ran the whole building's cash flows at its price, so its cap and returns are withheld."
+            : ci.cap != null
+              ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
+              : interestOf(ex).entityLoan != null && interestOf(ex).sharePct == null
+                ? // No stated percentage: its price grosses up to nothing,
+                  // the loan said beside it, as the report and the workbook
+                  // say (audit C6, MED-4).
+                  isTenancyInCommon(ex)
+                  ? "An undivided interest's price is for the interest, and the memorandum states no percentage to gross it up by; beside the loan on the property it is no building's price: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                  : "A share's price is for the share, and the memorandum states no percentage to gross it up by; beside the loan its entity carries it is no building's price: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+              : interestOf(ex).entityLoan != null
+                ? isWholeShare(interestOf(ex).sharePct)
+                  ? // All of the entity's interests (a stated 100%, research
+                    // pass 28) — or all the tenant-in-common interests, held
+                    // by no entity, whose loan is the property's (the lead's
+                    // item 16).
+                    isTenancyInCommon(ex)
+                    ? "This price buys all the tenant-in-common interests, and beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                    : "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                  : isTenancyInCommon(ex)
+                    ? // An undivided interest held as a tenant in common: its
+                      // loan is the property's (research pass 37).
+                      "An undivided interest's price is for the interest, and grossed up beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                    : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+          : ci.withheld === "lease"
+            ? // The leasehold card's own sentence (lib/leasehold-exit).
+              (ci.leaseEnd?.sentence ?? null)
+            : null;
+  return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", word: withheldWord(ci), line };
 }
 
 /**
@@ -134,25 +262,128 @@ export function modelReturnsRead(
 export function noteCapSlot(
   ex: ExtractionResult | null | undefined,
   asOf: Date = new Date(),
-): { ytmPct: number | null } | null {
-  if (!ex || interestOf(ex).kind !== "note") return null;
-  return { ytmPct: compareInterest(ex, null, asOf).noteYtmPct };
+): { ytmPct: number | null; of: OwnYield; underWater?: boolean } | null {
+  if (!ex) return null;
+  const kind = interestOf(ex).kind;
+  if (kind !== "note" && kind !== "preferred_equity") return null;
+  const ci = compareInterest(ex, null, asOf);
+  return { ytmPct: ci.noteYtmPct, of: kind === "note" ? "note" : "position", ...(ci.underWater ? { underWater: true } : {}) };
+}
+
+/** Why a deal's going-in cap slot holds no cap: its price buys a loan or a
+ *  position, which have a yield of their own (`OwnYield`), or a share beside
+ *  the loan its entity carries, or a share of the general partner's
+ *  interest. */
+export type CapWithheld = OwnYield | "share";
+
+/** The slot's reason as the pipeline's row carries it: `capSlotWithheld`'s,
+ *  and "under_water" for a note whose yield is withheld too (`noteCapSlot`'s
+ *  `underWater`) — the card, its CSV and the meeting workbook say "n/a —
+ *  under water" (lib/cap-slot `CAP_WITHHELD`). */
+export type CapSlotReason = CapWithheld | "under_water";
+
+/** `capSlotWithheld`, with a note under water named as such. */
+export function capSlotReason(withheld: CapWithheld | null, own: { underWater?: boolean } | null): CapSlotReason | null {
+  return withheld === "note" && own?.underWater ? "under_water" : withheld;
+}
+
+/** A share's withheld cap, in the words every surface says it in. */
+export const SHARE_CAP_WORDS = {
+  na: "n/a — share",
+  title:
+    "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, and a share of no stated percentage grosses up to nothing; a share of the general partner's interest is a share of a share, which no figure grosses up. None is the building's price, and a cap stated against it is on a basis the memorandum never says, so no cap is shown.",
+} as const;
+
+/**
+ * Whether the memorandum's stated going-in cap may fill a deal's cap slot,
+ * read ONE way wherever the slot is drawn: the deal header and the bar that
+ * repeats it, the research panel's leverage check, the pipeline card, its
+ * list and its CSV, the meeting workbook and the compare table. Null where
+ * the stated cap stands; else why it is withheld:
+ *   - "note" and "position": the price buys a loan or a preferred equity
+ *     position, and its own yield takes the slot (`noteCapSlot`);
+ *   - "share": a share beside the loan its entity carries (lib/interest
+ *     `entityLoan`), whose price grossed up is the equity's whole, not the
+ *     building's — no cap is struck on it (the audit of 2026-10-04), and
+ *     one the memorandum states is on a basis it never says; and a share of
+ *     the general partner's interest, whatever the loan (`isGpStake`): a
+ *     share of a share has no building price, basis or implied cap (research
+ *     pass 37), and the box had passed its building's stated cap beside a
+ *     return it withheld (audit C6, MED-5).
+ * Every other share keeps the memorandum's cap, as the header has always
+ * printed it; the compare table had left it blank where no model ran.
+ */
+export function capSlotWithheld(ex: ExtractionResult | null | undefined): CapWithheld | null {
+  if (!ex) return null;
+  const { kind, entityLoan } = interestOf(ex);
+  if (kind === "note") return "note";
+  if (kind === "preferred_equity") return "position";
+  if (kind === "partial_interest" && (entityLoan != null || isGpStake(ex))) return "share";
+  return null;
+}
+
+/**
+ * The going-in cap the memorandum states, as a deal's cap slot shows it —
+ * and where the extraction states none, or has not landed yet, the first
+ * signal's, where it can be a cap on the price at all (lib/deal-strategy
+ * `signalGoingInCap`): the deal header's own fallback, and lib/model-vs-
+ * market's `dealGoingInCap`'s, so a cap the header prints is never a dash on
+ * the card. None on a plan deal, which is judged on its yield on total cost
+ * (its slot carries that), and none where the slot is withheld
+ * (`capSlotWithheld`): a note's and a position's carry their own yield, and
+ * a share's beside the loan its entity carries says why. As the text the
+ * slot prints and the figure it reads — the figure null where the text names
+ * none — so the memories that pool a cap (the internal comps, the market
+ * memory, the analytics) pool the one the header prints.
+ */
+export function statedCapRead(
+  extraction: ExtractionResult | null | undefined,
+  planDeal: boolean,
+  signal?: { goingInCap?: string | null } | null,
+): { text: string; pct: number | null } | null {
+  if (planDeal || capSlotWithheld(extraction)) return null;
+  const row = findGoingInCap(extraction?.metrics ?? []);
+  if (row) return { text: row.value, pct: parsePct(row.value) };
+  const fromSignal = signalGoingInCap(signal);
+  return fromSignal ? { text: fromSignal.text, pct: fromSignal.pct } : null;
+}
+
+/**
+ * The going-in cap a pipeline row's Cap slot shows (`statedCapRead`'s text):
+ * the compare table reads it where a deal's model has no cap
+ * (lib/compare-figures), and the meeting workbook's row reads it too, so
+ * every surface shows one figure. lib/pipeline-slots re-exports it.
+ */
+export function statedCapSlot(
+  extraction: ExtractionResult | null,
+  planDeal: boolean,
+  signal?: { goingInCap?: string | null } | null,
+): string | null {
+  return statedCapRead(extraction, planDeal, signal)?.text ?? null;
 }
 
 /**
  * The going-in cap slot beside a deal's price in its header (and the bar
  * that repeats it): the cap as the memorandum states it — or, on a note,
- * its yield to maturity at its price where it pays or may, else the cap
- * withheld ("n/a — note", the compare table's words).
+ * its yield to maturity at its price where it pays or may, "n/a — under
+ * water" where its balance is over the collateral's stated value, else the
+ * cap withheld ("n/a — note", the compare table's words); and beside the loan
+ * a share's entity carries, the cap withheld (`capSlotWithheld`).
  */
 export function goingInCapFigure(
   ex: ExtractionResult | null | undefined,
   statedCap: string | null,
   asOf: Date = new Date(),
-): { label: string; value: string | null } {
-  const note = noteCapSlot(ex, asOf);
-  if (!note) return { label: "Going-in cap", value: statedCap };
-  return note.ytmPct != null
-    ? { label: "Yield to maturity", value: `${note.ytmPct.toFixed(1)}%` }
-    : { label: "Going-in cap", value: "n/a — note" };
+): { label: string; value: string | null; title?: string } {
+  const own = noteCapSlot(ex, asOf);
+  if (!own) {
+    return capSlotWithheld(ex) === "share"
+      ? { label: "Going-in cap", value: SHARE_CAP_WORDS.na, title: SHARE_CAP_WORDS.title }
+      : { label: "Going-in cap", value: statedCap };
+  }
+  if (own.underWater) return { label: UNDER_WATER_WORDS.label, value: UNDER_WATER_WORDS.na, title: UNDER_WATER_WORDS.title };
+  const words = OWN_YIELD_WORDS[own.of];
+  return own.ytmPct != null
+    ? { label: words.label, value: ownYieldText(own.ytmPct) }
+    : { label: "Going-in cap", value: words.na };
 }

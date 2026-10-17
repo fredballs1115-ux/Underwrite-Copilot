@@ -14,7 +14,20 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { entityLoanOf, interestOf, interestShortLine, readInterest, type EquipmentUse } from "@/lib/interest";
+import { compactUsd } from "@/lib/money";
+import {
+  entityLoanOf,
+  entityLoanWords,
+  groundRentOf,
+  interestOf,
+  interestShortLine,
+  isGpStake,
+  isTenancyInCommon,
+  isWholeShare,
+  readInterest,
+  shareProjectCostOf,
+  type EquipmentUse,
+} from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -41,31 +54,44 @@ import {
   parsePrice,
   parseSf,
   priceRange,
+  priceRefusal,
   screenYearOf,
 } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
   budgetFromText,
+  buildingPriceOf,
   capitalBudgetFromMetrics,
   askingPriceOf,
+  ebitdaFigure,
   findPriceMetric,
   inferStrategy,
+  isForwardPurchase,
   isPlanDeal,
   noiFigures,
   renovationProgramBudget,
   type StrategyKind,
   unitCountFromMetrics,
+  unitCountRow,
 } from "@/lib/deal-strategy";
 import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
-import { assetClassKey, assetWords } from "@/lib/asset-words";
+import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
 import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
+import { regulationModelLine, regulationShortLine, type RegulationRead } from "@/lib/rent-regulation";
+import { forwardModelLine, forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseModelLine, mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernModelLine, goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
+import { condoModelLine, condoShortLine, readCondo } from "@/lib/condo";
+import { condoUnitsOffered } from "@/lib/condo-units";
+import { readSandwichLease, sandwichModelLine, sandwichShortLine } from "@/lib/sandwich-lease";
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
+import { defaultExitGap } from "./cost-note";
 
 /** Property actuals fed into the model (Feature 1): when present, the rent
  *  roll's occupancy/SF and the T-12's NOI/expense ratio replace the OM
@@ -83,6 +109,22 @@ export interface MarketForModel {
   debtIndex?: DebtIndex | null;
 }
 
+/** What the model is told about the deal that its extraction alone cannot
+ *  say: the rent rules that reach the building (lib/rent-regulation), read
+ *  by the caller through `regulationForDeal` from the deal row's address,
+ *  site flags and class on the caller's own day. Absent or null, the cover
+ *  says nothing of rent rules — the sample, a test, the bridge's read. */
+export interface DealForModel {
+  regulation?: RegulationRead | null;
+  /** the day the model's dated readers read on — a lease's end, a note's
+   *  maturity, an abatement's burn-off, a bid deadline: the caller's own,
+   *  so each `meta.X.read` says what the page's panel beside it says (the
+   *  deal page its `readerNoon`, lib/reader-day; a route the reader's day
+   *  where it reads the time-zone cookie, else the UTC day's noon; research
+   *  pass 40). Absent, the readers read the clock, as before. */
+  asOf?: Date | null;
+}
+
 /** The model's hold, months — one constant, because the tenor the rate is
  *  seeded from is the one nearest the hold, and the caller that reads the
  *  index needs the same figure the model runs on. */
@@ -98,6 +140,20 @@ export interface InputSource {
   /** the document an extracted figure was read from where it is not the
    *  OM ("Rent roll"), so the SOURCE column never credits it to the OM */
   doc?: string;
+  /** a figure the memorandum states for this input that the model does not
+   *  run in its place — a leased fee's ground rent, which is the deal's
+   *  income (#415) while the model reads its NOI as a building's, or an NOI
+   *  of zero or less beside which the model runs the price × the stated cap
+   *  (research pass 38) — named so a surface that withholds the returns
+   *  never says no income was read; `unpriced` where a positive NOI was not
+   *  run because no price was read to set it against (the placeholder) */
+  notRun?: { label: string; value: number; unpriced?: boolean };
+  /** on the price: no price is stated, and the NOI it was backed out of
+   *  over the stated going-in cap (`label`, `value`) is zero or less — not a
+   *  year's income to price on, so the quotient is no price (research pass
+   *  38). The model runs the figure, which is the owner's to change; no
+   *  surface shows it, and the returns are withheld with the reason */
+  noPrice?: { label: string; value: number };
 }
 
 export interface WorkbookMeta {
@@ -113,7 +169,41 @@ export interface WorkbookMeta {
    *  not; absent for a plain fee simple. `equipment` is a ground lease's
    *  tower, billboard or solar array where the memorandum names one, which
    *  the deal type names on a leased fee in place of a building */
-  interest?: { line: string; modelCaveat: string | null; kind?: InterestKind; equipment?: EquipmentUse | null } | null;
+  interest?: {
+    line: string;
+    modelCaveat: string | null;
+    kind?: InterestKind;
+    equipment?: EquipmentUse | null;
+    /** where the price did not buy the building (lib/deal-strategy
+     *  `buildingPriceOf` answers none — a note, a leased fee, a preferred
+     *  equity position, a share of no stated percentage or beside its
+     *  entity's loan): the word its withheld cells say ("n/a — note") and
+     *  why no building basis or cap is struck on the price; absent or null
+     *  where the price is the building's */
+    basisWithheld?: { word: string; why: string } | null;
+  } | null;
+  /** what the Deal Summary's price tile is called where the model's price
+   *  is not the price the memorandum states for what is sold: a share's
+   *  price grossed up to the whole ("Whole Price (49% share grossed up)"),
+   *  or, beside the entity's stated loan, the equity's whole — the plan's
+   *  own words for it (lib/deal-strategy `planSummary`). Absent where the
+   *  model runs at the price as stated. */
+  priceLabel?: string | null;
+  /** the share the memorandum states a partial interest's price buys,
+   *  where the model grossed that price up to the whole it runs (the share
+   *  under 100% `priceLabel` names): the deal page's max bid, solved on the
+   *  whole, states the share's beside it (research pass 40, M7); absent
+   *  where the price is run as stated */
+  grossedUpSharePct?: number | null;
+  /** the model's price is a development's land or site cost: the
+   *  workbook's yardsticks call it "Land cost / Unit", never "Price / Unit"
+   *  (research pass 38); absent otherwise */
+  priceIsLand?: boolean;
+  /** the units a bulk condominium purchase buys (lib/condo-units
+   *  `condoUnitsOffered`): the workbook's per-unit yardsticks divide by
+   *  them, never by the condominium's whole count (research pass 38) — the
+   *  area the model runs on stays the owner's; absent otherwise */
+  unitsOffered?: number | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -179,6 +269,49 @@ export interface WorkbookMeta {
    *  premium sitting tenants pay over street and with a lease-up. Absent on
    *  anything else. */
   storage?: { line: string; read: string } | null;
+  /** the rent rules that reach the building (lib/rent-regulation): the
+   *  regime, the regulated share as stated and the allowance in force in a
+   *  line, then this model's one rent growth rate set beside the allowance
+   *  ("" where no regime reaches it and only the memorandum names one).
+   *  Absent where no rule reaches the building and the memorandum names
+   *  none. */
+  regulation?: { line: string; read: string } | null;
+  /** a forward purchase or a build-to-suit bought at delivery
+   *  (lib/forward-purchase): the price at delivery, the clock, the yield and
+   *  the deposit in a line, then what this model does with them — the price
+   *  as paid at closing with income from its first year, and its year-one
+   *  NOI beside the memorandum's at delivery. Absent on anything else. */
+  forward?: { line: string; read: string } | null;
+  /** a mixed-use building (lib/mixed-use): its two incomes as stated, the
+   *  commercial share of each and the commercial space in a line, then what
+   *  this model does with them — one exit cap and one growth rate for both.
+   *  Absent on anything else. */
+  mixedUse?: { line: string; read: string } | null;
+  /** an operating business on its real estate (lib/going-concern): what is
+   *  sold, the operator's earnings and the rent's coverage in a line, then
+   *  what this model does with the income — it capitalises it as rent and
+   *  allocates nothing to the business ("" on a lease to the operator,
+   *  whose rent is the landlord's income). Absent on anything else. */
+  goingConcern?: { line: string; read: string } | null;
+  /** condominium units bought in bulk (lib/condo): the units offered of the
+   *  condominium's, a year of their dues and a special assessment in a line,
+   *  then what this model does with them — it sells them as one building at
+   *  its exit cap and runs no retail exit. Absent on anything else. */
+  condo?: { line: string; read: string } | null;
+  /** a sandwich position (lib/sandwich-lease): the sublease income against
+   *  the master rent, its cover and the master lease's end in a line, then
+   *  what this model does with the position — it capitalises the income at
+   *  its sale as if it ran forever, while the master lease ends ("" where
+   *  the stated end has passed). Absent on anything but a master lease of
+   *  the building. */
+  sandwich?: { line: string; read: string } | null;
+  /** the share of effective gross income the model's operating expenses
+   *  take where it is the class's screening default, not a T-12's load
+   *  (research pass 40, M2): the operating expenses and the potential gross
+   *  revenue are then the year-1 NOI grossed up through it and the vacancy,
+   *  so the workbook's Operating Metrics leave out the rows that would only
+   *  restate it. Absent where a T-12's load runs. */
+  defaultExpenseRatio?: { ratio: number; classWord: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -192,7 +325,13 @@ export interface WorkbookMeta {
    *  finished project's figure, never year 1's; the workbook's Deal Summary
    *  puts it over total cost as the yield the plan is judged on. Null when
    *  the OM states none, or on a stabilized asset. */
-  stabilizedNoi?: { value: number; page?: string } | null;
+  stabilizedNoi?: {
+    value: number;
+    page?: string;
+    /** the month the memorandum states, where it states the NOI a month at
+     *  a time: `value` is twelve times it (lib/deal-strategy `noiOfRow`) */
+    month?: number;
+  } | null;
   /** the rate the model was seeded with off today's curve, with its note,
    *  so the deal page's debt sizer starts where the workbook does; null
    *  where no index was given or the class carries no permanent loan */
@@ -258,6 +397,19 @@ const CLASS_DEFAULTS: Record<
 const pageOf = (m: unknown): string | undefined =>
   m && typeof m === "object" && "page" in m ? (m as { page?: string }).page : undefined;
 
+/** A cap the OM states as a range — "5.25% - 5.75%", "5.25% to 5.75%" — as
+ *  its two ends, either order written; null for one figure (research pass
+ *  38, C27). */
+const CAP_SPAN = /(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%/i;
+function capSpanOf(raw: string): { low: number; high: number } | null {
+  const m = CAP_SPAN.exec(raw);
+  if (!m) return null;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  const low = Math.min(a, b);
+  const high = Math.max(a, b);
+  return low > 0 && high > low && high <= 25 ? { low, high } : null;
+}
+
 // Every class the site files has its own defaults; a phrase the model wrote
 // ("boutique hotel") is filed by its words (lib/asset-words), and only a
 // class nothing resolves falls to the generic row.
@@ -283,9 +435,82 @@ export function permanentLoanSpread(assetClass: string | null | undefined): Perm
 
 /** The cover's line about what is being sold, and what the model is and
  *  is not on it — null for a plain fee simple. */
-function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
-  const r = readInterest(extraction, askingPriceOf(extraction));
-  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat, kind: r.kind, equipment: r.equipment } : null;
+function interestMeta(extraction: ExtractionResult | null, asOf: Date): WorkbookMeta["interest"] {
+  const r = readInterest(extraction, askingPriceOf(extraction), asOf);
+  return r
+    ? {
+        line: interestShortLine(r),
+        modelCaveat: r.modelCaveat,
+        kind: r.kind,
+        equipment: r.equipment,
+        basisWithheld: basisWithheldOf(extraction),
+      }
+    : null;
+}
+
+/**
+ * Why no building basis or going-in cap is struck on the price, where the
+ * price did not buy the building — CLAUDE.md's rule, read through the one
+ * reader every surface divides a price by (lib/deal-strategy
+ * `buildingPriceOf`). Whether a price is the building's turns on what it
+ * buys alone, so any positive figure asks it. Null where it is.
+ */
+export function basisWithheldOf(extraction: ExtractionResult | null): { word: string; why: string } | null {
+  if (buildingPriceOf(extraction, 1) != null) return null;
+  const { kind, sharePct, entityLoan } = interestOf(extraction);
+  switch (kind) {
+    case "note":
+      return { word: "note", why: "the price buys a note secured by the building, not the building" };
+    case "preferred_equity":
+      return { word: "position", why: "the price buys a preferred equity position in the owning entity, not the building" };
+    case "leased_fee":
+      return { word: "leased fee", why: "the price buys the land under the building, not the building" };
+    case "partial_interest":
+      // A share of the general partner's interest is a share of a share:
+      // nothing grosses its price up to the building's (research pass 37).
+      if (isGpStake(extraction)) {
+        return {
+          word: "share",
+          why: "the price buys a share of the general partner's interest, a share of a share that no figure grosses up to the building's price",
+        };
+      }
+      // An undivided interest held as a tenant in common is the real
+      // estate's: a loan the memorandum states is the property's, never an
+      // entity's (research pass 37).
+      // A share of no stated percentage is run at its own price, grossed up
+      // to nothing, whatever loan is stated beside it: the loan is said
+      // beside the reason, never folded into an equity's whole the model
+      // never ran (audit C3a, LOW-8).
+      if (isTenancyInCommon(extraction)) {
+        return {
+          word: "share",
+          why:
+            entityLoan != null && sharePct != null
+              ? isWholeShare(sharePct)
+                ? // All the tenant-in-common interests: the whole, nothing
+                  // grossed up, as the cover, the lead and the buy box say
+                  // (audit C6, LOW-3).
+                  "the price for all the tenant-in-common interests is the equity's whole, nothing grossed up, with the loan on the property on top of it, not the building's price"
+                : "the interest's price grossed up is the equity's whole, with the loan on the property on top of it, not the building's price"
+              : `the price buys an undivided interest the memorandum states no percentage for, which cannot be grossed up to the building's price${
+                  entityLoan != null ? ", the loan on the property stated beside it" : ""
+                }`,
+        };
+      }
+      return {
+        word: "share",
+        why:
+          entityLoan != null && sharePct != null
+            ? isWholeShare(sharePct)
+              ? "the price for all of the entity's interests is the equity's whole, with the entity's loan on top of it, not the building's price"
+              : "the share's price grossed up is the equity's whole, with the entity's loan on top of it, not the building's price"
+            : `the price buys a share the memorandum states no percentage for, which cannot be grossed up to the building's price${
+                entityLoan != null ? ", the entity's loan stated beside it" : ""
+              }`,
+      };
+    default:
+      return null;
+  }
 }
 
 /** The cover's lines about the seller's loan offered for assumption
@@ -293,7 +518,7 @@ function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["intere
  *  this model's new loan. Null where none is offered. */
 function sellerNoteMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["sellerNote"] {
   const s = extraction ? readSellerFinancing(extraction, inputs) : null;
-  if (s) return { line: sellerFinancingLine(s.terms), read: sellerFinancingSentence(s) };
+  if (s) return { line: sellerFinancingLine(s.terms, s.overPrice), read: sellerFinancingSentence(s) };
   // On a note the seller's financing is of the note's purchase: listed as
   // that, and never run against this model's property loan.
   const t = notePurchaseFinancing(extraction);
@@ -305,24 +530,24 @@ function sellerNoteMeta(extraction: ExtractionResult | null, inputs: UnderwriteI
     : null;
 }
 
-function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {
-  const a = readAssumable(extraction, inputs);
+function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["assumable"] {
+  const a = readAssumable(extraction, inputs, asOf);
   return a ? { line: assumableLine(a), read: assumableSentence(a) } : null;
 }
 
 /** The cover's lines about a covenant or a contract that sets the rents
  *  (#453): the restriction, and what the model's one growth rate is not on
  *  it. Null on a market-rate deal. */
-function affordableMeta(extraction: ExtractionResult | null): WorkbookMeta["affordable"] {
-  const r = readAffordable(extraction);
+function affordableMeta(extraction: ExtractionResult | null, asOf: Date): WorkbookMeta["affordable"] {
+  const r = readAffordable(extraction, asOf);
   return r ? { line: affordableShortLine(r), modelCaveat: r.modelCaveat } : null;
 }
 
 /** The cover's lines about the one lease a single-tenant property is
  *  (#454): the lease, then the deal page's own read of it against this
  *  model. Null on anything else. */
-function singleTenantMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["singleTenant"] {
-  const r = readSingleTenant(extraction);
+function singleTenantMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["singleTenant"] {
+  const r = readSingleTenant(extraction, asOf);
   if (!r) return null;
   return {
     line: singleTenantShortLine(r),
@@ -363,11 +588,81 @@ function storageMeta(extraction: ExtractionResult | null, inputs: UnderwriteInpu
   };
 }
 
+/** The cover's lines about the rent rules that reach the building
+ *  (lib/rent-regulation): the read in a line, then this model's one rent
+ *  growth rate set beside the allowance in force — never changed by it. */
+function regulationMeta(r: RegulationRead | null | undefined, inputs: Pick<UnderwriteInputs, "rentGrowthPct">): WorkbookMeta["regulation"] {
+  if (!r) return null;
+  return { line: regulationShortLine(r), read: regulationModelLine(r, inputs.rentGrowthPct * 100) ?? "" };
+}
+
+/** The cover's lines about a forward purchase (lib/forward-purchase): the
+ *  read in a line, then what this model does with it — the price as paid at
+ *  closing, income from its first year, and its year-one NOI beside the
+ *  memorandum's at delivery. Null on anything else. */
+function forwardMeta(
+  extraction: ExtractionResult | null,
+  inputs: UnderwriteInputs,
+  noi1: number,
+  noiAssumed: boolean,
+  asOf: Date,
+): WorkbookMeta["forward"] {
+  const r = readForwardPurchase(extraction, asOf);
+  if (!r) return null;
+  return {
+    line: forwardShortLine(r),
+    read: forwardModelLine(r, { noi1, noiAssumed, price: inputs.purchasePrice }) ?? "",
+  };
+}
+
+/** The cover's lines about a mixed-use building (lib/mixed-use): the two
+ *  incomes in a line, then what this model does with them — one exit cap
+ *  and one growth rate for both. Null on anything else. */
+function mixedUseMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["mixedUse"] {
+  const r = readMixedUse(extraction, asOf);
+  if (!r) return null;
+  return {
+    line: mixedUseShortLine(r),
+    read: mixedUseModelLine(r, { exitCapPct: inputs.exitCapPct, rentGrowthPct: inputs.rentGrowthPct }) ?? "",
+  };
+}
+
+/** The cover's lines about an operating business on its real estate
+ *  (lib/going-concern): the read in a line, then what this model does with
+ *  the income — it capitalises its year-one income as rent and allocates
+ *  nothing to the business. Null on anything else. */
+function goingConcernMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, noi1: number, noiAssumed: boolean, asOf: Date): WorkbookMeta["goingConcern"] {
+  const r = readGoingConcern(extraction, asOf);
+  if (!r) return null;
+  return { line: goingConcernShortLine(r), read: goingConcernModelLine(r, { noi1, exitCapPct: inputs.exitCapPct, noiAssumed }) ?? "" };
+}
+
+/** The cover's lines about condominium units bought in bulk (lib/condo):
+ *  the read in a line, then what this model does with them — it sells the
+ *  units as one building at its exit cap, and runs no retail exit. Null on
+ *  anything else. */
+function condoMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["condo"] {
+  const r = readCondo(extraction, asOf);
+  if (!r) return null;
+  return { line: condoShortLine(r), read: condoModelLine(r, { exitCapPct: inputs.exitCapPct }) ?? "" };
+}
+
+/** The cover's lines about a sandwich position (lib/sandwich-lease): the
+ *  two rents and the master lease's end in a line, then what this model
+ *  does with the position — it capitalises the income at its sale as if it
+ *  ran forever, and the master lease ends against its hold. Null on
+ *  anything but a master lease of the building. */
+function sandwichMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["sandwich"] {
+  const r = readSandwichLease(extraction, asOf);
+  if (!r) return null;
+  return { line: sandwichShortLine(r), read: sandwichModelLine(r, { holdYears: inputs.holdMonths / 12 }) ?? "" };
+}
+
 /** The cover's lines about a multi-tenant property's listed tenants
  *  (#457): the roster, then what this model does not carry for its roll.
  *  Null where the memorandum lists fewer than two tenants. */
-function rosterMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["roster"] {
-  const r = readRoster(extraction);
+function rosterMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["roster"] {
+  const r = readRoster(extraction, asOf);
   if (!r) return null;
   return {
     line: rosterShortLine(r),
@@ -400,8 +695,8 @@ function valueAddMeta(extraction: ExtractionResult | null, inputs: UnderwriteInp
 /** The cover's lines about a property-tax abatement (#461): the
  *  abatement, then where it ends against this model's sale and what the
  *  step-up is worth at its exit cap. Null where the memorandum states none. */
-function taxAbatementMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["taxAbatement"] {
-  const r = readTaxAbatement(extraction);
+function taxAbatementMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["taxAbatement"] {
+  const r = readTaxAbatement(extraction, asOf);
   if (!r) return null;
   return {
     line: taxAbatementShortLine(r),
@@ -418,8 +713,8 @@ function taxAbatementMeta(extraction: ExtractionResult | null, inputs: Underwrit
  *  exit cap that runs this workbook on the term — the Exit Cap input stays
  *  the model's, the reader decides — then the financing and the basis.
  *  Null unless a leasehold states when its lease ends. */
-function leaseholdMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["leasehold"] {
-  const r = readLeaseholdExit(extraction, inputs);
+function leaseholdMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["leasehold"] {
+  const r = readLeaseholdExit(extraction, inputs, asOf);
   if (!r) return null;
   const t = r.onTerm;
   const run =
@@ -435,10 +730,14 @@ export function deriveUnderwriteInputs(
   fallbackName: string,
   actuals?: ActualsForModel,
   market?: MarketForModel,
+  deal?: DealForModel,
 ): DerivedModel {
   const metrics = extraction?.metrics ?? [];
   const assetClass = normalizeClass(extraction?.assetClass ?? "auto");
   const cd = CLASS_DEFAULTS[assetClass];
+  // The day every dated reader below reads on: the caller's, so the model's
+  // lines say what the page's panels say on the same day (research pass 40).
+  const asOf = deal?.asOf ?? new Date();
   // The class as a page says it, for the notes and the workbook's cover —
   // "Self-storage default", never "self_storage default", and "generic"
   // where nothing has read the deck.
@@ -516,11 +815,32 @@ export function deriveUnderwriteInputs(
     capDecimal != null && capDecimal / 100 > 0.005 && capDecimal / 100 <= IMPLIED_CAP_CEILING
       ? capDecimal / 100
       : null;
+  // A cap the OM states as a range — "5.25% - 5.75%" — runs at the end the
+  // cap reader took, and every note that names the cap names the range and
+  // that end, as the price note does a price range's (research pass 38,
+  // C27). Which end the model should run at is the owner's call.
+  const capSpan = capMetric && capPct != null ? capSpanOf(capMetric.value) : null;
+  const capEnd = capSpan && capPct != null ? (Math.abs(capPct * 100 - capSpan.low) < 1e-9 ? "low" : Math.abs(capPct * 100 - capSpan.high) < 1e-9 ? "high" : null) : null;
+  const capRangeWords =
+    capSpan && capEnd ? `the ${capEnd} end of the ${capSpan.low.toFixed(2)}%–${capSpan.high.toFixed(2)}% range the OM states as its going-in cap` : null;
   // A range the OM states — pricing guidance, a whisper — is read at its
   // top (#466): the end that does not flatter a single return below.
   let price = priceMetric ? parsePrice(priceMetric.value) : null;
   const priceSpan = priceMetric ? priceRange(priceMetric.value) : null;
   const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  // An NOI the OM states a month at a time is read as the year it makes
+  // (lib/deal-strategy `noiOfRow`, research pass 40), and every note that
+  // names it says so: "twelve times the $85,000 a month the OM states".
+  const monthWords = (f: { month?: number }) =>
+    f.month != null
+      ? `twelve times the ${Math.round(f.month) < 0 ? "−" : ""}$${Math.abs(Math.round(f.month)).toLocaleString("en-US")} a month the OM states`
+      : null;
+  // A stated NOI the model does not run is named in a sentence by its label
+  // and figure, and a year read off a month by its month too.
+  const namedLabel = (f: { label: string; month?: number }) => {
+    const month = monthWords(f);
+    return month ? `${f.label}, ${month},` : f.label;
+  };
   const spanNote = priceSpan
     ? `the top of the ${usd0(priceSpan.low)}–${usd0(priceSpan.high)} range the OM states, the end that does not flatter the returns`
     : "";
@@ -532,23 +852,78 @@ export function deriveUnderwriteInputs(
   const interest = interestOf(extraction);
   // How it is sold (#456): an auction's starting bid is where the price
   // starts, read only where no asking price is stated.
-  const saleFloor = readSale(extraction);
+  const saleFloor = readSale(extraction, asOf);
 
-  if (price != null && interest.kind === "partial_interest" && interest.sharePct != null) {
+  // A leased fee's price note says what the model runs as its income, which
+  // only the NOI's derivation below knows: it is written there.
+  let leasedFeePrice = false;
+  // The Deal Summary's name for the price where it is not the price as
+  // stated for what is sold (WorkbookMeta `priceLabel`): set below where a
+  // share's price is grossed up, or is the equity's whole.
+  let priceLabel: string | null = null;
+  // The share a partial interest's price was grossed up from (WorkbookMeta
+  // `grossedUpSharePct`), set where it is.
+  let grossedUpSharePct: number | null = null;
+  if (price != null && interest.kind === "partial_interest" && isWholeShare(interest.sharePct)) {
+    // All of the entity's interests (a stated 100%, research pass 28): the
+    // price is the whole's as stated, nothing grossed up — said so, never as
+    // a share with no stated percentage. Beside the entity's stated loan it
+    // is the equity's whole, and the loan sits on top of it, as below.
+    const entityLoan = entityLoanOf(extraction);
+    // All the tenant-in-common interests are together the whole property,
+    // held by no entity: its loan is the property's, and no entity's costs
+    // stand between the building and the buyer (the audit C3b LOW-1).
+    const tic = isTenancyInCommon(extraction);
+    if (entityLoan != null) priceLabel = tic ? "Equity's Whole (all the TIC interests)" : "Equity's Whole (all the entity's interests)";
+    const of = tic
+      ? `The OM's ${usd0(price)}${spanNote ? ` (${spanNote})` : ""} for all the tenant-in-common interests in the property, together the whole property`
+      : `The OM's ${usd0(price)}${spanNote ? ` (${spanNote})` : ""} for all of the owning entity's interests`;
+    const runs = tic ? "the model runs the whole building's cash flows" : "the model runs the whole building's cash flows, before the entity's own costs and fees";
+    mark(
+      "purchasePrice",
+      "extracted",
+      entityLoan != null
+        ? `${of} — the equity's whole, nothing grossed up, not the asset's: ${entityLoanWords(extraction, usd0(entityLoan))} sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; ${runs}`
+        : `${of} — the whole, nothing grossed up; ${runs}`,
+      pageOf(priceMetric),
+    );
+  } else if (price != null && interest.kind === "partial_interest" && interest.sharePct != null) {
     const share = interest.sharePct;
     const stated = price;
     price = stated / (share / 100);
+    grossedUpSharePct = share;
     // Beside the entity's stated loan the figure grossed up is the equity's
     // whole, not the asset's (research pass 23). The note names both; the
     // loan is not added to the price — that is the model's arithmetic, and
     // the owner's call.
     const entityLoan = entityLoanOf(extraction);
+    // The tile says what the figure is, in the plan's own words: the whole
+    // the share's price implies, or beside the entity's loan the equity's
+    // whole — never a "Purchase Price" the share does not cost.
+    const shareWord = `${Math.round(share * 10) / 10}%`;
+    // An undivided interest held as a tenant in common is title to the real
+    // estate beside its co-owners, never an entity's share: no promote, and a
+    // loan the memorandum states is the property's (research pass 37).
+    const tic = isTenancyInCommon(extraction);
+    // A stated total project cost above the figure grossed up makes it the
+    // equity's whole, never the whole (research pass 37: a development joint
+    // venture's equity commitment grossed up is its equity, the construction
+    // debt above it). Said; nothing is added to the price.
+    const projectCost = shareProjectCostOf(extraction, price);
+    priceLabel = `${entityLoan != null || projectCost != null ? "Equity's Whole" : "Whole Price"} (${shareWord} ${tic ? "TIC interest" : "share"} grossed up)`;
+    const sold = tic ? `an undivided ${share}% interest held as a tenant in common` : `${withArticle(`${share}%`)} share`;
+    const earns = tic
+      ? `the interest earns ${share}% of them before any fee the co-owners' agreement pays its manager`
+      : `the share earns ${share}% of them before the promote and the sponsor's fees`;
+    const loanOnTop = tic ? `the stated ${usd0(entityLoan ?? 0)} loan on the property` : `the entity's stated ${usd0(entityLoan ?? 0)} loan`;
     mark(
       "purchasePrice",
       "derived",
       entityLoan != null
-        ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to ${usd0(price)} — the equity's whole, not the asset's: the entity's stated ${usd0(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, and the share earns ${share}% of them before the promote and the sponsor's fees`
-        : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
+        ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to ${usd0(price)} — the equity's whole, not the asset's: ${loanOnTop} sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, and ${earns}`
+        : projectCost != null
+          ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to ${usd0(price)} — the equity's whole, not the project's: the memorandum's stated ${usd0(projectCost)} total project cost sits above it; the model runs the whole building's cash flows, and ${earns}`
+          : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to the whole asset — the model runs the whole building's cash flows; ${earns}`,
       pageOf(priceMetric),
     );
   } else if (price != null) {
@@ -556,11 +931,21 @@ export function deriveUnderwriteInputs(
       ? "OM land / site cost — the development's acquisition basis; the build sits in the capital plan"
       : interest.kind === "note"
         ? "The OM's price for a NOTE secured by the property — this model runs the collateral as if bought outright at that price, which is not the note's return"
+        : interest.kind === "preferred_equity"
+          ? "The OM's price for a PREFERRED EQUITY position in the owning entity — this model runs the whole building as if bought outright at that price, which is not the position's return: that is its rate and its redemption"
         : interest.kind === "partial_interest"
-          ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
+          ? isGpStake(extraction)
+            ? // A share of a share (research pass 37): the price runs as
+              // stated, as a share of no stated percentage's does, and its
+              // returns are said not to be the stake's.
+              "The OM's price for a share of the GENERAL PARTNER'S interest — a share of a share, not of the owning entity: this model runs the whole building's cash flows at that price, so its cap and returns are not the stake's"
+            : isTenancyInCommon(extraction)
+              ? "The OM's price for an UNDIVIDED INTEREST held as a tenant in common that states no single percentage — the model cannot gross it up, so its returns are not the interest's"
+              : "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
           : interest.kind === "leased_fee"
-            ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease; the model runs the ground rent as the income, with a building's assumptions"
+            ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease"
             : "OM asking / purchase price";
+    leasedFeePrice = interest.kind === "leased_fee" && !priceIsLand;
     mark(
       "purchasePrice",
       "extracted",
@@ -584,10 +969,34 @@ export function deriveUnderwriteInputs(
   } else if (goingFig && capPct) {
     // Only an in-place / Year-1 NOI may back a price out of the going-in cap.
     price = goingFig.value / capPct;
-    mark("purchasePrice", "derived", "NOI ÷ going-in cap");
+    if (goingFig.value > 0) {
+      const month = monthWords(goingFig);
+      mark("purchasePrice", "derived", `NOI${month ? ` (${month})` : ""} ÷ ${capRangeWords ?? "going-in cap"}`);
+    } else {
+      // An NOI of zero or less over the cap is no price: the model runs the
+      // quotient (the owner's to change), and the note says why it is none
+      // without printing it, marked so that no surface shows it and every
+      // one withholds the returns struck on it (research pass 38).
+      mark(
+        "purchasePrice",
+        "derived",
+        `The OM states no price, and its ${goingFig.label} of ${compactUsd(goingFig.value, { thousandsFrom: Infinity })}${monthWords(goingFig) ? ` (${monthWords(goingFig)})` : ""} is not a year's income to price on: that NOI ÷ ${capRangeWords ?? "the stated going-in cap"} is no price — enter the purchase price`,
+      );
+      sources.purchasePrice = { ...sources.purchasePrice!, noPrice: { label: namedLabel(goingFig), value: goingFig.value } };
+    }
   } else {
     price = 10_000_000;
-    mark("purchasePrice", "assumption", "Enter the purchase price");
+    // A price row whose value is no price ("6.25% cap rate", "185,000 per
+    // unit" — lib/criteria `priceRefusal`) is named, as written, so the note
+    // never reads as if the memorandum stated nothing (research pass 38).
+    const refused = priceMetric ? priceRefusal(priceMetric.value) : null;
+    mark(
+      "purchasePrice",
+      "assumption",
+      priceMetric && refused
+        ? `The OM's ${priceMetric.label.trim().toLowerCase()} reads “${priceMetric.value.trim()}” — ${refused}, not a price; enter the purchase price`
+        : "Enter the purchase price",
+    );
   }
 
   // The price the OM stated, or null. A placeholder never bounds a budget
@@ -612,17 +1021,44 @@ export function deriveUnderwriteInputs(
   // Why a stated NOI was not the anchor — said truthfully for each case: a
   // zero or negative figure is no income to anchor on; a plan deal's
   // stabilized figure is the finished project's; a figure past the cap
-  // ceiling on an operating asset cannot be year-1 income on this price.
-  const implausible = (f: { label: string; value: number }) => {
-    const amount = `$${Math.round(f.value).toLocaleString("en-US")}`;
+  // ceiling on an operating asset cannot be year-1 income on this price — and
+  // beside a price that buys a share no figure grosses up, the building's own
+  // income is not wrong, the price is not the building's (research pass 37:
+  // a GP stake's note had called the building's stated NOI no year-1 income).
+  const shareUngrossed = interest.kind === "partial_interest" && interest.sharePct == null;
+  const implausible = (f: { label: string; value: number; month?: number }) => {
+    // A loss is written with its minus outside the dollar, as every surface
+    // writes one: "−$310,000", never "$-310,000" (research pass 38) — and a
+    // year read off a month says so beside it (research pass 40).
+    const whole = Math.round(f.value);
+    const month = monthWords(f);
+    const amount = `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}${month ? ` (${month})` : ""}`;
     if (!(f.value > 0)) return `The OM's ${f.label} is ${amount} — no income in place to anchor year 1 on`;
+    // No price was read: a stated NOI is set against nothing the memorandum
+    // states, so it is never judged against the placeholder (research pass
+    // 38: "above any going-in cap on this price" of a $10M placeholder).
+    if (statedPrice == null && !isPlanDeal(strategy.kind)) {
+      return `The OM's ${f.label} of ${amount} cannot be set against the ${usd0(price)} placeholder price, which no memorandum stated — enter the price`;
+    }
+    if (shareUngrossed && !isPlanDeal(strategy.kind)) {
+      return `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the whole building's income against the price of ${
+        isGpStake(extraction) ? "a share of the general partner's interest" : "a share the memorandum states no percentage for"
+      }, which is not the building's price, so it does not anchor year 1 here`;
+    }
     return isPlanDeal(strategy.kind)
       ? `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the finished project's stabilized figure on ${withArticle(strategy.label.toLowerCase())} deal, not year-1 income, so it does not anchor year 1 here`
       : `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} above any going-in cap on this price, so it cannot be year-1 income and does not anchor year 1 here`;
   };
   let noi: number;
+  // What the year-1 NOI was read from, in words — a leased fee's price note
+  // says it, beside the ground rent the model does not read.
+  let noiRead: string;
+  // A building the memorandum states 0% occupied with no NOI, its year-1 NOI
+  // the 6% placeholder: the rent line's note says what its rent is, below.
+  let noIncomeInPlace = false;
   if (t12Noi != null) {
     noi = t12Noi;
+    noiRead = "the T-12's actual NOI";
     mark(
       "inPlaceRentAnnual",
       "derived",
@@ -630,10 +1066,12 @@ export function deriveUnderwriteInputs(
     );
   } else if (goingFig && plausibleOnPrice(goingFig.value)) {
     noi = goingFig.value;
+    const month = monthWords(goingFig);
+    noiRead = `the OM's ${goingFig.label}${month ? `, ${month}` : ""}`;
     mark(
       "inPlaceRentAnnual",
       "derived",
-      `Grossed up from the OM's ${goingFig.label} at an assumed expense ratio`,
+      `Grossed up from the OM's ${goingFig.label}${month ? ` — ${month} —` : ""} at an assumed expense ratio`,
       pageOfFig(goingFig),
     );
   } else if (
@@ -642,32 +1080,153 @@ export function deriveUnderwriteInputs(
     plausibleOnPrice(stabilizedFig.value)
   ) {
     noi = stabilizedFig.value;
+    const month = monthWords(stabilizedFig);
+    noiRead = `the OM's ${stabilizedFig.label}${month ? `, ${month}` : ""}`;
     mark(
       "inPlaceRentAnnual",
       "derived",
-      `Grossed up from the OM's ${stabilizedFig.label} — the only NOI stated; on a stabilized asset it is next year's income`,
+      `Grossed up from the OM's ${stabilizedFig.label}${month ? `, ${month},` : ""} — the only NOI stated; on a stabilized asset it is next year's income`,
       pageOfFig(stabilizedFig),
     );
   } else if (capPct) {
     noi = price * capPct;
+    noiRead = "this price × the stated going-in cap";
     const skipped = goingFig ?? stabilizedFig;
+    // Beside a stated NOI of zero or less, the price × the stated cap is not
+    // the building's income: the model runs it unchanged, but it is marked
+    // an assumption, so the returns are withheld on it and the debt sizer
+    // seeds no loan from it, and the memorandum's own figure is named as the
+    // one not run (research pass 38: an OM's −$310,000 ran as $616,250, a
+    // 13.31% IRR with a sizer seeded from it, the finding in another card).
+    const noIncome = skipped != null && !(skipped.value > 0);
+    // And where no price is stated, the price × the cap is the site's
+    // placeholder × the cap: the placeholder's NOI, never one derived from
+    // the memorandum, so a price typed over the placeholder never shows
+    // returns on it (the second audit, MED-2).
+    const onPlaceholder = statedPrice == null;
+    // A cap stated as a range is named with the end taken (C27).
+    const capWords = capRangeWords ?? `the stated ${(Math.round(capPct * 10_000) / 100).toFixed(2)}% going-in cap`;
+    // No price stated beside an NOI of zero or less: the price was backed
+    // out of that NOI over the cap (`noPrice`), so "price × the cap" is that
+    // NOI again — said as what the model runs, in the withheld sentence's
+    // own words, never as a figure set from a price no surface shows
+    // (research pass 40, item 16). Words only: the figure is the owner's.
+    const noPrice = sources.purchasePrice?.noPrice ?? null;
     mark(
       "inPlaceRentAnnual",
-      "derived",
-      skipped
-        ? `${implausible(skipped)}. Year-1 NOI set from price × the stated going-in cap instead`
-        : "From price × going-in cap, at an assumed expense ratio",
+      noIncome || onPlaceholder ? "assumption" : "derived",
+      skipped && noPrice
+        ? `${implausible(skipped)}. No price was stated, so the model's price is that NOI over ${capRangeWords ?? "the stated going-in cap"} and its year-1 NOI is that same NOI: ${compactUsd(noPrice.value, { thousandsFrom: Infinity })} is not a year's income to price on — enter the purchase price`
+        : skipped
+        ? `${implausible(skipped)}. Year-1 NOI set from ${onPlaceholder ? `the ${usd0(price)} placeholder × ${capWords}` : `price × ${capRangeWords ?? "the stated going-in cap"}`} instead`
+        : onPlaceholder
+          ? `The ${usd0(price)} placeholder × ${capWords}, at an assumed expense ratio — the memorandum states no price or NOI, so this NOI is the placeholder's; enter the price and the in-place NOI`
+          : `From price × ${capRangeWords ?? "going-in cap"}, at an assumed expense ratio`,
     );
+    if (noIncome && skipped && sources.inPlaceRentAnnual) {
+      sources.inPlaceRentAnnual = { ...sources.inPlaceRentAnnual, notRun: { label: namedLabel(skipped), value: skipped.value } };
+    }
   } else {
     noi = price * 0.06;
+    noiRead = "an assumed 6% of this price";
     const skipped = goingFig ?? stabilizedFig;
+    // An operating business's earnings stated where no NOI anchors year 1
+    // (research pass 28): said, so the note never reads as if the memorandum
+    // stated no earnings, and never used — EBITDA is the business's, before
+    // rent, a management fee and reserves, never the real estate's NOI. The
+    // model's NOI stays the assumed 6%.
+    const ebitda = ebitdaFigure(metrics);
+    const earnings = ebitda
+      ? `The OM states the business's ${ebitda.label} of $${Math.round(ebitda.value).toLocaleString("en-US")}, which is not the real estate's NOI and is not used`
+      : "";
+    // Land, which earns no income, and a building the memorandum states 0%
+    // occupied with no NOI (research pass 37): the 6% is said to be a
+    // placeholder, never an assumption about income the memorandum
+    // describes. Words only — the model's figures stand (the owner's call).
+    // A leased fee's land earns its ground rent, and a rent roll's occupancy
+    // outranks the memorandum's.
+    const noneStated = !skipped && !earnings && interest.kind !== "leased_fee";
+    const landNoIncome = noneStated && !assetWords(extraction?.assetClass).operating;
+    noIncomeInPlace = noneStated && !landNoIncome && rrOcc == null && occupancyPctFromMetrics(metrics) === 0;
+    // What to enter: on the placeholder, the price — a stated NOI is never
+    // asked for again ("enter the in-place NOI" beside the OM's own NOI,
+    // research pass 38) — and beside a stated NOI the price can carry, the
+    // year-1 NOI the reader would run.
+    const onPlaceholder = statedPrice == null;
+    // A positive NOI on an operating asset already asks for the price
+    // (`implausible`); a loss, or a plan's stabilized figure, does not.
+    const priceAsked = skipped != null && onPlaceholder && skipped.value > 0 && !isPlanDeal(strategy.kind);
+    const enter = !skipped || priceAsked ? "" : onPlaceholder ? "; enter the price" : "; enter the year-1 NOI you would run";
     mark(
       "inPlaceRentAnnual",
       "assumption",
-      skipped
-        ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI`
-        : "No NOI or cap in the OM — assumed 6% going-in",
+      landNoIncome
+        ? "Land earns no income: the 6% and the loan beside it are placeholders, and the returns are not the land's"
+        : noIncomeInPlace
+          ? "The memorandum states the building 0% occupied and no NOI: no income is in place, and the 6% is a placeholder"
+          : skipped
+            ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in${onPlaceholder ? ` on the ${usd0(price)} placeholder` : ""}${enter}${earnings ? `. ${earnings}` : ""}`
+            : earnings
+              ? `${earnings}; with no NOI or cap in the OM, the model assumed 6% going-in`
+              : "No NOI or cap in the OM — assumed 6% going-in",
     );
+    // A stated NOI the model does not run is named wherever the returns are
+    // withheld, never said to be unread — and where it had no stated price to
+    // be set against, said so (research pass 38).
+    if (skipped && sources.inPlaceRentAnnual) {
+      sources.inPlaceRentAnnual = {
+        ...sources.inPlaceRentAnnual,
+        notRun: { label: namedLabel(skipped), value: skipped.value, ...(onPlaceholder && skipped.value > 0 ? { unpriced: true } : {}) },
+      };
+    }
+  }
+
+  // A leased fee's income is its ground rent (#415), and the model reads no
+  // ground rent: the extraction files it under "Ground rent", a label no NOI
+  // reader takes, so year 1 runs on the NOI a building's model reads — a
+  // stated NOI, else the price × the stated cap, else the assumed 6%. Both
+  // notes say which figure the model runs and name the stated rent beside
+  // it, so the gap is seen; reading the rent as the NOI is the owner's call
+  // (research pass 34).
+  if (interest.kind === "leased_fee") {
+    const rent = groundRentOf(extraction);
+    // A year-1 NOI equal to the stated rent is the rent's own figure where
+    // it was read off a memorandum row (the OM's NOI, the T-12's), and the
+    // rent's only by arithmetic where it was struck — the price × the stated
+    // cap, or the assumed 6% (the second audit, MED-4: a NOI read off the
+    // OM's own row, which was the rent, was said to be "by arithmetic, not
+    // read from it" and the rent "not read").
+    const sameAsRent = rent != null && Math.abs(noi - rent) <= rent * 0.005;
+    const byArithmetic = sources.inPlaceRentAnnual?.provenance === "assumption" || noiRead === "this price × the stated going-in cap";
+    const sameFigure = rent != null ? ` — the same figure as the ${usd0(rent)} ground rent the OM states` : "";
+    if (rent != null && sources.inPlaceRentAnnual) {
+      sources.inPlaceRentAnnual =
+        sameAsRent && !byArithmetic
+          ? { ...sources.inPlaceRentAnnual, note: `${sources.inPlaceRentAnnual.note}${sameFigure}` }
+          : {
+              ...sources.inPlaceRentAnnual,
+              note: `${sources.inPlaceRentAnnual.note}. The OM's ${usd0(rent)} ground rent is the leased fee's income; the model does not read it`,
+              notRun: { label: "ground rent", value: rent },
+            };
+    }
+    if (leasedFeePrice && sources.purchasePrice) {
+      const against =
+        rent == null
+          ? ""
+          : sameAsRent
+            ? byArithmetic
+              ? ` — equal to the ${usd0(rent)} ground rent the OM states by arithmetic, not read from it`
+              : sameFigure
+            : `, not the ${usd0(rent)} ground rent the OM states`;
+      sources.purchasePrice = {
+        ...sources.purchasePrice,
+        note: `The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease${
+          spanNote ? ` (${usd0(price)}, ${spanNote})` : ""
+        }. The model reads no ground rent as its income: its year-1 NOI is ${noiRead}, ${usd0(noi)} a year${against}, run with a building's assumptions${
+          spanNote ? "; enter the price you would pay" : ""
+        }`,
+      };
+    }
   }
 
   // ── Capital / construction budget ──────────────────────────────────────
@@ -681,6 +1240,10 @@ export function deriveUnderwriteInputs(
   // A value-add that states its program a door at a time and no total
   // (#460) carries the doors times a door's cost — the plan's own budget,
   // from lib/deal-strategy, so the model and the plan spend one figure.
+  // A forward purchase or a build-to-suit bought at delivery
+  // (lib/forward-purchase): the developer funds the works. Said in the
+  // capital line's note — the model's figures are unchanged.
+  const forwardDeal = isForwardPurchase(extraction, strategy);
   const budgetRead =
     capitalBudgetFromMetrics(metrics, statedPrice, !priceIsLand) ??
     budgetFromText(extraction?.strategy?.capitalBudget, statedPrice, !priceIsLand) ??
@@ -689,13 +1252,13 @@ export function deriveUnderwriteInputs(
   // capital. Where the memorandum states a PIP and no other capital budget
   // the model carries it; where it states both, the budget is read as
   // including it — never the two added.
-  const hotelRead = readHotelDeal(extraction);
+  const hotelRead = readHotelDeal(extraction, asOf);
   const pipCapital = !budgetRead && hotelRead?.pipTotal != null && hotelRead.pipTotal > 0 ? hotelRead.pipTotal : null;
   // The property condition report's immediate repairs (#465): work the
   // building needs now, capital at closing. Carried where the memorandum
   // states no other budget and no PIP; a stated budget or PIP is read as
   // including them — never the two added.
-  const reportsRead = readSiteReports(extraction);
+  const reportsRead = readSiteReports(extraction, asOf);
   const repairsCapital =
     !budgetRead && pipCapital == null && reportsRead?.pca?.immediate != null && reportsRead.pca.immediate > 0
       ? reportsRead.pca.immediate
@@ -720,7 +1283,12 @@ export function deriveUnderwriteInputs(
   const sfMetric = buildingSfRow(metrics);
   const sfParsed = sfMetric ? parseSf(sfMetric.value) : null;
   const words = assetWords(extraction?.assetClass);
-  const unitNoun = words.noun ?? { one: "unit", many: "units" };
+  // The count in the memorandum's own noun (lib/asset-words `countNoun`): a
+  // care home's "Licensed beds" are beds and a marina's "Wet slips" slips,
+  // never "units" because the class names no noun of its own (audit A, L2);
+  // else the class's, else units.
+  const countMany = countNoun(unitCountRow(metrics)?.label, extraction?.assetClass);
+  const unitNoun = { one: countMany.replace(/s$/, ""), many: countMany };
   const typicalSf = units != null && units > 0 && cd.sfPerUnit ? Math.round(units * cd.sfPerUnit) : null;
   const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : (typicalSf ?? 100_000));
   if (rrSf != null) {
@@ -728,10 +1296,17 @@ export function deriveUnderwriteInputs(
   } else if (sfParsed && sfParsed > 100) {
     mark("rsf", "extracted", "OM building size", pageOf(sfMetric));
   } else if (typicalSf != null) {
+    // A class sized by the bed (student housing) whose memorandum counts
+    // units: the typical size is a bed's, applied to a unit count, and the
+    // note says so (research pass 38 — "180 units × 350 SF" for 600 beds).
+    // The area itself is the owner's.
+    const bedSizeOnUnits = words.noun?.one === "bed" && unitNoun.many !== "beds";
     mark(
       "rsf",
       "assumption",
-      `${units!.toLocaleString("en-US")} ${units === 1 ? unitNoun.one : unitNoun.many} × ${cd.sfPerUnit} SF typical — enter the rentable SF`,
+      `${units!.toLocaleString("en-US")} ${units === 1 ? unitNoun.one : unitNoun.many} × ${cd.sfPerUnit} SF typical — ${
+        bedSizeOnUnits ? `${cd.sfPerUnit} SF is a bed's typical size, applied here to a count of ${unitNoun.many}, not beds; ` : ""
+      }enter the rentable SF`,
     );
   } else {
     mark("rsf", "assumption", "Enter rentable SF");
@@ -757,6 +1332,16 @@ export function deriveUnderwriteInputs(
   const pgr = egr / (1 - vacancy);
   const inPlaceRentAnnual = pgr;
   const operatingExpenses = egr - noi; // = expenseRatio × EGR
+  // On a building with no income in place the rent line is the placeholder
+  // grossed up through the vacancy the stated 0% occupancy is run at — said,
+  // with its figure, as no building's rent (research pass 37: $92.7M a year on
+  // a vacant 42,000 SF office). Words only; the figure stands.
+  if (noIncomeInPlace && sources.inPlaceRentAnnual) {
+    sources.inPlaceRentAnnual = {
+      ...sources.inPlaceRentAnnual,
+      note: `${sources.inPlaceRentAnnual.note}. The ${compactUsd(pgr)} of gross potential rent on this line is backed out of that placeholder at the stated 0% occupancy, which the model runs as ${withArticle(`${Math.round(vacancy * 100)}% vacancy`)} — it is no building's rent`,
+    };
+  }
 
   // ── The rate ──────────────────────────────────────────────────────────
   // The index is a fact and the spread is a judgment (lib/debt-index): with
@@ -844,16 +1429,27 @@ export function deriveUnderwriteInputs(
   }
   mark("rentGrowthPct", "assumption", "Default 3.0%/yr — set your view");
   mark("expenseGrowthPct", "assumption", "Default 3.0%/yr — set your view");
+  // A stated occupancy under half: the class's ratio is a share of a mostly
+  // empty building's income, while its taxes and insurance are owed on the
+  // whole building (research pass 38). Said; the figure is the owner's.
+  const statedOcc = rrOcc ?? (occPct != null ? occPct / 100 : null);
+  const mostlyEmpty = statedOcc != null && statedOcc < 0.5;
   sources.expenseLines = t12Er != null
     ? {
         provenance: "extracted",
         note: `T-12 actual expense load${ttmNote} — ${Math.round(t12Er * 100)}% of EGI`,
+        // The T-12's own figure, never the OM's: the SOURCE column credits
+        // the document it was read from, as a rent roll's rows do (research
+        // pass 40, M3: "OM — T-12 actual expense load …").
+        doc: "T-12",
       }
     : {
         // Derived when the NOI it ties to came from the OM; an assumption when
         // the NOI itself was assumed.
         provenance: sources.inPlaceRentAnnual?.provenance === "derived" ? "derived" : "assumption",
-        note: `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — break out from a T-12`,
+        note: mostlyEmpty
+          ? `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — the class's ratio struck on a mostly empty building's income (${Math.round(statedOcc! * 100)}% occupied as stated), though its taxes and insurance do not fall with occupancy — enter the T-12's expenses`
+          : `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — break out from a T-12`,
       };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
   mark("reservesPsf", "assumption", `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
@@ -870,7 +1466,14 @@ export function deriveUnderwriteInputs(
           : budgetRead.isTotal
             ? " (stated all-in; the OM gives no price to take out of it)"
             : ""
-      } — spent in year 1 in this annual model; the OM's own timeline may run longer`,
+      }${
+        // A forward purchase (lib/forward-purchase): the developer funds the
+        // works and the price is all-in at delivery, which the note says —
+        // the model still charges the budget, an owner's call to change.
+        forwardDeal
+          ? " — the developer's budget: on a forward purchase the developer funds the works and the price is all-in at delivery, yet this model charges it as the buyer's first-year capital; enter 0 to run the price alone"
+          : " — spent in year 1 in this annual model; the OM's own timeline may run longer"
+      }`,
       budgetRead.page,
     );
   } else if (repairsCapital != null) {
@@ -893,7 +1496,9 @@ export function deriveUnderwriteInputs(
       "assumption",
       strategy.kind === "stabilized" || strategy.kind === "unknown"
         ? "No capital plan in the OM — enter one if the PCA finds work"
-        : `${withArticle(strategy.label.toLowerCase(), true)} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
+        : forwardDeal
+          ? "No construction budget is the buyer's: on a forward purchase the developer funds the works and the price is all-in at delivery"
+          : `${withArticle(strategy.label.toLowerCase(), true)} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
     );
   }
   mark("amFeePctEquity", "assumption", "Default 0.5% of equity/yr");
@@ -923,10 +1528,44 @@ export function deriveUnderwriteInputs(
     mark(key, "assumption", "None itemized — the general hold stands in for it; enter it to itemize");
   }
   for (const key of ["expenseRecoveriesAnnual", "otherRevenueAnnual"] as const) {
-    mark(key, "assumption", "Folded into the in-place rental revenue — split it out of that line, never add it on top");
+    mark(key, "assumption", "Folded into the potential gross revenue line — split it out of that line, never add it on top");
   }
+  // Leasing capital is held at none too, and said so (research pass 40, M4:
+  // the two rows printed $0.00 and 0.0% with nothing but how each is
+  // charged). What a class should carry is the owner's.
+  mark("tiPsf", "assumption", "None modelled — enter it to carry tenant improvements: the returns carry no leasing capital");
+  mark("lcPct", "assumption", "None modelled — enter it to carry leasing commissions: the returns carry none");
+  // The exit defaults to the OM's stated going-in cap (which cap it defaults
+  // to is the owner's call). Where the model's own entry — its year-1 NOI
+  // over its price, the Deal Summary's "Going-In Cap (Yr-1 NOI / Price)" —
+  // sits 5 bps or more from it, the note names that too, so a compression
+  // the default carries is seen (research pass 34). Never on a price that
+  // did not buy the building, where no cap is struck on the price.
+  const ownEntry = capPct && price > 0 && buildingPriceOf(extraction, price) != null ? noi / price : null;
+  const ownEntryClause =
+    capPct && ownEntry != null && Math.abs(ownEntry - capPct) >= 0.0005
+      ? `; the model's own year-1 NOI over its price is ${(ownEntry * 100).toFixed(2)}%`
+      : "";
+  // With no cap stated the exit is the flat default, and where the model's
+  // own entry — a stated price and a stated NOI, the price the building's —
+  // sits 5 bps or more from it, the note names the gap (research pass 38;
+  // lib/underwrite/cost-note `defaultExitGap`, which the playground says
+  // under its tiles too). The default itself is the owner's.
+  const defaultEntry =
+    !capPct &&
+    price > 0 &&
+    sources.purchasePrice?.provenance !== "assumption" &&
+    sources.inPlaceRentAnnual?.provenance !== "assumption" &&
+    buildingPriceOf(extraction, price) != null
+      ? noi / price
+      : null;
+  const defaultGap = capPct ? null : defaultExitGap(0.06, defaultEntry);
   mark("exitCapPct", capPct ? "derived" : "assumption",
-    capPct ? "Defaulted to the going-in cap — set your exit view" : "Default 6.0% — set your exit view",
+    capPct
+      ? `Defaulted to ${capRangeWords ?? "the OM's stated going-in cap"}${ownEntryClause} — set your exit view`
+      : defaultGap
+        ? `${defaultGap} — set your exit view`
+        : "Default 6.0% — set your exit view",
     capPct ? pageOf(capMetric) : undefined);
   mark("saleCostPct", "assumption", "Default 2.0% of sale price");
 
@@ -939,16 +1578,22 @@ export function deriveUnderwriteInputs(
       market: extraction?.market ?? "",
       // The workbook's cover prints this: the label, never a key or "auto".
       assetClass: assetClassLabel(extraction?.assetClass) || "—",
-      unitNoun: assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" },
-      interest: interestMeta(extraction),
-      assumable: assumableMeta(extraction, inputs),
+      unitNoun,
+      interest: interestMeta(extraction, asOf),
+      priceLabel,
+      ...(grossedUpSharePct != null ? { grossedUpSharePct } : {}),
+      // A development priced at its land, and a bulk condominium purchase's
+      // units offered: what the workbook's per-unit yardsticks are of.
+      ...(priceIsLand && statedPrice != null ? { priceIsLand: true } : {}),
+      ...(condoUnitsOffered(extraction) != null ? { unitsOffered: condoUnitsOffered(extraction) } : {}),
+      assumable: assumableMeta(extraction, inputs, asOf),
       sellerNote: sellerNoteMeta(extraction, inputs),
-      leasehold: leaseholdMeta(extraction, inputs),
-      affordable: affordableMeta(extraction),
-      singleTenant: singleTenantMeta(extraction, inputs),
-      roster: rosterMeta(extraction, inputs),
+      leasehold: leaseholdMeta(extraction, inputs, asOf),
+      affordable: affordableMeta(extraction, asOf),
+      singleTenant: singleTenantMeta(extraction, inputs, asOf),
+      roster: rosterMeta(extraction, inputs, asOf),
       valueAdd: valueAddMeta(extraction, inputs),
-      taxAbatement: taxAbatementMeta(extraction, inputs),
+      taxAbatement: taxAbatementMeta(extraction, inputs, asOf),
       siteReports: reportsRead
         ? {
             line: siteReportsShortLine(reportsRead),
@@ -958,13 +1603,20 @@ export function deriveUnderwriteInputs(
       student: studentMeta(extraction, inputs),
       mh: mhMeta(extraction, inputs),
       storage: storageMeta(extraction, inputs),
-      sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
+      regulation: regulationMeta(deal?.regulation, inputs),
+      forward: forwardMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption", asOf),
+      mixedUse: mixedUseMeta(extraction, inputs, asOf),
+      goingConcern: goingConcernMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption", asOf),
+      condo: condoMeta(extraction, inputs, asOf),
+      sandwich: sandwichMeta(extraction, inputs, asOf),
+      sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs, undefined, asOf) } : null,
       hotel: hotelRead
         ? {
             line: hotelShortLine(hotelRead),
             read: hotelModelLine(hotelRead, { holdMonths: inputs.holdMonths, capitalYr1: capitalBudget, capitalIsPip: pipCapital != null }),
           }
         : null,
+      ...(t12Er == null ? { defaultExpenseRatio: { ratio: cd.expenseRatio, classWord } } : {}),
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,
@@ -972,7 +1624,13 @@ export function deriveUnderwriteInputs(
       strategy: strategy.kind,
       stabilizedNoi:
         isPlanDeal(strategy.kind) && stabilizedFig && stabilizedFig.value > 0
-          ? { value: stabilizedFig.value, page: stabilizedFig.page }
+          ? {
+              value: stabilizedFig.value,
+              page: stabilizedFig.page,
+              // A month the memorandum states, so the workbook credits the
+              // twelve to the month and never a year to the OM (audit C4, M2).
+              ...(stabilizedFig.month != null ? { month: stabilizedFig.month } : {}),
+            }
           : null,
       rateSeed,
     },

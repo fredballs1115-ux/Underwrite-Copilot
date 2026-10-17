@@ -22,12 +22,17 @@ export function FileField({
   const [fileName, setFileName] = useState<string | null>(null);
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
+      {/* Out of the Tab order, as replace-om's is: the button beside it is
+          the way in, and the hidden input was a second, invisible stop
+          before it with the same name. Still named and still focusable, so
+          the browser can point at it when a required file is missing. */}
       <input
         ref={inputRef}
         type="file"
         name={name}
         accept={accept}
         required
+        tabIndex={-1}
         aria-label={buttonLabel}
         className="sr-only"
         onChange={(e) => {

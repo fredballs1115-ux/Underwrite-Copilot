@@ -14,8 +14,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
-import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
-import type { MandateScore, MandateVerdict } from "@/lib/mandate";
+import { screenYearOf } from "@/lib/criteria";
 import {
   fmtCapRange,
   fmtBasisRange,
@@ -26,6 +25,7 @@ import { ActualsPrompt, type ActualsSlotState } from "./actuals-prompt";
 import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playground";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
+import { internalCompsLead } from "@/lib/internal-comps-lead";
 import { DealAvatar } from "@/app/(app)/deal-avatar";
 import { DebtSizer } from "./debt-sizer";
 import { ModelVsMarketCard } from "./model-vs-market-card";
@@ -39,10 +39,13 @@ import type { AssumableView } from "@/lib/assumable-debt";
 import type { LeaseholdExitView } from "@/lib/leasehold-exit";
 import type { MetroDemand } from "@/lib/metro-demand";
 import { DecisionLog } from "./decision-log";
+import { DealOutcomeCard } from "./deal-outcome";
+import { OUTCOME_FORM_ERROR } from "@/lib/deal-outcome";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import { AskPanel } from "./ask-panel";
+import { askStarters } from "@/lib/ask-starters";
 import { ReconciliationPanel } from "./reconciliation-panel";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { LoiPanel } from "./loi-panel";
@@ -67,25 +70,36 @@ import {
 import { ModelView } from "./model-view";
 import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
+import { SourceDocumentsView } from "./source-documents";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
-import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
+import { findPricedMetric, inferStrategy, type DealStrategy } from "@/lib/deal-strategy";
 import type { LoiTerms } from "@/lib/loi-terms";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { LOI_REFUSAL_BANNERS } from "@/lib/loi-refusal";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
+import { condoUnitsOffered } from "@/lib/condo-units";
 import { interestOf } from "@/lib/interest";
-import { dealFileLinkFor } from "@/lib/deal-file-link";
-import { servedInline } from "@/lib/inline-types";
+import { sampleExportsFree } from "@/lib/sample-exports";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
+import { longerThanUsual, longerThanUsualLine } from "@/lib/screen-duration";
+import { supportMailto } from "@/lib/support-link";
 import { revealScrollLeft } from "@/lib/tab-strip";
-import type { ResultKey } from "@/lib/screen-run";
+import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
-import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
+import type { DealDocument } from "@/lib/documents";
+// The buy box tab lives in buy-box-panel.tsx, which /demo draws on the
+// sample without this module.
+import { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
+import { StatGridSkeleton, CardListSkeleton, TableSkeleton, VerdictSkeleton } from "./skeletons";
+export { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
 import { MAX_OM_PAGES } from "@/lib/pdf";
 import { needsOperator } from "@/lib/anthropic/operator-failures";
+import { documentFailure } from "@/lib/anthropic/document-failures";
+import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
+import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
 
@@ -100,12 +114,11 @@ type Job = {
    *  one job row (lib/jobs) — so the progress clock counts from the run's
    *  start rather than from the page load */
   created_at?: string | null;
+  /** how long ago the row was last written, on the server's clock at the
+   *  read (lib/screen-run `isStalled`): a run past the stale line is
+   *  stalled, and the page says so from its first paint */
+  ageMs?: number | null;
 } | null;
-
-// A run that hasn't written progress in this long is treated as stalled: the
-// background process likely died (a deploy/restart), so we offer a restart
-// instead of spinning the rail forever. Matches the server's stale-reclaim.
-const STALL_MS = 10 * 60 * 1000;
 
 type Results = {
   extraction: ExtractionResult | null;
@@ -169,6 +182,10 @@ const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"
 // them as one indicator, and the overview keeps its meter while they run.
 const SIDE_JOBS = new Set(["reconcile", "model", "comps_search"]);
 
+/** A run waiting for its turn: a few run at once, one after another past
+ *  that. It named "an open analyst slot", an analyst nobody has. */
+const QUEUED_LABEL = "Queued — waiting its turn to start…";
+
 const STEP_LABELS: Record<string, string> = {
   signal: "First pass — reading the headline figures…",
   extract: "Reading the OM and extracting the key terms…",
@@ -188,11 +205,13 @@ const MODEL_ERRORS: Record<string, string> = {
   modelupload:
     "Your model didn’t finish uploading — nothing was changed. Please try again.",
   omfile: "Choose the reissued OM (PDF) to upload.",
+  omempty:
+    "That PDF is empty (0 bytes) — download or export it again, and upload that. The stored OM is unchanged.",
   ompdf: "The replacement OM must be a PDF.",
   omsize: "That PDF is larger than 32 MB — please try a smaller file.",
   omlocked:
     "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password and upload that. The stored OM is unchanged.",
-  ompages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the financial sections on their own. The stored OM is unchanged.`,
+  ompages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the sections that hold the deal's figures, and the screen will read those pages alone, not the whole memorandum. The stored OM is unchanged.`,
   omupload:
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:
@@ -201,6 +220,12 @@ const MODEL_ERRORS: Record<string, string> = {
     "That file couldn’t be read as a picture — try a JPEG, PNG or WebP of the building.",
   picturesize: "That picture is larger than 12 MB — please try a smaller one.",
   busy: "A screen is already running on this deal — let it finish first.",
+  // The claim or the job row's insert failed: nothing is running, and
+  // nothing changed (research pass 30).
+  startfail:
+    "Couldn’t start the screen just now — our database didn’t take the write, and nothing changed. Try again in a moment.",
+  reconcilestartfail:
+    "Couldn’t start the reconciliation just now — our database didn’t take the write, and nothing changed. Try again in a moment.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
@@ -214,6 +239,11 @@ const MODEL_ERRORS: Record<string, string> = {
   deletepermission:
     "Only the deal’s creator or the team owner can delete this deal. Nothing was removed.",
   stage: "Couldn’t save the stage — please try again.",
+  outcome: "Couldn’t save what became of the deal — move it to Dead or Closed first, then try again.",
+  // The form's own words (lib/deal-outcome), the date's with its years.
+  outcomereason: OUTCOME_FORM_ERROR.reason,
+  outcomeprice: OUTCOME_FORM_ERROR.price,
+  outcomedate: OUTCOME_FORM_ERROR.date,
   note: "Couldn’t save your note — please try again.",
   noteempty: "Write something in the note first — whitespace doesn’t count.",
   notedelete: "Couldn’t remove that note — please try again.",
@@ -252,6 +282,12 @@ const MODEL_ERRORS: Record<string, string> = {
     "The latest screen of this deal hasn’t reached its verdict yet — the memo waits for it, so it never pairs the new terms with the last call.",
   reportrunning:
     "The latest screen of this deal hasn’t reached its verdict yet — the report waits for it, so it never pairs the new terms with the last call.",
+  // A run that stopped making progress (lib/screen-run `isStalled`) is
+  // waited on by nothing: start it again, then export.
+  memostalled:
+    "The latest screen of this deal stopped making progress before its verdict — start it again on this page, and the memo pairs today’s terms with today’s call once it finishes.",
+  reportstalled:
+    "The latest screen of this deal stopped making progress before its verdict — start it again on this page, and the report pairs today’s terms with today’s call once it finishes.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
@@ -300,16 +336,6 @@ const SECTION_STEPS: Record<SectionKey, string[]> = {
   documents: [],
 };
 
-export interface BuyBoxPanelData {
-  checks: BuyBoxCheck[];
-  /** the single 0–100 mandate-fit score + PURSUE/WATCH/PASS (null pre-screen) */
-  mandate: MandateScore | null;
-  scope: "team" | "personal";
-  /** the checks came from the first signal, not the full extraction yet */
-  provisional: boolean;
-  hasBox: boolean;
-}
-
 export function DealView({
   dealId,
   dealName,
@@ -319,6 +345,7 @@ export function DealView({
   modelErrorCode,
   job: initialJob,
   typicalScreen = null,
+  typicalScreenMs = null,
   results,
   supplements,
   model,
@@ -328,7 +355,10 @@ export function DealView({
   buyBox,
   screenDiff,
   stageHistory,
+  dealStage = null,
+  ddChecklist = null,
   internalComps = [],
+  internalCompsUnread = false,
   omUrl,
   facts = {},
   discrepancies = null,
@@ -341,6 +371,7 @@ export function DealView({
   marketMemory = null,
   actuals = { rentRoll: null, t12: null, noiComparison: null },
   playground = null,
+  dealStrategy = null,
   tasks = null,
   taskAssignees = [],
   todayIso = "",
@@ -355,6 +386,7 @@ export function DealView({
   loi = null,
   askerNames = null,
   modelInterest = null,
+  compsSubjectPoint = null,
 }: {
   dealId: string;
   dealName: string;
@@ -367,6 +399,10 @@ export function DealView({
    *  the median of their stored run times (lib/screen-duration); null under
    *  three runs, and then the rail claims no duration */
   typicalScreen?: string | null;
+  /** the same median in ms, so the rail can say a run is taking longer
+   *  than usual (lib/screen-duration `longerThanUsual`); null with no
+   *  measured median, and then it says nothing of the kind */
+  typicalScreenMs?: number | null;
   results: Results;
   /** results the latest screen has not rewritten — a failed run never
    *  reached them, or a running one has not yet — so they belong to the
@@ -402,6 +438,9 @@ export function DealView({
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
+  /** the deal's resolved location (lib/deal-location), the point its
+   *  pictures are drawn around; the comps map measures from it */
+  compsSubjectPoint?: SubjectPoint | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -410,7 +449,15 @@ export function DealView({
   buyBox: BuyBoxPanelData;
   screenDiff: ScreenDiff | null;
   stageHistory: StageChange[];
+  /** the deal's stage, for what became of it once Dead or Closed (lib/
+   *  deal-outcome, research pass 24 B4) */
+  dealStage?: string | null;
+  /** the due-diligence checklist the tasks card offers (lib/dd-checklist,
+   *  research pass 24 B16): only once the deal is under LOI or contract */
+  ddChecklist?: string[] | null;
   internalComps?: InternalComp[];
+  /** the read of the reader's other screens failed (audit C5, LOW-5) */
+  internalCompsUnread?: boolean;
   omUrl: string | null;
   facts?: Record<string, DealFact>;
   discrepancies?: ReconcileResult | null;
@@ -429,6 +476,9 @@ export function DealView({
   marketMemory?: MarketGroup | null;
   actuals?: ActualsData;
   playground?: PlaygroundData | null;
+  /** the deal's kind as the page's header reads it, the first signal
+   *  included — the debt sizer's plan block and price read it too */
+  dealStrategy?: DealStrategy | null;
   /** null = deal_tasks table not migrated yet (card hidden) */
   tasks?: DealTask[] | null;
   taskAssignees?: TaskAssignee[];
@@ -438,6 +488,9 @@ export function DealView({
 }) {
   const router = useRouter();
   const toast = useToast();
+  // The three downloads are open on the reader's own sample deal, as the
+  // public pages promise (lib/sample-exports, the routes' own rule).
+  const downloadsOpen = isPro || sampleExportsFree({ isSample, hasOm });
 
   // Live job status, kept fresh by polling. Server data (results) arrives via
   // props on each router.refresh(); this just tracks the in-flight step/%.
@@ -447,20 +500,36 @@ export function DealView({
   const notified = useRef(false);
   // Say "you were signed out" once, not on every 2-second poll.
   const signedOut = useRef(false);
-  // A run whose job row hasn't advanced in STALL_MS almost certainly lost its
-  // background process (a deploy/restart). Computed in the poll (where reading
-  // the clock is a side effect, not render), it flips the rail to a restart.
-  const [stalled, setStalled] = useState(false);
-  const wasStalled = useRef(false);
+  // A run whose job row hasn't advanced past the stale line almost certainly
+  // lost its background process (a deploy/restart): it flips the rail to a
+  // restart. Read off the age the job carries (lib/screen-run `isStalled`,
+  // the pipeline card's own rule), so the first paint is already right.
+  const stalled = isStalled(job);
+  const wasStalled = useRef(stalled);
   const operatorFailure = job?.status === "error" && needsOperator(job.error);
+  // A failure in the document itself (lib/anthropic/document-failures): a
+  // retry reads the same file the same way, so the banner offers another
+  // file — Replace OM — where it offered "Try again".
+  const remedy = job?.status === "error" && !operatorFailure ? documentFailure(job.error) : null;
+  const retryIsFutile = remedy === "replace" || remedy === "attach";
 
+  // A row in flight — the poll keeps reading it, a stalled one included, so
+  // a run the worker picks up again is seen.
   const active = isActive(job?.status);
+  // A run actually under way: a stalled one is not, so nothing below says
+  // "in progress", draws a skeleton or holds Replace OM back for it.
+  const live = active && !stalled;
   // Why any result below is the previous screen's: a failed run never
-  // reached it, or the run in progress has not yet (lib/screen-run).
-  const staleWhy: "failed" | "running" = job?.status === "error" ? "failed" : "running";
+  // reached it, the run in progress has not yet, or the run stopped making
+  // progress before it (lib/screen-run).
+  const staleWhy: BehindWhy = job?.status === "error" ? "failed" : stalled ? "stalled" : "running";
   // A screen, not a side job, is under way: the rail's "Step N of 6" is the
   // progress cue, and the overview's own count of results stands down.
-  const screening = active && !SIDE_JOBS.has(job?.step ?? "");
+  const screening = live && !SIDE_JOBS.has(job?.step ?? "");
+  // The latest screen stopped before its end (lib/screen-run): an empty
+  // section then points at the reason at the top of the page, rather than
+  // saying the screen "hasn't run" with a second button for the one there.
+  const stopped = screenStopped(job);
 
   // Poll the lightweight status endpoint while a run is in flight. When the
   // step changes (or the run ends), pull the freshly-written section data.
@@ -492,16 +561,18 @@ export function DealView({
         const stepChanged = data.step !== lastStep.current;
         const endedStep = data.step ?? lastStep.current;
         lastStep.current = data.step;
-        setJob(data);
-        // Detect a stalled run: still active but its row hasn't been written in
-        // the stale window (the background process likely died).
-        const isRunning = data.status === "running" || data.status === "queued";
-        const nowStalled =
-          isRunning && !!data.updated_at && Date.now() - Date.parse(data.updated_at) > STALL_MS;
-        setStalled(nowStalled);
+        // The row's age as the server measured it (the status route), for
+        // the stall rule (lib/screen-run `isStalled`) — never this browser's
+        // clock against the database's timestamp, which may run fast.
+        const next: NonNullable<Job> = {
+          ...data,
+          ageMs: typeof data.ageMs === "number" && Number.isFinite(data.ageMs) ? data.ageMs : null,
+        };
+        setJob(next);
         // The header was drawn while the run was reading: a figure not read
         // yet shimmered. A run that stalls is reading nothing, so the page is
         // drawn again once, and a missing figure takes its dash.
+        const nowStalled = isStalled(next);
         if (nowStalled && !wasStalled.current) router.refresh();
         wasStalled.current = nowStalled;
 
@@ -513,7 +584,8 @@ export function DealView({
         ) {
           notified.current = true;
           if (data.status === "error") {
-            toast("The screen hit a problem — open the deal for details.", "error");
+            // The reader is on the deal: the reason is in the banner above.
+            toast("The screen stopped — the reason is at the top of this page.", "error");
           } else {
             toast(completionMessage(endedStep), "success");
           }
@@ -622,24 +694,28 @@ export function DealView({
     syncUrl("analyses", key);
   }
 
-  /** Jump links from Overview still use the old keys — map and go. */
+  /** Jump links from Overview still use the old keys — map and go. The
+   *  link that was pressed leaves the page with the section it lived in, so
+   *  focus moves to the tab now open rather than dropping to the page,
+   *  where a screen reader says nothing (research pass 33). */
   function navigateLegacy(key: string) {
     const target = LEGACY_TABS[key];
     if (!target) return;
     if (target.analysis) selectAnalysis(target.analysis);
     else selectSection(target.section);
+    requestAnimationFrame(() => document.getElementById(`tab-${target.section}`)?.focus());
   }
 
   function sectionState(
     key: SectionKey,
   ): "done" | "running" | "pending" | "idle" {
     const steps = SECTION_STEPS[key];
-    if (active && job?.step && steps.includes(job.step)) return "running";
+    if (live && job?.step && steps.includes(job.step)) return "running";
     switch (key) {
       case "overview":
         return results.verdict || results.extraction
           ? "done"
-          : active
+          : live
             ? "running"
             : "idle";
       case "financials":
@@ -659,7 +735,7 @@ export function DealView({
       case "documents":
         return "idle";
     }
-    if (active && steps.length) {
+    if (live && steps.length) {
       const cur = PIPELINE.indexOf(job?.step ?? "");
       const first = PIPELINE.indexOf(steps[0]);
       if (first >= 0 && (cur < 0 || first > cur)) return "pending";
@@ -726,9 +802,9 @@ export function DealView({
 
   return (
     <div className="flex flex-col gap-5">
-      {active && !stalled && (
+      {live && (
         <div className="flex flex-col gap-2">
-          <ProgressRail job={job!} typicalScreen={typicalScreen} />
+          <ProgressRail job={job!} typicalScreen={typicalScreen} typicalScreenMs={typicalScreenMs} />
           <NotifyOffer />
         </div>
       )}
@@ -763,18 +839,45 @@ export function DealView({
             {staleResults.length > 0
               ? "The results it did not reach still show below, marked as the previous screen's. "
               : "Nothing was lost. "}
-            {operatorFailure ? "Email" : "If it fails twice, email"}{" "}
+            {/* "The same file" only where there is one: a deal with no file
+                attached is asked to attach one (the batch-2 audit). */}
+            {remedy === "attach"
+              ? "Attach the OM to screen this deal. "
+              : retryIsFutile
+                ? "Trying again would read the same file the same way. "
+                : ""}
+            {operatorFailure
+              ? "Email"
+              : remedy === "attach"
+                ? "If it does not screen, email"
+                : retryIsFutile
+                  ? "If this is the right file, email"
+                  : "If it fails twice, email"}{" "}
             <a
               className="font-medium text-brand hover:text-brand-strong"
-              href="mailto:underwritecopilot.support@gmail.com"
+              // The deal and the page's own sentence ride in the email, so
+              // support need not ask for either (research pass 30).
+              href={supportMailto({ dealId, dealName, step: job.step, error: job.error })}
             >
               underwritecopilot.support@gmail.com
             </a>{" "}
             {operatorFailure ? "and we\u2019ll fix it on our side." : "and we\u2019ll dig in."}
           </p>
           {/* A failure on our side (lib/anthropic/operator-failures) says a
-              retry will not help; no button offers one beneath it. */}
-          {!operatorFailure && <RetryForm dealId={dealId} label="Try again" />}
+              retry will not help; no button offers one beneath it. A failure
+              in the document offers the Documents tab's own action — another
+              file in its place — and a retry only beside it, where the
+              failure may yet pass (lib/anthropic/document-failures). */}
+          {operatorFailure ? null : remedy ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2" data-qa="document-failure">
+              <ReplaceOm dealId={dealId} disabled={false} attach={remedy === "attach" || !hasOm} prominent />
+              {remedy === "replace_or_retry" && (
+                <RetryForm dealId={dealId} label="Try again" className="" secondary />
+              )}
+            </div>
+          ) : (
+            <RetryForm dealId={dealId} label="Try again" />
+          )}
         </div>
       )}
 
@@ -812,6 +915,9 @@ export function DealView({
               >
                 <TabDot state={state} active={isActiveTab} />
                 {t.label}
+                {/* The dot's colour says a section is being worked on; so do
+                    words, to a screen reader (research pass 33). */}
+                {state === "running" ? <span className="sr-only">, running</span> : null}
                 {count > 0 && (
                   <span
                     title={`${count} finding${count === 1 ? "" : "s"}`}
@@ -820,6 +926,9 @@ export function DealView({
                     }`}
                   >
                     {count}
+                    {/* What the figure counts, said: it had been in a title
+                        only (research pass 33). */}
+                    <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
                   </span>
                 )}
               </button>
@@ -838,7 +947,7 @@ export function DealView({
       >
         {section === "overview" && (
           <div className="flex flex-col gap-6">
-            {isSample && <SampleGuide />}
+            {isSample && <SampleGuide onNavigate={navigateLegacy} />}
             {screenDiff && <SinceLastScreen diff={screenDiff} />}
             {discrepancies && discrepancies.discrepancies.length > 0 && (
               <ReconciliationPanel dealId={dealId} result={discrepancies} />
@@ -848,7 +957,7 @@ export function DealView({
             {/* Feature 1: prompt for the actuals docs. Hidden while a screen
                 runs, on the sample, and once both docs are folded in. */}
             {(() => {
-              if (active || isSample || !hasOm) return null;
+              if (live || isSample || !hasOm) return null;
               const slot = (
                 kind: "rent_roll" | "t12",
                 stored: boolean,
@@ -867,11 +976,12 @@ export function DealView({
             })()}
             <OverviewView
               results={results}
-              active={active}
+              active={live}
               screening={screening}
               onNavigate={navigateLegacy}
               stale={staleResults}
               staleWhy={staleWhy}
+              stopped={stopped != null}
             />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
@@ -881,6 +991,7 @@ export function DealView({
                 assignees={taskAssignees}
                 todayIso={todayIso}
                 verdictSteps={results.verdict?.nextSteps}
+                ddChecklist={ddChecklist}
               />
             )}
             <AskPanel
@@ -891,13 +1002,17 @@ export function DealView({
               isPro={isPro}
               omUrl={omUrl}
               askers={askerNames ? { me: userId, names: askerNames } : null}
+              starters={askStarters(results.challenges?.challenges, qa)}
             />
+            <DealOutcomeCard dealId={dealId} stage={dealStage} history={stageHistory} names={askerNames} />
             <DecisionLog
               dealId={dealId}
               notes={notes}
               stageHistory={stageHistory}
               userEmail={userEmail}
               userId={userId}
+              names={askerNames}
+              isSample={isSample}
             />
           </div>
         )}
@@ -905,17 +1020,21 @@ export function DealView({
         {section === "financials" && (
           <FinancialsPanel
             results={results}
-            active={active}
+            active={live}
+            stopped={stopped != null}
             step={job?.step ?? null}
             hasOm={hasOm}
             dealId={dealId}
             model={model}
             documents={documents}
             isPro={isPro}
+            downloadsOpen={downloadsOpen}
             supplement={supplements["terms"]}
             facts={facts}
             omUrl={omUrl}
             underwrite={playground?.inputs ?? null}
+            underwriteSources={playground?.sources ?? null}
+            dealStrategy={dealStrategy}
             rateSeeds={rateSeeds}
             modelVsMarket={modelVsMarket}
             assumable={assumable}
@@ -934,7 +1053,8 @@ export function DealView({
             onSelect={selectAnalysis}
             counts={analysisCounts}
             results={results}
-            active={active}
+            active={live}
+            stopped={stopped != null}
             step={job?.step ?? null}
             dealId={dealId}
             dealName={dealName}
@@ -944,17 +1064,22 @@ export function DealView({
             modelError={modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null}
             supplements={supplements}
             internalComps={internalComps}
+            internalCompsUnread={internalCompsUnread}
             omUrl={omUrl}
             marketSince={marketSince}
             metroDemand={metroDemand}
+            isSample={isSample}
             staleVerdict={staleResults.includes("verdict")}
             staleWhy={staleWhy}
+            compsSubjectPoint={compsSubjectPoint}
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
               inferStrategy(results.extraction, firstSignal).kind,
               screenYearOf(results.extraction),
               interestOf(results.extraction),
               results.extraction?.assetClass,
+              // A bulk condominium purchase's units offered (research pass 38).
+              condoUnitsOffered(results.extraction),
             )}
           />
         )}
@@ -965,11 +1090,11 @@ export function DealView({
               dealId={dealId}
               hasOm={hasOm}
               omUrl={omUrl}
-              canMemo={isPro && !!results.verdict}
+              canMemo={downloadsOpen && !!results.verdict}
               hasVerdict={!!results.verdict}
               documents={documents}
               supplements={supplements}
-              active={active}
+              active={live}
               manualFacts={
                 // Typed-facts deal = no OM, not the sample. Samples have no
                 // OM either but are static demo data — never editable.
@@ -977,6 +1102,10 @@ export function DealView({
                   ? factsFromExtraction(results.extraction, dealName)
                   : null
               }
+              // The sample's rent roll and T-12, as the Overview's actuals
+              // card reads them: listed here too, with no file to open.
+              isSample={isSample}
+              actuals={actuals}
             />
             {!isSample && (
               <LoiPanel
@@ -997,21 +1126,31 @@ export function DealView({
 /* Section panels                                                      */
 /* ------------------------------------------------------------------ */
 
+/** An empty section after the latest screen stopped before it: the reason
+ *  and its action are at the top of the page, so the section says so and
+ *  offers no second button (research pass 30). */
+const STOPPED_BEFORE =
+  "The last screen stopped before this step — the reason is at the top of the page.";
+
 /** Financials: the extracted terms first; the Excel model workflow lives in a
  *  collapsed block below — supporting detail, one click away. */
 function FinancialsPanel({
   results,
   active,
+  stopped = false,
   step,
   hasOm,
   dealId,
   model,
   documents,
   isPro,
+  downloadsOpen = isPro,
   supplement,
   facts = {},
   omUrl = null,
   underwrite = null,
+  underwriteSources = null,
+  dealStrategy = null,
   rateSeeds = null,
   modelVsMarket = null,
   assumable = null,
@@ -1022,16 +1161,23 @@ function FinancialsPanel({
 }: {
   results: Results;
   active: boolean;
+  /** the latest screen stopped before its end (lib/screen-run) */
+  stopped?: boolean;
   step: string | null;
   hasOm: boolean;
   dealId: string;
   model: UnderwritingModel | null;
   documents: DealDocument[];
   isPro: boolean;
+  /** the workbook download: Pro, or the reader's own sample deal
+   *  (lib/sample-exports) */
+  downloadsOpen?: boolean;
   supplement: TabSupplement | undefined;
   facts?: Record<string, DealFact>;
   omUrl?: string | null;
   underwrite?: UnderwriteInputs | null;
+  underwriteSources?: PlaygroundData["sources"];
+  dealStrategy?: DealStrategy | null;
   rateSeeds?: DealRateSeeds | null;
   modelVsMarket?: ModelVsMarket | null;
   assumable?: AssumableView | null;
@@ -1049,6 +1195,8 @@ function FinancialsPanel({
         <TermsView result={results.extraction} facts={facts} omUrl={omUrl} />
       ) : active && (step === "extract" || step === "signal") ? (
         <StatGridSkeleton />
+      ) : hasOm && stopped ? (
+        <EmptyState title={STOPPED_BEFORE} />
       ) : hasOm ? (
         <EmptyState
           title="The screen hasn’t run for this deal yet."
@@ -1064,7 +1212,9 @@ function FinancialsPanel({
         model={model}
         extraction={results.extraction}
         underwrite={underwrite}
+        underwriteSources={underwriteSources ?? null}
         rateSeeds={rateSeeds}
+        strategy={dealStrategy}
       />
 
       {/* The seller's loan, where the memorandum offers it for assumption:
@@ -1109,6 +1259,7 @@ function FinancialsPanel({
             documents={documents}
             active={active}
             isPro={isPro}
+            downloadsOpen={downloadsOpen}
             isSample={isSample}
             interest={modelInterest}
           />
@@ -1117,87 +1268,6 @@ function FinancialsPanel({
 
       {supplement && <Supplements dealId={dealId} tab="terms" data={supplement} />}
       <AddData dealId={dealId} tab="terms" />
-    </div>
-  );
-}
-
-const MANDATE_META: Record<
-  MandateVerdict,
-  { label: string; text: string; bar: string; chip: string }
-> = {
-  PURSUE: { label: "Pursue", text: "text-pass", bar: "bg-pass", chip: "bg-pass/15 text-pass" },
-  WATCH: { label: "Watch", text: "text-caution", bar: "bg-caution", chip: "bg-caution/15 text-caution" },
-  PASS: { label: "Pass", text: "text-kill", bar: "bg-kill", chip: "bg-kill/15 text-kill" },
-};
-
-/** The 0–100 mandate-fit score as a headline gauge: the number, the
- *  PURSUE/WATCH/PASS call, a bar with the 50/75 verdict thresholds marked, and
- *  the honest coverage line (what was scored, what's still pending). */
-function MandateScoreHeader({
-  mandate,
-  unscored,
-  outsideOn = [],
-}: {
-  mandate: MandateScore;
-  /** buy-box criteria that are checked (below) but not part of the fit score */
-  unscored: string[];
-  /** criteria the deal misses outright — the header's chip reads "Outside
-   *  box" on any of them, whatever the score's call */
-  outsideOn?: string[];
-}) {
-  const score = mandate.score!;
-  const meta = MANDATE_META[mandate.verdict!];
-  const scored = mandate.dimensions.filter((d) => d.status !== "unknown").length;
-  const pending = mandate.dimensions.length - scored;
-
-  return (
-    <div className="mt-3 rounded-xl border border-line bg-faint/60 p-4">
-      <div className="flex items-center gap-4">
-        <div className="flex items-baseline gap-1">
-          <span className={`text-4xl font-semibold tabular-nums tracking-tight ${meta.text}`}>
-            {score}
-          </span>
-          <span className="text-sm text-muted">/ 100</span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${meta.chip}`}
-            >
-              {meta.label}
-            </span>
-            <span className="text-xs text-muted">mandate fit</span>
-          </div>
-          {/* The bar, with the WATCH (50) and PURSUE (75) thresholds ticked. */}
-          <div className="relative mt-2 h-2 w-full overflow-hidden rounded-full bg-line">
-            <div
-              className={`h-full rounded-full ${meta.bar}`}
-              style={{ width: `${score}%` }}
-            />
-            <span className="absolute inset-y-0 left-[50%] w-px bg-surface/70" aria-hidden />
-            <span className="absolute inset-y-0 left-[75%] w-px bg-surface/70" aria-hidden />
-          </div>
-        </div>
-      </div>
-      <p className="mt-2.5 text-xs leading-relaxed text-muted">
-        {mandate.dealbreakerTripped ? (
-          <span className="font-medium text-kill">
-            A hard dealbreaker was tripped — capped at Pass regardless of the rest.{" "}
-          </span>
-        ) : null}
-        Scored on {scored} of {mandate.dimensions.length} mandate dimension
-        {mandate.dimensions.length === 1 ? "" : "s"}
-        {pending > 0 ? `, ${pending} pending more data` : ""}.
-        {unscored.length
-          ? ` ${unscored.join(" and ")} ${unscored.length > 1 ? "are" : "is"} checked below but not part of the fit score.`
-          : ""}
-        {mandate.unresolvedDealbreakers > 0 && !mandate.dealbreakerTripped
-          ? ` ${mandate.unresolvedDealbreakers} dealbreaker${mandate.unresolvedDealbreakers > 1 ? "s" : ""} couldn't be checked — verify manually.`
-          : ""}
-        {outsideOn.length > 0 && mandate.verdict !== "PASS"
-          ? ` It misses the box outright on ${outsideOn.join(" and ")}, so the deal's chip reads Outside box whatever the score's call.`
-          : ""}
-      </p>
     </div>
   );
 }
@@ -1245,127 +1315,6 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
   );
 }
 
-/** The mandate check, full detail — the bar carries only the chip. */
-// Exported so the public sample screen (/demo) can render the SAME panel a
-// logged-in user gets, driven by a fixture box.
-export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
-  if (!data.hasBox) {
-    return (
-      <EmptyState
-        title="No buy box set yet."
-        action={
-          <Link
-            href="/criteria"
-            className="mt-3 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-          >
-            Set your buy box
-          </Link>
-        }
-      />
-    );
-  }
-  if (!data.checks.length) {
-    return (
-      <EmptyState title="The screen hasn’t produced anything to check against your mandate yet." />
-    );
-  }
-  return (
-    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold tracking-tight">
-            The deal against your mandate
-          </h2>
-          <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
-            {data.scope === "team" ? "Team" : "Personal"}
-          </span>
-          {data.provisional && (
-            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
-              First read
-            </span>
-          )}
-        </div>
-        <Link
-          href="/criteria"
-          className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
-        >
-          Edit criteria →
-        </Link>
-      </div>
-      {data.mandate?.score != null && data.mandate.verdict && (
-        <MandateScoreHeader
-          mandate={data.mandate}
-          // Criteria the fold checks below but the 0–100 score doesn't weigh.
-          // The basis check wears the deal's noun ("Basis / key" on a hotel),
-          // so it is matched by its prefix, never by one spelling.
-          unscored={data.checks
-            .filter((c) => c.label === "Price" || c.label.startsWith("Basis / "))
-            .map((c) => (c.label === "Price" ? "price" : c.label.toLowerCase()))}
-          // The criteria the deal misses outright: the header's chip folds
-          // every check and reads "Outside box" on any of them (lib/buy-box-
-          // chip), so the gauge says why it differs from its own call.
-          outsideOn={data.checks.filter((c) => c.status === "miss").map((c) => c.label.toLowerCase())}
-        />
-      )}
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {data.checks.map((c) => (
-          <div
-            key={c.label}
-            className={`rounded-lg border p-3 ${
-              c.status === "miss"
-                ? "border-kill/25 bg-kill/[0.04]"
-                : c.status === "near"
-                  ? "border-caution/30 bg-caution/[0.05]"
-                  : c.status === "pass"
-                    ? "border-line bg-surface"
-                    : "border-line bg-faint"
-            }`}
-          >
-            <p className="flex items-center gap-1.5 text-xs font-medium">
-              <span
-                aria-hidden
-                className={
-                  c.status === "miss"
-                    ? "text-kill"
-                    : c.status === "near"
-                      ? "text-caution"
-                      : c.status === "pass"
-                        ? "text-pass"
-                        : "text-muted"
-                }
-              >
-                {c.status === "miss"
-                  ? "✕"
-                  : c.status === "near"
-                    ? "≈"
-                    : c.status === "pass"
-                      ? "✓"
-                      : "—"}
-              </span>
-              {c.label}
-              {c.status === "near" && (
-                <span className="rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-caution">
-                  Near miss
-                </span>
-              )}
-              <span className="sr-only">
-                {c.status === "miss"
-                  ? "outside the mandate"
-                  : c.status === "near"
-                    ? "a near-miss against the mandate"
-                    : c.status === "pass"
-                      ? "inside the mandate"
-                      : "not determinable yet"}
-              </span>
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">{c.detail}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 /** Analyses: secondary pill nav over the five analysis views — verdict first,
  *  then the critique behind it. One at a time here too. */
 function AnalysesPanel({
@@ -1374,6 +1323,7 @@ function AnalysesPanel({
   counts,
   results,
   active,
+  stopped = false,
   step,
   dealId,
   dealName,
@@ -1383,18 +1333,23 @@ function AnalysesPanel({
   modelError,
   supplements,
   internalComps,
+  internalCompsUnread = false,
   omUrl,
   staleVerdict = false,
   staleWhy = "failed",
   compSubject = null,
+  compsSubjectPoint = null,
   marketSince = null,
   metroDemand = null,
+  isSample = false,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
   counts: Record<AnalysisKey, number>;
   results: Results;
   active: boolean;
+  /** the latest screen stopped before its end (lib/screen-run) */
+  stopped?: boolean;
   step: string | null;
   dealId: string;
   dealName: string;
@@ -1404,18 +1359,26 @@ function AnalysesPanel({
   modelError: string | null;
   supplements: SupplementsMap;
   internalComps: InternalComp[];
+  /** the read of the reader's other screens failed: said, never as none */
+  internalCompsUnread?: boolean;
   omUrl: string | null;
   /** the latest screen has not re-run the verdict (lib/screen-run) */
   staleVerdict?: boolean;
-  /** why: that screen failed before the verdict, or is still running */
-  staleWhy?: "failed" | "running";
+  /** why: that screen failed before the verdict, is still running, or
+   *  stopped making progress on the way */
+  staleWhy?: BehindWhy;
   /** the subject's own basis, read where the first signal is in scope, so
    *  the comps table's tick and the deal header agree on the deal's kind */
   compSubject?: SubjectBasis | null;
+  /** the deal's resolved location, which the comps map measures from */
+  compsSubjectPoint?: SubjectPoint | null;
   /** what moved since the market check read its figures (lib/brief-delta) */
   marketSince?: BriefDelta | null;
   /** the metro area's payrolls by sector today (lib/metro-demand) */
   metroDemand?: MetroDemand | null;
+  /** the sample deal: its stress test is the first-draft model's run, and
+   *  the challenger's heading says so (lib/stress-test-title) */
+  isSample?: boolean;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -1441,6 +1404,14 @@ function AnalysesPanel({
           it's useful even before this deal's own comps scrutiny has run. */}
       {analysis === "comps" && internalComps.length > 0 && (
         <InternalCompsBlock comps={internalComps} />
+      )}
+      {analysis === "comps" && internalComps.length === 0 && internalCompsUnread && (
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-card" data-qa="internal-comps-unread">
+          <h2 className="text-sm font-semibold tracking-tight">From your pipeline</h2>
+          <p className="mt-1 text-sm text-caution" role="status">
+            Couldn&rsquo;t read your other screens just now, so none are listed here; reload the page to try again.
+          </p>
+        </section>
       )}
       {supp && <Supplements dealId={dealId} tab={analysis} data={supp} />}
       <AddData dealId={dealId} tab={analysis} />
@@ -1475,6 +1446,7 @@ function AnalysesPanel({
           result={results.challenges!}
           dealName={dealName}
           totalPages={results.extraction?.totalPages ?? null}
+          sample={isSample}
         />
       ) : analysis === "comps" ? (
         <BrokerComps
@@ -1486,11 +1458,15 @@ function AnalysesPanel({
           subject={compSubject}
           noun={assetWords(results.extraction?.assetClass).noun?.one}
           mapContext={{
-            subjectLabel:
-              results.extraction?.address || results.extraction?.market || "",
+            // The street address only: a market's name geocodes to a
+            // city's centre, which the map must never star as the subject.
+            subjectLabel: results.extraction?.address || "",
             market: results.extraction?.market ?? "",
             omUrl,
             totalPages: results.extraction?.totalPages ?? null,
+            subjectPoint: compsSubjectPoint,
+            // The sample's comps are fictional: none is geocoded or pinned.
+            sample: isSample,
           }}
         />
       ) : (
@@ -1503,6 +1479,8 @@ function AnalysesPanel({
     content = (
       <EmptyState title="The OM offered no comps to scrutinize — add your own below, or search the public web." />
     );
+  } else if (hasOm && stopped) {
+    content = <EmptyState title={STOPPED_BEFORE} />;
   } else if (hasOm) {
     content = (
       <EmptyState
@@ -1518,9 +1496,22 @@ function AnalysesPanel({
 
   return (
     <div className="flex flex-col gap-5">
+      {/* The tabs pattern the deal's own sections use: arrow keys, Home and
+          End move through them, one tab stop, each tied to the panel it
+          opens — they had been tabs in name only (research pass 33). */}
       <div
         role="tablist"
         aria-label="Analyses"
+        onKeyDown={(e) => {
+          const at = ANALYSES.findIndex((a) => a.key === analysis);
+          const n = ANALYSES.length;
+          const next =
+            e.key === "ArrowRight" ? (at + 1) % n : e.key === "ArrowLeft" ? (at - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+          if (next < 0) return;
+          e.preventDefault();
+          onSelect(ANALYSES[next].key);
+          document.getElementById(`analysis-tab-${ANALYSES[next].key}`)?.focus();
+        }}
         className="flex flex-wrap gap-1.5"
       >
         {ANALYSES.map((a) => {
@@ -1529,9 +1520,12 @@ function AnalysesPanel({
           return (
             <button
               key={a.key}
+              id={`analysis-tab-${a.key}`}
               type="button"
               role="tab"
               aria-selected={on}
+              aria-controls="analysis-tabpanel"
+              tabIndex={on ? 0 : -1}
               onClick={() => onSelect(a.key)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 on
@@ -1545,13 +1539,20 @@ function AnalysesPanel({
               {counts[a.key] > 0 && (
                 <span className="rounded-full bg-kill/10 px-1.5 py-px font-mono text-[10px] tabular-nums text-kill">
                   {counts[a.key]}
+                  <span className="sr-only">{` finding${counts[a.key] === 1 ? "" : "s"}`}</span>
                 </span>
               )}
             </button>
           );
         })}
       </div>
-      <div key={analysis} className="animate-fade flex flex-col gap-6">
+      <div
+        key={analysis}
+        id="analysis-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`analysis-tab-${analysis}`}
+        className="animate-fade flex flex-col gap-6"
+      >
         {content}
         {footer}
       </div>
@@ -1573,6 +1574,8 @@ function DocumentsPanel({
   supplements,
   active,
   manualFacts,
+  isSample = false,
+  actuals = null,
 }: {
   dealId: string;
   hasOm: boolean;
@@ -1585,16 +1588,11 @@ function DocumentsPanel({
   /** set only for a typed-facts deal (no OM, not the sample) — enables the
    *  attach-OM button and the edit-facts panel */
   manualFacts: ManualDealFacts | null;
+  /** the sample deal: its rent roll and T-12 are listed as the Overview's
+   *  actuals card reads them, with no file to open */
+  isSample?: boolean;
+  actuals?: Pick<ActualsData, "rentRoll" | "t12"> | null;
 }) {
-  const KIND_LABEL: Record<string, string> = {
-    om: "Offering memorandum",
-    rent_roll: "Rent roll",
-    t12: "T-12",
-    financials: "Financials",
-    loan_terms: "Loan terms",
-    bov: "BOV",
-    other: "Document",
-  };
   const SUPP_LABEL: Record<string, string> = {
     terms: "Financials",
     challenger: "Challenger",
@@ -1610,97 +1608,29 @@ function DocumentsPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
-        <h2 className="text-sm font-semibold tracking-tight">Source documents</h2>
-        <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
-          <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
-            <span className="min-w-0 flex-1 truncate font-medium">
-              Offering memorandum
-            </span>
-            {omUrl && (
-              <a
-                href={omUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Opens the uploaded OM"
-                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-              >
-                View
-              </a>
-            )}
+      <SourceDocumentsView
+        data={{
+          dealId,
+          hasOm,
+          omUrl,
+          sample: isSample,
+          typedFacts: !!manualFacts,
+          documents,
+          sampleActuals: isSample ? actuals : null,
+          memo: !hasVerdict ? null : canMemo ? { href: `/api/deals/${dealId}/memo` } : { upsell: "/billing" },
+        }}
+        omPicture={<DealAvatar dealId={dealId} size="md" />}
+        omActions={
+          <>
             {hasOm && <ReplaceOm dealId={dealId} disabled={active} />}
             {!hasOm && manualFacts && (
               // A manual deal — the OM can arrive later and upgrades the
               // screen to the full document analysis.
               <ReplaceOm dealId={dealId} disabled={active} attach />
             )}
-            {!hasOm && !manualFacts && (
-              <span className="text-xs text-muted">none uploaded</span>
-            )}
-          </li>
-          {manualFacts && (
-            <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
-              <span className="min-w-0 flex-1 truncate font-medium">
-                Typed deal facts
-              </span>
-              <span className="text-xs text-muted">
-                entered by hand — the screen runs on these
-              </span>
-            </li>
-          )}
-          {documents.map((d) => {
-            // Signed when it is clicked (app/api/deals/[id]/file), so a page
-            // left open never hands over an expired link.
-            const href = dealFileLinkFor(dealId, d.storage_path);
-            // A PDF or an image opens in the browser; anything else — a rent
-            // roll's spreadsheet — is stored to download (lib/inline-types).
-            const opens = d.content_type
-              ? servedInline(d.content_type)
-              : /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.filename);
-            return (
-              <li
-                key={d.id}
-                className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
-              >
-                <span className="min-w-0 flex-1 truncate">{d.filename}</span>
-                <span className="shrink-0 text-xs text-muted">
-                  {KIND_LABEL[d.kind] ?? DOC_KIND_LABEL[d.kind] ?? d.kind}
-                </span>
-                {href && (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={opens ? `Opens ${d.filename}` : `Downloads ${d.filename}`}
-                    aria-label={`${opens ? "View" : "Download"} ${d.filename}`}
-                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-                  >
-                    {opens ? "View" : "Download"}
-                  </a>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        {hasVerdict && (
-          <div className="mt-3">
-            {canMemo ? (
-              <a
-                href={`/api/deals/${dealId}/memo`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-              >
-                Download the IC memo (PDF)
-              </a>
-            ) : (
-              <Link
-                href="/billing"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-3 py-1.5 text-xs font-medium text-caution transition-colors hover:bg-caution/10"
-              >
-                Upgrade for the PDF memo
-              </Link>
-            )}
-          </div>
-        )}
+          </>
+        }
+      >
         {manualFacts && (
           <details className="group mt-3 rounded-lg border border-line">
             <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-medium transition-colors hover:bg-faint">
@@ -1719,7 +1649,7 @@ function DocumentsPanel({
             </div>
           </details>
         )}
-      </section>
+      </SourceDocumentsView>
 
       {suppEntries.length > 0 && (
         <section className="flex flex-col gap-4">
@@ -1755,18 +1685,19 @@ function TabDot({
 }) {
   const base = "h-1.5 w-1.5 rounded-full";
   if (state === "done") {
-    return <span className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
+    return <span aria-hidden className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
   }
   if (state === "running") {
     return (
-      <span className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`} />
+      <span aria-hidden className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`} />
     );
   }
   if (state === "pending") {
-    return <span className={`${base} ${active ? "bg-white/50" : "bg-line"}`} />;
+    return <span aria-hidden className={`${base} ${active ? "bg-white/50" : "bg-line"}`} />;
   }
   return (
     <span
+      aria-hidden
       className={`${base} ${
         active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"
       }`}
@@ -1781,7 +1712,7 @@ function TabDot({
  *  number, so a long step never reads as "hung" the way a frozen
  *  percentage does. The clock is read in the effect, never in render,
  *  so the server's markup and the first client render agree. */
-function useElapsed(startedAt: string | null | undefined): string {
+function useElapsed(startedAt: string | null | undefined): { label: string; ms: number } {
   const [clock, setClock] = useState<{ since: number; now: number } | null>(null);
   useEffect(() => {
     const since = Date.now();
@@ -1793,15 +1724,17 @@ function useElapsed(startedAt: string | null | undefined): string {
       clearInterval(t);
     };
   }, []);
-  return clock ? elapsedLabel(runStartMs(startedAt, clock.since), clock.now) : "0:00";
+  if (!clock) return { label: "0:00", ms: 0 };
+  const start = runStartMs(startedAt, clock.since);
+  return { label: elapsedLabel(start, clock.now), ms: Math.max(0, clock.now - start) };
 }
 
 /** Where the deal has been: every stage change with its date, newest first.
  *  Simple by design — a paper trail, not a timeline visualization. */
 
 const COMP_CALL: Record<string, { label: string; cls: string }> = {
-  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/10 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/10 text-caution" },
   pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 };
 
@@ -1814,9 +1747,12 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
       <h2 className="text-sm font-semibold tracking-tight">
         From your pipeline
       </h2>
-      <p className="mt-1 text-sm text-muted">
-        Same asset class, as extracted from each OM you&rsquo;ve screened —
-        your own frame of reference, not third-party comp data.
+      <p className="mt-1 text-sm text-muted" data-qa="internal-comps-lead">
+        {internalCompsLead(
+          comps.length,
+          comps.some((c) => c.teammate),
+          comps.some((c) => c.typedByHand),
+        )}
       </p>
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">
@@ -1824,7 +1760,11 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
             <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
               <th className="py-1.5 pr-3 font-medium">Deal</th>
               <th className="py-1.5 pr-3 font-medium">Screened</th>
-              <th className="py-1.5 pr-3 text-right font-medium">Price</th>
+              {/* Each figure is a memorandum's asking price, never a price
+                  anyone paid (the deal page's "at the ask" rule). */}
+              <th className="py-1.5 pr-3 text-right font-medium" title="The memorandum's asking price, not a sale price">
+                Ask
+              </th>
               <th className="py-1.5 pr-3 text-right font-medium">Cap</th>
               <th className="py-1.5 pr-3 text-right font-medium">Basis</th>
               <th className="py-1.5 text-right font-medium">Call</th>
@@ -1873,13 +1813,20 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
                     {c.priceLabel ?? <span className="text-line">—</span>}
+                    {/* A trade someone reported once the deal ended, its own
+                        figure under the ask — never pooled with it. */}
+                    {c.tradedLabel ? (
+                      <span className="block text-[10px] text-muted" title={c.tradedTitle ?? undefined}>
+                        traded {c.tradedLabel} (reported)
+                      </span>
+                    ) : null}
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
                     {c.capLabel ??
                       (c.yieldOnCostLabel ? (
                         <span
                           className="text-brand"
-                          title="Yield on cost — a plan deal has no going-in cap; this is its stabilized NOI over total cost"
+                          title={PLAN_YOC_TITLE}
                         >
                           {c.yieldOnCostLabel}
                           <span className="ml-0.5 font-sans text-[9px] font-medium uppercase">
@@ -1922,7 +1869,11 @@ function DealErrorBanner({ message }: { message: string }) {
   if (!shown) return null;
   return (
     <div className="flex items-start gap-3 rounded-xl border border-kill/30 bg-kill/5 p-4">
-      <p className="flex-1 text-sm font-medium text-kill">{message}</p>
+      {/* An alert: it arrives after an action, through the address bar, and
+          was said to no one (research pass 33). */}
+      <p role="alert" className="flex-1 text-sm font-medium text-kill">
+        {message}
+      </p>
       <button
         type="button"
         aria-label="Dismiss"
@@ -1932,7 +1883,7 @@ function DealErrorBanner({ message }: { message: string }) {
           url.searchParams.delete("error");
           window.history.replaceState(null, "", url);
         }}
-        className="shrink-0 rounded-md p-1 text-kill/70 transition-colors hover:bg-kill/10 hover:text-kill"
+        className="shrink-0 rounded-md p-1 text-kill transition-colors hover:bg-kill/10"
       >
         <svg
           viewBox="0 0 24 24"
@@ -1999,13 +1950,19 @@ function NotifyOffer() {
 function ProgressRail({
   job,
   typicalScreen = null,
+  typicalScreenMs = null,
 }: {
   job: NonNullable<Job>;
   /** the reader's own screens' measured median, said — or null, and no
    *  duration is claimed (lib/screen-duration) */
   typicalScreen?: string | null;
+  /** the same median in ms (lib/screen-duration `longerThanUsual`) */
+  typicalScreenMs?: number | null;
 }) {
-  const elapsed = useElapsed(job.created_at);
+  const { label: elapsed, ms: elapsedMs } = useElapsed(job.created_at);
+  // Past twice the reader's own measured median — never a duration nobody
+  // measured — the rail says this run is the slow one.
+  const slow = longerThanUsual(elapsedMs, typicalScreenMs);
 
   // Reconcile and model generation run on their own — a simple indicator, not
   // the 6-step pipeline rail.
@@ -2014,9 +1971,9 @@ function ProgressRail({
       <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
         <div className="flex items-center gap-3">
           <Spinner />
-          <span className="text-sm">
+          <span role="status" className="text-sm">
             {job.status === "queued"
-              ? "Queued — waiting for an open analyst slot…"
+              ? QUEUED_LABEL
               : (STEP_LABELS[job.step ?? ""] ?? "Working…")}
           </span>
           <span className="ml-auto font-mono text-xs tabular-nums text-muted">
@@ -2045,9 +2002,11 @@ function ProgressRail({
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex items-center gap-3">
         <Spinner />
-        <span className="text-sm">
+        {/* The step is the live status, said as it changes; the clock stays
+            outside it, or a screen reader would read every second. */}
+        <span role="status" className="text-sm">
           {job.status === "queued"
-            ? "Queued — waiting for an open analyst slot…"
+            ? QUEUED_LABEL
             : (STEP_LABELS[job.step ?? ""] ?? "Analyzing…")}
         </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted">
@@ -2079,94 +2038,24 @@ function ProgressRail({
           );
         })}
       </ol>
-      <p className="mt-3 text-xs text-muted">
-        {typicalScreen
-          ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
-          : "Finished sections open as they land, so feel free to explore them meanwhile."}
-      </p>
+      {slow ? (
+        <p className="mt-3 text-xs text-caution" data-qa="longer-than-usual">
+          {longerThanUsualLine(typicalScreen, job.status === "queued")}
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-muted">
+          {typicalScreen
+            ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
+            : "Finished sections open as they land, so feel free to explore them meanwhile."}
+        </p>
+      )}
     </div>
   );
 }
 
+/** The rail's spinner, a picture only: the step beside it is the status a
+ *  screen reader hears (research pass 33 — a fixed "Working" was all it
+ *  said while the step changed underneath). */
 function Spinner() {
-  return (
-    <span
-      role="status"
-      aria-label="Working"
-      className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand"
-    />
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Skeletons                                                           */
-/* ------------------------------------------------------------------ */
-
-function StatGridSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-line bg-surface p-4">
-          <div className="skeleton h-2.5 w-16 rounded" />
-          <div className="skeleton mt-3 h-5 w-20 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CardListSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-line bg-surface p-4">
-          <div className="skeleton h-3 w-40 rounded" />
-          <div className="skeleton mt-3 h-2.5 w-full rounded" />
-          <div className="skeleton mt-2 h-2.5 w-4/5 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TableSkeleton() {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex gap-4 py-2.5">
-          <div className="skeleton h-3 w-1/4 rounded" />
-          <div className="skeleton h-3 w-1/5 rounded" />
-          <div className="skeleton h-3 w-1/5 rounded" />
-          <div className="skeleton h-3 flex-1 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function VerdictSkeleton() {
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-        <div className="p-6">
-          <div className="skeleton h-2.5 w-16 rounded" />
-          <div className="mt-4 flex items-center gap-3">
-            <div className="skeleton h-11 w-11 rounded-full" />
-            <div className="skeleton h-7 w-40 rounded" />
-          </div>
-          <div className="skeleton mt-5 h-2.5 w-full rounded" />
-          <div className="skeleton mt-2 h-2.5 w-3/4 rounded" />
-        </div>
-        <div className="grid gap-px bg-line sm:grid-cols-2">
-          {[0, 1].map((i) => (
-            <div key={i} className="bg-surface p-5">
-              <div className="skeleton h-2.5 w-20 rounded" />
-              <div className="skeleton mt-3 h-2.5 w-full rounded" />
-              <div className="skeleton mt-2 h-2.5 w-5/6 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  return <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand" />;
 }

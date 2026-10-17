@@ -4,6 +4,7 @@
 // (Universal module: used by the deal page; snapshots are written by the
 // pipeline into deals.prior_screen — see migration 0010.)
 
+import { compactUsd } from "@/lib/money";
 import { METRIC_FIND, parseMoney, parsePct, parsePrice, screenYearOf } from "./criteria";
 
 interface MetricLike {
@@ -206,12 +207,7 @@ function pickPair(
   return null;
 }
 
-const fmtMoney = (d: number) => {
-  const abs = Math.abs(d);
-  if (abs >= 1e6) return `$${(d / 1e6).toFixed(1)}M`;
-  if (abs >= 1e3) return `$${Math.round(d / 1e3)}k`;
-  return `$${Math.round(d)}`;
-};
+const fmtMoney = (d: number) => compactUsd(d);
 
 export function computeScreenDiff(
   prior: PriorScreen,

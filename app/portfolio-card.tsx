@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MEASURE } from "@/app/panel-parts";
 import { assetWords } from "@/lib/asset-words";
 import { isStateMarket } from "@/lib/market-match";
 import { portfolioFacts, propertyFigures, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
@@ -70,7 +71,7 @@ export function PortfolioCard({
           </ul>
         )}
         {facts.length > 0 && (
-          <ul className="mt-2 space-y-0.5 text-xs leading-relaxed text-muted">
+          <ul className={`mt-2 ${MEASURE} space-y-0.5 text-xs leading-relaxed text-muted`}>
             {facts.map((f) => (
               <li key={f}>{f}</li>
             ))}
@@ -86,13 +87,15 @@ export function PortfolioCard({
               {a.page && <span className="ml-auto font-mono text-[10px] text-muted">{a.page}</span>}
             </div>
             {p.shares && (
+              // The panels' two track heights (app/panel-parts): the share a
+              // primary track, the NOI's share under it a secondary one.
               <div className="mt-1.5 space-y-1" aria-hidden>
-                <div className="h-2 rounded-full bg-faint">
-                  <div className="h-2 rounded-full bg-brand/70" data-bar="portfolio" style={{ width: width(p.shares[i]) }} />
+                <div className="h-3 rounded-full bg-faint">
+                  <div className="h-3 rounded-full bg-brand/70" data-bar="portfolio" style={{ width: width(p.shares[i]) }} />
                 </div>
                 {p.noiShares && (
-                  <div className="h-1.5 rounded-full bg-faint">
-                    <div className="h-1.5 rounded-full bg-ink/50" data-bar="portfolio-noi" style={{ width: width(p.noiShares[i]) }} />
+                  <div className="h-2 rounded-full bg-faint">
+                    <div className="h-2 rounded-full bg-ink/50" data-bar="portfolio-noi" style={{ width: width(p.noiShares[i]) }} />
                   </div>
                 )}
               </div>

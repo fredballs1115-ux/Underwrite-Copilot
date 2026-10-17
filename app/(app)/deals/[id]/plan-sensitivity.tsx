@@ -1,6 +1,8 @@
+import { compactUsd } from "@/lib/money";
+import { ScrollRegion } from "@/app/scroll-region";
 import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
-import { yieldOnCostText } from "@/lib/plan-facts";
+import { planNoiText, yieldOnCostText } from "@/lib/plan-facts";
 import {
   SPREAD_LABEL,
   SPREAD_RULE_OF_THUMB,
@@ -12,12 +14,7 @@ import {
   type SpreadBucket,
 } from "@/lib/plan-sensitivity";
 
-const money = (n: number): string =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(1)}M`
-    : Math.abs(n) >= 1e3
-      ? `$${Math.round(n / 1e3)}k`
-      : `$${Math.round(n)}`;
+const money = (n: number): string => compactUsd(n);
 const pct = (d: number, dp = 1): string => `${(d * 100).toFixed(dp)}%`;
 const delta = (d: number): string => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
 
@@ -60,7 +57,9 @@ export function PlanSensitivity({
   const grid = buildYieldOnCostGrid(plan, refCap.pct);
   const be = planBreakevens(plan, refCap.pct);
   if (!grid || !be) return null;
-  const noi = plan.stabilizedNoi!.value;
+  // Said with its month where the memorandum states it a month at a time,
+  // as the report's copy of these sentences says it (audit C6, LOW-1).
+  const noiText = planNoiText(plan.stabilizedNoi!, money);
   const budget = plan.budget!.budget;
   const refNote = refCapNote(refCap.provenance);
 
@@ -84,7 +83,7 @@ export function PlanSensitivity({
       {/* On a phone the grid scrolls sideways inside its card; the row
           labels stay pinned at its left edge (sticky, on the card's own
           surface) so a yield is never read without its row. */}
-      <div className="mt-3 overflow-x-auto" data-qa="plan-grid">
+      <ScrollRegion label="Yield on cost by NOI and budget" className="mt-3" data-qa="plan-grid">
         <table className="w-full min-w-[560px] border-separate border-spacing-1 text-center text-xs">
           <thead>
             <tr>
@@ -132,15 +131,15 @@ export function PlanSensitivity({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
 
       <ul className="mt-3 space-y-1 text-sm leading-relaxed">
         <li>
           {be.noiCushion > 0
-            ? `Stabilized NOI can come in ${pct(be.noiCushion)} under the OM's ${money(noi)} — down to ${money(
+            ? `Stabilized NOI can come in ${pct(be.noiCushion)} under the OM's ${noiText} — down to ${money(
                 be.noiAtRefCap,
               )} — before the yield on cost falls to the ${pct(refCap.pct, 2)} reference cap.`
-            : `The OM's ${money(noi)} stabilized NOI already yields less than the ${pct(
+            : `The OM's ${noiText} stabilized NOI already yields less than the ${pct(
                 refCap.pct,
                 2,
               )} reference cap on ${money(plan.totalCost ?? 0)} of total cost — the plan is under water before any stress.`}

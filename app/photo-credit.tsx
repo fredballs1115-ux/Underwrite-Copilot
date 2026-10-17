@@ -10,10 +10,12 @@ import { CreditPartsText } from "./credit-parts";
 // and stopped there, while every surface crops the photograph to its frame.
 // These draw lib/skyline's parts — the same words `creditLine` and
 // `galleryCredit` say — with the photographer linked to the file's page on
-// Commons and the licence to its text. No hooks, so a server page and a
-// client component (`CityPhoto`) draw the same markup. A client that is
-// handed a credit as data rather than a table id draws it with
-// `CreditPartsText` (app/credit-parts) directly.
+// Commons and the licence to its text. For a SERVER page: these read
+// lib/skyline's table by a market's id, and a client module must never import
+// them (lib/client-bundle-tables.test.ts). A client is handed a credit as
+// data and draws it with app/credit-parts — `CreditPartsText` for one
+// photograph (CityPhoto's client half), `GalleryCreditPartsText` for a grid
+// (the pipeline's cards).
 
 /** One photograph's credit: the place, the photographer, the licence and
  *  that it is cropped — lib/skyline `creditLine`'s words, linked. */

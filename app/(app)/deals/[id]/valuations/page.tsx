@@ -1,10 +1,12 @@
+import { compactUsd } from "@/lib/money";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { screeningModelCaveat } from "@/lib/bridge/model-caveat";
-import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
+import { currentDealModel } from "@/lib/bridge/deal-assumptions";
+import { unstatedPrice } from "@/lib/underwrite/report-grid";
 import { modelOpinion } from "@/lib/valuation/model-opinion";
 import {
   FIELD_KIND,
@@ -36,8 +38,13 @@ import {
   updateValuation,
 } from "./actions";
 import { DealCrumb } from "../deal-crumb";
+import { dealTitle } from "@/lib/deal-title";
 
-export const metadata: Metadata = { title: "Valuations" };
+/** "Valuations — <the deal's name>" (lib/deal-title). */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return dealTitle(id, "Valuations");
+}
 
 const ERRORS: Record<string, string> = {
   file: "Pick a BOV file to upload.",
@@ -78,8 +85,7 @@ const FIELD_HINT: Record<ValuationField, string> = {
   discountRate: "%",
 };
 /** "$2.0M", "$450k" — a dollar figure for a sentence. */
-const usdShort = (n: number): string =>
-  Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`;
+const usdShort = (n: number): string => compactUsd(n, { thousandsFrom: 0 });
 
 const toNamed = (v: Valuation): NamedValuation => ({
   sourceLabel: v.sourceLabel,
@@ -126,13 +132,22 @@ export default async function ValuationsPage({
   // stored — it always reflects the deal as it stands right now — and laid
   // out as a BOV states an opinion, so its cap and its deduction describe
   // the same price (lib/valuation/model-opinion).
-  const base = await currentDealAssumptions(
+  const model = await currentDealModel(
     supabase,
     id,
     deal.name as string,
     (deal.extraction as ExtractionResult | null) ?? null,
   );
+  const base = model?.inputs ?? null;
   const opinion = base ? modelOpinion(base) : null;
+  // The model's price where no memorandum stated one (research pass 40,
+  // item 15; lib/underwrite/report-grid `unstatedPrice`): the site's
+  // placeholder is marked as one beside the column's value, a figure backed
+  // out of an NOI of zero or less is no price and shows none, and the
+  // column's own levered IRR, struck on that figure, is withheld under the
+  // same sentence the report prints. A BOV's own price still runs through
+  // the model as before.
+  const priceMark = model ? unstatedPrice(model.inputs, model.sources) : null;
   // On a note or a plan deal the model's IRRs and going-in cap are not the
   // buyer's: said above the table, and on the copied line where the model's
   // own column is one side of the bridge.
@@ -141,11 +156,15 @@ export default async function ValuationsPage({
     (deal.first_signal as FirstSignal | null) ?? null,
     { cap: true },
   );
-  const ours: NamedValuation | null = opinion?.valuation ?? null;
+  const ours: NamedValuation | null = opinion
+    ? priceMark?.kind === "none"
+      ? { ...opinion.valuation, headlineValue: null }
+      : opinion.valuation
+    : null;
   // Where the model carries Year-1 capital its cap is on the all-in basis,
   // and the cell says so, with the cap on the price alone beside it.
-  const oursNotes: ColumnData["notes"] =
-    opinion?.allIn && base
+  const oursNotes: ColumnData["notes"] = {
+    ...(opinion?.allIn && base
       ? {
           goingInCap: {
             chip: "all-in",
@@ -154,7 +173,9 @@ export default async function ValuationsPage({
             }.`,
           },
         }
-      : {};
+      : {}),
+    ...(priceMark ? { headlineValue: { chip: priceMark.chip, title: priceMark.line } } : {}),
+  };
 
   // The extracted BOVs' own documents, so a page citation can open its
   // source: each through the route that signs the file when it is clicked
@@ -232,6 +253,15 @@ export default async function ValuationsPage({
             derivedFields: [],
             notes: oursNotes,
             implied: (() => {
+              if (priceMark) {
+                return {
+                  ok: false,
+                  error: priceMark.line,
+                  leveredIrrPct: null,
+                  leveredEquityMultiple: null,
+                  substitutions: [],
+                };
+              }
               const r = impliedReturns(base!, ours);
               return {
                 ok: r.ok,
@@ -263,10 +293,17 @@ export default async function ValuationsPage({
   const b = bId ? byId.get(bId)! : null;
   const bridge = a && b ? reconcileValuations(a, b) : null;
   const tally = a && b ? scoreAggressiveness(a, b) : null;
+  const oursBridged = aId === "__ours" || bId === "__ours";
   const summary = bridge?.ok
-    ? caveat && (aId === "__ours" || bId === "__ours")
-      ? `${bridgeSummaryLine(bridge)} ${caveat.copy}`
-      : bridgeSummaryLine(bridge)
+    ? [
+        bridgeSummaryLine(bridge),
+        caveat && oursBridged ? caveat.copy : null,
+        // A bridge to the model's placeholder is a bridge to no price the
+        // memorandum stated, said on the line a reader copies.
+        priceMark && oursBridged ? priceMark.line : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
     : null;
 
   return (
@@ -292,6 +329,15 @@ export default async function ValuationsPage({
           className="rounded-lg border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-ink"
         >
           {caveat.text}
+        </p>
+      ) : null}
+
+      {priceMark && ours ? (
+        <p
+          data-qa="valuations-price-unstated"
+          className="rounded-lg border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-ink"
+        >
+          {priceMark.line}
         </p>
       ) : null}
 

@@ -7,11 +7,13 @@
  * export and one sharp pass apiece. A route now draws only the frames its
  * own pages ask for, and any other size is the listed frame nearest it. The
  * pages that build the URLs import these same constants, so a page and its
- * route cannot drift apart: the shared screen's aerial (2026-10-01), and the
- * signed-in deal aerial and best-picture routes (research pass 22).
+ * route cannot drift apart: the shared screen's aerial (2026-10-01), the
+ * signed-in deal aerial and best-picture routes (research pass 22), and the
+ * cuts of a deal's flood frame (research pass 39).
  *
  * Pure and universal, so a client component can import the constants too.
  */
+import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 
 /** A picture's frame in pixels. */
 export interface PixelFrame {
@@ -68,6 +70,27 @@ export const PIPELINE_MAP_PICTURE: PixelFrame = { w: 96, h: 96 };
 
 /** The frames /api/deals/[id]/image draws: the avatar's two and the map's. */
 export const DEAL_IMAGE_FRAMES: readonly PixelFrame[] = [DEAL_AVATAR.sm, DEAL_AVATAR.md, PIPELINE_MAP_PICTURE];
+
+// ── /api/deals/[id]/flood — the deal's flood frame, cut (research pass 39) ──
+
+/** The deal page's Flood view (property-visual): its own 16:9, so nothing
+ *  the key describes is cut away by the box… */
+export const FLOOD_VIEW: PixelFrame = { w: 1280, h: 720 };
+/** …and the same at twice the pixels, for a dense screen. */
+export const FLOOD_VIEW_2X: PixelFrame = { w: FLOOD_VIEW.w * 2, h: FLOOD_VIEW.h * 2 };
+/** The Flood view's place in the filmstrip. */
+export const FLOOD_STRIP: PixelFrame = { w: 192, h: 108 };
+/** The full-screen viewer: the whole 4:3 frame, at twice the viewer's
+ *  overhead frame — the stored frame's own pixels. */
+export const FLOOD_VIEWER: PixelFrame = { w: DEAL_AERIAL_VIEWER.w * 2, h: DEAL_AERIAL_VIEWER.h * 2 };
+/** The full report's band (lib/basemaps `REPORT_FLOOD_SIZE`), at twice its
+ *  points. */
+export const FLOOD_REPORT: PixelFrame = { w: REPORT_FLOOD_SIZE.width * 2, h: REPORT_FLOOD_SIZE.height * 2 };
+
+/** The crops /api/deals/[id]/flood and lib/flood-map cut: the page's, the
+ *  viewer's and the report's, and no other — each size a page does not ask
+ *  for was a decode, a resize and an encode of its own. */
+export const FLOOD_FRAMES: readonly PixelFrame[] = [FLOOD_STRIP, FLOOD_VIEW, FLOOD_VIEW_2X, FLOOD_REPORT, FLOOD_VIEWER];
 
 /** The size a request that names none was always drawn at (the deal routes'
  *  old default); it is snapped like any other ask. */

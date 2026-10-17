@@ -15,6 +15,7 @@ import {
 import { getBilling } from "@/lib/billing";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
+import { PersonBadge } from "../person-badge";
 
 export const metadata: Metadata = { title: "Team" };
 
@@ -43,6 +44,11 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   invite: { cls: "bg-kill/10 text-kill", text: "Couldn't create the invite — please try again." },
   remove: { cls: "bg-kill/10 text-kill", text: "Couldn't remove that member — please try again." },
   leave: { cls: "bg-kill/10 text-kill", text: "Couldn't leave the team — please try again." },
+  // The departing member's share links on the team's other deals are revoked
+  // before the seat goes (lib/teams); where that could not be done, the seat
+  // stays and the page says why.
+  removelinks: { cls: "bg-kill/10 text-kill", text: "Couldn't revoke the share links that member made for the team's deals, so they are still on the team — please try again." },
+  leavelinks: { cls: "bg-kill/10 text-kill", text: "Couldn't revoke the share links you made for your teammates' deals, so you are still on the team — please try again." },
   ownerleave: { cls: "bg-kill/10 text-kill", text: "Owners can't leave their own team. Transfer isn't supported yet — email underwritecopilot.support@gmail.com and we'll handle it." },
   config: TEAM_UNAVAILABLE,
   save: { cls: "bg-kill/10 text-kill", text: "Couldn't save the team's billing profile — please try again." },
@@ -203,7 +209,7 @@ export default async function TeamPage({
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   team.planActive
-                    ? "bg-pass/15 text-pass"
+                    ? "bg-pass/10 text-pass"
                     : "bg-faint text-muted"
                 }`}
               >
@@ -222,9 +228,7 @@ export default async function TeamPage({
                   className="flex items-center justify-between gap-3 py-2.5"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-semibold uppercase text-brand">
-                      {memberLabel(m).charAt(0)}
-                    </span>
+                    <PersonBadge name={memberLabel(m)} id={m.userId} size="md" decorative />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
                         {memberLabel(m)}
@@ -232,7 +236,10 @@ export default async function TeamPage({
                           <span className="text-muted"> (you)</span>
                         )}
                       </p>
-                      {m.email && m.fullName && (
+                      {/* The account under the name, on the roster alone,
+                          where an owner tells two people apart before
+                          removing one; set or not, the name leads. */}
+                      {m.email && (
                         <p className="truncate text-xs text-muted">{m.email}</p>
                       )}
                     </div>

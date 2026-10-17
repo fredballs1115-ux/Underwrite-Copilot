@@ -13,11 +13,18 @@ import {
   findPriceMetric,
   isPlanDeal,
   noiFigures,
+  notYetDelivered,
   priceRowIsLand,
   unitCountRow,
   type StrategyKind,
 } from "./deal-strategy";
+import { forwardTermRows } from "./forward-purchase";
+import { COMMERCIAL_INCOME_ROW, RESIDENTIAL_INCOME_ROW, mixedUseTermRows } from "./mixed-use";
+import { goingConcernTermRows } from "./going-concern";
+import { HOA_DUES_ROW, condoTermRows } from "./condo";
+import { sandwichTermRows } from "./sandwich-lease";
 import { noteTermRows } from "./note-yield";
+import { positionTermRows } from "./position";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
 import { hotelTermRows } from "./hotel-deal";
@@ -31,6 +38,7 @@ import { siteReportTermRows } from "./site-reports";
 import { studentTermRows } from "./student-housing";
 import { mhTermRows } from "./manufactured-housing";
 import { storageTermRows } from "./self-storage";
+import { regulationTermRows } from "./rent-regulation";
 
 /** A cap rate on the property's income, whatever its qualifier: "Cap rate
  *  (T-12)", "Stabilized cap rate", "Going-in cap", "Exit cap". Never an
@@ -42,6 +50,11 @@ const COLLATERAL_CAP =
 function isCollateralCap(row: { label: string; value: string }): boolean {
   return COLLATERAL_CAP.test(row.label) || findGoingInCap([row]) === row;
 }
+
+/** Rows an operating business shares with other deals — a franchise, a
+ *  licence, a management fee — which lead the business's key terms only
+ *  beside a row of its own. */
+const SHARED_OPERATING_ROW = /^\s*(?:franchise|licen[cs]es?\b|management\s+fee)/i;
 
 export interface KeyTermMetric {
   label: string;
@@ -60,10 +73,15 @@ export interface KeyTermMetric {
  * the loan's own terms follow the price — the balance, the coupon, the
  * maturity, whether it pays — and the collateral's cap is not led with,
  * since it is not the buyer's; financing the seller offers on a note
- * follows them, labelled as the note purchase's. Rows that are not objects
- * (analysis output can carry nulls) are dropped. `screenYear` is the year
- * the screen read the memorandum (lib/criteria `screenYearOf`), which the
- * price row's label is read against, as on every other surface.
+ * follows them, labelled as the note purchase's. On a preferred equity
+ * position (lib/position) its own terms follow the price the same way — the
+ * amount, the preferred return and its parts, the redemption, the senior
+ * loan ahead of it, the remedies — and no cap on the building's income is
+ * printed, since its price buys a rate and a redemption, never a slice of
+ * the building (the cap slot's rule, lib/compare-interest). Rows that are
+ * not objects (analysis output can carry nulls) are dropped. `screenYear` is
+ * the year the screen read the memorandum (lib/criteria `screenYearOf`),
+ * which the price row's label is read against, as on every other surface.
  */
 export function keyTermRows<M extends KeyTermMetric>(
   metrics: ReadonlyArray<M | null | undefined>,
@@ -83,12 +101,21 @@ export function keyTermRows<M extends KeyTermMetric>(
   // An auction has no asking price (#456): its starting bid, the buyer's
   // premium, the reserve and the deadline stand where the price would.
   for (const row of saleTermRows(rows)) lead(row);
+  // A forward purchase (lib/forward-purchase): when the price is paid — the
+  // delivery, the outside date, the deposit, the cap at delivery and rent
+  // commencement — right after the price, on a building not yet delivered
+  // (an earnest-money "Deposit" on a standing building is not this).
+  if (notYetDelivered(kind)) for (const row of forwardTermRows(rows)) lead(row);
   if (interest === "note") {
     for (const row of noteTermRows(rows)) lead(row);
     // Financing the seller offers on a note is of the note's purchase: it
     // leads beside the note's own terms, so the block's limit never cuts
     // it, and is labelled as that below.
     for (const row of sellerFinancingTermRows(rows)) lead(row);
+  } else if (interest === "preferred_equity") {
+    // A preferred equity position's own terms lead after the price, as a
+    // note's do; the building's cap is not led with, and is not printed.
+    for (const row of positionTermRows(rows)) lead(row);
   } else if (isPlanDeal(kind)) {
     const stabilized = noiFigures(rows).find((f) => f.kind === "stabilized");
     if (stabilized) lead(rows.find((m) => m.label === stabilized.label));
@@ -103,9 +130,19 @@ export function keyTermRows<M extends KeyTermMetric>(
     lead(findGoingInCap(rows));
   }
   lead(unitCountRow(rows));
+  // A sandwich position (lib/sandwich-lease): the master rent and the
+  // sublease income the position lives between, then the master lease's
+  // end and its options — what the price buys, after the count. Only on a
+  // leasehold, so a seller's master lease of vacant suites on a building
+  // sold outright (a rent guarantee) never leads as one.
+  if (interest === "leasehold") for (const row of sandwichTermRows(rows)) lead(row);
   // A covenant or a contract that sets the rents (#453): how many units it
   // binds and until when, right after the count it is a share of.
   for (const row of affordableTermRows(rows)) lead(row);
+  // The rent rules (lib/rent-regulation): the regime as the memorandum
+  // names it, the units under it, and the legal and preferential rents —
+  // after the count the regulated units are a share of.
+  for (const row of regulationTermRows(rows)) lead(row);
   // The one lease a single-tenant property is (#454): when it ends, how its
   // rent grows and the tenant's options — what the price is paid for.
   for (const row of singleTenantTermRows(rows)) lead(row);
@@ -133,11 +170,33 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A self-storage facility (#471): the economic occupancy, the street rate
   // and the in-place rent.
   for (const row of storageTermRows(rows)) lead(row);
+  // A mixed-use building (lib/mixed-use): the residential and commercial
+  // incomes, the commercial space and its occupancy — only where an income
+  // half is stated, so a shopping center's "Retail SF" never leads as one.
+  const mixedUse = mixedUseTermRows(rows);
+  if (mixedUse.some((m) => RESIDENTIAL_INCOME_ROW.test(m.label) || COMMERCIAL_INCOME_ROW.test(m.label)))
+    for (const row of mixedUse) lead(row);
+  // An operating business (lib/going-concern): its earnings, the rent's
+  // coverage, then the contracts and a care operation's facts — only where
+  // a row of the operation's own is stated, so a franchise's end, a licence
+  // or a management fee alone (a hotel's, an apartment building's) never
+  // leads as one.
+  const business = goingConcernTermRows(rows);
+  if (business.some((m) => !SHARED_OPERATING_ROW.test(m.label))) for (const row of business) lead(row);
+  // Condominium units bought in bulk (lib/condo): the units offered and the
+  // condominium's, a unit's dues and a special assessment — only beside a
+  // row of the bulk purchase's own, so an association's dues alone (a
+  // build-to-rent community's, a townhome's) never lead as one.
+  const condo = condoTermRows(rows);
+  if (condo.some((m) => !HOA_DUES_ROW.test(m.label))) for (const row of condo) lead(row);
   // On a note no cap on the collateral's income is printed at all — the
   // going-in, the in-place, the stabilized, the exit: among the rows a
   // reader would take any of them for a cap on the note's price, which none
-  // is. An interest rate cap is a term of the loan and stays.
-  const rest = rows.filter((m) => !head.includes(m) && !(interest === "note" && isCollateralCap(m)));
+  // is. An interest rate cap is a term of the loan and stays. On a preferred
+  // equity position the same: a cap on the building's income would read as
+  // one on the position's price.
+  const noCap = interest === "note" || interest === "preferred_equity";
+  const rest = rows.filter((m) => !head.includes(m) && !(noCap && isCollateralCap(m)));
   const out = [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
   if (interest !== "note") return out;
   // On a note every row of the seller's financing is the note purchase's,

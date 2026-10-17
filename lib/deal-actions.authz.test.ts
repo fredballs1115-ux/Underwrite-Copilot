@@ -50,6 +50,17 @@ vi.mock("@/lib/supabase/admin", () => ({
           return { data: { arrayBuffer: async () => new TextEncoder().encode("%PDF- victim").buffer }, error: null };
         },
         createSignedUrl: async () => ({ data: null, error: null }),
+        // The deal's picture folders as the bucket lists them: a hero and a
+        // thumbnail no record names, a file the layout never mints, and a
+        // flood frame.
+        list: async (folder: string) => {
+          storageOps.push({ op: "list", paths: [folder] });
+          if (folder === `photos/${DEAL}`) {
+            return { data: [{ name: "lost1-hero.jpg" }, { name: "lost1-thumb.jpg" }, { name: "notes.txt" }], error: null };
+          }
+          if (folder === `flood/${DEAL}`) return { data: [{ name: "f1.jpg" }], error: null };
+          return { data: [], error: null };
+        },
       }),
     },
   }),
@@ -189,8 +200,9 @@ describe("deleteDeal", () => {
     const fd = new FormData();
     fd.set("dealId", DEAL);
     expect(await landing(() => deleteDeal(fd))).toBe("/deals?deleted=1");
-    expect(storageOps).toHaveLength(1);
-    const swept = storageOps[0].paths;
+    const removes = storageOps.filter((o) => o.op === "remove");
+    expect(removes).toHaveLength(1);
+    const swept = removes[0].paths;
     expect(swept).toContain(MY_OM);
     expect(swept).toContain(`${CREATOR}/${DEAL}.model-tmp`);
     expect(swept).toContain(MY_DOC);
@@ -199,6 +211,17 @@ describe("deleteDeal", () => {
     expect(swept).not.toContain(VICTIM_OM);
     expect(swept).not.toContain(FOREIGN_DOC);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(VICTIM_OM));
+  });
+
+  it("sweeps the deal's picture folders as the bucket lists them, beyond what its photo cache names (research pass 39)", async () => {
+    const fd = new FormData();
+    fd.set("dealId", DEAL);
+    expect(await landing(() => deleteDeal(fd))).toBe("/deals?deleted=1");
+    expect(storageOps.filter((o) => o.op === "list").map((o) => o.paths[0])).toEqual([`photos/${DEAL}`, `flood/${DEAL}`]);
+    const swept = storageOps.find((o) => o.op === "remove")!.paths;
+    expect(swept).toEqual(expect.arrayContaining([`photos/${DEAL}/lost1-hero.jpg`, `photos/${DEAL}/lost1-thumb.jpg`, `flood/${DEAL}/f1.jpg`]));
+    // A name the layout never mints is no file of the deal's to sweep.
+    expect(swept).not.toContain(`photos/${DEAL}/notes.txt`);
   });
 });
 

@@ -16,6 +16,8 @@ import { FREE_PLAN, PRICE_PRO_MONTHLY, PRO_PLAN_LINES, PRO_UPSELL } from "@/lib/
 import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
+import { PersonBadge } from "../person-badge";
+import { personName } from "@/lib/person";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -135,7 +137,7 @@ export default async function BillingPage({
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              isPro ? "bg-pass/15 text-pass" : "bg-faint text-muted"
+              isPro ? "bg-pass/10 text-pass" : "bg-faint text-muted"
             }`}
           >
             {isPro ? "Active" : "Free tier"}
@@ -229,7 +231,7 @@ export default async function BillingPage({
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">Pro</p>
             {isPro && (
-              <span className="rounded-full bg-pass/15 px-2.5 py-0.5 text-[11px] font-semibold text-pass">
+              <span className="rounded-full bg-pass/10 px-2.5 py-0.5 text-[11px] font-semibold text-pass">
                 Your plan
               </span>
             )}
@@ -244,7 +246,7 @@ export default async function BillingPage({
           <ul className="mt-5 flex-1 space-y-2.5">
             {PRO_PLAN_LINES.map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm">
-                <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
+                <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/10 text-[10px] font-bold text-pass">
                   ✓
                 </span>
                 {f}
@@ -277,7 +279,7 @@ export default async function BillingPage({
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
                 team.planActive
-                  ? "bg-pass/15 text-pass"
+                  ? "bg-pass/10 text-pass"
                   : "bg-faint text-muted"
               }`}
             >
@@ -340,8 +342,9 @@ export default async function BillingPage({
                   key={m.userId}
                   className="flex items-center gap-3 px-3 py-2 text-sm"
                 >
+                  <PersonBadge name={personName(m.fullName, m.email)} id={m.userId} size="sm" decorative />
                   <span className="min-w-0 flex-1 truncate">
-                    {m.fullName || m.email || "Teammate"}
+                    {personName(m.fullName, m.email)}
                   </span>
                   <span className="shrink-0 text-xs text-muted">
                     {m.role === "owner"

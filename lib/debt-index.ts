@@ -1,9 +1,10 @@
 import {
+  publisherTag,
   rateSeeds,
   seedRate,
   treasuryForTerm,
   type LiveRate,
-} from "@/lib/live-rates";
+} from "@/lib/live-rates-core";
 import { withArticle } from "@/lib/article";
 import { sourceParts } from "@/lib/source-parts";
 
@@ -139,14 +140,26 @@ export interface Benchmark30 {
   value: number;
   /** ISO date of the figure — the survey week, or the snapshot's own as-of */
   asOf: string;
-  /** "FRED · MORTGAGE30US" for the live survey (", stale" appended where
-   *  the table has not been written for the survey's cadence); for the
-   *  research layer's row, its publisher as the row's own source names it
-   *  ("Freddie Mac PMMS, the checked-in snapshot"), or "publisher not
-   *  recorded, the checked-in snapshot" where the source names none */
+  /** `SURVEY_SOURCE` for the live survey — Freddie Mac's, through FRED (",
+   *  stale" appended where the table has not been written for the survey's
+   *  cadence); for the research layer's row, its publisher as the row's own
+   *  source names it ("Freddie Mac PMMS, the checked-in snapshot"), or
+   *  "publisher not recorded, the checked-in snapshot" where the source
+   *  names none */
   source: string;
   live: boolean;
 }
+
+/**
+ * The live survey's source as the leverage check prints it: the publisher
+ * and its survey by the name Freddie Mac's own page gives it ("Primary
+ * Mortgage Market Survey®", as the runner printed it), through FRED, with
+ * FRED's series id. FRED is the channel: the survey is Freddie Mac's, and
+ * FRED's notes on the series say "Copyright, 2016, Freddie Mac. Reprinted
+ * with permission." (zori probe run 37262488972). It had read "FRED ·
+ * MORTGAGE30US" (research pass 31, C3).
+ */
+export const SURVEY_SOURCE = "Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US";
 
 /**
  * The publisher a snapshot's source names, as the research file writes it:
@@ -174,7 +187,7 @@ export function benchmark30(
     return {
       value: survey.pct,
       asOf: survey.asOf,
-      source: survey.fresh ? "FRED · MORTGAGE30US" : "FRED · MORTGAGE30US, stale",
+      source: survey.fresh ? SURVEY_SOURCE : `${SURVEY_SOURCE}, stale`,
       live: true,
     };
   }
@@ -256,8 +269,22 @@ export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number, spread?: P
     );
   }
   if (parts.length === 0) return null;
-  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
+  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing against these figures — and whether the going-in cap sits below the cost of the debt, where the price buys the building: a note's, a preferred equity position's or a leased fee's price buys none, and a share's buys the share, so no cap struck on that price is the deal's — and never state a rate as current that is not one of them or built from one of them.${
+    seeds.floating ? ` ${SOFR_LEVEL_RULE}` : ""
+  }`;
 }
+
+/**
+ * SOFR's level stays out of what a Claude step writes (audit B, LOW-6): the
+ * New York Fed licenses its rates with a notice beside each figure, which
+ * every SOFR figure the site draws carries (the rates strip), and a step's
+ * words reach the deal page, the shared screen and the documents with no
+ * notice under them. So a step judges a floating loan against SOFR and
+ * names it, never its level; an all-in rate built from it is the step's own
+ * figure, not the Fed's.
+ */
+export const SOFR_LEVEL_RULE =
+  "SOFR is the New York Fed's figure, republished only beside its notice: judge a floating loan against it, but never write its level — name SOFR and the spread instead.";
 
 /** Index plus spread, as a percent to two places — the figure a term sheet prints. */
 export function allInPct(index: DebtIndex, spreadBps: number): number {
@@ -289,9 +316,13 @@ export function indexName(index: DebtIndex): string {
  * same sentence: "5-yr Treasury 4.78% (FRED, Sep 17, 2026) + 200 bps
  * multifamily spread, a screening default — enter your quote". The index
  * half is the fact and the spread half is named as the assumption it is.
+ * An index FRED carries for another publisher is credited to that publisher
+ * through FRED, as the strip's tile credits it (`publisherTag`): "30-day avg
+ * SOFR 3.68% (New York Fed via FRED, Sep 21, 2026)".
  */
 export function debtRateNote(index: DebtIndex, spreadBps: number, spreadLabel: string): string {
-  return `${indexName(index)} ${index.pct.toFixed(2)}% (FRED, ${datedLong(index.asOf)}) + ${spreadBps} bps ${spreadLabel}, a screening default — enter your quote`;
+  const credit = publisherTag({ id: index.id, source: "fred", label: index.short }) ?? "FRED";
+  return `${indexName(index)} ${index.pct.toFixed(2)}% (${credit}, ${datedLong(index.asOf)}) + ${spreadBps} bps ${spreadLabel}, a screening default — enter your quote`;
 }
 
 /** A rate a surface starts from, with the sentence that says where it came from. */
@@ -299,6 +330,10 @@ export interface RateSeed {
   /** percent — 6.78 means 6.78% */
   pct: number;
   note: string;
+  /** the series id of the index the rate was built on ("SOFR30DAYAVG"),
+   *  where a surface prints that index's figure and owes its publisher's
+   *  notice (lib/data-notices `carriesNyFedNotice`); absent where none */
+  index?: string;
 }
 
 /** The deal page's two starting rates: the permanent loan's (the model's
@@ -316,5 +351,6 @@ export function constructionSeed(seeds: DebtSeeds): RateSeed | null {
   return {
     pct: allInPct(seeds.floating, CONSTRUCTION_SPREAD_BPS),
     note: debtRateNote(seeds.floating, CONSTRUCTION_SPREAD_BPS, "construction spread"),
+    index: seeds.floating.id,
   };
 }

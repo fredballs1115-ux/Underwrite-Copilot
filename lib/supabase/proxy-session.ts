@@ -20,6 +20,7 @@ export { safeNextPath };
 /** Every signed-in area: a signed-out visit bounces to /login with `next`. */
 export const PROTECTED_PREFIXES = [
   "/deals",
+  "/tasks",
   "/team",
   "/billing",
   "/account",

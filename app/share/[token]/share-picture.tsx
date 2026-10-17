@@ -11,6 +11,10 @@ export interface SharePictureSource {
   credit: string;
   /** the photograph's blur-up preview (#463): painted until it loads */
   preview?: string | null;
+  /** an overhead drawn around a street address: the building is ringed at
+   *  the frame's centre, as the sender's deal page rings it — never a
+   *  neighbourhood placement's centre, and never over a photograph */
+  ring?: boolean;
 }
 
 /**
@@ -29,6 +33,21 @@ export interface SharePictureSource {
  * frame. A picture that failed before the page hydrated fired its `error`
  * with nobody listening, so the effect checks on mount (and after each
  * switch), as `DealBanner` does.
+ *
+ * The aerial of a street address rings the building at its centre (research
+ * pass 29), as the deal page and the pipeline's cards do: without it a
+ * partner met a block of roofs with nothing marked. The frame is the
+ * aerial's own 12:5, so the centre of the picture is the centre it was
+ * drawn around. A neighbourhood placement's centre is a district's, and
+ * gets no ring; a photograph never does.
+ *
+ * On a phone the photograph is drawn 16:9 (research pass 29: the one
+ * picture a partner sees was a 12:5 strip 145px tall), from `sm` up 12:5 as
+ * before — the stored hero is cut to either by CSS alone. The aerial keeps
+ * its 12:5 at every width: its route draws one frame for the page, any
+ * other size snapped to it, and keeps it per deal (lib/image-frames
+ * `SHARE_AERIAL`, #491), so a phone's 16:9 would be a second drawing of
+ * every shared deal, or this one stretched across the phone.
  */
 export function SharePicture({ sources, place }: { sources: SharePictureSource[]; place: string }) {
   const [at, setAt] = useState(0);
@@ -42,21 +61,32 @@ export function SharePicture({ sources, place }: { sources: SharePictureSource[]
   if (!s) return null;
   return (
     <figure data-share-picture={s.kind} className="mt-5 overflow-hidden rounded-2xl border border-line bg-faint">
-      {/* eslint-disable-next-line @next/next/no-img-element -- a proxied
-          route that sets its own cache headers; next/image would add a
-          second cache layer over it */}
-      <img
-        key={s.src}
-        ref={ref}
-        src={s.src}
-        alt={s.kind === "photo" ? `Photograph of ${place}` : `Aerial view of ${place}`}
-        width={960}
-        height={400}
-        decoding="async"
-        onError={() => setAt((i) => i + 1)}
-        style={previewStyle(s.preview)}
-        className="aspect-[12/5] w-full object-cover"
-      />
+      <div className="relative">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a proxied
+            route that sets its own cache headers; next/image would add a
+            second cache layer over it */}
+        <img
+          key={s.src}
+          ref={ref}
+          src={s.src}
+          alt={s.kind === "photo" ? `Photograph of ${place}` : `Aerial view of ${place}`}
+          width={960}
+          height={400}
+          decoding="async"
+          onError={() => setAt((i) => i + 1)}
+          style={previewStyle(s.preview)}
+          className={`block w-full object-cover ${s.kind === "photo" ? "aspect-[16/9] sm:aspect-[12/5]" : "aspect-[12/5]"}`}
+        />
+        {s.kind === "aerial" && s.ring ? (
+          <span
+            aria-hidden
+            data-picture="aerial-pin"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_1px_6px_rgba(0,0,0,0.45)]"
+          >
+            <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+          </span>
+        ) : null}
+      </div>
       <figcaption className="px-3 py-1.5 text-[11px] text-muted">
         {place} · {s.credit}
       </figcaption>

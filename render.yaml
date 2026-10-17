@@ -22,6 +22,14 @@ services:
     # a deploy can't be marked failed by a third-party blip during the check.
     healthCheckPath: /api/health
     autoDeploy: true
+    # A deploy SIGTERMs the old instance a minute after the new one is up,
+    # and Next finishes in-flight requests and pending after() callbacks
+    # before it exits — but Render kills it after 30 seconds by default, and
+    # a screen run in-process (ANALYSIS_WORKER unset) takes minutes, so a
+    # deploy killed every screen it overlapped (research pass 30). Render's
+    # maximum is 300 seconds (render.com/docs/deploys, printed by the runner
+    # in zori probe run 37260503500). The lasting fix is the worker.
+    maxShutdownDelaySeconds: 300
     envVars:
       - key: NODE_VERSION
         value: "22"

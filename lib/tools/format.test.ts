@@ -91,7 +91,10 @@ describe("the shared dollar writer", () => {
     expect(usdExact(1_234.5)).toBe("$1,235");
     expect(usdCents(59.333)).toBe("$59.33");
     expect(usd(999_999.6)).toBe("$1,000,000");
-    expect(usd(1_005_000)).toBe("$1.00M");
+    // A half-step rounds up, counted in whole numbers as every compact
+    // figure on the site is (lib/money `compactUsd`): a float's toFixed
+    // had read 1.005 as "1.00" (research pass 34).
+    expect(usd(1_005_000)).toBe("$1.01M");
   });
 });
 

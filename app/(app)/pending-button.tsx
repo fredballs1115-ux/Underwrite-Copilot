@@ -21,22 +21,35 @@ export function PendingButton({
   disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
+  // While it saves the button stays focusable — aria-disabled, a second
+  // press refused here — and its pending words are said once: a focused
+  // button that disables itself sends focus to the page, and "Uploading
+  // your OM…" was never heard (research pass 33).
   return (
-    <button
-      type="submit"
-      disabled={disabled || pending}
-      aria-busy={pending}
-      className={`inline-flex items-center justify-center gap-2 ${className} disabled:cursor-not-allowed ${
-        pending ? "opacity-80" : "disabled:opacity-50"
-      }`}
-    >
-      {pending && (
-        <span
-          aria-hidden
-          className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
-        />
-      )}
-      {pending && pendingLabel ? pendingLabel : children}
-    </button>
+    <>
+      <button
+        type="submit"
+        disabled={disabled}
+        aria-disabled={pending || undefined}
+        onClick={pending ? (e) => e.preventDefault() : undefined}
+        aria-busy={pending}
+        className={`inline-flex items-center justify-center gap-2 ${className} disabled:cursor-not-allowed ${
+          pending ? "cursor-progress opacity-80" : "disabled:opacity-50"
+        }`}
+      >
+        {pending && (
+          <span
+            aria-hidden
+            className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+          />
+        )}
+        {pending && pendingLabel ? pendingLabel : children}
+      </button>
+      {pendingLabel ? (
+        <span role="status" className="sr-only">
+          {pending ? pendingLabel : ""}
+        </span>
+      ) : null}
+    </>
   );
 }

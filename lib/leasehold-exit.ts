@@ -38,16 +38,17 @@
 // and its rent usually resets to market when it is, so the term with every
 // option is read beside the term, never instead of it.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { interestOf } from "@/lib/interest";
+import { interestOf, leaseholdTermOf } from "@/lib/interest";
 import {
   endHasPassed,
   endsByYear,
   groundLeaseTermLine,
-  readGroundLeaseTerm,
   termEndLabel,
   yearsText,
   type GroundLeaseTerm,
+  type LeaseName,
 } from "@/lib/ground-lease-term";
 import { TERM_MARGIN_YEARS } from "@/lib/tools/ground-lease";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -73,6 +74,11 @@ export interface TermExit {
 
 export interface LeaseholdExitRead {
   term: GroundLeaseTerm;
+  /** the lease the position runs out with: the land's, or the building's
+   *  master lease a sandwich position holds (research pass 28, round 9),
+   *  where the position ends with the lease and nothing reverts to the
+   *  buyer */
+  lease: LeaseName;
   holdYears: number;
   /** the lease ends inside the hold, or has ended */
   endsInHold: boolean;
@@ -120,8 +126,8 @@ export function termShare(capPct: number, growthPct: number, years: number): num
 
 /**
  * The model's exit against the term left at its sale. Null unless the
- * memorandum sells a leasehold, states when its ground lease ends, and the
- * model can run.
+ * memorandum sells a leasehold, states when its lease ends (the ground
+ * lease's, or a master leasehold's master lease), and the model can run.
  */
 export function readLeaseholdExit(
   ex: ExtractionResult | null | undefined,
@@ -129,7 +135,7 @@ export function readLeaseholdExit(
   asOf: Date = new Date(),
 ): LeaseholdExitRead | null {
   if (!ex || interestOf(ex).kind !== "leasehold") return null;
-  const term = readGroundLeaseTerm(ex, asOf);
+  const { term, lease } = leaseholdTermOf(ex, asOf);
   if (!term || !inputs || !(inputs.purchasePrice > 0) || !(inputs.exitCapPct > 0)) return null;
 
   const run = computeUnderwrite(inputs);
@@ -170,9 +176,10 @@ export function readLeaseholdExit(
   const groundLease = ex.interest?.groundLease ?? "";
   return {
     term,
+    lease,
     holdYears,
     endsInHold,
-    endsInYear: endsInHold ? Math.max(1, Math.ceil(term.yearsToTheDay)) : null,
+    endsInYear: leaseEndInHold(term, lease, holdYears)?.year ?? null,
     exitNoi,
     exitCapPct,
     capitalised,
@@ -182,21 +189,36 @@ export function readLeaseholdExit(
     unleveredIrrPct: pctOf(run.returns.unleveredIrrPct),
     onTerm: endsInHold ? null : exitOn(yearsAtSale),
     withOptions: optionYears > 0 && !endHasPassed(term) ? exitOn(yearsAtSale + optionYears) : null,
-    subordinated: subordinationOf(groundLease),
+    // A master lease "subordinated" to the fee owner's mortgage is the
+    // opposite risk — the lease can fall with a foreclosure — so its words
+    // are never read for a ground lease's subordination.
+    subordinated: lease === "master lease" ? null : subordinationOf(groundLease),
+  };
+}
+
+/**
+ * The levered IRR on the term at other inputs — the report's max bid, solved
+ * on the model's capitalised exit at a price of its own (research pass 35):
+ * this module's own read at those inputs, as a decimal, so the bid's return
+ * on the term is the term block's arithmetic and never a second formula.
+ * Null on anything but a leasehold; the read answers null where the lease
+ * leaves no term to price at the sale.
+ */
+export function termReadFor(
+  ex: ExtractionResult | null | undefined,
+  asOf: Date = new Date(),
+): ((inputs: UnderwriteInputs) => { irr: number | null } | null) | null {
+  if (!ex || interestOf(ex).kind !== "leasehold") return null;
+  return (inputs) => {
+    const t = readLeaseholdExit(ex, inputs, asOf)?.onTerm;
+    return t ? { irr: t.leveredIrrPct == null ? null : t.leveredIrrPct / 100 } : null;
   };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────
 
-// Rounded on the tenths, never a float's toFixed.
-export const exitMoney = (n: number) =>
-  Math.abs(n) >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : Math.abs(n) >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : Math.abs(n) >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+export const exitMoney = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const pct2 = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}%`;
 // A return can be negative, and a minus is a minus sign.
 const pct1 = (n: number) => {
@@ -206,24 +228,81 @@ const pct1 = (n: number) => {
 /** A share said whole, or as "within 1%" near the top. */
 const shareText = (n: number) => `${Math.round(n)}%`;
 
+/** What a lease's end means for the buyer, by which lease it is: at a ground
+ *  lease's end the building reverts to the landowner; at a master lease's
+ *  the position ends with it — the building and the land were never the
+ *  buyer's (research pass 28, round 9). */
+function endWords(lease: LeaseName) {
+  return lease === "master lease"
+    ? {
+        theLease: "The master lease",
+        ends: "the position ends with it before the model sells it",
+        onWhat: "on a position that ends",
+        holder: "the master lessee",
+        optionRent: "at the rent the master lease sets for it",
+        never: "an income that never ends",
+        premium: "a buyer of the position asks a premium on top for the spread's risk and the master lease's own terms",
+      }
+    : {
+        theLease: "The ground lease",
+        ends: "the building reverts to the landowner before the model sells it",
+        onWhat: "on a building that reverts",
+        holder: "the leaseholder",
+        optionRent: "and its rent usually resets to market when it does",
+        never: "a building that never reverts",
+        premium: "a leasehold buyer asks a premium on top for the lease's resets, subordination and coverage",
+      };
+}
+
+/** A lease that ends inside the model's hold, or has ended. */
+export interface LeaseEndInHold {
+  /** the year of the hold it ends in — 1 where it already has */
+  year: number;
+  /** its stated end has gone by */
+  passed: boolean;
+  lease: LeaseName;
+  /** the card's own sentence (`leaseholdExitSentence`) */
+  sentence: string;
+}
+
+/**
+ * Where the lease ends inside the model's hold, or has ended: the year it
+ * ends in and the card's own sentence — the one rule the card, the deal
+ * page's playground, the report's grids and the compare table withhold the
+ * model's returns by (lib/compare-interest, research pass 38): every one of
+ * them sells the building at the hold's end, after it reverted. Null where
+ * the lease outlasts the hold.
+ */
+export function leaseEndInHold(term: GroundLeaseTerm, lease: LeaseName, holdYears: number): LeaseEndInHold | null {
+  if (!endsByYear(term, holdYears)) return null;
+  const year = Math.max(1, Math.ceil(term.yearsToTheDay));
+  const end = termEndLabel(term);
+  const w = endWords(lease);
+  const passed = endHasPassed(term);
+  return {
+    year,
+    passed,
+    lease,
+    sentence: passed
+      ? `${w.theLease}'s stated end, ${end}, has passed, so there is no term to value — check the lease and any extension already exercised before reading anything the model says.`
+      : `${w.theLease} ends ${term.from === "year" ? "in " : ""}${end}, in year ${year} of the model's ${holdYears}-year hold: ${w.ends}, so the income after that and the sale proceeds are not this buyer's to collect.`,
+  };
+}
+
 /**
  * The card's one sentence: the lease ending inside the hold, or the exit on
  * the term against the exit as the model runs it.
  */
 export function leaseholdExitSentence(r: LeaseholdExitRead): string {
-  const hold = `${r.holdYears}-year hold`;
   const end = termEndLabel(r.term);
-  if (endHasPassed(r.term)) {
-    return `The ground lease's stated end, ${end}, has passed, so there is no term to value — check the lease and any extension already exercised before reading anything the model says.`;
-  }
-  if (r.endsInHold) {
-    return `The ground lease ends ${r.term.from === "year" ? "in " : ""}${end}, in year ${r.endsInYear} of the model's ${hold}: the building reverts to the landowner before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.`;
-  }
+  const w = endWords(r.lease);
+  const inHold = leaseEndInHold(r.term, r.lease, r.holdYears);
+  if (inHold) return inHold.sentence;
   const t = r.onTerm;
   // Past the sale by under a whole month: the term's arithmetic counts
   // none of it, and a buyer at the sale buys almost no lease.
   if (!t && Math.round((r.term.yearsLeft - r.holdYears) * 12) < 1) {
-    return `The ground lease ends ${r.term.from === "year" ? "in " : ""}${end}, under a month after the model's sale in year ${r.holdYears}: a buyer then buys almost none of the term, so the model's capitalised exit is not a price anyone pays for it.`;
+    return `${w.theLease} ends ${r.term.from === "year" ? "in " : ""}${end}, under a month after the model's sale in year ${r.holdYears}: a buyer then buys almost none of the term, so the model's capitalised exit is not a price anyone pays for it.`;
   }
   if (!t) return "The model's exit could not be valued on the term.";
   if (t.sharePct >= 99.5) {
@@ -237,7 +316,7 @@ export function leaseholdExitSentence(r: LeaseholdExitRead): string {
         : "";
   return `With ${yearsText(t.yearsAtSale)} left at the model's sale in year ${r.holdYears}, the term bears ${shareText(t.sharePct)} of the capitalised exit — ${exitMoney(
     t.onTerm,
-  )} against ${exitMoney(r.capitalised)} — which is the model's ${pct2(r.exitCapPct)} exit cap read as ${pct2(t.termCapPct)} on a building that reverts.${irr}`;
+  )} against ${exitMoney(r.capitalised)} — which is the model's ${pct2(r.exitCapPct)} exit cap read as ${pct2(t.termCapPct)} ${w.onWhat}.${irr}`;
 }
 
 /** The options, beside the term: the ceiling. */
@@ -247,7 +326,8 @@ export function leaseholdOptionsLine(r: LeaseholdExitRead): string | null {
   // Nothing to add where the term alone already bears the capitalised exit.
   if (!o || !opts || (r.onTerm && r.onTerm.sharePct >= 99.5)) return null;
   const bears = o.sharePct >= 99.5 ? "the capitalised exit within 1%" : `${shareText(o.sharePct)} of the capitalised exit (${exitMoney(o.onTerm)})`;
-  return `Were every extension option exercised (${opts.how}, as stated), ${yearsText(o.yearsAtSale)} would be left at the sale and the term would bear ${bears}. An option adds years only if the leaseholder exercises it, and its rent usually resets to market when it does, so that is the ceiling.`;
+  const w = endWords(r.lease);
+  return `Were every extension option exercised (${opts.how}, as stated), ${yearsText(o.yearsAtSale)} would be left at the sale and the term would bear ${bears}. An option adds years only if ${w.holder} exercises it, ${w.optionRent}, so that is the ceiling.`;
 }
 
 /**
@@ -259,6 +339,18 @@ export function leaseholdOptionsLine(r: LeaseholdExitRead): string | null {
  */
 export function leaseholdLenderLine(r: LeaseholdExitRead): string | null {
   if (r.endsInHold || !r.onTerm) return null;
+  if (r.lease === "master lease") {
+    // A sandwich position: no landowner's subordination to read — the fee
+    // owner's own lender and a non-disturbance agreement are the questions,
+    // which the challenger names (lib/sandwich-lease).
+    const needed = SALE_LOAN_YEARS + TERM_MARGIN_YEARS;
+    const left = r.onTerm.yearsAtSale;
+    return left >= needed
+      ? `A buyer's ${SALE_LOAN_YEARS}-year loan on the position at the sale needs ${needed} years of master lease left — the loan's term and the ${TERM_MARGIN_YEARS}-year margin lenders want on a leasehold. It will have ${yearsText(left)}.`
+      : `A buyer's ${SALE_LOAN_YEARS}-year loan on the position at the sale needs ${needed} years of master lease left — the loan's term and the ${TERM_MARGIN_YEARS}-year margin lenders want on a leasehold — and it will have ${yearsText(
+          left,
+        )}: the buyer the model sells to may not be able to finance it at all, which costs more than the term's arithmetic says.`;
+  }
   if (r.subordinated === true) {
     return "The lease as stated is subordinated: the landowner has agreed to stand behind the mortgage, so a lender can take the building without the lease ending under it.";
   }
@@ -275,9 +367,10 @@ export function leaseholdLenderLine(r: LeaseholdExitRead): string | null {
 /** What the term was valued at, for the small print. */
 export function leaseholdBasisLine(r: LeaseholdExitRead): string | null {
   if (r.endsInHold || !r.onTerm) return null;
+  const w = endWords(r.lease);
   return `The years left are valued at the model's own exit return: its ${pct2(r.exitCapPct)} exit cap plus the ${pct1(
     r.growthPct,
-  )} its NOI grows in the year after the sale, ${pct2(r.returnPct)} — what a buyer paying that cap for a building that never reverts would earn. It is the term's arithmetic alone: a leasehold buyer asks a premium on top for the lease's resets, subordination and coverage, so the truth is at or under it.`;
+  )} its NOI grows in the year after the sale, ${pct2(r.returnPct)} — what a buyer paying that cap for ${w.never} would earn. It is the term's arithmetic alone: ${w.premium}, so the truth is at or under it.`;
 }
 
 // ── What the card draws ─────────────────────────────────────────────────
@@ -288,6 +381,9 @@ export function leaseholdBasisLine(r: LeaseholdExitRead): string | null {
  * browser bundle (metroDemand's rule).
  */
 export interface LeaseholdExitView {
+  /** which lease the term is: "ground lease", or a sandwich position's
+   *  "master lease" — the card's and the report's title name it */
+  lease: LeaseName;
   termLine: string;
   page: string;
   endLabel: string;
@@ -313,7 +409,8 @@ export interface LeaseholdExitView {
 
 export function leaseholdExitView(r: LeaseholdExitRead): LeaseholdExitView {
   return {
-    termLine: groundLeaseTermLine(r.term),
+    lease: r.lease,
+    termLine: groundLeaseTermLine(r.term, r.lease),
     page: r.term.page,
     endLabel: termEndLabel(r.term),
     holdYears: r.holdYears,

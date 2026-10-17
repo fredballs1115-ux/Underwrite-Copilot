@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeUnderwrite, type UnderwriteResult } from "@/lib/underwrite/engine";
 import { buildBridge, type Bridge } from "./attribution";
 import type { Assumptions } from "./model";
-import { needsSnapshot, nextAutoLabel, saveFailure, type SaveFailure } from "./version-rules";
+import { VERSION_LIST_MAX, needsSnapshot, nextAutoLabel, saveFailure, type SaveFailure } from "./version-rules";
 
 /**
  * Persistence for the Assumption Bridge: immutable version snapshots plus a
@@ -60,18 +60,30 @@ export function resultsFrom(r: UnderwriteResult): StoredResults {
 const VERSION_COLS =
   "id, deal_id, user_id, version_label, note, assumptions, results, automatic, created_at";
 
-/** Newest first. */
+/** The newest VERSION_LIST_MAX versions, newest first, with how many the deal
+ *  holds in all (`total`, an exact count; null where it did not come back),
+ *  so the page says "the newest 60 of 214" rather than a list that reads as
+ *  whole (research pass 42). */
+export async function listDealVersionsCounted(
+  supabase: SupabaseClient,
+  dealId: string,
+): Promise<{ versions: DealVersion[]; total: number | null }> {
+  const { data, count } = await supabase
+    .from("deal_versions")
+    .select(VERSION_COLS, { count: "exact" })
+    .eq("deal_id", dealId)
+    .order("created_at", { ascending: false })
+    .limit(VERSION_LIST_MAX);
+  const versions = (data ?? []) as unknown as DealVersion[];
+  return { versions, total: typeof count === "number" ? Math.max(count, versions.length) : null };
+}
+
+/** Newest first: the newest VERSION_LIST_MAX. */
 export async function listDealVersions(
   supabase: SupabaseClient,
   dealId: string,
 ): Promise<DealVersion[]> {
-  const { data } = await supabase
-    .from("deal_versions")
-    .select(VERSION_COLS)
-    .eq("deal_id", dealId)
-    .order("created_at", { ascending: false })
-    .limit(60);
-  return (data ?? []) as unknown as DealVersion[];
+  return (await listDealVersionsCounted(supabase, dealId)).versions;
 }
 
 export interface SnapshotOptions {

@@ -11,7 +11,14 @@
 // field errors so a wrong name is a one-line config fix, never a silent
 // wrong number.
 
-import { haversineKm, type LatLng } from "@/lib/geo";
+import { fmtMiles, haversineKm, kmToMiles, type LatLng } from "@/lib/geo";
+import { RECORDED_SALES } from "@/lib/public-record-asks";
+import type { LocationPrecision } from "@/lib/imagery-plan";
+
+/** The most sales a search keeps, the nearest first (lib/public-comps/run):
+ *  a source answers up to RECORDED_SALES.limit, and the stored set is cut to
+ *  this many. */
+export const STORED_COMPS = 40;
 
 export interface RecordComp {
   address: string;
@@ -25,12 +32,25 @@ export interface RecordComp {
   propertyType: string;
   distanceKm: number;
   sourceUrl: string;
+  /** what the record states of the sale beyond its price, each as the
+   *  source wrote it and absent or null where it states none — read from the
+   *  property database's rows (migration 0028) where the ingest filled them:
+   *  the units (New York's rows carry them), the parties, and the deed's
+   *  type in the source's own code, never read for a meaning */
+  units?: number | null;
+  buyer?: string | null;
+  seller?: string | null;
+  deedType?: string | null;
 }
 
 export interface RecordCompsStats {
   count: number;
   medianPrice: number;
   medianPerSqft: number | null;
+  /** the sales the $/SF median is taken over: those stating an area a
+   *  building could have (over 200 SF). Absent on a result stored before
+   *  it was recorded. */
+  perSqftCount?: number;
   low: number;
   high: number;
 }
@@ -48,14 +68,90 @@ export interface RecordCompsResult {
   providerId?: string;
   providerName?: string;
   datasetUrl?: string;
-  subject?: { lat: number; lng: number; label: string };
-  params?: { radiusKm: number; monthsBack: number; classFilter: string };
+  /** the point the search was measured from, and how finely it was placed
+   *  (lib/public-comps/subject-point): the building, its street, or only
+   *  the area the address names. No precision on a result stored before it
+   *  was recorded. */
+  subject?: { lat: number; lng: number; label: string; precision?: LocationPrecision };
+  /** what the search asked: its radius and window, and the class it held
+   *  the sales to — `classFilter` as the scope line says it, `classKey` the
+   *  site's class key (lib/public-comps/classes) where a class was applied,
+   *  absent for every sale and on a result stored before it was recorded */
+  params?: { radiusKm: number; monthsBack: number; classFilter: string; classKey?: string };
   comps: RecordComp[];
   stats?: RecordCompsStats;
   retrievedAt: string;
   error?: string;
   /** the honesty label rendered under the panel, verbatim */
   note: string;
+  /** the source answered with as many rows as a search asks for
+   *  (RECORDED_SALES.limit), so more sales may lie inside the radius and the
+   *  window than it returned — which ones it returned is `sourceOrder`'s
+   *  (research pass 42). Absent on a result stored before it was recorded. */
+  capped?: boolean;
+  /** how the source picks the rows it returns: its newest sales (a live
+   *  provider ordered by sale date), its nearest (the property database),
+   *  or in no order it states */
+  sourceOrder?: "newest" | "nearest" | null;
+  /** the recorded sales the search found inside the radius, before the
+   *  stored set was cut to the nearest STORED_COMPS */
+  found?: number;
+  /** the property database's market (lib/public-comps/db-markets) where it
+   *  answered a search with no sales, by its research name: the database
+   *  holds that market's sales, so none found is a finding about the
+   *  address, never "no source" */
+  dbMarket?: string;
+  /** the day the property database's newest row read was ingested (ISO
+   *  yyyy-mm-dd): its sales are as fresh as its last ingest, not the day
+   *  of the search. Absent on a live provider's result and on one stored
+   *  before it was recorded. */
+  ingestedThrough?: string;
+  /** on a pending pull: the last set that answered, kept while a refresh
+   *  runs so the deal never loses its sales to a pull in flight */
+  previous?: RecordCompsResult;
+  /** on a set kept after a refresh failed: when it failed and how. The set
+   *  is the earlier pull's, said as such — a failed refresh never replaces
+   *  sales that answered. */
+  refreshFailed?: { at: string; status: RecordCompsStatus };
+}
+
+/**
+ * The last set of sales a deal's pull answered with, or null: an "ok" result
+ * itself (less any set it carries), else the set a pending pull kept. A
+ * refresh that fails stores this back with `refreshFailed`.
+ */
+export function lastGoodOf(r: RecordCompsResult | null | undefined): RecordCompsResult | null {
+  if (!r) return null;
+  if (r.status === "ok") {
+    const own: RecordCompsResult = { ...r };
+    delete own.previous;
+    return own;
+  }
+  return r.previous && r.previous.status === "ok" ? lastGoodOf(r.previous) : null;
+}
+
+/** A kept set's line after a refresh failed: "The refresh on Oct 11, 2026
+ *  did not answer; these are the sales pulled Oct 1, 2026." "" otherwise. */
+export function refreshFailedLine(r: Pick<RecordCompsResult, "refreshFailed" | "retrievedAt">): string {
+  if (!r.refreshFailed) return "";
+  const why = r.refreshFailed.status === "geocode_failed" ? "could not place the address" : "did not answer";
+  return `The refresh on ${dayText(r.refreshFailed.at)} ${why}; these are the sales pulled ${dayText(r.retrievedAt)}.`;
+}
+
+/**
+ * The one sentence a failed pull says, never the source's own words (they
+ * go to the server log): what did not happen and what to do. `deal` says it
+ * for a deal's stored address, else for the address typed on /comps.
+ */
+export function failureSentence(status: RecordCompsStatus, deal: boolean): string {
+  if (status === "geocode_failed") {
+    return deal
+      ? "The deal's address could not be placed on a map, so no recorded sales were searched — check the address, then refresh."
+      : "The address could not be placed on a map, so no recorded sales were searched — pick it from the suggestions, or check the spelling.";
+  }
+  return deal
+    ? "The public-records source did not answer this pull, so no sales are shown — refresh to ask again."
+    : "The public-records source did not answer this pull, so no sales are shown — pull again to ask again.";
 }
 
 export const HONESTY_NOTE =
@@ -83,6 +179,16 @@ export interface ProviderConfig {
   buildUrl: (q: ProviderQuery) => string;
   /** parse the provider's JSON into comps (distance filled by the engine) */
   parse: (json: unknown) => Omit<RecordComp, "distanceKm">[];
+  /** how many rows the provider's JSON carries, parsed or not: a response
+   *  of RECORDED_SALES.limit rows is a source that stopped at its limit */
+  rowCount: (json: unknown) => number;
+  /** which rows the query asks for when more match than it returns: the
+   *  newest (ordered by sale date), or null where it states no order */
+  order: "newest" | null;
+  /** the classes (lib/public-comps/classes keys) the query holds its sales
+   *  to when asked; a class not listed is not applied, and the result says
+   *  "all sales" */
+  classFilters?: readonly string[];
   /** probe URL for /api/comps/health — cheap, 1-row or metadata */
   healthUrl: string;
   /** true when endpoint/fields could not be verified from the build env */
@@ -141,7 +247,7 @@ const philadelphia: ProviderConfig = {
       "AND the_geom IS NOT NULL " +
       `AND ST_DWithin(the_geom::geography, ST_SetSRID(ST_MakePoint(${q.lng}, ${q.lat}), 4326)::geography, ${meters})` +
       classWhere +
-      " ORDER BY sale_date DESC LIMIT 80";
+      ` ORDER BY sale_date DESC LIMIT ${RECORDED_SALES.limit}`;
     return `https://phl.carto.com/api/v2/sql?q=${encodeURIComponent(sql)}`;
   },
   parse: (json) => {
@@ -167,6 +273,9 @@ const philadelphia: ProviderConfig = {
     }
     return out;
   },
+  rowCount: (json) => ((json as { rows?: unknown[] })?.rows ?? []).length,
+  order: "newest",
+  classFilters: ["multifamily"],
   healthUrl:
     "https://phl.carto.com/api/v2/sql?q=" +
     encodeURIComponent(
@@ -216,7 +325,7 @@ const dc: ProviderConfig = {
       units: "esriSRUnit_Meter",
       outFields: "PREMISEADD,SALEDATE,SALEPRICE,USECODE,LANDAREA,LATITUDE,LONGITUDE,SSL",
       outSR: "4326",
-      resultRecordCount: "80",
+      resultRecordCount: String(RECORDED_SALES.limit),
       orderByFields: "SALEDATE DESC",
       returnGeometry: "true",
     });
@@ -248,6 +357,8 @@ const dc: ProviderConfig = {
     }
     return out;
   },
+  rowCount: (json) => ((json as { features?: unknown[] })?.features ?? []).length,
+  order: "newest",
   healthUrl:
     "https://opendata.dc.gov/api/search/v1/collections/dataset/items?" +
     new URLSearchParams({
@@ -311,7 +422,7 @@ const md: ProviderConfig = {
       ].join(", "),
       $where: where,
       $order: `${MD.date} DESC`,
-      $limit: "80",
+      $limit: String(RECORDED_SALES.limit),
     });
     return `https://opendata.maryland.gov/resource/ed4q-f8tm.json?${params.toString()}`;
   },
@@ -341,6 +452,8 @@ const md: ProviderConfig = {
     }
     return out;
   },
+  rowCount: (json) => (Array.isArray(json) ? json.length : 0),
+  order: "newest",
   // Ordered newest-first and limited to one row on purpose: the sample that
   // comes back shows the transfer date's LITERAL format, which is the one
   // thing the column dump could not tell us (is it 2026-08-14 or 20260814?).
@@ -391,7 +504,7 @@ const nj: ProviderConfig = {
       units: "esriSRUnit_Meter",
       outFields: "PROP_LOC,MUN_NAME,SALE_PRICE,DEED_DATE,PROP_CLASS,PAMS_PIN",
       outSR: "4326",
-      resultRecordCount: "80",
+      resultRecordCount: String(RECORDED_SALES.limit),
       returnGeometry: "false",
       returnCentroid: "true",
     });
@@ -429,6 +542,10 @@ const nj: ProviderConfig = {
     }
     return out;
   },
+  rowCount: (json) => ((json as { features?: unknown[] })?.features ?? []).length,
+  // The query names no order (no orderByFields): where more sales match than
+  // it returns, which ones come back is the service's.
+  order: null,
   healthUrl: `${NJ_LAYER}?f=json`,
   needsFieldVerification: false,
   configured: true,
@@ -499,6 +616,8 @@ const discovery = (
     throw new Error(`${id}: discovery mode — endpoint not yet configured`);
   },
   parse: () => [],
+  rowCount: () => 0,
+  order: null,
   healthUrl,
   needsFieldVerification: true,
   configured: false,
@@ -646,6 +765,7 @@ export function compStats(comps: RecordComp[]): RecordCompsStats | undefined {
     count: comps.length,
     medianPrice: Math.round(median(prices)),
     medianPerSqft: perSqft.length >= MEDIAN_FLOOR ? Math.round(median(perSqft)) : null,
+    perSqftCount: perSqft.length,
     low: Math.min(...prices),
     high: Math.max(...prices),
   };
@@ -715,5 +835,155 @@ export function evidenceNote(count: number): string {
       return `Only ${count} sales behind that figure, so one unusual trade moves it. Thin comp evidence is itself a finding.`;
     default:
       return "";
+  }
+}
+
+/**
+ * The $/SF middle said with the count behind it, which is only the sales
+ * that state an area — "median $245/SF on 6 of 40 sales" — under the price
+ * median's own floors on THAT count: none below MEDIAN_FLOOR (compStats
+ * takes none), and "thin" said where it rests on three or four. "" where
+ * there is no $/SF middle.
+ */
+export function perSqftPhrase(
+  stats: Pick<RecordCompsStats, "medianPerSqft" | "perSqftCount" | "count">,
+  areaCount: number,
+): string {
+  const n = stats.perSqftCount ?? areaCount;
+  if (stats.medianPerSqft == null || compEvidence(n) === "none" || compEvidence(n) === "individual") return "";
+  const fig = `$${Math.round(stats.medianPerSqft).toLocaleString("en-US")}/SF`;
+  const of = n === stats.count ? `on all ${n} sales` : `on ${n} of ${stats.count} sales`;
+  return `${medianLabel(n)} ${fig} ${of}${compEvidence(n) === "thin" ? ", thin" : ""}`;
+}
+
+/** A search's radius as the readout says it: "1 mi", "3 mi". */
+function radiusText(km: number): string {
+  const miles = kmToMiles(km);
+  return miles < 1.1 ? "1 mi" : `${Math.round(miles)} mi`;
+}
+
+/** A sale's day as the readout says it: "Aug 2, 2026" (UTC, its own day).
+ *  Hoisted: windowText and dayText above read it. */
+function saleDay(iso: string): string {
+  const t = Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(t)
+    ? new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : iso;
+}
+
+/**
+ * A search's window, dated: "the 24 months to Oct 8, 2026" — the day the
+ * search was run, since "the last 24 months" read later reads as through
+ * the reader's today. "the last 24 months" only where no day is known.
+ */
+export function windowText(monthsBack: number, retrievedAt?: string | null): string {
+  const t = retrievedAt ? Date.parse(retrievedAt) : NaN;
+  return Number.isFinite(t) ? `the ${monthsBack} months to ${saleDay(new Date(t).toISOString())}` : `the last ${monthsBack} months`;
+}
+
+/** A day as the readout says it ("Oct 8, 2026"), from an ISO timestamp or
+ *  day, read in UTC, its own day; "" for none. */
+export function dayText(iso: string | null | undefined): string {
+  return iso ? saleDay(iso) : "";
+}
+
+/** A stored pull older than this many days says so and asks for a refresh:
+ *  recorded sales file every week, and a set read a month ago is missing a
+ *  month of them. */
+export const STALE_PULL_DAYS = 30;
+
+/** The day a stored pull was made, said on the deal: "Pulled Oct 8, 2026."
+ *  or, past STALE_PULL_DAYS on the reader's day, "Pulled Aug 2, 2026, over
+ *  30 days ago — refresh for the sales recorded since." Null without a day. */
+export function pulledLine(retrievedAt: string | null | undefined, today: string): { text: string; stale: boolean } | null {
+  const day = dayText(retrievedAt);
+  if (!retrievedAt || !day) return null;
+  const age = Date.parse(`${today.slice(0, 10)}T00:00:00Z`) - Date.parse(`${retrievedAt.slice(0, 10)}T00:00:00Z`);
+  const stale = Number.isFinite(age) && age > STALE_PULL_DAYS * 86_400_000;
+  return {
+    stale,
+    text: stale
+      ? `Pulled ${day}, over ${STALE_PULL_DAYS} days ago — refresh for the sales recorded since.`
+      : `Pulled ${day}.`,
+  };
+}
+
+/**
+ * What a result's sales cover, said after their count: "within 1 mi · the
+ * 24 months to Oct 8, 2026 · multifamily". Where the source stopped at its limit (research
+ * pass 42) the set covers less than the search asked, and says what it does
+ * cover: a newest-first source's sales reach back only to the oldest one
+ * kept ("sold since Aug 2, 2026", never "last 24 months"), and the property
+ * database's nearest-first sales reach out only to the farthest one kept
+ * ("within 0.6 mi", never the mile asked).
+ */
+export function compsScope(
+  r: Pick<RecordCompsResult, "params" | "capped" | "sourceOrder" | "comps"> & { retrievedAt?: string },
+): string {
+  if (!r.params) return "";
+  const { radiusKm, monthsBack, classFilter } = r.params;
+  const dates = r.comps.map((c) => c.saleDate).filter(Boolean).sort();
+  const far = r.comps.reduce((m, c) => Math.max(m, c.distanceKm), 0);
+  const within =
+    r.capped && r.sourceOrder === "nearest" && r.comps.length > 0 ? `within ${fmtMiles(far)}` : `within ${radiusText(radiusKm)}`;
+  const window =
+    r.capped && r.sourceOrder === "newest" && dates.length > 0
+      ? `sold since ${saleDay(dates[0])}`
+      : r.retrievedAt
+        ? windowText(monthsBack, r.retrievedAt)
+        : `last ${monthsBack} months`;
+  return `${within} · ${window} · ${classFilter}`;
+}
+
+/**
+ * A search that answered with no sales, said as what it asked: "No recorded
+ * sales within 3 mi of the address in the 36 months to Oct 8, 2026, in the
+ * property database's New York City records." Where the source answered nothing at
+ * all the readout says so instead (status `no_provider`).
+ */
+export function noSalesSentence(
+  r: Pick<RecordCompsResult, "params" | "providerName" | "providerId" | "dbMarket"> & { retrievedAt?: string },
+): string {
+  const within = r.params ? `within ${radiusText(r.params.radiusKm)} of the address` : "near the address";
+  const window = r.params ? ` in ${windowText(r.params.monthsBack, r.retrievedAt)}` : "";
+  const cls = r.params && r.params.classFilter !== "all sales" ? ` (${r.params.classFilter})` : "";
+  const where =
+    r.providerId === "ingested_db"
+      ? r.dbMarket
+        ? `the property database's ${r.dbMarket} records`
+        : "the property database"
+      : (r.providerName ?? "the source");
+  return `No recorded sales${cls} ${within}${window}, in ${where}.`;
+}
+
+/**
+ * What a result left out, or "" where it left out nothing: the source's own
+ * limit (`capped` — "The source returns its 80 newest sales a search and
+ * returned 80: older sales within 1 mi and the last 24 months were not
+ * read"), and the stored set's cut to the nearest STORED_COMPS ("the 40
+ * nearest of the 78 found are kept"). Never "80 recorded sales … last 24
+ * months" said as the whole set.
+ */
+export function compsCutNote(
+  r: Pick<RecordCompsResult, "params" | "capped" | "sourceOrder" | "comps" | "found" | "providerId"> & {
+    retrievedAt?: string;
+  },
+): string {
+  const kept = r.comps.length;
+  const found = r.found ?? kept;
+  const cut = found > kept ? `the ${kept} nearest of the ${found} found are kept` : "";
+  if (!r.capped) return cut ? `${cut[0].toUpperCase()}${cut.slice(1)}.` : "";
+  const limit = RECORDED_SALES.limit;
+  const radius = r.params ? radiusText(r.params.radiusKm) : "the radius";
+  const months = r.params ? windowText(r.params.monthsBack, r.retrievedAt) : "the window";
+  const source = r.providerId === "ingested_db" ? "The property database" : "The source";
+  const tail = cut ? `; ${cut}` : "";
+  switch (r.sourceOrder) {
+    case "newest":
+      return `${source} returns its ${limit} newest sales a search and returned ${limit}: older sales within ${radius} and ${months} were not read${tail}.`;
+    case "nearest":
+      return `${source} returns its ${limit} nearest sales a search and returned ${limit}: sales farther out, within ${radius}, were not read${tail}.`;
+    default:
+      return `${source} returns at most ${limit} sales a search, in no order it states, and returned ${limit}: other sales within ${radius} and ${months} may not have been read${tail}.`;
   }
 }

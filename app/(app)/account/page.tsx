@@ -13,6 +13,10 @@ import { emailEnabled } from "@/lib/email-send";
 import { emailNotes } from "@/lib/email-notes";
 import { analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
 import { deletionStopNotice, doneFromQuery } from "@/lib/account-deletion";
+import { FULL_NAME_MAX, personName } from "@/lib/person";
+import { PendingButton } from "../pending-button";
+import { PersonBadge } from "../person-badge";
+import { saveFullName } from "./actions";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -30,6 +34,10 @@ const DELETE_ERRORS: Record<string, string> = {
   brandsave: "Couldn't save your branding just now — please try again.",
   brandlogosize: "That logo is over 1MB — please resize it and try again.",
   brandlogotype: "Logos must be a PNG or JPG file.",
+  // The name field (lib/person `readFullName`)
+  namesave: "Couldn't save your name just now — please try again.",
+  namelong: `Names are kept to ${FULL_NAME_MAX} characters — please shorten it.`,
+  nameemail: "That's an email address — enter the name your teammates know you by.",
 };
 
 /** The two email preferences, ON by default. One read of the profile row:
@@ -41,29 +49,34 @@ const DELETE_ERRORS: Record<string, string> = {
  *  could not check — while the senders read a failed read as OFF and send
  *  nothing (lib/email `wantsAnalysisEmail`; the digest asks for the
  *  switched-on rows and sends none when that read fails). */
-async function emailPrefsOf(userId: string): Promise<{ onAnalysis: boolean; weeklyDigest: boolean }> {
+async function emailPrefsOf(
+  userId: string,
+): Promise<{ onAnalysis: boolean; weeklyDigest: boolean; fullName: string | null }> {
   try {
     const { data, error } = await createSupabaseAdminClient()
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .maybeSingle();
-    const row = !error && data ? (data as { email_on_analysis?: unknown; email_weekly_digest?: unknown }) : null;
+    const row = !error && data ? (data as { email_on_analysis?: unknown; email_weekly_digest?: unknown; full_name?: unknown }) : null;
     return {
       onAnalysis: row?.email_on_analysis !== false,
       weeklyDigest: row?.email_weekly_digest !== false,
+      // The name the reader set on this page (saveFullName), read in the
+      // same round trip; the field shows it to edit.
+      fullName: typeof row?.full_name === "string" && row.full_name.trim() ? row.full_name.trim() : null,
     };
   } catch {
-    return { onAnalysis: true, weeklyDigest: true };
+    return { onAnalysis: true, weeklyDigest: true, fullName: null };
   }
 }
 
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string; error?: string; branding?: string; moved?: string; cancelled?: string }>;
+  searchParams: Promise<{ reset?: string; error?: string; branding?: string; moved?: string; cancelled?: string; name?: string }>;
 }) {
-  const { reset, error, branding: brandingParam, moved, cancelled } = await searchParams;
+  const { reset, error, branding: brandingParam, moved, cancelled, name: nameParam } = await searchParams;
   const deleteError =
     deletionStopNotice({ error, moved, cancelled }) ?? (error ? (DELETE_ERRORS[error] ?? null) : null);
   const supabase = await createSupabaseServerClient();
@@ -72,11 +85,14 @@ export default async function AccountPage({
   // The billing read and the email preferences don't wait on each other.
   const [billing, prefs] = user
     ? await Promise.all([getBilling(supabase, user.id), emailPrefsOf(user.id)])
-    : [null, { onAnalysis: true, weeklyDigest: true }];
+    : [null, { onAnalysis: true, weeklyDigest: true, fullName: null }];
   const isPro = billing?.isPro ?? false;
   // The pipeline's meter and this line count by the create action's own
   // rule (lib/deal-allowance): a team's trial first, then the reader's own.
   const allowance = billing ? dealAllowance(billing) : null;
+  // What teammates see: the name set here, else the email's local part.
+  const fullName = prefs.fullName;
+  const shownAs = personName(fullName, user?.email ?? null, "you");
   const emailOnAnalysis = prefs.onAnalysis;
   const emailWeeklyDigest = prefs.weeklyDigest;
   // What each switch promises, and which process sends each email
@@ -114,17 +130,22 @@ export default async function AccountPage({
       {/* Profile */}
       <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              Signed in as
-            </p>
-            <p className="mt-1 font-medium">{user?.email ?? "—"}</p>
-            {allowance?.line && <p className="mt-1 text-xs text-muted">{allowance.line}</p>}
+          <div className="flex min-w-0 items-center gap-3">
+            {/* The badge every teammate sees beside the reader's work. */}
+            {user && <PersonBadge name={fullName ?? user.email} id={user.id} size="md" decorative />}
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Signed in as
+              </p>
+              {fullName && <p className="mt-1 truncate font-medium">{fullName}</p>}
+              <p className={`truncate ${fullName ? "text-sm text-muted" : "mt-1 font-medium"}`}>{user?.email ?? "—"}</p>
+              {allowance?.line && <p className="mt-1 text-xs text-muted">{allowance.line}</p>}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                isPro ? "bg-pass/15 text-pass" : "bg-faint text-muted"
+                isPro ? "bg-pass/10 text-pass" : "bg-faint text-muted"
               }`}
             >
               {isPro ? "Pro" : "Free"}
@@ -137,6 +158,43 @@ export default async function AccountPage({
             </Link>
           </div>
         </div>
+
+        {/* The reader's name (signed-in gaps, H2): what a teammate reads on
+            the roster, a task, a note and a question in place of an email.
+            Saved through the reader's own session (saveFullName). */}
+        <form id="name" action={saveFullName} className="mt-5 scroll-mt-20 border-t border-line pt-5">
+          <label htmlFor="account-full-name" className="text-sm font-semibold tracking-tight">
+            Your name
+          </label>
+          <p className="mt-1 max-w-md text-sm text-muted">
+            {fullName
+              ? "What your teammates see on the roster, tasks, notes and questions."
+              : `Your teammates see ${shownAs} until you set one.`}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              id="account-full-name"
+              name="fullName"
+              type="text"
+              autoComplete="name"
+              maxLength={FULL_NAME_MAX}
+              defaultValue={fullName ?? ""}
+              placeholder="e.g. Jordan Lee"
+              className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 sm:max-w-xs"
+            />
+            <PendingButton
+              pendingLabel="Saving…"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+            >
+              Save name
+            </PendingButton>
+          </div>
+          {nameParam === "saved" && (
+            <p role="status" className="mt-2 text-sm text-pass">
+              {fullName ? `Saved — your teammates now see ${fullName}.` : "Name cleared — your teammates see your email's first part."}
+            </p>
+          )}
+        </form>
       </section>
 
       {/* Notifications */}

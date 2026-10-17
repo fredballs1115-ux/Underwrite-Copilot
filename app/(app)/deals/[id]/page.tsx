@@ -3,19 +3,33 @@ import { cookies } from "next/headers";
 import { addressUpgrade } from "@/lib/address";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { FILED_PERSONAL, filedPersonalNotice } from "@/lib/personal-deal";
+import {
+  FILED_PERSONAL,
+  filedPersonalNotice,
+  isMoveRefusal,
+  movedLanding,
+  moveNotice,
+  parseMoveBlock,
+  type MoveTarget,
+} from "@/lib/personal-deal";
+import { FREE_DEALS } from "@/lib/marketing-constants";
 import { notFound } from "next/navigation";
 import { ResearchPanel } from "./research-panel";
 import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
+import { HeroCover } from "./hero-cover";
+import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
+import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
+import { RegulationPanel } from "@/app/regulation-panel";
+import { regulationForDeal, rulesSizeText } from "@/lib/rent-regulation";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
 import { StudentHousingPanel } from "@/app/student-housing-panel";
@@ -24,12 +38,27 @@ import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
 import { readManufacturedHousing } from "@/lib/manufactured-housing";
 import { SelfStoragePanel } from "@/app/self-storage-panel";
 import { readSelfStorage } from "@/lib/self-storage";
+import { ForwardPanel } from "@/app/forward-panel";
+import { readForwardPurchase, readsConstructionLending } from "@/lib/forward-purchase";
+import { MixedUsePanel } from "@/app/mixed-use-panel";
+import { readMixedUse } from "@/lib/mixed-use";
+import { GoingConcernPanel } from "@/app/going-concern-panel";
+import { readGoingConcern } from "@/lib/going-concern";
+import { CondoPanel } from "@/app/condo-panel";
+import { readCondo } from "@/lib/condo";
+import { SandwichPanel } from "@/app/sandwich-panel";
+import { readSandwichLease } from "@/lib/sandwich-lease";
+import { exchangeForDeal } from "@/lib/exchange-deal";
+import { ExchangeChip } from "./exchange-chip";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
 import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
 import { SiteReportsPanel } from "@/app/site-reports-panel";
 import { ListingTeam } from "./listing-team";
+import { BrokerEmailActions } from "./broker-email-actions";
+import { documentProfileOf } from "@/lib/broker-mail";
+import { ddChecklist } from "@/lib/dd-checklist";
 import { listingTeamOf, offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
@@ -40,10 +69,14 @@ import { readValueAdd } from "@/lib/value-add";
 import { readTaxAbatement } from "@/lib/tax-abatement";
 import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
-import { withArticle } from "@/lib/article";
-import { dealTypeLabel, interestTag, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestOf, interestTag, isTenancyInCommon, readInterest } from "@/lib/interest";
+import { subjectBasis } from "@/lib/comp-detail";
+import { condoUnitsOffered } from "@/lib/condo-units";
+import type { SubjectForCall } from "@/lib/public-comps/vs-median";
+import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
+import { marketNames } from "@/lib/public-comps/db-markets";
 import { yieldOnCostText } from "@/lib/plan-facts";
-import { goingInCapFigure, modelReturnsRead, noteCapSlot } from "@/lib/compare-interest";
+import { capSlotWithheld, goingInCapFigure, modelReturnsRead } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
@@ -51,9 +84,10 @@ import { readPortfolio } from "@/lib/portfolio";
 import { loiTermsFor } from "@/lib/loi-terms";
 import { PICTURE_CREDIT, ensureDealPicture, galleryPage, memorandumPhotoCredit } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
-import { assetWords, countNoun } from "@/lib/asset-words";
-import { shownAssetClass } from "@/lib/pipeline-slots";
-import { cacheFresh, resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
+import { countNoun, dealClassKey } from "@/lib/asset-words";
+import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
+import type { SubjectPoint } from "@/lib/public-comps/subject-point";
+import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
@@ -64,12 +98,16 @@ import { floodClassOfZone } from "@/lib/flood-style";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { buildingSfRow, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
+import { publicRecordSubject } from "@/lib/public-record-subject";
+import { buildingSfRow, countNounOf, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import type { Metadata } from "next";
+import { dealTitle } from "@/lib/deal-title";
 import { omLinkFor } from "@/lib/om-link";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { isPro } from "@/lib/billing";
+import { sampleExportsFree } from "@/lib/sample-exports";
 import { type DealRow } from "@/lib/deals";
 import { type DealDocument } from "@/lib/documents";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -85,11 +123,16 @@ import {
   type FirstSignal,
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
+import { RetryForm } from "./deal-sections";
 import { parseFactRow, type DealFact } from "@/lib/facts";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
-import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
+import { jobAgeMs, storedPreviousResults, verdictBehind } from "@/lib/screen-run";
+import { olderScreen } from "@/lib/older-screen";
+import { OlderScreenNote } from "./older-screen-note";
+import { documentKindWarning } from "@/lib/document-kind";
+import { sameMemorandum, sameMemorandumTail, type SameMemorandum, type TwinDeal } from "@/lib/same-memorandum";
 import { readingMemorandum } from "@/lib/screen-reading";
 import {
   SCREEN_DURATION_SAMPLE,
@@ -100,9 +143,9 @@ import {
 import { StageSelect } from "./stage-select";
 import { OffersDueControl } from "../offers-due";
 import { ShareControl, type ShareRow } from "./share-control";
-import { parseStageHistory } from "@/lib/stages";
+import { normalizeStage, parseStageHistory } from "@/lib/stages";
 import { parseDealNotes, parseDealQa } from "@/lib/deals";
-import { deriveInternalComps } from "@/lib/internal-comps";
+import { deriveInternalComps, internalCompCandidates, type CompKeyRow, type InternalComp } from "@/lib/internal-comps";
 import {
   buildComps,
   marketMemoryFor,
@@ -113,8 +156,8 @@ import {
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
-import { BUY_BOX_CHIP_CLS, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
-import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
+import { readActuals } from "@/lib/actuals/actuals-read";
 import {
   signalGoingInCap,
   assessPlausibility,
@@ -124,7 +167,9 @@ import {
   inferStrategy,
   isPlanDeal,
   buildsSomething,
+  notYetDelivered,
   planSummary,
+  planWithBasisChecked,
   signalAskPrice,
   unitCountRow,
 } from "@/lib/deal-strategy";
@@ -134,6 +179,7 @@ import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { modelReadsWithheld, screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { type DealRateSeeds } from "@/lib/debt-index";
 import { constructionSeedFor, modelMarketFor } from "@/lib/model-market";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
@@ -144,14 +190,18 @@ import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
+import { versionBadge } from "@/lib/bridge/version-rules";
+import { readAll, readByIds } from "@/lib/read-all";
+import { readMemoryGroup, readMemoryKeys } from "@/lib/market-memory-read";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
+import { personName, viewerName } from "@/lib/person";
 import { SubmarketCard } from "./submarket-card";
 import type { PlaygroundData } from "./sensitivity-playground";
 
 const VERDICT_PILL = {
-  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/10 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/10 text-caution" },
   pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 } as const;
 
@@ -180,15 +230,38 @@ function knownPointOf(
     : null;
 }
 
+/** The deal's job row with its age on this server's clock (lib/screen-run
+ *  `jobAgeMs`) — read here, outside the render, since it reads the clock. */
+function jobWithAge<T extends { updated_at?: string | null; status: string; step: string | null }>(
+  row: T | null,
+): (T & { ageMs: number | null }) | null {
+  return row ? { ...row, ageMs: jobAgeMs(row, Date.now()) } : null;
+}
+
+/** The tab says the deal (lib/deal-title), never the homepage's tagline. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return dealTitle(id);
+}
+
 export default async function DealPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; tab?: string; a?: string; filed?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    tab?: string;
+    a?: string;
+    filed?: string;
+    moved?: string;
+    others?: string;
+    unrecorded?: string;
+  }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, tab, a: analysisParam, filed } = await searchParams;
+  const { error: errorCode, tab, a: analysisParam, filed, moved, others: moveOthers, unrecorded: moveUnrecorded } =
+    await searchParams;
 
   const supabase = await createSupabaseServerClient();
   // Request-cached: shares the layout's auth call instead of a second hop.
@@ -224,25 +297,39 @@ export default async function DealPage({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      // Internal comps memory: the user's other screened deals (RLS scopes to
-      // own + shared team deals). Derivation filters to this asset class.
-      supabase
-        .from("deals")
-        .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id")
-        .neq("id", id)
-        .not("extraction", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(40),
-      // Live share links (pre-0017 schema: the query errors and data reads
-      // null — the Share button simply shows an empty list).
-      supabase
-        .from("deal_shares")
-        .select("id, created_at, expires_at")
-        .eq("deal_id", id)
-        .eq("revoked", false)
-        .gt("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
-        .limit(5),
+      // Internal comps memory: the reader's other screened deals (RLS scopes
+      // to own + shared team deals), their class keys alone, every one a
+      // page at a time — the class is matched before any cut, then the
+      // newest of it are read in full below (research pass 42: the forty
+      // newest of every class had left an apartment deal no comps where
+      // forty offices came after it).
+      readAll<CompKeyRow>((from, to) =>
+        supabase
+          .from("deals")
+          .select("id, asset_class, is_sample, created_at, ext_class:extraction->>assetClass")
+          .neq("id", id)
+          .not("extraction", "is", null)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ).then((data) => ({ data })),
+      // Every live share link (a read that fails is null, and the panel says
+      // it could not list them — never none beside "revocable here", audit
+      // C5, LOW-5). All of them, newest first, a page at a time: the panel says a link is
+      // "revocable here anytime", and the newest five had left the sixth and
+      // older live and out of view until their thirty days ran out
+      // (research pass 42). A link lives thirty days, so they are few.
+      readAll<ShareRow>((from, to) =>
+        supabase
+          .from("deal_shares")
+          .select("id, created_at, expires_at")
+          .eq("deal_id", id)
+          .eq("revoked", false)
+          .gt("expires_at", new Date().toISOString())
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ).then((data) => ({ data })),
       // Citation facts (pre-0018 schema: query errors, data reads null — the
       // deal simply shows no source chips rather than faking them).
       supabase
@@ -251,19 +338,13 @@ export default async function DealPage({
         .eq("deal_id", id)
         .order("id", { ascending: true }),
       // Deal memory's own read: every deal the READER screened, never a
-      // teammate's — the forty newest above are the whole team's, so a
-      // busy team pushed the reader's own screens out of the count. Light:
-      // the class and the market only, the rows the strip needs in full
-      // are read once this deal's own class and market are known.
-      user
-        ? supabase
-            .from("deals")
-            .select("id, asset_class, is_sample, market:extraction->>market, ext_class:extraction->>assetClass")
-            .eq("user_id", user.id)
-            .neq("id", id)
-            .not("extraction", "is", null)
-            .limit(1000)
-        : Promise.resolve({ data: null }),
+      // teammate's — the comps above are the whole team's, so a busy team
+      // pushed the reader's own screens out of the count. Light: the class
+      // and the market only, every one a page at a time (lib/market-memory-
+      // read, the one read /market's "Your market data" counts from too, so
+      // the two state one count for one market); the rows the strip needs
+      // in full are read once this deal's own class and market are known.
+      user ? readMemoryKeys(supabase, user.id).then((data) => ({ data })) : Promise.resolve({ data: null }),
     ]);
 
   if (error) {
@@ -279,6 +360,10 @@ export default async function DealPage({
   const firstSignal = deal.first_signal
     ? (deal.first_signal as FirstSignal)
     : null;
+  // What the uploaded document is by its own pages (the first signal's
+  // read): a warning where it is not an offering memorandum. Only a deal
+  // screened from an upload; a deal typed in by hand has no document.
+  const documentKindNotice = deal.om_storage_path ? documentKindWarning(firstSignal?.documentKind) : null;
   const extraction = deal.extraction
     ? (deal.extraction as ExtractionResult)
     : null;
@@ -323,13 +408,39 @@ export default async function DealPage({
     (deal as { stage_history?: unknown }).stage_history,
   );
 
-  // What the user's own past screens said about deals like this one.
-  const internalComps = deriveInternalComps(
+  // What the reader's past screens — theirs and their team's — said about
+  // deals like this one: the newest of this deal's class, found in the light
+  // read above and read in full here (a hundred ids a request), newest first.
+  // Started now and awaited where the view is built.
+  const compIds = internalCompCandidates(
+    (siblings.data ?? []) as CompKeyRow[],
     deal.id,
     (deal.asset_class as string | null) ?? "auto",
     extraction,
-    (siblings.data ?? []) as Parameters<typeof deriveInternalComps>[3],
   );
+  // A read that fails is said as one, never as no comps (audit C5, LOW-5):
+  // the light read of the keys, or the full read of the candidates.
+  const compKeysUnread = siblings.data == null;
+  const internalCompsRead: Promise<{ comps: InternalComp[]; unread: boolean }> = compIds.length
+    ? readByIds(compIds, (ids) =>
+        supabase
+          .from("deals")
+          .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id, first_signal, stage, stage_history")
+          .in("id", ids),
+      )
+        .then((rows) => {
+          if (rows == null) return { comps: [], unread: true };
+          const order = new Map(compIds.map((x, i) => [x, i]));
+          const sorted = (rows as Parameters<typeof deriveInternalComps>[3]).sort(
+            (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
+          );
+          return {
+            comps: deriveInternalComps(deal.id, (deal.asset_class as string | null) ?? "auto", extraction, sorted, 8, user?.id ?? null),
+            unread: false,
+          };
+        })
+        .catch(() => ({ comps: [], unread: true }))
+    : Promise.resolve({ comps: [], unread: compKeysUnread });
 
   // Deal memory (Feature 6): the account's OWN prior screens of this exact
   // market + asset class, aggregated — found in the reader's own deals
@@ -345,26 +456,34 @@ export default async function DealPage({
       ? memoryCandidates(ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction.market)
       : [];
   const memoryRead: Promise<MarketGroup | null> = memoryIds.length
-    ? (async () => {
-        // A hundred ids a request keeps each URL well inside a proxy's limit.
-        const batches: string[][] = [];
-        for (let i = 0; i < memoryIds.length; i += 100) batches.push(memoryIds.slice(i, i + 100));
-        const reads = await Promise.all(
-          batches.map((ids) =>
-            supabase
-              .from("deals")
-              .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
-              .in("id", ids),
-          ),
-        );
-        const rows = reads.flatMap((r) => (r.data ?? []) as Parameters<typeof buildComps>[0]);
-        return marketMemoryFor(buildComps(rows), deal.id, currentClass, extraction!.market!);
-      })().catch(() => null)
+    ? readMemoryGroup(supabase, ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction!.market!)
+        .then((rows) => (rows ? marketMemoryFor(buildComps(rows), deal.id, currentClass, extraction!.market!) : null))
+        .catch(() => null)
     : Promise.resolve(null);
 
   const documents = (docsData ?? []) as DealDocument[];
 
-  const job = jobData as {
+  // The same memorandum, byte for byte, on an EARLIER deal the reader can see
+  // (lib/same-memorandum): the fingerprint every screen stores with its
+  // extraction, read once this deal's own screen has stored one. Said on the
+  // newer deal with a link; never a reason to refuse anything. Started now,
+  // awaited where the page is drawn.
+  const fingerprint =
+    deal.om_storage_path && !(deal as { is_sample?: boolean }).is_sample ? (extraction?.omFingerprint ?? null) : null;
+  const twinRead: Promise<SameMemorandum | null> = fingerprint
+    ? (async () => {
+        let q = supabase
+          .from("deals")
+          .select("id, name, created_at")
+          .neq("id", id)
+          .eq("extraction->>omFingerprint", fingerprint);
+        if (deal.created_at) q = q.lt("created_at", deal.created_at);
+        const { data } = await q.order("created_at", { ascending: true }).limit(6);
+        return sameMemorandum((data ?? []) as TwinDeal[]);
+      })().catch(() => null)
+    : Promise.resolve(null);
+
+  const jobRow = jobData as {
     status: string;
     step: string | null;
     progress: number;
@@ -372,13 +491,25 @@ export default async function DealPage({
     updated_at?: string | null;
     created_at?: string | null;
   } | null;
+  // The row's age on THIS server's clock: a run past the stale line is
+  // stalled (lib/screen-run `isStalled`) from the page's first paint, and
+  // the browser never judges it on a clock of its own.
+  const job = jobWithAge(jobRow);
 
   // A screen that failed midway, or one still running, leaves a MIXED
   // generation: the results from its step onward still belong to the
   // previous screen. Every surface below marks them, and the count of
-  // finished steps excludes them (lib/screen-run).
-  const staleResults = [...previousScreenResults(job)];
+  // finished steps excludes them (lib/screen-run) — only the ones the deal
+  // stores: a first screen has no previous screen's results to mark.
+  const staleResults = storedPreviousResults(job, { extraction, challenges, comps, market, verdict });
   const verdictLag = verdictBehind(job);
+  // A screen stored before a reader its figures turn on (lib/older-screen):
+  // said at the head of the header's panels with the re-screen control —
+  // never on the sample or a deal typed by hand, and not while a screen is
+  // already going (its extraction lands with every field asked today) —
+  // the pipeline card's own rule (`listJobStatus`'s "running").
+  const older =
+    verdictLag === "running" ? null : olderScreen(extraction, { isSample: !!(deal as { is_sample?: boolean }).is_sample });
 
   // The call in the header and the sticky bar. While the verdict on file
   // is the previous screen's, it is drawn dashed and says so, so the header
@@ -392,7 +523,9 @@ export default async function DealPage({
           note:
             verdictLag === "running"
               ? "The previous screen's call — a new screen of this deal is running and replaces it when it reaches the verdict"
-              : "The previous screen's call — the latest screen failed before it reached the verdict",
+              : verdictLag === "stalled"
+                ? "The previous screen's call — the latest screen stopped making progress before it reached the verdict; start it again on this page"
+                : "The previous screen's call — the latest screen failed before it reached the verdict",
         }
       : { label: basePill.label, cls: basePill.cls }
     : null;
@@ -409,7 +542,7 @@ export default async function DealPage({
   // the row's step at "verdict" but never writes a ledger, so the time read
   // is the screen's) — one small query, overlapped with the rest of the
   // page. Fewer than three and the rail says no duration at all.
-  const typicalScreenRead: Promise<string | null> =
+  const typicalScreenRead: Promise<{ phrase: string | null; ms: number | null }> =
     jobActive && user && isScreenJob(job?.step)
       ? (async () => {
           const { data } = await supabase
@@ -422,9 +555,10 @@ export default async function DealPage({
             .order("updated_at", { ascending: false })
             .limit(SCREEN_DURATION_SAMPLE);
           const ms = ((data ?? []) as Array<{ ms?: unknown }>).map((r) => r.ms);
-          return typicalScreenPhrase(typicalScreenMs(ms));
-        })().catch(() => null)
-      : Promise.resolve(null);
+          const median = typicalScreenMs(ms);
+          return { phrase: typicalScreenPhrase(median), ms: median };
+        })().catch(() => ({ phrase: null, ms: null }))
+      : Promise.resolve({ phrase: null, ms: null });
   const priorScreen = (deal.prior_screen as PriorScreen | undefined) ?? null;
   const screenDiff =
     !jobActive && job?.status !== "error" && priorScreen && extraction
@@ -495,10 +629,55 @@ export default async function DealPage({
   // (`?filed=personal`, lib/personal-deal): said where they land, since the
   // pipeline they share will not show it. Only while it is still so — the
   // reader's own deal, in no team's pipeline, and the reader on a team.
-  const filedPersonal =
-    filed === FILED_PERSONAL && !!user && ownership.user_id === user.id && !ownership.team_id
-      ? !!(await supabase.from("team_members").select("team_id").eq("user_id", user.id).maybeSingle()).data
-      : false;
+  // The reader's team, read once for that notice and for the deal's menu's
+  // move between the reader's own pipeline and the team's (lib/personal-deal):
+  // offered to the deal's creator alone, never on the sample.
+  const isCreator = !!user && ownership.user_id === user.id;
+  const isSampleDeal = !!(deal as { is_sample?: boolean }).is_sample;
+  // The three downloads are open on the reader's own sample deal, as the
+  // public pages promise (lib/sample-exports) — the routes read the same
+  // rule, so no Pro mark is drawn on a file the reader can take.
+  const downloadsOpen =
+    pro || sampleExportsFree({ isSample: isSampleDeal, hasOm: !!deal.om_storage_path });
+  const readerTeam =
+    isCreator && !isSampleDeal
+      ? (
+          await supabase
+            .from("team_members")
+            .select("team_id, teams(name)")
+            .eq("user_id", user!.id)
+            .maybeSingle()
+        ).data as { team_id: string; teams: { name: string | null } | { name: string | null }[] | null } | null
+      : null;
+  const readerTeamName = (() => {
+    const t = readerTeam?.teams;
+    const one = Array.isArray(t) ? t[0] : t;
+    return one?.name?.trim() || null;
+  })();
+  const filedPersonal = filed === FILED_PERSONAL && isCreator && !ownership.team_id && !!readerTeam;
+  // Share it into the reader's team where it is in no team's pipeline; make
+  // it personal where it is in one. The team's name only where it is the
+  // reader's own team.
+  const moveTo: MoveTarget | null =
+    !isCreator || isSampleDeal ? null : ownership.team_id ? "personal" : readerTeam ? "team" : null;
+  const moveTeamName =
+    moveTo === "team" || (ownership.team_id && readerTeam?.team_id === ownership.team_id) ? readerTeamName : null;
+  // A move's landing is said only while the deal is where it says
+  // (`movedLanding`), naming the team only where it is the reader's own.
+  const movedTo = movedLanding(moved, ownership.team_id);
+  const moveBanner = movedTo
+    ? moveNotice({ moved: movedTo, teamName: moveTeamName }, { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS })
+    : isMoveRefusal(errorCode)
+      ? moveNotice(
+          {
+            refused: errorCode,
+            // what blocked a move that would carry someone else's work
+            block: parseMoveBlock(moveOthers, moveUnrecorded),
+            teamName: errorCode === "moveteamwork" ? readerTeamName : moveTeamName,
+          },
+          { trialDeals: TEAM_TRIAL_DEALS, freeDeals: FREE_DEALS },
+        )
+      : null;
 
   // Delete is the creator's or the team owner's (the RLS delete policy); a
   // teammate is not offered it rather than refused after the fact.
@@ -621,7 +800,9 @@ export default async function DealPage({
       national: reads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
       assetClass: readClass,
       deckWords: extraction?.assetClass ?? null,
-      plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
+      // The pipeline's own rule: no construction lending on a forward
+      // purchase, whose developer funds the works.
+      plan: readsConstructionLending(extraction, inferStrategy(extraction, firstSignal)),
       builds: buildsSomething(extraction, inferStrategy(extraction, firstSignal).kind),
     });
     marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);
@@ -639,9 +820,22 @@ export default async function DealPage({
   // every number built on it. Read first: the actuals check, the summary
   // bar and every panel below take the kind from here.
   const strategy = inferStrategy(extraction, firstSignal);
-  const plan = planSummary(extraction, strategy);
+  // The plan's all-in basis only where the plausibility check does not find
+  // it outside the band (lib/deal-strategy `planWithBasisChecked`).
+  const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   const plausibility = assessPlausibility(extraction, strategy);
-  const interest = readInterest(extraction, askingPriceOf(extraction));
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once here and handed to what the page
+  // draws: what the price buys and its dates (a note's months to maturity, a
+  // position's to redemption, in the header's cap slot and price tag and on
+  // the Model tab, as the playground, the CSV and the workbook read them),
+  // the offers-due countdown in the header, the tasks' due dates, the
+  // Opportunity Zone round's line and the rent allowance in force. The
+  // server's UTC day had read a position due today as past in the header
+  // beside a playground reading it due (the audit of 2026-10-05).
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  const readerNoon = new Date(`${todayIso}T12:00:00Z`);
+  const interest = readInterest(extraction, askingPriceOf(extraction), readerNoon);
   // A note's or a leased fee's deal type describes a building the price does
   // not buy, so the header says whose (lib/interest `dealTypeLabel`).
   const summaryStrategy = strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction);
@@ -693,16 +887,11 @@ export default async function DealPage({
   // project, three years away, and is judged on yield on cost. Degenerate
   // actual NOI (0 / non-finite) renders no comparison rather than an
   // infinite delta.
-  const omPick = pickOmNoi(metrics, strategy.kind);
-  const omNoi = omPick?.noi ?? null;
-  const noiNote = isPlanDeal(strategy.kind)
-    ? omPick
-      ? `${withArticle(strategy.label.toLowerCase(), true)}: the T-12 is held against the OM's ${OM_NOI_BASIS_LABEL[omPick.basis]}. The stabilized pro forma describes the finished project and is judged on yield on cost, never against today's actuals.`
-      : t12Summary
-        ? `${withArticle(strategy.label.toLowerCase(), true)}: the OM states only the finished project's NOI, so there is nothing to hold the T-12 against until an in-place figure is stated. The stabilized pro forma is judged on yield on cost.`
-        : null
-    : null;
-  const actuals: ActualsData = {
+  // One reader for the card, the report's actuals page and the memo's line
+  // (lib/actuals/actuals-read, research pass 24 B3).
+  const actuals: ActualsData = readActuals({
+    metrics,
+    strategy,
     rentRoll: rrRes.data?.summary
       ? {
           asOf: (rrRes.data.as_of_date as string | null) ?? null,
@@ -715,17 +904,9 @@ export default async function DealPage({
           summary: t12Summary,
         }
       : null,
-    noiComparison:
-      omNoi != null &&
-      t12Summary?.noi != null &&
-      Number.isFinite(t12Summary.noi) &&
-      t12Summary.noi !== 0
-        ? compareNoi(omNoi, t12Summary.noi, omPick)
-        : null,
-    noiNote,
     // An apartment roll is read per unit a month, an office's per foot.
     assetClass: readClass,
-  };
+  }) ?? { rentRoll: null, t12: null, noiComparison: null, noiNote: null, assetClass: readClass };
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
   // base underwriting model — actuals folded in — computed once server-side;
@@ -737,6 +918,15 @@ export default async function DealPage({
   // print a different rate for one deal on one day. Never on the sample,
   // whose figures are pinned (lib/model-market).
   const debt = await liveDebtSeeds(HOLD_MONTHS);
+  // The rent rules that reach the building (lib/rent-regulation), read once
+  // through the one call every surface makes — at the address the page reads
+  // the deal at, with the Census place and county only from flags answered
+  // for it, in the deal's one class, on the reader's day — for the panel, the
+  // model's cover lines and its rent-growth check against the market.
+  const regulation = regulationForDeal(
+    { extraction, address: dealAddress, siteFlags, assetClass: deal.asset_class as string | null },
+    todayIso,
+  );
   const derived = extraction
     ? deriveUnderwriteInputs(
         extraction,
@@ -750,25 +940,35 @@ export default async function DealPage({
             : null,
         },
         modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+        // The model's lines read the reader's day, as the panels beside
+        // them do (research pass 40; lib/reader-day).
+        { regulation, asOf: readerNoon },
       )
     : null;
+  // The full report's gate (lib/underwrite/report-grid `modelReadsWithheld`):
+  // where the model runs on a placeholder price or an assumed year-1 NOI,
+  // nothing else it computed prints — the assumable and seller-note pricing,
+  // the leasehold's exit, the sale's ceiling, every panel's model line — and
+  // only the memorandum's terms do, as in the report (research pass 38).
+  const readsWithheld = derived ? modelReadsWithheld(derived.inputs, derived.sources, isPlanDeal(strategy.kind)) : null;
+  const shown = readsWithheld ? null : derived;
   // The seller's loan, where the memorandum offers it for assumption
   // (#417): priced against the model's own new loan at the model's own
   // rate — today's index plus the class spread wherever the table seeded
   // it. Only where the price buys the building (lib/assumable-debt).
-  const assumableRead = extraction ? readAssumable(extraction, derived?.inputs ?? null) : null;
+  const assumableRead = extraction ? readAssumable(extraction, shown?.inputs ?? null) : null;
   const assumable = assumableRead
-    ? assumableView(assumableRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
+    ? assumableView(assumableRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed, readsWithheld)
     : null;
   // A note the seller offers to carry (#462): the same comparison, the
   // note in the seller's loan's place.
-  const sellerRead = extraction ? readSellerFinancing(extraction, derived?.inputs ?? null) : null;
+  const sellerRead = extraction ? readSellerFinancing(extraction, shown?.inputs ?? null) : null;
   const sellerNote = sellerRead
-    ? sellerFinancingView(sellerRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
+    ? sellerFinancingView(sellerRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed, readsWithheld)
     : null;
   // A leasehold's exit, valued on the term its ground lease has left at the
   // model's sale (#421) — only where the memorandum states when it ends.
-  const leaseholdRead = extraction ? readLeaseholdExit(extraction, derived?.inputs ?? null) : null;
+  const leaseholdRead = extraction ? readLeaseholdExit(extraction, shown?.inputs ?? null) : null;
   const leaseholdExit = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
   const rateSeeds: DealRateSeeds = {
     permanent: derived?.meta.rateSeed ?? null,
@@ -783,6 +983,36 @@ export default async function DealPage({
         // A plan deal's price ⇄ cap control must say its cap is year-1
         // income as modelled, not the finished project's pro forma.
         strategy: derived.meta.strategy ?? null,
+        // Where each input came from: a placeholder price or an assumed NOI
+        // makes the returns a placeholder's, withheld as the report withholds
+        // them (lib/underwrite/report-grid).
+        sources: derived.sources,
+        // What the price buys, by the compare table's rule on this model
+        // (lib/compare-interest): a note's, a position's or such a share's
+        // returns are the building's at a price that did not buy it, and
+        // the tiles withhold them as the first-draft card does.
+        // And where a leasehold's lease ends inside the model's hold, its
+        // returns are withheld over the leasehold card's own sentence — the
+        // report's read of the same model (research pass 38).
+        interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs), readerNoon),
+        // The occupancy the model read: a building it runs 90% vacant or
+        // more has its returns, cap and bid withheld, the sentence naming
+        // the occupancy stated (lib/underwrite/report-grid).
+        occupancyPct: derived.meta.occupancyPct ?? null,
+        // The panel's findings under the header: while figures that do not
+        // tie stand, the tiles and the bid are withheld with the claim.
+        findings: plausibility,
+        // Whether the price is the building's: only then is the model's own
+        // entry set against a default exit under the tiles, as the exit's
+        // SOURCE note sets it (research pass 38).
+        buildingPriced: !derived.meta.interest?.basisWithheld,
+        // On a share the model's price is the whole its price grosses up
+        // to: the field says so in the workbook tile's own words, and the
+        // max bid states the share's bid beside the whole's, at the share
+        // the memorandum states (research pass 40, M7).
+        priceLabel: derived.meta.priceLabel ?? null,
+        sharePct: derived.meta.grossedUpSharePct ?? null,
+        shareNoun: isTenancyInCommon(extraction) ? "interest" : "share",
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own
@@ -812,10 +1042,12 @@ export default async function DealPage({
   const versionCount = versionsRes.error ? 0 : (versionsRes.count ?? 0);
   if (playground && user) {
     const snapshotInputs = playground.inputs;
+    // The page's own client: a Server Component cannot read cookies inside
+    // after() (Next's docs), so a client opened there threw and every
+    // snapshot was lost to the catch below.
     after(async () => {
       try {
-        const client = await createSupabaseServerClient();
-        await snapshotVersion(client, {
+        await snapshotVersion(supabase, {
           dealId: id,
           userId: user.id,
           assumptions: snapshotInputs,
@@ -846,15 +1078,21 @@ export default async function DealPage({
   // Teammate emails read under the "teammates read profiles" policy (0007).
   const taskAssignees: TaskAssignee[] = [];
   // Who asked each of Ask's questions on a team deal, named the way the
-  // pipeline names who added a deal (`full_name`, else the email) — from
+  // pipeline names who added a deal (`full_name`, else the email's local
+  // part, lib/person) — from
   // the same profile rows, so it costs no query of its own. Null on a
   // personal deal, whose thread names no one.
   const askerNames: Record<string, string> | null = ownership.team_id ? {} : null;
   if (user) {
+    // Each person by the name they set on the account page, else their
+    // email's local part (lib/person), never the whole address.
     taskAssignees.push({
       userId: user.id,
-      label: user.email ? `${user.email.split("@")[0]} (you)` : "You",
+      label: `${viewerName(user, "You")} (you)`,
     });
+    // The reader by name too, for the badge on their own questions; the
+    // words still say "you" (AskPanel reads `me` first).
+    if (askerNames) askerNames[user.id] = viewerName(user);
     if (ownership.team_id) {
       const otherIds = ((memberRes.data ?? []) as { user_id: string }[])
         .map((m) => m.user_id)
@@ -871,11 +1109,9 @@ export default async function DealPage({
         }[]) {
           taskAssignees.push({
             userId: p.id,
-            label:
-              (p.full_name ?? "").trim() ||
-              (p.email ? p.email.split("@")[0] : "teammate"),
+            label: personName(p.full_name, p.email, "teammate"),
           });
-          if (askerNames) askerNames[p.id] = p.full_name || p.email || "Teammate";
+          if (askerNames) askerNames[p.id] = personName(p.full_name, p.email);
         }
       }
     }
@@ -946,6 +1182,7 @@ export default async function DealPage({
           storedAssetClass: deal.asset_class as string | null,
           metro: liveMarket,
           reads,
+          regulation,
         })
       : null;
   // Year built feeds the rules engine's age-based coverage tests (NYC
@@ -964,10 +1201,37 @@ export default async function DealPage({
     ((deal as { public_comps?: RecordCompsResult | null }).public_comps) ?? null;
   // The price the building's own figures describe (#415) — a share's
   // grossed up to the whole, none for a note or a leased fee — which the
-  // public-record comps' median call and the research panel's per-unit
-  // read divide; the header still shows the price as asked.
-  const priceTag = interestTag(extraction);
+  // public-record comps' median call divides (the research panel reads the
+  // pipeline card's basis instead); the header still shows the price as asked.
+  // What the price buys beside it ("Price · Pref equity, 12% to Jun 2029"),
+  // on the reader's day, as the cap slot beside it reads its dates.
+  const priceTag = interestTag(extraction, readerNoon);
   const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parsePrice(summaryPrice) : null);
+  // What the recorded sales may be set against (lib/public-comps/vs-median):
+  // the building's price and its price a square foot (the comps tab's own
+  // reader, so the two never name different figures), the class the deal
+  // shows, and whether it is one building at a building's price.
+  const compsClassKey = dealClassKey(deal.asset_class as string | null, extraction);
+  const compsCallSubject: SubjectForCall = {
+    price: subjectPriceNumber,
+    perSf: subjectBasis(
+      extraction?.metrics ?? [],
+      strategy.kind,
+      screenYearOf(extraction),
+      interestOf(extraction),
+      extraction?.assetClass,
+      condoUnitsOffered(extraction),
+    ).perSf,
+    classKey: compsClassKey,
+    classLabel: assetClassLabel(shownAssetClass(deal.asset_class as string | null, extraction)),
+    portfolio: readPortfolio(extraction) !== null,
+    planOrLand: strategy.kind === "development" || strategy.kind === "conversion" || compsClassKey === "land_infill",
+  };
+  // Where no source reaches the deal, the no-source sentence names the
+  // property database's markets that hold recorded sales (the cached count
+  // read), read only then.
+  const compsDbMarketsLine =
+    publicComps?.status === "no_provider" ? marketNames(await dbMarketsWithSales()) : "";
   // Also re-kick a lingering "pending" sentinel: a deploy can kill the
   // after() worker between claim and result, and claimRecordComps's
   // stale-pending reclaim (10-min threshold) is only reachable if someone
@@ -990,6 +1254,13 @@ export default async function DealPage({
   const visualCache = (deal.photo as DealVisualCache | null) ?? null;
   const knownPoint = knownPointOf(visualCache, dealAddress);
   const floodArea = !!knownPoint && visualCache?.geoPrecision === "area";
+  // The same point for the comps (the research pass's H2): the OM comps map
+  // and the parcel card measure from where the deal's pictures say the
+  // building is, its precision said, never a second geocode of the line.
+  const compsSubjectPoint: SubjectPoint | null =
+    knownPoint && visualCache?.geoMiss !== true
+      ? { ...knownPoint, precision: visualCache?.geoPrecision ?? addressPrecision(dealAddress) }
+      : null;
   const floodFrame = knownPoint && floodFrameCurrent(visualCache?.floodFrame, knownPoint) ? visualCache?.floodFrame ?? null : null;
   if (floodStreet && !floodArea && !floodFrame) {
     after(async () => {
@@ -1011,10 +1282,12 @@ export default async function DealPage({
 
   // The buy-box call as one chip (lib/buy-box-chip's `buyBoxChip`: the
   // mandate-fit score leads — "Fit 82 · Pursue" — unless a hard "outside"
-  // fold wins, and the older fold stands in without a score), toned by the
-  // same map the sensitivity playground's chip reads.
+  // fold wins, and the older fold stands in without a score; "Fit 100 · 2
+  // of 4 checked" where the box could not be judged whole, which criteria
+  // in its tooltip), toned by the same map the sensitivity playground's
+  // chip reads.
   const buyBoxChip = boxRead
-    ? { label: boxRead.chip.label, cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone] }
+    ? { label: buyBoxChipText(boxRead.chip), cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone], note: boxRead.chip.note }
     : null;
 
   const addressLine =
@@ -1026,7 +1299,9 @@ export default async function DealPage({
 
   const floodLegendEntries = await floodLegendRead;
   const marketMemory = await memoryRead;
+  const { comps: internalComps, unread: internalCompsUnread } = await internalCompsRead;
   const typicalScreen = await typicalScreenRead;
+  const sameFile = await twinRead;
 
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
@@ -1047,16 +1322,17 @@ export default async function DealPage({
   // A note has no going-in cap (lib/compare-interest, #423's rule, which the
   // key terms and the compare table keep): the collateral's income over a
   // loan's price is a cap nobody earns, so the slot says the note's yield to
-  // maturity at its price, or that the cap is withheld.
+  // maturity at its price, or that the cap is withheld — and a preferred
+  // equity position's yield to redemption, its price buying a rate and a
+  // redemption, never a slice of the building.
+  // A yield no project earns is refused: "n/a", the plan's sentence why in
+  // its title and under the plan's facts (research pass 38).
   const returnFigure: HeroFigure = plan
-    ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
-    : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
-  const noteCap = noteCapSlot(extraction);
-  // Today on the reader's own calendar (their browser's zone, from its
-  // cookie — lib/reader-day), read once here and handed to what the page
-  // draws: the offers-due countdown in the header, the tasks' due dates and
-  // the Opportunity Zone round's line.
-  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+    ? plan.yieldWithheld && summaryYoc == null
+      ? { label: "Yield on cost", value: "n/a", figure: true, title: plan.yieldWithheld }
+      : { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
+    : { ...goingInCapFigure(extraction, summaryCap ?? null, readerNoon), figure: true };
+  const capWithheld = capSlotWithheld(extraction);
 
   return (
     <div className="flex flex-col gap-6">
@@ -1067,9 +1343,39 @@ export default async function DealPage({
         ← All deals
       </Link>
 
+      {moveBanner && (
+        <p
+          role="status"
+          data-qa="deal-moved"
+          className={`rounded-lg px-3 py-2 text-sm ${moveBanner.tone === "ok" ? "bg-brand/10 text-brand-strong" : "bg-caution/10 text-caution"}`}
+        >
+          {moveBanner.text}
+        </p>
+      )}
+
       {filedPersonal && (
         <p role="status" data-qa="filed-personal" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
           {filedPersonalNotice(TEAM_TRIAL_DEALS)}
+        </p>
+      )}
+
+      {/* The first signal read the upload as something other than an
+          offering memorandum (lib/document-kind): said, never acted on —
+          the screen runs as it would on an OM. */}
+      {documentKindNotice && (
+        <p role="status" data-qa="document-kind" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
+          {documentKindNotice}
+        </p>
+      )}
+
+      {/* The same file already on an earlier deal (lib/same-memorandum). */}
+      {sameFile && (
+        <p role="status" data-qa="same-memorandum" className="rounded-lg bg-brand/5 px-3 py-2 text-sm">
+          {"This same memorandum, byte for byte, is already on "}
+          <Link href={`/deals/${sameFile.id}`} className="font-medium text-brand hover:text-brand-strong">
+            {sameFile.name}
+          </Link>
+          {sameMemorandumTail(sameFile)}
         </p>
       )}
 
@@ -1092,7 +1398,7 @@ export default async function DealPage({
               </span>
             )}
             {buyBoxChip && (
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`} title={buyBoxChip.note}>
                 {buyBoxChip.label}
               </span>
             )}
@@ -1113,6 +1419,9 @@ export default async function DealPage({
           returnFigure,
           { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
         ]}
+        // The year built and today's occupancy, only where the memorandum
+        // states them, on a line under the tiles (lib/hero-figure).
+        facts={buildingFacts(metrics, { screenYear: screenYearOf(extraction), notYetDelivered: notYetDelivered(strategy.kind) })}
         // While a first screen has not yet written the terms of a memorandum,
         // a figure not read yet shimmers; once they are written, a missing
         // one keeps its dash — the pipeline row's own rule (`readingTerms`).
@@ -1130,7 +1439,18 @@ export default async function DealPage({
               dealId={id}
               label={dealAddress?.label ?? (deal.name as string)}
               hasStreetAddress={!!dealAddress?.street}
-              googleEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
+              // The aerial's centre is ringed only where it is the building's
+              // own point (lib/deal-location), never a street's or a town's.
+              pointIsBuilding={pointIsBuilding(visualCache, dealAddress)}
+              // Photon placed the point (the Census geocoder found nothing):
+              // the pictures framed on it credit OpenStreetMap.
+              osmPlaced={placedByOpenStreetMap(visualCache, dealAddress)}
+              // Never Google's: the visual draws USGS's aerial, FEMA's flood
+              // map and an OpenStreetMap view beside its pictures, and Google's
+              // Maps Platform terms (zori probe run 37266021924) forbid its
+              // services "with or near a non-Google Map" — Street View "and
+              // non-Google Maps on the same screen" by name.
+              googleEnabled={false}
               hasAddress={!!dealAddress?.label}
               picture={
                 picture
@@ -1157,12 +1477,28 @@ export default async function DealPage({
                           ? floodClassOfZone(floodLegendEntries, siteFlags.flood.zone, siteFlags.flood.subtype)
                           : null,
                       zone: siteFlags?.flood && siteFlags.flood !== "unavailable" ? `Zone ${siteFlags.flood.zone}` : null,
-                      line: floodZoneLine(siteFlags?.flood, floodLegendEntries),
+                      // The sentence names the point as the key beside it
+                      // does: the building's only where the ring is drawn.
+                      line: floodZoneLine(siteFlags?.flood, floodLegendEntries, pointIsBuilding(visualCache, dealAddress)),
                     }
                   : null
               }
             />
-          ) : null
+          ) : (
+            // Nothing of the place to show — no address, no photograph, no
+            // market photograph: the deal's own cover, the one its pipeline
+            // card wears (lib/deal-cover), so the header is never bare text.
+            <HeroCover
+              cover={coverFor({
+                seed: id,
+                assetClass: shownClass,
+                place: coverPlace(dealAddress, null, extraction?.market ?? firstSignal?.market ?? null),
+              })}
+              label={deal.name as string}
+              dealId={id}
+              canAdd={!(deal as { is_sample?: boolean }).is_sample}
+            />
+          )
         }
         actions={
           <>
@@ -1170,6 +1506,7 @@ export default async function DealPage({
               <ShareControl
                 dealId={id}
                 shares={((sharesRes.data ?? []) as ShareRow[])}
+                sharesUnread={sharesRes.data == null}
                 appUrl={
                   process.env.NEXT_PUBLIC_APP_URL ??
                   "https://underwrite-copilot.onrender.com"
@@ -1180,7 +1517,7 @@ export default async function DealPage({
               <a
                 href={`/api/deals/${id}/memo`}
                 title={
-                  pro
+                  downloadsOpen
                     ? "One-page IC screening memo — verdict, buy-box fit, flags, next steps"
                     : "One-page IC screening memo — part of Pro"
                 }
@@ -1202,7 +1539,7 @@ export default async function DealPage({
                   <path d="M10 16h4" />
                 </svg>
                 IC memo
-                {!pro && (
+                {!downloadsOpen && (
                   <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
                     Pro
                   </span>
@@ -1213,7 +1550,7 @@ export default async function DealPage({
               <a
                 href={`/api/deals/${id}/report`}
                 title={
-                  pro
+                  downloadsOpen
                     ? "The full screening report — memo plus every term, challenge, comp, and market check"
                     : "The full screening report — part of Pro"
                 }
@@ -1232,7 +1569,7 @@ export default async function DealPage({
                   <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
                 </svg>
                 Full report
-                {!pro && (
+                {!downloadsOpen && (
                   <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
                     Pro
                   </span>
@@ -1243,7 +1580,7 @@ export default async function DealPage({
               <a
                 href={`/api/deals/${id}/underwrite.xlsx`}
                 title={
-                  pro
+                  downloadsOpen
                     ? "Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates"
                     : "Institutional acquisition model (Excel) — part of Pro"
                 }
@@ -1263,7 +1600,7 @@ export default async function DealPage({
                   <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
                 </svg>
                 Underwrite model
-                {!pro && (
+                {!downloadsOpen && (
                   <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
                     Pro
                   </span>
@@ -1315,7 +1652,9 @@ export default async function DealPage({
             {versionCount >= 2 && (
               <Link
                 href={`/deals/${id}/bridge`}
-                title="Assumption bridge — which input moved the IRR, and by how much"
+                // The badge counts every saved version of the deal's
+                // assumptions — said, never a bare figure beside the name.
+                title={versionBadge(versionCount).title}
                 className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
               >
                 <svg
@@ -1331,8 +1670,8 @@ export default async function DealPage({
                   <path d="M4 19V9M10 19V5M16 19v-7M22 19h-20" />
                 </svg>
                 Bridge
-                <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                  {versionCount}
+                <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand" data-qa="bridge-count">
+                  {versionBadge(versionCount).text}
                 </span>
               </Link>
             )}
@@ -1348,6 +1687,11 @@ export default async function DealPage({
               fromMemorandum={offersDue != null && offersDue === offeringDue?.iso ? offeringDue.page : null}
               calendarHref={offersDue ? `/api/deals/${id}/offers-due.ics` : null}
             />
+            {/* The buyer's 1031 clock (lib/exchange-deal), where the reader's
+                buy box holds an exchange still running: the deadlines against
+                this deal's offers-due day and what its price buys, read on the
+                reader's own day. Never on the shared screen. */}
+            <ExchangeChip exchange={exchangeForDeal(buyBox?.exchange, extraction, offersDue, readerNoon)} />
             <StageSelect
               key={((deal as { stage?: string }).stage as string) ?? "screening"}
               dealId={id}
@@ -1358,42 +1702,100 @@ export default async function DealPage({
               dealName={deal.name}
               canDelete={canDelete}
               canRename={!(deal as { is_sample?: boolean }).is_sample}
+              moveTo={moveTo}
+              teamName={moveTeamName}
+              inReadersTeam={!ownership.team_id || readerTeam?.team_id === ownership.team_id}
             />
           </>
         }
       >
+        {/* A screen stored before the site read what its figures turn on —
+            what is being sold — says so first, once, with the re-screen
+            control (lib/older-screen). */}
+        {older ? (
+          <OlderScreenNote
+            line={older.line}
+            action={<RetryForm dealId={id} label="Re-screen" className="" secondary />}
+          />
+        ) : null}
         {/* The plan, as the OM states it, when the deal is not a stabilized
             asset — it changes what every figure above means. Then anything
-            that genuinely does not tie. */}
-        <PlanStrip strategy={strategy} plan={plan} noun={assetWords(shownClass).noun?.one} />
+            that genuinely does not tie. Its basis is per the counting row's
+            own noun (a hotel counting "Rooms" is per room), as the Size
+            slot, the card and the workbook say it — else the class's. */}
+        <PlanStrip strategy={strategy} plan={plan} noun={countNounOf(metrics, shownClass, strategy.kind).one} />
         {/* What is being sold (#414): a note, a share, a leasehold — said
             before any figure is believed, since it changes what the price
             buys (lib/interest). Nothing for a plain fee simple. */}
         <InterestPanel interest={interest} />
+        {/* What does not tie comes before the deal-kind panels below, which
+            build on the same figures (research pass 36: it had drifted under
+            every one of them, up to four phone screens below the plan). */}
+        <PlausibilityPanel findings={plausibility} strategy={strategy} />
+        {/* A sandwich position (lib/sandwich-lease): the sublease income
+            against the master rent with the spread filled, its cover, the
+            master lease's term against the model's hold, and what the model
+            does with a position that ends. Every panel below that says
+            "today", counts the days to a date or reads a date as passed reads
+            the reader's day (`readerNoon`, lib/reader-day). */}
+        <SandwichPanel
+          sandwich={readSandwichLease(extraction, readerNoon)}
+          holdYears={shown ? shown.inputs.holdMonths / 12 : null}
+          modelLine={shown?.meta.sandwich?.read ?? ""}
+        />
         {/* How it is sold (#456): an auction's starting bid is where the
             price starts — the bid, the premium on top, the model's ceiling
             at the buyer's hurdle; a court's or a lender's sale says who is
             selling (lib/sale-terms). */}
         <SalePanel
-          sale={readSale(extraction)}
-          ceiling={derived ? saleCeiling(extraction, derived.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT) : null}
+          sale={readSale(extraction, readerNoon)}
+          ceiling={shown ? saleCeiling(extraction, shown.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT, readerNoon) : null}
+        />
+        {/* A forward purchase or a build-to-suit bought at delivery
+            (lib/forward-purchase): the clock from today to the delivery and
+            the outside date, the deposit's share of the price, and the yield
+            at delivery against the model's exit cap — the buyer carries no
+            construction. Read on the reader's day, with the page's kind. */}
+        <ForwardPanel
+          forward={readForwardPurchase(extraction, readerNoon, strategy)}
+          today={todayIso}
+          exitCapPct={shown ? shown.inputs.exitCapPct * 100 : null}
+          modelLine={shown?.meta.forward?.read ?? ""}
+        />
+        {/* An operating business on its real estate (lib/going-concern):
+            the operator's EBITDAR against its rent with the 1.0x line, the
+            price as the memorandum splits it, the contracts as stated, and
+            what the model does with the business's income. */}
+        <GoingConcernPanel
+          goingConcern={readGoingConcern(extraction, readerNoon)}
+          modelLine={shown?.meta.goingConcern?.read ?? ""}
         />
         {/* A covenant or a contract that sets the rents (#453): the units it
             binds, until when, each tier against its limit — said before any
             rent growth is believed (lib/affordable). */}
-        <AffordablePanel affordable={readAffordable(extraction)} />
+        <AffordablePanel affordable={readAffordable(extraction, readerNoon)} />
+        {/* The rent rules that reach the building (lib/rent-regulation):
+            each regime and whether it applies, the regulated share as
+            stated, the allowance in force against the model's one growth
+            rate on one scale, and the period with today's tick. */}
+        <RegulationPanel
+          regulation={regulation}
+          today={todayIso}
+          modelGrowthPct={shown ? shown.inputs.rentGrowthPct * 100 : null}
+          modelLine={shown?.meta.regulation?.read ?? ""}
+        />
         {/* One tenant leases the whole property (#454): its guarantor, the
             term left today and at the model's sale, the options, and the
             lease's increases against the model's growth (lib/single-tenant). */}
         <SingleTenantPanel
-          lease={readSingleTenant(extraction)}
+          lease={readSingleTenant(extraction, readerNoon)}
           model={
-            derived
+            shown
               ? {
-                  holdMonths: derived.inputs.holdMonths,
-                  rentGrowthPct: derived.inputs.rentGrowthPct,
-                  vacancyPct: derived.inputs.vacancyPct,
-                  exitCapPct: derived.inputs.exitCapPct,
+                  holdMonths: shown.inputs.holdMonths,
+                  rentGrowthPct: shown.inputs.rentGrowthPct,
+                  vacancyPct: shown.inputs.vacancyPct,
+                  exitCapPct: shown.inputs.exitCapPct,
                 }
               : null
           }
@@ -1402,59 +1804,88 @@ export default async function DealPage({
             model's sale a year at a time, the building by the space each
             leases with an anchor outside the sale drawn apart, and each
             tenant's end and rights. */}
-        <RosterPanel roster={readRoster(extraction)} modelLine={derived?.meta.roster?.read ?? ""} />
+        <RosterPanel roster={readRoster(extraction, readerNoon)} modelLine={shown?.meta.roster?.read ?? ""} />
         {/* A value-add renovation program (#460): the doors done and to
             go, the premium priced on against the one achieved with the
             break-even at the model's exit cap, and the pace the period
             asks of turnover. */}
         <ValueAddPanel
           program={readValueAdd(extraction)}
-          exitCapPct={derived ? derived.inputs.exitCapPct : null}
-          modelLine={derived?.meta.valueAdd?.read ?? ""}
+          exitCapPct={shown ? shown.inputs.exitCapPct : null}
+          modelLine={shown?.meta.valueAdd?.read ?? ""}
         />
         {/* A property-tax abatement (#461): the years still abated against
             the model's sale, the bill today against the full one, and the
             share of the NOI that goes to taxes when it ends. */}
         <TaxAbatementPanel
-          abatement={readTaxAbatement(extraction)}
-          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
-          modelLine={derived?.meta.taxAbatement?.read ?? ""}
+          abatement={readTaxAbatement(extraction, readerNoon)}
+          holdYears={shown ? shown.inputs.holdMonths / 12 : null}
+          modelLine={shown?.meta.taxAbatement?.read ?? ""}
         />
         {/* What a hotel is sold with (#455): the flag, the manager, the
             encumbrance and the PIP — the basis a key with the PIP on top,
             the agreements' clocks against the model's sale, the rooms. */}
         <HotelPanel
-          hotel={readHotelDeal(extraction)}
-          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
-          modelLine={derived?.meta.hotel?.read ?? ""}
+          hotel={readHotelDeal(extraction, readerNoon)}
+          holdYears={shown ? shown.inputs.holdMonths / 12 : null}
+          modelLine={shown?.meta.hotel?.read ?? ""}
         />
         {/* A student building (#468): the pre-leasing against last year's
             and the occupancy the model runs at, the beds, the walk to
             campus (lib/student-housing). */}
         <StudentHousingPanel
           student={readStudentHousing(extraction)}
-          modelLine={derived?.meta.student?.read ?? ""}
-          modelOccupancyPct={derived ? Math.round((1 - derived.inputs.vacancyPct) * 1000) / 10 : null}
+          modelLine={shown?.meta.student?.read ?? ""}
+          modelOccupancyPct={shown ? Math.round((1 - shown.inputs.vacancyPct) * 1000) / 10 : null}
         />
         {/* A manufactured-housing park (#470): whose homes stand on the pads,
             the lot rent against the memorandum's market, the water and
             sewer, and what the model does with each
             (lib/manufactured-housing). */}
-        <ManufacturedHousingPanel park={readManufacturedHousing(extraction)} modelLine={derived?.meta.mh?.read ?? ""} />
+        <ManufacturedHousingPanel park={readManufacturedHousing(extraction)} modelLine={shown?.meta.mh?.read ?? ""} />
         {/* A self-storage facility (#471): its units, area and rent let
             against the 85% line, the in-place rent against the street rate,
             and whose platform it rides on (lib/self-storage). */}
-        <SelfStoragePanel storage={readSelfStorage(extraction)} modelLine={derived?.meta.storage?.read ?? ""} />
+        <SelfStoragePanel storage={readSelfStorage(extraction)} modelLine={shown?.meta.storage?.read ?? ""} />
+        {/* A mixed-use building (lib/mixed-use): the residential and
+            commercial incomes on one bar, the commercial share of the area,
+            and what the model's one exit cap does to both. */}
+        <MixedUsePanel
+          mixedUse={readMixedUse(extraction, readerNoon)}
+          modelLine={shown?.meta.mixedUse?.read ?? ""}
+        />
+        {/* Condominium units bought in bulk (lib/condo): the buyer's share of
+            the association with a lender's limit on a single owner, a year of
+            the dues, the reserves and restrictions as stated, and what the
+            model does with the units. */}
+        <CondoPanel condo={readCondo(extraction, readerNoon)} modelLine={shown?.meta.condo?.read ?? ""} />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML
             against the lenders' 20%, and what the model does with the
             immediate repairs. */}
-        <SiteReportsPanel reports={readSiteReports(extraction)} modelLine={derived?.meta.siteReports?.read ?? ""} />
+        <SiteReportsPanel reports={readSiteReports(extraction, readerNoon)} modelLine={shown?.meta.siteReports?.read ?? ""} />
         {/* Who is selling it and when offers are due (#467): the brokers as
             the memorandum prints them, a tap to call or write, and the call
             for offers as written (lib/offering). */}
-        <ListingTeam team={listingTeam} offersDue={offeringDue} />
-        <PlausibilityPanel findings={plausibility} strategy={strategy} />
+        <ListingTeam
+          team={listingTeam}
+          offersDue={offeringDue}
+          // Writing to the brokers the memorandum names (research pass 24,
+          // B15): the questions and the documents the deal does not hold —
+          // never on the sample, whose brokers are the walkthrough's.
+          actions={
+            isSampleDeal ? null : (
+              <BrokerEmailActions
+                to={listingTeam.map((b) => b.email).filter((e): e is string => !!e)}
+                dealName={deal.name}
+                challenges={challenges?.challenges ?? []}
+                totalPages={typeof extraction?.totalPages === "number" ? extraction.totalPages : null}
+                have={{ rentRoll: !!actuals.rentRoll, t12: !!actuals.t12 }}
+                profile={documentProfileOf(compsClassKey, extraction?.assetClass, extraction?.hotel)}
+              />
+            )
+          }
+        />
         <PlanSensitivity plan={plan} refCap={refCap} />
 
         {!extraction && firstSignal?.take && (
@@ -1462,8 +1893,9 @@ export default async function DealPage({
         )}
       </DealHero>
 
-      {/* The deal, kept in view once the header scrolls away (#437): the
-          header's own price and return figures, a blank left out. */}
+      {/* The deal, kept in view once the header's name and figures scroll
+          away (#437), its panels or not: the header's own price and return
+          figures, a blank left out. */}
       <DealStickyBar
         dealId={id}
         name={deal.name as string}
@@ -1506,7 +1938,9 @@ export default async function DealPage({
         // note's cap and returns withheld, its yield in the cap's place; a
         // share's cap struck on the whole, its returns standing only where
         // the model ran at that whole.
-        modelInterest={model ? modelReturnsRead(extraction, model.returns) : null}
+        // …and where a leasehold's lease ends inside the model's own hold,
+        // its returns withheld over the leasehold card's sentence.
+        modelInterest={model ? modelReturnsRead(extraction, { ...model.returns, holdYears: model.holdYears }, readerNoon) : null}
         metroDemand={
           reads && liveMarket
             ? metroDemand(reads.rates, readClass)
@@ -1517,7 +1951,8 @@ export default async function DealPage({
         hasOm={!!deal.om_storage_path}
         modelErrorCode={errorCode ?? null}
         job={job}
-        typicalScreen={typicalScreen}
+        typicalScreen={typicalScreen.phrase}
+        typicalScreenMs={typicalScreen.ms}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
         staleResults={staleResults}
         firstSignal={firstSignal}
@@ -1535,7 +1970,16 @@ export default async function DealPage({
         }}
         screenDiff={screenDiff}
         stageHistory={stageHistory}
+        dealStage={((deal as { stage?: string }).stage as string) ?? "screening"}
+        // The due-diligence checklist, once the deal is under LOI or
+        // contract (research pass 24, B16) — never on the sample.
+        ddChecklist={
+          !isSampleDeal && ["loi_submitted", "under_contract"].includes(normalizeStage((deal as { stage?: string }).stage ?? null))
+            ? ddChecklist(deal.asset_class as string | null, extraction)
+            : null
+        }
         internalComps={internalComps}
+        internalCompsUnread={internalCompsUnread}
         omUrl={omUrl}
         facts={factsByField}
         discrepancies={
@@ -1550,9 +1994,13 @@ export default async function DealPage({
         marketMemory={marketMemory}
         actuals={actuals}
         playground={playground}
+        // The deal's kind the header reads (the first signal included), so
+        // the debt sizer's plan block and price read the same kind.
+        dealStrategy={strategy}
         tasks={dealTasks}
         taskAssignees={taskAssignees}
         todayIso={todayIso}
+        compsSubjectPoint={compsSubjectPoint}
       />
 
       <div className="mt-6 space-y-4">
@@ -1560,13 +2008,27 @@ export default async function DealPage({
           dealId={id}
           result={publicComps}
           hasAddress={!!dealAddress?.label}
-          subjectPrice={subjectPriceNumber}
+          subject={compsCallSubject}
+          today={todayIso}
+          dbMarketsLine={compsDbMarketsLine}
         />
         <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} today={todayIso} />
         <PublicRecordCard
           address={dealAddress}
           market={placement.briefed}
-          subject={publicComps?.subject ?? siteFlags?.subject ?? null}
+          // The nearest parcel within 120 m is the building's only from a
+          // point placed at the building: never a street's centreline or an
+          // area's centre, where the nearest parcel is somebody else's — and
+          // never on the sample, whose building is fictional
+          // (lib/public-record-subject).
+          sample={isSampleDeal}
+          subject={publicRecordSubject({
+            isSample: isSampleDeal,
+            buildingPoint: pointIsBuilding(visualCache, dealAddress) ? knownPoint : null,
+            compsSubject: publicComps?.subject ?? null,
+            siteFlagsSubject: siteFlags?.subject ?? null,
+            siteFlagsPointIsBuilding: siteFlags?.pointIsBuilding ?? null,
+          })}
         />
         {/* Anchor target for the Regulation panel's "answer in Deal facts"
             links; scroll-mt keeps the jump clear of the sticky header. */}
@@ -1583,13 +2045,21 @@ export default async function DealPage({
           address={dealAddress}
           placement={placement}
           census={siteFlags && siteFlags.status !== "pending" ? { place: siteFlags.place, county: siteFlags.county } : null}
-          sizeText={summarySize}
-          priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
+          // The rules test the building's stated unit count, read as the
+          // rent-regulation read reads it (lib/rent-regulation
+          // `rulesSizeText`) — never the header's Size slot, which shows the
+          // area where a memorandum states both. Before the extraction, the
+          // first signal's size as the header has it.
+          sizeText={extraction ? rulesSizeText(extraction, shownClass) : summarySize}
+          // The price by its class's basis, the pipeline card's own reader.
+          basis={extraction ? basisTag(extraction, strategy.kind, deal.asset_class as string | null) : null}
           // The leverage read spreads the BUYER's cap against debt, so on a
-          // note it does not run on the collateral's (lib/compare-interest):
-          // the panel says why instead.
-          capText={noteCap ? null : summaryCap}
-          capWithheld={noteCap ? "note" : null}
+          // note it does not run on the collateral's, nor on a preferred
+          // equity position on the building's, nor on a share beside its
+          // entity's loan (lib/compare-interest `capSlotWithheld`, the
+          // header's rule): the panel says why instead.
+          capText={capWithheld ? null : summaryCap}
+          capWithheld={capWithheld}
           planLabel={isPlanDeal(strategy.kind) ? strategy.label : null}
           yearBuilt={summaryYearBuilt}
           sectorFields={

@@ -11,6 +11,7 @@ import {
   type Observation,
   type YieldCurve,
 } from "@/lib/live-rates";
+import { FRED_NOTICE, NY_FED_SOFR_NOTICES, carriesNyFedNotice } from "@/lib/data-notices";
 
 /**
  * Today's rates — across the top of the calculators, and on `/market`.
@@ -81,7 +82,9 @@ export function RatesStrip({
           Rates today
         </h2>
         <p className="text-[11px] text-muted">
-          {`The latest figure each series has posted, dated by its own day, month or quarter · FRED, pulled every weekday · ${rates.length} series · each figure links to its source`}
+          {/* FRED is the channel: a figure FRED carries for another
+              publisher names that publisher on its tile (publisherTag). */}
+          {`The latest figure each series has posted, dated by its own day, month or quarter · pulled through FRED every weekday · ${rates.length} series · each figure links to its source`}
         </p>
       </div>
 
@@ -112,6 +115,15 @@ export function RatesStrip({
                 <Tile key={r.meta.id} r={r} seeded={seeds.includes(r.meta.id)} />
               ))}
             </div>
+            {/* The New York Fed's terms ask for their notice with any
+                presentation of SOFR, and the DTCC sentence rides with it
+                (lib/data-notices): once, small, beside the tiles that draw
+                SOFR or its 30-day average — never a copy a tile. */}
+            {money.rates.some((r) => carriesNyFedNotice(r.meta.id)) && (
+              <p className="mt-3 text-[10px] leading-snug text-muted" data-qa="nyfed-notice">
+                {NY_FED_SOFR_NOTICES}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -154,6 +166,12 @@ export function RatesStrip({
         The 30-year survey is an owner-occupier residential rate, not a
         commercial quote, so it is shown here and never fills a box. An index
         is shown as its change from a year ago, never as a level.
+      </p>
+      {/* FRED's terms ask for this notice prominently on the application
+          (lib/data-notices), and the strip is where /tools and /market draw
+          FRED's figures, so it stands under them as well as in the footer. */}
+      <p className="mt-2 text-[11px] text-muted" data-qa="fred-notice">
+        {FRED_NOTICE}
       </p>
     </section>
   );

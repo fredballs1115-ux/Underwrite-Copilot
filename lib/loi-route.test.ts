@@ -21,6 +21,15 @@ const OWNER = "11111111-1111-4111-8111-111111111111";
 const db = vi.hoisted(() => ({
   user: null as { id: string } | null,
   row: null as Record<string, unknown> | null,
+  /** the reader's time-zone cookie (lib/reader-day), as the browser writes it */
+  tz: undefined as string | undefined,
+}));
+
+// The request's cookies: the route dates the letter on the reader's day.
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) => (name === "uc_tz" && db.tz != null ? { name, value: db.tz } : undefined),
+  }),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -128,6 +137,7 @@ const row = (label: string, value: string) => ({ label, value, flagged: false, p
 
 beforeEach(() => {
   db.user = { id: OWNER };
+  db.tz = undefined;
   db.row = {
     id: DEAL,
     user_id: OWNER,
@@ -138,6 +148,33 @@ beforeEach(() => {
     extraction,
     first_signal: signal,
   };
+});
+
+// Research pass 35 (F5): the letter was dated by the server's clock, which
+// runs UTC, so from 8 pm Eastern it was dated tomorrow — and its offer is
+// "open for acceptance for 7 days from the date above".
+describe("the LOI is dated on the reader's own day", () => {
+  it("at 11:30 pm in New York the letter is dated that evening, though the server's UTC day has turned", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T03:30:00Z"));
+    try {
+      db.tz = "America%2FNew_York";
+      let letter = await letterText(await download());
+      expect(letter).toContain("October 5, 2026");
+      expect(letter).not.toContain("October 6, 2026");
+      expect(letter).toContain("open for acceptance for 7 days from the date above");
+      // No cookie yet (the reader's first page): Eastern's day.
+      db.tz = undefined;
+      expect(await letterText(await download())).toContain("October 5, 2026");
+      // A reader in London is past midnight: their day.
+      db.tz = "Europe%2FLondon";
+      letter = await letterText(await download());
+      expect(letter).toContain("October 6, 2026");
+      expect(letter).not.toContain("October 5, 2026");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("the LOI route and the panel read the deal's plan the same way", () => {
@@ -179,6 +216,49 @@ describe("the LOI is refused where the memorandum sells something else, or sells
     ],
     ["a share", { ...extraction, interest: interest("partial_interest", { share: "49% limited partnership interest" }) }, "share"],
     ["a share of no stated percentage", { ...extraction, interest: interest("partial_interest") }, "share"],
+    // An undivided interest held as a tenant in common is the real estate's,
+    // never an entity's share — and still not the whole property (research
+    // pass 37).
+    [
+      "an undivided interest held as a tenant in common",
+      { ...extraction, interest: interest("partial_interest", { share: "30% tenant-in-common interest", summary: "An undivided 30% tenant-in-common interest in the fee simple" }) },
+      "tic",
+    ],
+    // All the tenant-in-common interests are together the whole property,
+    // bought from each co-owner (audit C3b LOW-1).
+    [
+      "all the tenant-in-common interests",
+      {
+        ...extraction,
+        interest: interest("partial_interest", {
+          share: "100% of the tenant-in-common interests",
+          summary: "100% of the tenant-in-common interests in the property, sold together by the co-owners",
+        }),
+      },
+      "tic_all",
+    ],
+    // A share of the general partner's interest is a share of a share.
+    ["a share of the general partner's interest", { ...extraction, interest: interest("partial_interest", { share: "50% of the general partner interest" }) }, "gp_stake"],
+    // A preferred equity position (lib/position): its own kind, and a share
+    // filed before the kind was asked whose rows say a position.
+    [
+      "a preferred equity position",
+      {
+        ...extraction,
+        interest: interest("preferred_equity"),
+        metrics: [...extraction.metrics, row("Preferred equity amount", "$15,000,000"), row("Preferred return", "12% preferred return, 8% current pay")],
+      },
+      "position",
+    ],
+    [
+      "a share whose rows say a preferred equity position",
+      {
+        ...extraction,
+        interest: interest("partial_interest"),
+        metrics: [...extraction.metrics, row("Preferred equity amount", "$15,000,000"), row("Current pay rate", "8.0%")],
+      },
+      "position",
+    ],
     ["the leased fee", { ...extraction, interest: interest("leased_fee", { groundLease: "Ground lease to 2071" }) }, "leased_fee"],
     ["an auction", { ...extraction, sale: sale("auction"), metrics: [...extraction.metrics, row("Starting bid", "$2,500,000")] }, "auction"],
     // An auction's figures make an auction whatever the method says (lib/sale-terms).
@@ -233,6 +313,14 @@ describe("the LOI is refused where the memorandum sells something else, or sells
 
   it("says why in each sentence: a note is bought under a loan sale agreement, an auction under its own terms", () => {
     expect(LOI_REFUSAL.note).toMatch(/loan sale agreement, not a property letter of intent/);
+    expect(LOI_REFUSAL.position).toMatch(/sells a preferred equity position in the owning entity, not the property — a position is bought under the entity's own agreements/);
+    // A tenancy in common is never called a share of an entity (research pass 37).
+    expect(LOI_REFUSAL.tic).toMatch(/sells an undivided interest in the property, held as a tenant in common beside its co-owners/);
+    expect(LOI_REFUSAL.tic).not.toMatch(/entity/);
+    // All of them are the whole property, bought from several owners.
+    expect(LOI_REFUSAL.tic_all).toMatch(/sells all the tenant-in-common interests in the property, together the whole property/);
+    expect(LOI_REFUSAL.tic_all).not.toMatch(/entity|beside its co-owners/);
+    expect(LOI_REFUSAL.gp_stake).toMatch(/sells a share of the general partner's interest, not the property — a share of a share/);
     expect(LOI_REFUSAL.auction).toMatch(/bid for under the auction's own terms/);
     // True of a stalking horse whether or not the memorandum prices it.
     expect(LOI_REFUSAL.bids).toMatch(/states a stalking-horse bid — the property is sold through bidding that higher bids can reopen/);
@@ -353,9 +441,45 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
     expect(loiTermsFor(extraction, null).shortSale).toBeNull();
   });
 
+  // Research pass 35 (F15): a hotel's letter said nothing about its flag, the
+  // franchisor's approval or the PIP the buyer funds.
+  it("a flagged hotel: the letter notes under its Closing clause what the sale carries and the franchisor's approval", async () => {
+    const hotel: ExtractionResult = {
+      ...extraction,
+      assetClass: "hospitality_str",
+      totalPages: 40,
+      hotel: { brand: "Hilton Garden Inn", franchise: "", management: "", encumbrance: "brand", pip: "", page: "p. 5" },
+      metrics: [...extraction.metrics, row("Keys", "120"), row("PIP cost", "$4,200,000")],
+    };
+    const terms = loiTermsFor(hotel, null);
+    expect(terms.hotel).toEqual({
+      stated: "the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a $4.2M PIP",
+      page: "p. 5",
+    });
+    db.row = { ...db.row, extraction: hotel, first_signal: null };
+    const res = await download();
+    expect(res.status).toBe(200);
+    const letter = await letterText(res);
+    const note =
+      "[Review before sending: the memorandum says the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a $4.2M PIP (p. 5); the PSA should condition closing on the franchisor approving the transfer and the PIP as issued.]";
+    expect(letter).toContain(note);
+    // Under the Closing clause; no clause is added for it.
+    expect(letter.indexOf(note)).toBeGreaterThan(letter.indexOf("5. Closing"));
+    expect(letter.indexOf(note)).toBeLessThan(letter.indexOf("6. Purchase and Sale Agreement"));
+    // The panel says what the download carries, in the same list.
+    expect(panelText(hotel, null)).toMatch(
+      /It is a flagged hotel, so the draft notes under its closing that the PSA should condition the closing on the franchisor approving the transfer and the PIP as issued\.\s*Each is highlighted in the draft for review\./,
+    );
+    // No franchisor has a transfer to approve on an independent hotel, or
+    // one sold unencumbered: no note.
+    for (const over of [{ brand: "Independent" }, { encumbrance: "unencumbered" as const }]) {
+      expect(loiTermsFor({ ...hotel, hotel: { ...hotel.hotel!, ...over } }, null).hotel).toBeNull();
+    }
+  });
+
   it("a plain fee simple sold the usual way: the letter is the letter it always was", async () => {
     const plain = loiTermsFor(extraction, null);
-    expect(plain).toMatchObject({ refusal: null, leasehold: null, seller: null, shortSale: null, properties: [], notes: [] });
+    expect(plain).toMatchObject({ refusal: null, leasehold: null, seller: null, shortSale: null, hotel: null, properties: [], notes: [] });
     db.row = { ...db.row, first_signal: null };
     const res = await download();
     expect(res.status).toBe(200);
@@ -363,7 +487,11 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
     expect(textOfXml(xml)).toContain(
       "Cascade (“Buyer”) is pleased to submit this non-binding letter of intent to acquire the above-referenced property (the “Property”) from its owner (“Seller”) on the principal terms set out below.",
     );
-    expect(xml).not.toMatch(/w:highlight/);
+    // One highlight only: the closing line every letter carries, marked to
+    // come out before sending (research pass 35) — nothing the memorandum
+    // decided.
+    expect(xml.match(/<w:highlight w:val="yellow"\/>/g)).toHaveLength(1);
+    expect(textOfXml(xml)).toContain("[Draft prepared with Underwrite Copilot for negotiation purposes");
     expect(textOfXml(xml)).not.toContain("[Review");
     // Word for word what the letter builder drafts with none of the new terms.
     const params = {
@@ -380,7 +508,9 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
       firmName: null,
     };
     const before = await letterXml(await buildLoiDocx(params));
-    const after = await letterXml(await buildLoiDocx({ ...params, plan: null, leasehold: null, seller: null, shortSale: null, properties: [] }));
+    const after = await letterXml(
+      await buildLoiDocx({ ...params, plan: null, leasehold: null, seller: null, shortSale: null, hotel: null, properties: [] }),
+    );
     expect(after).toBe(before);
     expect(panelHtml(extraction, null)).not.toMatch(/data-qa="loi-notes"/);
   });

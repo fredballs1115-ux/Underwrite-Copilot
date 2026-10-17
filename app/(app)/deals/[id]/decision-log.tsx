@@ -3,14 +3,20 @@
 import { useFormStatus } from "react-dom";
 import type { DealNote } from "@/lib/deals";
 import { STAGE_LABEL, type StageChange } from "@/lib/stages";
+import { outcomeWords } from "@/lib/deal-outcome";
 import { addDealNote, deleteDealNote } from "../actions";
+import { displayName } from "@/lib/person";
+import { mayRemoveNote } from "@/lib/note-remove";
+import { PersonBadge } from "../../person-badge";
 
 // Module-level cached formatter (creating one per render is measurable).
 // UTC-pinned, date-only: the server and the browser must render the SAME
-// string or React logs a hydration mismatch on every deal with a note.
+// string or React logs a hydration mismatch on every deal with a note. The
+// year in full: a log runs across New Year, and "Aug 26" reads as the 26th.
 const WHEN_FMT = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
+  year: "numeric",
   timeZone: "UTC",
 });
 
@@ -60,12 +66,22 @@ export function DecisionLog({
   stageHistory,
   userEmail,
   userId,
+  names = null,
+  isSample = false,
 }: {
   dealId: string;
+  /** the sample deal, whose own seeded note its reader may remove
+   *  (lib/note-remove, the delete action's rule too) */
+  isSample?: boolean;
   notes: DealNote[];
   stageHistory: StageChange[];
   userEmail: string | null;
   userId: string | null;
+  /** a team deal's teammates by user id, named as Ask's askers are (the
+   *  name each set, else their email's local part); where it is not
+   *  handed in, a teammate's note reads its author's email's local part;
+   *  also who reported a trade, by account */
+  names?: Record<string, string> | null;
 }) {
   const entries: Entry[] = [
     ...notes.map((note): Entry => ({ kind: "note", at: note.at, note })),
@@ -74,6 +90,11 @@ export function DecisionLog({
 
   const mine = (n: DealNote) =>
     n.byId ? n.byId === userId : !!userEmail && n.by === userEmail;
+  // Who wrote a note: the reader as "you", a teammate by name, and an
+  // author no name is known for by their email's local part — a note
+  // stores the address it was written under, never printed whole.
+  const authorOf = (n: DealNote): string =>
+    mine(n) ? "you" : (n.byId && names?.[n.byId]) || displayName(n.by) || "a teammate";
 
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -93,7 +114,7 @@ export function DecisionLog({
             rows={2}
             aria-label="New decision note"
             placeholder="e.g. Passed at $68M — revisit if they come back under $63M."
-            className="w-full min-w-0 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30 sm:flex-1"
+            className="w-full min-w-0 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 sm:flex-1"
           />
           <SaveButton />
         </div>
@@ -105,12 +126,21 @@ export function DecisionLog({
         <ol className="mt-4 space-y-3">
           {entries.map((e, i) => (
             <li key={`${e.at}-${i}`} className="flex gap-3">
-              <span
-                aria-hidden
-                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                  e.kind === "note" ? "bg-brand" : "border border-brand/50 bg-surface"
-                }`}
-              />
+              {/* A note wears its author's badge; a stage move, which no
+                  one is recorded as making, keeps the timeline's hollow
+                  dot, centred in the badge's column so the words align. */}
+              {e.kind === "note" ? (
+                <PersonBadge
+                  name={(e.note.byId && names?.[e.note.byId]) || e.note.by}
+                  id={e.note.byId || e.note.by}
+                  size="sm"
+                  decorative
+                />
+              ) : (
+                <span aria-hidden className="flex w-6 shrink-0 justify-center pt-1.5">
+                  <span className="h-2 w-2 rounded-full border border-brand/50 bg-surface" />
+                </span>
+              )}
               <div className="min-w-0 flex-1">
                 {e.kind === "note" ? (
                   <>
@@ -120,8 +150,8 @@ export function DecisionLog({
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
                       <span>{safeWhen(e.at)}</span>
                       <span aria-hidden>·</span>
-                      <span className="truncate">{e.note.by}</span>
-                      {mine(e.note) && (
+                      <span className="truncate">{authorOf(e.note)}</span>
+                      {mayRemoveNote(e.note, { userId, userEmail }, isSample) && (
                         <form action={deleteDealNote} className="inline">
                           <input type="hidden" name="dealId" value={dealId} />
                           <input type="hidden" name="at" value={e.at} />
@@ -137,6 +167,11 @@ export function DecisionLog({
                       {STAGE_LABEL[e.stage.stage] ?? e.stage.stage}
                     </span>
                     <span className="ml-2 text-xs">{safeWhen(e.at)}</span>
+                    {/* What became of the deal, on the move that ended it
+                        (research pass 24, B4). */}
+                    {e.stage.outcome ? (
+                      <span className="mt-0.5 block text-xs text-ink">{outcomeWords(e.stage.outcome, names)}</span>
+                    ) : null}
                   </p>
                 )}
               </div>

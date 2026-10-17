@@ -11,6 +11,7 @@ import { DebtSizer } from "@/app/(app)/deals/[id]/debt-sizer";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { FLAT_SIZER_RATE_PCT, sizerStartingRate } from "@/lib/sizer-terms";
+import { inferStrategy } from "@/lib/deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const OM: ExtractionResult = {
@@ -162,6 +163,64 @@ describe("the debt sizer's opening sentence names where its starting figures com
     expect(visibleText(html)).toContain("Rate starts from the screening model's 6.00% placeholder");
   });
 
+  // Research pass 34: with a T-12 uploaded and no first-draft model, the
+  // sizer said "Price and NOI from the OM" and seeded the OM's in-place NOI
+  // while the playground's coverage ran the T-12's; an OM stating only a
+  // pro forma NOI seeded none ("needs an NOI") while the model ran it.
+  it("starts from the screening model's year-1 NOI — the playground's, the T-12's where uploaded — and says so", () => {
+    const t12 = {
+      summary: { collectedRent: null, vacancyLoss: null, otherIncome: null, egi: 4_400_000, opex: [], totalOpex: 1_800_000, noi: 2_600_000, noiDerived: false },
+      periodEnd: "2026-06-30",
+    };
+    const derived = deriveUnderwriteInputs(OM, "Harbor Point Apartments", { t12 });
+    const html = render({ model: null, extraction: OM, underwrite: derived.inputs, underwriteSources: derived.sources, rateSeeds: null });
+    clean(html);
+    expect(inputValue(html, "Year-1 NOI")).toBe("$2,600,000");
+    expect(opening(html)).toBe(
+      "Price from the OM, NOI from the screening model the playground and the workbook run; the amortization and lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+    // A stabilized OM that states only a pro forma NOI: the model runs it,
+    // and so does the sizer now.
+    const proForma: ExtractionResult = {
+      ...OM,
+      metrics: OM.metrics.map((m) => (/NOI/.test(m.label) ? { ...m, label: "NOI (pro forma)" } : m)),
+    };
+    const pf = deriveUnderwriteInputs(proForma, "Harbor Point Apartments");
+    expect(render({ model: null, extraction: proForma, underwrite: pf.inputs, rateSeeds: null })).not.toContain('value="$2,400,000"');
+    const seeded = render({ model: null, extraction: proForma, underwrite: pf.inputs, underwriteSources: pf.sources, rateSeeds: null });
+    expect(inputValue(seeded, "Year-1 NOI")).toBe("$2,400,000");
+    // An NOI the model had to assume is no NOI to start a loan from.
+    const unread: ExtractionResult = { ...OM, metrics: OM.metrics.filter((m) => !/NOI/.test(m.label)) };
+    const assumed = deriveUnderwriteInputs(unread, "Harbor Point Apartments");
+    expect(assumed.sources.inPlaceRentAnnual?.provenance).toBe("assumption");
+    const none = render({ model: null, extraction: unread, underwrite: assumed.inputs, underwriteSources: assumed.sources, rateSeeds: null });
+    expect(inputValue(none, "Year-1 NOI")).toBe("");
+    expect(opening(none)).toMatch(/^Price from the OM; /);
+  });
+
+  it("reads the deal's kind the page reads, the first signal included: a value-add the header names gets its plan block", () => {
+    const ex: ExtractionResult = {
+      ...OM,
+      metrics: [
+        { label: "Asking price", value: "$18,500,000", flagged: false, page: "p. 3" },
+        { label: "NOI (in-place)", value: "$1,100,000", flagged: false, page: "p. 8" },
+        { label: "NOI (stabilized)", value: "$1,337,800", flagged: false, page: "p. 9" },
+        { label: "Capital budget", value: "$2,850,000", flagged: false, page: "p. 10" },
+        { label: "Units", value: "100", flagged: false, page: "p. 3" },
+      ],
+    };
+    // Nothing in the rows names the plan; the first signal does.
+    expect(inferStrategy(ex).kind).toBe("stabilized");
+    const page = inferStrategy(ex, { take: "A value-add play: the renovation program carries the return — check the premium." });
+    expect(page.kind).toBe("value_add");
+    const d = deriveUnderwriteInputs(ex, "x");
+    const block = "Construction &amp; take-out — the plan&#x27;s debt";
+    expect(render({ model: null, extraction: ex, underwrite: d.inputs, rateSeeds: null })).not.toContain(block);
+    const html = render({ model: null, extraction: ex, underwrite: d.inputs, underwriteSources: d.sources, rateSeeds: null, strategy: page });
+    expect(html).toContain(block);
+    clean(html);
+  });
+
   it("with nothing to start from, asks for the deal's figures and still names the defaults", () => {
     const html = render({ model: null, extraction: null, underwrite: null, rateSeeds: null });
     expect(opening(html)).toBe(
@@ -183,5 +242,71 @@ describe("sizerStartingRate — the precedence, one rule", () => {
     });
     // A model rate that is no rate is no starting point.
     expect(sizerStartingRate({ statedPct: null, seed: null, modelRateDec: Number.NaN, operating: true }).from).toBe("flat");
+  });
+});
+
+describe("the three lender tests are one picture", () => {
+  it("draws each test's loan on one track, the binding one filled and the max loan ticked on every row", () => {
+    const derived = deriveUnderwriteInputs(OM, "Harbor Point Apartments");
+    const html = render({ model: null, extraction: OM, underwrite: derived.inputs, underwriteSources: derived.sources, rateSeeds: null });
+    clean(html);
+    expect((html.match(/data-bar="sizer-binding"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-bar="sizer-test"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="sizer-max"/g) ?? []).length).toBe(3);
+    const text = visibleText(html);
+    // 65% of the $40M price is the smallest of the three: the LTV binds.
+    expect(text).toContain("Max LTV 65%");
+    expect(text).toContain("Binding");
+    expect(text).toContain("Track: $0 to the $40M price");
+    // The binding bar is the price's 65%, on the price's track.
+    expect(html).toMatch(/style="width:65%"[^>]*data-bar="sizer-binding"/);
+  });
+
+  it("draws the breakeven occupancy on a 0–100% track, the breakeven and the model's occupancy as ticks", () => {
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
+    const html = render({ model: SAMPLE_DEAL.model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    clean(html);
+    const text = visibleText(html);
+    // The figure the sentence states is the tick's key, one figure.
+    const occ = /([\d.]+)%\s*occupancy covers expenses/.exec(text)?.[1];
+    expect(occ).toBeTruthy();
+    expect(text).toContain(`Breakeven ${occ}%`);
+    expect(text).toContain(`The model's ${100 - SAMPLE_DEAL.model.inputs.vacancyPct!}%`);
+    expect(html).toContain('data-bar="breakeven"');
+    expect(html).toContain('data-bar="model-occupancy"');
+    const drawn = /style="width:([\d.]+)%"[^>]*data-bar="breakeven-need"/.exec(html)?.[1];
+    expect(Math.abs(Number(drawn) - Number(occ))).toBeLessThan(0.05);
+    if (Number(occ) < 100 - SAMPLE_DEAL.model.inputs.vacancyPct!) {
+      expect(html).toContain('data-bar="breakeven-cushion"');
+      expect(text).toContain("The cushion");
+    }
+  });
+
+  it("measures the track in potential rent, and past 100% says the breakeven is not reached at full occupancy, as the workbook does (audit C11, L2)", () => {
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
+    const sample = visibleText(render({ model: SAMPLE_DEAL.model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null }));
+    expect(sample).toContain("100% of potential rent");
+    expect(sample).not.toContain("100% occupied");
+    // The same deal with its expenses near its whole potential rent.
+    const inp = SAMPLE_DEAL.model.inputs;
+    const heavy = { ...SAMPLE_DEAL.model, inputs: { ...inp, year1Opex: inp.year1Gpr! * 0.97 } };
+    const html = render({ model: heavy, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    clean(html);
+    const text = visibleText(html);
+    const past = /need\s*([\d.]+)%\s*of the potential rent/.exec(text)?.[1];
+    expect(Number(past)).toBeGreaterThan(100);
+    expect(text).toContain("Not reached at full occupancy:");
+    expect(text).toContain(`Breakeven not reached at full occupancy (${past}% of potential rent)`);
+    expect(text).not.toMatch(/[\d.]+%\s*occupancy covers expenses/);
+    // The fill sits at the track's end.
+    expect(html).toMatch(/style="width:100%"[^>]*data-bar="breakeven-need"/);
+  });
+
+  it("with nothing to size on, draws no bars and no key", () => {
+    const html = render({ model: null, extraction: null, underwrite: null, rateSeeds: null });
+    clean(html);
+    expect(html).not.toContain('data-bar="sizer-');
+    expect(html).not.toContain('data-qa="sizer-key"');
+    expect(visibleText(html)).toContain("needs a price");
   });
 });

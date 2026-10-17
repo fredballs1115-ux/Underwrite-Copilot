@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
-import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
+import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFinancials, type SampleFit } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { ScrollProgress } from "./scroll-progress";
+import { RECONCILE_RUN, SCREEN_STAGES, type ScreenStageKey } from "@/lib/screen-stages";
 import type { Metadata } from "next";
 import {
   SPREAD_LOW_IRR_PCT,
@@ -19,16 +20,18 @@ import {
   FREE_DEALS_LINE,
   FREE_PLAN,
   PRO_PLAN_LINES,
-  SAMPLE_COMP_PREMIUM_LINE,
 } from "@/lib/marketing-constants";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-// The Excel-preview rows are COMPUTED from the live engine on the sample
-// model at render time — hardcoded copies of these figures are exactly what
-// drifted (the page said 7.1% while the engine computed 6.9%).
-import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
+import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
+import { constructionSeedFor } from "@/lib/model-market";
+import { NO_DEBT_SEEDS } from "@/lib/debt-index";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { modelReturnsRead } from "@/lib/compare-interest";
+import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
+import { buyBoxLines } from "@/lib/criteria";
+import type { SampleBuyBoxData } from "./sample-buy-box";
 import { ruleCounts } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { latestChange } from "@/lib/changelog";
@@ -43,16 +46,26 @@ import { MarketsGallery } from "./markets-gallery";
 import { HERO_STRIP, HERO_WORDS_TOP, PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
+import { sampleHeader, type HeaderFacts } from "@/lib/sample-header";
+import { SampleDealHero } from "./sample-hero";
+import { MemoPreview } from "./memo-preview";
+import { SamplePipelineCard } from "./sample-pipeline-card";
+import { sampleMemoData } from "@/lib/sample-memo";
+import { compRating, inCompOrder } from "@/lib/comp-rating";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
 // (Server component only: these pull the research JSONs, which must not ride
 // into client bundles via marketing-constants.)
 const RULES = ruleCounts();
-// "29 rules, 28 source-linked" — a rule filed without a source is never
-// counted as linked (the pre-ship audit of 2026-09-30).
+// "29 rules across the markets, 28 of them source-linked" — a rule filed
+// without a source is never counted as linked (the pre-ship audit of
+// 2026-09-30), and the count is the file's whole, never one market's
+// (research pass 43, L11).
 const RULES_PHRASE =
-  RULES.sourced === RULES.all ? `${RULES.all} source-linked` : `${RULES.all}, ${RULES.sourced} of them source-linked`;
+  RULES.sourced === RULES.all
+    ? `${RULES.all} across the markets, each source-linked`
+    : `${RULES.all} across the markets, ${RULES.sourced} of them source-linked`;
 // The sample deal's legal read through the REAL rules engine — feeds the
 // walkthrough widget's Regulation block. Read for the day the page renders
 // (the page is ISR), since a rule's date is marked stale past the research
@@ -105,71 +118,67 @@ function Icon({ children, className = "h-5 w-5" }: { children: ReactNode; classN
   );
 }
 
-// The actual six-stage pipeline — a word or two each; the trace band under
-// the rail shows what each stage produces. Reconcile runs only where the
-// buyer adds their own model (lib/screen-run), and its tile says so.
-const STAGES: { title: string; note?: string; icon: ReactNode }[] = [
-  {
-    title: "Extract",
-    icon: (
-      <Icon>
-        <path d="M6 2h9l5 5v15H6z" />
-        <path d="M14 2v6h6" />
-        <path d="M9 13h6M9 17h6" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Challenge",
-    icon: (
-      <Icon>
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Comps",
-    icon: (
-      <Icon>
-        <path d="M4 20v-9M10 20V5M16 20v-6M2 20h20" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Reconcile",
-    note: "with your model",
-    icon: (
-      <Icon>
-        <path d="M12 4v16M5 20h14M6 8h12" />
-        <path d="m6 8-3 6h6zM18 8l-3 6h6z" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Market",
-    icon: (
-      <Icon>
-        <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
-        <circle cx="12" cy="10" r="2.5" />
-      </Icon>
-    ),
-  },
-  {
-    title: "Verdict",
-    icon: (
-      <Icon>
-        <circle cx="12" cy="12" r="9" />
-        <path d="m8.5 12 2.5 2.5 4.5-5" />
-      </Icon>
-    ),
-  },
-];
+// The screen's six stages, named and ordered as the deal page's progress
+// rail names them (lib/screen-stages, which a test holds to the rail): the
+// first pass on the headline figures, then the extraction, the challenger,
+// the broker comps, the market check and the verdict. An icon each; the
+// trace band under the rail shows what each stage produces.
+const STAGE_ICON: Record<ScreenStageKey, ReactNode> = {
+  signal: (
+    <Icon>
+      <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+    </Icon>
+  ),
+  extract: (
+    <Icon>
+      <path d="M6 2h9l5 5v15H6z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 13h6M9 17h6" />
+    </Icon>
+  ),
+  challenge: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
+    </Icon>
+  ),
+  comps: (
+    <Icon>
+      <path d="M4 20v-9M10 20V5M16 20v-6M2 20h20" />
+    </Icon>
+  ),
+  market: (
+    <Icon>
+      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </Icon>
+  ),
+  verdict: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
+    </Icon>
+  ),
+};
 
-// Everything else the product does, as an icon and a few words. Each tile
-// opens the surface that shows it working.
-const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
+// Reconciling the buyer's own model is a run of its own, after the screen,
+// which re-runs the verdict (lib/anthropic/pipeline) — drawn apart from the
+// six, as the deal page's rail keeps it among its side jobs.
+const RECONCILE_ICON = (
+  <Icon>
+    <path d="M12 4v16M5 20h14M6 8h12" />
+    <path d="m6 8-3 6h6zM18 8l-3 6h6z" />
+  </Icon>
+);
+
+// Everything else the product does, as an icon and a few words. A tile
+// opens the public surface that shows it working where there is one (the
+// sample screen, the stress bench, the market pages); one that works only
+// on a deal of your own is a tile with no link, never a link to a page
+// that does not show it (the tasks tile had opened /demo, which shows no
+// tasks).
+const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   {
     label: "OM + rent roll + T-12, one model",
     href: "/demo",
@@ -202,7 +211,7 @@ const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Comps from county records",
+    label: "Comps from public property records",
     href: "/market",
     icon: (
       <Icon>
@@ -218,16 +227,6 @@ const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
       <Icon>
         <path d="m3 10 9-6 9 6" />
         <path d="M5 10v9M10 10v9M14 10v9M19 10v9M3 19h18" />
-      </Icon>
-    ),
-  },
-  {
-    label: "Verdict → assigned tasks",
-    href: "/demo",
-    icon: (
-      <Icon>
-        <path d="M10 6h11M10 12h11M10 18h11" />
-        <path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
       </Icon>
     ),
   },
@@ -251,6 +250,118 @@ const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
       </Icon>
     ),
   },
+  {
+    label: "Ask this deal, answered with the page",
+    icon: (
+      <Icon>
+        <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
+        <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5h.01" />
+      </Icon>
+    ),
+  },
+  {
+    label: "FEMA's flood map over the building",
+    icon: (
+      <Icon>
+        <path d="M2 15c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5" />
+        <path d="M2 19.5c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5" />
+        <path d="m5 10 7-6 7 6M7 9v3M17 9v3" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Your pipeline as photo cards, a list or a map",
+    icon: (
+      <Icon>
+        <rect x="3" y="3" width="8" height="8" rx="1.5" />
+        <rect x="13" y="3" width="8" height="8" rx="1.5" />
+        <rect x="3" y="13" width="8" height="8" rx="1.5" />
+        <path d="M17 21s3-2.7 3-5a3 3 0 0 0-6 0c0 2.3 3 5 3 5z" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Compare deals side by side",
+    icon: (
+      <Icon>
+        <rect x="3" y="4" width="7" height="16" rx="1.5" />
+        <rect x="14" y="4" width="7" height="16" rx="1.5" />
+        <path d="M5.5 9h2M16.5 9h2M5.5 13h2M16.5 13h2" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Share the screen by link, never your files",
+    icon: (
+      <Icon>
+        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+      </Icon>
+    ),
+  },
+  {
+    label: "An LOI drafted from the screen",
+    icon: (
+      <Icon>
+        <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+        <path d="M14 3v6h6" />
+        <path d="m9 16 1.5-3.5L16 7l1.5 1.5L12 14z" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Two BOVs, the gap taken apart",
+    icon: (
+      <Icon>
+        <path d="M12 3v18M5 8l7-5 7 5" />
+        <path d="M3 12h6l-3 6-3-6zM15 12h6l-3 6-3-6z" />
+      </Icon>
+    ),
+  },
+  {
+    label: "The pipeline meeting's workbook",
+    icon: (
+      <Icon>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 9h18M9 3v18" />
+        <path d="M12 13h5M12 17h3" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Verdict → assigned tasks",
+    icon: (
+      <Icon>
+        <path d="M10 6h11M10 12h11M10 18h11" />
+        <path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
+      </Icon>
+    ),
+  },
+];
+
+// Every kind of deal the screen reads for what it is: each the heading its
+// panel on the deal page wears (app/*-panel.tsx `PanelHead`, held to the
+// panels' sources by lib/home.render.test.ts), so the row names nothing the
+// product does not draw.
+const DEAL_KINDS: string[] = [
+  "What is being sold",
+  "Rent regulation",
+  "Affordable housing",
+  "Single tenant",
+  "Tenants",
+  "Hotel",
+  "How it is sold",
+  "Value-add program",
+  "Tax abatement",
+  "Third-party reports",
+  "Student housing",
+  "Manufactured housing",
+  "Self-storage",
+  "Mixed-use",
+  "Operating business",
+  "Condominium",
+  "Sandwich position",
+  "Forward purchase",
 ];
 
 const STATS: { value: number; suffix: string; label: string }[] = [
@@ -260,21 +371,59 @@ const STATS: { value: number; suffix: string; label: string }[] = [
   { value: RULES.all, suffix: "", label: "rules checked by address" },
 ];
 
-// Live-engine rows for the Excel-preview tile: the sample model recomputed
-// at render, so the page can never disagree with what the workbook computes.
-const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
-  const inputs = SAMPLE_DEAL.model.inputs;
-  const irr = (over: Partial<typeof inputs>) => {
-    const r = computeModel({ ...inputs, ...over }).returns.leveredIrrPct;
-    return r == null ? "—" : `IRR ${r.toFixed(1)}%`;
+// The Excel-preview tile's rows: the sample workbook's own figures — its
+// engine on the one derivation the demo workbook is built from, and two
+// cells of its Sensitivity tab (lib/sample-derive) — so the tile and the
+// workbook it links can never disagree.
+const XLSX_PREVIEW_ROWS: [string, string, string][] = sampleWorkbookPreview();
+
+// The stress bench's base: the same derivation, run here so the browser
+// gets the inputs and never the derivation (its readers hold data tables).
+const BENCH = sampleDerivedInputs();
+
+// The walkthrough's Financials tab, its reads made as /demo makes them
+// (app/demo/demo-data): the debt sizer starts from the same derivation, and
+// the sample is never seeded from today's rates (lib/model-market), so no
+// rate is read for it here.
+function sampleFinancials(asOf: Date = new Date()): SampleFinancials {
+  return {
+    underwrite: BENCH.inputs,
+    underwriteSources: BENCH.sources,
+    rateSeeds: {
+      permanent: BENCH.meta.rateSeed ?? null,
+      construction: constructionSeedFor(true, NO_DEBT_SEEDS),
+    },
+    strategy: inferStrategy(SAMPLE_DEAL.extraction, null),
+    modelInterest: modelReturnsRead(
+      SAMPLE_DEAL.extraction,
+      { ...SAMPLE_DEAL.model.returns, holdYears: SAMPLE_DEAL.model.holdYears },
+      asOf,
+    ),
   };
-  return [
-    ["Purchase price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`, irr({})],
-    ["Exit cap", `${inputs.exitCapPct.toFixed(2)}%`, irr({})],
-    ["Exit cap (flexed)", "5.75%", irr({ exitCapPct: 5.75 })],
-    ["Rent growth (flexed)", "2.5%", irr({ rentGrowthPct: 2.5 })],
-  ];
-})();
+}
+
+// The sample against its demo buy box, read the way the deal page's header
+// reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, a criterion the
+// box misses outright winning the chip, and every criterion the count
+// counts — so no surface here says what the product's own header would not.
+const SAMPLE_READ = buyBoxRead(
+  SAMPLE_DEAL.asset_class,
+  dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
+  SAMPLE_DEMO_BOX,
+);
+const SAMPLE_FIT: SampleFit = {
+  label: SAMPLE_READ.chip.label,
+  cls: BUY_BOX_CHIP_CLS[SAMPLE_READ.chip.tone],
+  ...(SAMPLE_READ.chip.note ? { note: SAMPLE_READ.chip.note } : {}),
+  criteria: boxCriteria(SAMPLE_READ.checks, SAMPLE_READ.mandate),
+};
+// The walkthrough's Buy box tab: the deal page's own panel on the same read
+// (its data built as /demo builds it, app/demo/demo-data), and the box's
+// lines, under a caption naming it the sample's example box.
+const SAMPLE_BUY_BOX: SampleBuyBoxData = {
+  panel: { checks: SAMPLE_READ.checks, mandate: SAMPLE_READ.mandate, scope: "personal", provisional: false, hasBox: true },
+  lines: buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }),
+};
 
 // The plan cards' lists are the billing page's too (lib/marketing-constants
 // FREE_PLAN, PRO_PLAN_LINES), each Pro line held to the gate that makes it
@@ -291,7 +440,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Which markets does it cover?",
-    a: `${MARKET_COUNT} markets with research briefs, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. ${DATA_METROS.length} more metro areas are read without a brief — their published rents, vacancy, jobs and, where FRED carries them, permits, each dated, with no local rules or notes on file: ${DATA_METROS.map((m) => m.name).join(", ")}. Outside all of them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}.`,
+    a: `${MARKET_COUNT} markets with research briefs, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. ${DATA_METROS.length} more metro areas are read without a brief — their published rents, vacancy, jobs and, where FRED carries them, permits, each dated, with no local rules or notes on file: ${DATA_METROS.map((m) => m.name).join(", ")}. Outside all of them the screen still runs: the statewide rules on file for ${RULES.statewideStates} states are checked, the market check reads the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via public property-record APIs in ${COMPS_JURISDICTIONS}.`,
   },
   {
     q: "Why not just ask ChatGPT?",
@@ -299,7 +448,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Are my documents private?",
-    a: "Yes. Documents are stored in private storage with isolation enforced at the database level. Your deals are visible only to you — or to your teammates if you join a team — and your documents are never shared beyond that or resold.",
+    a: "Yes. Documents are stored in private storage behind the database's row-level security and a server check on every file, and your deals are visible only to you and your team — and to whoever holds a share link you send, which shows the screen, never your documents. To run a screen, a document is read by Anthropic's Claude API, which does not train on it; the security page lists every outside service and what it receives. Nothing you upload is ever sold.",
   },
   {
     q: "Is this investment advice?",
@@ -307,7 +456,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: "A live-formula workbook: a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.",
+    a: "A live-formula workbook: a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.",
   },
   {
     q: "Can my team share one pipeline?",
@@ -409,7 +558,7 @@ const TRUST: { label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Delete it all, self-serve",
+    label: "Delete it all, self-serve (a team owner, by email)",
     icon: (
       <Icon>
         <path d="M4 7h16M10 11v6M14 11v6" />
@@ -444,9 +593,10 @@ function SectionHead({
 /**
  * The photograph behind the hero's headline. The operator's own (a real
  * building, a team at work) when `public/photos/hero.jpg` exists; until
- * then Manhattan's skyline, the one photograph the site can always produce
- * for itself (PlaceBackdrop, shared with the other public pages' opening
- * bands). Both draw at full strength under the SAME scrim (PhotoScrim):
+ * then the sample deal's own market, Philadelphia (lib/photos HERO_AERIAL),
+ * so the band and the sample's header in it show one city — the photograph
+ * the site can always produce for itself (PlaceBackdrop, shared with the
+ * other public pages' opening bands), credited at the band's foot. Both draw at full strength under the SAME scrim (PhotoScrim):
  * dark under the left-hand type, clear over the picture. A photograph the
  * treatment washes out costs the same bytes and says nothing.
  *
@@ -520,6 +670,11 @@ function PeopleStrip({ photos }: { photos: PhotoSlot[] }) {
 export default function Home() {
   const photos = photosOnDisk();
   const legal = legalToday();
+  // The sample's header, read on the render's day (the page is ISR).
+  const header = sampleHeader();
+  // The sample memo's own data, as its download draws it, on the render's
+  // day (the download names the day it is printed).
+  const memo = sampleMemoData();
   return (
     <div className="flex flex-1 flex-col">
       <script
@@ -532,7 +687,7 @@ export default function Home() {
           on the dark hero and the light body alike). */}
       <ScrollProgress />
       {/* Nav — dark, so it reads as one piece with the hero. */}
-      <header className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
+      <header data-home-bar className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
           {/* min-w-0 + truncate: on narrow phones the wordmark gives way
               instead of colliding with the CTA (the logo always stays). */}
@@ -700,7 +855,7 @@ export default function Home() {
 
                 {/* Product preview */}
                 <div>
-                  <DealPreview />
+                  <DealPreview header={header} />
                   <p className="mt-4 text-center text-[11px] text-white/55">
                     Illustrative sample deal ·{" "}
                     <Link
@@ -736,11 +891,18 @@ export default function Home() {
 
         {/* The problem, drawn: two analysts, one deal, the spread between
             them. Both ends are neutral on purpose — the spread is the problem. */}
-        <section id="problem" className="scroll-mt-16">
+        <section id="problem">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="The problem" title={`Same deal, same data room, ${SPREAD_BPS} bps apart.`} />
             <Reveal>
               <div className="shadow-card mt-8 rounded-2xl border border-line bg-surface p-6">
+                {/* The two IRRs are a stated illustration, not a measured
+                    benchmark (lib/marketing-constants), so the card says so. */}
+                <p className="mb-4">
+                  <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    Illustration
+                  </span>
+                </p>
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
@@ -777,7 +939,7 @@ export default function Home() {
                   />
                 </div>
                 <p className="mt-3 text-center text-xs text-muted">
-                  Same deal. Same afternoon. Same data room. One method fixes that.
+                  Same deal. Same afternoon. Same data room. One method narrows it.
                 </p>
               </div>
             </Reveal>
@@ -785,14 +947,14 @@ export default function Home() {
         </section>
 
         {/* The six-stage screen — a rail of icons, then the trace of it running. */}
-        <section id="screen" className="scroll-mt-16 border-t border-line bg-faint">
+        <section id="screen" className="border-t border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="How it works" title="Six stages, same order." />
             <Reveal delay={60}>
               <ol className="stage-rail mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
-                {STAGES.map((s, i) => (
+                {SCREEN_STAGES.map((s, i) => (
                   <li
-                    key={s.title}
+                    key={s.key}
                     style={{ "--i": i } as React.CSSProperties}
                     className="hover-lift stage-cycle relative flex flex-col items-center gap-3 rounded-xl border border-line bg-surface px-3 py-5 text-center shadow-card"
                   >
@@ -800,13 +962,21 @@ export default function Home() {
                       {i + 1}
                     </span>
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                      {s.icon}
+                      {STAGE_ICON[s.key]}
                     </span>
-                    <span className="text-sm font-medium">{s.title}</span>
-                    {s.note && <span className="-mt-2 text-[11px] leading-tight text-muted">{s.note}</span>}
+                    <span className="text-sm font-medium">{s.label}</span>
                   </li>
                 ))}
               </ol>
+              {/* Apart from the six, dashed: it runs only once you add your
+                  own model. */}
+              <p className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-line px-4 py-3 text-sm">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface text-muted">
+                  {RECONCILE_ICON}
+                </span>
+                <span className="font-medium">{RECONCILE_RUN.label}</span>{" "}
+                <span className="text-muted">a run of its own, when you add your model</span>
+              </p>
             </Reveal>
           </div>
         </section>
@@ -825,20 +995,36 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={legal} />
+              <DemoTabs legal={legal} buyBox={SAMPLE_BUY_BOX} financials={sampleFinancials()} />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Your pipeline — the sample's own pipeline card (lib/pipeline-card,
+            deal-tile.tsx): its market photograph with its caption and
+            credit, the call on the picture, Price with its basis under it,
+            Cap, Fit. Only the sample's card, opening /demo, never an
+            invented deal, and no stage control. */}
+        <section className="border-b border-line" data-qa="home-pipeline-card">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-16 sm:py-20 md:grid-cols-[1fr_minmax(0,20rem)]">
+            <Reveal>
+              <SectionHead eyebrow="Your pipeline" title="Every deal, a card." />
+            </Reveal>
+            <Reveal delay={120}>
+              <SamplePipelineCard />
             </Reveal>
           </div>
         </section>
 
         {/* Break it yourself — the deterministic engine, live in the browser. */}
-        <section id="stress" className="band-dark scroll-mt-16 text-white">
+        <section id="stress" className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
               <SectionHead eyebrow="Try the engine" title="Break it yourself." dark />
             </Reveal>
             <Reveal delay={80}>
               <div className="mt-8">
-                <StressBench />
+                <StressBench base={BENCH.inputs} units={BENCH.meta.units} />
               </div>
             </Reveal>
             {/* The bench stresses one screened deal. /tools is the same
@@ -869,7 +1055,7 @@ export default function Home() {
                 <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                   {groupedTools().map(({ group, tools }) => (
                     <div key={group}>
-                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/55">
                         {group}
                       </p>
                       <ul className="mt-2 flex flex-wrap gap-1.5">
@@ -913,7 +1099,15 @@ export default function Home() {
                 {/* Excel model — the flagship tile */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold">Excel model, live formulas</h3>
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                      Excel model, live formulas
+                      {/* On your own deals the exports are Pro, as the hero's
+                          card marks them; the samples download free
+                          (research pass 32). The space keeps "Pro" a word of
+                          its own to a screen reader; the flex gap spaces it
+                          on screen. */}{" "}
+                      <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
+                    </h3>
                     <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                       Sample
                     </span>
@@ -951,26 +1145,14 @@ export default function Home() {
 
                 {/* Memo */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="text-sm font-semibold">One-page IC memo</h3>
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                    One-page IC memo{" "}
+                    <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
+                  </h3>
+                  {/* The memo it downloads: its own title, call and key
+                      terms, from the download's own inputs. */}
                   <div className="mt-4 flex-1">
-                    <div className="rounded-lg border border-line bg-paper p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="h-2 w-20 rounded bg-ink/70" />
-                        <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[9px] font-semibold text-caution">
-                          Caution
-                        </span>
-                      </div>
-                      <div className="mt-2.5 space-y-1.5">
-                        <div className="h-1.5 w-full rounded bg-line" />
-                        <div className="h-1.5 w-5/6 rounded bg-line" />
-                        <div className="h-1.5 w-full rounded bg-line" />
-                        <div className="h-1.5 w-2/3 rounded bg-line" />
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-1.5">
-                        <div className="h-8 rounded bg-faint" />
-                        <div className="h-8 rounded bg-faint" />
-                      </div>
-                    </div>
+                    <MemoPreview data={memo} />
                   </div>
                   <a
                     href="/api/demo/memo"
@@ -983,47 +1165,36 @@ export default function Home() {
                 {/* Comps */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">Comps, graded</h3>
-                  <div className="mt-4 space-y-1.5 text-[10px]">
-                    {[
-                      ["The Brixton", "Supports", "text-pass bg-pass/10"],
-                      ["Parkside", "Leans favorable", "text-caution bg-caution/10"],
-                      ["Vue at Girard", "Stretched", "text-kill bg-kill/10"],
-                    ].map(([n, r, c]) => (
-                      <div
-                        key={n}
-                        className="flex items-center justify-between rounded-md border border-line px-2.5 py-1.5"
-                      >
-                        <span className="font-medium">{n}</span>
-                        <span className={`rounded-full px-1.5 py-0.5 font-medium ${c}`}>
-                          {r}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {/* The sample's own sale comps, in the deal page's order
+                      and grades (lib/comp-rating), each with the figures its
+                      memorandum line states. */}
+                  <ul className="mt-4 space-y-1.5 text-[10px]">
+                    {inCompOrder(SAMPLE_DEAL.comps.saleComps).map((c) => {
+                      const r = compRating(c.support);
+                      return (
+                        <li key={c.name} className="rounded-md border border-line px-2.5 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate font-medium">{c.name}</span>{" "}
+                            <span
+                              className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
+                            >
+                              {r.label}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 truncate font-mono tabular-nums text-muted">{c.detail}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
 
                 {/* Buy box */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <h3 className="text-sm font-semibold">Your buy box, checked in code</h3>
-                  <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-medium">
-                    {(
-                      [
-                        // The sample deal's own checks against its demo buy box
-                        // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
-                        ["✓", "Asset class", "text-pass border-line"],
-                        ["✓", "Units", "text-pass border-line"],
-                        ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
-                        ["—", "Target return", "text-muted border-line"],
-                      ] as const
-                    ).map(([mark, label, cls]) => (
-                      <span
-                        key={label}
-                        className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}
-                      >
-                        <span aria-hidden>{mark}</span>
-                        <span className="text-ink">{label}</span>
-                      </span>
-                    ))}
+                  {/* The sample deal's own checks against its demo buy box
+                      (lib/sample-deal SAMPLE_DEMO_BOX), every one the count counts. */}
+                  <div className="mt-4">
+                    <CriteriaChips criteria={SAMPLE_FIT.criteria} />
                   </div>
                 </div>
               </div>
@@ -1032,33 +1203,55 @@ export default function Home() {
         </section>
 
         {/* Everything else, as icons. */}
-        <section id="toolkit" className="scroll-mt-16">
+        <section id="toolkit">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
               <SectionHead eyebrow="Also in the box" title="Everything else, at a glance." />
             </Reveal>
             <Reveal delay={80}>
               <ul className="feature-grid mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {FEATURES.map((f) => (
-                  <li key={f.label}>
-                    <Link
-                      href={f.href}
-                      className="hover-lift flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-brand/30"
-                    >
+                {FEATURES.map((f) => {
+                  const face = (
+                    <>
                       <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
                         {f.icon}
                       </span>
                       <span className="text-sm font-medium leading-snug">{f.label}</span>
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  );
+                  const tile = "flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface p-4 shadow-card";
+                  return (
+                    <li key={f.label}>
+                      {f.href ? (
+                        <Link href={f.href} className={`hover-lift ${tile} transition-colors hover:border-brand/30`}>
+                          {face}
+                        </Link>
+                      ) : (
+                        <div className={tile}>{face}</div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
+              {/* The deal-type readers, each named as its panel is. */}
+              <div className="mt-6">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
+                  Every kind of deal, read for what it is
+                </p>
+                <ul aria-label="The deal types the screen reads" className="mt-3 flex flex-wrap gap-1.5">
+                  {DEAL_KINDS.map((k) => (
+                    <li key={k} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-medium">
+                      {k}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </Reveal>
           </div>
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="scroll-mt-16 border-t border-line">
+        <section id="pricing" className="border-t border-line">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <Reveal>
             <SectionHead eyebrow="Pricing" title="Start free. Upgrade when the screen earns it." />
@@ -1104,7 +1297,7 @@ export default function Home() {
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {PRO_PLAN_LINES.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
-                      <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
+                      <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/10 text-[10px] font-bold text-pass">
                         ✓
                       </span>
                       {f}
@@ -1184,14 +1377,14 @@ export default function Home() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="scroll-mt-16 border-y border-line bg-faint">
+        <section id="faq" className="border-y border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <SectionHead eyebrow="FAQ" title="The questions we'd ask too." />
             <div className="mx-auto mt-8 max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
               {FAQ.map((f, i) => (
                 <details key={f.q} className="group">
                   <summary className="flex cursor-pointer items-center gap-3 px-5 py-4 text-sm font-medium transition-colors hover:bg-faint [&::-webkit-details-marker]:hidden">
-                    <span className="font-mono text-xs tabular-nums text-brand/50">
+                    <span className="font-mono text-xs tabular-nums text-brand/80">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="flex-1">{f.q}</span>
@@ -1336,111 +1529,21 @@ export default function Home() {
   );
 }
 
-/** A faithful miniature of the REAL deal page's summary bar — name + verdict
- *  + buy-box chips, the address line, exactly four figures, and the artifact
- *  row (IC memo / Full report / Underwrite model), plus the top deal-killer.
- *  Figures derive from the sample fixture through the live engine, so this
- *  card can never drift from what the product actually renders. */
-function DealPreview() {
-  const inputs = SAMPLE_DEAL.model.inputs;
-  const r = computeModel(inputs).returns;
-  const verdictWord =
-    SAMPLE_DEAL.verdict.verdict === "pass"
-      ? "Go"
-      : SAMPLE_DEAL.verdict.verdict === "pass_on"
-        ? "No-go"
-        : "Caution";
-  // The sample against its demo buy box, read the way the deal page's
-  // header reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, and a
-  // criterion the box misses outright winning the chip — so the card never
-  // says what the product's own header would not.
-  const fitChip = buyBoxRead(
-    SAMPLE_DEAL.asset_class,
-    dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
-    SAMPLE_DEMO_BOX,
-  ).chip;
-  const FIT_TONE: Record<BuyBoxChipTone, string> = {
-    pass: "bg-pass/10 text-pass",
-    caution: "bg-caution/10 text-caution",
-    kill: "bg-kill/10 text-kill",
-    muted: "bg-faint text-muted",
-  };
+/** The sample deal's header — the deal page's own `DealHero` on the facts
+ *  lib/sample-header reads through the deal page's readers (the name with
+ *  "Sample — ", the call, the buy-box fit, the four figures as stated,
+ *  Philadelphia's photograph, the tool row), so the card shows exactly
+ *  what the signed-in sample deal shows. Stacked on a second sheet, so it
+ *  reads as one deal of a pipeline; the name is an h2 under the hero's h1. */
+function DealPreview({ header }: { header: HeaderFacts }) {
   return (
-    <div className="relative">
-      {/* Glow + a second sheet behind, so the card reads as a stack. */}
+    <div className="relative text-ink">
       <div
         className="absolute inset-0 translate-x-3 translate-y-3 rounded-2xl border border-white/10 bg-white/[0.04]"
         aria-hidden
       />
-      <div className="shadow-float relative rounded-2xl border border-line bg-surface p-5 text-ink">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold tracking-tight">
-            The Maddox at Brewerytown
-          </p>
-          {/* Two chips, each named for a screen reader: the call, and the
-              buy-box fit, which says "Fit" on its face. */}
-          <span className="stamp-in rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution ring-1 ring-caution/30">
-            <span className="sr-only">Verdict: </span>
-            {verdictWord}
-          </span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FIT_TONE[fitChip.tone]}`}>
-            <span className="sr-only">Buy-box </span>
-            {fitChip.label}
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-muted">
-          Brewerytown, Philadelphia · Multifamily · {inputs.units} units
-        </p>
-
-        <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 border-y border-line py-3">
-          {(
-            [
-              ["Price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`],
-              ["Size", `${inputs.units} units`],
-              ["Going-in cap", `${r.goingInCapPct.toFixed(2)}%`],
-              // The real deal header carries a fourth figure now — the deal's
-              // strategy — and the sample mirrors the real page or it lies.
-              ["Deal type", "Stabilized"],
-            ] as const
-          ).map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-[10px] uppercase tracking-wide text-muted">
-                {k}
-              </dt>
-              <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
-                {v}
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        {/* The real header's artifact row, in miniature. */}
-        <div className="mt-3 flex flex-wrap gap-1.5" aria-hidden>
-          {["IC memo", "Full report", "Underwrite model"].map((a) => (
-            <span
-              key={a}
-              className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-medium shadow-sm"
-            >
-              {a}
-              <span className="rounded-full bg-brand/10 px-1.5 py-px text-[9px] font-semibold text-brand">
-                Pro
-              </span>
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-3 rounded-lg border border-line border-l-4 border-l-kill bg-paper p-3">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs tabular-nums text-muted">1</span>
-            <span className="text-xs font-medium">Basis</span>
-            <span className="ml-auto rounded-full bg-kill/10 px-2 py-0.5 text-[10px] font-medium uppercase text-kill">
-              Deal-killer
-            </span>
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            {SAMPLE_COMP_PREMIUM_LINE}
-          </p>
-        </div>
+      <div className="relative">
+        <SampleDealHero header={header} titleAs="h2" stamp />
       </div>
     </div>
   );
@@ -1475,7 +1578,9 @@ async function FooterTrustLine() {
   const latest = latestChange();
   // Render exposes the deployed commit at build time — the footer names it,
   // so "is the site actually on the latest code" is answerable by comparing
-  // this stamp to the repo's main tip. Absent locally; omitted then.
+  // this stamp to the repo's main tip. Absent locally; omitted then. Plain
+  // text, never a link to the repository (research pass 43): live-verify
+  // reads the same id off the <meta name="uc-build"> the layout prints.
   const buildSha = (process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7);
   // The year is the render's, never typed: a typed one goes stale on Jan 1.
   const rendered = new Date();
@@ -1485,14 +1590,7 @@ async function FooterTrustLine() {
       {buildSha && (
         <>
           {" · build "}
-          <a
-            href={`https://github.com/fredballs1115-ux/Underwrite-Copilot/commit/${buildSha}`}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono underline decoration-dotted underline-offset-2 hover:text-ink"
-          >
-            {buildSha}
-          </a>
+          <span className="font-mono">{buildSha}</span>
         </>
       )}
       {latest && (
@@ -1508,12 +1606,12 @@ async function FooterTrustLine() {
           ({fmt(`${latest.date}T00:00:00Z`)})
         </>
       )}
-      {verifiedAt && !overdue && <> · data last verified {fmt(verifiedAt)} by the nightly steward</>}
+      {verifiedAt && !overdue && <> · research data last verified {fmt(verifiedAt)} by the nightly steward</>}
       {verifiedAt && overdue && (
         <>
           {" · "}
           <span className="text-caution">
-            data verification overdue (last ran {fmt(verifiedAt)})
+            research data verification overdue (last ran {fmt(verifiedAt)})
           </span>
         </>
       )}

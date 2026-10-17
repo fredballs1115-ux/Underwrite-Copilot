@@ -8,6 +8,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   uploadOmPdf,
   removeStorageFiles,
+  listDealPictureFiles,
   uploadSupplement,
   modelTmpPath,
   omStoragePath,
@@ -17,7 +18,7 @@ import { MAX_PICTURE_BYTES, clearOmPicture, picturePaths, storePicture } from "@
 import { floodFramePaths } from "@/lib/flood-frame-core";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { dealLanding } from "@/lib/personal-deal";
+import { dealLanding, moveBlock, moveBlockQuery, type DealWork } from "@/lib/personal-deal";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import {
   claimJob,
@@ -33,8 +34,8 @@ import {
   parseStageHistory,
   type Stage,
 } from "@/lib/stages";
-import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { OM_REPLACED, parseDealNotes } from "@/lib/deals";
+import { SAMPLE_DEAL, sampleWork } from "@/lib/sample-deal";
+import { OM_REPLACED, parseDealNotes, parseDealQa } from "@/lib/deals";
 import { omFingerprint } from "@/lib/om-fingerprint";
 import {
   factsFromForm,
@@ -42,8 +43,14 @@ import {
   buildManualExtraction,
   firstSignalFromExtraction,
 } from "@/lib/manual-deal";
+import { dealNameOf } from "@/lib/deal-name";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { checkPdfOpens } from "@/lib/pdf-open";
+import { capRefusalOf } from "@/lib/deal-allowance";
+import { deadlineDay } from "@/lib/deadline-day";
+import { currentOutcome, readOutcomeForm, withOutcome } from "@/lib/deal-outcome";
+import { personName } from "@/lib/person";
+import { writeStageGuarded } from "@/lib/stage-write";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -54,6 +61,9 @@ const MAX_BYTES = 32 * 1024 * 1024;
 // Accepted formats for the buyer's own underwriting model (Phase 5 reconciler).
 const MODEL_EXT = /\.(xlsx|xls|csv|pdf)$/i;
 
+/** A deal's id: the database's uuid, nothing else. */
+const DEAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Everything that can go wrong creating a deal, as codes the callers map to
  *  copy: the single form redirects with ?error=, the batch panel shows inline. */
 export type CreateDealError =
@@ -62,6 +72,7 @@ export type CreateDealError =
   | "limit"
   | "teamlimit"
   | "file"
+  | "empty"
   | "pdf"
   | "size"
   | "locked"
@@ -83,7 +94,9 @@ export type CreateDealResult =
  * can surface failures its own way.
  */
 async function createDealCore(formData: FormData): Promise<CreateDealResult> {
-  const name = String(formData.get("name") ?? "").trim();
+  // The one cap every name is stored under (lib/deal-name): the upload had
+  // stored a name of any length (research pass 42).
+  const name = dealNameOf(formData.get("name"));
   const assetClass = String(formData.get("assetClass") ?? "auto");
   const file = formData.get("om");
 
@@ -102,9 +115,13 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     return { ok: false, error: billing.team ? "teamlimit" : "limit" };
   }
 
-  if (!(file instanceof File) || file.size === 0) {
+  // No file chosen arrives as an empty File with no name; a file that is
+  // chosen and empty (0 bytes) has its name, and is said as empty — not
+  // "choose a PDF", and not a retry of the same empty file.
+  if (!(file instanceof File) || (file.size === 0 && !file.name)) {
     return { ok: false, error: "file" };
   }
+  if (file.size === 0) return { ok: false, error: "empty" };
   // Accept when the browser says PDF, says nothing (some drag sources report an
   // empty type for a real PDF), or the name ends in .pdf — then let the magic
   // bytes below be the real gate.
@@ -157,20 +174,17 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
-  const personal = !!billing.team && !teamAllowed;
-  const { data: deal, error: insertErr } = await supabase
-    .from("deals")
-    .insert({
-      name,
-      asset_class: assetClass,
-      user_id: user.id,
-      team_id: teamAllowed ? billing.team!.id : null,
-    })
-    .select("id")
-    .single();
-  if (insertErr || !deal) return { ok: false, error: "save" };
+  const filed = await fileDeal(
+    supabase,
+    { name, asset_class: assetClass, user_id: user.id },
+    teamAllowed ? billing.team!.id : null,
+  );
+  // The database's own cap refusal is the plan's limit, said as one — a
+  // double-submit or a second tab the read above let through.
+  if (!("id" in filed)) return { ok: false, error: filed.refusal ?? "save" };
+  const personal = !!billing.team && !filed.teamFiled;
 
-  const dealId = deal.id as string;
+  const dealId = filed.id;
   const path = omStoragePath(user.id, dealId);
 
   // Optional property address from the autocomplete: the structured pick
@@ -265,6 +279,38 @@ export async function createDealFromBatch(
  *  user typed is ever lost. */
 export type ManualDealState = { error: string } | null;
 
+/** The typed-facts form's words for a plan's limit — the app's own check
+ *  and the database's refusal alike. */
+const MANUAL_LIMIT = "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.";
+/**
+ * Insert a new deal: on the reader's team while its plan or trial allows
+ * (`teamId`), else as the reader's own. Where the database refuses the
+ * team's insert for its trial — another insert took the last slot between
+ * the allowance read and this write — the deal is filed again as the
+ * reader's own, which the personal cap then decides; refused there too, both
+ * pools are in use, and the refusal is the team's limit. So "your personal
+ * free deals are all in use" is said only where they are (the batch-2
+ * audit: a raced team insert had said it with the reader's own slots free).
+ */
+async function fileDeal(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  row: Record<string, unknown>,
+  teamId: string | null,
+): Promise<{ id: string; teamFiled: boolean } | { refusal: "limit" | "teamlimit" | null }> {
+  const insert = (team_id: string | null) => supabase.from("deals").insert({ ...row, team_id }).select("id").single();
+  const first = await insert(teamId);
+  if (first.data && !first.error) return { id: first.data.id as string, teamFiled: teamId !== null };
+  const refusal = capRefusalOf(first.error);
+  if (teamId === null || refusal !== "teamlimit") return { refusal };
+  const again = await insert(null);
+  if (again.data && !again.error) return { id: again.data.id as string, teamFiled: false };
+  const second = capRefusalOf(again.error);
+  return { refusal: second === "limit" ? "teamlimit" : second };
+}
+
+const MANUAL_TEAM_LIMIT =
+  "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro.";
+
 /**
  * Create a deal from TYPED facts — no OM. The facts become a normal
  * ExtractionResult (plus an instant first signal), so the buy box, mandate
@@ -291,11 +337,7 @@ export async function createManualDeal(
 
   const billing = await getBilling(supabase, user.id);
   if (!billing.canCreateDeal) {
-    return {
-      error: billing.team
-        ? "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro."
-        : "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.",
-    };
+    return { error: billing.team ? MANUAL_TEAM_LIMIT : MANUAL_LIMIT };
   }
 
   // Same 15s idempotency window as the upload path — a double-click can't
@@ -326,23 +368,20 @@ export async function createManualDeal(
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
-  const personal = !!billing.team && !teamAllowed;
-  const { data: deal, error: insertErr } = await supabase
-    .from("deals")
-    .insert({
-      name: facts.name,
-      asset_class: facts.assetClass,
-      user_id: user.id,
-      team_id: teamAllowed ? billing.team!.id : null,
-      extraction,
-      first_signal: firstSignal,
-    })
-    .select("id")
-    .single();
-  if (insertErr || !deal) {
-    return { error: "Couldn’t save the deal. Please try again." };
+  const filed = await fileDeal(
+    supabase,
+    { name: facts.name, asset_class: facts.assetClass, user_id: user.id, extraction, first_signal: firstSignal },
+    teamAllowed ? billing.team!.id : null,
+  );
+  if (!("id" in filed)) {
+    // The database's own cap refusal is the plan's limit, never "try again".
+    const cap = filed.refusal;
+    return {
+      error: cap === "teamlimit" ? MANUAL_TEAM_LIMIT : cap === "limit" ? MANUAL_LIMIT : "Couldn’t save the deal. Please try again.",
+    };
   }
-  const dealId = deal.id as string;
+  const personal = !!billing.team && !filed.teamFiled;
+  const dealId = filed.id;
 
   // Best-effort separate update so a pre-0011 schema can't sink the create.
   if (address) {
@@ -425,6 +464,9 @@ export async function updateManualFacts(
   );
   if (claim.outcome === "busy") {
     return { error: "A screen is already running on this deal — give it a minute to finish." };
+  }
+  if (claim.outcome === "error") {
+    return { error: "Couldn’t start the re-screen just now — nothing changed. Try again in a moment." };
   }
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
@@ -569,6 +611,7 @@ export async function createSampleDeal() {
       // pre-0011 schema — carry on
     }
     await seedSampleActuals(existing.id as string);
+    await seedSampleWork(existing.id as string);
     redirect(`/deals/${existing.id}`);
   }
 
@@ -608,6 +651,7 @@ export async function createSampleDeal() {
   }
 
   await seedSampleActuals(deal.id as string);
+  await seedSampleWork(deal.id as string);
 
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);
@@ -657,6 +701,51 @@ async function seedSampleActuals(dealId: string): Promise<void> {
   }
 }
 
+/**
+ * The sample's lower half (signed-in gaps, H7): three Ask answers from its
+ * fictional memorandum, the verdict's next steps as tasks and one note in
+ * the decision log (lib/sample-deal `sampleWork`), so the panels a deal
+ * grows into are not a row of empty states on the deal a new reader learns
+ * the product on. Each is the sample's, never a person's: the answers name
+ * no asker, the note is by the sample with no author id, and the tasks were
+ * created by no one and are assigned to no one — so they are written with
+ * the service role (a task's insert policy asks for the writer as its
+ * creator). Once only: the sample cannot be asked (it has no PDF), so an Ask
+ * thread on it is this seed's, and a sample that has one is left alone —
+ * a task or a note the reader removed is never put back. The notes and the
+ * tasks are each added only where the deal has none. Best-effort, like the
+ * actuals: a failed read writes nothing and the next open tries again.
+ */
+async function seedSampleWork(dealId: string): Promise<void> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const [row, tasks] = await Promise.all([
+      admin.from("deals").select("qa, notes, is_sample").eq("id", dealId).maybeSingle(),
+      admin.from("deal_tasks").select("id", { count: "exact", head: true }).eq("deal_id", dealId),
+    ]);
+    const deal = row.data as { qa?: unknown; notes?: unknown; is_sample?: boolean } | null;
+    if (row.error || tasks.error || !deal?.is_sample) return;
+    if (Array.isArray(deal.qa) && deal.qa.length > 0) return;
+    const work = sampleWork(new Date().toISOString());
+    // The tasks first, the thread last: the thread is what says the seed
+    // ran, so a write that fails before it leaves the next open to try.
+    if ((tasks.count ?? 0) === 0) {
+      const { error } = await admin.from("deal_tasks").insert(
+        work.tasks.map((t) => ({ deal_id: dealId, title: t.title, source: t.source, created_by: null })),
+      );
+      if (error) return;
+    }
+    const notes = parseDealNotes(deal.notes);
+    await admin
+      .from("deals")
+      .update({ qa: work.qa, ...(notes.length === 0 ? { notes: work.notes } : {}) })
+      .eq("id", dealId)
+      .eq("is_sample", true);
+  } catch {
+    // the sample still opens; its panels show their empty states
+  }
+}
+
 /** Track where a deal sits in YOUR process — independent of the verdict.
  *  RLS lets the creator or any teammate move it. Every change is appended to
  *  the deal's stage history with its date. */
@@ -677,26 +766,21 @@ export async function setStage(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Read the current stage + history so the change is logged with its date.
-  const { data: current } = await supabase
-    .from("deals")
-    .select("stage, stage_history")
-    .eq("id", dealId)
-    .maybeSingle();
-  if (!current) redirect(backTo);
-  if (normalizeStage(current!.stage as string) === stage) redirect(backTo);
-
-  const history = [
-    ...parseStageHistory(current!.stage_history),
-    { stage: stage as Stage, at: new Date().toISOString() },
-  ];
-
+  // Read the current stage + history so the change is logged with its date,
+  // and write it only onto the row as read: a change a teammate made in
+  // between is read again and kept, never written over (lib/stage-write,
+  // audit C8, L4).
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("deals")
-    .update({ stage, stage_history: history, updated_at: now })
-    .eq("id", dealId);
-  if (error) {
+  const written = await writeStageGuarded(supabase, dealId, (current) => {
+    if (normalizeStage(current.stage as string) === stage) return { skip: "unchanged" };
+    const history = [...parseStageHistory(current.stage_history), { stage: stage as Stage, at: now }];
+    return { patch: { stage, stage_history: history, updated_at: now } };
+  });
+  if (!written.ok && written.why !== "error") {
+    if (written.why === "conflict") redirect(`/deals/${dealId}?error=stage`);
+    redirect(backTo);
+  }
+  if (!written.ok) {
     // Pre-0013 schema: the history column may not exist yet — the stage value
     // itself should still save where the old constraint allows it.
     const { error: retryErr } = await supabase
@@ -710,14 +794,72 @@ export async function setStage(formData: FormData) {
   redirect(backTo);
 }
 
+/** Why a dead deal died, and what it — or a closed one — traded at
+ *  (research pass 24, B4): stored on the stage-history entry that ended the
+ *  deal (lib/deal-outcome), which every later stage change keeps. A deal
+ *  whose move to Dead or Closed was not recorded has no entry to carry it,
+ *  and is refused rather than given a move on a day nobody made. */
+export async function setDealOutcome(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) redirect("/deals");
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // Who reports a trade: their account, and the name their profile gives
+  // (else their email's local part, lib/person `personName` — never the
+  // whole address, which the account page promises teammates do not see) —
+  // the card says "your profile's name" and the deal page names a
+  // teammate's account as the team knows it today (audit C8, L4). A
+  // profile that cannot be read leaves the email's local part.
+  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user!.id).maybeSingle();
+  const reporterName = personName((profile as { full_name?: string | null } | null)?.full_name ?? null, user!.email ?? null, "") || null;
+
+  const form = readOutcomeForm(
+    {
+      reason: formData.get("reason") as string | null,
+      price: formData.get("price") as string | null,
+      buyer: formData.get("buyer") as string | null,
+      date: formData.get("date") as string | null,
+    },
+    { id: user!.id, name: reporterName },
+    new Date().toISOString(),
+  );
+  if (!form.ok) redirect(`/deals/${dealId}?error=outcome${form.error}`);
+  // The reason and the trade are two forms on the card: a field the form
+  // did not send keeps what is recorded — a tap on a reason never clears a
+  // reported trade, nor a saved trade the reason. Built on the row as read,
+  // and written only onto it: a stage change made in between is read again
+  // and kept, never put back (lib/stage-write).
+  const written = await writeStageGuarded(supabase, dealId, (current) => {
+    const recorded = parseStageHistory(current.stage_history);
+    const existing = currentOutcome(current.stage as string | null, recorded);
+    const outcome = {
+      reason: formData.has("reason") ? form.outcome.reason : (existing?.reason ?? null),
+      trade: formData.has("price") ? form.outcome.trade : (existing?.trade ?? null),
+    };
+    const history = withOutcome(current.stage as string | null, recorded, outcome);
+    if (!history) return { skip: "refused" };
+    return { patch: { stage_history: history, updated_at: new Date().toISOString() } };
+  });
+  if (!written.ok && written.why === "missing") redirect(`/deals/${dealId}`);
+  if (!written.ok) redirect(`/deals/${dealId}?error=outcome`);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/analytics");
+  redirect(`/deals/${dealId}`);
+}
+
 /** Set or clear the broker's call-for-offers date. */
 export async function setOffersDue(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const raw = String(formData.get("offersDue") ?? "").trim();
   if (!dealId) redirect("/deals");
-  // Empty clears the deadline; otherwise require a plain ISO date.
-  const offersDue =
-    raw === "" ? null : /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
+  // Empty clears the deadline; otherwise a real day between 2000 and 2100
+  // (lib/deadline-day) — a date field reports 0002 on the way to 2027, and
+  // this had stored it.
+  const offersDue = raw === "" ? null : (deadlineDay(raw) ?? undefined);
   if (offersDue === undefined) redirect(`/deals/${dealId}?error=deadline`);
 
   const supabase = await createSupabaseServerClient();
@@ -742,7 +884,7 @@ export async function setOffersDue(formData: FormData) {
  *  offers it no Rename; this refuses one sent anyway. */
 export async function renameDeal(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
+  const name = dealNameOf(formData.get("name"));
   if (!dealId || !name) redirect(`/deals/${dealId}`);
 
   const supabase = await createSupabaseServerClient();
@@ -760,11 +902,142 @@ export async function renameDeal(formData: FormData) {
 
   await supabase
     .from("deals")
-    .update({ name: name.slice(0, 120), updated_at: new Date().toISOString() })
+    .update({ name, updated_at: new Date().toISOString() })
     .eq("id", dealId);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
   redirect(`/deals/${dealId}`);
+}
+
+/**
+ * Move a deal between the reader's own pipeline and their team's — "Share
+ * with team" and "Make personal" on the deal's menu (lib/personal-deal). The
+ * creator's alone: migration 0007's protect_deal_identity refuses anyone but
+ * the creator or the team's owner a change of team, and a team owner taking
+ * a member's deal out of the pipeline would hand it to someone else's own
+ * pipeline, so the menu and this action offer it to the creator only. The
+ * sample stays where it is. The move is counted against the cap of the
+ * pipeline it lands in, as an insert there would be: the allowance is read
+ * first (lib/billing, the create actions' own rule), and migration 0036's
+ * update trigger refuses one the read let through, said in the same words.
+ */
+export async function moveDeal(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  const to = String(formData.get("to") ?? "");
+  // A deal's id is a UUID; anything else goes nowhere near a query or the
+  // redirect built from it (audit C7, L13).
+  if (!DEAL_ID.test(dealId)) redirect("/deals");
+  const back = `/deals/${dealId}`;
+  if (to !== "team" && to !== "personal") redirect(back);
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, user_id, team_id, is_sample, notes, qa, supplements")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) redirect("/deals");
+  const row = deal as {
+    user_id: string;
+    team_id: string | null;
+    is_sample?: boolean;
+    notes?: unknown;
+    qa?: unknown;
+    supplements?: unknown;
+  };
+  if (row.is_sample) redirect(back);
+  if (row.user_id !== user!.id) redirect(`${back}?error=movepermission`);
+  // Already where it was asked to go: nothing to do, nothing to say.
+  if ((to === "team") === !!row.team_id) redirect(back);
+
+  const billing = await getBilling(supabase, user!.id);
+  let teamId: string | null = null;
+  if (to === "team") {
+    if (!billing.team) redirect(`${back}?error=movenoteam`);
+    if (!(billing.team!.active || billing.team!.dealCount < TEAM_TRIAL_DEALS)) {
+      redirect(`${back}?error=moveteamlimit`);
+    }
+    teamId = billing.team!.id;
+  } else if (!(billing.plan === "pro" || billing.dealCount < billing.dealLimit)) {
+    redirect(`${back}?error=movelimit`);
+  }
+
+  // What the move carries (lib/personal-deal `moveBlock`): someone else's
+  // tasks, notes, files, Ask questions or source documents never cross into
+  // a pipeline that would show them to people who could not see them, or out
+  // of one that would hide them from the people who added them. Read with
+  // the reader's own session — the creator can read every one of these
+  // tables' rows for their deal, and the destination team's roster as its
+  // member. A read that fails refuses rather than moves blind.
+  const work = await readDealWork(supabase, dealId, row);
+  if (!work) redirect(`${back}?error=movefail`);
+  let members: Set<string> | undefined;
+  if (to === "team") {
+    const { data: roster, error: rosterErr } = await supabase
+      .from("team_members")
+      .select("user_id")
+      .eq("team_id", teamId!);
+    if (rosterErr || !roster) redirect(`${back}?error=movefail`);
+    members = new Set((roster as { user_id: string }[]).map((m) => m.user_id));
+  }
+  const block = moveBlock(to, work!, { creatorId: user!.id, creatorEmail: user!.email ?? null, members });
+  if (block) {
+    redirect(`${back}?error=${to === "team" ? "moveteamwork" : "movepersonalwork"}&${moveBlockQuery(block)}`);
+  }
+
+  // `.select` so a write row-level security matched nothing for — 204 and
+  // no error, as PostgREST answers — reads as the failure it is.
+  const { data: moved, error } = await supabase
+    .from("deals")
+    .update({ team_id: teamId, updated_at: new Date().toISOString() })
+    .eq("id", dealId)
+    .select("id");
+  if (error) {
+    const refusal = capRefusalOf(error);
+    redirect(
+      `${back}?error=${refusal === "teamlimit" ? "moveteamlimit" : refusal === "limit" ? "movelimit" : "movefail"}`,
+    );
+  }
+  if (!moved || moved.length === 0) redirect(`${back}?error=movefail`);
+  revalidatePath(back);
+  revalidatePath("/deals");
+  redirect(`${back}?moved=${to}`);
+}
+
+/** Everything on a deal a move carries, with who added each where that is
+ *  recorded (lib/personal-deal `DealWork`), or null where a read failed. */
+async function readDealWork(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  dealId: string,
+  row: { notes?: unknown; qa?: unknown; supplements?: unknown },
+): Promise<DealWork | null> {
+  const [tasks, documents] = await Promise.all([
+    supabase.from("deal_tasks").select("created_by, assignee_user_id").eq("deal_id", dealId),
+    supabase.from("deal_documents").select("id").eq("deal_id", dealId),
+  ]);
+  if (tasks.error || documents.error) return null;
+  const supp = (row.supplements && typeof row.supplements === "object" ? row.supplements : {}) as Record<
+    string,
+    { notes?: { byId?: unknown }[]; files?: { byId?: unknown }[] } | null
+  >;
+  const idOf = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+  const tabs = Object.values(supp).filter((t): t is NonNullable<typeof t> => !!t && typeof t === "object");
+  return {
+    tasks: ((tasks.data ?? []) as { created_by: string | null; assignee_user_id: string | null }[]).map((t) => ({
+      createdBy: t.created_by,
+      assignee: t.assignee_user_id,
+    })),
+    logNotes: parseDealNotes(row.notes),
+    tabNotes: tabs.flatMap((t) => (Array.isArray(t.notes) ? t.notes : []).map((n) => ({ byId: idOf(n?.byId) }))),
+    files: tabs.flatMap((t) => (Array.isArray(t.files) ? t.files : []).map((f) => ({ byId: idOf(f?.byId) }))),
+    ask: parseDealQa(row.qa).map((e) => ({ by: e.by })),
+    documents: (documents.data ?? []).length,
+  };
 }
 
 /**
@@ -830,7 +1103,11 @@ export async function deleteDeal(formData: FormData) {
     .select("id");
   if (delErr) redirect(`/deals/${dealId}?error=delete`);
   if (!gone || gone.length === 0) redirect(`/deals/${dealId}?error=deletepermission`);
-  await removeStorageFiles(paths, scope);
+  // The deal's picture folders are listed too, not only the files its photo
+  // cache names: a picture whose record another write lost is still the
+  // deal's (lib/storage `listDealPictureFiles`, research pass 39).
+  const listed = await listDealPictureFiles(dealId).catch(() => [] as string[]);
+  await removeStorageFiles([...new Set([...paths, ...listed])], scope);
 
   revalidatePath("/deals");
   redirect("/deals?deleted=1");
@@ -879,6 +1156,9 @@ export async function rerunAnalysis(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  // A claim the database did not take, or a row it would not insert, is a
+  // start that failed — never "a screen is already running" (research pass 30).
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=startfail`);
   if (claim.outcome === "none") {
     // No prior job row means no completed prior generation to diff against.
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
@@ -888,7 +1168,7 @@ export async function rerunAnalysis(formData: FormData) {
         workerMode ? { workerPayload: { kind: "screen", requestedBy: user.id } } : undefined,
       ),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=startfail`);
   }
 
   // Snapshot for the retrade diff only when the stored results are a
@@ -943,9 +1223,10 @@ export async function replaceOm(formData: FormData) {
   }
 
   const file = formData.get("om");
-  if (!(file instanceof File) || file.size === 0) {
+  if (!(file instanceof File) || (file.size === 0 && !file.name)) {
     redirect(`/deals/${dealId}?error=omfile`);
   }
+  if (file.size === 0) redirect(`/deals/${dealId}?error=omempty`);
   const looksPdf =
     file.type === "application/pdf" ||
     file.type === "" ||
@@ -987,6 +1268,8 @@ export async function replaceOm(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  // Before the upload: the stored OM is untouched (research pass 30).
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=startfail`);
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
       newJobRow(
@@ -997,7 +1280,7 @@ export async function replaceOm(formData: FormData) {
           : undefined,
       ),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=startfail`);
   }
 
   // Keep the same storage path (upsert) so every reference — signed URLs,
@@ -1171,6 +1454,7 @@ export async function reconcileWithModel(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=reconcilestartfail`);
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
       workerMode && tmpPath
@@ -1180,7 +1464,7 @@ export async function reconcileWithModel(formData: FormData) {
           })
         : newJobRow(dealId, "reconcile", { status: "running", progress: 10 }),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=reconcilestartfail`);
   } else if (!workerMode) {
     // We own the row now — surface the reconcile step immediately.
     await supabase
@@ -1289,15 +1573,19 @@ export async function deleteDealNote(formData: FormData) {
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, notes")
+    .select("id, notes, is_sample")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) redirect("/deals");
 
   // Identity: the stamped user id when present (survives email changes),
-  // else the write-time email for notes from before byId existed.
+  // else the write-time email for notes from before byId existed; the
+  // sample deal's own seeded note is its reader's to remove
+  // (lib/note-remove, the decision log's rule too).
+  const { mayRemoveNote } = await import("@/lib/note-remove");
+  const reader = { userId: user.id, userEmail: user.email ?? "unknown" };
   const notes = parseDealNotes(deal.notes).filter(
-    (n) => !(n.at === at && (n.byId ? n.byId === user.id : n.by === (user.email ?? "unknown"))),
+    (n) => !(n.at === at && mayRemoveNote(n, reader, deal.is_sample === true)),
   );
   const { error } = await supabase
     .from("deals")

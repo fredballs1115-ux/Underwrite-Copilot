@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -47,6 +47,9 @@ export async function checkMarket(
   /** the metro's published figures, dated (lib/live-market-brief's `text`),
    *  where the deal sits in a covered market; null outside them */
   liveMarket?: string | null,
+  /** a forward purchase (lib/forward-purchase): its paragraph stands where
+   *  a plan's would — the developer's budget is not the buyer's */
+  forward = false,
 ): Promise<MarketResult> {
   const client = getAnthropic();
 
@@ -58,18 +61,20 @@ export async function checkMarket(
       {
         role: "user",
         content: [
-          // Reads the OM from the prompt cache the extraction step wrote; the
-          // context and the figures ride after it so the cached prefix stays
-          // identical.
+          // The OM under the cache breakpoint every step sends (whether this
+          // reads an earlier step's cache, with a structured-output format of
+          // its own, is the ledger's to say — ./models); the context and the
+          // figures ride after it so nothing that varies by deal sits before
+          // it.
           omDocument(om),
-          { type: "text", text: marketCheckInstruction(assetClass, context, liveMarket) },
+          { type: "text", text: marketCheckInstruction(assetClass, context, liveMarket, forward) },
           // Today's date, which every dated figure is read against
           // (lib/anthropic/today).
           { type: "text", text: todayLine() },
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(MarketSchema) },
+    output_config: { format: screenOutputFormat(MarketSchema) },
   }, omRequestOptions(om)));
   return out;
 }

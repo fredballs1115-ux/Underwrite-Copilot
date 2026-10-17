@@ -16,13 +16,13 @@
 // books, records and leases. Four rules.
 //
 //   THE WRONG DOCUMENT IS REFUSED, WITH THE REASON. A note, a share of the
-//   owning entity and the leased fee are not the property; an auction and a
-//   bankruptcy sale are bid for under their own terms, and so is a sale with
-//   a stalking-horse bid — priced or not, and whatever method the
-//   memorandum names (it had been refused only where the bid parsed as
-//   dollars, so "In place — terms in the data room" drafted a purchase from
-//   the owner). No draft is made, and the panel and the route say the same
-//   one sentence (lib/loi-refusal).
+//   owning entity, a preferred equity position in it and the leased fee are
+//   not the property; an auction and a bankruptcy sale are bid for under
+//   their own terms, and so is a sale with a stalking-horse bid — priced or
+//   not, and whatever method the memorandum names (it had been refused only
+//   where the bid parsed as dollars, so "In place — terms in the data room"
+//   drafted a purchase from the owner). No draft is made, and the panel and
+//   the route say the same one sentence (lib/loi-refusal).
 //
 //   WHAT THE MEMORANDUM STATES IS SAID, AND NOTHING IS INVENTED. A
 //   leasehold's draft names the leasehold interest under its ground lease as
@@ -40,6 +40,13 @@
 //   carries an entitlements contingency — a condition, with no figure in
 //   it, marked for review beside the memorandum's words.
 //
+//   A HOTEL'S FLAG WAITS ON ITS FRANCHISOR. Where the memorandum sells a
+//   hotel with a flag, a brand encumbrance or a PIP (lib/hotel-deal), the
+//   draft notes under its Closing clause what the memorandum says the sale
+//   carries, and that the PSA should condition the closing on the
+//   franchisor approving the transfer and the PIP as issued (research pass
+//   35) — a note for review, with no clause drafted for it.
+//
 //   A BLANK IS NULL. An extraction saved before the interest or the sale was
 //   read is a fee simple sold the usual way, and drafts as before.
 //
@@ -48,9 +55,10 @@
 
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { inferStrategy, isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
-import { interestOf, readInterest } from "@/lib/interest";
+import { interestOf, isGpStake, isTenancyInCommon, isWholeShare, readInterest } from "@/lib/interest";
 import { readSale, statesStalkingHorse } from "@/lib/sale-terms";
 import { readPortfolio } from "@/lib/portfolio";
+import { hotelSaleFacts, readHotelDeal } from "@/lib/hotel-deal";
 import { LOI_REFUSAL, type LoiRefusalKind } from "@/lib/loi-refusal";
 
 /** A fact the draft takes from the memorandum: its own words where it
@@ -79,6 +87,11 @@ export interface LoiTerms {
    *  lender approving the sale and the payoff it will accept — the sale's
    *  terms as stated beside it */
   shortSale: LoiStated | null;
+  /** a hotel with a flag, a brand encumbrance or a PIP: what the memorandum
+   *  says the sale carries (lib/hotel-deal `hotelSaleFacts`, our words from
+   *  its facts, never a quote) and the hotel's page, for the note under the
+   *  draft's Closing clause */
+  hotel: LoiStated | null;
   /** a portfolio's properties, in the memorandum's order: the draft lists
    *  them by name ("" for an address the memorandum does not print, or one
    *  that is the name itself) */
@@ -92,7 +105,20 @@ export interface LoiTerms {
 function refusalOf(ex: ExtractionResult | null | undefined): LoiRefusalKind | null {
   const { kind } = interestOf(ex);
   if (kind === "note") return "note";
-  if (kind === "partial_interest") return "share";
+  // An undivided interest held as a tenant in common is the real estate's,
+  // never an entity's share (research pass 37) — still not the whole
+  // property this draft buys.
+  // A share of the general partner's interest is a share of a share, said as
+  // one (research pass 37).
+  // All the tenant-in-common interests are the whole property, conveyed by
+  // each co-owner (the audit C3b LOW-1).
+  if (kind === "partial_interest") {
+    if (isTenancyInCommon(ex)) return isWholeShare(interestOf(ex).sharePct) ? "tic_all" : "tic";
+    return isGpStake(ex) ? "gp_stake" : "share";
+  }
+  // A preferred equity position, its own kind or a share whose rows say one
+  // (lib/interest `interestOf`).
+  if (kind === "preferred_equity") return "position";
   if (kind === "leased_fee") return "leased_fee";
   const sale = readSale(ex);
   if (sale) {
@@ -125,6 +151,7 @@ export function loiTermsFor(
       leasehold: null,
       seller: null,
       shortSale: null,
+      hotel: null,
       properties: [],
       notes: [],
     };
@@ -143,6 +170,13 @@ export function loiTermsFor(
   // The owner sells, but its lender decides: the closing waits on the
   // lender's approval of the sale and the payoff it will accept.
   const shortSale = sale?.method === "short_sale" ? { stated: sale.terms, page: sale.page } : null;
+
+  // A flagged hotel: its franchisor approves the transfer and issues the
+  // PIP the buyer funds. The page is the hotel's, else its PIP row's, each
+  // validated against the memorandum's length (lib/hotel-deal).
+  const hotelRead = readHotelDeal(extraction);
+  const hotelFacts = hotelRead ? hotelSaleFacts(hotelRead) : null;
+  const hotel = hotelRead && hotelFacts ? { stated: hotelFacts, page: hotelRead.page || hotelRead.pipPage } : null;
 
   const properties = (readPortfolio(extraction)?.assets ?? []).map((a) => ({
     name: a.name,
@@ -168,6 +202,11 @@ export function loiTermsFor(
       "It is a short sale, so the draft makes the closing conditional on the seller's lender approving the sale and the payoff it will accept.",
     );
   }
+  if (hotel) {
+    notes.push(
+      "It is a flagged hotel, so the draft notes under its closing that the PSA should condition the closing on the franchisor approving the transfer and the PIP as issued.",
+    );
+  }
 
-  return { plan, refusal: null, leasehold, seller, shortSale, properties, notes };
+  return { plan, refusal: null, leasehold, seller, shortSale, hotel, properties, notes };
 }

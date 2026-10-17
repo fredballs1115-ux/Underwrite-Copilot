@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { PICTURE_CHIPS, PICTURE_TIERS, chipWidth, dealTags, pictureRoom, placeTags, placeTagsByTier } from "./pipeline-tags";
+import { PICTURE_CHIPS, PICTURE_TIERS, ROUNDING_PX_PER_CHAR, chipWidth, chipWidthBound, dealTags, pictureRoom, placeTags, placeTagsByTier } from "./pipeline-tags";
 import type { PipelineSlots } from "./pipeline-slots";
+import type { ExtractionResult } from "./anthropic/types";
+import { exchangeForDeal } from "./exchange-deal";
 
 const slots = (over: Partial<PipelineSlots>): PipelineSlots => ({ cap: null, price: null, yoc: null, ...over });
 
@@ -44,9 +46,13 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         price: "$12,500,000",
         sale: "Auction, 5% premium",
         interest: "49% share",
+        sandwich: "Spread $720k, 1.65× cover",
+        forward: "Build-to-suit, 6.00% at delivery",
+        goingConcern: "Operator lease, 2.61x coverage",
         debt: "Assumable 3.45%",
         sellerNote: "Seller financing 5.00%",
         affordable: "LIHTC, 75% restricted",
+        regulation: "Rent-stabilized, 41 of 48",
         tenancy: "Single tenant, 6 yrs left",
         roster: "Shadow-anchored",
         valueAdd: "Reno $250/mo, 20% on cost",
@@ -56,13 +62,16 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         student: "Drive-to campus",
         mh: "Lot rent $430 vs $525 mkt, Private water & sewer",
         storage: "Lease-up, 72% occupied",
+        mixedUse: "Commercial 29% of income",
+        condo: "Bulk 42 of 120 (35%)",
+        exchange: "1031: identify by Oct 30",
         broker: "CBRE",
         basis: "$274k/unit",
       }),
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "debt", "sellerNote", "affordable", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage",
+      "flood", "sale", "interest", "sandwich", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse", "condo", "exchange",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -73,9 +82,90 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     expect(tags.find((t) => t.key === "interest")?.title).toBe("49% share: the price does not buy the building outright — the deal page says what it buys");
     // The tone warns where the words do.
     const tone = (key: string) => tags.find((t) => t.key === key)?.tone;
-    expect([tone("sale"), tone("roster"), tone("abatement"), tone("reports"), tone("student"), tone("mh"), tone("storage")]).toEqual(Array(7).fill("caution"));
-    expect([tone("interest"), tone("debt"), tone("sellerNote"), tone("affordable"), tone("tenancy"), tone("valueAdd"), tone("hotel")]).toEqual(Array(7).fill("brand"));
+    expect([tone("sale"), tone("regulation"), tone("roster"), tone("abatement"), tone("reports"), tone("student"), tone("mh"), tone("storage")]).toEqual(Array(8).fill("caution"));
+    expect([tone("interest"), tone("forward"), tone("debt"), tone("sellerNote"), tone("affordable"), tone("tenancy"), tone("valueAdd"), tone("hotel")]).toEqual(Array(8).fill("brand"));
+    expect(tags.find((t) => t.key === "forward")?.title).toBe(
+      "Build-to-suit, 6.00% at delivery: the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery",
+    );
     expect(dealTags(slots({ student: "Pre-leased 87%, +5 pts y/y", mh: "Lot rent $430 vs $525 mkt", storage: "In-place 21.1% over street" })).map((t) => t.tone)).toEqual(["brand", "brand", "brand"]);
+    expect(tone("mixedUse")).toBe("brand");
+    // Condominium units are the brand's: the deal page reads the share.
+    expect(tone("condo")).toBe("brand");
+    // A sandwich position's spread is the brand's; subleases that bring in
+    // less than the master rent warn.
+    expect(tone("sandwich")).toBe("brand");
+    expect(dealTags(slots({ sandwich: "Subleases under the master rent" }))[0]).toMatchObject({ key: "sandwich", tone: "caution" });
+    // No spread at all warns too, as the panel does (the pre-merge audit).
+    expect(dealTags(slots({ sandwich: "Subleases equal the master rent" }))[0]).toMatchObject({ key: "sandwich", tone: "caution" });
+    expect(tags.find((t) => t.key === "sandwich")?.title).toBe(
+      "Spread $720k, 1.65× cover: a master lease of the building, sublet — the master rent is owed whatever the subtenants pay; the deal page reads the spread, its cover and the master lease's term",
+    );
+    // A lease the operator's earnings cover is the brand's; a business sold
+    // with its real estate, one not settled, or a coverage under 1.00x warns.
+    expect(tone("goingConcern")).toBe("brand");
+    for (const words of ["Going concern", "Operating business", "Operator lease, 0.85x coverage"])
+      expect(dealTags(slots({ goingConcern: words }))[0], words).toMatchObject({ key: "goingConcern", tone: "caution" });
+    expect(dealTags(slots({ goingConcern: "Operator lease" }))[0].tone).toBe("brand");
+  });
+
+  it("says the seller's loan is priced only where its tag is a fixed coupon (research pass 37)", () => {
+    const title = (debt: string) => dealTags(slots({ debt }))[0].title;
+    for (const debt of ["Assumable 3.45%", "Assumable 2.65% + MIP"]) {
+      expect(title(debt), debt).toBe(`${debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate`);
+    }
+    for (const debt of ["Assumable SOFR + 3.25%", "Assumable 3.85% + supplemental", "Assumable loan", "Assumable floating rate"]) {
+      expect(title(debt), debt).toBe(`${debt}: the seller's loan is offered for assumption — the deal page reads its terms as stated and says what it cannot price`);
+    }
+  });
+
+  it("says the reader's 1031 exchange in the composition's own tone, read off the tag's words (lib/exchange-deal)", () => {
+    const today = new Date(Date.UTC(2026, 9, 5, 12));
+    const block = { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const };
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "", basis: "na" as const });
+    const deal = (interest?: Record<string, string>, metrics: ReturnType<typeof row>[] = []) =>
+      ({ dealName: "X", assetClass: "multifamily", totalPages: 40, metrics, ...(interest ? { interest } : {}) }) as unknown as ExtractionResult;
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    // Every tag the reader writes: the clock, each date fact and each question.
+    const reads = [
+      exchangeForDeal(block, deal(), "2026-10-20", today),
+      exchangeForDeal(block, deal(), "2026-11-02", today),
+      exchangeForDeal(block, deal(), "2027-04-01", today),
+      exchangeForDeal({ relinquishedTransferOn: "2026-08-01" }, deal(), null, today),
+      exchangeForDeal({ relinquishedTransferOn: "2026-12-01" }, deal(), null, today),
+      exchangeForDeal(block, deal({ kind: "note", ...blank }), null, today),
+      exchangeForDeal(block, deal({ kind: "partial_interest", ...blank }), null, today),
+      exchangeForDeal(block, deal({ kind: "preferred_equity", ...blank }), null, today),
+      exchangeForDeal(block, deal({ kind: "leasehold", ...blank, summary: "Leasehold under a ground lease" }, [row("Ground lease expiration", "June 30, 2049")]), null, today),
+    ];
+    expect(reads.map((r) => r?.tag)).toEqual([
+      "1031: identify by Oct 30",
+      "1031: offers due after ID",
+      "1031: offers due after close",
+      "1031: ID period over",
+      "1031: identify by Jan 15",
+      "1031: note — ask counsel",
+      "1031: share — ask counsel",
+      "1031: position — ask counsel",
+      "1031: lease under 30 yrs",
+    ]);
+    for (const r of reads) {
+      const t = dealTags(slots({ exchange: r!.tag }))[0];
+      expect(t, r!.tag).toMatchObject({ key: "exchange", tone: r!.tone });
+      expect(t.title, r!.tag).toMatch(/^1031: [^:]+: your 1031 exchange's deadlines against this deal's offers-due date and what its price buys/);
+    }
+    expect(reads.map((r) => r!.tone)).toEqual(["brand", "caution", "caution", "caution", "brand", "muted", "muted", "muted", "muted"]);
+  });
+
+  it("says a regime that applies, or the memorandum's claim of one, in the warning tone, and one to check in the muted tone (lib/rent-regulation)", () => {
+    const tone = (regulation: string) => dealTags(slots({ regulation }))[0];
+    expect(tone("Rent-stabilized, 41 of 48")).toMatchObject({ key: "regulation", tone: "caution" });
+    expect(tone("LA RSO, 3% cap").tone).toBe("caution");
+    expect(tone("Rent-regulated (OM)").tone).toBe("caution");
+    expect(tone("Rent rules: check")).toMatchObject({ tone: "muted", title: expect.stringMatching(/^Rent rules: check: the rent rules that reach the building/) });
+    // Rules that apply to a building the memorandum says has none of its
+    // units regulated: a fact to check, never a stabilized building in the
+    // warning tone (the batch audit).
+    expect(tone("Rent rules apply; 0 of 48 regulated (OM)").tone).toBe("muted");
   });
 
   it("a deal with nothing to flag carries no tags, and a flood lookup outside a hazard area adds none", () => {
@@ -110,9 +200,15 @@ describe("placeTags — the card's picture carries a chip only where it fits who
     // the chip the research pass found cut, "Shadow-anchored, 56% rolls in 5 …".
     const roster = tag("Shadow-anchored, 56% rolls in 5 yrs");
     for (const w of PICTURE_TIERS) expect(placeTags([roster], w)).toEqual({ picture: [], line: [roster] });
-    // 188.8px drawn: whole on a 348px picture, not on a 278px one.
+    // 188.8px drawn, 194.8 estimated, in a 348px picture's 201px column: a
+    // few pixels from wrapping where each glyph is rounded up to a whole
+    // pixel, and it wrapped into a two-line pill on a phone. It waits on the
+    // line at every width now.
     const abated = tag("Tax abated, 4 yrs left, +$450k/yr");
-    expect(placeTagsByTier([abated])).toEqual([{ tag: abated, onPicture: [false, false, true] }]);
+    expect(placeTagsByTier([abated])).toEqual([{ tag: abated, onPicture: [false, false, false] }]);
+    // A chip with room for every glyph rounded up rides where it has it.
+    const preleased = tag("Pre-leased 87%, +5 pts y/y");
+    expect(placeTagsByTier([preleased])[0].onPicture).toEqual([false, false, true]);
     // A short chip rides on every picture.
     expect(placeTagsByTier([tag("49% share")])[0].onPicture).toEqual([true, true, true]);
   });
@@ -123,9 +219,9 @@ describe("placeTags — the card's picture carries a chip only where it fits who
     const narrow = placeTags(tags, PICTURE_TIERS[0]);
     expect(narrow.picture.map((t) => t.text)).toEqual(["Flood AE", "49% share"]);
     expect(narrow.line.map((t) => t.text)).toEqual(["Mgmt encumbered, PIP $35k/key", "Note"]);
-    const wide = placeTags(tags, PICTURE_TIERS[2]);
-    expect(wide.picture.map((t) => t.text)).toEqual(["Mgmt encumbered, PIP $35k/key", "Flood AE"]);
-    expect(wide.line.map((t) => t.text)).toEqual(["49% share", "Note"]);
+    const wide = placeTags([tag("Pre-leased 87%, +5 pts y/y"), ...tags], PICTURE_TIERS[2]);
+    expect(wide.picture.map((t) => t.text)).toEqual(["Pre-leased 87%, +5 pts y/y", "Flood AE"]);
+    expect(wide.line.map((t) => t.text)).toEqual(["Mgmt encumbered, PIP $35k/key", "49% share", "Note"]);
     // Every tag is on the picture or the line at every width, never both
     // and never neither.
     for (const w of PICTURE_TIERS) {
@@ -134,8 +230,22 @@ describe("placeTags — the card's picture carries a chip only where it fits who
     }
   });
 
+  it("never wraps a chip it puts on a picture: each one the site writes fits its column with every glyph rounded up a pixel", () => {
+    expect(ROUNDING_PX_PER_CHAR).toBe(1);
+    for (const [text, drawn] of DRAWN_CHIP) {
+      expect(chipWidthBound(text), text).toBeGreaterThanOrEqual(drawn + [...text].length);
+      PICTURE_TIERS.forEach((w, k) => {
+        if (placeTagsByTier([tag(text)])[0].onPicture[k]) {
+          // The column a chip has at the tier's narrowest card, and the
+          // widest the chip can draw on any engine.
+          expect(drawn + [...text].length, `${text} at ${w}px`).toBeLessThanOrEqual(w * 0.58);
+        }
+      });
+    }
+  });
+
   it("asks of the card's picture the widths it places for: the card's container queries are the tiers'", () => {
-    const source = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
+    const source = readFileSync("app/(app)/deals/deal-tile.tsx", "utf8");
     const asked = new Set([...source.matchAll(/@min-\[(\d+)px\]\/card:/g)].map((m) => Number(m[1])));
     expect([...asked].sort((a, b) => a - b)).toEqual(PICTURE_TIERS.slice(1));
   });

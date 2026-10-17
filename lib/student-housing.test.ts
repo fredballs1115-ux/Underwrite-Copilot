@@ -56,6 +56,12 @@ describe("student housing, read as stated (#468)", () => {
     expect(studentHousingTag(full)).toBe("Pre-leased 87%, +5 pts y/y");
   });
 
+  it("reads a rent a bed with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no rent.
+    expect(readStudentHousing(deal([row("Beds", "612"), row("Rent per bed", "$1,085 per month (2026-27, all-inclusive)")]))!.rentPerBed).toBe(1085);
+    expect(readStudentHousing(deal([row("Beds", "612"), row("Rent per bed", "$1,085-$1,250 per month")]))!.rentPerBed).toBeNull();
+  });
+
   it("reads last year's pace from the same row where the words say so, and a pace behind as behind", () => {
     const r = readStudentHousing(deal([row("Beds", "400"), row("Pre-leased", "71.5% for 2026-27 vs. 78% a year ago")]))!;
     expect(r).toMatchObject({ preLeasedPct: 71.5, priorPct: 78, pacePts: -6.5, term: "2026–27" });

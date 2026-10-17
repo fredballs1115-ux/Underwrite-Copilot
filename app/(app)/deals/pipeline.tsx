@@ -1,5 +1,7 @@
 "use client";
 
+import type { PriceChange } from "@/lib/price-change";
+import { PriceChangeBadge } from "./price-change-badge";
 import {
   Fragment,
   memo,
@@ -16,13 +18,27 @@ import { useRouter } from "next/navigation";
 import { createDealFromBatch, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
-import { DealBanner } from "./deal-banner";
-import { GalleryCreditText } from "@/app/photo-credit";
-import { shownMarketIds, type BannerSource } from "@/lib/deal-banner";
+import { DealTile, DealTilePreview } from "./deal-tile";
+import {
+  FIT_META,
+  FIT_TONE_CLS,
+  FitBar,
+  TagLine,
+  Unstated,
+  VERDICT_META,
+  assetMeta,
+  callTitle,
+  compactPrice,
+  fmtDate,
+} from "./deal-card-parts";
+import { PersonBadge } from "../person-badge";
+import { displayName } from "@/lib/person";
+import { GalleryCreditPartsText } from "@/app/credit-parts";
+import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
-import { PIPELINE_VIEW_COOKIE, remembersView, type PipelineView } from "@/lib/pipeline-view";
+import { PIPELINE_CARD_GRID, PIPELINE_VIEW_COOKIE, filtersFoldLabel, remembersView, type PipelineView } from "@/lib/pipeline-view";
 import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
@@ -32,16 +48,21 @@ import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
 import { rowMarketLabel } from "@/lib/placed-by";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
-import { parseMoney, priceRange, priceRangeShort } from "@/lib/criteria";
+import type { BuyBoxCoverage } from "@/lib/criteria";
 import { compareSortValues, pipelineSortValue, type PipelineSortKey, type SortDir } from "@/lib/pipeline-sort";
-import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
-import { SHARING_OPTIONS, matchesSharing } from "@/lib/personal-deal";
+import { PERSONAL_TAG, dealTags, olderScreenTag } from "@/lib/pipeline-tags";
+import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-deal";
 // Why a fit wears "First read": it is judged on the first signal, before the
 // extraction lands — the deal page's buy-box panel says the same, and the
 // CSV and the meeting workbook mark the figure with the same words.
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
+import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
+import { checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone } from "@/lib/fit-label";
+import { fitFilterKey, fitFilterOptions, normalizeFitFilter } from "@/lib/fit-filter";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
-import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
+import { DEAL_NAME_MAX, nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
+import { COMPARE_MAX } from "@/lib/link-limits";
 import {
   STAGES,
   STAGE_LABEL,
@@ -55,17 +76,29 @@ export type DealCard = {
   assetClass: string;
   createdAt: string;
   verdict: string | null; // "pass" | "caution" | "pass_on" | null
+  /** the day the call on file was written (lib/screen-run `screenedOn`,
+   *  "Sep 12, 2026", and `screenedDay`, the ISO day the CSV writes); null
+   *  for a deal with no call, never the day it was added */
+  screened?: { on: string; day: string } | null;
   /** the user's own tracker, independent of the verdict (raw DB value —
    *  normalized via lib/stages when read) */
   stage: string;
   /** teammate who added this team deal (null when it's yours) */
   addedBy: string | null;
+  /** that teammate's user id, so their badge wears the tone it wears on
+   *  every other surface (lib/person `personToneIndex`); absent where the
+   *  page has none, and the badge is keyed on the name */
+  addedById?: string | null;
   /** the deal is in the reader's own pipeline while the reader is on a team
    *  — no team holds it, so the teammates do not see it (lib/personal-deal);
    *  absent off a team */
   personal?: boolean;
   /** deterministic buy-box result against the user's mandate */
   fit: "fits" | "near" | "outside" | null;
+  /** how many of the box's criteria the fit stands on (lib/criteria
+   *  `buyBoxCoverage`): the card says "2 of 4 checked" where not every one
+   *  could be, and draws no green while one the price decides is among them */
+  fitCoverage?: BuyBoxCoverage | null;
   /** 0–100 mandate-fit score + its PURSUE/WATCH/PASS call (null pre-screen) */
   score: number | null;
   mandateVerdict: "PURSUE" | "WATCH" | "PASS" | null;
@@ -87,7 +120,10 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; capWithheld?: "note" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; basis?: string | null };
+  /** the ask's move since the previous screen (lib/price-change, research
+   *  pass 24 B14): drawn beside the price by its own badge */
+  priceChange?: PriceChange | null;
+  slots: { cap: string | null; price: string | null; yoc: string | null; yocWithheld?: string | null; plan?: boolean; capWithheld?: "note" | "position" | "share" | "under_water" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -96,6 +132,9 @@ export type DealCard = {
    *  where a finished read's empty slot keeps the dash that says "not
    *  stated" */
   reading?: boolean;
+  /** whether a memorandum is on file: a deal typed in from its facts has
+   *  none, and its first screen reads no OM (the batch-2 audit) */
+  hasOm?: boolean;
   /** a buy box stands against the deal, so a fit is scored once the terms
    *  are read — without one, the fit's dash is final */
   hasBox?: boolean;
@@ -124,17 +163,28 @@ export type DealCard = {
   place?: MapPlace | null;
   /** a geocoder definitively found nothing for the address */
   placeMiss?: boolean;
+  /** the screen was stored before a reader its figures turn on (lib/older-
+   *  screen): the server's sentence, worn as the "Older screen" chip on the
+   *  card's line and the row's, the sentence in its title */
+  older?: string | null;
 };
 
 // How the pipeline is drawn, and which view is remembered, live in
 // lib/pipeline-view (#438): the page is a server component and reads them,
 // and an export of this "use client" module is only a client reference there.
 export type { PipelineView } from "@/lib/pipeline-view";
+// The card, drawn outside the pipeline too, lives in deal-tile.tsx; its
+// importers keep reading it here.
+export { DealTilePreview, PhotoFlip } from "./deal-tile";
 
-/** Why a note's cap slot holds its yield, or "n/a" (lib/compare-interest
- *  `noteCapSlot`): the collateral's cap is not the buyer's figure. */
-const NOTE_CAP_TITLE =
-  "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. The note's yield to maturity at its price stands in its place, where the note pays or may.";
+/** A card's stage control, handed to the card (deal-tile.tsx imports no
+ *  server action, so the homepage can draw the sample's card). */
+const tileStage = (d: DealCard) => <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />;
+
+// The cap slot's words where it holds no cap of the deal's own — a note's
+// or a position's own yield, or why the cap is withheld — live in
+// lib/cap-slot, import-free, so the CSV's cell is tested and the words are
+// held to the server's copy.
 
 /** A card as the map reads it. */
 function mapDealOf(d: DealCard): MapDeal {
@@ -148,7 +198,7 @@ function mapDealOf(d: DealCard): MapDeal {
       : d.slots.yoc
         ? `${d.slots.yoc} yield on cost`
         : d.slots.noteYield
-          ? `${d.slots.noteYield} to maturity`
+          ? `${d.slots.noteYield} ${ownYieldOf(d.slots.capWithheld).to}`
           : null,
     place: d.place ?? null,
     placeMiss: d.placeMiss,
@@ -162,33 +212,10 @@ function mapDealOf(d: DealCard): MapDeal {
  *  column is lib/pipeline-sort's `pipelineSortValue`. */
 type SortKey = PipelineSortKey;
 
-/** The price as a table wants it — "$68.0M", "$950k" — with the OM's own
- *  figure kept for the tooltip and the CSV. A column eighty pixels wide
- *  showed every deal as "$68,000,…" before; the raw string stays when it
- *  is not a figure at all ("Call for offers"). */
-function compactPrice(raw: string): string {
-  // Guidance stated as a range stays one (#466) — "$40–42M" — where the
-  // first cut showed its bottom alone, the flattering end, as the price.
-  const range = priceRange(raw);
-  if (range) return priceRangeShort(range);
-  const n = parseMoney(raw);
-  if (n == null || !(n > 0)) return raw;
-  return n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-}
-
-const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string }> = {
-  outside: { label: "Outside", cls: "text-kill" },
-  near: { label: "Near", cls: "text-caution" },
-  fits: { label: "Fits", cls: "text-pass" },
-};
-
-const MANDATE_META: Record<
-  NonNullable<DealCard["mandateVerdict"]>,
-  { label: string; cls: string }
-> = {
-  PASS: { label: "Pass", cls: "text-kill" },
-  WATCH: { label: "Watch", cls: "text-caution" },
-  PURSUE: { label: "Pursue", cls: "text-pass" },
+const MANDATE_META: Record<NonNullable<DealCard["mandateVerdict"]>, { label: string }> = {
+  PASS: { label: "Pass" },
+  WATCH: { label: "Watch" },
+  PURSUE: { label: "Pursue" },
 };
 
 /** First click on a header sorts the way people expect that column to lead:
@@ -205,25 +232,6 @@ const DEFAULT_DIR: Record<SortKey, SortDir> = {
   due: "asc",
 };
 
-const VERDICT_META: Record<string, { label: string; cls: string }> = {
-  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
-  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
-};
-
-/** Each asset class reads as its own kind of thing at a glance: a colour dot
- *  beside the class name and a thin rail down the row's left edge, one hue per
- *  class (tokens in globals.css). Deliberately quiet — the verdict colours
- *  still carry the loudest signal on the row. */
-const ASSET_META: Record<string, { dot: string; rail: string }> = {
-  multifamily: { dot: "bg-asset-multifamily", rail: "border-l-asset-multifamily" },
-  office: { dot: "bg-asset-office", rail: "border-l-asset-office" },
-  industrial: { dot: "bg-asset-industrial", rail: "border-l-asset-industrial" },
-  retail: { dot: "bg-asset-retail", rail: "border-l-asset-retail" },
-};
-const OTHER_ASSET = { dot: "bg-asset-other", rail: "border-l-asset-other" };
-const assetMeta = (cls: string) => ASSET_META[cls.toLowerCase()] ?? OTHER_ASSET;
-
 /** The ladder's steps at funnel width — the group headers keep the full
  *  labels; the funnel has room for one word each. */
 const SHORT_STAGE: Record<Stage, string> = {
@@ -235,27 +243,6 @@ const SHORT_STAGE: Record<Stage, string> = {
   closed: "Closed",
   dead: "Dead",
 };
-
-/** "Jordan Lee" → "JL"; an email → its first letter. */
-function initials(name: string): string {
-  const parts = name.split(/[\s._-]+/).filter(Boolean);
-  const letters = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 1);
-  return letters.toUpperCase();
-}
-
-// One cached formatter — constructing Intl.DateTimeFormat per call costs
-// ~50ms per full-list render at 500 rows. Pinned to UTC so the server and
-// client render the same string (no hydration mismatch from timezones).
-const DATE_FMT = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-function fmtDate(iso: string): string {
-  return DATE_FMT.format(new Date(iso));
-}
 
 const PERSIST_KEY = "uc-pipeline-view";
 
@@ -287,6 +274,10 @@ export function Pipeline({
   viewerId = null,
   onTeam = false,
   todayIso,
+  totalDeals = null,
+  readNote = null,
+  sampleCard = null,
+  filterBar = null,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -295,6 +286,10 @@ export function Pipeline({
    *  fresh nonce per invocation re-triggers the effect even when the form
    *  was closed and the param is still in the URL. */
   openNew?: string;
+  /** the sample deal's own card (lib/pipeline-card `sampleDealCard`), which
+   *  an empty pipeline shows as its first deal: the card the reader gets
+   *  the moment they add it, judged against their own buy box */
+  sampleCard?: DealCard | null;
   /** structured address handed in from Pull Comps ("screen this address") —
    *  opens the form on the manual tab with the address pre-picked. */
   prefillAddress?: StructuredAddress | null;
@@ -312,6 +307,18 @@ export function Pipeline({
    *  counts from it, so the server's markup and the browser's are the same
    *  day */
   todayIso: string;
+  /** the exact count of the deals the reader can see (research pass 42):
+   *  the page reads every one, a page at a time, and where the count is
+   *  larger than the deals read — a deal added between the two — the header
+   *  says both, never a total it did not read */
+  totalDeals?: number | null;
+  /** what a read behind the list could not read just now (each deal's
+   *  latest screen, its offers-due date), said over the list — a failed
+   *  read is never shown as no rows */
+  readNote?: string | null;
+  /** a filter the page draws on the server and the list shows over its
+   *  deals — the brokerage filter (research pass 24, B13) */
+  filterBar?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -329,7 +336,8 @@ export function Pipeline({
   const [stage, setStage] = useState("all");
   const [asset, setAsset] = useState("all");
   const [market, setMarket] = useState("all");
-  // Mandate-fit filter (Feature 4): all / PURSUE / WATCH / PASS.
+  // The fit filter, in the card's own words (lib/fit-filter): a score band,
+  // "Outside box", or "2 of 4 checked" — a deal files where its chip says.
   const [mfit, setMfit] = useState("all");
   // On a team: the shared pipeline's deals, or the reader's own the team
   // does not see (lib/personal-deal).
@@ -368,7 +376,7 @@ export function Pipeline({
           if (typeof v.stage === "string") setStage(v.stage);
           if (typeof v.asset === "string") setAsset(v.asset);
           if (typeof v.market === "string") setMarket(v.market);
-          if (typeof v.mfit === "string") setMfit(v.mfit);
+          if (typeof v.mfit === "string") setMfit(normalizeFitFilter(v.mfit));
           if (typeof v.sharing === "string") setSharing(v.sharing);
           if (typeof v.showDead === "boolean") setShowDead(v.showDead);
           if (v.collapsed && typeof v.collapsed === "object")
@@ -450,7 +458,6 @@ export function Pipeline({
     return () => window.removeEventListener("keydown", onKey);
   }, [atLimitRef]);
 
-  const COMPARE_MAX = 4;
   // Stable identity so memoized rows don't re-render on unrelated changes.
   const toggleSelected = useCallback((id: string) => {
     setSelected((prev) => {
@@ -476,8 +483,10 @@ export function Pipeline({
     () => Array.from(new Set(deals.map((d) => d.market).filter(Boolean))).sort(),
     [deals],
   );
-  // Only surface the mandate-fit filter once at least one deal carries a score.
-  const hasScores = useMemo(() => deals.some((d) => !!d.mandateVerdict), [deals]);
+  // The fit filter's options: one for each set of words a deal's chip says
+  // (lib/fit-filter), drawn once a deal has a fit to file.
+  const fitOptions = useMemo(() => fitFilterOptions(deals, mfit), [deals, mfit]);
+  const hasScores = fitOptions.length > 1;
 
   // Typing stays instant even with hundreds of rows: the list follows the
   // query at deferred priority.
@@ -504,7 +513,7 @@ export function Pipeline({
       if (dealStage === "dead" && !showDead && stage !== "dead") return false;
       if (asset !== "all" && d.assetClass !== asset) return false;
       if (market !== "all" && d.market !== market) return false;
-      if (mfit !== "all" && d.mandateVerdict !== mfit) return false;
+      if (mfit !== "all" && fitFilterKey(d) !== mfit) return false;
       // Only where the filter is drawn: a choice saved on a team never
       // hides deals once the reader is off it.
       if (onTeam && !matchesSharing(sharing, !!d.personal)) return false;
@@ -562,7 +571,7 @@ export function Pipeline({
   }
   const cardsOnScreen =
     view === "cards" ? STAGES.flatMap((s) => (sectionDrawn(s) && isOpen(s) ? (groups.get(s) ?? []) : [])) : [];
-  const marketPhotoIds = shownMarketIds(cardsOnScreen, marketShown);
+  const marketPhotoCredits = shownMarketCredits(cardsOnScreen, marketShown);
   function toggleSection(s: Stage) {
     setCollapsed((c) => ({ ...c, [s]: isOpen(s) }));
   }
@@ -609,6 +618,21 @@ export function Pipeline({
     market !== "all" ||
     mfit !== "all" ||
     (onTeam && sharing !== "all");
+  // The filters a phone folds behind one row, counted for its summary
+  // ("Filters · 2 set"): the selects and the dead deals' toggle — never the
+  // search beside it, or the verdict chips above it, which show their own.
+  const filtersSet = [
+    stage !== "all",
+    asset !== "all",
+    market !== "all",
+    mfit !== "all",
+    onTeam && sharing !== "all",
+    deadCount > 0 && showDead,
+  ].filter(Boolean).length;
+  // Open when any is set (a saved view restored, a rung tapped), and as the
+  // reader leaves it once they have opened or closed it themselves.
+  const [foldOpen, setFoldOpen] = useState<boolean | null>(null);
+  const filtersOpen = foldOpen ?? filtersSet > 0;
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
     // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
@@ -617,9 +641,11 @@ export function Pipeline({
       const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
       return `"${safe.replaceAll('"', '""')}"`;
     };
-    // A plan deal's cap cell is empty and its yield on cost sits in its own
-    // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Market read", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Self-storage", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
+    // A plan deal's cap cell says "n/a — plan" and its yield on cost sits in
+    // its own column — the same two cells the meeting .xlsx writes, in its
+    // words (lib/cap-slot `PLAN_CAP_NA`); the cell had been blank, which
+    // reads as a cap the memorandum does not state.
+    const header = ["Deal", "Asset class", "Market", "Market read", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Self-storage", "Rent regulation", "Forward purchase", "Mixed-use", "Operating business", "Condominium", "Sandwich position", "1031 exchange", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Screened", "Stage", "Offers due", "Broker", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -631,7 +657,9 @@ export function Pipeline({
         rowMarketLabel(d) ?? "",
         d.slots.price ?? "",
         // The price by the unit, the key or the foot (#469); blank where
-        // the count or the area is not stated, and on a plan deal.
+        // the count or the area is not stated, and on a conversion or a
+        // development (whose basis is the all-in cost). A value-add's is the
+        // price over the building as it stands, not the plan's all-in basis.
         d.slots.basis ?? "",
         // Blank on a fee simple — the price is the building's.
         d.slots.interest ?? "",
@@ -662,17 +690,57 @@ export function Pipeline({
         d.slots.mh ?? "",
         // Blank on anything but self-storage (#471).
         d.slots.storage ?? "",
+        // Blank where no rent rule reaches the building and the memorandum
+        // names no regime (lib/rent-regulation).
+        d.slots.regulation ?? "",
+        // Blank unless the buyer pays for the building at its delivery
+        // (lib/forward-purchase).
+        d.slots.forward ?? "",
+        // Blank unless both halves of a mixed-use building's income, or the
+        // commercial area and the building's, are stated (lib/mixed-use).
+        d.slots.mixedUse ?? "",
+        // Blank unless the memorandum names an operating business or states
+        // its EBITDA (lib/going-concern).
+        d.slots.goingConcern ?? "",
+        // Blank unless the deal's own words name a condominium and the
+        // memorandum states one of its figures (lib/condo).
+        d.slots.condo ?? "",
+        // Blank unless the price buys a master lease of the building, sublet,
+        // and the memorandum states both rents (lib/sandwich-lease).
+        d.slots.sandwich ?? "",
+        // Blank unless the reader's buy box holds a 1031 exchange still
+        // running: its deadlines against the row's (lib/exchange-deal).
+        d.slots.exchange ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
-        // A note's cap is withheld, said so rather than left blank (#423).
-        d.slots.cap ?? (d.slots.capWithheld === "note" ? "n/a — note" : ""),
-        d.slots.yoc ?? "",
+        // A plan deal's cap is "n/a — plan", as the meeting workbook says
+        // it. A note's or a position's cap is withheld, its own yield in the
+        // column as the card shows it ("17.0% to maturity"), else the cap
+        // said withheld rather than left blank (#423).
+        capCellText(d.slots),
+        // A yield no project earns is refused in the plan's own words.
+        d.slots.yoc ?? (d.slots.yocWithheld ? YOC_WITHHELD : ""),
         // A fit judged on the first signal, before the extraction lands, is
         // marked on each of its figures as the card marks it — "Near (first
-        // read)" — since a CSV is read away from the page (lib/first-read).
-        markFirstRead(d.fit ? FIT_META[d.fit].label : "", d.fitFirstRead),
+        // read)" — since a CSV is read away from the page (lib/first-read);
+        // and the fit says how many of the box's criteria it stands on where
+        // not every one could be checked, "Fits (2 of 4)", as the meeting
+        // workbook's cell does (lib/fit-label `fitCellText`).
+        fitCellText(d.fit ? FIT_META[d.fit].label : "", d.fitCoverage, d.fitFirstRead),
         markFirstRead(d.score != null ? String(d.score) : "", d.fitFirstRead),
-        markFirstRead(d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "", d.fitFirstRead),
+        // The score's call in the deal header's chip's own words (lib/
+        // fit-label `fitScoreLabel`): "Outside box" on a miss outright, and
+        // the count in the call's place where the screen could not check
+        // every criterion ("2 of 4 checked"), never a bare "Pursue" over half
+        // the box.
+        markFirstRead(
+          d.mandateVerdict && d.score != null
+            ? fitScoreLabel(d.score, d.mandateVerdict, d.fit === "outside", d.fitCoverage).replace(/^Fit \d+ · /, "")
+            : d.mandateVerdict
+              ? MANDATE_META[d.mandateVerdict].label
+              : "",
+          d.fitFirstRead,
+        ),
         d.jobStatus === "failed"
           ? "Failed"
           : d.jobStatus === "stalled"
@@ -684,13 +752,17 @@ export function Pipeline({
               : d.verdict
                 ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
                 : "Not screened",
+        // The day the call on file was written, ISO like the other dates;
+        // blank with no call — never the day the deal was added.
+        d.screened?.day ?? "",
         STAGE_LABEL[normalizeStage(d.stage)],
         d.offersDue ?? "",
         // The brokerage the memorandum names (#467).
         d.slots.broker ?? "",
         // ISO like the deadline column, so both parse as dates in Excel.
         d.createdAt.slice(0, 10),
-        d.addedBy ?? "You",
+        // A name, never an address (lib/person).
+        d.addedBy ? displayName(d.addedBy) : "You",
       ]
         .map(esc)
         .join(","),
@@ -717,8 +789,17 @@ export function Pipeline({
           {(deals.length > 0 || showUsage) && (
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
               {deals.length > 0 && (
-                <span>
-                  {deals.length} {deals.length === 1 ? "deal" : "deals"}
+                <span
+                  data-qa="deal-count"
+                  title={
+                    totalDeals != null && totalDeals > deals.length
+                      ? `${totalDeals} deals counted, ${deals.length} read — refresh to read them all`
+                      : undefined
+                  }
+                >
+                  {totalDeals != null && totalDeals > deals.length
+                    ? `${deals.length} of ${totalDeals} deals`
+                    : `${deals.length} ${deals.length === 1 ? "deal" : "deals"}`}
                 </span>
               )}
               {showUsage && allowance && allowance.left != null && (
@@ -774,6 +855,7 @@ export function Pipeline({
               <button
                 type="button"
                 onClick={() => setShowForm((s) => !s)}
+                aria-expanded={showForm}
                 className="shadow-card hover-lift rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
               >
                 {showForm ? "Close" : "+ New deal"}
@@ -789,7 +871,21 @@ export function Pipeline({
         </p>
       )}
 
-      {onboarding && (
+      {/* A read behind the list that failed is said, never shown as nothing
+          to show: no deadlines, no screen running (research pass 42). */}
+      {readNote && (
+        <p role="status" data-qa="pipeline-read-note" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
+          {readNote}
+        </p>
+      )}
+
+      {filterBar}
+
+      {/* With no deals the empty card below carries the same three steps
+          as its own list, so the checklist would offer the upload and the
+          sample a second time on a new reader's first screen (signed-in
+          gaps, H4). */}
+      {onboarding && deals.length > 0 && (
         <GettingStarted
           state={onboarding}
           atLimit={atLimit}
@@ -811,7 +907,7 @@ export function Pipeline({
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
           <p className="text-sm font-medium">
             {selected.size === 0
-              ? "Select 2–4 deals to compare."
+              ? `Select 2–${COMPARE_MAX} deals to compare.`
               : selected.size >= COMPARE_MAX
                 ? `${selected.size} of ${COMPARE_MAX} selected`
                 : `${selected.size} selected`}
@@ -836,7 +932,9 @@ export function Pipeline({
       )}
       {atLimit && errorMessage && (
         <section className="rounded-xl border border-caution/30 bg-caution/5 p-5">
-          <p className="text-sm font-medium text-caution">{errorMessage}</p>
+          <p role="alert" className="text-sm font-medium text-caution">
+            {errorMessage}
+          </p>
           <Link
             href="/billing"
             className="mt-3 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
@@ -848,7 +946,7 @@ export function Pipeline({
 
       {deals.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+          <div className="relative max-sm:min-w-0 max-sm:flex-1">
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -869,112 +967,137 @@ export function Pipeline({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search deals…  ( / )"
               aria-label="Search deals"
-              className="w-48 rounded-lg border border-line bg-surface py-1.5 pl-9 pr-3 text-sm shadow-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="w-48 rounded-lg border border-line bg-surface py-1.5 pl-9 pr-3 text-sm shadow-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40 max-sm:w-full"
             />
           </div>
-          {/* The verdict filter is the split's chips above; the stage filter
-              is the funnel's rungs — this select is the keyboard-and-phone
-              route to the same thing. */}
-          <FilterSelect
-            label="Filter by stage"
-            value={stage}
-            onChange={setStage}
-            options={[
-              ["all", "All stages"],
-              ...STAGES.map((s) => [s, STAGE_LABEL[s]] as [string, string]),
-            ]}
-          />
-          {assets.length > 1 && (
-            <FilterSelect
-              label="Filter by asset class"
-              value={asset}
-              onChange={setAsset}
-              className="max-w-40"
-              options={[
-                ["all", "All assets"],
-                ...assets.map((a) => [a, assetClassLabel(a)] as [string, string]),
-              ]}
-            />
-          )}
-          {/* A select is as wide as its longest option, and a market name can
-              run to a whole line ("Washington, DC (DC Proper / Fort Totten …)")
-              — capped, so the row keeps every filter on one line at desktop
-              width instead of stranding the next one below. */}
-          {markets.length > 1 && (
-            <FilterSelect
-              label="Filter by market"
-              value={market}
-              onChange={setMarket}
-              className="max-w-48"
-              options={[
-                ["all", "All markets"],
-                ...markets.map((m) => [m, m] as [string, string]),
-              ]}
-            />
-          )}
-          {hasScores && (
-            <FilterSelect
-              label="Filter by mandate fit"
-              value={mfit}
-              onChange={setMfit}
-              options={[
-                ["all", "All fit"],
-                ["PURSUE", "Pursue · 75+"],
-                ["WATCH", "Watch · 50–74"],
-                ["PASS", "Pass · <50"],
-              ]}
-            />
-          )}
-          {/* On a team the list holds the shared pipeline's deals beside the
-              reader's own, which the team does not see (lib/personal-deal). */}
-          {onTeam && (
-            <FilterSelect
-              label="Filter by sharing"
-              value={sharing}
-              onChange={setSharing}
-              options={SHARING_OPTIONS}
-            />
-          )}
-          {deadCount > 0 && (
-            <button
-              type="button"
-              aria-pressed={showDead}
-              onClick={() => setShowDead((v) => !v)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors ${
-                showDead
-                  ? "border-brand bg-brand/5 text-brand"
-                  : "border-line bg-surface text-muted hover:bg-faint hover:text-ink"
+          {/* Below sm the filters fold behind one row (research pass 29: four
+              selects stacked two by two pushed a phone's first photograph
+              off its first screen): this summary, saying how many are set,
+              opens the selects that follow it, and is open when any is set.
+              From sm up it is gone and the selects sit in the row as ever
+              (`sm:contents`) — they follow the details rather than sit in it,
+              since a closed details hides its contents at every width. */}
+          <details
+            data-filters="fold"
+            open={filtersOpen}
+            onToggle={(e) => setFoldOpen(e.currentTarget.open)}
+            className="peer/filters group/filters sm:hidden"
+          >
+            <summary
+              className={`inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 [&::-webkit-details-marker]:hidden ${
+                filtersSet > 0 ? "border-brand bg-brand/5 text-brand" : "border-line bg-surface text-ink hover:bg-faint"
               }`}
             >
-              {showDead ? "Hide dead" : `Show dead (${deadCount})`}
-            </button>
-          )}
-          {/* Below md the column headers are hidden, and the cards have none
-              at any width, so sorting lives here. */}
-          <FilterSelect
-            label="Sort deals"
-            value={`${sortKey}:${sortDir}`}
-            onChange={(v) => {
-              const [k, dir] = v.split(":") as [SortKey, SortDir];
-              setSortKey(k);
-              setSortDir(dir);
-            }}
-            className={`ml-auto ${view === "list" ? "md:hidden" : ""}`}
-            options={[
-              ["added:desc", "Newest"],
-              ["added:asc", "Oldest"],
-              ["due:asc", "Offers due, earliest"],
-              ["price:desc", "Price: high to low"],
-              ["cap:desc", "Cap: high to low"],
-              ["fit:desc", "Mandate fit: high to low"],
-              ["status:desc", "By status"],
-              ["name:asc", "Name A–Z"],
-            ]}
-          />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
+                <path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4" />
+              </svg>
+              {filtersFoldLabel(filtersSet)}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-3.5 w-3.5 transition-transform group-open/filters:rotate-180">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+          </details>
+          <div data-filters="selects" className="hidden w-full flex-wrap items-center gap-2 max-sm:peer-open/filters:flex sm:contents">
+            {/* The verdict filter is the split's chips above; the stage filter
+                is the funnel's rungs — this select is the keyboard-and-phone
+                route to the same thing. */}
+            <FilterSelect
+              label="Filter by stage"
+              value={stage}
+              onChange={setStage}
+              options={[
+                ["all", "All stages"],
+                ...STAGES.map((s) => [s, STAGE_LABEL[s]] as [string, string]),
+              ]}
+            />
+            {assets.length > 1 && (
+              <FilterSelect
+                label="Filter by asset class"
+                value={asset}
+                onChange={setAsset}
+                className="max-w-40"
+                options={[
+                  ["all", "All assets"],
+                  ...assets.map((a) => [a, assetClassLabel(a)] as [string, string]),
+                ]}
+              />
+            )}
+            {/* A select is as wide as its longest option, and a market name can
+                run to a whole line ("Washington, DC (DC Proper / Fort Totten …)")
+                — capped, so the row keeps every filter on one line at desktop
+                width instead of stranding the next one below. */}
+            {markets.length > 1 && (
+              <FilterSelect
+                label="Filter by market"
+                value={market}
+                onChange={setMarket}
+                className="max-w-48"
+                options={[
+                  ["all", "All markets"],
+                  ...markets.map((m) => [m, m] as [string, string]),
+                ]}
+              />
+            )}
+            {hasScores && (
+              <FilterSelect
+                label="Filter by mandate fit"
+                value={mfit}
+                onChange={setMfit}
+                options={fitOptions}
+              />
+            )}
+            {/* On a team the list holds the shared pipeline's deals beside the
+                reader's own, which the team does not see (lib/personal-deal). */}
+            {onTeam && (
+              <FilterSelect
+                label="Filter by sharing"
+                value={sharing}
+                onChange={setSharing}
+                options={SHARING_OPTIONS}
+              />
+            )}
+            {deadCount > 0 && (
+              <button
+                type="button"
+                aria-pressed={showDead}
+                onClick={() => setShowDead((v) => !v)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors ${
+                  showDead
+                    ? "border-brand bg-brand/5 text-brand"
+                    : "border-line bg-surface text-muted hover:bg-faint hover:text-ink"
+                }`}
+              >
+                {showDead ? "Hide dead" : `Show dead (${deadCount})`}
+              </button>
+            )}
+            {/* Below md the column headers are hidden, and the cards have none
+                at any width, so sorting lives here. */}
+            <FilterSelect
+              label="Sort deals"
+              value={`${sortKey}:${sortDir}`}
+              onChange={(v) => {
+                const [k, dir] = v.split(":") as [SortKey, SortDir];
+                setSortKey(k);
+                setSortDir(dir);
+              }}
+              className={`ml-auto ${view === "list" ? "md:hidden" : ""}`}
+              options={[
+                ["added:desc", "Newest"],
+                ["added:asc", "Oldest"],
+                ["due:asc", "Offers due, earliest"],
+                ["price:desc", "Price: high to low"],
+                ["cap:desc", "Cap: high to low"],
+                ["fit:desc", "Mandate fit: high to low"],
+                ["status:desc", "By status"],
+                ["name:asc", "Name A–Z"],
+              ]}
+            />
+          </div>
           {/* The two exports travel together at the right edge: when the
               filters wrap, the last line ends with them, never with one
-              stranded select beside them. */}
-          <div className={`flex items-center gap-2 ${view === "list" ? "md:ml-auto" : ""}`}>
+              stranded select beside them. They wrap too: at 320px (a laptop
+              at 400%) "Excel" ran off the page (research pass 33). */}
+          <div className={`flex flex-wrap items-center gap-2 ${view === "list" ? "md:ml-auto" : ""}`}>
             <ViewToggle view={view} onChange={setView} />
             <button
               type="button"
@@ -1006,51 +1129,51 @@ export function Pipeline({
       )}
 
       {deals.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-surface p-10 text-center shadow-card">
-          <EmptyArt />
-          <p className="mt-5 text-base font-semibold tracking-tight">
-            Start your pipeline
-          </p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-            Upload an OM or type the deal’s facts. Or open the worked sample first.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-            {atLimit ? (
+        <div
+          className={`rounded-2xl border border-line bg-surface shadow-card ${
+            sampleCard
+              ? "grid items-center gap-6 p-5 sm:p-8 md:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] md:gap-10"
+              : "p-10 text-center"
+          }`}
+        >
+          {/* The sample's own card, as the pipeline draws it the moment the
+              reader adds it (lib/pipeline-card): its market's photograph,
+              the call on it, the figures. A still picture: "Try a sample
+              deal" beside it adds it and opens it. */}
+          {sampleCard ? (
+            <DealTilePreview
+              d={sampleCard}
+              note="Sample deal"
+              todayIso={todayIso}
+              className="grid max-w-[19rem]"
+            />
+          ) : (
+            <EmptyArt />
+          )}
+          <div>
+            <p className={`text-base font-semibold tracking-tight ${sampleCard ? "" : "mt-5"}`}>
+              Start your pipeline
+            </p>
+            {/* The three first steps, each with its one way in: the upload,
+                the sample, the buy box — the checklist's own steps and
+                segment bar (`SetupSteps`), drawn here in place of a second
+                copy above (signed-in gaps, H4). */}
+            <SetupSteps
+              steps={setupSteps(onboarding ?? NO_ONBOARDING, { atLimit, onNewDeal: () => setShowForm(true), variant: "buttons" })}
+              className={`mt-3 max-w-md text-left ${sampleCard ? "" : "mx-auto"}`}
+            />
+            <p className="mt-3 text-xs">
+              {/* To the metro explorer itself: /market opens a signed-in
+                  reader on their own market data, which an empty pipeline has
+                  none of ("No market data yet", and a link back here). */}
               <Link
-                href="/billing"
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                href="/market#explorer"
+                className="font-medium text-brand hover:text-brand-strong"
               >
-                See plans
+                Browse the covered markets →
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowForm(true)}
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-              >
-                + New deal
-              </button>
-            )}
-            <form action={createSampleDeal}>
-              <PendingButton
-                pendingLabel="Setting up your sample…"
-                className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
-              >
-                Try a sample deal
-              </PendingButton>
-            </form>
+            </p>
           </div>
-          <p className="mt-3 text-xs">
-            {/* To the metro explorer itself: /market opens a signed-in
-                reader on their own market data, which an empty pipeline has
-                none of ("No market data yet", and a link back here). */}
-            <Link
-              href="/market#explorer"
-              className="font-medium text-brand hover:text-brand-strong"
-            >
-              Browse the covered markets →
-            </Link>
-          </p>
         </div>
       ) : filtered.length === 0 ? (
         deadCount === deals.length && !showDead && stage !== "dead" ? (
@@ -1171,8 +1294,10 @@ export function Pipeline({
                     </button>
                     {open && view === "cards" && (
                       // The photograph-led view (#428): a card a deal, the
-                      // building's picture first, the way a listing reads.
-                      <ul className="stagger mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-view="cards">
+                      // building's picture first, the way a listing reads —
+                      // never a card narrower than 17.5rem where one fits
+                      // (lib/pipeline-view).
+                      <ul className={`stagger ${PIPELINE_CARD_GRID}`} data-view="cards">
                         {sectionDeals.map((d, idx) => (
                           <DealTile
                             key={d.id}
@@ -1183,6 +1308,7 @@ export function Pipeline({
                             onToggle={toggleSelected}
                             onMarket={reportMarket}
                             todayIso={todayIso}
+                            stageControl={tileStage}
                           />
                         ))}
                       </ul>
@@ -1206,9 +1332,9 @@ export function Pipeline({
                 );
               })}
             </div>
-            {view === "cards" && marketPhotoIds.length > 0 ? (
+            {view === "cards" && marketPhotoCredits.length > 0 ? (
               <p className="mt-6 text-[11px] leading-relaxed text-muted" data-qa="market-photo-credit">
-                <GalleryCreditText ids={marketPhotoIds} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />
+                <GalleryCreditPartsText credits={marketPhotoCredits} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />
               </p>
             ) : null}
           </div>
@@ -1515,8 +1641,12 @@ function MetaLine({
 }) {
   const shown = bits.filter(Boolean);
   if (shown.length === 0) return null;
+  // `relative` holds a bit's screen-reader text (an absolute `sr-only`
+  // span, "added by …") inside the clipped line: its containing block had
+  // been outside it, so at 320px it sat past the screen's edge and the list
+  // scrolled sideways (research pass 36).
   return (
-    <p className={`${flush ? "" : "mt-0.5 "}truncate text-xs text-muted ${className ?? ""}`}>
+    <p className={`${flush ? "" : "mt-0.5 "}relative truncate text-xs text-muted ${className ?? ""}`}>
       {shown.map((b, idx) => (
         <Fragment key={idx}>
           {idx > 0 && " · "}
@@ -1524,95 +1654,6 @@ function MetaLine({
         </Fragment>
       ))}
     </p>
-  );
-}
-
-/** A tag's tone in its words, and in the outline its chip wears on a line
- *  of its own (on the picture, a chip is white). */
-const TAG_TEXT: Record<TagTone, string> = { brand: "text-brand", caution: "text-caution", kill: "text-kill", muted: "text-muted" };
-const TAG_BORDER: Record<TagTone, string> = { brand: "border-brand/30", caution: "border-caution/35", kill: "border-kill/35", muted: "border-line" };
-
-/** A deal's tags (lib/pipeline-tags) on a line of their own under its
- *  figures, wrapping: a chip each, never cut — a tag longer than the line
- *  wraps inside its chip rather than losing its end, and a figure never
- *  shares a line with them, so no tag can push a figure off one. The
- *  caller names the line's display (`flex`, or a card's width tiers'), and
- *  a card's own tiers for each chip. */
-function TagLine({
-  tags,
-  className = "flex",
-  chipClass,
-}: {
-  tags: readonly DealTag[];
-  className?: string;
-  chipClass?: (t: DealTag) => string;
-}) {
-  if (tags.length === 0) return null;
-  return (
-    <p className={`flex-wrap gap-1 ${className}`} data-tags="line">
-      {tags.map((t, idx) => (
-        <Fragment key={t.key}>
-          {idx > 0 && " "}
-          <span
-            title={t.title}
-            className={`max-w-full rounded-full border bg-surface px-2 py-0.5 text-[11px] font-semibold leading-tight ${TAG_BORDER[t.tone]} ${TAG_TEXT[t.tone]} ${chipClass?.(t) ?? ""}`}
-          >
-            {t.text}
-          </span>
-        </Fragment>
-      ))}
-    </p>
-  );
-}
-
-/** Drawn at the picture widths a mask names — one digit a tier of
- *  lib/pipeline-tags `PICTURE_TIERS`: under 278px, 278 to 347, 348 up — as
- *  the card's picture and tag row ask of themselves (`@container/card`).
- *  A chip shows as a block (a flex item either way); the line as a flex
- *  row. Every class is written out whole, for Tailwind's scanner. */
-const AT_TIERS: Record<string, { block: string; flex: string }> = {
-  "111": { block: "", flex: "flex" },
-  "100": { block: "@min-[278px]/card:hidden", flex: "flex @min-[278px]/card:hidden" },
-  "010": { block: "hidden @min-[278px]/card:block @min-[348px]/card:hidden", flex: "hidden @min-[278px]/card:flex @min-[348px]/card:hidden" },
-  "001": { block: "hidden @min-[348px]/card:block", flex: "hidden @min-[348px]/card:flex" },
-  "110": { block: "@min-[348px]/card:hidden", flex: "flex @min-[348px]/card:hidden" },
-  "011": { block: "hidden @min-[278px]/card:block", flex: "hidden @min-[278px]/card:flex" },
-  "101": { block: "@min-[278px]/card:hidden @min-[348px]/card:block", flex: "flex @min-[278px]/card:hidden @min-[348px]/card:flex" },
-  "000": { block: "hidden", flex: "hidden" },
-};
-const atTiers = (shown: readonly boolean[]) => AT_TIERS[shown.map((on) => (on ? "1" : "0")).join("")] ?? AT_TIERS["111"];
-
-/** A slot the live screen has not read yet: a quiet shimmer where the figure
- *  will land (`.skeleton` moves only where motion is welcome), named for a
- *  screen reader — never the dash that says the memorandum states none. */
-function Reading({ width }: { width: string }) {
-  return (
-    <span
-      role="img"
-      aria-label="Reading the memorandum"
-      title="Reading the memorandum"
-      data-reading
-      className={`skeleton inline-block h-3.5 rounded align-middle ${width}`}
-    />
-  );
-}
-
-/** A figure's empty slot: the shimmer while the terms are being read, the
- *  dash once a read has found none. */
-function Unstated({ reading, width, className = "text-line" }: { reading: boolean; width: string; className?: string }) {
-  return reading ? <Reading width={width} /> : <span className={className}>—</span>;
-}
-
-/** The mandate score drawn: a 0–100 bar in the current text colour (the
- *  call's), so a row reads its fit before the number does. */
-function FitBar({ score }: { score: number }) {
-  return (
-    <span aria-hidden data-fit-bar className="h-1 w-10 overflow-hidden rounded-full bg-faint">
-      <span
-        className="block h-full rounded-full bg-current"
-        style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
-      />
-    </span>
   );
 }
 
@@ -1679,6 +1720,7 @@ const DealRow = memo(function DealRow({
   const priceBit = d.slots.price ? (
     <span className="font-mono tabular-nums" title={d.slots.basis ? `${d.slots.price} — ${d.slots.basis}` : d.slots.price}>
       {compactPrice(d.slots.price)}
+      <PriceChangeBadge change={d.priceChange} />
     </span>
   ) : null;
   // What the price buys where it is not the building, the seller's loan, a
@@ -1686,8 +1728,11 @@ const DealRow = memo(function DealRow({
   // line of their own under the figures at every width, so a tag never
   // pushes the price, the cap or the fit off a one-line truncation — the
   // phone's line had read "$41.3M · 49% share · 5…" — and is never cut
-  // itself. A deal the reader's team does not see says so last.
-  const tags = d.personal ? [...dealTags(d.slots, d.flood), PERSONAL_TAG] : dealTags(d.slots, d.flood);
+  // itself. A screen stored before a reader its figures turn on says so
+  // after them (lib/older-screen), and a deal the reader's team does not see
+  // says so last.
+  const older = olderScreenTag(d.older);
+  const tags = [...dealTags(d.slots, d.flood), ...(older ? [older] : []), ...(d.personal ? [PERSONAL_TAG] : [])];
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -1698,15 +1743,21 @@ const DealRow = memo(function DealRow({
     // This bit only shows below `md` (the cap column takes over there), so
     // it wears the column's "yoc" micro-label: "7.2% yield on cost" was the
     // part a phone's one-line truncation cut.
-    <span title="Yield on total cost — a plan deal has no going-in cap">
+    <span title={PLAN_YOC_TITLE}>
       <span className="font-mono tabular-nums">{d.slots.yoc}</span>{" "}
       <span className="text-[9px] font-medium uppercase">yoc</span>
     </span>
+  ) : d.slots.yocWithheld ? (
+    // A yield no project earns is refused: n/a, with the plan's sentence why.
+    <span title={d.slots.yocWithheld}>
+      n/a <span className="text-[9px] font-medium uppercase">yoc</span>
+    </span>
   ) : d.slots.noteYield ? (
-    // A note has no going-in cap: its yield to maturity takes the slot.
-    <span title={NOTE_CAP_TITLE}>
+    // A note, or a preferred equity position, has no going-in cap: its own
+    // yield takes the slot.
+    <span title={ownYieldOf(d.slots.capWithheld).title}>
       <span className="font-mono tabular-nums">{d.slots.noteYield}</span>{" "}
-      <span className="text-[9px] font-medium uppercase">ytm</span>
+      <span className="text-[9px] font-medium uppercase">{ownYieldOf(d.slots.capWithheld).micro}</span>
     </span>
   ) : null;
   // The mandate score, when there is one: a call's colour, the words a
@@ -1714,35 +1765,57 @@ const DealRow = memo(function DealRow({
   // bar the narrower widths draw. The words "buy box" live on the Buy box
   // page and the deal header's chip — the row doesn't repeat them.
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
-  const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
+  // The call's colour — red on a miss outright — and never green while a
+  // criterion the price decides could not be checked (lib/fit-label
+  // `fitTone`, the deal header's chip's rule).
+  const fitCls = scored ? FIT_TONE_CLS[fitTone(scored.verdict, d.fit, d.fitCoverage)] : "";
   // A fit judged on the first signal alone says so wherever it is drawn —
   // the deal page's "First read" — until the extraction lands.
   const firstRead = !!d.fitFirstRead && (!!scored || !!d.fit);
+  // How many of the box's criteria the fit stands on, where the screen
+  // could not check every one: "2 of 4" in the column, "2 of 4 checked"
+  // where there is room, and which ones in the tooltip.
+  const checkedShort = scored || d.fit ? checkedOf(d.fitCoverage, true) : null;
+  const checkedNote = scored || d.fit ? checkedSentence(d.fitCoverage) : null;
+  // The deal header's chip's own words (lib/fit-label): "Outside box"
+  // wherever the deal misses the box outright, whatever the score's call,
+  // and the count in the call's place where the box was not judged whole.
   const fitWords = scored
-    ? `${
-        d.fit === "outside"
-          ? `Fit ${scored.score} · Outside box`
-          : `Fit ${scored.score} · ${MANDATE_META[scored.verdict].label}`
-      }${firstRead ? ", first read" : ""}`
+    ? `${fitScoreLabel(scored.score, scored.verdict, d.fit === "outside", d.fitCoverage)}${firstRead ? ", first read" : ""}`
     : null;
   const fitTitle = scored
-    ? `${
+    ? [
         d.fit === "outside"
-          ? `${scored.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
-          : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
-      }${firstRead ? `. ${FIRST_READ_TITLE}` : ""}`
+          ? `${scored.score} / 100 mandate fit (${MANDATE_META[scored.verdict].label}), but outside the box: it misses at least one criterion outright, and that wins over the score's call`
+          : checkedShort
+            ? `${scored.score} / 100 mandate fit, on the criteria the screen could check`
+            : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`,
+        checkedNote,
+        firstRead ? FIRST_READ_TITLE : null,
+      ]
+        .filter((s): s is string => !!s)
+        .map((s) => s.replace(/\.$/, ""))
+        .join(". ")
     : null;
   const firstReadMark = firstRead ? (
     <span className="text-[9px] font-medium uppercase text-brand" title={FIRST_READ_TITLE}>
       first read
     </span>
   ) : null;
+  const checkedMark = checkedShort ? (
+    <span className="whitespace-nowrap text-[9px] font-medium text-muted" title={checkedNote ?? undefined} data-qa="fit-checked">
+      {checkedShort}
+    </span>
+  ) : null;
   // Without a score there is no bar to draw, so the fit stays a word in the
   // meta line; with one, the bar below carries it and the word goes.
   const fitBit =
     !scored && d.fit ? (
-      <span className={`font-medium ${FIT_META[d.fit].cls}`} title={firstRead ? FIRST_READ_TITLE : undefined}>
-        {FIT_META[d.fit].label} box{firstRead ? ", first read" : ""}
+      <span
+        className={`font-medium ${FIT_TONE_CLS[fitTone(null, d.fit, d.fitCoverage)]}`}
+        title={[checkedNote, firstRead ? FIRST_READ_TITLE : null].filter(Boolean).join(" ") || undefined}
+      >
+        {`${FIT_META[d.fit].label} box${checkedShort ? `, ${checkedOf(d.fitCoverage)}` : ""}${firstRead ? ", first read" : ""}`}
       </span>
     ) : null;
   // Below `lg` the score column is hidden, and as a word at the end of the
@@ -1758,6 +1831,7 @@ const DealRow = memo(function DealRow({
         fit
       </span>
       <FitBar score={scored.score} />
+      {checkedShort ? <span aria-hidden>{checkedMark}</span> : null}
       {firstRead ? <span aria-hidden>{firstReadMark}</span> : null}
       <span className="sr-only">{fitWords}</span>
     </span>
@@ -1766,17 +1840,14 @@ const DealRow = memo(function DealRow({
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
   const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} today={todayIso} /> : null;
-  // A teammate's deal wears their initials; the name is the tooltip and
-  // what a screen reader says.
+  // A teammate's deal wears their badge — the one every surface draws a
+  // person with, in the tone their user id keys; the name (an email's local
+  // part, never the address) is the tooltip and what a screen reader says.
+  const addedByName = d.addedBy ? displayName(d.addedBy) : "";
   const addedByBit = d.addedBy ? (
-    <span className="inline-flex items-center align-middle" title={`Added by ${d.addedBy}`}>
-      <span
-        aria-hidden
-        className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 text-[9px] font-semibold text-brand"
-      >
-        {initials(d.addedBy)}
-      </span>
-      <span className="sr-only">added by {d.addedBy}</span>
+    <span className="inline-flex items-center align-middle" title={`Added by ${addedByName}`} data-qa="added-by">
+      <PersonBadge name={d.addedBy} id={d.addedById} size="xs" decorative />
+      <span className="sr-only">added by {addedByName}</span>
     </span>
   ) : null;
 
@@ -1812,10 +1883,12 @@ const DealRow = memo(function DealRow({
         title={v ? `Re-screening — the previous call was ${v.label}` : undefined}
       >
         <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        {v ? "Re-screening…" : "Screening…"}
+        {v ? "Re-screening…" : d.hasOm === false ? "Screening the facts…" : "Reading the OM…"}
       </span>
     ) : v ? (
-      <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}>{v.label}</span>
+      <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`} title={callTitle(v.label, d.screened)}>
+        {v.label}
+      </span>
     ) : (
       // Nothing has run yet: an empty ring where the verdict pill will sit.
       <span className="inline-flex h-6 items-center" title="Not screened yet — open the deal to run the screen">
@@ -1909,18 +1982,23 @@ const DealRow = memo(function DealRow({
         <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
           {d.slots.cap ??
             (d.slots.yoc ? (
-              <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
+              <span title={PLAN_YOC_TITLE} className="text-brand">
                 {d.slots.yoc}
                 <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
               </span>
-            ) : d.slots.noteYield ? (
-              // A note has no going-in cap: its yield to maturity, labelled.
-              <span title={NOTE_CAP_TITLE} className="text-brand">
-                {d.slots.noteYield}{" "}
-                <span className="text-[9px] font-sans font-medium uppercase">ytm</span>
+            ) : d.slots.yocWithheld ? (
+              // A yield no project earns is refused, its sentence the title.
+              <span title={d.slots.yocWithheld} className="font-sans text-xs text-muted">
+                n/a
               </span>
-            ) : d.slots.capWithheld === "note" ? (
-              <span title={NOTE_CAP_TITLE} className="font-sans text-xs text-muted">
+            ) : d.slots.noteYield ? (
+              // A note, or a position, has no going-in cap: its own yield, labelled.
+              <span title={ownYieldOf(d.slots.capWithheld).title} className="text-brand">
+                {d.slots.noteYield}{" "}
+                <span className="text-[9px] font-sans font-medium uppercase">{ownYieldOf(d.slots.capWithheld).micro}</span>
+              </span>
+            ) : d.slots.capWithheld ? (
+              <span title={CAP_WITHHELD[d.slots.capWithheld].title} className="font-sans text-xs text-muted">
                 n/a
               </span>
             ) : (
@@ -1936,13 +2014,18 @@ const DealRow = memo(function DealRow({
             >
               {scored.score}
               <FitBar score={scored.score} />
+              {checkedMark}
               {firstReadMark}
             </span>
           ) : d.fit ? (
             <>
-              <span className={FIT_META[d.fit].cls} title={firstRead ? FIRST_READ_TITLE : undefined}>
+              <span
+                className={FIT_TONE_CLS[fitTone(null, d.fit, d.fitCoverage)]}
+                title={[checkedNote, firstRead ? FIRST_READ_TITLE : null].filter(Boolean).join(" ") || undefined}
+              >
                 {FIT_META[d.fit].label}
               </span>
+              {checkedMark}
               {firstReadMark}
             </>
           ) : (
@@ -1963,8 +2046,10 @@ const DealRow = memo(function DealRow({
       style={{ "--i": i } as React.CSSProperties}
       // The asset-class rail: a 3px line in the class's hue down the left
       // edge, so a mixed section reads as its kinds without a legend.
+      // A dead deal reads grey, never faded: at 60% opacity its words fell
+      // to 2.5:1 (research pass 33), and the stage select still says Dead.
       className={`border-l-[3px] ${d.assetClass ? asset.rail : "border-l-transparent"} ${
-        isDead ? "opacity-60" : ""
+        isDead ? "grayscale" : ""
       }`}
     >
       {compareMode ? (
@@ -2057,392 +2142,131 @@ function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: Pipe
   );
 }
 
-/** A card's call, drawn solid so it reads over any photograph: the
- *  verdict in its colour, a failed or stalled run over the verdict it left
- *  behind, a live screen, or the empty ring of a deal not yet screened. */
-const TILE_CALL: Record<string, string> = {
-  pass: "bg-pass text-white",
-  caution: "bg-caution text-white",
-  pass_on: "bg-kill text-white",
-};
+const ONBOARD_KEY = "uc-onboard-dismissed";
 
-function TileCall({ d }: { d: DealCard }) {
-  const v = d.verdict ? VERDICT_META[d.verdict] : null;
-  const pill = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none shadow-sm";
-  if (d.jobStatus === "failed") {
-    return (
-      <span className={`${pill} bg-kill text-white`} title="The latest screen failed — open the deal to see why and try again">
-        Failed
-      </span>
-    );
-  }
-  if (d.jobStatus === "stalled") {
-    return (
-      <span className={`${pill} bg-caution text-white`} title="The run stopped writing progress — open the deal to start it again">
-        Stalled
-      </span>
-    );
-  }
-  // A screen in flight outranks the call it will replace: a re-screen's
-  // terms are already rewriting under the old verdict.
-  if (d.jobStatus === "running") {
-    return (
-      <span className={`${pill} bg-white/95 text-ink`} title={v ? `Re-screening — the previous call was ${v.label}` : undefined}>
-        <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        {v ? "Re-screening…" : "Screening…"}
-      </span>
-    );
-  }
-  if (v && d.verdict) return <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`}>{v.label}</span>;
-  return (
-    <span className={`${pill} bg-white/90 py-1.5 text-muted`} title="Not screened yet — open the deal to run the screen">
-      <span aria-hidden className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70" />
-      <span className="sr-only">Not screened</span>
-    </span>
-  );
+/** An account with nothing done: the empty pipeline's steps when the page
+ *  was handed no onboarding state. */
+const NO_ONBOARDING: OnboardingState = { hasBuyBox: false, sampleId: null, hasScreenedOm: false };
+
+type SetupStep = { key: string; label: string; done: boolean; action: ReactNode };
+
+/** The three real steps to a working account, each with its one way in —
+ *  the upload first, the sample second, the buy box last: the checklist had
+ *  opened on the buy box, the step that asks the most of someone who has not
+ *  yet seen a screen (research pass 32). `variant` is how the ways in are
+ *  drawn: as the checklist's small links, or as the empty pipeline's
+ *  buttons, where they are the only ways in on the screen. */
+function setupSteps(
+  state: OnboardingState,
+  { atLimit, onNewDeal, variant }: { atLimit: boolean; onNewDeal: () => void; variant: "links" | "buttons" },
+): SetupStep[] {
+  const link = "text-xs font-medium text-brand hover:text-brand-strong";
+  const primary =
+    "inline-block rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong";
+  const secondary =
+    "inline-block rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint";
+  const buttons = variant === "buttons";
+  return [
+    {
+      key: "screen",
+      label: "Screen your first OM",
+      done: state.hasScreenedOm,
+      action: atLimit ? (
+        <Link href="/billing" className={buttons ? primary : link}>
+          {buttons ? "See plans" : "See plans →"}
+        </Link>
+      ) : (
+        <button type="button" onClick={onNewDeal} className={buttons ? primary : link}>
+          {buttons ? "+ New deal" : "Upload →"}
+        </button>
+      ),
+    },
+    {
+      key: "sample",
+      label: "Open the sample deal",
+      done: !!state.sampleId,
+      // Both states route through the ACTION (it redirects into an existing
+      // sample after topping up anything the fixture gained since — a plain
+      // link would bypass that self-heal).
+      action: (
+        <form action={createSampleDeal}>
+          <PendingButton
+            pendingLabel={buttons ? "Setting up your sample…" : state.sampleId ? "Opening…" : "Adding…"}
+            className={buttons ? secondary : link}
+          >
+            {buttons ? "Try a sample deal" : state.sampleId ? "Open it →" : "Add it →"}
+          </PendingButton>
+        </form>
+      ),
+    },
+    {
+      key: "buybox",
+      label: "Set your buy box",
+      done: state.hasBuyBox,
+      action: (
+        <Link href="/criteria" className={buttons ? secondary : link}>
+          {buttons ? "Set it" : "Set it →"}
+        </Link>
+      ),
+    },
+  ];
 }
 
-function TileStat({ label, title, sub, children }: { label: string; title?: string; sub?: string | null; children: ReactNode }) {
+/** The steps as one picture: a segment a step, then a row a step with its
+ *  number (or a tick) and its way in. */
+function SetupSteps({ steps, className = "" }: { steps: SetupStep[]; className?: string }) {
+  const done = steps.filter((s) => s.done).length;
   return (
-    <div className="min-w-0">
-      <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate font-mono text-sm tabular-nums text-ink" title={title}>
-        {children}
-      </dd>
-      {/* A second figure under the first, as a listing card prints the
-          price per unit under the price (#469). */}
-      {sub && <dd className="truncate font-mono text-[10px] tabular-nums text-muted" data-qa="tile-sub">{sub}</dd>}
+    <div className={className}>
+      {/* Progress as segments, one per step. */}
+      <div
+        className="mt-1.5 flex items-center gap-1"
+        role="img"
+        aria-label={`${done} of ${steps.length} steps done`}
+        data-qa="setup-progress"
+      >
+        {steps.map((s) => (
+          <span
+            key={s.key}
+            className={`h-1.5 w-8 rounded-full ${s.done ? "bg-pass" : "bg-line"}`}
+          />
+        ))}
+      </div>
+      <ol className="mt-3 space-y-2" data-qa="setup-steps">
+        {steps.map((s, i) => (
+          <li
+            key={s.key}
+            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2"
+          >
+            <span
+              aria-hidden
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                s.done
+                  ? "bg-pass/10 text-pass"
+                  : "bg-faint text-muted ring-1 ring-inset ring-line"
+              }`}
+            >
+              {s.done ? "✓" : i + 1}
+            </span>
+            <span
+              className={`min-w-0 flex-1 text-sm ${
+                s.done ? "text-muted line-through decoration-line" : ""
+              }`}
+            >
+              {s.label}
+              {s.done && <span className="sr-only"> (done)</span>}
+            </span>
+            {!s.done && <span className="shrink-0">{s.action}</span>}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
 
-// The card view's deal (#428): the building's picture first — its own
-// photograph or the Street View frame, else the photograph its market is
-// known by, named as the market's (#438), and outside every photographed
-// market the deal's cover, never an overhead (#442); each pinned with its
-// credit — the call over the picture, then the name, the place and the
-// three figures a pipeline is read by. Memoized like the row.
-const DealTile = memo(function DealTile({
-  d,
-  i,
-  compareMode,
-  checked,
-  onToggle,
-  onMarket,
-  todayIso,
-}: {
-  d: DealCard;
-  i: number;
-  compareMode: boolean;
-  checked: boolean;
-  onToggle: (id: string) => void;
-  /** told which market photograph the card shows, for the page's credit */
-  onMarket?: (dealId: string, marketId: string | null) => void;
-  /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
-  todayIso: string;
-}) {
-  const dealId = d.id;
-  const reportMarket = useCallback((marketId: string | null) => onMarket?.(dealId, marketId), [dealId, onMarket]);
-  // The deal's photographs, flipped through on the card (#450): which one is
-  // on screen, and whether the deal's own photograph is the picture at all
-  // (a card whose photograph failed shows its market's or its cover, and
-  // offers nothing to flip through).
-  // A photograph that fails to load is dropped from the set, so the arrows,
-  // the dots and the count never point at a picture the card cannot show.
-  const [dead, setDead] = useState<ReadonlySet<string>>(new Set());
-  const slides = useMemo(() => (d.slides ?? []).filter((s) => !dead.has(s.src)), [d.slides, dead]);
-  const [slideAsked, setSlide] = useState(0);
-  const [photoOn, setPhotoOn] = useState(d.pictures?.[0]?.kind === "photo" && !d.pictures[0].pending);
-  const canFlip = !compareMode && photoOn && slides.length > 0;
-  const count = slides.length + 1;
-  const slide = slideAsked < count ? slideAsked : 0;
-  const go = (step: number) => setSlide((s) => ((s < count ? s : 0) + step + count) % count);
-  const dropSlide = useCallback((src: string) => setDead((g) => new Set(g).add(src)), []);
-  // The next photograph is asked for before it is wanted: on the first
-  // hover, then one ahead of wherever the reader is.
-  const [warm, setWarm] = useState(false);
-  useEffect(() => {
-    if (!canFlip || !warm) return;
-    const next = slides[slide % slides.length];
-    if (next) new Image().src = next.src;
-  }, [canFlip, warm, slide, slides]);
-  const touch = useRef<{ x: number; y: number } | null>(null);
-  const isDead = normalizeStage(d.stage) === "dead";
-  const asset = assetMeta(d.assetClass ?? "");
-  const place = d.coveredMarket ?? d.readMarket ?? d.market;
-  const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
-  const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
-  // What the picture must not hide — a Special Flood Hazard Area, how it is
-  // sold, what the price buys where it is not the building, the seller's
-  // loan… (lib/pipeline-tags). A chip rides on the picture only where it
-  // fits whole on a picture as wide as this card's (each of the tiers'
-  // widths, asked by container query), two at most; the rest wait on the
-  // card's line under the figures. A chip is never cut: the picture's had
-  // truncated "Shadow-anchored, 56% rolls in 5 …" at 390px.
-  const placed = placeTagsByTier(dealTags(d.slots, d.flood));
-  const pictureTags = placed.filter((p) => p.onPicture.some(Boolean));
-  const lineTags = placed.filter((p) => p.onPicture.some((on) => !on));
-  const lineAt = new Map(lineTags.map((p) => [p.tag.key, p.onPicture.map((on) => !on)]));
-  // A deal the reader's team does not see says so on the line at every
-  // width, after the tags; never on the picture, which carries what the
-  // building's figures must not hide.
-  const lineShown = PICTURE_TIERS.map((_, k) => !!d.personal || lineTags.some((p) => !p.onPicture[k]));
-
-  const inner = (
-    <>
-      {/* A container (`@container/card`), so the chips on it ask the
-          picture's own width. */}
-      <div className="@container/card relative">
-        <DealBanner
-          sources={d.pictures ?? []}
-          cover={d.cover ?? null}
-          label={d.name}
-          aspect="16/10"
-          flush
-          shade
-          priority={i < 4}
-          photos={d.photos ? d.photos - dead.size : 0}
-          slides={slides}
-          slide={canFlip ? slide : 0}
-          onPhoto={setPhotoOn}
-          onSlideGone={dropSlide}
-          onMarket={reportMarket}
-          sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
-        />
-        {/* The call, and in compare mode the pick beside it: the foot of the
-            picture is the market photograph's caption (#438). */}
-        <span className="absolute left-3 top-3 flex items-center gap-1.5">
-          <TileCall d={d} />
-          {compareMode && (
-            <span
-              aria-hidden
-              className={`flex h-6 w-6 items-center justify-center rounded-md border-2 shadow-sm ${
-                checked ? "border-brand bg-brand text-white" : "border-white bg-white/80"
-              }`}
-            >
-              {checked && (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              )}
-            </span>
-          )}
-        </span>
-        {pictureTags.length > 0 && (
-          // Inside the column's 58%, never past it: a flex item sized to its
-          // content ran leftward over the call. Every chip here fits that
-          // column whole on the narrowest card (lib/pipeline-tags), so none
-          // is truncated.
-          <span className="absolute right-3 top-3 flex max-w-[58%] flex-col items-end gap-1" data-tags="picture">
-            {pictureTags.map(({ tag: t, onPicture }, idx) => (
-              <Fragment key={t.key}>
-                {idx > 0 && " "}
-                <span
-                  title={t.title}
-                  className={`max-w-full rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${TAG_TEXT[t.tone]} ${atTiers(onPicture).block}`}
-                >
-                  {t.text}
-                </span>
-              </Fragment>
-            ))}
-          </span>
-        )}
-      </div>
-      {/* The card's rows — the picture, the name and place, the figures,
-          the tags under them — are the grid row's own (`grid-rows-subgrid`
-          on the card), so a row of cards lines up its figures whatever the
-          names' lengths, and whichever cards carry tags under them. */}
-      <div className="px-4 pb-3 pt-3">
-        <p className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight" title={d.name}>
-          {d.name}
-        </p>
-        <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted">
-          {d.assetClass ? (
-            <>
-              <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${asset.dot}`} />
-              <span className="shrink-0">{assetClassLabel(d.assetClass)}</span>
-            </>
-          ) : null}
-          {d.assetClass && place ? <span aria-hidden>·</span> : null}
-          {place ? (
-            <span className="truncate" title={place}>
-              {place}
-            </span>
-          ) : null}
-        </p>
-      </div>
-      {/* The price is the longest figure ("$9–9.5M", "$124.5M"), so its
-          column is the widest. */}
-      <dl className="grid grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)] gap-3 border-t border-line mx-4 pt-3">
-        {/* While a first screen has not read the terms, an empty slot
-            shimmers ("not read yet"); once a read finds none, the dash
-            ("not stated"). */}
-        <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
-          {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
-        </TileStat>
-        {/* A plan deal has no going-in cap; its yield on total cost takes
-            the slot, labelled. Nor has a note: its yield to maturity
-            takes it where the note pays or may, else it says n/a. */}
-        <TileStat
-          label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? "Note yield" : "Cap"}
-          title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld === "note" ? NOTE_CAP_TITLE : undefined}
-          sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? "to maturity" : undefined}
-        >
-          {d.slots.cap ??
-            d.slots.yoc ??
-            d.slots.noteYield ??
-            (d.slots.capWithheld === "note" ? "n/a" : <Unstated reading={!!d.reading} width="w-10" />)}
-        </TileStat>
-        <div className="min-w-0">
-          <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
-          <dd className="mt-0.5 text-sm font-semibold">
-            {scored ? (
-              <span
-                className={`flex items-center gap-1.5 tabular-nums ${fitCls}`}
-                title={d.fitFirstRead ? `${scored.score} / 100 mandate fit. ${FIRST_READ_TITLE}` : `${scored.score} / 100 mandate fit`}
-              >
-                {scored.score}
-                <FitBar score={scored.score} />
-              </span>
-            ) : d.fit ? (
-              <span className={FIT_META[d.fit].cls} title={d.fitFirstRead ? FIRST_READ_TITLE : undefined}>
-                {FIT_META[d.fit].label}
-              </span>
-            ) : (
-              <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
-            )}
-          </dd>
-          {/* Judged on the first signal while the extraction is on its
-              way: said under the fit, as the deal page says it. */}
-          {d.fitFirstRead && (scored || d.fit) ? (
-            <dd className="truncate text-[10px] font-medium uppercase tracking-wide text-brand" title={FIRST_READ_TITLE} data-qa="fit-first-read">
-              First read
-            </dd>
-          ) : null}
-        </div>
-      </dl>
-      {/* The tags the picture could not carry whole, on a line of their own
-          under the figures, at the widths where it could not; a card with
-          none keeps only the padding. A container, as the picture is, so
-          the two ask the same width. */}
-      <div className="@container/card pb-3.5">
-        <TagLine
-          tags={d.personal ? [...lineTags.map((p) => p.tag), PERSONAL_TAG] : lineTags.map((p) => p.tag)}
-          className={`px-4 pt-2.5 ${atTiers(lineShown).flex}`}
-          chipClass={(t) => atTiers(lineAt.get(t.key) ?? []).block}
-        />
-      </div>
-    </>
-  );
-
-  return (
-    <li
-      style={{ "--i": i } as React.CSSProperties}
-      data-deal-tile={d.id}
-      onPointerEnter={canFlip && !warm ? () => setWarm(true) : undefined}
-      onTouchStart={
-        canFlip
-          ? (e) => {
-              const t = e.touches[0];
-              const inPicture = (e.target as Element).closest("[data-deal-banner],[data-flip]");
-              touch.current = t && inPicture ? { x: t.clientX, y: t.clientY } : null;
-              setWarm(true);
-            }
-          : undefined
-      }
-      onTouchEnd={
-        canFlip
-          ? (e) => {
-              const from = touch.current;
-              const t = e.changedTouches[0];
-              touch.current = null;
-              if (!from || !t) return;
-              const dx = t.clientX - from.x;
-              // A swipe across the picture, not a scroll down the page.
-              if (Math.abs(dx) > 40 && Math.abs(dx) > 1.5 * Math.abs(t.clientY - from.y)) go(dx < 0 ? 1 : -1);
-            }
-          : undefined
-      }
-      // Five rows of the grid's own (the picture, the name and place, the
-      // figures, the tags under them, the footer), so every card in a row
-      // of the grid shares their heights.
-      className={`group relative row-span-5 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
-        checked ? "border-brand ring-2 ring-brand/40" : "border-line"
-      } ${isDead ? "opacity-60" : ""}`}
-    >
-      {compareMode ? (
-        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="row-span-4 grid grid-rows-subgrid text-left">
-          {inner}
-        </button>
-      ) : (
-        <>
-          <Link href={`/deals/${d.id}`} className="row-span-4 grid grid-rows-subgrid">
-            {inner}
-          </Link>
-          {/* The deal's other photographs (#450), flipped through where a
-              listing's card lets you: arrows on the picture, shown on hover
-              or focus and always on a touch screen, a swipe, and a dot a
-              photograph. Outside the link, over the picture: a button inside
-              an anchor is invalid, and the card's click still opens the deal. */}
-          {canFlip ? (
-            <div data-flip="photos" className="pointer-events-none absolute inset-x-0 top-0 flex aspect-[16/10] items-center justify-between px-2">
-              {[-1, 1].map((step) => (
-                <button
-                  key={step}
-                  type="button"
-                  onClick={() => go(step)}
-                  aria-label={`${step < 0 ? "Previous" : "Next"} photo of ${d.name}`}
-                  data-flip-step={step}
-                  className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-ink shadow-md opacity-0 transition hover:bg-white focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand group-hover:opacity-100 pointer-coarse:opacity-90"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
-                    <path d={step < 0 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
-                  </svg>
-                </button>
-              ))}
-              <span aria-hidden className="absolute bottom-7 left-1/2 flex -translate-x-1/2 gap-1">
-                {Array.from({ length: Math.min(count, 5) }, (_, k) => {
-                  const first = Math.min(Math.max(0, slide - 2), Math.max(0, count - 5));
-                  return (
-                    <span
-                      key={first + k}
-                      className={`h-1.5 w-1.5 rounded-full shadow-sm ${first + k === slide ? "bg-white" : "bg-white/55"}`}
-                    />
-                  );
-                })}
-              </span>
-            </div>
-          ) : null}
-          {/* Outside the link: a select inside an anchor is invalid, and the
-              stage is changed here without leaving the pipeline. */}
-          <div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">
-            {d.offersDue ? (
-              <OffersDueBit iso={d.offersDue} today={todayIso} />
-            ) : (
-              <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
-            )}
-            {d.addedBy ? (
-              <span className="inline-flex items-center" title={`Added by ${d.addedBy}`}>
-                <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 text-[9px] font-semibold text-brand">
-                  {initials(d.addedBy)}
-                </span>
-                <span className="sr-only">added by {d.addedBy}</span>
-              </span>
-            ) : null}
-            <span className="ml-auto">
-              <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />
-            </span>
-          </div>
-        </>
-      )}
-    </li>
-  );
-});
-
-const ONBOARD_KEY = "uc-onboard-dismissed";
-
-/** Three real steps to a working account — every check reflects actual data,
- *  and the card retires itself (or can be dismissed) once the account is set. */
+/** The setup checklist over a pipeline that has deals: every check reflects
+ *  actual data, and the card retires itself (or can be dismissed) once the
+ *  account is set. */
 function GettingStarted({
   state,
   atLimit,
@@ -2465,66 +2289,7 @@ function GettingStarted({
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const steps: {
-    key: string;
-    label: string;
-    done: boolean;
-    action: ReactNode;
-  }[] = [
-    {
-      key: "buybox",
-      label: "Set your buy box",
-      done: state.hasBuyBox,
-      action: (
-        <Link
-          href="/criteria"
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          Set it →
-        </Link>
-      ),
-    },
-    {
-      key: "sample",
-      label: "Open the sample deal",
-      done: !!state.sampleId,
-      // Both states route through the ACTION (it redirects into an existing
-      // sample after topping up anything the fixture gained since — a plain
-      // link would bypass that self-heal).
-      action: (
-        <form action={createSampleDeal}>
-          <PendingButton
-            pendingLabel={state.sampleId ? "Opening…" : "Adding…"}
-            className="text-xs font-medium text-brand hover:text-brand-strong"
-          >
-            {state.sampleId ? "Open it →" : "Add it →"}
-          </PendingButton>
-        </form>
-      ),
-    },
-    {
-      key: "screen",
-      label: "Screen your first OM",
-      done: state.hasScreenedOm,
-      action: atLimit ? (
-        <Link
-          href="/billing"
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          See plans →
-        </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={onNewDeal}
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          Upload →
-        </button>
-      ),
-    },
-  ];
-
+  const steps = setupSteps(state, { atLimit, onNewDeal, variant: "links" });
   const remaining = steps.filter((s) => !s.done);
   if (!show || remaining.length === 0) return null;
 
@@ -2540,22 +2305,7 @@ function GettingStarted({
   return (
     <section className="animate-rise rounded-2xl border border-brand/20 bg-brand/[0.03] p-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">Get set up</h2>
-          {/* Progress as segments, one per step. */}
-          <div
-            className="mt-1.5 flex items-center gap-1"
-            role="img"
-            aria-label={`${steps.length - remaining.length} of ${steps.length} steps done`}
-          >
-            {steps.map((s) => (
-              <span
-                key={s.key}
-                className={`h-1.5 w-8 rounded-full ${s.done ? "bg-pass" : "bg-line"}`}
-              />
-            ))}
-          </div>
-        </div>
+        <h2 className="text-sm font-semibold tracking-tight">Get set up</h2>
         <button
           type="button"
           onClick={dismiss}
@@ -2577,33 +2327,7 @@ function GettingStarted({
           </svg>
         </button>
       </div>
-      <ul className="mt-3 space-y-2">
-        {steps.map((s, i) => (
-          <li
-            key={s.key}
-            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2"
-          >
-            <span
-              aria-hidden
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                s.done
-                  ? "bg-pass/15 text-pass"
-                  : "bg-faint text-muted ring-1 ring-inset ring-line"
-              }`}
-            >
-              {s.done ? "✓" : i + 1}
-            </span>
-            <span
-              className={`min-w-0 flex-1 text-sm ${
-                s.done ? "text-muted line-through decoration-line" : ""
-              }`}
-            >
-              {s.label}
-            </span>
-            {!s.done && <span className="shrink-0">{s.action}</span>}
-          </li>
-        ))}
-      </ul>
+      <SetupSteps steps={steps} />
     </section>
   );
 }
@@ -2788,8 +2512,10 @@ function NewDealForm({
     <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">New deal</h2>
+        {/* Two pressed-or-not buttons, as the view toggle is: it promised
+            tabs the arrow keys did not move (research pass 33). */}
         <div
-          role="tablist"
+          role="group"
           aria-label="How to add the deal"
           className="flex gap-1 rounded-lg bg-faint p-1"
         >
@@ -2802,8 +2528,7 @@ function NewDealForm({
             <button
               key={key}
               type="button"
-              role="tab"
-              aria-selected={mode === key}
+              aria-pressed={mode === key}
               onClick={() => setMode(key)}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 mode === key
@@ -2829,8 +2554,10 @@ function NewDealForm({
       )}
       {mode === "upload" && (
         <>
+      {/* An alert: it arrives through the address bar after an upload the
+          server refused, and was said to no one (research pass 33). */}
       {errorMessage && (
-        <p className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
+        <p role="alert" className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
           {errorMessage}
         </p>
       )}
@@ -2886,7 +2613,9 @@ function NewDealForm({
           }
           if (res.ok) {
             writeDraft(draftKey, null);
-            router.push(`/deals/${res.dealId}`);
+            // Where a team member's deal went into their own pipeline, the
+            // deal page says so (lib/personal-deal) — the landing carries it.
+            router.push(dealLanding(res.dealId, !!res.personal));
             return;
           }
           keep();
@@ -2906,38 +2635,50 @@ function NewDealForm({
         }
         className="mt-4 space-y-3"
       >
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <input
-            name="name"
-            required
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              persist({ name: e.target.value });
-            }}
-            aria-label="Deal name"
-            placeholder="Deal name — e.g. The Maddox at Brewerytown"
-            className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
-          />
-          <select
-            name="assetClass"
-            value={assetClass}
-            onChange={(e) => {
-              setAssetClass(e.target.value);
-              persist({ assetClass: e.target.value });
-            }}
-            aria-label="Asset class"
-            className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
-          >
-            <option value="auto">Auto-detect</option>
-            {ASSET_CLASS_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+        {/* Each field says what it is above it, where a placeholder alone
+            went the moment the reader typed (research pass 33). */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-xs font-medium text-muted">Deal name</span>
+            <input
+              name="name"
+              required
+              maxLength={DEAL_NAME_MAX}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                persist({ name: e.target.value });
+              }}
+              placeholder="e.g. The Maddox at Brewerytown"
+              className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted">Asset class</span>
+            <select
+              name="assetClass"
+              value={assetClass}
+              onChange={(e) => {
+                setAssetClass(e.target.value);
+                persist({ assetClass: e.target.value });
+              }}
+              className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <option value="auto">Auto-detect</option>
+              {ASSET_CLASS_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div>
+          {/* The field's own name is "Property address"; this is that name,
+              on screen. */}
+          <p aria-hidden className="mb-1 text-xs font-medium text-muted">
+            Property address <span className="font-normal">(optional)</span>
+          </p>
           <AddressAutocomplete
             key={addrKey}
             name="address"
@@ -2968,6 +2709,7 @@ function NewDealForm({
           accept="application/pdf"
           hint="PDF offering memorandum, up to 32 MB"
           maxBytes={32 * 1024 * 1024}
+          tooLarge="memorandum"
           onFile={(file) => {
             if (!file) return;
             const next = prefillName(name, filledName.current, file.name);

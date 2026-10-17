@@ -4,18 +4,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { BASEMAPS, BASEMAP_ORDER, type BasemapId } from "@/lib/basemaps";
+import Link from "next/link";
+import { BASEMAPS, BASEMAP_ORDER, OSM_ATTRIBUTION, type BasemapId } from "@/lib/basemaps";
+import { DealAvatar } from "@/app/(app)/deal-avatar";
 import {
   MAX_TO_PLACE,
+  UNPLACED_SHOWN,
   PIN_LABEL,
   PIN_UNSCREENED,
   pinColor,
   pinHtml,
   pinTapAction,
+  pinTitle,
   placementLine,
   partitionForMap,
+  osmPlacedAny,
   previewHtml,
   tooltipHtml,
+  unplacedDeals,
+  unplacedReason,
   type MapDeal,
   type MapPlace,
 } from "@/lib/pipeline-map";
@@ -37,6 +44,11 @@ import {
  */
 const BASE_DEFAULT: BasemapId = "hybrid";
 const CONCURRENCY = 3;
+/** How long the hover card waits, once the pointer leaves the pin or the
+ *  card, before it closes: long enough to cross the gap between the two
+ *  (the card's arrow takes no pointer), so the card can be hovered
+ *  (WCAG 1.4.13). */
+const CARD_CLOSE_DELAY_MS = 300;
 
 export function PipelineMap({
   deals,
@@ -145,8 +157,19 @@ export function PipelineMap({
       });
       setReady(true);
     })();
+    // Escape dismisses the open card wherever the focus is, without moving
+    // the pointer or the focus (WCAG 1.4.13).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      pinsRef.current?.eachLayer((layer) => {
+        layer.closeTooltip();
+      });
+      mapRef.current?.closePopup();
+    };
+    document.addEventListener("keydown", onKey);
     return () => {
       disposed = true;
+      document.removeEventListener("keydown", onKey);
       mapRef.current?.remove();
       mapRef.current = null;
       layerRef.current = null;
@@ -184,7 +207,7 @@ export function PipelineMap({
           tooltipAnchor: [0, -size / 2 - 1],
           popupAnchor: [0, -size / 2],
         }),
-        title: deal.name,
+        title: pinTitle(deal),
         keyboard: true,
         riseOnHover: true,
       });
@@ -206,7 +229,19 @@ export function PipelineMap({
           };
         });
       } else if (!coarse) {
-        marker.bindTooltip(tooltipHtml(deal), { direction: "top", className: "uc-maptip-wrap", opacity: 1 });
+        // The card takes the pointer (`interactive`), and its pointer events
+        // reach this marker, Leaflet's parent for them. Leaflet closes the
+        // card the moment the pointer leaves the pin, before it can reach
+        // the card; that close is swapped for one that waits a moment, and
+        // entering the pin or the card again keeps the card open.
+        marker.bindTooltip(tooltipHtml(deal), { direction: "top", className: "uc-maptip-wrap", opacity: 1, interactive: true });
+        marker.off("mouseout", marker.closeTooltip);
+        let closing: ReturnType<typeof setTimeout> | undefined;
+        marker.on("mouseout", () => {
+          clearTimeout(closing);
+          closing = setTimeout(() => marker.closeTooltip(), CARD_CLOSE_DELAY_MS);
+        });
+        marker.on("mouseover", () => clearTimeout(closing));
       }
       marker.on("click", () => {
         const tap = tapRef.current?.id === deal.id ? tapRef.current : null;
@@ -257,6 +292,19 @@ export function PipelineMap({
     }
   }, [ready, points, selected, compareMode]);
 
+  // A pin Photon placed is OpenStreetMap's data: the map credits it over
+  // every basemap while one is drawn (the batch-2 audit, LOW-8). The street
+  // tiles carry the same string, which the control prints once.
+  const osmPins = osmPlacedAny(points);
+  const osmCredited = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || osmPins === osmCredited.current) return;
+    if (osmPins) map.attributionControl?.addAttribution(OSM_ATTRIBUTION);
+    else map.attributionControl?.removeAttribution(OSM_ATTRIBUTION);
+    osmCredited.current = osmPins;
+  }, [ready, osmPins]);
+
   // Basemap switch: swap the tile layer in place, keeping the view and pins.
   useEffect(() => {
     const L = leafletRef.current;
@@ -273,6 +321,9 @@ export function PipelineMap({
   }, [basemap]);
 
   const counts = { placed: points.length, placing: waiting.length, later: beyond, unplaceable: part.unplaceable.length + missed };
+  // The deals the map cannot draw, named with their pictures under it.
+  const unplaced = unplacedDeals(part, resolved);
+  const unplacedShown = unplaced.slice(0, UNPLACED_SHOWN);
   const legend: { label: string; color: string; n: number }[] = [
     ...(["pass", "caution", "pass_on"] as const).map((v) => ({
       label: PIN_LABEL[v],
@@ -322,6 +373,45 @@ export function PipelineMap({
       <p className="border-t border-line px-4 py-2 text-xs text-muted" data-map-count>
         {placementLine(counts)}
       </p>
+      {unplaced.length > 0 && (
+        // Not only a count (the Crexi / LoopNet map's list beside it): each
+        // deal the map cannot draw, its building beside its name — the
+        // avatar asks no Google picture (`google=0`), as nothing beside a
+        // Leaflet map may — and why it is off the map.
+        <div data-map-unplaced className="border-t border-line px-4 py-3">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted">Not on the map</h3>
+          <ul className="mt-2 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+            {unplacedShown.map((d) => {
+              const picked = !!selected?.has(d.id);
+              return (
+                <li key={d.id} data-unplaced={d.id} className="flex min-w-0 items-center gap-2.5">
+                  <DealAvatar dealId={d.id} />
+                  <span className="min-w-0 flex-1">
+                    {compareMode && onToggle ? (
+                      <button
+                        type="button"
+                        onClick={() => onToggle(d.id)}
+                        aria-pressed={picked}
+                        className={`block max-w-full truncate text-left text-sm font-medium hover:text-brand ${picked ? "text-brand" : ""}`}
+                      >
+                        {d.name}
+                      </button>
+                    ) : (
+                      <Link href={`/deals/${d.id}`} className="block truncate text-sm font-medium hover:text-brand">
+                        {d.name}
+                      </Link>
+                    )}
+                    <span className="block text-xs text-muted">{unplacedReason(d)}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {unplaced.length > unplacedShown.length ? (
+            <p className="mt-2 text-xs text-muted">and {unplaced.length - unplacedShown.length} more, in the list view</p>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }

@@ -1,5 +1,13 @@
-import { PERMIT_WINDOW_MONTHS, permitsTrailingYear, seriesUrl, type LiveRate, type MetroSeriesMeta } from "@/lib/live-rates";
-import { monthOf } from "@/lib/zori";
+// The table-free core: the demand card draws this module's sentence in
+// the browser, and lib/live-rates would send the whole series table with it.
+import {
+  PERMIT_WINDOW_MONTHS,
+  monthOf,
+  permitsTrailingYear,
+  seriesUrlOf,
+  type LiveRate,
+  type MetroSeriesMeta,
+} from "@/lib/live-rates-core";
 
 /**
  * The supply side of a rental market: the units the metro area has
@@ -91,8 +99,8 @@ export function metroSupply(rates: readonly LiveRate[]): MetroSupply | null {
     multiPrior: multi.priorUnits,
     multiChangePct: multi.changePct,
     multiSharePct: all.units > 0 ? Math.round((multi.units / all.units) * 1000) / 10 : null,
-    hrefTotal: seriesUrl(total.meta.id),
-    hrefSingle: seriesUrl(single.meta.id),
+    hrefTotal: seriesUrlOf(total.meta),
+    hrefSingle: seriesUrlOf(single.meta),
     fresh: total.fresh && single.fresh,
     months,
   };

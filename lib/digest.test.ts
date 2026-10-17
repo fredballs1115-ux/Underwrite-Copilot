@@ -161,6 +161,55 @@ describe("the digest marks a call its re-screen is replacing, as the pipeline ca
   });
 });
 
+describe("a cut list says what it left out (research pass 42, H4c)", () => {
+  // The pass's account: 200 open deals, fifteen deadlines inside the week the
+  // digest names and ten calls in it. The lists stop at six; nine deadlines
+  // had been dropped with no sign, and the preheader had said "6 verdicts".
+  const stages = ["screening", "tracking", "active_pursuit", "loi_submitted", "under_contract"];
+  const deals = Array.from({ length: 200 }, (_, i) =>
+    deal({
+      name: `The Maddox at Brewerytown ${i}`,
+      stage: stages[i % stages.length],
+      offers_due: i < 15 ? day(i % 7) : null,
+      verdict:
+        i < 10
+          ? { verdict: ["pass", "caution", "pass_on"][i % 3], generatedAt: new Date(NOW - (i + 1) * 12 * 3600e3).toISOString() }
+          : { verdict: "caution", generatedAt: "2026-01-15T00:00:00Z" },
+    }),
+  );
+
+  it("counts every deadline and every call, lists six of each, and says the rest", () => {
+    const content = build(deals)!;
+    expect(content.offersDue).toHaveLength(6);
+    expect(content.offersDueTotal).toBe(15);
+    expect(content.verdicts).toHaveLength(6);
+    expect(content.verdictsTotal).toBe(10);
+    const pipelineUrl = `${SITE}/deals`;
+    const { html, text } = weeklyDigestEmail({ ...content, pipelineUrl, settingsUrl: `${SITE}/account` });
+    expect(text).toContain(`  and 9 more due by Sun, Oct 11 — open the pipeline: ${pipelineUrl}`);
+    expect(text).toContain("  and 4 more since last week");
+    expect(html).toContain(`and 9 more due by Sun, Oct 11 — <a href="${pipelineUrl}" style="color:#114e54;font-weight:600;">open the pipeline</a>`);
+    expect(html).toContain("and 4 more since last week</p>");
+    // The inbox preheader leads with the true count of deadlines — the
+    // preview line an inbox shows is cut at 140 characters (PREVIEW_MAX).
+    const pre = /mso-hide:all;">([^<]*)</.exec(html)?.[1] ?? "";
+    expect(pre).toMatch(/^15 offers due by Sun, Oct 11: The Maddox at Brewerytown 0 \(Mon, Oct 5\), /);
+    // With no deadline to lead, the calls' true count is the one said.
+    const quiet = build(deals.map((d) => ({ ...d, offers_due: null })))!;
+    const calm = weeklyDigestEmail({ ...quiet, pipelineUrl, settingsUrl: `${SITE}/account` });
+    expect(/mso-hide:all;">([^<]*)</.exec(calm.html)?.[1]).toBe("200 open deals in your pipeline. 10 verdicts since last week.");
+  });
+
+  it("says nothing more where nothing was left out", () => {
+    const content = build(deals.slice(0, 4).map((d) => ({ ...d })))!;
+    expect(content.offersDueTotal).toBe(content.offersDue.length);
+    const { html, text } = weeklyDigestEmail({ ...content, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` });
+    expect(text).not.toMatch(/\bmore (due|since)\b/);
+    expect(html).not.toMatch(/\bmore (due|since)\b/);
+    expect(/mso-hide:all;">([^<]*)</.exec(html)?.[1]).toMatch(/^Offers due: /);
+  });
+});
+
 /* ------------------------------ the runner ------------------------------ */
 
 type Row = Record<string, unknown>;
@@ -169,8 +218,21 @@ interface Db {
   team: { data: Row | null; error: { message: string } | null };
   deals: Row[];
   jobs: Row[];
+  /** deal_tasks rows; `tasksFail` makes their read fail */
+  tasks?: Row[];
+  tasksFail?: boolean;
   /** every call the runner made, in order */
-  calls: { table: string; op: string; patch?: Row; inIds?: unknown[] }[];
+  calls: { table: string; op: string; patch?: Row; inIds?: unknown[]; or?: string; order?: string; range?: [number, number] }[];
+  /** the most rows one response holds, as a project's max rows caps a read
+   *  that asks for more — a normal success, with no sign the rest exist */
+  maxRows?: number;
+}
+
+/** The claim's own filter, as the database applies it: a profile with no
+ *  digest yet, or whose last one is older than the cutoff. */
+function dueByOr(or: string | undefined) {
+  const m = /^last_digest_at\.is\.null,last_digest_at\.lt\.(.+)$/.exec(or ?? "");
+  return (row: Row) => !m || row.last_digest_at == null || String(row.last_digest_at) < m[1];
 }
 
 function fakeAdmin(db: Db): SupabaseClient {
@@ -179,6 +241,10 @@ function fakeAdmin(db: Db): SupabaseClient {
       let op = "select";
       let patch: Row | undefined;
       let inIds: unknown[] | undefined;
+      let or: string | undefined;
+      let order: string | undefined;
+      let range: [number, number] | undefined;
+      const eqs: [string, unknown][] = [];
       const q = {
         select: () => q,
         update: (p: Row) => {
@@ -186,27 +252,60 @@ function fakeAdmin(db: Db): SupabaseClient {
           patch = p;
           return q;
         },
-        eq: () => q,
-        or: () => q,
+        eq: (col: string, val: unknown) => {
+          eqs.push([col, val]);
+          return q;
+        },
+        or: (s: string) => {
+          or = s;
+          return q;
+        },
         in: (_col: string, ids: unknown[]) => {
           inIds = ids;
+          return q;
+        },
+        lte: (col: string, val: string) => {
+          eqs.push([`lte:${col}`, val]);
+          return q;
+        },
+        limit: () => q,
+        order: (col: string) => {
+          order = col;
+          return q;
+        },
+        range: (from: number, to: number) => {
+          range = [from, to];
           return q;
         },
         maybeSingle: async () => {
           db.calls.push({ table, op });
           return table === "team_members" ? db.team : { data: null, error: null };
         },
-        then<T>(resolve: (v: { data: unknown; error: null }) => T) {
-          db.calls.push({ table, op, patch, inIds });
+        then<T>(resolve: (v: { data: unknown; error: { message: string } | null }) => T) {
+          db.calls.push({ table, op, patch, inIds, or, order, range });
+          if (table === "deal_tasks") {
+            if (db.tasksFail) return Promise.resolve({ data: null, error: { message: "boom" } }).then(resolve);
+            const rows = (db.tasks ?? []).filter((t) =>
+              eqs.every(([c, v]) => (c.startsWith("lte:") ? String(t[c.slice(4)]) <= String(v) : t[c] === v)),
+            );
+            return Promise.resolve({ data: rows, error: null }).then(resolve);
+          }
           let data: unknown = null;
+          let rows: Row[] | null = null;
           // A read hands back copies, as the database does.
-          if (table === "profiles" && op === "select") data = db.profiles.map((p) => ({ ...p }));
-          else if (table === "profiles" && op === "update") {
-            const row = db.profiles[0];
+          if (table === "profiles" && op === "select") {
+            rows = db.profiles.filter((p) => eqs.every(([c, v]) => p[c] === v)).filter(dueByOr(or)).map((p) => ({ ...p }));
+          } else if (table === "profiles" && op === "update") {
+            const row = db.profiles.find((p) => eqs.every(([c, v]) => p[c] === v) && dueByOr(or)(p));
             if (row && patch) Object.assign(row, patch);
-            data = [{ id: row?.id }];
-          } else if (table === "deals") data = db.deals;
+            data = row ? [{ id: row.id }] : [];
+          } else if (table === "deals") rows = db.deals.map((d) => ({ ...d }));
           else if (table === "analysis_jobs") data = db.jobs;
+          if (rows) {
+            if (order) rows.sort((a, b) => String(a[order!]).localeCompare(String(b[order!])));
+            const [from, to] = range ?? [0, Number.MAX_SAFE_INTEGER];
+            data = rows.slice(from, Math.min(to + 1, from + (db.maxRows ?? Number.MAX_SAFE_INTEGER)));
+          }
           return Promise.resolve({ data, error: null }).then(resolve);
         },
       };
@@ -366,5 +465,157 @@ describe("runWeeklyDigests", () => {
     const db = dbWith({ deals: [{ ...deal({ stage: "closed" }) }, { ...deal({ stage: "dead", offers_due: day(1) }) }] });
     expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(0);
     expect(sent).toEqual([]);
+  });
+});
+
+describe("the digest says what moved and the reader's own tasks (research pass 24, B1)", () => {
+  const at = (offset: number) => new Date(NOW + offset * DAY).toISOString();
+
+  it("lists the week's stage moves, newest first, with the stage each left — none older than a week", () => {
+    const deals = [
+      deal({ name: "Harbor Point", stage: "tracking", stage_history: [{ stage: "tracking", at: at(-2) }] }),
+      deal({
+        name: "The Maddox",
+        stage: "dead",
+        stage_history: [
+          { stage: "tracking", at: at(-30) },
+          { stage: "dead", at: at(-1) },
+        ],
+      }),
+      deal({ name: "Old move", stage: "tracking", stage_history: [{ stage: "tracking", at: at(-9) }] }),
+    ];
+    const out = build(deals)!;
+    expect(out.moved!.map((m) => [m.name, m.move])).toEqual([
+      ["The Maddox", "Tracking → Dead"],
+      ["Harbor Point", "to Tracking"],
+    ]);
+    expect(out.movedTotal).toBe(2);
+    const email = weeklyDigestEmail({ ...out, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` });
+    expect(email.text).toContain("Moved since last week:");
+    expect(email.text).toContain("  The Maddox: Tracking → Dead");
+    expect(email.html).toContain("Moved since last week");
+  });
+
+  it("lists the reader's overdue tasks and the week's, soonest first, never a dead deal's or a deal they cannot see", () => {
+    const harbor = deal({ name: "Harbor Point" });
+    const dead = deal({ name: "Gone", stage: "dead" });
+    const out = buildDigest([harbor, dead], new Map(), {
+      now: NOW,
+      appUrl: SITE,
+      recipient: "u1",
+      pictureUrl: () => null,
+      tasks: [
+        { title: "Order the PCA", due_date: day(2), deal_id: harbor.id },
+        { title: "Call the broker", due_date: day(-3), deal_id: harbor.id },
+        { title: "Dead deal's task", due_date: day(1), deal_id: dead.id },
+        { title: "Someone else's deal", due_date: day(1), deal_id: "not-visible" },
+        { title: "Too far out", due_date: day(9), deal_id: harbor.id },
+      ],
+    })!;
+    expect(out.myTasks!.map((t) => [t.title, t.overdue])).toEqual([
+      ["Call the broker", true],
+      ["Order the PCA", false],
+    ]);
+    const email = weeklyDigestEmail({ ...out, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` });
+    expect(email.text).toContain("Your tasks due by Sun, Oct 11:");
+    expect(email.text).toContain("  Call the broker (Harbor Point) — overdue, was due Fri, Oct 2");
+    expect(email.html).toContain("Overdue · Fri, Oct 2");
+  });
+
+  it("gives each move and each task its deal's square, as the deadlines and calls have", () => {
+    const harbor = deal({ name: "Harbor Point", stage: "tracking", stage_history: [{ stage: "tracking", at: at(-2) }] });
+    const out = buildDigest([harbor], new Map(), {
+      now: NOW,
+      appUrl: SITE,
+      recipient: "u1",
+      pictureUrl: (id) => `${SITE}/sq/${id}`,
+      tasks: [{ title: "Order the PCA", due_date: day(2), deal_id: harbor.id }],
+    })!;
+    expect(out.moved!.map((m) => m.pictureUrl)).toEqual([`${SITE}/sq/${harbor.id}`]);
+    expect(out.myTasks!.map((t) => t.pictureUrl)).toEqual([`${SITE}/sq/${harbor.id}`]);
+  });
+
+  // Audit C8, L9: the total was counted from at most DIGEST_TASKS_READ rows,
+  // after the tasks on deals the person cannot see were dropped, so "and N
+  // more" could undercount.
+  it("says a count read at its cap as a floor, never as the whole", () => {
+    const harbor = deal({ name: "Harbor Point" });
+    const tasks = Array.from({ length: 12 }, (_, i) => ({ title: `Task ${i}`, due_date: day(1), deal_id: harbor.id }));
+    const opts = { now: NOW, appUrl: SITE, recipient: "u1", pictureUrl: () => null, tasks };
+    const whole = buildDigest([harbor], new Map(), opts)!;
+    expect(whole.myTasksTotalIsFloor).toBe(false);
+    const capped = buildDigest([harbor], new Map(), { ...opts, tasksCapped: true })!;
+    expect(capped.myTasksTotalIsFloor).toBe(true);
+    const more = capped.myTasksTotal! - capped.myTasks!.length;
+    const email = (c: typeof whole) => weeklyDigestEmail({ ...c, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` }).text;
+    expect(email(whole)).toContain(`and ${more} more due by`);
+    expect(email(capped)).toContain(`and at least ${more} more due by`);
+    // Every task read is listed, but the read stopped at its cap.
+    const few = buildDigest([harbor], new Map(), { ...opts, tasks: tasks.slice(0, 2), tasksCapped: true })!;
+    expect(email(few)).toContain("and possibly more due by");
+  });
+
+  it("says a task read that failed, never shows it as none", () => {
+    const out = buildDigest([deal()], new Map(), { now: NOW, appUrl: SITE, recipient: "u1", pictureUrl: () => null, tasks: null })!;
+    expect(out.myTasksUnread).toBe(true);
+    const email = weeklyDigestEmail({ ...out, pipelineUrl: `${SITE}/deals`, settingsUrl: `${SITE}/account` });
+    expect(email.text).toContain("Your tasks could not be read for this digest");
+  });
+
+  it("the runner reads the person's own tasks through the window's last day and hands them in", async () => {
+    const db = dbWith();
+    const harbor = db.deals[0].id as string;
+    db.tasks = [
+      { title: "Order the PCA", due_date: day(2), deal_id: harbor, assignee_user_id: "u1", done: false },
+      { title: "A teammate's", due_date: day(2), deal_id: harbor, assignee_user_id: "u2", done: false },
+      { title: "Done already", due_date: day(2), deal_id: harbor, assignee_user_id: "u1", done: true },
+    ];
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    expect(sent[0].text).toContain("  Order the PCA (Harbor Point) — Wed, Oct 7");
+    expect(sent[0].text).not.toContain("A teammate's");
+    expect(sent[0].text).not.toContain("Done already");
+  });
+
+  it("a failed task read still sends the digest and says so", async () => {
+    const db = dbWith({ tasksFail: true });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    expect(sent[0].text).toContain("Your tasks could not be read for this digest");
+  });
+});
+
+describe("runWeeklyDigests past the project's row cap (research pass 42, H4a and H4b)", () => {
+  it("reads every due profile — the cutoff in the query, in id order, a page at a time", async () => {
+    // Seven opted-in profiles, two stamped this week; the database answers
+    // three rows a response. One capped read had seen three, in no order.
+    const profiles: Row[] = Array.from({ length: 7 }, (_, i) => ({
+      id: `u${7 - i}`,
+      email_weekly_digest: true,
+      last_digest_at: i < 2 ? new Date(NOW - DAY).toISOString() : LAST_WEEK,
+    }));
+    profiles.push({ id: "u0", email_weekly_digest: false, last_digest_at: null });
+    const db = dbWith({ profiles, maxRows: 3, team: { data: null, error: null } });
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(5);
+    const reads = db.calls.filter((c) => c.table === "profiles" && c.op === "select");
+    expect(reads.length).toBeGreaterThan(1);
+    for (const r of reads) {
+      expect(r.or).toBe(`last_digest_at.is.null,last_digest_at.lt.${new Date(NOW - 5 * DAY).toISOString()}`);
+      expect(r.order).toBe("id");
+    }
+    // Every due profile was claimed; the two stamped this week and the one
+    // opted out were not.
+    const claimed = db.profiles.filter((p) => p.last_digest_at === new Date(NOW).toISOString()).map((p) => p.id);
+    expect(claimed.sort()).toEqual(["u1", "u2", "u3", "u4", "u5"]);
+  });
+
+  it("counts one person's whole pipeline, a page at a time", async () => {
+    const deals = Array.from({ length: 8 }, (_, i) => ({ ...deal({ name: `Open ${i}`, offers_due: i < 7 ? day(1) : null }) }));
+    const db = dbWith({ deals, maxRows: 3 });
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    expect(sent[0].subject).toBe("Your pipeline this week — 8 open deals");
+    expect(sent[0].text).toContain("  and 1 more due by Sun, Oct 11 — open the pipeline");
+    const reads = db.calls.filter((c) => c.table === "deals");
+    expect(reads.length).toBeGreaterThan(1);
+    expect(reads.every((r) => r.order === "id" && r.range)).toBe(true);
   });
 });

@@ -6,39 +6,43 @@ import { MAX_OM_PAGES } from "@/lib/pdf";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { type DealRow } from "@/lib/deals";
-import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueUpgrade } from "@/lib/offering";
+import { personName } from "@/lib/person";
 import { WhatsNewCard } from "./whats-new";
-import { NewsStrip, type NewsStripItem } from "./news-strip";
+import { NewsStrip } from "./news-strip";
+import { fetchLiveHeadlines } from "@/lib/news/live";
+import type { RankedHeadline } from "@/lib/news/feeds";
+import { BrokerageFilter, type BrokerageOption } from "./brokerage-filter";
+import { brokerageOptions, dealFirms } from "@/lib/brokerage";
+import { PRIOR_PRICE_COLUMNS, priorScreenOfColumns, type PriorPriceColumns } from "@/lib/price-change";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
-import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
-import { coverFor, coverPlace } from "@/lib/deal-cover";
-import { marketPictureFor } from "@/lib/market-picture";
-import { PICTURE_CREDIT, galleryPage, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
-import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
+import type { DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
-import { inferStrategy } from "@/lib/deal-strategy";
-import { pickSlots, readingTerms, shownAssetClass } from "@/lib/pipeline-slots";
-import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
-import { scoreMandateFit } from "@/lib/mandate";
-import { countyOf, placeDeal } from "@/lib/market-county";
-import { listJobStatus, type JobLike } from "@/lib/screen-run";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
+import { type JobLike } from "@/lib/screen-run";
 import { screenedAnOm } from "@/lib/onboarding";
+import { pipelineCard, sampleDealCard } from "@/lib/pipeline-card";
+import { readAllResult, readByIds } from "@/lib/read-all";
+import { pipelineReadNote } from "@/lib/pipeline-read-note";
+import { inTurns } from "@/lib/in-turns";
+import { after } from "next/server";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
 const ERRORS: Record<string, string> = {
   name: "Please give the deal a name.",
   file: "Please choose a PDF offering memorandum to upload.",
+  // GOV.UK's own words for it: a chosen file of 0 bytes is empty.
+  empty: "That file is empty (0 bytes) — download or export it again, and upload that. Nothing was saved.",
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
   size: "That PDF is larger than 32 MB — please try a smaller file for now.",
   locked: "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password (or ask the broker for one) and upload that. Nothing was saved.",
-  pages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the financial sections on their own. Nothing was saved.`,
+  pages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the sections that hold the deal's figures, and the screen will read those pages alone, not the whole memorandum. Nothing was saved.`,
   save: "Couldn’t save the deal. Please try again.",
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
   // The limits read from the constants the gates count by (lib/billing,
@@ -55,13 +59,7 @@ const ERRORS: Record<string, string> = {
 // columns (or shows —), so one header labels them all and values align into
 // scannable columns instead of repeating micro-labels in every row. The
 // slots themselves are read in lib/pipeline-slots (pure, tested) by the
-// same rule the meeting .xlsx applies.
-
-/** A stored site-flags result as the pipeline row reads it (#426). */
-function floodFor(flags: SiteFlagsResult | null): { tag: string | null; cell: string } | null {
-  if (!flags || flags.status === "pending") return null;
-  return { tag: floodTag(flags.flood), cell: floodCell(flags.flood) };
-}
+// same rule the meeting .xlsx applies, through lib/pipeline-card.
 
 export default async function DealsPage({
   searchParams,
@@ -72,9 +70,10 @@ export default async function DealsPage({
     joined?: string;
     new?: string;
     addr?: string;
+    broker?: string;
   }>;
 }) {
-  const { error: errorCode, deleted, joined, new: newParam, addr } = await searchParams;
+  const { error: errorCode, deleted, joined, new: newParam, addr, broker } = await searchParams;
   // Pull Comps hand-off: a structured address arrives as ?addr=<json> and
   // opens the new-deal form on the manual tab with the address pre-picked.
   const prefillAddress = parseStructuredAddress(addr ?? "");
@@ -93,18 +92,44 @@ export default async function DealsPage({
   // Request-cached: shares the layout's auth call instead of a second hop.
   const user = await getCurrentUser();
 
-  // Billing state, the deal list, and the personal buy box are independent —
-  // fetch them together.
-  const [billing, { data, error }, personalBox] = await Promise.all([
+  type Row = Pick<
+    DealRow,
+    "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
+  > & {
+    address: unknown;
+    first_signal: unknown;
+    user_id: string;
+    team_id: string | null;
+    stage: string | null;
+    is_sample: boolean | null;
+    site_flags?: SiteFlagsResult | null;
+    photo?: DealVisualCache | null;
+    om_storage_path?: string | null;
+  } & PriorPriceColumns;
+
+  // Billing state, the deal list, its count and the personal buy box are
+  // independent — fetch them together. Every deal the reader can see, a page
+  // at a time, newest first (lib/read-all): one read answers at most the
+  // project's max rows, and the page had counted, funnelled, split and
+  // exported only the newest 1,000 with nothing saying the rest exist
+  // (research pass 42). The exact count beside it is the total the page
+  // states.
+  const [billing, { data, error: readError }, { count: dealTotal }, personalBox] = await Promise.all([
     user ? getBilling(supabase, user.id) : Promise.resolve(null),
-    supabase
-      .from("deals")
-      .select(
-        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path",
-      )
-      .order("created_at", { ascending: false }),
+    readAllResult<Row>((from, to) =>
+      supabase
+        .from("deals")
+        .select(
+          `id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path, ${PRIOR_PRICE_COLUMNS}`,
+        )
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    supabase.from("deals").select("id", { count: "exact", head: true }),
     user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
   ]);
+  const error = readError ? { message: (readError as { message?: string }).message ?? "" } : null;
   const teamBox = billing?.team
     ? await getBuyBoxForDeal("", billing.team.id).catch(() => null)
     : null;
@@ -113,7 +138,7 @@ export default async function DealsPage({
     // "Relation does not exist" means the migrations haven't run (a setup
     // state); anything else is a transient outage — don't tell a user in
     // production to go run SQL.
-    const schemaMissing = /relation|does not exist|schema/i.test(error.message);
+    const schemaMissing = /relation|does not exist|schema/i.test(error.message ?? "");
     return (
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
         {schemaMissing ? (
@@ -137,30 +162,22 @@ export default async function DealsPage({
     );
   }
 
-  type Row = Pick<
-    DealRow,
-    "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
-  > & {
-    address: unknown;
-    first_signal: unknown;
-    user_id: string;
-    team_id: string | null;
-    stage: string | null;
-    is_sample: boolean | null;
-    photo?: DealVisualCache | null;
-    om_storage_path?: string | null;
-  };
-
   // The card view's pictures (#428): the reader's choice of view from its
   // cookie — the cards or the list, never the map (#438) — and whether
   // Street View can be tried at all.
   const initialView = landingView((await cookies()).get(PIPELINE_VIEW_COOKIE)?.value);
   const googleEnabled = !!process.env.GOOGLE_MAPS_API_KEY;
 
-  // The latest job per deal (Screening… / Failed labels) and the teammate
-  // names for shared deals both depend only on the deal list, not on each
-  // other — fetch them together instead of one after the other.
-  const rows = (data ?? []) as Row[];
+  // The latest job per deal (Screening… / Failed labels), the teammate names
+  // for shared deals and each deal's call-for-offers deadline depend only on
+  // the deal list, not on each other — fetched together, a hundred ids a
+  // request (lib/read-all): a whole pipeline's ids in one URL ran past what a
+  // request line carries, and the jobs' one read past the project's max rows
+  // (research pass 42). A read that fails is said over the list
+  // (lib/pipeline-read-note), never shown as no screen running, no deadline.
+  // The previous screen rebuilt from its narrow columns (lib/price-change
+  // `PRIOR_PRICE_COLUMNS`), as the card's price badge reads it.
+  const rows = ((data ?? []) as Row[]).map((d) => ({ ...d, prior_screen: priorScreenOfColumns(d) }));
   const ids = rows.map((d) => d.id);
   const teammateIds = Array.from(
     new Set(
@@ -169,37 +186,46 @@ export default async function DealsPage({
         .map((d) => d.user_id),
     ),
   );
-  const [{ data: jobsData }, { data: mates }, { data: dueRows }] = await Promise.all([
-    ids.length
-      ? supabase
+  const failedRead = (what: string) => (e: unknown) => console.error(`[pipeline] ${what} read failed:`, e);
+  const [jobsData, mates, dueRows] = await Promise.all([
+    readByIds<{ deal_id: string } & JobLike>(
+      ids,
+      (chunk) =>
+        supabase
           .from("analysis_jobs")
           // step + updated_at: a failed run's step says which results it
           // left behind, and a live row that stopped writing reads as stalled.
           .select("deal_id, status, step, updated_at, created_at")
-          .in("deal_id", ids)
+          .in("deal_id", chunk)
           .order("created_at", { ascending: false })
-          // Only the newest row per deal is read below — cap the fetch so a
-          // long re-screen history can't grow this query without bound.
-          .limit(Math.max(100, ids.length * 3))
-      : Promise.resolve({ data: [] as ({ deal_id: string } & JobLike)[] }),
-    teammateIds.length
-      ? supabase.from("profiles").select("id, email, full_name").in("id", teammateIds)
-      : Promise.resolve({ data: [] as { id: string; email: string | null; full_name: string | null }[] }),
-    // Call-for-offers deadlines are best-effort: the column arrived in
-    // migration 0013, and the pipeline must keep working on a database that
-    // hasn't run it yet (the query just errors and every deadline reads null).
-    ids.length
-      ? supabase.from("deals").select("id, offers_due").in("id", ids)
-      : Promise.resolve({ data: [] as { id: string; offers_due: string | null }[] }),
+          // Only the newest row per deal is read below — a few a deal, so a
+          // long re-screen history can't grow a request past one response.
+          .limit(Math.max(100, chunk.length * 3)),
+      failedRead("job"),
+    ),
+    readByIds<{ id: string; email: string | null; full_name: string | null }>(
+      teammateIds,
+      (chunk) => supabase.from("profiles").select("id, email, full_name").in("id", chunk),
+      failedRead("teammate name"),
+    ),
+    // The deadline column arrived in migration 0013, run everywhere since.
+    readByIds<{ id: string; offers_due: string | null }>(
+      ids,
+      (chunk) => supabase.from("deals").select("id, offers_due").in("id", chunk),
+      failedRead("offers-due"),
+    ),
   ]);
+  const readNote = pipelineReadNote({ jobs: !jobsData, offersDue: !dueRows, names: !mates });
+  // Each chunk's rows arrive newest first, and a deal's rows all sit in its
+  // own chunk, so the first seen is its latest.
   const jobByDeal = new Map<string, JobLike>();
-  for (const j of (jobsData ?? []) as ({ deal_id: string } & JobLike)[]) {
+  for (const j of jobsData ?? []) {
     if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
   }
 
   const dueById = new Map<string, string>();
   const dueRead = new Set<string>();
-  for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
+  for (const r of dueRows ?? []) {
     dueRead.add(r.id);
     if (r.offers_due) dueById.set(r.id, r.offers_due);
   }
@@ -213,27 +239,11 @@ export default async function DealsPage({
     const next = offersDueUpgrade(null, d.extraction as ExtractionResult | null);
     if (next) dueFills.push([d.id, next]);
   }
-  if (dueFills.length) {
-    await Promise.all(
-      dueFills.map(([id, offers_due]) =>
-        supabase
-          .from("deals")
-          .update({ offers_due })
-          .eq("id", id)
-          .is("offers_due", null)
-          .then(
-            () => undefined,
-            () => undefined,
-          ),
-      ),
-    );
-    for (const [id, due] of dueFills) dueById.set(id, due);
-  }
-  const nameById = new Map(
-    ((mates ?? []) as { id: string; email: string | null; full_name: string | null }[]).map(
-      (m) => [m.id, m.full_name || m.email || "Teammate"],
-    ),
-  );
+  // Read here from the values computed; written behind the response (below).
+  for (const [id, due] of dueFills) dueById.set(id, due);
+  // A teammate is named as every surface names a person (lib/person): the
+  // name they set, else their email's local part — never the whole address.
+  const nameById = new Map((mates ?? []).map((m) => [m.id, personName(m.full_name, m.email)]));
 
   // Every deal placed by its address (#441): a deal uploaded with the
   // address box empty takes the one its memorandum states, and a typed line
@@ -248,190 +258,82 @@ export default async function DealsPage({
     const next = addressUpgrade(d.address, d.extraction as ExtractionResult | null);
     if (next) upgrades.set(d.id, next);
   }
-  if (upgrades.size) {
-    await Promise.all(
-      [...upgrades].map(([id, address]) =>
+  for (const d of rows) {
+    const next = upgrades.get(d.id);
+    if (next) d.address = next;
+  }
+
+  // Both write-backs go behind the response, a few at a time (lib/in-turns):
+  // the page had awaited every one at once before it drew anything, so a
+  // pipeline of older screens waited on a burst of updates (research pass
+  // 42). The client was made before the render, so the callback reads no
+  // request API; a write that fails is logged and made again on the next
+  // view, which computes the same value.
+  if (dueFills.length || upgrades.size) {
+    const writes: (() => PromiseLike<boolean>)[] = [
+      ...dueFills.map(([id, offers_due]) => () =>
+        supabase
+          .from("deals")
+          .update({ offers_due })
+          .eq("id", id)
+          .is("offers_due", null)
+          .then(({ error: e }) => !e),
+      ),
+      ...[...upgrades].map(([id, address]) => () =>
         supabase
           .from("deals")
           .update({ address })
           .eq("id", id)
-          .then(
-            () => undefined,
-            () => undefined,
-          ),
+          .then(({ error: e }) => !e),
       ),
-    );
-    for (const d of rows) {
-      const next = upgrades.get(d.id);
-      if (next) d.address = next;
-    }
+    ];
+    after(async () => {
+      const failed = await inTurns(writes, (write) => write());
+      if (failed) console.error(`[pipeline] ${failed} of ${writes.length} write-backs failed; the next view makes them again`);
+    });
   }
 
-  const deals: DealCard[] = rows.map((d) => {
-    const extraction = d.extraction as ExtractionResult | null;
-    const verdict = d.verdict as { verdict?: string } | null;
-    const job = jobByDeal.get(d.id);
-    // Same deterministic engine AND the same inputs as the deal page: judge
-    // against buyBoxCheckSource (extraction, else first signal, with the typed
-    // address widening geography) so a deal reads identically on both surfaces.
-    const box = d.team_id ? teamBox : personalBox;
-    const checkSource = box
-      ? buyBoxCheckSource(
-          extraction,
-          (d.first_signal as FirstSignal | null) ?? null,
-          (d.address as StructuredAddress | null) ?? null,
-          // The kind as the card infers it, so the fit chip judges a
-          // development's land cost — the price the card prints.
-          inferStrategy(extraction, (d.first_signal as FirstSignal | null) ?? null).kind,
-        )
-      : null;
-    const mandate =
-      box && checkSource ? scoreMandateFit(d.asset_class, checkSource, box) : null;
-    // Where the deal is, the deal page's answer (lib/market-county, #447):
-    // its briefed market, else the metro area whose figures it reads — by
-    // its county where its address names no place a market's keywords know.
-    // Site flags looked up for an address since edited are the old one's.
-    const rowAddress = (d.address as StructuredAddress | null) ?? null;
-    const storedFlags = (d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
-    const flags = siteFlagsStale(storedFlags, rowAddress?.label) ? null : storedFlags;
-    const placement = placeDeal(rowAddress, countyOf(rowAddress, flags));
-    // Running, stalled (its process died mid-screen — a deploy, most
-    // often) or failed with the verdict left behind; a failure that never
-    // touched the verdict leaves the pill alone (lib/screen-run.ts).
-    const jobStatus = listJobStatus(job, !!verdict?.verdict);
-    return {
-      id: d.id,
-      name: d.name,
-      // "auto" is the create form's choice, not a class: the row shows what
-      // the extraction read the deck as, and nothing until it has.
-      assetClass: shownAssetClass(d.asset_class, extraction),
-      createdAt: d.created_at,
-      verdict: verdict?.verdict ?? null,
-      stage: (d.stage as DealCard["stage"]) ?? "screening",
-      // Any miss → outside; else any near-miss → near; all-pass → fits.
-      // Unknown-only results (nothing checkable yet) stay null and render as —.
-      fit:
-        box && checkSource
-          ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, checkSource, box))
-          : null,
-      score: mandate?.score ?? null,
-      mandateVerdict: mandate?.verdict ?? null,
-      // Judged on the first signal alone until the extraction lands — the
-      // deal page's "First read" (its buy-box panel's provisional rule).
-      fitFirstRead: !extraction && !!d.first_signal,
-      addedBy:
-        d.team_id && d.user_id !== user?.id
-          ? (nameById.get(d.user_id) ?? "Teammate")
-          : null,
-      // On a team, a deal no team holds is the reader's own and the team
-      // does not see it — filed there once the team's trial deals are in
-      // use, or added before the reader joined (lib/personal-deal).
-      personal: !!billing?.team && !d.team_id,
-      market: extraction?.market ?? "",
-      // The same placement the deal page makes — the list and the detail
-      // agree on whether an address sits inside the briefed markets.
-      coveredMarket: placement.briefed?.name ?? null,
-      // A metro area the site reads without a brief, or one the deal's
-      // county placed it in: named, and said how, so the row never reads
-      // as "no figures".
-      readMarket: placement.read?.name ?? null,
-      readCounty: placement.placedBy?.county ?? null,
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once per request and handed to the list:
+  // every offers-due countdown counts from it, on the server and in the
+  // browser alike (the deal page reads its own the same way), and each
+  // row's rent rules read the allowance in force on it.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+
+  // Each deal's card (lib/pipeline-card): the figures, the fit, the tags
+  // and the pictures the card, the list row and the map draw — one builder,
+  // so a page that shows the sample's card draws the pipeline's own.
+  // The pipeline by brokerage (research pass 24, B13): the firms the
+  // memoranda name, each with its count, and the deals of the one chosen —
+  // a firm no deal names any longer is no filter, never an empty list.
+  // Each firm named as the analytics scorecard names it (lib/brokerage
+  // `firmDisplayName`: the name printed most often).
+  const firmsByDeal = new Map<string, string[]>();
+  const dealFirmLists: { key: string; name: string }[][] = [];
+  for (const d of rows) {
+    if (d.is_sample) continue;
+    const firms = dealFirms(d.extraction as ExtractionResult | null);
+    firmsByDeal.set(d.id, firms.map((f) => f.key));
+    dealFirmLists.push(firms);
+  }
+  const firmOptions: BrokerageOption[] = brokerageOptions(dealFirmLists);
+  const activeBroker = broker && firmOptions.some((f) => f.key === broker) ? broker : null;
+  const shownRows = activeBroker ? rows.filter((d) => firmsByDeal.get(d.id)?.includes(activeBroker)) : rows;
+
+  const deals: DealCard[] = shownRows.map((d) => {
+    const card = pipelineCard(d, {
+      viewerId: user?.id ?? null,
+      onTeam: !!billing?.team,
+      box: d.team_id ? teamBox : personalBox,
+      job: jobByDeal.get(d.id),
+      addedByName: nameById.get(d.user_id) ?? null,
       offersDue: dueById.get(d.id) ?? null,
-      // Before the extraction lands the first signal's ask fills the price,
-      // as on the deal page (lib/pipeline-slots).
-      slots: pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class),
-      jobStatus,
-      // A first screen before its terms are read: an empty slot is "not
-      // read yet" and shimmers, never the dash that says "not stated"
-      // (lib/pipeline-slots). The fit waits with them only where a buy box
-      // stands — without one its dash is final.
-      reading: readingTerms(jobStatus, !!extraction, !!d.om_storage_path),
-      hasBox: !!box,
-      // Gate the aerial thumbnail here rather than letting every row fire a
-      // request that can only 404: no address, no possible photograph.
-      hasAddress: !!(d.address as StructuredAddress | null)?.label?.trim(),
-      // FEMA's flood zone at the building, from the stored site-flags lookup
-      // (#426): the row's tag in a Special Flood Hazard Area, the CSV's cell
-      // in every case, nothing before the lookup has answered.
-      flood: floodFor(flags),
-      // Where the deal is, from the location its pictures were drawn at
-      // (#431): read from the cache only — the list never geocodes; the map
-      // places the rest on its own first view.
-      ...(() => {
-        const cache = d.photo ?? null;
-        if (!cacheFresh(cache, Date.now(), (d.address as StructuredAddress | null) ?? null)) return { place: null };
-        if (cache?.geoMiss) return { place: null, placeMiss: true };
-        return typeof cache?.lat === "number" && typeof cache?.lng === "number"
-          ? { place: { lat: cache.lat, lng: cache.lng, precision: cache.geoPrecision ?? ((d.address as StructuredAddress | null)?.street?.trim() ? "street" : "area") } }
-          : { place: null };
-      })(),
-      // The card's pictures, best first and each pinned with its credit
-      // (#428, the compare page's rule): the deal's own photograph — or the
-      // memorandum's cover on its first ask — then Street View, then the
-      // photograph the deal's market is known by, named as the market's
-      // (#438). No overhead (#442): the pipeline's rule is pictures, not
-      // maps, so where no photograph answers the card wears the deal's
-      // cover, and the list row's thumbnail the same, at its own frame.
-      ...(() => {
-        const cache = d.photo ?? null;
-        const address = (d.address as StructuredAddress | null) ?? null;
-        const unread = pictureMayBeInMemorandum({
-          omPath: d.om_storage_path ?? null,
-          isSample: !!d.is_sample,
-          cache,
-        });
-        // A memorandum photograph lifted under older rules is asked for
-        // again like one not yet looked for (#444): over the next picture,
-        // taking over only if today's search keeps it.
-        const picture = unread ? null : (cache?.picture ?? null);
-        const market = marketPictureFor(address, extraction?.market ?? null, placement.briefed ?? placement.read, placement.county);
-        const facts = {
-          dealId: d.id,
-          pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
-          // Its colours before its pixels (#463): the blur-up the frame
-          // shows until the photograph has loaded whole.
-          picturePreview: picture?.preview ?? null,
-          memorandumUnread: unread,
-          googleEnabled,
-          hasStreetAddress: !!address?.street?.trim(),
-          hasAddress: !!address?.label?.trim(),
-          aerial: false,
-        };
-        return {
-          pictures: bannerSources({ ...facts, market }, CARD),
-          // No market photograph on a row: a skyline is a panorama, a sliver
-          // at 48px, and its licence wants the photographer named beside it,
-          // which a row's slot has no room for. The building's own
-          // photograph, then its cover.
-          thumbs: bannerSources(facts, THUMB),
-          cover: coverFor({
-            seed: d.id,
-            assetClass: shownAssetClass(d.asset_class, extraction),
-            place: coverPlace(address, market?.name, extraction?.market),
-          }),
-          // How many photographs the deal page holds (#448): the cover and
-          // the memorandum's others, counted on the card over its photograph.
-          photos: picture && !d.is_sample ? 1 + (cache?.gallery?.length ?? 0) : 0,
-          // …and flipped through on the card (#450), each with its own page's
-          // credit, only where the card leads with the deal's own photograph.
-          slides:
-            picture && !d.is_sample
-              ? (cache?.gallery ?? []).map((g, k) => {
-                  // A page the deal's owner wrote is printed only as a page number.
-                  const page = galleryPage(g.page);
-                  return {
-                    kind: "photo" as const,
-                    src: `/api/deals/${encodeURIComponent(d.id)}/picture?size=hero&g=${k + 1}`,
-                    credit: memorandumPhotoCredit(page),
-                    alt: page
-                      ? `Photograph from page ${page} of the memorandum for ${d.name}`
-                      : `Photograph from the memorandum for ${d.name}`,
-                  };
-                })
-              : [],
-        };
-      })(),
-    };
+      today: todayIso,
+      googleEnabled,
+    });
+    // The adder's user id beside their name, so their badge wears the tone
+    // it wears on every other surface (the roster, a task, a note).
+    return card.addedBy ? { ...card, addedById: d.user_id } : card;
   });
 
   // Getting-started state — all real, computed from the reader's own data:
@@ -452,12 +354,6 @@ export default async function DealsPage({
       }),
     ),
   };
-
-  // Today on the reader's own calendar (their browser's zone, from its
-  // cookie — lib/reader-day), read once per request and handed to the list:
-  // every offers-due countdown counts from it, on the server and in the
-  // browser alike (the deal page reads its own the same way).
-  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   return (
     <>
@@ -483,6 +379,21 @@ export default async function DealsPage({
         viewerId={user?.id ?? null}
         onTeam={!!billing?.team}
         todayIso={todayIso}
+        // The exact count beside the deals read: the page says the two
+        // apart should they ever differ (a deal added or removed between the
+        // count and the read), never a total it did not read.
+        totalDeals={activeBroker ? null : (dealTotal ?? null)}
+        filterBar={<BrokerageFilter firms={firmOptions} active={activeBroker} shown={shownRows.length} total={rows.length} />}
+        // A read beside the deals that failed, said over the list.
+        readNote={readNote}
+        // An empty pipeline shows the sample's own card, the one the reader
+        // gets the moment they add it: their own box judges it, and a deal
+        // the sample action files is the reader's own, on a team or off.
+        sampleCard={
+          rows.length === 0
+            ? sampleDealCard({ today: todayIso, box: personalBox, viewerId: user?.id ?? null, onTeam: !!billing?.team })
+            : null
+        }
       />
       {/* The strip's own read streams after the pipeline rather than
           holding it back; nothing is drawn until it has stories. */}
@@ -494,24 +405,17 @@ export default async function DealsPage({
   );
 }
 
-/** Compact stories strip under the pipeline: the newest headlines the
- *  weekday sweep scored 5 or more, each linking to its source and dated. The
- *  sweep's table is shared by every account and carries no market, so the
- *  strip is titled for what it is (`NewsStrip`). Renders nothing at all
- *  until the intel cron has stories — no filler card. */
+/** The live headlines under the pipeline (signed-in gaps, H6): the
+ *  publishers' own feeds, read through the News page's live layer
+ *  (lib/news/live — one copy a process, shared with that page), drawn with
+ *  their pictures, publishers and days (`NewsStrip`). Renders nothing at
+ *  all until a publisher has answered — no filler card. */
 async function TodaysNews() {
-  let items: NewsStripItem[] = [];
+  let headlines: RankedHeadline[] = [];
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase
-      .from("market_intel_items")
-      .select("url, title, source, relevance, published_at")
-      .gte("relevance", 5)
-      .order("created_at", { ascending: false })
-      .limit(4);
-    items = (data as NewsStripItem[] | null) ?? [];
-  } catch {
-    // table absent — no card
+    headlines = (await fetchLiveHeadlines()).headlines;
+  } catch (e) {
+    console.error("[pipeline] live headlines read failed:", e);
   }
-  return <NewsStrip items={items} />;
+  return <NewsStrip headlines={headlines} />;
 }

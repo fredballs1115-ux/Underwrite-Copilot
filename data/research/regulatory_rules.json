@@ -135,10 +135,10 @@
     ]
    },
    "effect": "Montgomery County rent stabilization (Bill 15-23, effective 2024) caps annual increases at CPI-U + 3%, maximum 6%. Key exemptions include buildings first occupied fewer than 23 years ago (rolling window) and small owner-occupied configurations; exact exemption list in county code — verify per deal.",
-   "source": "https://www.montgomerycountymd.gov/DHCA/housing/landlordtenant/rent-stabilization.html",
+   "source": "https://www.montgomerycountymd.gov/department-housing-community-affairs/rent-stabilization",
    "as_of": "2026-07-15",
    "status": "sourced",
-   "verification": "Cap formula verified in July 15 pass (CPI+3% capped at 6%); exemption details sourced, panel cut"
+   "verification": "Cap formula verified in July 15 pass (CPI+3% capped at 6%); exemption details sourced, panel cut; 2026-10-05: the county moved the page - the old address (/DHCA/housing/landlordtenant/rent-stabilization.html) answers 404 (link audit 2026-09-28, zori probe run 37257535999) and DHCA's home page links this one (run 37258400181), which states the formula's current result: 'The current CPI-U is 2.2%, and the maximum allowable rent increase is 5.2%. These rates will be in effect from July 1, 2026, through June 30, 2027.' (run 37258453291)"
   },
   {
    "id": "md-takoma-park-rent-stabilization",

@@ -7,6 +7,7 @@
 // read one sentence; it states the inputs, never changes them.
 
 import { withArticle } from "@/lib/article";
+import { compactUsd } from "@/lib/money";
 
 export interface CostInputs {
   transferTaxPct: number;
@@ -31,4 +32,41 @@ export function costAssumptionsLine(i: CostInputs): string {
   return tax > 0
     ? `These returns carry ${hold}, ${sale} and ${pct(tax)} of the price in transfer and recordation tax on the purchase. Set each in the Excel model.`
     : `These returns carry ${hold} and ${sale}, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.`;
+}
+
+/**
+ * Where the model spends capital in year 1 — a renovation budget, a PIP, a
+ * PCA's immediate repairs — it pays it from the year's cash flow, not from
+ * the equity at closing, so the equity multiple counts it against the
+ * distributions and the year-1 cash-on-cash falls by it (research pass 40,
+ * M6: a deal with $2,000,000 of year-1 repairs read a 1.52x multiple where
+ * its distributions over its contributions are 1.42x, and a −23.1% year-1
+ * return). Said beside each, on the deal page's tiles, the report's base
+ * case and the workbook's Deal Summary; how the multiple should count it is
+ * the owner's. Null where the model spends none in year 1.
+ */
+export function yearOneCapitalLine(capitalImprovementsYr1: number): string | null {
+  if (!(capitalImprovementsYr1 > 0) || !Number.isFinite(capitalImprovementsYr1)) return null;
+  return `The equity multiple and the year-1 cash-on-cash are net of the ${compactUsd(capitalImprovementsYr1)} of year-1 capital, which the model pays from the year's cash flow, not from the equity at closing.`;
+}
+
+/**
+ * Where the memorandum states no going-in cap, the exit is the model's
+ * default: the gap between it and the model's own entry — its year-1 NOI over
+ * its price — said, so the compression or expansion the default carries is
+ * seen (research pass 38: a $10M office at an 8.00% entry read a 25.1% IRR on
+ * the 6.00% default exit, 200 bps of compression nobody chose). "Default
+ * 6.00%; the model's own year-1 NOI over its price is 8.00%: 200 bps of
+ * compression ride in these returns". Null under 5 bps, or without an entry.
+ * The exit's SOURCE note and the line under the playground's tiles read this
+ * one sentence; which default the exit takes is the owner's.
+ */
+export function defaultExitGap(exitDec: number, entryDec: number | null | undefined): string | null {
+  if (entryDec == null || !Number.isFinite(entryDec) || !(entryDec > 0) || !Number.isFinite(exitDec)) return null;
+  const bps = Math.round((entryDec - exitDec) * 10_000);
+  if (Math.abs(bps) < 5) return null;
+  const two = (d: number) => `${(d * 100).toFixed(2)}%`;
+  return `Default ${two(exitDec)}; the model's own year-1 NOI over its price is ${two(entryDec)}: ${Math.abs(bps).toLocaleString("en-US")} bps of ${
+    bps > 0 ? "compression" : "expansion"
+  } ride in these returns`;
 }

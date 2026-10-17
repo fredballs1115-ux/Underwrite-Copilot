@@ -28,8 +28,13 @@ import { RentRollDashboard } from "./dashboard";
 import { MappingForm } from "./mapping-form";
 import { deleteRentRollImport, saveLeasingProfile, uploadRentRoll } from "./actions";
 import { DealCrumb } from "../deal-crumb";
+import { dealTitle } from "@/lib/deal-title";
 
-export const metadata: Metadata = { title: "Rent roll" };
+/** "Rent roll — <the deal's name>" (lib/deal-title). */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return dealTitle(id, "Rent roll");
+}
 
 const ERRORS: Record<string, string> = {
   file: "Pick a rent roll file to upload.",

@@ -1,0 +1,549 @@
+// A forward purchase or a build-to-suit (research pass 28, round 2).
+//
+// The screen read a forward purchase as a development: the buyer was handed
+// the construction loan's interest reserve and carry, the model's capital
+// note told them to "enter the construction / renovation cost" on a price
+// that is all-in at delivery, and the pipeline row's yield slot stood empty.
+// A forward purchase is a contract to buy a building when it is finished:
+// the developer funds the works, the buyer pays the price at delivery, and
+// what the buyer holds before then is a deposit and a date.
+//
+// PURE. Six rules:
+//   1. THE PRICE IS PAID AT DELIVERY. The developer funds the works; the
+//      buyer's cost is the price, never the price plus the developer's
+//      budget.
+//   2. THE YIELD IS STRUCK AT DELIVERY. The delivery cap as stated, else the
+//      stated stabilized NOI over the price — said at delivery, never as a
+//      going-in cap on a building that stands.
+//   3. THE CLOCK IS THE RISK. Delivery against the outside date; a delivery
+//      stated as a quarter, a month or a year alone is read on its LAST day
+//      (a later delivery is the side that does not flatter: rent starts
+//      later, the deposit waits longer).
+//   4. THE DEPOSIT IS AT RISK, NOT THE BUILD. Before delivery the buyer's
+//      exposure is the deposit and its terms, as stated.
+//   5. THE LEASE STARTS AT COMMENCEMENT. A build-to-suit's lease runs from
+//      delivery (lib/single-tenant counts it so); a community leases up
+//      after it, and a stabilized NOI is the leased community's.
+//   6. A BLANK IS NULL.
+
+import type { ExtractionResult } from "@/lib/anthropic/types";
+import {
+  BUILD_TO_SUIT_WORDS,
+  buildingPriceOf,
+  findPriceMetric,
+  forwardDeliveryNoi,
+  forwardWordsOf,
+  inferStrategy,
+  isForwardPurchase,
+  isPlanDeal,
+  type DealStrategy,
+} from "@/lib/deal-strategy";
+import { findGoingInCap, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
+import { SCALE_WORDS, compactUsd, parseUsd } from "@/lib/money";
+import { readStatedDate } from "@/lib/note-yield";
+import { withArticle } from "@/lib/article";
+
+// The predicate the plan needs lives in lib/deal-strategy, which this module
+// imports (`planSummary` reads it to say the developer funds the works);
+// re-exported here so every surface reads the purchase from one module.
+export { isForwardPurchase };
+
+/**
+ * Whether the market check reads the construction lenders' standards for
+ * the deal (lib/live-market-brief's `plan`): every plan deal's, but a
+ * forward purchase's (research pass 41) — its developer funds the works,
+ * so no construction loan is the buyer's (rule 1). The pipeline and the
+ * deal page's since-this-screen both ask here, so the two read one set.
+ */
+export function readsConstructionLending(
+  ex: ExtractionResult | null | undefined,
+  strategy: DealStrategy = inferStrategy(ex ?? null),
+): boolean {
+  return isPlanDeal(strategy.kind) && !isForwardPurchase(ex, strategy);
+}
+
+type MetricRow = { label: string; value: string; page?: string };
+
+const rowOf = (metrics: readonly MetricRow[], re: RegExp, not?: RegExp) =>
+  metrics.find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
+
+/** A figure a dollar reader takes ("$1,000,000", "$2.4M", "1,500,000"),
+ *  each read by `parseUsd`, whose floor drops a day count or a year. */
+const DOLLAR_FIGURE = new RegExp(String.raw`\$?\s*\d[\d,]*(?:\.\d+)?(?!\.?\d)\s*(?:${SCALE_WORDS})?\b`, "gi");
+/** A deposit's words that say it grows after its first payment. */
+const STEPS_UP = /\bincreas\w*|\brais(?:es|ed|ing)\b|\bris(?:es|ing)\b|\bstep(?:s|ped|ping)?[\s-]+up\b|\badditional\b|\bsecond\s+deposit\b|\bfurther\s+deposit\b|\bfollowed\s+by\b|\btop(?:s|ped|ping)?[\s-]+up\b/i;
+
+const BTR_WORDS = /\bbuild[- ]to[- ]rent\b|\bbtr\b|\bsingle[- ]family rental\b|\brental homes?\b/i;
+
+/** "Delivery date", "Substantial completion", "Estimated delivery",
+ *  "Certificate of occupancy" — never a construction start. */
+export const DELIVERY_ROW =
+  /^\s*(?:(?:estimated|scheduled|anticipated|expected|projected|target(?:ed)?)\s+)?(?:delivery|substantial completion|completion|certificate of occupancy|c\.?\s?o\.?)(?:\s+date)?\s*$/i;
+export const OUTSIDE_ROW = /^\s*outside\s+(?:closing\s+)?date\s*$/i;
+export const RENT_COMMENCEMENT_ROW = /^\s*rent\s+commencement(?:\s+date)?\s*$/i;
+/** The buyer's deposit, never a tenant's security deposit. */
+export const DEPOSIT_ROW = /^\s*(?:(?:initial|earnest money|good[- ]faith|purchase|buyer'?s)\s+)?deposits?\b/i;
+const NOT_BUYERS_DEPOSIT = /security|tenant|utility/i;
+export const DELIVERY_CAP_ROW = /^\s*(?:delivery\s+cap(?:\s+rate)?|cap\s+rate\s+(?:at|on)\s+delivery)\s*$/i;
+export const PRICE_ADJUSTMENT_ROW = /^\s*price\s+adjustment\b/i;
+export const DEVELOPER_ROW = /^\s*developer\s*$/i;
+export const GUARANTY_ROW = /^\s*completion\s+guarant(?:y|ee)\s*$/i;
+
+/** The rows the extraction files for a forward purchase, in the order a
+ *  key-terms block leads with them after the price — each only where the
+ *  memorandum states it. */
+export function forwardTermRows<M extends MetricRow>(metrics: ReadonlyArray<M>): M[] {
+  return [
+    rowOf(metrics, DELIVERY_ROW),
+    rowOf(metrics, OUTSIDE_ROW),
+    rowOf(metrics, DEPOSIT_ROW, NOT_BUYERS_DEPOSIT),
+    rowOf(metrics, DELIVERY_CAP_ROW),
+    rowOf(metrics, RENT_COMMENCEMENT_ROW),
+  ].filter((m): m is M => m != null) as M[];
+}
+
+// ── Dates read on their last day ─────────────────────────────────────────
+
+export interface DeliveryDate {
+  /** the day read: a quarter's, a month's or a year's last — where the
+   *  words name several dates, the latest */
+  iso: string;
+  /** what the memorandum wrote — on a phased delivery, the last takedown's
+   *  own words ("Q2 2028") */
+  text: string;
+  precision: "day" | "month" | "quarter" | "year";
+  /** where the words name several dates, each as written with the day it
+   *  is read as, in the order written: the delivery is the latest, the side
+   *  that does not flatter (research pass 37). Absent on a single date */
+  dates?: { text: string; iso: string }[];
+  /** the words name phases or numbered buildings, each date one of them */
+  phased?: true;
+  /** each phase is a closing of its own — the words name tranches,
+   *  takedowns or a closing a phase, and never one closing ("closing at
+   *  final completion"): the price is paid in tranches as they deliver */
+  closings?: true;
+}
+
+const lastDayOf = (y: number, mo: number) => new Date(Date.UTC(y, mo, 0)).getUTCDate();
+const isoOf = (y: number, mo: number, d: number) =>
+  `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+// A date a delivery row may name more than one of, in the forms one date is
+// read in: a quarter, a day, a month, a year's end.
+const DATE_MENTION = new RegExp(
+  [
+    String.raw`\b(?:q[1-4]|[1-4]q)\s*[-'’]?\s*\d{4}\b`,
+    String.raw`\b(?:first|second|third|fourth)\s+quarter\s+(?:of\s+)?\d{4}\b`,
+    String.raw`\b\d{4}-\d{1,2}-\d{1,2}\b`,
+    String.raw`\b\d{1,2}\/\d{1,2}\/\d{2,4}\b`,
+    String.raw`\b\d{1,2}\/\d{4}\b`,
+    String.raw`\b[A-Za-z]{3,9}\.?\s+(?:\d{1,2}(?:st|nd|rd|th)?,?\s+)?\d{4}\b`,
+    String.raw`\b(?:year[- ]end|end\s+of|late)\s+\d{4}\b`,
+  ].join("|"),
+  "gi",
+);
+/** Words that make each date a phase's. */
+const PHASE_WORDS = /\bphases?\b|\btranches?\b|\btake[- ]?downs?\b/i;
+const NAMED_BUILDINGS = /\bBuildings?\s+(?:[A-Z]|\d{1,2})\b/;
+/** Words that make each phase a closing of its own: tranches, takedowns, a
+ *  closing a phase or a building (audit C3a: any "Phase" had read as
+ *  tranches, beside a memorandum that said it closes once). */
+const SEPARATE_CLOSINGS =
+  /\btranches?\b|\btake[- ]?downs?\b|\bseparate\s+closings\b|\bphased\s+closings?\b|\bclos(?:ing|ings|es|ed)\b[^.;]{0,30}\b(?:each|every|per|by)\s+(?:phase|building|tranche)\b|\b(?:each|every|per)\s+(?:phase|building)\b[^.;]{0,30}\bclos(?:ing|es|ed)\b/i;
+/** Words that say the purchase closes once, whatever its phases. */
+const ONE_CLOSING =
+  /\b(?:single|one)\s+closing\b|\bclos(?:ing|es|e)\s+(?:at|upon|on)\s+(?:the\s+)?(?:final|full|substantial)\s+completion\b|\bclos(?:ing|es|e)\s+(?:at|upon|on)\s+(?:the\s+)?(?:completion|delivery)\s+of\s+(?:the\s+)?(?:last|final)\b/i;
+
+/** A date as written, read on its LAST day where it names a quarter, a
+ *  month or a year alone. Null for words with no date in them ("upon
+ *  completion", "TBD"). Words that name several dates are read at the
+ *  latest — "Phase 1 (60 homes) Q2 2027; Phase 2 (80 homes) Q4 2027; Phase
+ *  3 (60 homes) Q2 2028" is delivered when its last phase is — and each date
+ *  is kept, a phase's where the words name phases. The phases are closings
+ *  of their own only where the row or the deal's `context` words say so
+ *  (tranches, takedowns, a closing a phase) and never where they say it
+ *  closes once (`closings`). */
+export function readDeliveryDate(text: string | null | undefined, asOf: Date, context = ""): DeliveryDate | null {
+  const s = (text ?? "").trim();
+  if (!s) return null;
+  const read = (t: string) => readOneDate(t, asOf);
+  const phased = PHASE_WORDS.test(s) || NAMED_BUILDINGS.test(s);
+  const both = `${s} \n ${context}`;
+  const closings = phased && SEPARATE_CLOSINGS.test(both) && !ONE_CLOSING.test(both);
+  type Found = { text: string; index: number; at: DeliveryDate };
+  const found: Found[] = [];
+  for (const m of s.matchAll(DATE_MENTION)) {
+    const at = read(m[0]);
+    if (at) found.push({ text: m[0], index: m.index ?? 0, at });
+  }
+  // A phase stated by its year alone ("Phase 1 Q4 2027; Phase 2 2028") —
+  // only where the words name phases, so a year in passing elsewhere ("Q3
+  // 2027, permits issued 2025") is no date of delivery.
+  if (phased) {
+    for (const m of s.matchAll(/\b20\d{2}\b/g)) {
+      const index = m.index ?? 0;
+      const at = read(m[0]);
+      if (at && !found.some((f) => index >= f.index && index < f.index + f.text.length)) found.push({ text: m[0], index, at });
+    }
+  }
+  const dates = found.sort((a, b) => a.index - b.index);
+  if (new Set(dates.map((d) => d.at.iso)).size < 2) return read(s);
+  const latest = dates.reduce((a, b) => (b.at.iso >= a.at.iso ? b : a));
+  return {
+    iso: latest.at.iso,
+    text: phased ? latest.text : s,
+    precision: latest.at.precision,
+    dates: dates.map((d) => ({ text: d.text, iso: d.at.iso })),
+    ...(phased ? { phased: true as const } : {}),
+    ...(closings ? { closings: true as const } : {}),
+  };
+}
+
+/** One date as written, read on its last day. */
+function readOneDate(s: string, asOf: Date): DeliveryDate | null {
+  const minYear = asOf.getUTCFullYear() - 10;
+  const maxYear = asOf.getUTCFullYear() + 15;
+  const q = s.match(/\b(?:q([1-4])|([1-4])q)\s*[-'’]?\s*(\d{4})\b/i) ?? s.match(/\b(first|second|third|fourth)\s+quarter\s+(?:of\s+)?(\d{4})\b/i);
+  if (q) {
+    const words: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4 };
+    const quarter = q.length === 4 ? Number(q[1] ?? q[2]) : words[q[1].toLowerCase()];
+    const y = Number(q.length === 4 ? q[3] : q[2]);
+    if (y < minYear || y > maxYear) return null;
+    const mo = quarter * 3;
+    return { iso: isoOf(y, mo, lastDayOf(y, mo)), text: s, precision: "quarter" };
+  }
+  const stated = readStatedDate(s, minYear, maxYear, "last");
+  if (stated) return { iso: stated.iso, text: s, precision: stated.month ? "month" : "day" };
+  const year = s.match(/^\s*(?:(?:late|end of|ye|year[- ]end)\s+)?(\d{4})\s*$/i);
+  if (year) {
+    const y = Number(year[1]);
+    return y >= minYear && y <= maxYear ? { iso: isoOf(y, 12, 31), text: s, precision: "year" } : null;
+  }
+  return null;
+}
+
+/** "Jun 30, 2028" — a date as a page says it. */
+function dayText(iso: string): string {
+  const at = Date.parse(`${iso}T00:00:00Z`);
+  return Number.isFinite(at)
+    ? new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : iso;
+}
+
+/** The words of the date a delivery is read at: on words that name several
+ *  dates, the latest one's own ("Q2 2028"). */
+export function lastDeliveryWords(d: DeliveryDate): string {
+  return d.dates ? (d.dates.filter((x) => x.iso === d.iso).at(-1)?.text ?? d.text) : d.text;
+}
+
+/** What a delivery is said as: the memorandum's words, with the day they
+ *  are read as where they name no day. A delivery in tranches is said by its
+ *  takedowns and the last of them — "phased: 3 takedowns, the last Q2 2028
+ *  (read as Jun 30, 2028)" — one in phases that close once by the last of
+ *  them ("the last of 3 phases, Q2 2028 (read as Jun 30, 2028)"), and words
+ *  that name several dates otherwise with the latest of them. */
+export function deliveryText(d: DeliveryDate): string {
+  if (d.dates && d.phased && d.closings) return `phased: ${d.dates.length} takedowns, the last ${latestDeliveryText(d)}`;
+  if (d.dates && d.phased) return `the last of ${d.dates.length} phases, ${latestDeliveryText(d)}`;
+  if (d.dates) return `${d.text} (read as ${dayText(d.iso)}, the latest date it names)`;
+  return d.precision === "day" ? dayText(d.iso) : `${d.text} (read as ${dayText(d.iso)})`;
+}
+
+/** The date a delivery is read at, said alone: "Q2 2028 (read as Jun 30,
+ *  2028)", "Jul 15, 2027". */
+export function latestDeliveryText(d: DeliveryDate): string {
+  return d.precision === "day" ? dayText(d.iso) : `${lastDeliveryWords(d)} (read as ${dayText(d.iso)})`;
+}
+
+/** A delivery in tranches' count of takedowns; null on one closing. */
+const takedowns = (d: DeliveryDate | null): number | null => (d?.phased && d.closings && d.dates ? d.dates.length : null);
+/** A delivery in phases that close once: its count of phases; null
+ *  otherwise. */
+const phasesOnly = (d: DeliveryDate | null): number | null => (d?.phased && !d.closings && d.dates ? d.dates.length : null);
+
+function monthsBetweenIso(fromIso: string, toIso: string): number {
+  const a = new Date(`${fromIso}T00:00:00Z`);
+  const b = new Date(`${toIso}T00:00:00Z`);
+  return (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth()) + (b.getUTCDate() >= a.getUTCDate() ? 0 : -1);
+}
+
+// ── The read ─────────────────────────────────────────────────────────────
+
+export interface ForwardRead {
+  /** a single tenant's build-to-suit, a rental community, or another */
+  kind: "bts" | "btr" | "forward";
+  /** the price paid at delivery — the building's (`buildingPriceOf`) */
+  price: number | null;
+  delivery: DeliveryDate | null;
+  /** the delivery row's words where no date is read from them */
+  deliveryWords: string | null;
+  outside: DeliveryDate | null;
+  /** months from delivery to the outside date; negative where the outside
+   *  date is earlier, which the memorandum's two dates cannot both mean */
+  slackMonths: number | null;
+  /** months from the day read to delivery; null once delivery has passed */
+  monthsToDelivery: number | null;
+  deliveryPassed: boolean;
+  rentCommencement: string | null;
+  deposit: { text: string; amount: number | null; sharePct: number | null } | null;
+  /** the yield at delivery, a percent: the stated delivery cap (or the
+   *  memorandum's plain cap on the price — a forward purchase has no
+   *  standing building, so its cap is struck at delivery), else the NOI at
+   *  delivery over the price */
+  deliveryYieldPct: number | null;
+  yieldFrom: "stated_cap" | "noi_over_price" | null;
+  /** the NOI the memorandum states at delivery: the stabilized figure, or on
+   *  a build-to-suit the lease's first year (its rent starts at delivery) */
+  deliveryNoi: { value: number; label: string } | null;
+  developer: string | null;
+  guaranty: string | null;
+  priceAdjustment: string | null;
+  headline: string;
+}
+
+/** "$48.0M", "$3.96M", "$950k": two places under $10M, where a model's NOI
+ *  and the memorandum's sit a few percent apart. */
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
+const pctText = (n: number) => `${n.toFixed(2)}%`;
+
+/**
+ * A forward purchase's read: the price at delivery, the clock to it and to
+ * the outside date, the deposit, and the yield at delivery — each only as
+ * stated. Null unless the deal is a purchase at completion
+ * (`isForwardPurchase`).
+ */
+export function readForwardPurchase(
+  ex: ExtractionResult | null | undefined,
+  asOf: Date = new Date(),
+  strategy: DealStrategy = inferStrategy(ex ?? null),
+): ForwardRead | null {
+  if (!ex || !isForwardPurchase(ex, strategy)) return null;
+  const metrics = (ex.metrics ?? []) as MetricRow[];
+  const words = forwardWordsOf(ex);
+  const priceRow = findPriceMetric(metrics, strategy.kind, screenYearOf(ex));
+  const stated = priceRow ? parsePrice(priceRow.value) : null;
+  const price = buildingPriceOf(ex, stated != null && stated > 0 ? stated : null);
+
+  const deliveryRow = rowOf(metrics, DELIVERY_ROW);
+  const delivery = deliveryRow ? readDeliveryDate(deliveryRow.value, asOf, words) : null;
+  const outsideRow = rowOf(metrics, OUTSIDE_ROW);
+  const outside = outsideRow ? readDeliveryDate(outsideRow.value, asOf) : null;
+  const todayIso = asOf.toISOString().slice(0, 10);
+  const deliveryPassed = delivery != null && delivery.iso < todayIso;
+  const slackMonths = delivery && outside ? monthsBetweenIso(delivery.iso, outside.iso) : null;
+  const monthsToDelivery = delivery && !deliveryPassed ? Math.max(0, monthsBetweenIso(todayIso, delivery.iso)) : null;
+
+  const depositRow = rowOf(metrics, DEPOSIT_ROW, NOT_BUYERS_DEPOSIT);
+  // A deposit that steps up ("$1,000,000 at signing, increasing to
+  // $4,800,000 at the start of construction") states more than one figure:
+  // no amount and no share is read off it, and the row is said as stated —
+  // its first figure had been said as the buyer's exposure, a 2.1% bar where
+  // the deposit at go-hard is 10% (the audit of 2026-10-05).
+  const depositText = depositRow?.value ?? "";
+  const dollars = [...depositText.matchAll(DOLLAR_FIGURE)].map((m) => parseUsd(m[0])).filter((n): n is number => n != null);
+  const pctFigures = depositText.match(/\d(?:[\d,]*\d)?(?:\.\d+)?\s*%/g)?.length ?? 0;
+  const statedPct = pctFigures === 1 ? parsePct(depositText) : null;
+  // A dollar figure and a share that are not one deposit ("$1,000,000 at
+  // signing; 10% at go-hard") are two.
+  const disagree =
+    dollars.length === 1 && statedPct != null && price != null && price > 0 && Math.abs((dollars[0] / price) * 100 - statedPct) > 0.5;
+  const stepped = STEPS_UP.test(depositText) || dollars.length > 1 || pctFigures > 1 || disagree;
+  const depositAmount = !stepped && dollars.length === 1 ? dollars[0] : null;
+  const depositPctStated = !stepped ? statedPct : null;
+  const deposit = depositRow
+    ? {
+        text: depositRow.value.trim(),
+        amount: depositAmount != null && depositAmount > 100 ? depositAmount : null,
+        sharePct:
+          depositPctStated != null && depositPctStated > 0 && depositPctStated < 50
+            ? depositPctStated
+            : depositAmount != null && depositAmount > 100 && price != null && price > 0
+              ? (depositAmount / price) * 100
+              : null,
+      }
+    : null;
+
+  const kind: ForwardRead["kind"] = BUILD_TO_SUIT_WORDS.test(words) ? "bts" : BTR_WORDS.test(words) ? "btr" : "forward";
+  const capRow = rowOf(metrics, DELIVERY_CAP_ROW) ?? findGoingInCap(metrics);
+  const capRead = capRow ? parsePct(capRow.value) : null;
+  const capStated = capRead != null && capRead > 0.5 && capRead < 20 ? capRead : null;
+  // The plan's own rule (lib/deal-strategy), so the plan's yield on cost and
+  // this read stand on one NOI.
+  const atDelivery = forwardDeliveryNoi(metrics, kind === "bts");
+  const fromNoi = atDelivery && price != null && price > 0 ? (atDelivery.value / price) * 100 : null;
+  const deliveryYieldPct = capStated ?? (fromNoi != null && fromNoi > 0.5 && fromNoi < 20 ? fromNoi : null);
+  const yieldFrom: ForwardRead["yieldFrom"] = capStated != null ? "stated_cap" : deliveryYieldPct != null ? "noi_over_price" : null;
+  const asStated = (re: RegExp) => rowOf(metrics, re)?.value.trim() || null;
+
+  const parts: string[] = [];
+  const what = kind === "bts" ? "A build-to-suit bought at delivery" : "A forward purchase";
+  const at = delivery ? `at delivery, ${deliveryText(delivery)}` : deliveryRow ? `at delivery (${deliveryRow.value.trim()})` : "at delivery";
+  parts.push(
+    `${what}: the buyer pays ${price != null ? money(price) : "the price"} ${at}, and the developer funds the works — the price is the buyer's whole cost, never the price plus the developer's budget.`,
+  );
+  // A phased delivery: the price is paid in tranches, one a takedown, and
+  // the takedowns are said as stated.
+  const phases = takedowns(delivery);
+  if (phases != null && deliveryRow) {
+    parts.push(`The takedowns as stated: ${deliveryRow.value.trim().replace(/[.;]+$/, "")} — the price is paid in tranches as each delivers.`);
+  }
+  // Phases that close once: the phases said as stated, the price paid at
+  // the one closing (audit C3a).
+  const phaseCount = phasesOnly(delivery);
+  if (phaseCount != null && deliveryRow) {
+    parts.push(`The phases as stated: ${deliveryRow.value.trim().replace(/[.;]+$/, "")} — the memorandum names no closing a phase, so the price is read as paid at one closing.`);
+  }
+  // The clock's end: the delivery, or on a phased delivery its last takedown
+  // or its last phase.
+  const end = phases != null ? "the last takedown" : phaseCount != null ? "the last phase" : "delivery";
+  if (deliveryPassed && delivery) {
+    parts.push(
+      phases != null || phaseCount != null
+        ? `The last stated ${phases != null ? "takedown" : "phase"}, ${latestDeliveryText(delivery)}, has passed; whether each phase was delivered is the memorandum's to say.`
+        : `The stated delivery, ${deliveryText(delivery)}, has passed; whether the building was delivered is the memorandum's to say.`,
+    );
+  }
+  if (deliveryYieldPct != null) {
+    parts.push(
+      yieldFrom === "stated_cap"
+        ? `It is struck at ${withArticle(`${pctText(deliveryYieldPct)} cap`)} at delivery, as stated.`
+        : `The NOI the memorandum states at delivery, ${money(atDelivery!.value)}, is ${pctText(deliveryYieldPct)} of the price.`,
+    );
+  }
+  if (outside) {
+    parts.push(
+      slackMonths != null && slackMonths < 0
+        ? `The outside date, ${deliveryText(outside)}, is before the ${phases != null ? "last stated takedown" : phaseCount != null ? "last stated phase" : "stated delivery"}: the two cannot both hold, and which governs is the contract's.`
+        : slackMonths != null
+          ? `The outside date is ${deliveryText(outside)}, ${slackMonths} ${slackMonths === 1 ? "month" : "months"} after ${end}.`
+          : `The outside date is ${deliveryText(outside)}.`,
+    );
+  }
+  if (deposit) {
+    parts.push(
+      `The deposit as stated: ${deposit.text}${deposit.sharePct != null && depositPctStated == null ? ` (${Math.round(deposit.sharePct * 10) / 10}% of the price)` : ""} — the buyer's exposure before delivery.`,
+    );
+  }
+  const rentCommencement = asStated(RENT_COMMENCEMENT_ROW);
+  if (rentCommencement) parts.push(`Rent commences as stated: ${rentCommencement.replace(/\.$/, "")}.`);
+
+  return {
+    kind,
+    price,
+    delivery,
+    deliveryWords: deliveryRow && !delivery ? deliveryRow.value.trim() : null,
+    outside,
+    slackMonths,
+    monthsToDelivery,
+    deliveryPassed,
+    rentCommencement,
+    deposit,
+    deliveryYieldPct,
+    yieldFrom,
+    deliveryNoi: atDelivery ? { value: atDelivery.value, label: atDelivery.label } : null,
+    developer: asStated(DEVELOPER_ROW),
+    guaranty: asStated(GUARANTY_ROW),
+    priceAdjustment: asStated(PRICE_ADJUSTMENT_ROW),
+    headline: parts.join(" "),
+  };
+}
+
+// ── What each surface says ───────────────────────────────────────────────
+
+/** The pipeline row's tag: "Forward, delivers Q2 2028", "Forward, 5.50% at
+ *  delivery". Null where the deal is no forward purchase. */
+export function forwardTag(r: ForwardRead | null): string | null {
+  if (!r) return null;
+  const word = r.kind === "bts" ? "Build-to-suit" : "Forward";
+  if (r.deliveryYieldPct != null) return `${word}, ${pctText(r.deliveryYieldPct)} at delivery`;
+  const phases = takedowns(r.delivery);
+  const phaseCount = phasesOnly(r.delivery);
+  if (r.delivery && !r.deliveryPassed) {
+    return phases != null
+      ? `${word}, ${phases} takedowns to ${lastDeliveryWords(r.delivery)}`
+      : phaseCount != null
+        ? `${word}, ${phaseCount} phases to ${lastDeliveryWords(r.delivery)}`
+        : `${word}, delivers ${lastDeliveryWords(r.delivery)}`;
+  }
+  return `${word} purchase`;
+}
+
+/** The read in one line, for the memo, the workbook's cover and the shared
+ *  screen. */
+export function forwardShortLine(r: ForwardRead): string {
+  const phases = takedowns(r.delivery);
+  const phaseCount = phasesOnly(r.delivery);
+  const when =
+    r.delivery && phases != null
+      ? ` in ${phases} takedowns as its phases deliver, the last ${lastDeliveryWords(r.delivery)}`
+      : r.delivery && phaseCount != null
+        ? ` at delivery of the last of ${phaseCount} phases (${lastDeliveryWords(r.delivery)})`
+        : ` at delivery${r.delivery ? ` (${r.delivery.text})` : ""}`;
+  const bits = [`${r.price != null ? money(r.price) : "the price"} paid${when}, the works the developer's`];
+  if (r.deliveryYieldPct != null) bits.push(`${pctText(r.deliveryYieldPct)} at delivery${r.yieldFrom === "noi_over_price" ? " on the stated NOI" : ""}`);
+  if (r.outside) bits.push(`outside date ${deliveryText(r.outside)}`);
+  if (r.deposit) bits.push(`deposit ${r.deposit.amount != null ? money(r.deposit.amount) : r.deposit.text}`);
+  return `${r.kind === "bts" ? "Build-to-suit" : "Forward purchase"}: ${bits.join("; ")}`;
+}
+
+/** The deal context's line, for every step that reads the OM after the
+ *  extraction. */
+export function forwardContextLine(r: ForwardRead): string {
+  const facts = [
+    r.developer ? `Developer as stated: ${r.developer.replace(/\.$/, "")}.` : "",
+    r.guaranty ? `Completion guaranty as stated: ${r.guaranty.replace(/\.$/, "")}.` : "",
+    r.priceAdjustment ? `Price adjustment as stated: ${r.priceAdjustment.replace(/\.$/, "")}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `Forward purchase: ${r.headline}${facts ? ` ${facts}` : ""}`;
+}
+
+/**
+ * The model's read (`meta.forward`): it runs the price as paid at closing,
+ * with income from its first year — on a forward purchase that day is
+ * delivery — and its year-one NOI beside the memorandum's at delivery. The
+ * model is unchanged; anchoring it on the delivery NOI is the owner's call.
+ */
+export function forwardModelLine(
+  r: ForwardRead | null,
+  model: { noi1: number | null; noiAssumed: boolean; price: number | null } | null,
+): string | null {
+  if (!r) return null;
+  const phaseCount = phasesOnly(r.delivery);
+  const when = r.delivery
+    ? phaseCount != null
+      ? `delivery of the last of ${phaseCount} phases, ${lastDeliveryWords(r.delivery)}`
+      : `delivery, ${r.delivery.text}`
+    : "delivery";
+  // Whenever the deposit row says it is paid (the audit of 2026-10-05: "paid
+  // at signing" was said of every deposit).
+  const deposit = r.deposit ? ", and the deposit sits outside its cash flows" : "";
+  // A phased purchase pays its price in tranches as its phases deliver; the
+  // model runs it as one closing (research pass 37).
+  const phases = takedowns(r.delivery);
+  let noi = "";
+  if (model?.noi1 != null && r.deliveryNoi != null) {
+    const stated = r.deliveryNoi.value;
+    const gap = model.noi1 - stated;
+    const rel = Math.abs(gap) < 0.005 * stated ? "the same as" : gap > 0 ? "above" : "below";
+    const assumed =
+      model.noiAssumed && model.price != null && model.price > 0 ? `an assumed ${pctText((model.noi1 / model.price) * 100)} of the price, ` : "";
+    noi = ` Its year-one NOI is ${assumed}${money(model.noi1)}, ${rel} the ${money(stated)} the memorandum states at delivery.`;
+  }
+  if (r.delivery && phases != null) {
+    return `The memorandum pays the price in tranches as its phases deliver — ${phases} takedowns, the last ${lastDeliveryWords(r.delivery)} — and the model runs it as one closing, with income from its first year.${
+      r.deposit ? " The deposit sits outside its cash flows." : ""
+    }${noi}`;
+  }
+  return `The model runs the price as paid at closing with income from its first year: on a forward purchase that day is ${when}${deposit}.${noi}`;
+}
+
+const TRAPS =
+  "FORWARD-PURCHASE TRAPS, checked by name where the OM gives the inputs: (a) COMPLETION — what the contract calls complete (substantial or final completion, the certificate of occupancy, the tenant's acceptance) and who certifies it; (b) THE OUTSIDE DATE AND THE DEPOSIT — what happens to the deposit if delivery runs past the outside date, and how the deposit is secured; (c) THE PRICE MECHANISM — a fixed price, or a cap on the rent at completion: who bears a change in rent, cap rates or interest rates between signing and closing; (d) THE LEASE AT DELIVERY — on a build-to-suit, rent commencement, free rent and the punch list; on a community, the lease-up the buyer inherits and any rent guarantee or master lease, as stated; (e) THE DEVELOPER — its balance sheet, its lender's lien released at closing, and the warranties assigned to the buyer; (f) THE BUYER'S FINANCING — struck at the rates of the closing day, not today's.";
+
+/** The purchase's traps, for the challenger — in place of the construction
+ *  paragraph a development gets: the facts first, then the traps by name. */
+export function forwardNote(r: ForwardRead): string {
+  return `${forwardContextLine(r)} ${TRAPS}`;
+}

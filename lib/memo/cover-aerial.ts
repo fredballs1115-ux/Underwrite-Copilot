@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { IMAGE_CREDIT, fetchOneImage, type BestImage } from "@/lib/imagery";
+import { withOsmLocation } from "@/lib/basemaps";
 import type { MemoCover } from "./memo-document";
 
 /** The cover frame's pixels: twice the 104 × 58 pt box it prints in, so the
@@ -84,7 +85,9 @@ export async function coverFrom(
     if (bytes.length === 0 || !intactImage(bytes, type)) return null;
     return {
       dataUri: `data:${type.toLowerCase()};base64,${bytes.toString("base64")}`,
-      credit: credit ?? IMAGE_CREDIT[best.source],
+      // An overhead framed on a point Photon placed names OpenStreetMap too
+      // (the batch-2 audit, LOW-8).
+      credit: credit ?? withOsmLocation(IMAGE_CREDIT[best.source], best.placedBy === "photon"),
     };
   } catch {
     return null;

@@ -39,6 +39,9 @@
 // property loan; it is said, as stated and as what it is, wherever the
 // terms are listed (`notePurchaseFinancing`; research pass 23 found the
 // terms dropped silently).
+//
+// A note at or over the price is said, never priced (research pass 38): it
+// leaves no equity cheque, so neither position's return solves.
 
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
@@ -48,8 +51,12 @@ import {
   assumableApplies,
   assumableMoney,
   modelForAssumption,
+  overPriceClause,
+  overPriceOf,
+  overPriceWords,
   type AssumableView,
   type ModelForAssumption,
+  type OverPrice,
 } from "@/lib/assumable-debt";
 import { readAssumption, type AssumptionRead } from "@/lib/tools/loan-assumption";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -150,10 +157,13 @@ export interface SellerFinancingRead {
   underMarketBps: number | null;
   /** the whole years the note runs at its rate: its term, rounded down */
   noteYears: number | null;
-  /** the two positions, run whole — null where a term is missing or the
-   *  note is a second */
+  /** the two positions, run whole — null where a term is missing, the note
+   *  is a second, or its amount is at or over the price (`overPrice`) */
   read: AssumptionRead | null;
   missing: string[];
+  /** the note's amount at or over the price it is set against — said, and
+   *  nothing priced on it; null where it is under (research pass 38) */
+  overPrice: OverPrice | null;
 }
 
 /**
@@ -168,8 +178,11 @@ export function readSellerFinancing(ex: Extraction, inputs: UnderwriteInputs | n
   // A share of the price is struck on the model's price where there is a
   // model, and on the stated ask where there is not (the context, the
   // challenger and the documents' line).
-  const terms = readSellerFinancingTerms(ex as MetricRows, model?.price ?? askingPriceOf(ex as never));
+  const ask = askingPriceOf(ex as never);
+  const terms = readSellerFinancingTerms(ex as MetricRows, model?.price ?? ask);
   if (!terms) return null;
+  // A note at or over the price leaves no equity cheque: said, never priced.
+  const overPrice = overPriceOf(terms.amount, ask, model?.price ?? null);
   const underMarketBps = model && terms.ratePct != null ? Math.round((model.marketRatePct - terms.ratePct) * 100) : null;
   const noteYears = terms.termYears != null ? Math.floor(terms.termYears) : null;
   const amort = terms.interestOnly === true ? (model?.newLoanAmortYears ?? 30) : terms.amortYears;
@@ -181,7 +194,7 @@ export function readSellerFinancing(ex: Extraction, inputs: UnderwriteInputs | n
   if (amort == null) missing.push("its payment schedule");
 
   let read: AssumptionRead | null = null;
-  if (!terms.second && model && terms.amount != null && terms.ratePct != null && noteYears != null && noteYears >= 1 && amort != null) {
+  if (!terms.second && !overPrice && model && terms.amount != null && terms.ratePct != null && noteYears != null && noteYears >= 1 && amort != null) {
     const r = readAssumption({
       price: model.price,
       noi: model.noi,
@@ -206,7 +219,7 @@ export function readSellerFinancing(ex: Extraction, inputs: UnderwriteInputs | n
     });
     read = r.assume && r.newLoan ? r : null;
   }
-  return { terms, model, underMarketBps, noteYears, read, missing };
+  return { terms, model, underMarketBps, noteYears, read, missing, overPrice };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────
@@ -232,6 +245,9 @@ export function sellerFinancingTermsLine(t: SellerFinancingTerms): string {
 /** The deal context's line: the note as stated, and what its value turns
  *  on — never a rate alone. */
 export function sellerFinancingContextLine(s: SellerFinancingRead): string {
+  if (s.overPrice?.stated) {
+    return `The memorandum says the seller will carry financing: ${sellerFinancingTermsLine(s.terms)}; the note's ${assumableMoney(s.overPrice.amount)} is ${overPriceClause(s.overPrice, "note's amount")}. A note at or over the price leaves no equity cheque, so it is priced against nothing until the amount is checked.`;
+  }
   return `The memorandum says the seller will carry financing: ${sellerFinancingTermsLine(s.terms)}. Its value to a buyer is the rate below today's over the years of it the hold uses, against the cheque its size sets — and a seller who carries paper below the market has usually priced the difference into the ask.`;
 }
 
@@ -241,10 +257,16 @@ export function sellerFinancingNote(s: SellerFinancingRead): string {
 }
 
 /** The card's one sentence: what is missing, or that it is a second, or
- *  the answer the two positions give. */
-export function sellerFinancingSentence(s: SellerFinancingRead): string {
+ *  that its amount is at or over the price (said, and priced against
+ *  nothing), or the answer the two positions give — or, where the model's
+ *  reads are left out (`withheld`, lib/underwrite/report-grid
+ *  `modelReadsWithheld`), why nothing is priced. */
+export function sellerFinancingSentence(s: SellerFinancingRead, withheld: string | null = null): string {
   if (s.terms.second) {
     return "It sits behind new senior debt: a second is priced with the first, not against it, so the page does not run it against the model's loan — and most senior lenders forbid seller paper behind them.";
+  }
+  if (s.overPrice) {
+    return `${overPriceWords(s.overPrice, "note's amount")}. A note at or over the price leaves no equity cheque, so nothing is priced against a new loan.`;
   }
   if (s.missing.length) {
     const list = s.missing.length === 1 ? s.missing[0] : `${s.missing.slice(0, -1).join(", ")} or ${s.missing[s.missing.length - 1]}`;
@@ -254,6 +276,7 @@ export function sellerFinancingSentence(s: SellerFinancingRead): string {
     return "Its term is under a year — a note that short is a bridge to a refinance at today's rate, so there is nothing to price against a new loan.";
   }
   const r = s.read;
+  if (withheld) return `It is not priced against a new loan: ${withheld}`;
   if (!r || !s.model) return "The model this deal runs on is not ready, so the note cannot be priced against its new loan yet.";
   const hold = `${s.model.holdYears}-year hold`;
   const balloon =
@@ -278,19 +301,25 @@ export function sellerFinancingSentence(s: SellerFinancingRead): string {
       cheque ? `, and takes ${cheque}` : ""
     }.${coverage}${balloon}`;
   }
-  return `The seller's note returns ${oneDp(r.irrGapPts ?? 0)} points more than the model's new loan.${coverage}${balloon}`;
+  // A gap that did not solve is no gap, never "0 points" (research pass 38).
+  if (r.irrGapPts == null) {
+    return `No return gap is stated: the levered return of the seller's note, or of the model's new loan, does not solve on the model's figures.${coverage}${balloon}`;
+  }
+  return `The seller's note returns ${oneDp(r.irrGapPts)} points more than the model's new loan.${coverage}${balloon}`;
 }
 
 /** The card's figures as plain data — the assumption card's shape, marked
- *  as the seller's note so the card says so. */
-export function sellerFinancingView(s: SellerFinancingRead, rateNote: string | null, seeded: boolean): AssumableView {
+ *  as the seller's note so the card says so. `withheld`: why the model's
+ *  reads are left out, where they are (the read is then taken with no
+ *  model, so only the terms print). */
+export function sellerFinancingView(s: SellerFinancingRead, rateNote: string | null, seeded: boolean, withheld: string | null = null): AssumableView {
   const r = s.read;
   const m = s.model;
   return {
     kind: "seller",
     termsLine: sellerFinancingTermsLine(s.terms),
     page: s.terms.page,
-    sentence: sellerFinancingSentence(s),
+    sentence: sellerFinancingSentence(s, withheld),
     couponPct: s.terms.ratePct,
     marketPct: m ? m.marketRatePct : null,
     rateLine: m
@@ -329,9 +358,13 @@ export function sellerFinancingTag(ex: Extraction): string | null {
 
 /** The documents' one line — the memo, the shared screen, the workbook's
  *  cover: the note as stated. The pricing needs the model, which the deal
- *  page and the report carry; a line never claims more than the terms. */
-export function sellerFinancingLine(t: SellerFinancingTerms): string {
-  return `The seller offers to carry financing: ${sellerFinancingTermsLine(t)}`;
+ *  page and the report carry; a line never claims more than the terms. A
+ *  note at or over the memorandum's own ask (`overPrice`, the read's) is
+ *  said here too — never against a model's price, which may be its
+ *  placeholder. */
+export function sellerFinancingLine(t: SellerFinancingTerms, overPrice: OverPrice | null = null): string {
+  const over = overPrice?.stated ? `; the note's ${assumableMoney(overPrice.amount)} is ${overPriceClause(overPrice, "note's amount")}` : "";
+  return `The seller offers to carry financing: ${sellerFinancingTermsLine(t)}${over}`;
 }
 
 // ── On a note ───────────────────────────────────────────────────────────
@@ -367,7 +400,7 @@ export function notePurchaseFinancingContextLine(t: SellerFinancingTerms): strin
  *  offered. The memo's header and the shared screen read this one function. */
 export function sellerFinancingDocLine(ex: Extraction): string {
   const s = readSellerFinancing(ex, null);
-  if (s) return sellerFinancingLine(s.terms);
+  if (s) return sellerFinancingLine(s.terms, s.overPrice);
   const t = notePurchaseFinancing(ex);
   return t ? notePurchaseFinancingLine(t) : "";
 }

@@ -18,12 +18,21 @@ const base: LoiParams = {
   firmName: null,
 };
 
-async function letterText(p: LoiParams): Promise<string> {
+async function letterXml(p: LoiParams): Promise<string> {
   const buf = await buildLoiDocx(p);
   const zip = await JSZip.loadAsync(buf);
-  const xml = await zip.file("word/document.xml")!.async("string");
-  return xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  return zip.file("word/document.xml")!.async("string");
 }
+
+async function letterText(p: LoiParams): Promise<string> {
+  return (await letterXml(p)).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+}
+
+/** The highlighted runs' text, in order. */
+const highlighted = (xml: string) =>
+  [...xml.matchAll(/<w:r>((?:(?!<\/w:r>).)*?<w:highlight w:val="yellow"\/>(?:(?!<\/w:r>).)*?)<\/w:r>/g)].map((m) =>
+    m[1].replace(/<[^>]+>/g, ""),
+  );
 
 describe("LOI draft — the deal's kind shapes the paper", () => {
   it("a stabilized asset gets the six standard clauses and no entitlements contingency", async () => {
@@ -140,5 +149,52 @@ describe("LOI draft — a short sale closes on its lender's approval", () => {
     expect(both).toContain("[Review before sending: the memorandum says this is a short sale its lender must approve.]");
     expect(both).toContain("7. Closing");
     expect(await letterText(base)).not.toContain("Lender Approval");
+  });
+});
+
+// Research pass 35 (F15): a hotel's letter said nothing about its flag, the
+// closing line meant to come out before sending was the one such line left
+// unmarked, and neither party's block had a Name or a Title line.
+describe("LOI draft — a flagged hotel, the signature blocks and the closing line", () => {
+  const NOTE =
+    "[Review before sending: the memorandum says the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a $4.2M PIP (p. 5); the PSA should condition closing on the franchisor approving the transfer and the PIP as issued.]";
+  const hotel = { stated: "the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a $4.2M PIP", page: "p. 5" };
+
+  it("notes under the Closing clause what the memorandum says the hotel's sale carries, and drafts no clause for it", async () => {
+    const xml = await letterXml({ ...base, hotel });
+    const t = (await letterText({ ...base, hotel })).trim();
+    expect(t).toContain(NOTE);
+    // Under the Closing clause, before the next; six clauses, as before.
+    expect(t.indexOf(NOTE)).toBeGreaterThan(t.indexOf("5. Closing"));
+    expect(t.indexOf(NOTE)).toBeLessThan(t.indexOf("6. Purchase and Sale Agreement"));
+    expect(t).not.toContain("7.");
+    // The note is highlighted; the Closing clause's own words are not.
+    const marks = highlighted(xml);
+    expect(marks).toContain(NOTE);
+    expect(marks.some((m) => m.startsWith("Closing shall occur"))).toBe(false);
+    // With no page, none is cited.
+    expect(await letterText({ ...base, hotel: { ...hotel, page: "" } })).toContain(
+      "the memorandum says the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a $4.2M PIP; the PSA should condition",
+    );
+    // Any other deal's letter says nothing of a franchisor.
+    expect(await letterText(base)).not.toContain("franchisor");
+  });
+
+  it("gives each party a By line with its date, then the signer's Name and Title", async () => {
+    const t = await letterText(base);
+    const buyer = t.slice(t.indexOf("Sincerely,"), t.indexOf("Acknowledged and agreed"));
+    const seller = t.slice(t.indexOf("Acknowledged and agreed"));
+    for (const block of [buyer, seller]) {
+      expect(block).toMatch(/By: _+ Date: _+ Name: _+ Title: _+/);
+    }
+    expect(buyer).toContain("Cascade Capital Partners LLC By:");
+    expect(seller).toMatch(/Seller: _+ By:/);
+  });
+
+  it("marks the closing line as every line meant to come out before sending is: bracketed and highlighted", async () => {
+    const xml = await letterXml(base);
+    const line = "[Draft prepared with Underwrite Copilot for negotiation purposes — have counsel review before sending or signing.]";
+    expect(highlighted(xml)).toEqual([line]);
+    expect((await letterText(base)).trim().endsWith(line)).toBe(true);
   });
 });

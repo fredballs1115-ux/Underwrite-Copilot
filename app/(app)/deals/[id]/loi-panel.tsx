@@ -74,7 +74,7 @@ export function LoiPanel({
           : null;
 
   const field =
-    "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30";
+    "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30";
 
   const header = (
     <div className="flex flex-wrap items-center gap-2">

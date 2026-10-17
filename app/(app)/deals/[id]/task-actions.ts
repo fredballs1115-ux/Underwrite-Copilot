@@ -8,7 +8,8 @@ import {
   normalizeTaskTitle,
   unimportedVerdictSteps,
 } from "@/lib/deal-tasks";
-import type { VerdictResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
+import { ddChecklist, unaddedChecklist } from "@/lib/dd-checklist";
 
 // All writes go through the USER client — RLS from 0022 (can_access_deal in
 // every policy) is the security boundary; these actions only shape the data.
@@ -114,6 +115,57 @@ export async function deleteDealTask(formData: FormData) {
     .eq("id", taskId)
     .eq("deal_id", dealId);
   if (error) redirect(`/deals/${dealId}?error=taskdelete`);
+
+  revalidatePath(`/deals/${dealId}`);
+}
+
+/** One click: the due-diligence checklist for the deal's class and what its
+ *  price buys (lib/dd-checklist, research pass 24 B16) becomes open tasks,
+ *  undated — the contract's dates are the team's to set. An item already a
+ *  task is skipped, so a second click adds nothing twice. */
+export async function importDdChecklist(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) redirect("/deals");
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal, error: readErr } = await supabase
+    .from("deals")
+    .select("id, asset_class, extraction")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (readErr) redirect(`/deals/${dealId}?error=task`);
+  if (!deal) redirect("/deals");
+
+  // As for the verdict's steps: with the dedupe base missing, importing
+  // would duplicate every item.
+  const { data: existing, error: existErr } = await supabase
+    .from("deal_tasks")
+    .select("title")
+    .eq("deal_id", dealId);
+  if (existErr) redirect(`/deals/${dealId}?error=task`);
+
+  const fresh = unaddedChecklist(
+    ddChecklist(deal.asset_class as string | null, (deal.extraction as ExtractionResult | null) ?? null),
+    (existing ?? []) as { title: string }[],
+  );
+  if (fresh.length === 0) {
+    revalidatePath(`/deals/${dealId}`);
+    return;
+  }
+  const { error } = await supabase.from("deal_tasks").insert(
+    fresh.map((title) => ({
+      deal_id: dealId,
+      created_by: user.id,
+      title,
+      source: "manual" as const,
+    })),
+  );
+  if (error) redirect(`/deals/${dealId}?error=task`);
 
   revalidatePath(`/deals/${dealId}`);
 }

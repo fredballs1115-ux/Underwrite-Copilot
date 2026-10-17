@@ -1,7 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { escapeHtml, screenStoppedEmail, analysisReadyEmail } from "@/lib/email-template";
+import { emailFigures } from "@/lib/email-figures";
 import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE, needsOperator } from "@/lib/anthropic/operator-failures";
+import { documentFailure } from "@/lib/anthropic/document-failures";
 import { operatorEmails } from "@/lib/operator";
 import { screenedOn, verdictBehind } from "@/lib/screen-run";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
@@ -202,11 +204,29 @@ export async function notifyAnalysisReady(
       },
       to.userId,
     );
+    // The pipeline card's figure tiles, a listing alert's (lib/email-figures),
+    // read on the UTC day, as the worker's other dates are. Best-effort: a
+    // read that throws leaves the email as it was.
+    let figures: ReturnType<typeof emailFigures> = [];
+    try {
+      const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+      figures = emailFigures({
+        name: dealName,
+        assetClass: (deal.asset_class as string | null) ?? null,
+        extraction,
+        firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
+        address: addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null,
+        today: new Date().toISOString().slice(0, 10),
+      });
+    } catch {
+      // no figures: the call and the box still go
+    }
     const { subject, html, text } = analysisReadyEmail({
       dealName,
       verdictLabel: v.label,
       verdictColor: v.color,
       buyBoxLabel,
+      figures,
       reason: verdict.reason ?? "",
       dealUrl: `${appUrl()}/deals/${dealId}`,
       settingsUrl: `${appUrl()}/account`,
@@ -270,6 +290,14 @@ export async function notifyAnalysisFailed(
       dealUrl: `${appUrl()}/deals/${dealId}`,
       settingsUrl: `${appUrl()}/account`,
       previousCall: previous ? { ...previous, on: screenedOn(stored?.generatedAt) } : null,
+      // A failure in the document: the deal page offers Replace OM, not a
+      // retry that reads the same file the same way, and so does the email.
+      replaceOm: documentFailure(message) === "replace",
+      // The building across the top, as the screen-complete email draws it,
+      // from the same signed route. The memorandum is not read for a cover
+      // here: the screen just stopped, often on that very file, and the
+      // route serves the deal's cover where no photograph is stored.
+      picture: stoppedEmailPicture(dealId, to.userId),
     });
     // The occasion is the run: its job row's created_at, restamped by every
     // claim (lib/jobs), so a run's one failure is one email.
@@ -354,6 +382,13 @@ async function latestJob(
   } catch {
     return null;
   }
+}
+
+/** The stopped-screen email's banner: the signed link alone, never a read
+ *  of the memorandum (the run may have stopped on it), for `recipient`. */
+export function stoppedEmailPicture(dealId: string, recipient: string): { url: string } | null {
+  const url = emailPictureUrl(appUrl(), dealId, "banner", recipient);
+  return url ? { url } : null;
 }
 
 /** How long the email waits for a turn to read the memorandum's cover. */

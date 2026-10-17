@@ -7,6 +7,7 @@ import {
   BASEMAPS,
   BASEMAP_ORDER,
   DEFAULT_BASEMAP,
+  OSM_ATTRIBUTION,
   type BasemapId,
 } from "@/lib/basemaps";
 import type { LocationPrecision } from "@/lib/deal-location";
@@ -24,6 +25,8 @@ interface DealLocation {
   lat: number;
   lng: number;
   precision: LocationPrecision;
+  /** the geocoder that placed it (lib/deal-location) */
+  source?: "census" | "photon";
 }
 
 /** A street address frames the building; a block-level placement the road it
@@ -107,6 +110,10 @@ export function PropertyMap({
       }).addTo(map);
 
       L.control.scale({ imperial: true, metric: false }).addTo(map);
+      // A pin Photon placed is OpenStreetMap's data, credited over every
+      // basemap (the batch-2 audit, LOW-8); the street tiles carry the same
+      // string, which the control prints once.
+      if (loc.source === "photon") map.attributionControl?.addAttribution(OSM_ATTRIBUTION);
 
       L.marker([loc.lat, loc.lng], {
         icon: L.divIcon({

@@ -15,6 +15,7 @@ import { isDataMetro, isStateMarket } from "@/lib/market-match";
 import { ownMarketBuilding } from "@/lib/tracker-read";
 import { placedByClause, type CountyPlacedBy } from "@/lib/placed-by";
 import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
+import { regionClause } from "@/lib/region-line";
 
 export type { CountyPlacedBy } from "@/lib/placed-by";
 
@@ -62,7 +63,9 @@ export interface LiveMarketInput {
    *  office or industrial reads no neighbour's rent index (`rentIndexFor`) */
   deckWords?: string | null;
   /** a plan deal (development, conversion) also reads the construction
-   *  lenders' standards */
+   *  lenders' standards — never a forward purchase, whose developer funds
+   *  the works (lib/forward-purchase `readsConstructionLending`, which the
+   *  pipeline and the deal page both ask) */
   plan?: boolean;
   /** the deal builds something (lib/deal-strategy `buildsSomething`: a
    *  development, a conversion, or a value-add with a stated budget), so it
@@ -341,6 +344,15 @@ export interface LiveMarketBrief {
   placedBy?: CountyPlacedBy | null;
 }
 
+/** How a Census region's rental vacancy line opens: "Rental vacancy, South
+ *  Census region: 9.5% …" — read back by lib/region-line's `regionOfLine`. */
+const REGION_LINE_LEAD = "Rental vacancy";
+
+// A region's line said apart from the metro's: the readers live in
+// lib/region-line, import-free, so the deal page's client fold reads them
+// too (audit C4, L7).
+export { regionClause, regionOfLine } from "@/lib/region-line";
+
 const signed = (v: number, dp = 1): string => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(dp)}`;
 const whole = (n: number): string => Math.round(n).toLocaleString("en-US");
 
@@ -449,8 +461,11 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
         figures: fig("rental_vacancy_msa", "Rental vacancy, metro area", "pts"),
       };
     case "rental_vacancy":
+      // The Census region's, which the survey publishes at no finer grain
+      // beside the metro area's own: the line names its region, and the
+      // block's header says the line apart (`regionOfLine`).
       return {
-        line: `Rental vacancy${where}: ${r.value.toFixed(1)}% (${when}; ${via})`,
+        line: `${REGION_LINE_LEAD}${where}: ${r.value.toFixed(1)}% (${when}; ${via})`,
         figures: fig("rental_vacancy", "Rental vacancy, Census region", "pts"),
       };
     default:
@@ -707,13 +722,19 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   said.push(...debtMarketLines(input.national, input.assetClass, input.plan ?? false));
   if (said.length === 0) return null;
   const national = said.length - local;
+  // No figure of the market's own was current (each stale, or none reads
+  // for this kind of building): every line is the nation's, and the header
+  // says that rather than "each is the state's" (the pre-merge audit).
+  const noneOwn = local === 0;
   const nationalNote =
-    national > 0
+    national > 0 && !noneOwn
       ? ` ${national === 1 ? "The last line is the nation's figure, said as such" : `The last ${national} lines are the nation's figures, each said as such`}, and never this ${grainOf(input.metro.id) === "state" ? "state's" : "market's"}.`
       : "";
   const lines = said.map((s) => s.line);
   const figures = said.flatMap((s) => s.figures);
   const readOn = input.now.toISOString().slice(0, 10);
+  // A Census region's line among the market's own is said apart from them.
+  const region = regionClause(lines.slice(0, local));
   // The grain is said first: a deal outside the metros the site tracks
   // reads its STATE's figures, and a state figure passed off as a metro's
   // flatters or damns a market the deal is not in.
@@ -722,13 +743,21 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   // The publishers the block can carry: the Census Bureau's survey, Zillow,
   // Realtor.com and the BLS's own CPI rent series speak to rental housing
   // alone, so a commercial deal's block — its every line read through FRED
-  // — never names them.
-  const sources = !housing
-    ? "FRED"
-    : grain === "state"
-      ? "FRED and the Census Bureau"
-      : "FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com";
+  // — never names them, and nor does a block of the nation's lines alone.
+  const sources =
+    !housing || noneOwn
+      ? "FRED"
+      : grain === "state"
+        ? "FRED and the Census Bureau"
+        : "FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com";
   const whose = grain === "state" ? "the state's" : "the metro area's";
+  // Where nothing of the market's own was current, one sentence in place of
+  // "each is the state's": whose figures none of the lines are, and whose
+  // every line is.
+  const noneOwnSentence = (never: string) =>
+    ` No figure of ${whose} own was current; ${
+      national === 1 ? "the one line below is the nation's figure, dated and said as such" : `the ${national} lines below are the nation's figures, each dated and said as such`
+    }, and never ${never}.`;
   // One of a portfolio's OTHER markets (#413): its own block, saying which
   // of the portfolio's properties it speaks for — never the portfolio's,
   // and never those properties' own. The national figures ride in the
@@ -737,8 +766,16 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
     const sit = `${pf.here} of the portfolio's ${pf.properties} properties ${pf.here === 1 ? "sits" : "sit"}`;
     const otherHeader =
       grain === "state"
-        ? `Published figures for the state of ${input.metro.name}, where ${sit} outside the metros the site tracks, read on ${readOn} from ${sources}. Each is dated, and each is the state's — not a metro's, not those properties' own and never the portfolio's.`
-        : `Published figures for the ${input.metro.name} ${isDataMetro(input.metro.id) ? "metro area — a market the site reads but does not brief —" : "market,"} where ${sit}, read on ${readOn} from ${sources}. Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's.`;
+        ? `Published figures for the state of ${input.metro.name}, where ${sit} outside the metros the site tracks, read on ${readOn} from ${sources}.${
+            noneOwn
+              ? noneOwnSentence("those properties' own or the portfolio's")
+              : ` Each is dated, and each is the state's — not a metro's, not those properties' own and never the portfolio's${region}.`
+          }`
+        : `Published figures for the ${input.metro.name} ${isDataMetro(input.metro.id) ? "metro area — a market the site reads but does not brief —" : "market,"} where ${sit}, read on ${readOn} from ${sources}.${
+            noneOwn
+              ? noneOwnSentence("those properties' own or the portfolio's")
+              : ` Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's${region}.`
+          }`;
     const text = [otherHeader + nationalNote, ...lines.map((l) => `- ${l}`)].join("\n");
     return { metro: input.metro.name, grain, readOn, lines, figures, text, national, portfolio: { here: pf.here, of: pf.properties } };
   }
@@ -750,12 +787,19 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   const placed = grain === "metro" ? (input.metro.placedBy ?? null) : null;
   const placedNote = placed ? `${placedByClause(placed)}, and the address names no place the site's list for this market does` : "";
   const notCounty = placed ? " — not the county's," : " —";
+  const each = noneOwn ? null : ` Each is dated, and each is ${whose}${notCounty} not the submarket's and not the building's${region}.`;
   const header =
     grain === "state"
-      ? `Published figures for the state of ${input.metro.name} the deal sits in — the address lies outside the metros the site tracks, so these are the state's own figures — read on ${readOn} from ${sources}. Each is dated, and each is the state's — not the metro's, not the submarket's and not the building's.`
+      ? `Published figures for the state of ${input.metro.name} the deal sits in — the address lies outside the metros the site tracks${
+          noneOwn ? "" : ", so these are the state's own figures"
+        } — read on ${readOn} from ${sources}.${
+          noneOwn ? noneOwnSentence("this state's") : ` Each is dated, and each is the state's — not the metro's, not the submarket's and not the building's${region}.`
+        }`
       : isDataMetro(input.metro.id)
-        ? `Published figures for the ${input.metro.name} metro area the deal sits in — a market the site reads but does not brief, so these figures are all it holds for it${placedNote} — read on ${readOn} from ${sources}. Each is dated, and each is ${whose}${notCounty} not the submarket's and not the building's.`
-        : `Published figures for the ${input.metro.name} market the deal sits in${placed ? `${placedNote} —` : ","} read on ${readOn} from ${sources}. Each is dated, and each is ${whose}${notCounty} not the submarket's and not the building's.`;
+        ? `Published figures for the ${input.metro.name} metro area the deal sits in — a market the site reads but does not brief${
+            noneOwn ? "" : ", so these figures are all it holds for it"
+          }${placedNote} — read on ${readOn} from ${sources}.${each ?? noneOwnSentence("this market's")}`
+        : `Published figures for the ${input.metro.name} market the deal sits in${placed ? `${placedNote} —` : ","} read on ${readOn} from ${sources}.${each ?? noneOwnSentence("this market's")}`;
   // A portfolio across several markets: these are one market's figures,
   // and the header says which properties they speak for — and whether the
   // other markets' figures follow in blocks of their own.
@@ -767,8 +811,11 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
           notRead > 0 ? `, and ${notRead} more ${notRead === 1 ? "market has" : "markets have"} no figures here` : ""
         }, and a figure is never the portfolio's.`
       : " — the other markets' properties are not read here, and a figure below is never the portfolio's.";
+  // The nation's lines alone are for no property in particular.
   const portfolioSentence = pf
-    ? ` The deal is a portfolio of ${pf.properties} properties across ${pf.markets}; these figures are for ${pf.here > 0 ? `the ${pf.here} ${pf.here === 1 ? "property" : "properties"} in ${input.metro.name}` : `the address on file in ${input.metro.name}, where none of the listed properties' own addresses sits`}${rest}`
+    ? noneOwn
+      ? ` The deal is a portfolio of ${pf.properties} properties across ${pf.markets}${rest}`
+      : ` The deal is a portfolio of ${pf.properties} properties across ${pf.markets}; these figures are for ${pf.here > 0 ? `the ${pf.here} ${pf.here === 1 ? "property" : "properties"} in ${input.metro.name}` : `the address on file in ${input.metro.name}, where none of the listed properties' own addresses sits`}${rest}`
     : "";
   const text = [header + nationalNote + portfolioSentence, ...lines.map((l) => `- ${l}`)].join("\n");
   return {

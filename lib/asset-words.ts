@@ -247,7 +247,43 @@ const housingWithCommercial = (s: string) =>
 // it — filed as senior housing, a 55+ apartment building in Prince George's
 // County lost its rent cap and ran on licensed care's defaults (research
 // pass 28).
-const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent living|skilled nursing|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?)`;
+// Rehabilitation is a nursing facility's only beside the nursing words
+// ("Nursing and Rehabilitation Center"): a rehabilitation hospital, an
+// addiction or a behavioral-health rehabilitation center and an outpatient
+// therapy clinic sell no residence (the audit of 2026-10-05 found each filed
+// as senior housing, on licensed care's defaults and traps).
+const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent living|skilled nursing|snf|nursing\s+(?:homes?|facilit(?:y|ies)|cent(?:er|re)s?)|post[\s-]+acute|(?:nursing|skilled|post[\s-]+acute|sub[\s-]?acute)\s+(?:and|&)\s+rehab(?:ilitation)?|rehab(?:ilitation)?\s+(?:and|&)\s+(?:nursing|skilled|post[\s-]+acute|sub[\s-]?acute)|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?)`;
+// Senior APARTMENTS — "Senior Apartments (LIHTC, 62+)", "Affordable Senior
+// Housing", "62+ apartments" — rent an age-restricted home and sell no care:
+// rental housing the rent rules reach, as an active-adult community is
+// (research pass 28's amendment; filed as senior housing they lost the rent
+// rules and ran on licensed care's defaults). A care or service word keeps
+// a phrase senior housing: independent living's meals and services are care
+// a resident buys. "Senior living" is the industry's own word for a care
+// community, apartments or not ("Senior Living Apartments") — but not beside
+// an affordable or age-restricted program's own words: "Senior Living
+// Apartments (LIHTC, 62+)" is a tax-credit building with an age restriction,
+// which sells no care unless a care word proper says so (the pre-merge
+// audit: filed as senior housing, it lost the rent rules and ran on licensed
+// care's defaults and traps).
+const CARE_WORDS =
+  /\b(?:assisted|memory|skilled|nursing|snf|care|independent[\s-]+living|ccrcs?|continuing|life[\s-]+plan|licensed|services?|meals?|post[\s-]+acute|rehabilitation)\b/i;
+const HOUSING_PROGRAM = /\b(?:lihtc|tax[\s-]+credits?|section\s+8|age[\s-]+restricted)\b|\b(?:55|62)\s*\+|\b(?:55|62)[\s-]+and[\s-]+(?:over|older)\b/i;
+// A care or service word the phrase denies — "no services", "no care
+// provided", "without meals or services", "non-licensed" — is struck before
+// the care rule reads, as lib/site-reports strikes "no RECs" before it reads
+// a finding (audit C3a: "Senior Apartments (55+), no services" had filed as
+// licensed senior housing).
+const DENIED_CARE =
+  /\b(?:no|without|non|not)[\s-]+(?:[a-z]+[\s-]+){0,2}?(?:care|services?|meals?|assisted|licensed|nursing|medical)\b(?:\s+(?:or|and|&)\s+(?:care|services?|meals?)\b)?/gi;
+const careOrService = (phrase: string) => {
+  const s = phrase.replace(DENIED_CARE, " ");
+  return CARE_WORDS.test(s) || (/\bsenior[\s-]+living\b/i.test(s) && !HOUSING_PROGRAM.test(s));
+};
+const seniorApartments = (s: string) =>
+  /\bseniors?\b/i.test(s) &&
+  (/\b(?:apartments?|affordable|lihtc|tax[\s-]+credit|section\s+8|age[\s-]+restricted|rental\s+housing)\b/i.test(s) || /\b(?:55|62)\s*\+/.test(s)) &&
+  !careOrService(s);
 const AGE_RESTRICTED = String.raw`active[\s-]+adult|age[\s-]+restricted|55[\s-]+and[\s-]+over`;
 // A mobile home in the plural too ("Mobile homes" ran past the word's end),
 // and a land-lease community, whose residents own their homes and rent the
@@ -320,9 +356,14 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   [/\b(storage)\b/i, "self_storage"],
   [new RegExp(String.raw`\b(?:${MANUFACTURED_WORDS})\b`, "i"), "manufactured_housing"],
   [/\b(student)\b/i, "student_housing"],
+  // Senior apartments are rental housing (`seniorApartments`), read ahead
+  // of the senior rule their word would otherwise file them under.
+  [seniorApartments, "multifamily"],
   // A continuing care retirement community (a CCRC, a "life plan
-  // community") and an active adult community are senior housing by their
-  // own names; a 55+ park is read by the manufactured-housing rule above.
+  // community"), a skilled nursing facility by any of its names (an SNF, a
+  // nursing home, post-acute care, a rehabilitation center) and an active
+  // adult community are senior housing by their own names; a 55+ park is
+  // read by the manufactured-housing rule above.
   [new RegExp(String.raw`\b(?:${SENIOR_WORDS})\b`, "i"), "senior_housing"],
   // Housing beside shops or offices, read ahead of the office and retail
   // rules that had filed it as one of them (`housingWithCommercial`).
@@ -350,16 +391,37 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   [/\b(office|creative|life sciences?|labs?|laborator(?:y|ies))\b/i, "office"],
   [/\b(industrial|warehouse|logistics|distribution|flex|manufacturing|cold storage|ios|outdoor storage)\b/i, "industrial"],
   [/\b(retail|shopping|strip|grocery|restaurant|qsr)\b/i, "retail"],
+  // A medical tenant's outpatient space by its own name — a dialysis center,
+  // an urgent care, an ambulatory surgery center, a freestanding ER, a
+  // veterinary clinic — is medical office (research pass 28: each filed as
+  // no class, so every class's traps and the generic defaults). Read after
+  // the net-lease rule, so "Dialysis Center (NNN)" or a single-tenant urgent
+  // care stays the net lease it filed as, and after the retail rule, so a
+  // strip an urgent care anchors stays retail.
+  [
+    /\b(?:dialysis|urgent[\s-]+care|ambulatory[\s-]+(?:surgery|surgical|care)|asc|surg(?:ery|ical)[\s-]+cent(?:er|re)s?|free[\s-]?standing[\s-]+(?:er|emergency)|veterinary|vet[\s-]+clinics?|animal[\s-]+hospitals?)\b/i,
+    "medical_office",
+  ],
   // "Apartments" in the plural too: the bare word ran past the rule's end
   // and filed nowhere, a building of apartments read as no class at all.
   [/\b(multifamily|multi[- ]family|apartments?|residential|condo|garden|mid[- ]rise|high[- ]rise|walk[- ]up)\b/i, "multifamily"],
+  // A small apartment building named by its count of homes — a duplex, a
+  // triplex, a fourplex or quadplex ("4-Plex", "Four-plex"), a "2-unit" —
+  // filed nowhere, so a fourplex that states no area ran on the generic
+  // 100,000 SF placeholder and its reserves took 82% of its NOI (research
+  // pass 38). Read after the commercial rules, so a "2-unit retail strip"
+  // stays retail.
+  [
+    /\b(?:duplex(?:es)?|triplex(?:es)?|fourplex(?:es)?|quadplex(?:es)?|quadruplex(?:es)?|(?:2|3|4|two|three|four|tri|quad)[\s-]?plex(?:es)?|(?:2|3|4|two|three|four)[\s-]units?)\b/i,
+    "multifamily",
+  ],
   // Rental housing named by its program or its tenants ("Affordable Housing
   // (LIHTC)", "Workforce Housing") — last, so a student, senior,
   // manufactured or single-family phrase is read by its own rule first.
   [/\b(affordable|workforce|lihtc|section 8|housing)\b/i, "multifamily"],
   // An active-adult or 55+ community that names no other housing: rental
   // housing with an age restriction (`AGE_RESTRICTED`).
-  [new RegExp(String.raw`\b(?:${AGE_RESTRICTED})\b|\b55\s*\+`, "i"), "multifamily"],
+  [new RegExp(String.raw`\b(?:${AGE_RESTRICTED})\b|\b(?:55|62)\s*\+`, "i"), "multifamily"],
 ];
 
 /** The known key a stored class or a phrase of the model's resolves to;
@@ -449,7 +511,9 @@ export function perSuffix(words: Pick<AssetWords, "basis" | "noun">): string {
  *  hotel and "212 units" on an apartment building. */
 export function countNoun(label: string | null | undefined, cls: string | null | undefined): string {
   const l = (label ?? "").toLowerCase();
-  const m = l.match(/\b(home ?sites?|keys?|beds?|pads?|rooms?|homes?|lots?|sites?|spaces?|suites?|apartments?|doors?|units?|acres?)\b/g);
+  // A marina's slips and a campground's campsites in their own words
+  // (research pass 28), beside a care facility's licensed beds.
+  const m = l.match(/\b(home ?sites?|camp ?sites?|keys?|beds?|pads?|rooms?|homes?|lots?|sites?|spaces?|suites?|slips?|apartments?|doors?|units?|acres?)\b/g);
   if (m?.length) {
     const last = m[m.length - 1].replace(/\s+/g, "");
     const base = last.replace(/s$/, "");

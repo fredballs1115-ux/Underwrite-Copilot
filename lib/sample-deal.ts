@@ -3,6 +3,7 @@
 // Seeded into the user's pipeline by the "Try a sample deal" action.
 
 import { computeModel, type ModelInputs } from "@/lib/model/compute";
+import { compactUsd } from "@/lib/money";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -19,13 +20,23 @@ import type {
   T12Summary,
 } from "@/lib/actuals/types";
 import type { BuyBox } from "@/lib/criteria";
+import type { AskEntry, DealNote } from "@/lib/deals";
+import { normalizeTaskTitle } from "@/lib/deal-tasks";
+import { withArticle } from "@/lib/article";
+import { SAMPLE_AUTHOR } from "@/lib/note-remove";
 
-/** The hypothetical mandate the PUBLIC sample screen judges the deal
- *  against — chosen so the fit lands WATCH beside the Caution verdict (a
- *  consistent story: in scope and the right size, but short of the return
- *  floors — the count band passes at 248 units and the cap misses its
- *  floor, 25 of 40 points, still WATCH). Logged-in users see their OWN box
- *  here instead. */
+/** The hypothetical mandate the PUBLIC sample is judged against — the
+ *  homepage's chip, /demo's buy-box tab, and the public memo and full
+ *  report (lib/sample-cover `sampleDocumentChecks`). It tells one story
+ *  beside the Caution verdict: in scope and the right size (the class
+ *  passes, and the count band at 248 units), short of the return floors.
+ *  The going-in cap misses its floor outright, so the header's chip reads
+ *  "Outside box" whatever the score (lib/fit-label `fitScoreLabel`), in
+ *  the kill tone, with the count of criteria checked beside the score —
+ *  the target return and the cash-on-cash cannot be checked from the
+ *  documents, and lib/buy-box-chip's `buyBoxRead` says so in the chip's
+ *  note. A signed-in reader's sample is judged against the reader's OWN
+ *  box instead. */
 export const SAMPLE_DEMO_BOX: BuyBox = {
   assetClasses: ["multifamily"],
   unitsMin: 100,
@@ -74,6 +85,12 @@ const bpsFrom = (v: number | null): string => {
 const OM_CASE = { exitCapPct: 5.25, rentGrowthPct: 4, vacancyPct: 6 } as const;
 /** The OM's stated NOI less the T-12's, the gap the reconciliation names. */
 const NOI_GAP = 3_880_000 - 3_706_500;
+/** The model's exit against its own going-in cap, read off the model and
+ *  said as a figure, never as "flat": the exit is 5.50% and the going-in
+ *  5.45%, 5 bps of expansion (research pass 40, L8: "Held flat to
+ *  going-in"). The going-in figure itself stays on the tab's own tile, where
+ *  a price that buys no building withholds it. */
+const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.exitCapPct - returns.goingInCapPct) * 100)} bps over the going-in cap`;
 
 const modelMetrics: ReconciledMetric[] = [
   {
@@ -122,7 +139,7 @@ const modelMetrics: ReconciledMetric[] = [
     unit: "%",
     sources: [{ doc: "Market", value: "5.5%", locator: "", basis: "market norm" }],
     authority: "Market",
-    rationale: "Held flat to going-in — no compression thesis.",
+    rationale: `${EXIT_OVER_ENTRY} — no compression thesis.`,
     confidence: "medium",
     isConflict: false,
   },
@@ -255,7 +272,7 @@ const model: UnderwritingModel = {
   cashFlow,
   returns,
   summary:
-    "Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit holds flat to going-in with no compression assumed.",
+    `Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit is ${EXIT_OVER_ENTRY}, with no compression assumed.`,
   caveats: [
     "Single-tranche debt and straight-line growth — a screening model, not a full build.",
     "Capital reserve is a flat annual figure; confirm against a real engineering budget.",
@@ -285,6 +302,11 @@ const extraction: ExtractionResult = {
     { label: "Vacancy (pro forma)", value: "6.0%", flagged: true, page: "p. 8", basis: "pro_forma" },
     { label: "Loan-to-value", value: "60%", flagged: false, page: "p. 44", basis: "na" },
   ],
+  // The fictional memorandum's length, at or past its last cited page
+  // (p. 44): a citation prints only inside the page count (lib/facts), and
+  // without one the demo report's page column was dashes on every row
+  // beside the "(p. 14)" its own memo page cites (research pass 35).
+  totalPages: 48,
 };
 
 const challenges: ChallengerResult = {
@@ -293,7 +315,7 @@ const challenges: ChallengerResult = {
       assumption: "Exit cap compression to 5.25%",
       severity: "high",
       challenge:
-        "The model exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
+        "The OM's pro forma exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
       question:
         "What thesis supports buying at a 5.45% cap and selling five years later at 5.25%?",
     },
@@ -317,9 +339,11 @@ const challenges: ChallengerResult = {
   // $3.1M is not the T-12's $3,085,000, so the sentence names the model's
   // figure, and its exit is said as a figure, not as "flat" against the
   // 5.45% going-in cap (the pre-merge audit of 2026-09-30).
-  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same $${(inputs.year1Opex / 1e6).toFixed(1)}M of year-one expenses.`,
+  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same ${compactUsd(inputs.year1Opex)} of year-one expenses.`,
 };
 
+// The memorandum's three sale comps sit on its p. 14, the page the
+// verdict's basis range cites for the $252k and $261k trades.
 const comps: BrokerCompsResult = {
   saleComps: [
     {
@@ -327,18 +351,21 @@ const comps: BrokerCompsResult = {
       detail: "$252k/unit · 5.6% cap · Q3'25",
       support: "supports",
       note: "Comparable vintage and submarket; supports a sub-$260k basis.",
+      page: "p. 14",
     },
     {
       name: "Vue at Girard — 4.0 mi",
       detail: "$298k/unit · 4.9% cap · Q1'25",
       support: "stretched",
       note: "Newer, amenitized asset in a stronger submarket — not a clean comp.",
+      page: "p. 14",
     },
     {
       name: "Parkside — 1.4 mi",
       detail: "$261k/unit · 5.4% cap · Q4'25",
       support: "favorable",
       note: "Closest comp; lands near the subject's implied basis.",
+      page: "p. 14",
     },
   ],
   leaseComps: [
@@ -423,7 +450,7 @@ const verdict: VerdictResult = {
   ],
   nextSteps: [
     "Pull three renovated-comp leases to test the rent premium.",
-    "Re-run returns at a flat 5.5% exit and real in-place vacancy.",
+    "Re-run returns at a 5.50% exit, 5 bps over the 5.45% going-in, and real in-place vacancy.",
   ],
   screen: {
     ranges: [
@@ -473,11 +500,17 @@ const verdict: VerdictResult = {
       {
         lever: "exit",
         read: "Underwritten at a 5.25% exit, inside going-in.",
-        risk: `A flat 5.5% exit knocks roughly ${bpsFrom(irrWith({ exitCapPct: 5.25 }))} off the IRR.`,
+        risk: `A 5.50% exit, 5 bps over going-in, knocks roughly ${bpsFrom(irrWith({ exitCapPct: 5.25 }))} off the IRR.`,
       },
       {
         lever: "debt",
-        read: "60% LTV at 6.0% with one year of IO.",
+        // What the documents' model runs (lib/sample-derive): it amortizes
+        // over 30 years from the first month, so no interest-only year
+        // (research pass 35: the read said "with one year of IO"). And it
+        // sizes the loan at 60% of cost, its default, never 60% of value:
+        // the demo report's base case says "Loan … · 60% of cost" beside
+        // this line (audit C3a, LOW-13), and a test holds both to the model.
+        read: "60% of cost, the model's default, at 6.0%, amortizing over 30 years.",
         risk: "A soft refi window or higher rate pressures the takeout.",
       },
     ],
@@ -572,6 +605,116 @@ const t12Summary: T12Summary = {
   noi: 3_706_500,
   noiDerived: false,
 };
+
+// ---- The sample's lower half: Ask, tasks and a note ------------------------
+// A new reader opened the sample onto a row of empty states — no tasks, no
+// questions, nothing logged (signed-in gaps, H7) — so the panels a deal
+// grows into never showed. These are seeded beside the row, and every word
+// of them is read off the fixture above: each Ask answer quotes the
+// fictional memorandum's own facts and cites only the pages those facts
+// carry (inside its `totalPages`), each figure it works out is worked out
+// here from them, and each answer says it is the sample memorandum's. None
+// carries a person: no asker, no author id, no creator — they are the
+// sample's, and lib/sample-deal.test.ts holds them to all of it.
+
+/** Who the seeded note is by: the sample, never a person (defined beside
+ *  the rule for who may remove a note, lib/note-remove: the sample's reader
+ *  may remove this one). */
+export { SAMPLE_AUTHOR };
+
+/** One of the memorandum's stated facts, by its label: its value and page. */
+function memoFact(label: string): { value: string; page: string } {
+  const m = extraction.metrics.find((x) => x.label === label);
+  if (!m?.page) throw new Error(`sample fixture: no "${label}" with a page`);
+  return { value: m.value, page: m.page };
+}
+
+/** The first number in a fact's value ("$2,400/mo" → 2400, "5.45%" → 5.45). */
+function numberOf(value: string): number {
+  const m = value.replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+  if (!m) throw new Error(`sample fixture: no figure in "${value}"`);
+  return Number(m[0]);
+}
+
+/** The sample's three questions of its fictional memorandum, each answered
+ *  from the facts it states and citing the pages it states them on. */
+function sampleAsk(at: string): AskEntry[] {
+  const exit = memoFact("Exit cap");
+  const entry = memoFact("Going-in cap");
+  const tighterBps = Math.round((numberOf(entry.value) - numberOf(exit.value)) * 100);
+
+  const inPlace = memoFact("Avg in-place rent");
+  const proForma = memoFact("Pro forma rent");
+  const growth = memoFact("Rent growth");
+  const premium = numberOf(proForma.value) - numberOf(inPlace.value);
+  const premiumPct = ((premium / numberOf(inPlace.value)) * 100).toFixed(1);
+
+  const price = memoFact("Asking price");
+  const units = memoFact("Units");
+  const perUnit = compactUsd(numberOf(price.value) / numberOf(units.value));
+  const compPage = comps.saleComps[0].page ?? "";
+  const compWords = comps.saleComps.map((c) => {
+    const [basis, cap, when] = c.detail.split(" · ");
+    return `${c.name.split(" — ")[0]} at ${basis} and ${withArticle(cap)} (${when})`;
+  });
+
+  return [
+    {
+      at,
+      q: "What exit cap does the memorandum sell at, against the cap it buys at?",
+      answer:
+        `The sample's fictional memorandum sells at ${withArticle(exit.value)} exit cap (${exit.page}) and buys at ` +
+        `${withArticle(entry.value)} going-in cap (${entry.page}): it sells ${tighterBps} bps tighter than it buys, ` +
+        "and states no reason for the compression.",
+      cites: [
+        { page: exit.page, note: "Exit cap" },
+        { page: entry.page, note: "Going-in cap" },
+      ],
+    },
+    {
+      at,
+      q: "How far above the in-place rents are the pro forma rents?",
+      answer:
+        `The sample's fictional memorandum states an average in-place rent of ${inPlace.value} and a pro forma ` +
+        `rent of ${proForma.value} (${proForma.page}): a $${premium.toLocaleString("en-US")} premium a month, ` +
+        `${premiumPct}% over in-place. It then grows rents ${growth.value} (${growth.page}).`,
+      cites: [
+        { page: proForma.page, note: "In-place and pro forma rents" },
+        { page: growth.page, note: "Rent growth" },
+      ],
+    },
+    {
+      at,
+      q: "Which sale comps does the memorandum cite, and what is the ask a unit?",
+      answer:
+        `The sample's fictional memorandum cites three sale comps (${compPage}): ${compWords[0]}, ${compWords[1]}, ` +
+        `and ${compWords[2]}. Its ${price.value} ask for ${units.value} units (${price.page}) is ${perUnit} a unit.`,
+      cites: [
+        { page: compPage, note: "Sale comps" },
+        { page: price.page, note: "Asking price and units" },
+      ],
+    },
+  ];
+}
+
+/**
+ * What the sample deal's lower half is seeded with when the reader adds it
+ * (deals/actions `createSampleDeal`), stamped at `at`, the moment it is
+ * added: the three Ask answers, the verdict's next steps as tasks (marked
+ * from the verdict, created by no one, assigned to no one) and one note in
+ * the decision log, by the sample.
+ */
+export function sampleWork(at: string): {
+  qa: AskEntry[];
+  notes: DealNote[];
+  tasks: { title: string; source: "verdict" }[];
+} {
+  return {
+    qa: sampleAsk(at),
+    notes: [{ at, by: SAMPLE_AUTHOR, text: `Held at Caution. ${verdict.reason}` }],
+    tasks: verdict.nextSteps.map((s) => ({ title: normalizeTaskTitle(s), source: "verdict" as const })),
+  };
+}
 
 /** The full seed payload for a sample deal row. */
 export const SAMPLE_DEAL = {

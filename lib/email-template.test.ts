@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   PREVIEW_MAX,
+  REPLACE_OM_LINE,
   analysisReadyEmail,
   bannerAlt,
+  escapeHtml,
   previewLine,
   previousCallLine,
   screenStoppedEmail,
@@ -205,6 +207,30 @@ describe("the Monday digest pictures each deal it names (#464)", () => {
     expect(mixed.html.match(/<img /g)?.length).toBe(2);
   });
 
+  it("pictures the week's moves and the reader's tasks too, a task's square named for its deal", () => {
+    const { html } = weeklyDigestEmail({
+      ...base,
+      moved: [{ name: "Elm Court", move: "Screening → Tracking", url: "https://underwrite.example/deals/e", pictureUrl: thumb(5) }],
+      myTasks: [
+        {
+          title: "Call the broker",
+          dealName: "Ash & Vine",
+          url: "https://underwrite.example/deals/f",
+          due: "Wed, Oct 7",
+          overdue: false,
+          pictureUrl: thumb(6),
+        },
+      ],
+    });
+    expect(html).toContain(`<img src="${thumb(5)}" width="48" height="48" alt="Elm Court"`);
+    expect(html).toContain(`<img src="${thumb(6)}" width="48" height="48" alt="Ash &amp; Vine"`);
+    expect(html).toContain('<a href="https://underwrite.example/deals/f" style="display:block;text-decoration:none;"><img');
+    // Every row with a square: two deadlines, a call, a move, a task.
+    expect(html.match(/<td width="48"/g)?.length).toBe(5);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
   it("with no pictures at all, reads as it always has: the call first", () => {
     const plain = weeklyDigestEmail({
       ...base,
@@ -257,6 +283,30 @@ describe("a screen that stopped says so by email (pass 14, 2026-10-01)", () => {
     );
     // A first screen has no call to stand.
     expect(screenStoppedEmail(input).text).not.toContain("still stands");
+  });
+
+  it("a failure in the document says the way on is replacing the OM, as the deal page offers (research pass 30)", () => {
+    const doc = { ...input, message: "We couldn't read any figures out of this PDF.", replaceOm: true };
+    const { html, text } = screenStoppedEmail(doc);
+    expect(text).toContain(REPLACE_OM_LINE);
+    expect(html).toContain(escapeHtml(REPLACE_OM_LINE));
+    expect(screenStoppedEmail(input).text).not.toContain(REPLACE_OM_LINE);
+  });
+
+  it("opens on the building, as the screen-complete email does, and stays as it was without a picture", () => {
+    const { html, text } = screenStoppedEmail({ ...input, picture: { url: BANNER } });
+    const img = /<a href="([^"]+)"[^>]*><img src="([^"]+)" width="520" height="260" alt="([^"]*)"/.exec(html);
+    expect(img).not.toBeNull();
+    expect(img![1]).toBe(input.dealUrl);
+    expect(img![2]).toBe(BANNER);
+    expect(img![3]).toBe(bannerAlt(escapeHtml(input.dealName)));
+    // Between the masthead and the words.
+    expect(html.indexOf("Underwrite Copilot</span>")).toBeLessThan(html.indexOf(BANNER));
+    expect(html.indexOf(BANNER)).toBeLessThan(html.indexOf("The screen stopped</p>"));
+    expect(text).toBe(screenStoppedEmail(input).text);
+    expect(screenStoppedEmail(input).html).not.toContain("<img");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("names the deal, says the deal page's own sentence and links back", () => {

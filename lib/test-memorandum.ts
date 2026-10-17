@@ -92,6 +92,42 @@ export async function testMemorandum(pages: TestPage[], security: Security = "no
 }
 
 /**
+ * The same file saved incrementally, as Acrobat saves an annotated deck: the
+ * original bytes, then an update section that writes every page object again
+ * (with an empty `/Annots`), its own xref for them, and a trailer whose
+ * `/Prev` points at the original's. pdfjs reads the newest copy of each
+ * object — the same pages — while a byte counter counts every copy, so a
+ * 350-page deck reads as 700 (research pass 30). The file must carry a
+ * classic xref table and trailer, as pdfkit writes it.
+ */
+export function incrementalRevision(pdf: Uint8Array | Buffer): Buffer {
+  const original = Buffer.from(pdf);
+  const s = original.toString("latin1");
+  const startxref = Number(/startxref\s+(\d+)\s+%%EOF\s*$/.exec(s)?.[1]);
+  const trailer = /trailer\s*<<([\s\S]*?)>>\s*startxref/.exec(s)?.[1] ?? "";
+  const size = Number(/\/Size\s+(\d+)/.exec(trailer)?.[1]);
+  const root = /\/Root\s+(\d+\s+\d+\s+R)/.exec(trailer)?.[1];
+  const info = /\/Info\s+(\d+\s+\d+\s+R)/.exec(trailer)?.[1];
+  if (!Number.isFinite(startxref) || !Number.isFinite(size) || !root) {
+    throw new Error("incrementalRevision: no classic xref table and trailer to revise");
+  }
+  const pageObject = /(\d+) 0 obj\s*<<\s*\/Type\s*\/Page(?![a-zA-Z])[\s\S]*?endobj/g;
+  const objects: { num: number; text: string }[] = [];
+  for (let m = pageObject.exec(s); m !== null; m = pageObject.exec(s)) objects.push({ num: Number(m[1]), text: m[0] });
+  let body = "\n";
+  const offsets: { num: number; at: number }[] = [];
+  for (const o of objects) {
+    offsets.push({ num: o.num, at: original.length + Buffer.byteLength(body, "latin1") });
+    body += o.text.replace(/>>\s*endobj$/, "/Annots []\n>>\nendobj") + "\n";
+  }
+  const xrefAt = original.length + Buffer.byteLength(body, "latin1");
+  let xref = "xref\n";
+  for (const o of offsets) xref += `${o.num} 1\n${String(o.at).padStart(10, "0")} 00000 n \n`;
+  xref += `trailer\n<< /Size ${size} /Root ${root}${info ? ` /Info ${info}` : ""} /Prev ${startxref} >>\nstartxref\n${xrefAt}\n%%EOF\n`;
+  return Buffer.concat([original, Buffer.from(body + xref, "latin1")]);
+}
+
+/**
  * Draw a JPEG 2000 picture the way pdfkit draws a JPEG: its own image
  * XObject, filtered `/JPXDecode` alone (so pdfkit neither deflates it nor
  * claims a colour space — the JP2 header says it), encrypted with the rest

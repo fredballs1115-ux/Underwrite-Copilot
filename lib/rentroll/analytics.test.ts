@@ -8,6 +8,8 @@ import {
   defaultAbsorptionSfPerMonth,
   leaseUpCurve,
   markToMarket,
+  ROLLOVER_CHART_COLUMNS,
+  rolloverBars,
   rolloverCostForecast,
   rolloverSchedule,
   yearsTo,
@@ -115,6 +117,41 @@ describe("rolloverSchedule", () => {
   it("computes % of NRA against the stated NRA, not the roll's own sum", () => {
     const s = rolloverSchedule(CLEAN, { nra: 120_000 });
     expect(s.years.find((y) => y.year === 2027)!.pctOfNra).toBeCloseTo(40_000 / 120_000, 12);
+  });
+});
+
+describe("rolloverBars — the chart's columns", () => {
+  it("draws every year from the first expiry to the last, a year nothing rolls in at zero", () => {
+    const bars = rolloverBars(rolloverSchedule(CLEAN).years);
+    expect(bars.map((b) => b.year)).toEqual([2026, 2027, 2028, 2029]);
+    const none = bars.find((b) => b.year === 2028)!;
+    expect(none).toMatchObject({ sfExpiring: 0, rentExpiring: 0, leaseCount: 0, pctOfNra: 0 });
+    expect(none.through).toBeUndefined();
+  });
+
+  it("folds the years past the twelfth column into one last bar that counts them, dropping nothing", () => {
+    const year = (y: number, sfExpiring: number) => ({
+      year: y,
+      sfExpiring,
+      pctOfNra: sfExpiring / 100_000,
+      rentExpiring: sfExpiring * 20,
+      leaseCount: 1,
+      tenants: [`T${y}`],
+    });
+    const years = [year(2026, 5_000), year(2030, 5_000), year(2038, 7_000), year(2041, 3_000)];
+    const bars = rolloverBars(years);
+    expect(bars).toHaveLength(ROLLOVER_CHART_COLUMNS);
+    expect(bars.slice(0, 11).map((b) => b.year)).toEqual(Array.from({ length: 11 }, (_, i) => 2026 + i));
+    const last = bars.at(-1)!;
+    expect(last).toMatchObject({ year: 2037, through: 2041, foldedYears: 5, sfExpiring: 10_000, leaseCount: 2, rentExpiring: 200_000 });
+    expect(last.pctOfNra).toBeCloseTo(0.1, 12);
+    expect(last.tenants).toEqual(["T2038", "T2041"]);
+    // Every foot that rolls is on the chart.
+    expect(bars.reduce((s, b) => s + b.sfExpiring, 0)).toBe(20_000);
+    // A schedule with no NRA says no share, at zero or folded.
+    const noNra = rolloverBars(years.map((y) => ({ ...y, pctOfNra: null })));
+    expect(noNra.every((b) => b.pctOfNra === null)).toBe(true);
+    expect(rolloverBars([])).toEqual([]);
   });
 });
 

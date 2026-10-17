@@ -4,10 +4,16 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { parseStructuredAddress } from "@/lib/address";
 import { coveredState, metroForAddress } from "@/lib/market-match";
-import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
 import { computeRecordComps } from "@/lib/public-comps/run";
 import { AddressAutocomplete } from "../address-autocomplete";
 import { CompsResultView } from "./result-view";
+import { CoverageChips } from "./coverage-chips";
+import { MarketBriefCard } from "@/app/market/market-brief-card";
+import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
+import { marketNames } from "@/lib/public-comps/db-markets";
+import { COMPS_CLASS_OPTIONS } from "@/lib/public-comps/classes";
+import { askOf, readCompsQuery } from "@/lib/public-comps/comps-query";
+import { RECORDED_SALES_MONTH_CHOICES, RECORDED_SALES_RADIUS_CHOICES } from "@/lib/public-record-asks";
 
 export const metadata: Metadata = { title: "Pull comps" };
 // Every render with an address hits the geocoder + the property DB / live
@@ -24,7 +30,7 @@ export const dynamic = "force-dynamic";
 export default async function PullCompsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; addr?: string; cls?: string }>;
+  searchParams: Promise<{ q?: string; addr?: string; cls?: string; r?: string; m?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/comps");
@@ -34,7 +40,11 @@ export default async function PullCompsPage({
   // the degraded fallback when the geocoder was unreachable while typing.
   const picked = parseStructuredAddress(params.addr ?? "");
   const q = picked?.label ?? (params.q ?? "").trim().slice(0, 160);
-  const cls = params.cls === "multifamily" ? "multifamily" : "";
+  // The radius, window and class the reader set, each held to the choices
+  // offered (lib/public-comps/comps-query); the query string carries them,
+  // so a search is a link.
+  const query = readCompsQuery(params);
+  const cls = query.cls;
   const result = q
     ? await computeRecordComps({
         label: q,
@@ -42,8 +52,15 @@ export default async function PullCompsPage({
         city: picked?.city,
         county: picked?.county,
         assetClass: cls,
+        // A pick names its street or does not; typed text is read by what
+        // Photon matched (a house, a street, or an area).
+        hasStreet: picked ? !!picked.street?.trim() : true,
+        ask: askOf(query),
       })
     : null;
+  // The property database's markets that hold recorded sales today (the
+  // cached count read), named on the chips and in a no-source sentence.
+  const dbMarkets = await dbMarketsWithSales();
   // Same chip the deal page shows: one click from a comps pull to the
   // address's market brief (rules, rents, data coverage).
   const metro = picked ? metroForAddress(picked) : null;
@@ -53,11 +70,10 @@ export default async function PullCompsPage({
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Pull comps</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Recorded sales around any address, straight from the public record —
-          the same engine that sanity-checks every deal you screen. Coverage
-          today: {COVERAGE_SUMMARY}, plus every market loaded into the
-          property database.
+          Recorded sales around an address, from the public record — the same
+          read every screened deal gets.
         </p>
+        <CoverageChips dbMarkets={dbMarkets} />
       </header>
 
       <form method="get" className="flex flex-wrap items-end gap-2">
@@ -72,14 +88,44 @@ export default async function PullCompsPage({
           />
         </label>
         <label>
-          <span className="mb-1 block text-xs font-medium text-muted">Filter</span>
+          <span className="mb-1 block text-xs font-medium text-muted">Radius</span>
+          <select
+            name="r"
+            defaultValue={query.radiusMiles ?? ""}
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
+          >
+            <option value="">1 mi, 3 if thin</option>
+            {RECORDED_SALES_RADIUS_CHOICES.map((c) => (
+              <option key={c.miles} value={c.miles}>{`${c.miles} mi`}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="mb-1 block text-xs font-medium text-muted">Window</span>
+          <select
+            name="m"
+            defaultValue={query.monthsBack ?? ""}
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
+          >
+            <option value="">24 months, 36 if thin</option>
+            {RECORDED_SALES_MONTH_CHOICES.map((m) => (
+              <option key={m} value={m}>{`${m} months`}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="mb-1 block text-xs font-medium text-muted">Class</span>
           <select
             name="cls"
             defaultValue={cls}
             className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
           >
             <option value="">All recorded sales</option>
-            <option value="multifamily">Multifamily / mixed only</option>
+            {COMPS_CLASS_OPTIONS.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         <button
@@ -118,13 +164,7 @@ export default async function PullCompsPage({
             </Link>
           </div>
           {metro ? (
-            <Link
-              href={`/market?metro=${metro.id}`}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand outline-none transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40"
-            >
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
-              Covered market: {metro.name} — open the market brief →
-            </Link>
+            <MarketBriefCard metro={metro} />
           ) : picked?.state ? (
             <p className="mt-2 text-[11px] text-muted">
               Not in a covered market — market-level coverage here is
@@ -140,12 +180,29 @@ export default async function PullCompsPage({
               </Link>
             </p>
           ) : null}
-          <CompsResultView result={result} subjectPrice={null} />
+          <CompsResultView result={result} showMap dbMarketsLine={marketNames(dbMarkets)} />
         </section>
       ) : (
         <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-          Type an address above and pick it from the suggestions — the pick
-          tells the engine the county. Every result carries its source.
+          <ol className="grid gap-3 sm:grid-cols-3">
+            {[
+              ["Pick an address", "from the suggestions, so the search knows its county"],
+              ["See the sales", "on a map, with each price on one track"],
+              ["Screen it", "as a deal in one click, or copy the table"],
+            ].map(([head, tail], i) => (
+              <li key={head} className="flex items-start gap-2">
+                <span
+                  aria-hidden
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand"
+                >
+                  {i + 1}
+                </span>
+                <span>
+                  <span className="font-medium text-ink">{head}</span> {tail}
+                </span>
+              </li>
+            ))}
+          </ol>
         </section>
       )}
     </div>

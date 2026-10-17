@@ -265,6 +265,12 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
   }
   if (key === "owner_occupied_with_units_lte") {
     const w = typeof want === "number" ? want : Number(want);
+    // A building over the limit is outside the exemption whoever lives in
+    // it, so occupancy is asked only of one the limit can reach (the audit
+    // of 2026-10-05: a 48-unit Seattle building and a 120-unit Newark one
+    // were asked whether the buyer would owner-occupy, and their caps read
+    // "possibly applies").
+    if (s.units !== undefined && Number.isFinite(w) && s.units > w) return "no";
     // The buyer's stated intent (deal-facts boolean) answers this; the
     // occupancy STRING is the fallback for subjects that carry one (tests,
     // the homepage playground).
@@ -323,6 +329,16 @@ function evalConditions(
   let acc: Tri = "yes";
   const unknowns: string[] = [];
   for (const [k, v] of Object.entries(conds)) {
+    // An open "any of" is open on the questions its open branches ask, and
+    // is named as those questions: listed as the key itself, the panels
+    // read "Open: any of" where they should have asked for the year built.
+    if (k === "any_of" && Array.isArray(v)) {
+      const branches = v.map((w) => evalConditions(w as Record<string, unknown>, s));
+      const t = branches.map((b) => b.result).reduce<Tri>((a, r) => or(a, r), "no");
+      if (t === "unknown") unknowns.push(...branches.filter((b) => b.result === "unknown").flatMap((b) => b.unknowns));
+      acc = and(acc, t);
+      continue;
+    }
     const t = evalCondition(k, v, s);
     if (t === "unknown") unknowns.push(k);
     acc = and(acc, t);
@@ -333,6 +349,51 @@ function evalConditions(
 /** The open question a rule carries where the deal's names cannot say
  *  whether it sits inside the rule's city (`jurisdictionOf` "unknown"). */
 export const WITHIN_CITY_LIMITS = "within_city_limits";
+
+/** Plain-English labels for condition keys surfaced as open questions —
+ *  the rules panel's and lib/rent-regulation's, one list. */
+export const OPEN_QUESTION_LABELS: Record<string, string> = {
+  building_permit_issued_on_or_before: "building permit year",
+  building_permit_issued_after: "building permit year",
+  built_before: "year built",
+  building_age_years_lt: "year built",
+  exemption_registered_with_rad: "RAD exemption registration",
+  units_gte: "unit count",
+  units_lte: "unit count",
+  municipality_adopted_etpa: "whether the municipality adopted ETPA",
+  municipality_population_gte: "municipality population",
+  occupancy: "current occupancy status",
+  owner_occupied_with_units_lte: "whether you'll owner-occupy (and unit count)",
+  owner_total_rental_units_in_state_lte: "total rental units you own in this state",
+  owner_total_rental_units_in_county_lte: "total rental units you own in this county",
+  owner_other_rental_units_in_dc: "other rental units you own in DC",
+  owner_is_natural_person: "whether the owner is a natural person",
+  owner_natural_persons_lte: "how many natural persons own it",
+  owner_form_any_of: "the owner's legal form",
+  property_type: "whether it is rental housing",
+  transaction: "whether the deal is a sale of rental housing",
+  action: "whether an eviction is at issue",
+  see_rule: "the exemption the rule refers to",
+  within_city_limits: "whether the building sits inside the city's limits",
+  rule_unverified: "the ordinance itself, which the site has not verified",
+};
+
+/** The open question a rule the site has not verified carries. */
+export const RULE_UNVERIFIED = "rule_unverified";
+
+/** A rule the site has not verified — its research found nothing to cite
+ *  ("unverified_not_found"), or it carries no source. New Jersey's municipal
+ *  rule says itself that every municipality but the two screened by their
+ *  own rules is unscreened ("rules unknown, check the ordinance before
+ *  offer"), and had been read as applying to every rental building in the
+ *  state (the audit of 2026-10-05). */
+export const unverifiedRule = (rule: Pick<RegulatoryRule, "status" | "source">): boolean =>
+  rule.status === "unverified_not_found" || !rule.source;
+
+/** A rule's family: a rent cap's coverage rule is a rent rule, as the cap
+ *  is (New Jersey's municipal rule is filed as rent control, Newark's and
+ *  Jersey City's as its coverage). */
+const ruleFamily = (type: string): string => (type === "rent_control_coverage" ? "rent_control" : type);
 
 /**
  * A rule's exemption conditions with its cross-reference resolved: an
@@ -362,9 +423,20 @@ export function exemptionConditions(
  *  at most "possibly applies", with that question named. */
 export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): RuleEvaluation[] {
   const out: RuleEvaluation[] = [];
+  // A place screened by its own rule: where a local rule of a family holds
+  // the deal (Newark's rent control, Jersey City's), a statewide rule of the
+  // same family the site has not verified — New Jersey's municipal rule,
+  // whose own words say those two are screened by their own rules — is not
+  // read beside it. Said here, so the rules panel and the rent rules
+  // (lib/rent-regulation) read one rule (the pre-merge audit: the panel
+  // listed it as possibly applying where the rent rules had dropped it).
+  const ownPlace = new Set(
+    rules.filter((r) => !!r.jurisdiction_local && jurisdictionOf(r, subject) === "yes").map((r) => `${r.jurisdiction_state.toUpperCase()}:${ruleFamily(r.rule_type)}`),
+  );
   for (const rule of rules) {
     const where = jurisdictionOf(rule, subject);
     if (where === "no") continue;
+    if (!rule.jurisdiction_local && unverifiedRule(rule) && ownPlace.has(`${rule.jurisdiction_state.toUpperCase()}:${ruleFamily(rule.rule_type)}`)) continue;
     const applies = evalConditions(rule.applies_if, subject);
     const exemptIf = exemptionConditions(rule, rules);
     const exempt = evalConditions(exemptIf, subject);
@@ -380,13 +452,24 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
     // Only a rule that would otherwise reach the deal asks where it is.
     const asks = where === "unknown" && (outcome === "applies" || outcome === "possibly_applies");
     if (asks) outcome = "possibly_applies";
+    // A rule the site has not verified reaches no deal for certain: where it
+    // would, it possibly does, and says why — on every surface that reads
+    // the evaluation, never "Applies" beside an "unverified" badge (the
+    // batch-2 audit).
+    const unchecked = unverifiedRule(rule) && (outcome === "applies" || outcome === "possibly_applies");
+    if (unchecked) outcome = "possibly_applies";
 
     out.push({
       rule,
       applies: applies.result,
       exempt: exemptTri,
       outcome,
-      unknowns: [...(asks ? [WITHIN_CITY_LIMITS] : []), ...applies.unknowns, ...(hasExemption ? exempt.unknowns : [])],
+      unknowns: [
+        ...(unchecked ? [RULE_UNVERIFIED] : []),
+        ...(asks ? [WITHIN_CITY_LIMITS] : []),
+        ...applies.unknowns,
+        ...(hasExemption ? exempt.unknowns : []),
+      ],
       dated: subject.today ? datedNotes(rule.effect, subject.today) : [],
     });
   }

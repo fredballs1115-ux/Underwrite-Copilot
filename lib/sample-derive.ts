@@ -7,7 +7,10 @@
 // sensitivity page that cleared the hurdle) while the page beside it ran the
 // actuals (5.45%, 9.3%, and did not). Pure: no I/O.
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { deriveUnderwriteInputs, type DealForModel } from "@/lib/underwrite/inputs";
+import { buildSensitivityGrids, type SensCell } from "@/lib/underwrite/sensitivity";
+import { runScenario } from "@/lib/underwrite/playground";
+import { compactUsd } from "@/lib/money";
 
 /** The sample's actuals, in the shape deriveUnderwriteInputs takes. */
 export const SAMPLE_ACTUALS = {
@@ -21,7 +24,53 @@ export const SAMPLE_ACTUALS = {
   },
 } as const;
 
-/** The sample deal's derived model inputs, actuals included. */
-export function sampleDerivedInputs() {
-  return deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS);
+/** The sample deal's derived model inputs, actuals included. `deal` is what
+ *  a document is told beside the extraction (the rent rules, the day its
+ *  dated readers read on), as the signed-in sample's workbook route tells
+ *  its derivation: it reaches the cover's lines (`meta`) and never a figure
+ *  the model runs on. */
+export function sampleDerivedInputs(deal?: DealForModel) {
+  return deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS, undefined, deal);
+}
+
+/**
+ * The base case's returns as the workbook and the stress bench run them
+ * (lib/underwrite/playground `runScenario` on `sampleDerivedInputs`), with
+ * the exit cap they run at. The homepage's Financials tab prints these, so
+ * the page shows the sample one levered IRR: the tab had printed the
+ * first-draft model's 8.72% at a 5.50% exit beside the Excel tile's 9.3%
+ * at 5.45% (research pass 43, L3).
+ */
+export function sampleBaseReturns() {
+  const { inputs } = sampleDerivedInputs();
+  return { ...runScenario(inputs, {}), exitCapPct: inputs.exitCapPct };
+}
+
+/**
+ * The homepage's "Excel model, live formulas" tile, read off the sample
+ * workbook it links (/api/demo/underwrite.xlsx, built from
+ * `sampleDerivedInputs`): the base case's levered IRR at its price and its
+ * exit cap, then two cells of the workbook's own Sensitivity tab — its Exit
+ * Cap × Purchase Price grid one exit-cap step wider, and one price step
+ * lower (lib/underwrite/sensitivity, which the workbook's live engine
+ * blocks mirror) — each as the workbook computes it. Rows are [input,
+ * value, effect]. Research pass 34: the tile had run the first-draft model
+ * (lib/model/compute) under a comment promising the workbook's figures, at
+ * a 5.50% exit and an 8.7% IRR against the workbook's 5.45% and 9.3%, and
+ * flexed a rent growth no tab of the workbook runs.
+ */
+export function sampleWorkbookPreview(): [string, string, string][] {
+  const { inputs } = sampleDerivedInputs();
+  const grid = buildSensitivityGrids(inputs).find((g) => g.key === "capPrice")!;
+  const p = grid.rowAxis.baseIndex;
+  const c = grid.colAxis.baseIndex;
+  const irr = (cell: SensCell) => (cell.irrPct == null ? "—" : `IRR ${(cell.irrPct * 100).toFixed(1)}%`);
+  const money = (n: number) => compactUsd(n, { trim: true });
+  const cap = (d: number) => `${(d * 100).toFixed(2)}%`;
+  return [
+    ["Purchase price", money(inputs.purchasePrice), irr(grid.cells[p][c])],
+    ["Exit cap", cap(inputs.exitCapPct), irr(grid.cells[p][c])],
+    ["Exit cap (flexed)", cap(grid.colAxis.values[c + 1]), irr(grid.cells[p][c + 1])],
+    ["Purchase price (flexed)", money(grid.rowAxis.values[p - 1]), irr(grid.cells[p - 1][c])],
+  ];
 }

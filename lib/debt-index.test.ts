@@ -4,6 +4,7 @@ import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import {
   CONSTRUCTION_SPREAD_BPS,
   NO_DEBT_SEEDS,
+  SURVEY_SOURCE,
   allInPct,
   benchmark30,
   constructionSeed,
@@ -13,6 +14,7 @@ import {
   indexName,
   isDebtSeedSeries,
   ratesPromptLine,
+  SOFR_LEVEL_RULE,
   type SurveyRate,
 } from "./debt-index";
 import { SERIES } from "./live-rates";
@@ -108,9 +110,14 @@ describe("the all-in rate and its note", () => {
     const c = constructionSeed(debtSeeds(rates, 60));
     expect(c?.pct).toBe(Math.round((3.67623 + CONSTRUCTION_SPREAD_BPS / 100) * 100) / 100);
     expect(c?.pct).toBe(7.18);
+    // SOFR's figure is the New York Fed's, through FRED, as the strip's
+    // tile credits it; a Treasury tenor's note still says FRED.
     expect(c?.note).toBe(
-      "30-day avg SOFR 3.68% (FRED, Sep 21, 2026) + 350 bps construction spread, a screening default — enter your quote",
+      "30-day avg SOFR 3.68% (New York Fed via FRED, Sep 21, 2026) + 350 bps construction spread, a screening default — enter your quote",
     );
+    // The index it was built on, so the panel that prints it owes and draws
+    // the New York Fed's notice (lib/data-notices).
+    expect(c?.index).toBe("SOFR30DAYAVG");
     expect(constructionSeed(NO_DEBT_SEEDS)).toBeNull();
   });
 
@@ -126,11 +133,14 @@ describe("benchmark30 — the leverage check's 30-yr fixed, and which one it is"
   // as the seed reads it: its source is the file's first.
   const snapshot = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed")!;
 
-  it("the week's survey first, named as FRED's series", () => {
+  it("the week's survey first, credited to Freddie Mac's survey through FRED's series", () => {
+    // FRED is the channel; the survey is Freddie Mac's, by the name its own
+    // page gives it (research pass 31, C3).
+    expect(SURVEY_SOURCE).toBe("Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US");
     expect(benchmark30(live, snapshot)).toEqual({
       value: 6.95,
       asOf: "2026-09-17",
-      source: "FRED · MORTGAGE30US",
+      source: "Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US",
       live: true,
     });
   });
@@ -139,7 +149,7 @@ describe("benchmark30 — the leverage check's 30-yr fixed, and which one it is"
     const b = benchmark30({ ...live, fresh: false }, snapshot);
     expect(b?.value).toBe(6.95);
     expect(b?.asOf).toBe("2026-09-17");
-    expect(b?.source).toBe("FRED · MORTGAGE30US, stale");
+    expect(b?.source).toBe("Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, stale");
   });
 
   it("the checked-in snapshot only where the table has no survey, named as the snapshot by the publisher its source states", () => {
@@ -188,6 +198,27 @@ describe("today's rates, as a line a Claude step reads (the audit of 2026-09-30)
     expect(line).toContain(`the 10-yr Treasury ${seeds.tenYear!.pct.toFixed(2)}% (${datedLong(seeds.tenYear!.asOf)})`);
     expect(line).toContain(`30-day avg SOFR ${seeds.floating!.pct.toFixed(2)}% (${datedLong(seeds.floating!.asOf)}), a floating, bridge or construction loan's index`);
     expect(line).toContain("never state a rate as current that is not one of them or built from one of them");
+  });
+
+  // Research pass 41 (M4): the line asked every interest "whether the
+  // going-in cap sits below the cost of the debt" beside notes saying a
+  // note's, a position's or a leased fee's price buys no building.
+  it("asks the negative-leverage question only where the price buys the building", () => {
+    const line = ratesPromptLine(debtSeeds(rates, 60), 60)!;
+    expect(line).toContain(
+      "Judge the financing against these figures — and whether the going-in cap sits below the cost of the debt, where the price buys the building: a note's, a preferred equity position's or a leased fee's price buys none, and a share's buys the share, so no cap struck on that price is the deal's",
+    );
+    expect(line).not.toContain("Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures");
+  });
+
+  // Audit B, LOW-6: a step's words reach the deal page and the shared screen
+  // with no notice under them, so SOFR's level is the one figure it is
+  // handed to judge by and never to write.
+  it("tells the step to judge by SOFR but never write its level, only where SOFR is handed over", () => {
+    const seeds = debtSeeds(rates, 60);
+    expect(ratesPromptLine(seeds, 60)!.endsWith(` ${SOFR_LEVEL_RULE}`)).toBe(true);
+    expect(SOFR_LEVEL_RULE).toMatch(/never write its level/);
+    expect(ratesPromptLine({ ...seeds, floating: null }, 60)).not.toContain("New York Fed");
   });
 
   it("says the 10-year once where the hold prices off it", () => {

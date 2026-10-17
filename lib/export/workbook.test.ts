@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildRentRollWorkbook, colLetter, isoToSerial } from "./workbook";
-import { buildRentRollCashFlow, type WorkbookInputs } from "./cashflow";
+import { buildRentRollCashFlow, pmt, type WorkbookInputs } from "./cashflow";
 import { parseCsv, suggestMapping, toLeases } from "@/lib/rentroll/parse";
 import { PROFILE_DEFAULTS, normalizeProfile } from "@/lib/rentroll/profiles";
 import { CLEAN_CSV } from "@/lib/rentroll/__fixtures__";
@@ -179,12 +179,35 @@ describe("buildRentRollWorkbook — structure", () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);
     const cf = wb.getWorksheet("Cash Flow")!;
-    expect((cf.getCell(CF_ROW.leveredIrr, 2).value as CellVal).formula).toMatch(/^IRR\(/);
+    // The native function, wrapped so flows no rate solves read a sentence
+    // rather than an error code (research pass 35).
+    expect((cf.getCell(CF_ROW.leveredIrr, 2).value as CellVal).formula).toMatch(/^IFERROR\(IRR\(B40:L40\),/);
+    expect((cf.getCell(CF_ROW.unleveredIrr, 2).value as CellVal).formula).toMatch(/^IFERROR\(IRR\(B39:L39\),/);
     // HyperFormula has no XIRR, so the recalculation assertions below don't
     // cover it — LibreOffice does. What's asserted here is that the cell holds
     // the native function rather than a value we computed and pasted.
-    expect((cf.getCell(44, 2).value as CellVal).formula).toMatch(/^XIRR\(/);
+    expect((cf.getCell(44, 2).value as CellVal).formula).toMatch(/^IFERROR\(XIRR\(B40:L40,B3:L3\),/);
     expect((cf.getCell(CF_ROW.equityMultiple, 2).value as CellVal).formula).toContain("SUM(");
+  });
+
+  // Research pass 35 (F8): years printed "2,027", the statistics' labels were
+  // cut at a 10-wide column, and the indicator columns printed 1 and 0.
+  it("prints a year as a year, the indicators as Yes or No over their 1 and 0, and the statistics' labels whole", async () => {
+    const { wb, value } = await loadWorkbook(buffer);
+    const roll = wb.getWorksheet("Rent Roll")!;
+    for (let r = 4; r < 4 + LEASES.length; r++) {
+      expect(roll.getCell(r, 10).numFmt, `Rent Roll!J${r}`).toBe("0");
+      for (const c of [13, 14]) expect(roll.getCell(r, c).numFmt, `Rent Roll!${colLetter(c)}${r}`).toBe('"Yes";"Yes";"No"');
+    }
+    // The indicators still hold numbers, which the statistics multiply.
+    expect(value("Rent Roll", 4, 10)).toBe(2027);
+    expect(value("Rent Roll", 4, 13)).toBe(1);
+    expect(value("Rent Roll", 6, 13)).toBe(0); // the vacant suite
+    const rollover = wb.getWorksheet("Rollover")!;
+    expect(rollover.getCell(4, 2).numFmt).toBe("0");
+    expect(value("Rollover", 4, 2)).toBe(2026);
+    // Wide enough for "WALT — rent weighted (yrs)" and its indent.
+    expect(roll.getColumn(1).width).toBeGreaterThanOrEqual(26);
   });
 
   it("writes no serial for a day that does not exist, so the page and the workbook date the same leases", () => {
@@ -304,6 +327,33 @@ describe("buildRentRollWorkbook — the formulas compute the app's numbers", () 
   });
 });
 
+// Research pass 35 (F8): on flows that never earn the equity back the
+// levered IRR read #NUM! (HyperFormula, Excel) and Err:523 (LibreOffice),
+// beside an equity multiple of -1.71x. The multiple is the formula's honest
+// answer and stays; the IRR cell says why it has no rate, and stays a formula.
+// A price far over what the roll's income carries, at 90% loan-to-cost: the
+// debt service outruns the NOI every year and the sale does not repay the loan.
+const UNDERWATER: WorkbookInputs = { ...INPUTS, purchasePrice: 100_000_000, ltc: 0.9 };
+
+describe("buildRentRollWorkbook — flows no rate solves read a sentence, not an error", () => {
+  const sunk = buildRentRollCashFlow(LEASES, UNDERWATER);
+
+  it("says the levered flows never turn positive, as the mirror does, and stays a formula", async () => {
+    // The fixture is what it says: every levered flow at or under zero.
+    expect(Math.max(...sunk.leveredVector)).toBeLessThanOrEqual(0);
+    expect(sunk.leveredIrr).toBeNull();
+    expect(sunk.leveredIrrNote).toBe("no IRR: the levered flows never turn positive");
+    const { wb, value } = await loadWorkbook(await buildRentRollWorkbook(LEASES, UNDERWATER));
+    expect(value("Cash Flow", CF_ROW.leveredIrr, 2)).toBe(sunk.leveredIrrNote);
+    expect((wb.getWorksheet("Cash Flow")!.getCell(CF_ROW.leveredIrr, 2).value as CellVal).formula).toMatch(/^IFERROR\(IRR\(B40:L40\),IF\(MAX\(B40:L40\)<=0,/);
+    // The multiple is left as the formula computes it.
+    expect(value("Cash Flow", CF_ROW.equityMultiple, 2) as number).toBeLessThan(0);
+    // A rate that stands has no note, in the mirror or the file.
+    expect(model.leveredIrrNote).toBeNull();
+    expect(model.unleveredIrrNote).toBeNull();
+  });
+});
+
 describe("buildRentRollWorkbook — the model is live", () => {
   it("moves levered IRR when the exit cap on the Assumptions tab changes", async () => {
     const { value, setValue } = await loadWorkbook(buffer);
@@ -327,6 +377,73 @@ describe("buildRentRollWorkbook — the model is live", () => {
     setValue("Assumptions", 12, 2, 20); // market rent $/SF
     const after = value("Cash Flow", CF_ROW.noi, 12) as number;
     expect(after).toBeGreaterThan(before);
+  });
+});
+
+// The audit of 2026-10-05: the balance at exit divided by the monthly rate
+// and the gross sale by the exit cap, so a 0% loan or a 0% exit cap typed
+// into the file read #DIV/0! there and in every return below it, while the
+// mirror (lib/export/cashflow) answers both. Each cell is still a formula,
+// and takes the mirror's own branch.
+const ASSUM_ROW = { rate: 41, monthlyPayment: 57, balanceAtExit: 59 };
+const CF_SALE_ROW = { grossSale: 32, saleCosts: 33, loanPayoff: 34, netSaleLevered: 35, netSaleUnlevered: 36 };
+
+describe("buildRentRollWorkbook — a 0% rate and a 0% exit cap compute as the mirror does", () => {
+  it("a 0% loan's balance at exit is the loan less the payments made", async () => {
+    const { wb, value, setValue } = await loadWorkbook(buffer);
+    // At the seeded rate the closed form stands, as before.
+    expect(value("Assumptions", ASSUM_ROW.balanceAtExit, 2) as number).toBeCloseTo(model.loanPayoff, 2);
+
+    setValue("Assumptions", ASSUM_ROW.rate, 2, 0);
+    const zero = buildRentRollCashFlow(LEASES, { ...INPUTS, allInRatePct: 0 });
+    // The fixture is what it says: a loan that amortizes, at no interest.
+    expect(zero.loanPayoff).toBeGreaterThan(0);
+    expect(zero.loanPayoff).toBeLessThan(zero.loanAmount);
+    expect(value("Assumptions", ASSUM_ROW.monthlyPayment, 2) as number).toBeCloseTo(
+      pmt(zero.loanAmount, 0, INPUTS.amortMonths),
+      4,
+    );
+    const balance = value("Assumptions", ASSUM_ROW.balanceAtExit, 2);
+    expect(typeof balance, "the balance at exit reads a figure, not #DIV/0!").toBe("number");
+    expect(balance as number).toBeCloseTo(zero.loanPayoff, 2);
+    expect(value("Cash Flow", CF_SALE_ROW.loanPayoff, 2) as number).toBeCloseTo(-zero.loanPayoff, 2);
+    expect(value("Cash Flow", CF_SALE_ROW.netSaleLevered, 2) as number).toBeCloseTo(zero.netSaleProceedsLevered, 2);
+    // …and the returns the payoff feeds.
+    zero.years.forEach((y, i) => {
+      expect(value("Cash Flow", CF_ROW.leveredCf, 3 + i) as number).toBeCloseTo(y.leveredCashFlow, 4);
+    });
+    expect(value("Cash Flow", CF_ROW.leveredIrr, 2) as number).toBeCloseTo(zero.leveredIrr!, 4);
+    expect(value("Cash Flow", CF_ROW.equityMultiple, 2) as number).toBeCloseTo(zero.equityMultiple!, 4);
+    // Still a formula, the zero rate's branch first.
+    const formula = (wb.getWorksheet("Assumptions")!.getCell(ASSUM_ROW.balanceAtExit, 2).value as CellVal).formula;
+    expect(formula).toMatch(/^IF\(Assumptions!\$B\$56=0,MAX\(0,Assumptions!\$B\$52-Assumptions!\$B\$57\*Assumptions!\$B\$58\),MAX\(0,/);
+  });
+
+  it("an exit cap of 0% or below strikes no sale price, as the mirror does, and the returns still read", async () => {
+    const { wb, value, setValue } = await loadWorkbook(buffer);
+    setValue("Assumptions", ASSUM_EXIT_CAP_ROW, 2, 0);
+    const noCap = buildRentRollCashFlow(LEASES, { ...INPUTS, exitCapPct: 0 });
+    expect(noCap.grossSaleProceeds).toBe(0);
+    expect(value("Cash Flow", CF_SALE_ROW.grossSale, 2)).toBe(0);
+    expect(value("Cash Flow", CF_SALE_ROW.saleCosts, 2) as number).toBeCloseTo(0, 6);
+    expect(value("Cash Flow", CF_SALE_ROW.netSaleUnlevered, 2) as number).toBeCloseTo(0, 6);
+    expect(value("Cash Flow", CF_SALE_ROW.loanPayoff, 2) as number).toBeCloseTo(-noCap.loanPayoff, 2);
+    expect(value("Cash Flow", CF_SALE_ROW.netSaleLevered, 2) as number).toBeCloseTo(noCap.netSaleProceedsLevered, 2);
+    expect(value("Cash Flow", CF_ROW.unleveredIrr, 2) as number).toBeCloseTo(noCap.unleveredIrr!, 4);
+    expect(value("Cash Flow", CF_ROW.equityMultiple, 2) as number).toBeCloseTo(noCap.equityMultiple!, 4);
+    // The mirror finds no levered rate for these flows, and the cell says so
+    // in the mirror's words rather than reading #DIV/0!.
+    expect(noCap.leveredIrr).toBeNull();
+    expect(value("Cash Flow", CF_ROW.leveredIrr, 2)).toBe(noCap.leveredIrrNote);
+    // A cap below zero is no cap either, in both.
+    setValue("Assumptions", ASSUM_EXIT_CAP_ROW, 2, -0.01);
+    expect(value("Cash Flow", CF_SALE_ROW.grossSale, 2)).toBe(0);
+    expect(buildRentRollCashFlow(LEASES, { ...INPUTS, exitCapPct: -0.01 }).grossSaleProceeds).toBe(0);
+    // Still a formula, and at a real cap it divides as before.
+    const cell = wb.getWorksheet("Cash Flow")!.getCell(CF_SALE_ROW.grossSale, 2);
+    expect((cell.value as CellVal).formula).toBe("IF(Assumptions!$B$36>0,B31/Assumptions!$B$36,0)");
+    setValue("Assumptions", ASSUM_EXIT_CAP_ROW, 2, INPUTS.exitCapPct);
+    expect(value("Cash Flow", CF_SALE_ROW.grossSale, 2) as number).toBeCloseTo(model.grossSaleProceeds, 2);
   });
 });
 
@@ -403,5 +520,78 @@ describe.skipIf(!SOFFICE)("LibreOffice recalculation", () => {
     // XIRR dates the flows a year apart, so it lands near — not on — the
     // undated IRR. Within 50 bps is the honest tolerance.
     expect(labelled("Levered XIRR (dated)")).toBeCloseTo(model.leveredIrr!, 2);
+  }, 300_000);
+
+  // LibreOffice answered Err:523 for an IRR no rate solves; the cell now
+  // reads the mirror's sentence there too, and XIRR's says the same.
+  it("reads the sentence, not Err:523, where the levered flows never turn positive", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rentroll-wb-sunk-"));
+    const xlsx = join(dir, "model.xlsx");
+    const outDir = join(dir, "out");
+    mkdirSync(outDir);
+    return buildRentRollWorkbook(LEASES, UNDERWATER).then((buf) => {
+      writeFileSync(xlsx, buf);
+      execFileSync(
+        SOFFICE!,
+        [
+          "--headless",
+          "--norestore",
+          `-env:UserInstallation=file://${join(dir, "loprofile")}`,
+          "--convert-to",
+          "csv:Text - txt - csv (StarCalc):44,34,76,1,,0,false,true,false,false,,4",
+          "--outdir",
+          outDir,
+          xlsx,
+        ],
+        { stdio: "pipe", timeout: 240_000 },
+      );
+      const produced = readdirSync(outDir).filter((f) => f.endsWith(".csv"));
+      expect(produced.length).toBeGreaterThan(0);
+      const rows = parseCsv(readFileSync(join(outDir, produced[0]), "utf8"));
+      const cell = (name: string) => String(rows.find((r) => String(r[0] ?? "").trim() === name)?.[1] ?? "");
+      const sunk = buildRentRollCashFlow(LEASES, UNDERWATER);
+      expect(cell("Levered IRR")).toBe(sunk.leveredIrrNote);
+      expect(cell("Levered XIRR (dated)")).toBe("no XIRR: the levered flows never turn positive");
+    });
+  }, 300_000);
+
+  // The balance at exit and the gross sale divided by a rate and a cap the
+  // file let a reader set to zero; LibreOffice read Err:532 (#DIV/0!) there.
+  it("reads the mirror's sale and payoff, not #DIV/0!, at a 0% rate and a 0% exit cap", async () => {
+    const DEGENERATE: WorkbookInputs = { ...INPUTS, allInRatePct: 0, exitCapPct: 0 };
+    const dir = mkdtempSync(join(tmpdir(), "rentroll-wb-zero-"));
+    const xlsx = join(dir, "model.xlsx");
+    const outDir = join(dir, "out");
+    mkdirSync(outDir);
+    writeFileSync(xlsx, await buildRentRollWorkbook(LEASES, DEGENERATE));
+    execFileSync(
+      SOFFICE!,
+      [
+        "--headless",
+        "--norestore",
+        `-env:UserInstallation=file://${join(dir, "loprofile")}`,
+        "--convert-to",
+        "csv:Text - txt - csv (StarCalc):44,34,76,1,,0,false,true,false,false,,4",
+        "--outdir",
+        outDir,
+        xlsx,
+      ],
+      { stdio: "pipe", timeout: 240_000 },
+    );
+    const produced = readdirSync(outDir).filter((f) => f.endsWith(".csv"));
+    expect(produced.length).toBeGreaterThan(0);
+    const rows = parseCsv(readFileSync(join(outDir, produced[0]), "utf8"));
+    const figure = (name: string): number => {
+      const raw = String(rows.find((r) => String(r[0] ?? "").trim() === name)?.[1] ?? "");
+      const n = Number(raw.replace(/[%$,\s]/g, ""));
+      expect(Number.isFinite(n), `"${name}" came back as "${raw}"`).toBe(true);
+      return raw.includes("%") ? n / 100 : n;
+    };
+    const both = buildRentRollCashFlow(LEASES, DEGENERATE);
+    expect(figure("Gross sale proceeds")).toBe(0);
+    expect(figure("Loan payoff")).toBeCloseTo(-both.loanPayoff, 2);
+    expect(figure("Net sale proceeds — levered")).toBeCloseTo(both.netSaleProceedsLevered, 2);
+    expect(figure("Unlevered IRR")).toBeCloseTo(both.unleveredIrr!, 4);
+    expect(figure("Equity multiple")).toBeCloseTo(both.equityMultiple!, 4);
   }, 300_000);
 });

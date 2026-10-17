@@ -17,7 +17,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
-import { IMAGE_CREDIT, fetchStreetViewImage } from "@/lib/imagery";
+import { GOOGLE_NO_STORE, IMAGE_CREDIT, fetchStreetViewImage } from "@/lib/imagery";
 
 const SIZE = { width: 800, height: 450 };
 
@@ -49,8 +49,10 @@ export async function GET(
   return new NextResponse(img.body, {
     headers: {
       "content-type": img.headers.get("content-type") ?? "image/jpeg",
-      // Street imagery changes rarely; a day of caching keeps quota near zero.
-      "cache-control": "private, max-age=86400",
+      // Never kept: Google's policies prohibit caching its content
+      // (lib/imagery GOOGLE_NO_STORE). This route had told browsers to keep
+      // the image a day.
+      "cache-control": GOOGLE_NO_STORE,
       "x-image-credit": IMAGE_CREDIT.streetview,
     },
   });

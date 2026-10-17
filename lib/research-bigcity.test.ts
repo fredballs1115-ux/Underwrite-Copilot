@@ -276,9 +276,10 @@ describe("buildSubject portfolio totals", () => {
       built_year: 1985,
       owner_total_rental_units_in_state: 15,
     });
-    // Not exempt; owner-occupancy is the one path left open, so it reads as
-    // an open question rather than a silent pass either way.
-    expect(o["ny-good-cause-eviction"]).toBe("possibly_applies");
+    // Not exempt: 15 units is over the small-landlord limit and over the
+    // owner-occupied building's, so no path is left open (the audit of
+    // 2026-10-05 — occupancy had been asked of a building over its limit).
+    expect(o["ny-good-cause-eviction"]).toBe("applies");
   });
 });
 

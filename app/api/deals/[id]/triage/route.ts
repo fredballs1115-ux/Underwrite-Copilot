@@ -3,12 +3,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import {
   evaluateBuyBox,
-  buyBoxCheckSource,
+  buyBoxCoverage,
   foldBuyBoxChecks,
+  type BuyBoxCoverage,
 } from "@/lib/criteria";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
-import { inferStrategy } from "@/lib/deal-strategy";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { scoreMandateFit } from "@/lib/mandate";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -64,6 +66,11 @@ export async function GET(
 
   let fit: TriageFit;
   let provisional = true;
+  // How many of the box's criteria the fit stands on (lib/criteria
+  // `buyBoxCoverage`), so the chip says "Fits box (2 of 4)" as the pipeline
+  // card says it, and is not green while a criterion the price decides
+  // could not be checked.
+  let coverage: BuyBoxCoverage | null = null;
   try {
     const box = await getBuyBoxForDeal(
       deal.user_id as string,
@@ -73,30 +80,33 @@ export async function GET(
       fit = "nobox";
     } else {
       const extraction = (deal.extraction as ExtractionResult | null) ?? null;
-      const source = buyBoxCheckSource(
+      // The same source the deal page and the pipeline judge (lib/buy-box-
+      // chip) — adjacent surfaces must agree on a development's land cost as
+      // its price, and on a cap or a basis the price does not buy.
+      const source = dealCheckSource(
         extraction,
         (deal.first_signal as FirstSignal | null) ?? null,
         (deal.address as StructuredAddress | null) ?? null,
-        // The same read the deal page and the pipeline make — adjacent
-        // surfaces must agree on a development's land cost as its price.
-        inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null).kind,
       );
       provisional = !extraction;
       if (!source) {
         fit = "pending";
       } else {
-        // The pipeline table's exact fold — adjacent surfaces must agree.
-        fit =
-          foldBuyBoxChecks(
-            evaluateBuyBox((deal.asset_class as string) ?? "auto", source, box),
-          ) ?? "unverified";
+        // The pipeline table's exact fold — adjacent surfaces must agree —
+        // and its coverage, which counts what the mandate-fit score judges
+        // that no check lists: the cash-on-cash floor and the red lines.
+        const filedAs = (deal.asset_class as string) ?? "auto";
+        const checks = evaluateBuyBox(filedAs, source, box);
+        fit = foldBuyBoxChecks(checks) ?? "unverified";
+        coverage = buyBoxCoverage(checks, scoreMandateFit(filedAs, source, box));
       }
     }
   } catch (err) {
     // Eternal "pending" chips with silent logs would be undebuggable.
     console.error(`triage failed for deal ${id}:`, err);
     fit = "pending";
+    coverage = null;
   }
 
-  return Response.json({ fit, provisional }, { headers: NO_STORE });
+  return Response.json({ fit, provisional, coverage }, { headers: NO_STORE });
 }

@@ -64,6 +64,15 @@ describe("rentOf — the year's rent from what the memorandum states", () => {
     expect(rentOf("$8,000/mo", 2_000)).toEqual({ annual: 96_000, psf: 48 });
   });
 
+  it("reads a year's rent with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no rent.
+    expect(rentOf("$725,000 (NNN, 10-year term)", 58_000)).toEqual({ annual: 725_000, psf: 725_000 / 58_000 });
+    expect(rentOf("$725,000 (non-cancellable)", null)).toEqual({ annual: 725_000, psf: null });
+    // Its bumps after a dash are words after the rent (audit C3a).
+    expect(rentOf("$725,000 – 3% annual bumps", null)).toEqual({ annual: 725_000, psf: null });
+    expect(rentOf("$12.50/SF — 2.5% increases", 2_000)).toEqual({ annual: 25_000, psf: 12.5 });
+  });
+
   it("a range is two figures and reads as none; a blank is null", () => {
     expect(rentOf("$18-$22/SF", 1_000)).toEqual({ annual: null, psf: null });
     expect(rentOf("", 1_000)).toEqual({ annual: null, psf: null });

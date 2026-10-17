@@ -41,7 +41,76 @@ const STAND_INS: ((s: string) => string)[] = [
   (s) => s.replace(/[\u2002-\u200a\u202f\u205f]/g, " "),
 ];
 
-export const pdfSafe = (s: string): string =>
-  STAND_INS.reduce((t, f) => f(t), s).replace(/[^\n\u0020-\u007e\u00a0-\u00ff]/gu, (ch) =>
-    WINANSI_EXTRA.has(ch.codePointAt(0)!) ? ch : "",
-  );
+/** A word longer than this wraps by `nameBreaks`; shorter, it wraps whole. */
+const NAME_WORD_WHOLE = 24;
+/** The pieces a run with no separator is cut into, as the memo's own
+ *  hyphenation cuts a long word. */
+const NAME_PIECE = 12;
+/** An empty part react-pdf reads as a break with nothing drawn: textkit
+ *  removes a soft hyphen from a part, and an empty part is zero-width glue,
+ *  where a break draws no hyphen (a break between two parts of a word is a
+ *  penalty, and react-pdf draws "-" at every one). */
+const BREAK_HERE = "­";
+
+/**
+ * Where a deal's name may break on paper (research pass 42, L1): react-pdf's
+ * hyphenation callback for the Text that prints it. A word of the name that
+ * fits any column wraps whole. A longer one — a URL pasted as the name —
+ * breaks after its slashes (never inside "//") and after each hyphen, dot or
+ * underscore it already has, and a run still longer than a column is cut in
+ * twelve-letter pieces; every break draws nothing, so the printed name is
+ * the name: "…/1400-Market-St-P- hiladelphia-…" had been drawn by the
+ * memo's own hyphenation, which puts a hyphen at every break.
+ */
+export function nameBreaks(word: string): string[] {
+  if (word.length <= NAME_WORD_WHOLE) return [word];
+  const pieces = word
+    .split(/(?<=[-_.])|(?<=\/)(?!\/)/)
+    .filter(Boolean)
+    .flatMap((p) => (p.length > NAME_WORD_WHOLE ? (p.match(new RegExp(`.{1,${NAME_PIECE}}`, "gu")) ?? [p]) : [p]));
+  return pieces.flatMap((p, i) => (i === 0 ? [p] : [BREAK_HERE, p]));
+}
+
+/** Whether the font prints a character: WinAnsi, or a line break. */
+const prints = (ch: string): boolean => /[\n\u0020-\u007e\u00a0-\u00ff]/u.test(ch) || WINANSI_EXTRA.has(ch.codePointAt(0)!);
+
+const withStandIns = (s: string): string => STAND_INS.reduce((t, f) => f(t), s);
+
+export const pdfSafe = (s: string): string => withStandIns(s).replace(/[^\n\u0020-\u007e\u00a0-\u00ff]/gu, (ch) => (prints(ch) ? ch : ""));
+
+/** What the memo and the report call a deal whose name the font cannot
+ *  print (research pass 42, M5). */
+export const NAME_NOT_PRINTABLE = "Deal (name not printable in this PDF's font)";
+
+/** The letters `pdfSafe` would drop — never one a stand-in adds: "Tower ↑
+ *  Redevelopment" prints "Tower up Redevelopment" whole, where comparing the
+ *  two texts' letter counts had called it not printable (audit C5, LOW-4). */
+const lostLetters = (s: string): number => [...withStandIns(s)].filter((ch) => /\p{L}/u.test(ch) && !prints(ch)).length;
+
+/** A text as the PDF can print it: composed (a letter typed with a combining
+ *  accent is the accented letter WinAnsi has: "Café", never "Cafe"), safe,
+ *  and its spaces folded; null where printing it would lose a letter. */
+function printableWhole(s: unknown): string | null {
+  const raw = typeof s === "string" ? s.normalize("NFC").replace(/\s+/g, " ").trim() : "";
+  const safe = pdfSafe(raw).replace(/\s+/g, " ").trim();
+  return lostLetters(raw) === 0 ? safe : null;
+}
+
+/**
+ * The deal's name as the memo and the report print it: the title, the
+ * running header and the PDF's own title alike. Standard Helvetica prints
+ * WinAnsi alone, and `pdfSafe` drops the rest: a name in Japanese printed as
+ * "2", one in Arabic as "12", and two such deals' memos could be taken one
+ * for the other. Where printing the name would lose a letter, it is
+ * NAME_NOT_PRINTABLE followed by the first of `places` (the address, then
+ * the market) the font can print whole: "Deal (name not printable in this
+ * PDF's font) · 1200 N 31st St, Philadelphia, PA". A symbol the font lacks
+ * (an emoji) is no letter and is dropped as before; a name of none at all is
+ * "Deal".
+ */
+export function printableName(name: unknown, places: readonly unknown[] = []): string {
+  const whole = printableWhole(name);
+  if (whole != null) return whole || "Deal";
+  const place = places.map(printableWhole).find((p): p is string => !!p);
+  return place ? `${NAME_NOT_PRINTABLE} · ${place}` : NAME_NOT_PRINTABLE;
+}

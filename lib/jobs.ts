@@ -135,7 +135,11 @@ export async function jobInFlight(
 }
 
 export interface JobClaim {
-  outcome: "claimed" | "busy" | "none";
+  /** "busy": a live run holds the row. "error": the claim's read or write
+   *  failed — nothing was claimed and nothing is known to be running, so the
+   *  caller says the start failed, never that a screen is already running
+   *  (research pass 30). */
+  outcome: "claimed" | "busy" | "none" | "error";
   /** the status the row held BEFORE the claim (null when outcome="none") —
    *  "done" means the stored results are one coherent, completed generation */
   priorStatus: string | null;
@@ -183,13 +187,19 @@ export async function claimJob(
   const cols = (
     workerPayload !== undefined ? "id, status, updated_at, payload" : "id, status, updated_at"
   ) as "id, status, updated_at";
-  const { data } = await supabase
+  const { data, error: readErr } = await supabase
     .from("analysis_jobs")
     .select(cols)
     .eq("deal_id", dealId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  // A read that failed says nothing about the row: never "none" (the caller
+  // would insert a second row beside the first) and never "busy".
+  if (readErr) {
+    console.error(`[jobs] claim read failed for deal ${dealId}: ${readErr.message}`);
+    return { outcome: "error", priorStatus: null };
+  }
   const existing = data as {
     id: string;
     status: string;
@@ -258,10 +268,11 @@ export async function claimJob(
   }
   const { data: claimed, error: claimErr } = await query.select("id");
   if (claimErr) {
-    // Never silent: an errored claim reads as "busy" to the caller, and a
-    // schema-shaped failure (missing 0016 columns) would otherwise look like
-    // permanent contention with no trace anywhere.
+    // Never silent, and never "busy": an errored claim had read as a screen
+    // already running when none was, and a schema-shaped failure (missing
+    // 0016 columns) as permanent contention.
     console.error(`[jobs] claim update failed for deal ${dealId}: ${claimErr.message}`);
+    return { outcome: "error", priorStatus };
   }
   return claimed && claimed.length > 0
     ? { outcome: "claimed", priorStatus }

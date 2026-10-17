@@ -60,9 +60,12 @@ export function DealCover({
       className={`overflow-hidden ${place}`}
     >
       {/* On the ground at the picture's foot, below its horizon on the
-          smallest card the pipeline draws (held by the test). */}
+          smallest card the pipeline draws (held by the test). The eyebrow is
+          11px on the 13.5px line its 9px type had at the page's 1.5
+          (research pass 29: 9px was under any comfortable size on a phone),
+          so the words cover no more of the picture than they did. */}
       <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent px-3 pb-2 pt-9">
-        <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-white/90">No photo yet</span>{" "}
+        <span className="block text-[11px] leading-[13.5px] font-semibold uppercase tracking-[0.14em] text-white/90">No photo yet</span>{" "}
         {cover.place ? (
           <span className="block truncate text-[13px] font-semibold leading-tight text-white">{cover.place}</span>
         ) : null}

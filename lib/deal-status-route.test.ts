@@ -31,6 +31,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { GET } from "@/app/api/deals/[id]/status/route";
+import { isStalled } from "./screen-run";
 
 const DEAL = "11111111-1111-4111-8111-111111111111";
 const get = (id = DEAL) =>
@@ -60,9 +61,38 @@ describe("the deal's live job status", () => {
     expect(body.step).toBe("challenge");
   });
 
+  it("says how long ago the row was written, on the server's own clock — the page judges a stall by it (research pass 30)", async () => {
+    state.job = {
+      status: "running",
+      step: "challenge",
+      progress: 40,
+      error: null,
+      updated_at: "2026-10-05T11:49:00.000000+00:00",
+      created_at: "2026-10-05T11:45:00.000000+00:00",
+    };
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      const body = (await (await get()).json()) as Record<string, unknown>;
+      // Eleven minutes on the server's clock, past the stale line: stalled,
+      // whatever the browser's own clock says.
+      expect(body.ageMs).toBe(11 * 60_000);
+      expect(isStalled(body as never)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+    vi.useFakeTimers({ now: new Date("2026-10-05T11:49:30Z"), toFake: ["Date"] });
+    try {
+      const body = (await (await get()).json()) as Record<string, unknown>;
+      expect(body.ageMs).toBe(30_000);
+      expect(isStalled(body as never)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("a deal with no job has no start, so the page's clock falls back to its own load", async () => {
     const body = (await (await get()).json()) as Record<string, unknown>;
-    expect(body).toEqual({ status: "none", step: null, progress: 0, error: null, updated_at: null, created_at: null });
+    expect(body).toEqual({ status: "none", step: null, progress: 0, error: null, updated_at: null, created_at: null, ageMs: null });
   });
 
   it("a malformed id or a signed-out visitor reads nothing", async () => {

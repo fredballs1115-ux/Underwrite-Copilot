@@ -11,9 +11,14 @@
 // with a low sun, the deal's kind of building standing on its ground line
 // with its lit face toward the sun and its other face in shade, a few of its
 // windows lit, and its reflection on the ground beneath, where a card sets
-// its words. The deal's tone (one of eight skies) and its variant (where the
-// sun sits, which windows are lit) are drawn from its id, so a deal always
-// wears the same cover and a pipeline wears many.
+// its words. The deal's tone (one of twelve skies) and its variant are drawn
+// from its id, so a deal always wears the same cover and a pipeline wears
+// many. The variant is the deal's own draw of the scene (`coverDraw`,
+// research pass 29: a pipeline of one class had been a wall of twins told
+// apart by their skies): the hour — the evening it always was, a night with
+// its windows lit, or a morning — which side the light comes from, where the
+// building stands, the buildings in shade beside it and the trees along the
+// street, the sun's place, and which windows are lit.
 //
 // Pure and dependency-free, so a client component can draw from it without
 // the asset-class table (lib/deal-cover reads the class; this only draws).
@@ -60,11 +65,12 @@ export interface CoverTone {
 }
 
 /**
- * The eight skies, each a hue family from the evening: teal, harbour blue,
- * forest, slate, plum, brick, sea and bronze. The pipeline's cards are told
- * apart by colour, and none of them shouts over the photographs beside it.
- * The ground under every sky is deep, so a card's white words read on it
- * (held by the test).
+ * The twelve skies, each a hue family from the evening: teal, harbour blue,
+ * forest, slate, plum, brick, sea, bronze, and — since research pass 29, when
+ * eight let three of every seventeen deals share one — indigo, rose, olive
+ * and moss. The pipeline's cards are told apart by colour, and none of them
+ * shouts over the photographs beside it. The ground under every sky is deep,
+ * so a card's white words read on it (held by the test).
  */
 export const COVER_TONES: readonly CoverTone[] = [
   // teal: an evening over the water
@@ -179,6 +185,64 @@ export const COVER_TONES: readonly CoverTone[] = [
     accent: "#4691a4",
     tree: "#3b2b1c",
   },
+  // The four added in research pass 29, each slot at the eight's own
+  // lightness at a hue the eight leave open.
+  // indigo: a deep blue dusk, peach at the horizon
+  {
+    sky: ["#121336", "#3e4084", "#efc5b3"],
+    sun: "#ffe6db",
+    haze: "#7d7996",
+    lit: ["#a5a6c0", "#717298"],
+    rim: "#e1cec7",
+    shade: "#2b2c50",
+    pane: ["#3c3e67", "#171831"],
+    glow: ["#ffda85", "#f4b25e"],
+    ground: ["#191a33", "#0d0d1c"],
+    accent: "#ebaf47",
+    tree: "#1e1f38",
+  },
+  // rose: a rose dusk over warm stone
+  {
+    sky: ["#341420", "#80425b", "#efc7b3"],
+    sun: "#ffe7db",
+    haze: "#967987",
+    lit: ["#bfa6b0", "#967381"],
+    rim: "#e1cfc7",
+    shade: "#4e2d3a",
+    pane: ["#653f4e", "#2f1821"],
+    glow: ["#ffda85", "#f4b25e"],
+    ground: ["#321b24", "#1b0d13"],
+    accent: "#46a498",
+    tree: "#372029",
+  },
+  // olive: a dry evening, the light like straw
+  {
+    sky: ["#323115", "#7d7b45", "#efe1b3"],
+    sun: "#fff7db",
+    haze: "#969279",
+    lit: ["#bebda7", "#949375"],
+    rim: "#e1dbc7",
+    shade: "#4c4b2f",
+    pane: ["#636141", "#2e2d19"],
+    glow: ["#ffda85", "#f4b25e"],
+    ground: ["#31301c", "#1b1a0e"],
+    accent: "#d05f43",
+    tree: "#363521",
+  },
+  // moss: a mild evening over the green
+  {
+    sky: ["#202f18", "#59784a", "#efe5b3"],
+    sun: "#fff9db",
+    haze: "#889679",
+    lit: ["#b0bbaa", "#809178"],
+    rim: "#e1dcc7",
+    shade: "#394931",
+    pane: ["#4d5f44", "#212c1b"],
+    glow: ["#ffda85", "#f4b25e"],
+    ground: ["#232f1e", "#13190f"],
+    accent: "#cc5c6b",
+    tree: "#293423",
+  },
 ];
 
 /** What a cover is drawn from: its kind of building, its sky and its draw. */
@@ -186,14 +250,56 @@ export interface CoverScene {
   kind: CoverKind;
   /** which of `COVER_TONES` */
   tone: number;
-  /** the deal's own draw of the scene's details: where the sun sits, which
-   *  windows are lit */
+  /** the deal's own draw of the scene (`coverDraw`): its hour, its light's
+   *  side, where the building stands and what stands beside it, where the
+   *  sun sits, which windows are lit */
   variant: number;
 }
 
+/** The hour a cover is drawn at: the evening it always was, a night with
+ *  its windows lit under a moon, or a morning with its lights mostly off. */
+export type CoverTime = "dusk" | "night" | "morning";
+
+/** What a deal's draw decides about its scene beyond its sky. */
+export interface CoverDraw {
+  time: CoverTime;
+  /** the scene flipped: the sun on the right, the building's lit face
+   *  turned toward it */
+  mirror: boolean;
+  /** where the building stands in the room the sun leaves it, from 0 (as
+   *  near the sun as it may) to 1 (as far) */
+  place: number;
+  /** low buildings in shade on the far side from the sun, 0 to 2 */
+  neighbours: number;
+  /** trees along the street, beside the building, 0 to 2 */
+  trees: number;
+}
+
+/** The hours by the variant's two lowest bits: the evening half the time. */
+const TIMES: readonly CoverTime[] = ["dusk", "dusk", "night", "morning"];
+
+/**
+ * A deal's draw of its scene, from its variant. The hour and the side are
+ * the variant's own low bits, so every hour on either side is a variant a
+ * test can name; the rest is the variant's seeded draw.
+ */
+export function coverDraw(variant: number): CoverDraw {
+  const v = variant >>> 0;
+  const d = draw(v ^ 0x3c6ef372);
+  return {
+    time: TIMES[v & 3],
+    mirror: (v & 4) !== 0,
+    place: d(),
+    neighbours: [0, 1, 1, 2][Math.floor(d() * 4)],
+    trees: Math.floor(d() * 3),
+  };
+}
+
 /** The drawing's edition, in the image route's validator: a browser holding
- *  a cover drawn to an earlier edition is sent this one, never a 304. */
-export const COVER_EDITION = 2;
+ *  a cover drawn to an earlier edition is sent this one, never a 304. 3 is
+ *  research pass 29's: twelve skies, the hours, the mirror, the building's
+ *  place, its neighbours and trees, and the land drawn boldly when small. */
+export const COVER_EDITION = 3;
 
 /** At or under this many pixels on its short side a frame is drawn simply:
  *  the building larger, fewer and larger windows, no clouds, and no lights
@@ -242,6 +348,63 @@ function fill(colour: string, d: string, extra = ""): string {
   return d ? `<path fill="${colour}"${extra} d="${d}"/>` : "";
 }
 
+/** A number as `f` writes it, as a number: the pen of `strokes` moves
+ *  between written positions, so its moves never drift. */
+function at1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+
+/** A large frame's scene in whole pixels: a tenth of a pixel on a distant
+ *  block, a street tree or a star is nothing anyone sees, and it is a card's
+ *  characters. A small frame's keeps `f`'s tenths. */
+function scenePx(small: boolean): (v: number) => number {
+  return small ? at1 : Math.round;
+}
+
+/** A number written as a scene's rounding gives it, never "-0". */
+function num(v: number): string {
+  return v === 0 ? "0" : String(v);
+}
+
+/** A rectangle in a frame's pixels, its corners rounded by `q`, closing
+ *  exactly whatever the rounding. */
+function sceneRect(q: (v: number) => number, x: number, y: number, w: number, h: number): string {
+  return `M${num(q(x))} ${num(q(y))}H${num(q(x + w))}V${num(q(y + h))}H${num(q(x))}z`;
+}
+
+/** A disc in a frame's pixels, rounded by `q`. */
+function sceneDisc(q: (v: number) => number, cx: number, cy: number, r: number): string {
+  const rr = Math.max(q(r), 0.1);
+  const x0 = q(cx) - rr;
+  return `M${num(q(x0))} ${num(q(cy))}a${num(rr)} ${num(rr)} 0 1 0 ${num(q(2 * rr))} 0a${num(rr)} ${num(rr)} 0 1 0 ${num(-q(2 * rr))} 0z`;
+}
+
+/**
+ * A run of panes of one height drawn as one stroke: each a stroke as wide
+ * as the pane is high, along its middle, as long as it is wide, reached by a
+ * move from the last — the same rectangle a filled path draws, in half the
+ * characters, so a night's lit facade stays inside a card's few kilobytes.
+ */
+function strokes(): { add: (x: number, mid: number, w: number) => void; d: () => string } {
+  let d = "";
+  let px = 0;
+  let py = 0;
+  return {
+    add(x, mid, w) {
+      const [rx, ry, rw] = [at1(x), at1(mid), at1(w)];
+      d += d ? `m${f(rx - px)} ${f(ry - py)}h${f(rw)}` : `M${f(rx)} ${f(ry)}h${f(rw)}`;
+      px = rx + rw;
+      py = ry;
+    },
+    d: () => d,
+  };
+}
+
+/** Stroked panes, in one colour. */
+function stroked(colour: string, height: number, d: string, extra = ""): string {
+  return d ? `<path fill="none" stroke="${colour}"${extra} stroke-width="${f(height)}" d="${d}"/>` : "";
+}
+
 /** What a kind's drawing has to hand: its colours, its draws, its size. */
 interface Kit {
   t: CoverTone;
@@ -250,11 +413,19 @@ interface Kit {
   /** the deal's draw of which windows are lit */
   rand: () => number;
   small: boolean;
-  /** the lit windows so far, as path data, drawn over the panes: those lit
-   *  by a lamp at the glass, and those lit from deeper in the room */
-  glow: string;
-  dim: string;
+  /** the lit windows so far, drawn over the panes: those lit by a lamp at
+   *  the glass, and those lit from deeper in the room, one stroke (`strokes`)
+   *  a colour and a pane's height */
+  lit: Map<string, { colour: string; h: number; pen: ReturnType<typeof strokes> }>;
+  /** how many of the evening's lit windows the hour lights (`LIT`) */
+  litScale: number;
 }
+
+/** The windows lit at each hour against the evening's: most of them at
+ *  night, a few in the morning. */
+const LIT: Record<CoverTime, number> = { dusk: 1, night: 2.4, morning: 0.35 };
+/** No more of a facade than this is ever lit, even at night. */
+const MOST_LIT = 0.7;
 
 /** One of `options`, by the deal's own draw of its building's form, so two
  *  deals of one kind are two buildings. */
@@ -270,23 +441,40 @@ function pick<T>(k: Kit, options: readonly T[]): T {
 function grid(k: Kit, x: number, y: number, cols: number, rows: number, w: number, h: number, px: number, py: number, face: 0 | 1, lit: number): string {
   if (cols < 1 || rows < 1) return "";
   const len = (cols - 1) * px + w;
+  const share = Math.min(MOST_LIT, lit * k.litScale);
+  const lamp = litPen(k, k.t.glow[0], h);
+  const room = litPen(k, k.t.glow[1], h);
   let d = "";
   for (let r = 0; r < rows; r++) {
     d += `M${f(x)} ${f(y + r * py + h / 2)}h${f(len)}`;
     for (let c = 0; c < cols; c++) {
       const p = k.rand();
-      if (p < lit * 0.7) k.glow += R(x + c * px, y + r * py, w, h);
-      else if (p < lit) k.dim += R(x + c * px, y + r * py, w, h);
+      if (p < share * 0.7) lamp.add(x + c * px, y + r * py + h / 2, w);
+      else if (p < share) room.add(x + c * px, y + r * py + h / 2, w);
     }
   }
   return `<path fill="none" stroke="${k.t.pane[face]}" stroke-width="${f(h)}" stroke-dasharray="${f(w)} ${f(px - w)}" d="${d}"/>`;
 }
 
-/** The lit windows gathered so far, drawn now. */
+/** The pen a colour's lit windows of one height are drawn with. */
+function litPen(k: Kit, colour: string, h: number): ReturnType<typeof strokes> {
+  const key = `${colour} ${f(h)}`;
+  let e = k.lit.get(key);
+  if (!e) {
+    e = { colour, h, pen: strokes() };
+    k.lit.set(key, e);
+  }
+  return e.pen;
+}
+
+/** The lit windows gathered so far, drawn now: those lit from deep in the
+ *  room first, the lamps at the glass over them. */
 function lights(k: Kit): string {
-  const out = fill(k.t.glow[1], k.dim) + fill(k.t.glow[0], k.glow);
-  k.glow = "";
-  k.dim = "";
+  let out = "";
+  for (const colour of [k.t.glow[1], k.t.glow[0]]) {
+    for (const e of k.lit.values()) if (e.colour === colour) out += stroked(e.colour, e.h, e.pen.d());
+  }
+  k.lit.clear();
   return out;
 }
 
@@ -326,13 +514,15 @@ interface Art {
 // ── The kinds ───────────────────────────────────────────────────────────────
 
 /** An apartment block of four to six storeys under a parapet, balconies
- *  down its face or none, its entrance lit, a tree either side. */
+ *  down its face or none, its entrance lit, a tree either side, one or none. */
 function housing(k: Kit): Art {
   const { t, small } = k;
   const floors = pick(k, [4, 5, 6]);
   const bays = pick(k, [4, 5, 6]);
   const balconies = pick(k, ["alternate", "all", "none"] as const);
   const side = pick(k, [16, 20, 24]);
+  // Drawn last, so the block itself is the draw it always was.
+  const trees = pick(k, ["both", "left", "right", "none"] as const);
   if (small) {
     // Three bays of larger windows, a storey fewer.
     const top = -(10 + (floors - 1) * 11.5);
@@ -359,7 +549,8 @@ function housing(k: Kit): Art {
   s += fill(t.shade, rails);
   const dx = X + 4 + door * 11;
   s += fill(t.glow[0], R(dx, -9, 7, 9)) + fill(t.shade, R(dx - 3, -11, 13, 1.4));
-  s += tree(k, 4, 6.5) + tree(k, X + w + side + 4, 5.5);
+  if (trees === "both" || trees === "left") s += tree(k, 4, 6.5);
+  if (trees === "both" || trees === "right") s += tree(k, X + w + side + 4, 5.5);
   return { w: X + w + side + 10, h: 6 - top, svg: s };
 }
 
@@ -581,23 +772,51 @@ const SPAN: Record<CoverKind, number> = {
  *  a line of trees where a city would be wrong. */
 const HILLS: ReadonlySet<CoverKind> = new Set(["homes", "storage", "land"]);
 
+/** The kinds a street of lower buildings stands beside (`coverDraw`'s
+ *  neighbours): never a self-storage yard, whose neighbours are its trees,
+ *  and never the land. A house's neighbour is a house. */
+const STREET: ReadonlySet<CoverKind> = new Set(["housing", "homes", "office", "industrial", "retail", "hotel", "building"]);
+
+/** The sun's size at each hour against the evening's: the moon smaller. */
+const SUN_SIZE: Record<CoverTime, number> = { dusk: 1, night: 0.75, morning: 0.85 };
+/** The share of the street's windows lit at each hour. */
+const STREET_LIT: Record<CoverTime, number> = { dusk: 0.14, night: 0.5, morning: 0.04 };
+/** The share of the distant city's blocks with a window lit at each hour. */
+const CITY_LIT: Record<CoverTime, number> = { dusk: 0.6, night: 0.8, morning: 0.25 };
+
 // ── The scene ───────────────────────────────────────────────────────────────
 
+/** A box in the frame's pixels. */
+export interface CoverBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /** A distant skyline along the horizon, blocks of the deal's own heights,
- *  a window lit here and there: the path, and the lit windows' path. */
-function skyline(W: number, H: number, gY: number, rand: () => number, small: boolean): [string, string] {
-  let d = "";
-  let lit = "";
+ *  a window lit here and there, most of them at night: the blocks as one
+ *  stepped outline, and the lit windows, each `pane` wide and 1.3 panes
+ *  high, as one stroke (`strokes`). */
+function skyline(W: number, H: number, gY: number, rand: () => number, small: boolean, litChance: number): [string, string, number] {
+  // In whole pixels on a large frame: a distant block's edge a tenth of a
+  // pixel over is nothing anyone sees there, and it is a card's characters.
+  const n = small ? f : (v: number) => String(Math.round(v));
+  const foot = gY + 1;
   let x = -W * 0.02;
+  let d = `M${n(x)} ${n(foot)}`;
+  const lit = strokes();
   const pane = H * 0.008;
   while (x < W) {
     const w = W * (small ? 0.09 + rand() * 0.08 : 0.035 + rand() * 0.06);
     const h = H * (0.035 + rand() * (small ? 0.08 : 0.1));
-    d += R(x, gY - h, w, h + 1);
-    if (!small && rand() < 0.6) lit += R(x + pane + rand() * (w - 3 * pane), gY - h + pane * 2 + rand() * (h - pane * 5), pane, pane * 1.3);
-    x += w + (rand() < 0.3 ? W * 0.012 : 0);
+    d += `V${n(gY - h)}H${n(x + w)}`;
+    if (!small && rand() < litChance) lit.add(x + pane + rand() * (w - 3 * pane), gY - h + pane * 2 + rand() * (h - pane * 5) + pane * 0.65, pane);
+    const gap = rand() < 0.3 ? W * 0.012 : 0;
+    if (gap) d += `V${n(foot)}H${n(x + w + gap)}`;
+    x += w + gap;
   }
-  return [d, lit];
+  return [`${d}V${n(foot)}z`, lit.d(), pane * 1.3];
 }
 
 /** Rolling hills along the horizon, `n` crests of the deal's own heights. */
@@ -627,23 +846,97 @@ function treeline(t: CoverTone, W: number, gY: number, size: number, rand: () =>
   return s;
 }
 
+/**
+ * A lower building beside the subject, in shade (`coverDraw`'s neighbours):
+ * its face, rows of dark windows and a few lit, most of them at night. A
+ * house's gable where the street is homes. Its outline in the scene's
+ * rounding (`scenePx`), its windows in tenths, where the lit ones lie over
+ * them.
+ */
+function neighbour(t: CoverTone, n: CoverBox, H: number, rand: () => number, lit: number, house: boolean, q: (v: number) => number): string {
+  const eave = n.y + n.h * 0.4;
+  let s = fill(t.pane[0], neighbourOutline(q, n, house));
+  // Its windows: a dashed stroke a row, a few of them lit.
+  const pw = Math.max(1.5, n.w * 0.11);
+  const ph = H * 0.022;
+  const px = pw * 2.2;
+  const py = H * 0.06;
+  const top = (house ? eave : n.y) + H * 0.03;
+  const cols = Math.max(1, Math.floor((n.w - pw * 1.5) / px) + 1);
+  const rows = Math.max(1, Math.floor((n.y + n.h - top - H * 0.035) / py) + 1);
+  const x0 = n.x + (n.w - (cols - 1) * px - pw) / 2;
+  let d = "";
+  const on = strokes();
+  for (let r = 0; r < rows; r++) {
+    const y = top + r * py;
+    d += `M${f(x0)} ${f(y + ph / 2)}h${f((cols - 1) * px + pw)}`;
+    for (let c = 0; c < cols; c++) if (rand() < lit) on.add(x0 + c * px, y + ph / 2, pw);
+  }
+  s += `<path fill="none" stroke="${t.pane[1]}" stroke-width="${f(ph)}" stroke-dasharray="${f(pw)} ${f(px - pw)}" d="${d}"/>`;
+  return s + stroked(t.glow[1], ph, on.d());
+}
+
+/** A neighbour's outline: a block, or a house under its gable. */
+function neighbourOutline(q: (v: number) => number, n: CoverBox, house: boolean): string {
+  if (!house) return sceneRect(q, n.x, n.y, n.w, n.h);
+  const eave = n.y + n.h * 0.4;
+  return (
+    sceneRect(q, n.x, eave, n.w, n.y + n.h - eave) +
+    `M${num(q(n.x - 1))} ${num(q(eave))}L${num(q(n.x + n.w / 2))} ${num(q(n.y))}L${num(q(n.x + n.w + 1))} ${num(q(eave))}z`
+  );
+}
+
+/** A round tree standing on the ground line, in the frame's pixels, as
+ *  path data: the street's, in front of the buildings. */
+function streetTree(q: (v: number) => number, x: number, gY: number, r: number): string {
+  return sceneRect(q, x - r * 0.1, gY - r * 1.2, r * 0.2, r * 1.2) + sceneDisc(q, x, gY - r * 1.9, r) + sceneDisc(q, x + r * 0.45, gY - r * 1.35, r * 0.75);
+}
+
+/** The stars over a night's sky: three rows of dots, each row one dotted
+ *  stroke whose gaps are the deal's own, so no two rows keep one pitch. */
+function stars(t: CoverTone, W: number, H: number, rand: () => number): string {
+  const gaps = Array.from({ length: 6 }, () => `0 ${Math.round(W * (0.05 + rand() * 0.12))}`).join(" ");
+  let d = "";
+  for (const row of [0.07, 0.15, 0.23]) d += `M${num(Math.round(-rand() * W * 0.15))} ${Math.round(H * (row + rand() * 0.03))}h${Math.round(W * 1.2)}`;
+  return `<path fill="none" stroke="${t.sun}" stroke-opacity="0.7" stroke-width="${f(Math.max(1.2, H / 240))}" stroke-linecap="round" stroke-dasharray="${gaps}" d="${d}"/>`;
+}
+
 /** The land: a field furrowed toward the horizon, a staked parcel on it of
  *  the deal's own size and place, its survey flag at one far corner, trees
  *  on the horizon — drawn in the frame's own terms, since it lies on the
- *  ground. */
+ *  ground. On a small frame it is drawn whole and bold (research pass 29):
+ *  at a list row's 48px the parcel's dashes and stakes were finer than a
+ *  pixel, and the land read as a dark band under a sun. */
 function land(t: CoverTone, W: number, H: number, gY: number, rand: () => number, small: boolean): string {
   const u = H / 100;
   let s = fill("url(#h)", hills(W, gY, 10 * u, small ? 3 : 5, rand));
   s += fill(t.tree, hills(W, gY, 5 * u, small ? 2 : 4, rand));
   const cx = W * ((small ? 0.5 : 0.56) + (rand() - 0.5) * 0.08);
+  if (small) {
+    // The furrows, a pale parcel outlined whole in one stroke, and a survey
+    // flag on the parcel's far corner away from the sun, as large as the
+    // field allows: a pixel's line at 48px.
+    const line = Math.max(1, 2.4 * u);
+    let furrows = "";
+    for (let i = -3; i <= 3; i++) furrows += `M${f(cx + i * W * 0.04)} ${f(gY)}L${f(cx + i * W * 0.34)} ${f(H)}`;
+    s += `<path fill="none" stroke="${t.haze}" stroke-opacity="0.3" stroke-width="${f(line * 0.6)}" d="${furrows}"/>`;
+    const near = H - 8 * u;
+    const far = gY + 10 * u;
+    const hw = W * 0.4;
+    s += `<path fill="${t.sun}" fill-opacity="0.2" stroke="${t.rim}" stroke-width="${f(line)}" stroke-linejoin="round" d="${poly([cx - hw * 0.55, far], [cx + hw * 0.55, far], [cx + hw, near], [cx - hw, near])}"/>`;
+    const fx = cx + hw * 0.55;
+    s += fill(t.rim, R(fx - line / 2, far - 32 * u, line, 32 * u));
+    s += fill(t.accent, poly([fx + line / 2, far - 32 * u], [fx + 22 * u, far - 25 * u], [fx + line / 2, far - 18 * u]));
+    return s;
+  }
   // The furrows, running to the horizon behind the parcel.
   let furrows = "";
   for (let i = -8; i <= 8; i++) furrows += `M${f(cx + i * W * 0.012)} ${f(gY)}L${f(cx + i * W * 0.16)} ${f(H)}`;
   s += `<path fill="none" stroke="${t.haze}" stroke-opacity="0.12" stroke-width="${f(0.35 * u)}" d="${furrows}"/>`;
   // The parcel, in perspective: its near edge low in the frame.
-  const near = gY + (small ? 12 : 10) * u;
+  const near = gY + 10 * u;
   const far = gY + 2.4 * u;
-  const hw = W * (small ? 0.36 : 0.21 + rand() * 0.07);
+  const hw = W * (0.21 + rand() * 0.07);
   const pts: [number, number][] = [
     [cx - hw * 0.6, far],
     [cx + hw * 0.6, far],
@@ -665,7 +958,7 @@ function land(t: CoverTone, W: number, H: number, gY: number, rand: () => number
   ribbons += poly([fx + 0.4 * u, fy - 24 * u], [fx + 11 * u, fy - 20.5 * u], [fx + 0.4 * u, fy - 17 * u]);
   s += fill(t.rim, stakes) + fill(t.accent, ribbons);
   // Trees on the horizon, off to the side.
-  const tx = W * (small ? 0.84 : 0.86);
+  const tx = W * 0.86;
   s += fill(
     t.tree,
     R(tx - 0.4 * u, gY - 8 * u, 0.8 * u, 8 * u) + disc(tx, gY - 11 * u, 4.5 * u) + disc(tx + 2.5 * u, gY - 8.5 * u, 3.2 * u) + disc(tx - 7 * u, gY - 5 * u, 3 * u) + R(tx - 7.3 * u, gY - 4 * u, 0.6 * u, 4 * u),
@@ -683,58 +976,129 @@ function check(scene: CoverScene): CoverTone {
   return tone;
 }
 
-/** Where a cover's pieces fall in its frame, in the frame's pixels. */
+/** Where a cover's pieces fall in its frame, in the frame's pixels, as the
+ *  picture shows them: after the mirror, where the deal's draw turns it. */
 export interface CoverLayout {
   /** drawn simply: a list row's square, an avatar */
   small: boolean;
   /** the horizon, where the building stands and the ground begins */
   horizon: number;
   /** the building's box (none for land, whose drawing lies on the ground) */
-  building: { x: number; y: number; w: number; h: number } | null;
-  /** the sun */
+  building: CoverBox | null;
+  /** the sun, or at night the moon */
   sun: { x: number; y: number; r: number };
+  /** the lower buildings in shade beside it */
+  neighbours: CoverBox[];
+  /** the hour it is drawn at */
+  time: CoverTime;
+  /** the light from the right: the scene turned */
+  mirror: boolean;
 }
 
 /** A cover's drawing and where it falls: one computation behind the layout
- *  the tests hold and the document the surfaces serve. */
+ *  the tests hold and the document the surfaces serve. Laid out with the
+ *  light from the left, and turned as a whole where the deal's draw says. */
 function compose(scene: CoverScene, width: number, height: number) {
   const t = check(scene);
   const W = Math.max(1, Math.round(width));
   const H = Math.max(1, Math.round(height));
   const small = Math.min(W, H) <= SMALL_FRAME_PX;
   const seed = scene.variant >>> 0;
+  const look = coverDraw(seed);
   const sunDraw = draw(seed ^ 0x5bd1e995);
-  const kit: Kit = { t, form: draw(seed ^ 0x9e3779b9), rand: draw(seed ^ 0x165667b1), small, glow: "", dim: "" };
+  const kit: Kit = {
+    t,
+    form: draw(seed ^ 0x9e3779b9),
+    rand: draw(seed ^ 0x165667b1),
+    small,
+    lit: new Map(),
+    litScale: LIT[look.time],
+  };
   const isLand = scene.kind === "land";
   // The horizon: on a wide frame high enough that a card's words, which
   // take a fixed height at its foot, sit on the ground even on the
-  // smallest card the pipeline draws.
-  const horizon = H * (small ? (isLand ? 0.62 : 0.8) : isLand ? 0.6 : 0.72);
+  // smallest card the pipeline draws; half way down a small frame's land,
+  // so its field holds the parcel and the flag whole.
+  const horizon = H * (small ? (isLand ? 0.52 : 0.8) : isLand ? 0.6 : 0.72);
 
   // The building: as large as the sky above it and the kind's share of the
-  // width allow, a little right of centre on a wide frame.
+  // width allow.
   const art = scene.kind === "land" ? null : KINDS[scene.kind](kit);
   const top = H * (small ? 0.16 : 0.14);
   const span = small ? Math.min(1, SPAN[scene.kind] + 0.26) : SPAN[scene.kind];
   const scale = art ? Math.min((horizon - top) / art.h, (W * span) / art.w) : 0;
-  const building = art
-    ? { x: W * (small ? 0.5 : 0.56) - (art.w * scale) / 2, y: horizon - art.h * scale, w: art.w * scale, h: art.h * scale }
-    : null;
+  const bw = art ? art.w * scale : 0;
+  const bh = art ? art.h * scale : 0;
 
-  // The sun, low on the left; never sitting on a roofline: beside the
-  // building where there is room, above it where there is sky, else half
-  // set behind it. On a wide frame it stays clear of the top left, where a
-  // card sets its call.
+  // The sun — the moon at night — low on the light's side, which is the
+  // left until the scene is turned; higher and smaller at night and in the
+  // morning.
+  const r = H * (small ? 0.075 : 0.046) * SUN_SIZE[look.time];
   let x = W * (small ? 0.2 + sunDraw() * 0.12 : 0.12 + sunDraw() * 0.18);
-  let y = small ? H * (0.22 + sunDraw() * 0.1) : horizon - H * (0.26 + sunDraw() * 0.13);
-  const r = H * (small ? 0.075 : 0.046);
+  const [lift, spread] = look.time === "dusk" ? [0.26, 0.13] : [0.3, 0.12];
+  let y = small ? H * (0.22 + sunDraw() * 0.1) : horizon - H * (lift + sunDraw() * spread);
+
+  // Where the building stands: on a wide frame, in the room the sun leaves
+  // it, as near the sun or as far as the deal's draw says, its middle
+  // between 40% and 74% of the width; a little right of centre where it is
+  // too wide for that, and centred on a small frame.
+  let bx = W * (small ? 0.5 : 0.56) - bw / 2;
+  if (art && !small) {
+    const lo = Math.max(W * 0.02, x + r * 1.8, W * 0.4 - bw / 2);
+    const hi = Math.min(W * 0.98 - bw, W * 0.74 - bw / 2);
+    if (lo <= hi) bx = lo + look.place * (hi - lo);
+  }
+  const building: CoverBox | null = art ? { x: bx, y: horizon - bh, w: bw, h: bh } : null;
+
+  // Never sitting on a roofline: beside the building where there is room,
+  // above it where there is sky, else half set behind it. On a wide frame it
+  // stays clear of the top corners, where a card sets its call and its tags.
   if (building && x + r * 1.6 > building.x && y + r * 1.6 > building.y) {
     if (building.x - r * 1.8 >= W * 0.1) x = building.x - r * 1.8;
     else if (building.y - r * 2 >= H * (small ? 0.14 : 0.3)) y = building.y - r * 2;
     else y = building.y + r * 0.3;
   }
-  const layout: CoverLayout = { small, horizon, building, sun: { x, y, r } };
-  return { t, W, H, art, scale, layout, skyDraw: draw(seed ^ 0x27d4eb2f) };
+
+  // The street on the far side from the sun: lower buildings in shade, the
+  // first standing partly behind the building, the next behind the first.
+  const neighbours: CoverBox[] = [];
+  if (building && !small && STREET.has(scene.kind)) {
+    const nd = draw(seed ^ 0x7f4a7c15);
+    let at = building.x + building.w;
+    for (let i = 0; i < look.neighbours && at < W; i++) {
+      const w = W * (0.09 + nd() * 0.07);
+      const h = Math.max(H * 0.1, Math.min(building.h * (0.3 + nd() * 0.3), H * 0.3));
+      const nx = at - w * (i === 0 ? 0.3 : 0.08);
+      neighbours.push({ x: nx, y: horizon - h, w, h });
+      at = nx + w;
+    }
+  }
+  // Trees along the street: beside the building and in the open ground,
+  // never as tall as the sun is low.
+  const trees: { x: number; r: number }[] = [];
+  if (building && !small && look.trees > 0) {
+    const td = draw(seed ^ 0x2545f491);
+    const spots = [building.x - W * 0.03, building.x + building.w + W * 0.035, W * (0.03 + td() * 0.05), W * (0.92 + td() * 0.05)];
+    for (let i = spots.length - 1; i > 0; i--) {
+      const j = Math.floor(td() * (i + 1));
+      [spots[i], spots[j]] = [spots[j], spots[i]];
+    }
+    for (const tx of spots.slice(0, look.trees)) trees.push({ x: tx, r: H * (0.035 + td() * 0.025) });
+  }
+
+  // As the picture shows it: turned where the deal's draw says.
+  const turn = (b: CoverBox): CoverBox => (look.mirror ? { ...b, x: W - b.x - b.w } : b);
+  const layout: CoverLayout = {
+    small,
+    horizon,
+    building: building && turn(building),
+    sun: { x: look.mirror ? W - x : x, y, r },
+    neighbours: neighbours.map(turn),
+    time: look.time,
+    mirror: look.mirror,
+  };
+  const drawn = { horizon, building, sun: { x, y, r }, neighbours, trees };
+  return { t, W, H, art, scale, look, layout, drawn, seed, skyDraw: draw(seed ^ 0x27d4eb2f) };
 }
 
 /** Where a cover's pieces fall in a frame of the given size. */
@@ -750,24 +1114,40 @@ export function coverLayout(scene: CoverScene, width: number, height: number): C
  * name the deal beside it.
  */
 export function coverSvg(scene: CoverScene, width: number, height: number): string {
-  const { t, W, H, art, scale, layout, skyDraw } = compose(scene, width, height);
-  const { small, horizon: gY, building, sun } = layout;
+  const { t, W, H, art, scale, look, layout, drawn, seed, skyDraw } = compose(scene, width, height);
+  const { small } = layout;
+  const { horizon: gY, building, sun, neighbours, trees } = drawn;
+  const night = look.time === "night";
+  const morning = look.time === "morning";
 
+  // The sky: the evening's three bands; at night its deep tone down to its
+  // middle one at the horizon; in the morning its middle tone over the pale
+  // band. Laid in the frame's own pixels, so a disc painted with it is the
+  // sky behind it: the moon's dark side.
+  const stops: [string, number][] = night
+    ? [[t.sky[0], 0.45], [t.sky[1], 1]]
+    : morning
+      ? [[t.sky[1], 0], [t.sky[2], 0.8]]
+      : [[t.sky[0], 0], [t.sky[1], 0.55], [t.sky[2], 1]];
+  // The face the light falls on: in shade itself at night.
+  const face = night ? [t.lit[1], t.shade] : [t.lit[0], t.lit[1]];
   let defs =
-    `<linearGradient id="k" x2="0" y2="1"><stop stop-color="${t.sky[0]}"/><stop offset="0.55" stop-color="${t.sky[1]}"/><stop offset="1" stop-color="${t.sky[2]}"/></linearGradient>` +
+    `<linearGradient id="k" gradientUnits="userSpaceOnUse" x2="0" y2="${f(gY + 1)}">${stops.map(([c, o]) => `<stop${o ? ` offset="${o}"` : ""} stop-color="${c}"/>`).join("")}</linearGradient>` +
     `<radialGradient id="s"><stop stop-color="${t.sun}" stop-opacity="0.6"/><stop offset="0.14" stop-color="${t.sun}" stop-opacity="0.3"/>` +
     `<stop offset="0.45" stop-color="${t.sun}" stop-opacity="0.08"/><stop offset="1" stop-color="${t.sun}" stop-opacity="0"/></radialGradient>` +
     `<linearGradient id="g" x2="0" y2="1"><stop stop-color="${t.ground[0]}"/><stop offset="1" stop-color="${t.ground[1]}"/></linearGradient>` +
     `<linearGradient id="h" x2="0" y2="1"><stop stop-color="${t.haze}"/><stop offset="1" stop-color="${t.haze}" stop-opacity="0.55"/></linearGradient>` +
-    `<linearGradient id="f" x2="0.35" y2="1"><stop stop-color="${t.lit[0]}"/><stop offset="1" stop-color="${t.lit[1]}"/></linearGradient>`;
+    `<linearGradient id="f" x2="0.35" y2="1"><stop stop-color="${face[0]}"/><stop offset="1" stop-color="${face[1]}"/></linearGradient>`;
 
-  // The sky, the sun's glow across it, the sun and its halo.
-  let body =
-    `<rect width="${W}" height="${f(gY + 1)}" fill="url(#k)"/>` +
-    `<circle cx="${f(sun.x)}" cy="${f(sun.y)}" r="${f(H * 0.62)}" fill="url(#s)"/>` +
-    fill(t.sun, disc(sun.x, sun.y, sun.r * 1.45), ` fill-opacity="0.16"`) +
-    fill(t.sun, disc(sun.x, sun.y, sun.r));
-  if (!small) {
+  // The sky; at night its stars; the sun's glow across it — the moon's
+  // smaller — the sun and its halo, or the moon with its dark side cut away.
+  let body = `<rect width="${W}" height="${f(gY + 1)}" fill="url(#k)"/>`;
+  if (night && !small) body += stars(t, W, H, skyDraw);
+  body += `<circle cx="${f(sun.x)}" cy="${f(sun.y)}" r="${f(H * (night ? 0.3 : morning ? 0.5 : 0.62))}" fill="url(#s)"${night ? ` opacity="0.6"` : ""}/>`;
+  if (!night) body += fill(t.sun, disc(sun.x, sun.y, sun.r * 1.45), ` fill-opacity="0.16"`);
+  body += fill(t.sun, disc(sun.x, sun.y, sun.r));
+  if (night) body += fill("url(#k)", disc(sun.x + sun.r * 0.45, sun.y - sun.r * 0.3, sun.r * 0.8));
+  if (!small && !night) {
     // Long wisps of cloud, lit from below, fading at both ends.
     defs +=
       `<linearGradient id="c"><stop stop-color="${t.sun}" stop-opacity="0"/><stop offset="0.5" stop-color="${t.sun}" stop-opacity="0.3"/>` +
@@ -777,7 +1157,7 @@ export function coverSvg(scene: CoverScene, width: number, height: number): stri
       const cx = W * (0.06 + skyDraw() * 0.6) + (i === 2 ? W * 0.08 : 0);
       const cy = H * (i === 2 ? 0.16 : 0.1 + i * 0.14) + H * skyDraw() * 0.06;
       const ch = H * (i === 2 ? 0.012 : 0.02);
-      body += `<rect x="${f(cx)}" y="${f(cy)}" width="${f(cw)}" height="${f(ch)}" rx="${f(ch / 2)}" fill="url(#c)"/>`;
+      body += `<rect x="${Math.round(cx)}" y="${Math.round(cy)}" width="${Math.round(cw)}" height="${f(ch)}" rx="${f(ch / 2)}" fill="url(#c)"/>`;
     }
   }
   body += `<rect y="${f(gY)}" width="${W}" height="${f(H - gY)}" fill="url(#g)"/>`;
@@ -789,8 +1169,21 @@ export function coverSvg(scene: CoverScene, width: number, height: number): stri
     if (HILLS.has(scene.kind)) {
       body += fill("url(#h)", hills(W, gY, H * 0.1, small ? 3 : 5, skyDraw)) + treeline(t, W, gY, H * (small ? 0.03 : 0.022), skyDraw);
     } else {
-      const [city, lit] = skyline(W, H, gY, skyDraw, small);
-      body += fill("url(#h)", city) + fill(t.glow[0], lit, ` fill-opacity="0.55"`);
+      const [city, lit, pane] = skyline(W, H, gY, skyDraw, small, CITY_LIT[look.time]);
+      body += fill("url(#h)", city) + stroked(t.glow[0], pane, lit, ` stroke-opacity="${night ? 0.75 : 0.55}"`);
+    }
+    if (morning && !small) {
+      // The morning's mist, low over the distance.
+      defs += `<linearGradient id="v" x2="0" y2="1"><stop stop-color="${t.haze}" stop-opacity="0"/><stop offset="1" stop-color="${t.haze}" stop-opacity="0.5"/></linearGradient>`;
+      body += `<rect y="${Math.round(gY - H * 0.09)}" width="${W}" height="${Math.round(H * 0.09) + 1}" fill="url(#v)"/>`;
+    }
+    // The street beside it: the nearer building in shade with its windows,
+    // the one beyond it a silhouette in the haze, behind it.
+    const q = scenePx(small);
+    const windows = draw(seed ^ 0x61c88647);
+    const house = scene.kind === "homes";
+    for (let i = neighbours.length - 1; i >= 0; i--) {
+      body += i === 0 ? neighbour(t, neighbours[i], H, windows, STREET_LIT[look.time], house, q) : fill("url(#h)", neighbourOutline(q, neighbours[i], house));
     }
     // The building, and its reflection on the ground: short and faint, gone
     // before a card's words begin.
@@ -801,9 +1194,13 @@ export function coverSvg(scene: CoverScene, width: number, height: number): stri
     body +=
       `<g id="b" transform="translate(${f(building.x)} ${f(gY)}) scale(${scale.toFixed(3)})">${art.svg}</g>` +
       `<g mask="url(#m)" opacity="${small ? 0.3 : 0.24}"><use href="#b" transform="matrix(1 0 0 -1 0 ${f(2 * gY)})"/></g>`;
+    // The street's trees, in front of it.
+    body += fill(t.tree, trees.map((tr) => streetTree(q, tr.x, gY, tr.r)).join(""));
   }
   // The ground line, catching the last of the light.
-  body += fill(t.rim, R(0, gY - 0.5, W, Math.max(1, H / 320)), ` fill-opacity="0.35"`);
+  body += fill(t.rim, R(0, gY - 0.5, W, Math.max(1, H / 320)), ` fill-opacity="${night ? 0.2 : 0.35}"`);
+  // Turned as a whole where the deal's draw says: the light from the right.
+  if (look.mirror) body = `<g transform="matrix(-1 0 0 1 ${W} 0)">${body}</g>`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>${defs}</defs>${body}</svg>`;
 }

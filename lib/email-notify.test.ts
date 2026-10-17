@@ -40,6 +40,7 @@ import {
 } from "./email";
 import { replyToAddress } from "./email-send";
 import { readEmailPictureToken } from "./email-picture";
+import { interruptedMessage } from "./worker-interruptions";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -161,6 +162,43 @@ describe("the screen-complete email's picture (#464)", () => {
     expect(sent[0].html).toMatch(/<img src="https:\/\/underwrite\.example\/api\/email\/picture\/[^"]+\?s=banner" width="520" height="260" alt="The Maddox — open the deal"/);
     const token = /\/api\/email\/picture\/([^?"]+)\?s=banner/.exec(sent[0].html)![1];
     expect(readEmailPictureToken(token)).toEqual({ dealId: DEAL, recipient: BUYER });
+  });
+
+  it("a stopped screen's email opens on the building too, signed for whoever asked, and never reads the memorandum for it", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM = "Underwrite Copilot <notify@underwrite.example>";
+    process.env.RESEND_BASE_URL = "https://resend.test";
+    const sent: { html: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { body: string }) => {
+        sent.push(JSON.parse(init.body));
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const row = { name: "The Maddox", user_id: BUYER, team_id: null, is_sample: false, verdict: null };
+    const chain = (data: unknown) => {
+      const q = {
+        select: () => q,
+        eq: () => q,
+        order: () => q,
+        limit: () => q,
+        maybeSingle: async () => ({ data, error: null }),
+      };
+      return q;
+    };
+    const fake = {
+      from: (table: string) =>
+        chain(table === "deals" ? row : table === "analysis_jobs" ? null : { email_on_analysis: true }),
+      auth: { admin: { getUserById: async () => ({ data: { user: { email: "buyer@example.com" } } }) } },
+    } as unknown as SupabaseClient;
+    await notifyAnalysisFailed(fake, DEAL, "We couldn't read any figures out of this PDF.");
+    expect(sent).toHaveLength(1);
+    expect(sent[0].html).toMatch(/<img src="https:\/\/underwrite\.example\/api\/email\/picture\/[^"]+\?s=banner" width="520" height="260" alt="The Maddox — open the deal"/);
+    const token = /\/api\/email\/picture\/([^?"]+)\?s=banner/.exec(sent[0].html)![1];
+    expect(readEmailPictureToken(token)).toEqual({ dealId: DEAL, recipient: BUYER });
+    // The run may have stopped on the memorandum: no search for its cover.
+    expect(pic.asked).toEqual([]);
   });
 });
 
@@ -384,7 +422,7 @@ describe("the analysis emails go only where the reader has not said no", () => {
   it("the worker emails a screen it gives up on, or that throws, as the pipeline does its own — to whoever asked", () => {
     const src = readFileSync(join(process.cwd(), "worker/index.ts"), "utf8");
     expect(src).toMatch(
-      /if \(payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, next\.deal_id as string, INTERRUPTED_MSG, \{\s*requestedBy: requesterOf\(payload\.requestedBy\),/,
+      /if \(payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, next\.deal_id as string, message, \{\s*requestedBy: requesterOf\(payload\.requestedBy\),/,
     );
     expect(src).toMatch(
       /if \(failed && job\.payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, job\.dealId, message, \{ requestedBy: requesterOf\(job\.payload\.requestedBy\) \}\)/,
@@ -485,8 +523,11 @@ describe("a stopped screen's email says what stands, and tells the operators wha
   });
 
   it("says a worker that gave up in plain words, with the deal page's own button", () => {
+    // The sentence is lib/worker-interruptions' (its own test words each
+    // kind); the worker gives up on it, failing the job and emailing it.
     const src = readFileSync(join(process.cwd(), "worker/index.ts"), "utf8");
-    const msg = /const INTERRUPTED_MSG =([\s\S]*?);\n/.exec(src)![1];
+    expect(src).toMatch(/const message = interruptedMessage\(/);
+    const msg = interruptedMessage(["restart", "restart", "restart"], 3, 30);
     expect(msg).not.toMatch(/worker|hit /);
     expect(msg).toContain("while our servers restarted");
     expect(msg).toContain("Choose “Try again” on the deal page");

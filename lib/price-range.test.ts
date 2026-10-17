@@ -55,6 +55,15 @@ describe("a price stated as a range (#466)", () => {
     expect(priceRangeShort({ low: 400_000, high: 450_000 })).toBe("$400–450k");
   });
 
+  it("rounds each end as a compact figure alone is rounded (research pass 34)", () => {
+    // A half-step up, counted in whole numbers (lib/money `scaledText`).
+    expect(priceRangeShort({ low: 9e6, high: 9.45e6 })).toBe("$9–9.5M");
+    // A thousand thousands is a million, as compactUsd says it alone: the
+    // top had read "$600–1000k".
+    expect(priceRangeShort({ low: 600_000, high: 999_960 })).toBe("$600k–$1M");
+    expect(priceRangeShort({ low: 999_960, high: 1.2e6 })).toBe("$1–1.2M");
+  });
+
   it("is the ask every reader takes, the model's price and its note", () => {
     const deal = ex([m("Pricing guidance", "$40,000,000 – $42,000,000"), m("NOI (T-12)", "$2,300,000"), m("Units", "240")]);
     expect(askingPriceOf(deal)).toBe(42e6);

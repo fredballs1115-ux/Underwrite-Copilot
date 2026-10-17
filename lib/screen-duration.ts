@@ -41,6 +41,34 @@ export function typicalScreenPhrase(ms: number | null): string | null {
   return `about ${Math.round(ms / 60_000)} minutes`;
 }
 
+/** How far past its usual time a run must go before the rail says so:
+ *  twice the reader's own median, so the line marks a run that is notably
+ *  slow, not the half of all runs that land past a median. */
+export const LONGER_THAN_USUAL = 2;
+
+/**
+ * Whether the run on screen is taking longer than the reader's screens
+ * usually do: past `LONGER_THAN_USUAL` times their measured median. Never
+ * without a measured median — the rail claims no duration it has not
+ * measured, so with fewer than three runs it says nothing of the kind. A
+ * step can run for many minutes (the SDK retries an overloaded call twice,
+ * ten minutes each), and the rail said "Your screens usually take about 3
+ * minutes" under it all the while (research pass 30).
+ */
+export function longerThanUsual(elapsedMs: number, typicalMs: number | null | undefined): boolean {
+  if (typicalMs == null || !Number.isFinite(typicalMs) || typicalMs <= 0) return false;
+  return Number.isFinite(elapsedMs) && elapsedMs > LONGER_THAN_USUAL * typicalMs;
+}
+
+/** The rail's line once a run passes twice the reader's own median. A
+ *  queued run is waiting its turn, never "still running": the clock counts
+ *  from the ask, queue wait included (the batch-2 audit). */
+export function longerThanUsualLine(typicalScreen: string | null, queued: boolean): string {
+  const said = typicalScreen ? ` (${typicalScreen})` : "";
+  const where = queued ? "it is still waiting its turn to start" : "it is still running";
+  return `This one is taking longer than your screens usually do${said} — ${where}, and it carries on if you leave this page.`;
+}
+
 /** A job the progress rail draws as the six-step screen — not a comp
  *  search, a model build or the reconciler, which run on their own. */
 export function isScreenJob(step: string | null | undefined): boolean {

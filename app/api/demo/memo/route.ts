@@ -1,19 +1,9 @@
-import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
-import { MemoDocument, buildMemoData } from "@/lib/memo/memo-document";
-import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { evaluateBuyBox } from "@/lib/criteria";
-import type { DealRow } from "@/lib/deals";
-import { COVER_SIZE, coverFrom } from "@/lib/memo/cover-aerial";
-import { fetchAerialImage } from "@/lib/imagery";
+import { buildMemoData, renderMemoPdf, type MemoData, type MemoExchange } from "@/lib/memo/memo-document";
+import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { readerDateLong, readerToday } from "@/lib/reader-day";
+import { sampleActualsLine, sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
-
-// The sample is placed at neighbourhood level on purpose (lib/sample-deal:
-// never a street address), so its cover is the USGS frame of Brewerytown
-// itself — a real place, the building invented. Fixed coordinates, no
-// geocode and no deal row to cache on.
-const BREWERYTOWN = { lat: 39.9735, lng: -75.185, precision: "area" as const };
 
 // The memo prints today's date but is otherwise pure fixture, so render it
 // once per day per process and serve the same bytes: this is a public
@@ -21,49 +11,46 @@ const BREWERYTOWN = { lat: 39.9735, lng: -75.185, precision: "area" as const };
 // without this every request would pay a full @react-pdf render. The promise
 // (not the buffer) is cached so concurrent first hits share one render; a
 // failed render clears the slot to allow retry.
-let cachedRender: { dateStr: string; pdf: Promise<Buffer> } | null = null;
+let cachedRender: { day: string; pdf: Promise<Buffer> } | null = null;
 
-function getSampleMemo(dateStr: string): Promise<Buffer> {
-  if (cachedRender && cachedRender.dateStr === dateStr) return cachedRender.pdf;
+/**
+ * The memo the signed-in route (app/api/deals/[id]/memo) builds for the
+ * sample, call for call: the same row, the same check source, the same
+ * arguments to `buildMemoData` in the same order, the same actuals line and
+ * the same `renderMemoPdf` (lib/sample-documents.render.test.ts renders both
+ * routes and holds the two PDFs' text equal).
+ */
+async function renderSampleMemo(dateStr: string, readerDay: string): Promise<Buffer> {
+  const deal = sampleDocumentRow();
+  // The demo mandate, where a signed-in reader's memo judges the reader's
+  // own box: a visitor has none (lib/sample-cover `sampleDocumentChecks`).
+  const buyBoxChecks = sampleDocumentChecks();
+  // A 1031 exchange is a buy box's, and the demo mandate holds none.
+  const exchange: MemoExchange | null = SAMPLE_DEMO_BOX.exchange
+    ? { block: SAMPLE_DEMO_BOX.exchange, readerDay }
+    : null;
+  // No firm's branding and no dismissed submarket checks: both are a
+  // signed-in reader's own rows, and a visitor has neither.
+  const branding: MemoData["branding"] = null;
+  const overrides: string[] | null = null;
+  // The aerial of Brewerytown, the sample report's cover too
+  // (lib/sample-cover), bounded like the real memo's: a slow or failed USGS
+  // answer means a memo without a cover.
+  const cover = await sampleCover(readerDay);
+  // The sample's rent roll and T-12 against its memorandum, in the line the
+  // signed-in memo sets beside its key terms (audit C8, H1).
+  const actualsLine = sampleActualsLine();
+  const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange), actualsLine };
+  // Drawn as the signed-in memo is: the line rides where the page has room
+  // for it, so the one-page memo stays on one page.
+  return renderMemoPdf(memo);
+}
 
-  const deal = {
-    name: SAMPLE_DEAL.name,
-    asset_class: SAMPLE_DEAL.asset_class,
-    extraction: SAMPLE_DEAL.extraction,
-    challenges: SAMPLE_DEAL.challenges,
-    comps: SAMPLE_DEAL.comps,
-    market: SAMPLE_DEAL.market,
-    verdict: SAMPLE_DEAL.verdict,
-    prior_screen: null,
-  } as unknown as DealRow;
-
-  const checks = evaluateBuyBox(
-    SAMPLE_DEAL.asset_class,
-    {
-      assetClass: SAMPLE_DEAL.extraction.assetClass,
-      market: SAMPLE_DEAL.extraction.market,
-      metrics: SAMPLE_DEAL.extraction.metrics,
-    },
-    SAMPLE_DEMO_BOX,
-  );
-
-  const render = async () => {
-    // Bounded like the real memo's cover: a slow or failed USGS answer means
-    // a memo without a cover, cached for the day like every other render.
-    const cover = await coverFrom(() =>
-      fetchAerialImage(BREWERYTOWN, COVER_SIZE).then((res) =>
-        res ? { response: res, source: "aerial" as const } : null,
-      ),
-    );
-    const memo = buildMemoData(deal, dateStr, checks, null, null, cover);
-    const element = React.createElement(MemoDocument, {
-      data: memo,
-    }) as unknown as Parameters<typeof renderToBuffer>[0];
-    return renderToBuffer(element);
-  };
+function getSampleMemo(dateStr: string, readerDay: string): Promise<Buffer> {
+  if (cachedRender && cachedRender.day === readerDay) return cachedRender.pdf;
   const next = {
-    dateStr,
-    pdf: render().catch((err) => {
+    day: readerDay,
+    pdf: renderSampleMemo(dateStr, readerDay).catch((err) => {
       // Only clear our own entry — a newer day's render may have replaced it.
       if (cachedRender === next) cachedRender = null;
       throw err;
@@ -80,14 +67,14 @@ function getSampleMemo(dateStr: string): Promise<Buffer> {
  * against the same hypothetical mandate the /demo buy-box tab shows.
  */
 export async function GET() {
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // Dated as the signed-in route dates a reader whose browser has not told
+  // it a time zone (lib/reader-day), the day its dated lines read on too.
+  const now = new Date();
+  const dateStr = readerDateLong(null, now);
+  const readerDay = readerToday(null, now);
 
   try {
-    const buffer = await getSampleMemo(dateStr);
+    const buffer = await getSampleMemo(dateStr, readerDay);
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",

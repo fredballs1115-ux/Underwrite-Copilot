@@ -4,7 +4,7 @@
 // figure's place (app/(app)/deals/[id]/deal-hero), where a finished screen's
 // missing figure keeps its dash.
 
-import { STALE_MS, staleWhileRunning, type JobLike } from "@/lib/screen-run";
+import { isStalled, staleWhileRunning, type JobLike } from "@/lib/screen-run";
 
 /**
  * True while a live screen has not yet rewritten the extraction the header's
@@ -13,11 +13,11 @@ import { STALE_MS, staleWhileRunning, type JobLike } from "@/lib/screen-run";
  * still missing is one the memorandum does not state, and the header says so
  * with its dash, whatever else the run is doing. A job that is no screen (a
  * comp search, a model build, the reconciler) reads no figures, and a run
- * that has stopped writing progress (`STALE_MS`) is reading nothing.
+ * that has stopped writing progress (lib/screen-run's one stall rule,
+ * `isStalled`) is reading nothing.
  */
 export function readingMemorandum(job: JobLike | null | undefined, now: number = Date.now()): boolean {
   if (!job || (job.status !== "queued" && job.status !== "running")) return false;
-  const t = job.updated_at ? Date.parse(job.updated_at) : NaN;
-  if (Number.isFinite(t) && now - t > STALE_MS) return false;
+  if (isStalled(job, now)) return false;
   return staleWhileRunning(job).has("extraction");
 }

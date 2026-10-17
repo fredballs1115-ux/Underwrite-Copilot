@@ -1,4 +1,6 @@
+import { compactUsd } from "@/lib/money";
 import type { StudentHousingRead } from "@/lib/student-housing";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * A student building (#468) — the pure panel for `lib/student-housing`,
@@ -19,6 +21,10 @@ import type { StudentHousingRead } from "@/lib/student-housing";
  */
 
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
+// The price a bed is a figure the panel works out and draws, compact as the
+// pipeline card's basis says it ("$100k"); the rent a bed is the
+// memorandum's own term, a month's, to the dollar as it states it.
+const money = (n: number) => compactUsd(n);
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const clamp = (n: number) => `${Math.max(0, Math.min(100, n))}%`;
 
@@ -56,7 +62,7 @@ export function StudentHousingPanel({
       tone: "neutral",
     });
   }
-  if (r.pricePerBed != null) tiles.push({ key: "price-bed", label: "Price a bed", value: usd(r.pricePerBed), sub: "At the asking price", tone: "neutral" });
+  if (r.pricePerBed != null) tiles.push({ key: "price-bed", label: "Price a bed", value: money(r.pricePerBed), sub: "At the asking price", tone: "neutral" });
   if (r.rentPerBed != null) tiles.push({ key: "rent-bed", label: "Rent a bed", value: usd(r.rentPerBed), sub: "A month, as stated", tone: "neutral" });
   if (r.walk) {
     tiles.push({
@@ -76,48 +82,37 @@ export function StudentHousingPanel({
       data-qa="student-housing-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-pass bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-pass"}`}>Student housing</span>
+      <PanelHead title="Student housing" tone={flagged ? "text-caution" : "text-pass"}>
         <span className="text-sm font-semibold">
           {r.preLeasedPct != null ? `Pre-leased ${pct1(r.preLeasedPct)}${r.term ? ` for ${r.term}` : ""}` : "Leased by the bed"}
         </span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
 
       {r.preLeasedPct != null && (
         <div className="mt-2 text-[11px]" data-qa="student-prelease">
           <div className="relative h-3 rounded-full bg-faint" aria-hidden>
             <div className={`h-full rounded-full ${behind || short ? "bg-caution/60" : "bg-pass/60"}`} data-bar="prelease" style={{ width: clamp(r.preLeasedPct) }} />
-            {r.priorPct != null && (
-              <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="prelease-prior" style={{ left: clamp(r.priorPct) }} />
-            )}
-            {modelOccupancyPct != null && (
-              <div className="absolute -inset-y-1 border-l-2 border-dashed border-brand" data-bar="prelease-model" style={{ left: clamp(modelOccupancyPct) }} />
-            )}
+            {r.priorPct != null && <Tick at={clamp(r.priorPct)} bar="prelease-prior" />}
+            {modelOccupancyPct != null && <Tick at={clamp(modelOccupancyPct)} bar="prelease-model" tone="border-brand" dashed />}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li>{`${pct1(r.preLeasedPct)} signed${r.term ? ` for ${r.term}` : ""}`}</li>
+          <Key>
+            <KeyItem>{`${pct1(r.preLeasedPct)} signed${r.term ? ` for ${r.term}` : ""}`}</KeyItem>
             {r.priorPct != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
+              <KeyItem mark="tick" tone="bg-ink">
                 {`Last year at this point: ${pct1(r.priorPct)}${r.pacePts != null ? ` (${r.pacePts >= 0 ? "+" : "−"}${Math.round(Math.abs(r.pacePts) * 10) / 10} pts)` : ""}`}
-              </li>
+              </KeyItem>
             )}
-            {modelOccupancyPct != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0 shrink-0 border-l-2 border-dashed border-brand" />
-                {`The model runs at ${pct1(modelOccupancyPct)}`}
-              </li>
-            )}
-          </ul>
+            {modelOccupancyPct != null && <KeyItem mark="dashed" tone="border-brand">{`The model runs at ${pct1(modelOccupancyPct)}`}</KeyItem>}
+          </Key>
         </div>
       )}
 
       {tiles.length > 0 && (
         <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-qa="student-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]}`} data-student={t.key}>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
+            <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]} ${tileSpan(t.value)}`} data-student={t.key}>
+              <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
             </li>
@@ -125,17 +120,8 @@ export function StudentHousingPanel({
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

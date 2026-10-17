@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
@@ -113,7 +113,7 @@ export async function reconcileDocs(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(ReconSchema) },
+    output_config: { format: screenOutputFormat(ReconSchema) },
   }));
 
   // Percent-convention guard: the prompt demands 0-100 scale ("5.5% -> 5.5"),

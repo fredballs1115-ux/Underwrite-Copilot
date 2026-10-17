@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import {
@@ -105,7 +105,7 @@ export async function extractRentRoll(parsed: ParsedModel): Promise<RentRollExtr
             ],
           },
         ],
-        output_config: { format: zodOutputFormat(RentRollSchema) },
+        output_config: { format: screenOutputFormat(RentRollSchema) },
       }, doc.om ? omRequestOptions(doc.om) : {}),
     );
     // Hard cap defensively even if the model over-returns.
@@ -136,7 +136,7 @@ export async function extractT12(parsed: ParsedModel): Promise<T12Extraction> {
             content: [doc.block, { type: "text", text: t12ExtractionInstruction() }, { type: "text", text: todayLine() }],
           },
         ],
-        output_config: { format: zodOutputFormat(T12Schema) },
+        output_config: { format: screenOutputFormat(T12Schema) },
       }, doc.om ? omRequestOptions(doc.om) : {}),
     );
   } finally {

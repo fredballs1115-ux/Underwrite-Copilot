@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { renameDeal, deleteDeal } from "../actions";
+import { renameDeal, deleteDeal, moveDeal } from "../actions";
+import { DEAL_NAME_MAX } from "@/lib/deal-name";
+import { MOVE_ITEM, moveQuestion, type MoveTarget } from "@/lib/personal-deal";
 
 const itemCls =
   "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors";
@@ -11,6 +13,9 @@ export function DealActions({
   dealName,
   canDelete = true,
   canRename = true,
+  moveTo = null,
+  teamName = null,
+  inReadersTeam = true,
 }: {
   dealId: string;
   dealName: string;
@@ -20,9 +25,18 @@ export function DealActions({
   /** The sample keeps its name — the name is what marks it as the sample
    *  on every list — so it offers no Rename (renameDeal refuses it too). */
   canRename?: boolean;
+  /** The move the deal's creator may make between their own pipeline and
+   *  their team's (lib/personal-deal, `moveDeal`): into the team where it is
+   *  in no team's pipeline, out where it is in one; null offers none. */
+  moveTo?: MoveTarget | null;
+  /** The team's name, where it is the reader's own team. */
+  teamName?: string | null;
+  /** False where the deal sits in a team the reader is no longer on: the
+   *  question then says so, rather than "your teammates". */
+  inReadersTeam?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"menu" | "rename" | "delete">("menu");
+  const [mode, setMode] = useState<"menu" | "rename" | "delete" | "move">("menu");
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   function close() {
@@ -43,15 +57,18 @@ export function DealActions({
   }, [open]);
 
   // Nothing to offer is no menu, never an empty one.
-  if (!canRename && !canDelete) return null;
+  if (!canRename && !canDelete && !moveTo) return null;
 
+  // On a phone the button sits in the deal header's scrolling row of
+  // controls, so the menu's containing block is that row (DealHero's
+  // ToolRow), outside the scroller: it opens at the row's right edge rather
+  // than inside the scroll, which would cut it off (research pass 36).
   return (
-    <div className="relative">
+    <div className="sm:relative">
       <button
         ref={triggerRef}
         type="button"
         aria-label="Deal actions"
-        aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => {
           setOpen((o) => !o);
@@ -87,6 +104,16 @@ export function DealActions({
                     Rename
                   </button>
                 )}
+                {moveTo && (
+                  <button
+                    type="button"
+                    data-qa="move-deal"
+                    onClick={() => setMode("move")}
+                    className={`${itemCls} hover:bg-faint`}
+                  >
+                    {MOVE_ITEM[moveTo]}
+                  </button>
+                )}
                 {canDelete && (
                   <button
                     type="button"
@@ -108,7 +135,7 @@ export function DealActions({
                   defaultValue={dealName}
                   required
                   autoFocus
-                  maxLength={120}
+                  maxLength={DEAL_NAME_MAX}
                   className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
                 />
                 <div className="flex gap-2">
@@ -129,9 +156,42 @@ export function DealActions({
               </form>
             )}
 
+            {/* A move is confirmed before it is made: it changes who sees
+                the deal. Focus lands on Cancel, as the delete's does. */}
+            {mode === "move" && moveTo && (
+              <div role="group" aria-labelledby={`${dealId}-move-q`} className="space-y-2.5 p-1.5">
+                <p id={`${dealId}-move-q`} className="text-sm leading-relaxed">
+                  {moveQuestion(moveTo, teamName, inReadersTeam)}
+                </p>
+                <div className="flex gap-2">
+                  <form action={moveDeal}>
+                    <input type="hidden" name="dealId" value={dealId} />
+                    <input type="hidden" name="to" value={moveTo} />
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                    >
+                      {MOVE_ITEM[moveTo]}
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    onClick={close}
+                    autoFocus
+                    className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* The question is the group's name, and focus lands on Cancel —
+                the button pressed is gone, and focus had dropped to the page
+                (research pass 33). */}
             {mode === "delete" && (
-              <div className="space-y-2.5 p-1.5">
-                <p className="text-sm leading-relaxed">
+              <div role="group" aria-labelledby={`${dealId}-delete-q`} className="space-y-2.5 p-1.5">
+                <p id={`${dealId}-delete-q`} className="text-sm leading-relaxed">
                   Delete this deal permanently? Its documents and analysis are
                   removed and this can&apos;t be undone.
                 </p>
@@ -148,6 +208,7 @@ export function DealActions({
                   <button
                     type="button"
                     onClick={close}
+                    autoFocus
                     className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint"
                   >
                     Cancel

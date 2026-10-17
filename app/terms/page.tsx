@@ -1,6 +1,24 @@
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { googleConfigured } from "@/lib/imagery";
 import { publicMetadata } from "@/lib/page-meta";
+
+/**
+ * What Google Maps Platform's terms require of a site that uses it
+ * (cloud.google.com/maps-platform/terms, printed by the runner in zori probe
+ * run 37262665824): the site's terms must "notify users that the Customer
+ * Application includes Google Maps features and content" and "state that
+ * use of Google Maps features and content is subject to the then-current
+ * versions of the: (1) Google Maps End User Additional Terms of Service at
+ * https://maps.google.com/help/terms_maps/ ; and (2) Google Privacy Policy
+ * at https://policies.google.com/privacy". Drawn only where the deployment
+ * has the key (`googleConfigured`): without it the site shows no Google
+ * content, and the notice would be untrue.
+ */
+const GOOGLE_MAPS_TERMS = {
+  endUserTerms: "https://maps.google.com/help/terms_maps/",
+  privacy: "https://policies.google.com/privacy",
+} as const;
 
 export const metadata = publicMetadata({
   title: "Terms of service",
@@ -119,6 +137,22 @@ export default function TermsPage() {
               ))}
             </section>
           ))}
+          {googleConfigured() && (
+            <section data-terms="google-maps">
+              <h2 className="text-lg font-semibold tracking-tight">Google Maps</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                {"This service includes Google Maps features and content. Use of Google Maps features and content is subject to the then-current versions of the "}
+                <a href={GOOGLE_MAPS_TERMS.endUserTerms} className="underline underline-offset-2 hover:text-ink">
+                  Google Maps End User Additional Terms of Service
+                </a>
+                {" and the "}
+                <a href={GOOGLE_MAPS_TERMS.privacy} className="underline underline-offset-2 hover:text-ink">
+                  Google Privacy Policy
+                </a>
+                {"."}
+              </p>
+            </section>
+          )}
         </div>
       </main>
 

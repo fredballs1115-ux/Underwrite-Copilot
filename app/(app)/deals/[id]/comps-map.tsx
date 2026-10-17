@@ -8,9 +8,19 @@ import {
   BASEMAPS,
   BASEMAP_ORDER,
   DEFAULT_BASEMAP,
+  OSM_ATTRIBUTION,
   type BasemapId,
 } from "@/lib/basemaps";
 import { safeHttpUrl } from "@/lib/safe-url";
+import { photonPrecision } from "@/lib/geocode";
+import {
+  distanceFrom,
+  placementNote,
+  pointIsSubject,
+  subjectPinLabel,
+  type LocationPrecision,
+  type SubjectPoint,
+} from "@/lib/public-comps/subject-point";
 
 /** One pin/row on the comps map — OM broker comps and public-web comps carry
  *  the same shape with a different `kind` (and marker color). */
@@ -51,9 +61,15 @@ function writeGeoCache(cache: Record<string, LatLng | null>) {
   }
 }
 
+/** A geocoded point and how finely Photon matched it (lib/geocode's
+ *  `photonPrecision`): a house, a street's centreline, or an area. */
+interface Hit extends LatLng {
+  precision?: LocationPrecision;
+}
+
 /** Free-text geocode via Photon (the same free service the address
  *  autocomplete uses). Returns null when nothing matches. */
-async function geocode(q: string): Promise<LatLng | null> {
+async function geocode(q: string): Promise<Hit | null> {
   const res = await fetch(
     `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
     // A hung endpoint must fail fast into the table-only fallback, not leave
@@ -62,15 +78,19 @@ async function geocode(q: string): Promise<LatLng | null> {
   );
   if (!res.ok) return null;
   const json = (await res.json()) as {
-    features?: { geometry?: { coordinates?: [number, number] } }[];
+    features?: { geometry?: { coordinates?: [number, number] }; properties?: { type?: string } }[];
   };
-  const c = json.features?.[0]?.geometry?.coordinates;
+  const f = json.features?.[0];
+  const c = f?.geometry?.coordinates;
   return c && Number.isFinite(c[0]) && Number.isFinite(c[1])
-    ? { lat: c[1], lng: c[0] }
+    ? { lat: c[1], lng: c[0], precision: photonPrecision(f?.properties?.type) }
     : null;
 }
 
 type SortKey = "distance" | "name" | "kind";
+
+/** Every kind of comp, listed in the card's own table by default. */
+const ALL_KINDS: readonly MapComp["kind"][] = ["om", "web"];
 
 const PIN_COLOR: Record<MapComp["kind"], string> = {
   om: "#114e54",
@@ -114,15 +134,28 @@ export function CompsMap({
   subjectLabel,
   market,
   comps,
+  subjectPoint = null,
+  tableKinds = ALL_KINDS,
 }: {
-  /** the subject's best address line (street address, else market) */
+  /** the subject's street address, or "" — never the market's name, whose
+   *  centre is no building */
   subjectLabel: string;
-  /** metro context appended to comp geocode queries */
+  /** metro context appended to comp geocode queries; its centre is only the
+   *  anchor the plausibility gate measures from where there is no subject,
+   *  never drawn */
   market: string;
   comps: MapComp[];
+  /** the deal's resolved location (lib/deal-location), the point its
+   *  pictures are drawn around; the map geocodes the address only where the
+   *  page has none */
+  subjectPoint?: SubjectPoint | null;
+  /** the kinds of comp this card's table lists: the deal page lists the OM's
+   *  own comps once, in their table with the pins, and this one the rest */
+  tableKinds?: readonly MapComp["kind"][];
 }) {
   const [placed, setPlaced] = useState<Placed[] | null>(null);
   const [subjectPos, setSubjectPos] = useState<LatLng | null>(null);
+  const [subjectPrecision, setSubjectPrecision] = useState<LocationPrecision | null>(null);
   const [phase, setPhase] = useState<"locating" | "ready" | "nomap">("locating");
   const [sortKey, setSortKey] = useState<SortKey>("distance");
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
@@ -141,7 +174,7 @@ export function CompsMap({
     let cancelled = false;
     (async () => {
       const cache = readGeoCache();
-      const lookupOne = async (q: string): Promise<LatLng | null> => {
+      const lookupOne = async (q: string): Promise<Hit | null> => {
         if (q in cache) return cache[q];
         try {
           const pos = await geocode(q);
@@ -162,11 +195,20 @@ export function CompsMap({
         return null;
       };
 
-      const subj =
-        (subjectLabel.trim() ? await lookupOne(subjectLabel.trim()) : null) ??
-        (market.trim() ? await lookupOne(market.trim()) : null);
+      // The deal's own point first; the address geocoded only where the page
+      // has none; the market's centre never drawn — it anchors the
+      // plausibility gate alone, so a name-match three states away still
+      // stays off the map.
+      const subjHit: Hit | null = subjectPoint
+        ? subjectPoint
+        : subjectLabel.trim()
+          ? await lookupOne(subjectLabel.trim())
+          : null;
+      const subj: LatLng | null = subjHit ? { lat: subjHit.lat, lng: subjHit.lng } : null;
+      const anchor: LatLng | null = subj ?? (market.trim() ? await lookupOne(market.trim()) : null);
       if (cancelled) return;
       setSubjectPos(subj);
+      setSubjectPrecision(subjHit?.precision ?? null);
 
       const out: Placed[] = [];
       for (let i = 0; i < comps.length; i++) {
@@ -176,11 +218,11 @@ export function CompsMap({
         // Plausibility gate: a name-match that lands metro-distances away is
         // NOT this comp — keep it off the map rather than pin it wrong.
         const plausible =
-          pos && subj ? haversineKm(subj, pos) <= MAX_PLAUSIBLE_KM : !!pos && !subj;
+          pos && anchor ? haversineKm(anchor, pos) <= MAX_PLAUSIBLE_KM : !!pos && !anchor;
         out.push({
           ...c,
           n: i + 1,
-          pos: plausible ? pos : null,
+          pos: plausible && pos ? { lat: pos.lat, lng: pos.lng } : null,
           distanceKm: plausible && pos && subj ? haversineKm(subj, pos) : null,
         });
       }
@@ -191,7 +233,7 @@ export function CompsMap({
     return () => {
       cancelled = true;
     };
-  }, [subjectLabel, market, comps]);
+  }, [subjectLabel, market, comps, subjectPoint]);
 
   // ── Build the Leaflet map once positions are in ──────────────────────────
   useEffect(() => {
@@ -219,9 +261,29 @@ export function CompsMap({
         maxNativeZoom: base.maxNativeZoom,
         attribution: base.attribution,
       }).addTo(map);
+      // Every pin here was placed by Photon, a geocoder on OpenStreetMap's
+      // data, so the map credits OpenStreetMap over whichever basemap is
+      // drawn (lib/basemaps `OSM_ATTRIBUTION`, the guideline's own form).
+      // The street tiles' credit is the same string, and the control keeps
+      // one of each, so on the street map it reads once.
+      map.attributionControl?.addAttribution(OSM_ATTRIBUTION);
       L.control.scale({ imperial: true, metric: false }).addTo(map);
 
-      if (subjectPos) {
+      if (subjectPos && !pointIsSubject(subjectPrecision)) {
+        // A point placed no finer than a street or an area is said as that —
+        // a plain ring, never the star, and no mile rings round a centre that
+        // is not the building.
+        const label = subjectPinLabel(subjectPrecision);
+        L.circleMarker(subjectPos, {
+          radius: 7,
+          color: "#18211f",
+          weight: 2,
+          fillColor: "#ffffff",
+          fillOpacity: 0.9,
+        })
+          .addTo(map)
+          .bindTooltip(label);
+      } else if (subjectPos) {
         // Distance rings before the pins so they sit underneath.
         for (const miles of [1, 3]) {
           L.circle(subjectPos, {
@@ -273,7 +335,7 @@ export function CompsMap({
             `<div style="max-width:240px"><strong>${escapeHtml(`${c.n}. ${c.name}`)}</strong>` +
               `<div style="margin-top:3px;color:#5f6b69">${escapeHtml(c.detail)}</div>` +
               (c.distanceKm != null
-                ? `<div style="margin-top:3px;font-variant-numeric:tabular-nums">${escapeHtml(fmtMiles(c.distanceKm))} from the subject</div>`
+                ? `<div style="margin-top:3px;font-variant-numeric:tabular-nums">${escapeHtml(`${fmtMiles(c.distanceKm)} ${distanceFrom(subjectPrecision)}`)}</div>`
                 : "") +
               `<div style="margin-top:4px">` +
               (href
@@ -298,7 +360,7 @@ export function CompsMap({
       baseLayerRef.current = null;
       leafletRef.current = null;
     };
-  }, [phase, placed, subjectPos]);
+  }, [phase, placed, subjectPos, subjectPrecision]);
 
   // Basemap switch: swap the tile layer in place so pins, zoom and popups
   // all survive the change.
@@ -333,8 +395,12 @@ export function CompsMap({
       const db = b.distanceKm ?? Infinity;
       return da - db || a.name.localeCompare(b.name);
     });
-    return list;
-  }, [placed, comps, sortKey]);
+    return list.filter((c) => tableKinds.includes(c.kind));
+  }, [placed, comps, sortKey, tableKinds]);
+  // The OM comps' pins, where another table lists them: said once, so a pin
+  // with no row here is never a mystery.
+  const omPins = comps.filter((c) => c.kind === "om").length;
+  const omElsewhere = omPins > 0 && !tableKinds.includes("om");
 
   const placedCount = placed?.filter((c) => c.pos).length ?? 0;
 
@@ -373,14 +439,16 @@ export function CompsMap({
             <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: PIN_COLOR.web }} />
             Public-web comps
           </span>
-          <span className="hidden items-center gap-1 sm:flex">
-            <span
-              aria-hidden
-              className="inline-block h-2.5 w-2.5 rounded-full border border-dashed"
-              style={{ borderColor: "#114e54" }}
-            />
-            1 &amp; 3 mi rings
-          </span>
+          {subjectPos && pointIsSubject(subjectPrecision) && (
+            <span className="hidden items-center gap-1 sm:flex">
+              <span
+                aria-hidden
+                className="inline-block h-2.5 w-2.5 rounded-full border border-dashed"
+                style={{ borderColor: "#114e54" }}
+              />
+              1 &amp; 3 mi rings
+            </span>
+          )}
         </p>
       </div>
 
@@ -417,6 +485,15 @@ export function CompsMap({
         </div>
       )}
 
+      {omElsewhere && (
+        <p className="mt-2 text-[11px] text-muted" data-qa="map-om-pins">
+          {omPins === 1
+            ? "Pin 1 is the sale comp in the table below."
+            : `Pins 1–${omPins} are the sale comps in the table below, by the same numbers.`}
+        </p>
+      )}
+
+      {rows.length > 0 && (
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -449,7 +526,9 @@ export function CompsMap({
                     {c.n}
                   </span>
                 </td>
-                <td className="max-w-52 truncate py-2 pr-3 font-medium">{c.name}</td>
+                <td className="py-2 pr-3 font-medium">
+                  <CompName name={c.name} placed={!!c.pos} onShow={() => zoomTo(c)} />
+                </td>
                 <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs tabular-nums">
                   {c.distanceKm != null ? (
                     fmtMiles(c.distanceKm)
@@ -488,18 +567,47 @@ export function CompsMap({
           </tbody>
         </table>
       </div>
+      )}
 
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
         Pins are approximate, geocoded from stated addresses; a comp that
         can&apos;t be placed is listed without a pin.
+        {subjectPos && placementNote(subjectPrecision) ? ` ${placementNote(subjectPrecision)}` : ""}
+        {phase !== "locating" && !subjectPos
+          ? " The deal's address could not be placed, so no distances are given."
+          : ""}
       </p>
     </div>
   );
 }
 
+/** The Comp cell: the comp's name, and for a comp with a pin, a button that
+ *  flies the map to it, so what the row's click does is reachable from the
+ *  keyboard too. The name is cut here rather than on the cell, so the cell
+ *  never clips the button's focus ring. */
+export function CompName({ name, placed, onShow }: { name: string; placed: boolean; onShow: () => void }) {
+  return placed ? (
+    <button
+      type="button"
+      title="Show on the map"
+      onClick={(e) => {
+        e.stopPropagation();
+        onShow();
+      }}
+      className="block max-w-52 cursor-pointer truncate text-left"
+    >
+      {name}
+    </button>
+  ) : (
+    <span className="block max-w-52 truncate">{name}</span>
+  );
+}
+
+/** A sortable header. Every sort here runs ascending (A to Z, nearest
+ *  first), so the sorted header says so and the others say nothing. */
 function Th({ label, onClick, active }: { label: string; onClick: () => void; active: boolean }) {
   return (
-    <th className="py-1.5 pr-3 font-medium">
+    <th className="py-1.5 pr-3 font-medium" aria-sort={active ? "ascending" : undefined}>
       <button
         type="button"
         onClick={onClick}

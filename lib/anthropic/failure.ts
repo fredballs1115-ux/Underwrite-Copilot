@@ -12,6 +12,11 @@
  */
 import { recordUsage, usageOfResponse } from "./usage";
 import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE } from "./operator-failures";
+import { EXTRACTION_TOO_LONG_FAILURE, REJECTED_FAILURE, STORAGE_MISSING_FAILURE, TOO_LARGE_FAILURE, refusalFailure } from "./document-failures";
+
+/** The extraction's name as `structured` below is handed it (./extract):
+ *  its cut-off is the memorandum's, not a passing fault. */
+export const EXTRACTION_STEP = "Extraction";
 
 /** An error whose message was written for the analyst and shows as it is. */
 export class ScreenError extends Error {
@@ -36,14 +41,14 @@ const RATE_LIMITED =
   "The analysis service is rate-limiting us right now — wait a minute and try again.";
 const OVERLOADED =
   "The analysis service is overloaded right now — try again in a few minutes.";
-const TOO_LARGE =
-  "The analysis service refused this document as too large — try a smaller PDF.";
+// The document's own failures: their sentences live in ./document-failures,
+// which the deal page reads to offer Replace OM instead of "Try again".
+const TOO_LARGE = TOO_LARGE_FAILURE;
 // A scanned deck reads fine (the service reads the pages as pictures), and a
 // file that needs a password to open or runs past the page limit is refused
 // at the upload (lib/pdf-open), so neither is the advice here: what is left
 // is a secured copy the service turned away, or a passing fault.
-const REJECTED =
-  "The analysis service could not accept this document — if it is a secured copy, save an unlocked one (print it to PDF) and upload it with Replace OM; otherwise try again.";
+const REJECTED = REJECTED_FAILURE;
 // The provider answers a spent credit balance or a workspace's usage limit
 // with a 400 like any malformed request; read as REJECTED, it blamed the
 // analyst's document for the operator's account.
@@ -55,8 +60,18 @@ const UNREACHABLE =
   "We couldn't reach the analysis service — check back in a minute and try again.";
 const UNREADABLE =
   "Claude's answer came back incomplete or unreadable — try again.";
-const STORAGE =
-  "We couldn't read the OM back from storage — re-upload it and try again.";
+// Our own file storage, named as itself: a storage read that failed on the
+// network carries the same words as the analysis service's ("fetch failed",
+// a timeout), and was told it could not reach the analysis service.
+const STORAGE_UNREACHABLE =
+  "We couldn't read the OM back from our file storage just now — try again in a minute; if it keeps failing, upload it again with Replace OM.";
+const STORAGE_MISSING = STORAGE_MISSING_FAILURE;
+
+/** One read of the deal from our database failed — a network blip, a
+ *  timeout — where the deal is still there: never "no longer available"
+ *  about a deal the reader is looking at (research pass 30). */
+export const DATABASE_READ_FAILURE =
+  "We couldn't read this deal from our database just now — try again in a minute.";
 const UNEXPECTED = "The screen hit an unexpected error — try again.";
 
 function messageOf(err: unknown): string {
@@ -132,6 +147,12 @@ export function describeRunFailure(err: unknown): RunFailure {
 
   const name = nameOf(err);
   const msg = messageOf(err);
+  // Our file storage first: its failures carry the connection words below
+  // ("fetch failed", a timeout, a gateway's 5xx), and read as the analysis
+  // service's (research pass 30). A missing object is gone, not unreachable.
+  if (/^storage (?:download|upload) failed\b|not found in storage|\bbucket\b/i.test(msg)) {
+    return { message: /object not found|not found in storage/i.test(msg) ? STORAGE_MISSING : STORAGE_UNREACHABLE, detail };
+  }
   if (/^APIConnection/.test(name) || /ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|network error|timed out|timeout/i.test(msg)) {
     return { message: UNREACHABLE, detail };
   }
@@ -139,7 +160,7 @@ export function describeRunFailure(err: unknown): RunFailure {
   if (isStructuredParseFailure(err) || /structured output|Unterminated string|Unexpected token|Unexpected end of JSON|in JSON at position/i.test(msg)) {
     return { message: UNREADABLE, detail };
   }
-  if (/storage download failed|object not found|not found in storage|bucket/i.test(msg)) return { message: STORAGE, detail };
+  if (/object not found/i.test(msg)) return { message: STORAGE_MISSING, detail };
   if (/^Deal not found\.?$/i.test(msg)) return { message: "This deal is no longer available.", detail };
 
   return { message: looksReadable(msg) ? msg : UNEXPECTED, detail };
@@ -159,19 +180,51 @@ export interface StructuredResponse<T> {
   } | null;
 }
 
+// The mark a structured-output format's parse leaves where the model's text
+// did not parse (./output-format `screenOutputFormat`): the SDK then hands
+// back the whole response, its meters and its stop reason with it, where
+// its own parse threw them away with the error.
+const UNPARSED = Symbol.for("underwrite-copilot.unparsed-output");
+
+/** A model's answer that did not parse, with the parser's words. */
+export interface UnparsedOutput {
+  readonly [UNPARSED]: string;
+}
+
+/** The mark for an answer whose text did not parse — the parser's words kept
+ *  for the log. */
+export function unparsedOutput(err: unknown): UnparsedOutput {
+  return { [UNPARSED]: failureDetail(err) };
+}
+
+function isUnparsedOutput(v: unknown): v is UnparsedOutput {
+  return typeof v === "object" && v !== null && UNPARSED in v;
+}
+
+/** A cut-off at the step named. The extraction's is the memorandum's (its
+ *  answer runs as long as the deck makes it, and the same deck makes it
+ *  again: ./document-failures), every other step's a passing fault. */
+function cutOffFailure(what: string): string {
+  return what === EXTRACTION_STEP ? EXTRACTION_TOO_LONG_FAILURE : `${what} was cut off before it finished — try again.`;
+}
+
 /**
  * Read a structured-output response, naming the failures the SDK leaves
  * indistinguishable: the answer ran past `max_tokens` (a cut-off, not
- * nonsense), the model declined, or no parsed block came back at all.
+ * nonsense), the model declined, the answer did not parse, or no parsed
+ * block came back at all.
  */
 export function structuredOutput<T>(response: StructuredResponse<T>, what: string): T {
+  const parsed: unknown = response.parsed_output;
+  const parserWords = isUnparsedOutput(parsed) ? parsed[UNPARSED] : undefined;
   if (response.stop_reason === "max_tokens") {
-    throw new ScreenError(`${what} was cut off before it finished — try again.`);
+    throw new ScreenError(cutOffFailure(what), parserWords);
   }
   if (response.stop_reason === "refusal") {
-    throw new ScreenError(
-      `${what} was declined by the model — the document may hold content it will not analyze.`,
-    );
+    throw new ScreenError(refusalFailure(what));
+  }
+  if (parserWords !== undefined) {
+    throw new ScreenError(`${what} came back unreadable — the answer was malformed. Try again.`, parserWords);
   }
   if (response.parsed_output == null) {
     throw new ScreenError(`${what} did not return structured output.`);
@@ -180,11 +233,14 @@ export function structuredOutput<T>(response: StructuredResponse<T>, what: strin
 }
 
 /**
- * Run one structured-output call and read its result. The SDK parses the
- * model's text while building the response and throws its own
- * "Failed to parse structured output: … Unterminated string in JSON at
- * position 62" on a cut-off or malformed answer — here that becomes a
- * sentence, with the parser's text kept as the detail for the log.
+ * Run one structured-output call and read its result. A format from
+ * ./output-format leaves an answer that did not parse in the response as a
+ * mark, so the response comes back whole: its meters are recorded and its
+ * stop reason says whether it was cut off. A format that throws instead
+ * (the SDK's own `zodOutputFormat`: "Failed to parse structured output: …
+ * Unterminated string in JSON at position 62") leaves no response — that
+ * becomes a sentence, with the parser's text kept as the detail for the log,
+ * and an extraction's is named as the cut-off it almost always is.
  */
 export async function structured<T>(
   what: string,
@@ -197,14 +253,17 @@ export async function structured<T>(
   } catch (err) {
     if (isStructuredParseFailure(err)) {
       throw new ScreenError(
-        `${what} came back unreadable — the answer was cut off or malformed. Try again.`,
+        what === EXTRACTION_STEP
+          ? EXTRACTION_TOO_LONG_FAILURE
+          : `${what} came back unreadable — the answer was cut off or malformed. Try again.`,
         failureDetail(err),
       );
     }
     throw err;
   }
-  // The meters are recorded before the guards below run: a cut-off or a
-  // refusal still spent the tokens, and the ledger should say so.
+  // The meters are recorded before the guards below run: a cut-off, a
+  // refusal or an answer that did not parse still spent the tokens, and the
+  // ledger should say so.
   const used = usageOfResponse(what, response, Date.now() - started);
   if (used) recordUsage(used);
   return structuredOutput(response, what);
