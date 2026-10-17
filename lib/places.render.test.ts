@@ -216,6 +216,68 @@ describe("the market grids' one credit line names the picture each tile settled 
   });
 });
 
+// ── The homepage's gallery and the submarket cards too (audit C10, M3) ──────
+import { readFileSync } from "node:fs";
+import { MarketsGallery } from "@/app/markets-gallery";
+import { SubmarketCards } from "@/app/market/submarket-cards";
+import { EMPTY_RULES, type Submarket } from "@/lib/market/types";
+
+describe("every grid of market tiles credits the pictures its tiles report, never a list fixed in advance", () => {
+  // Every grid that draws CityPhoto tiles under one credit line.
+  const GRIDS = [
+    "app/markets-gallery.tsx",
+    "app/market/submarket-cards.tsx",
+    "app/market/market-memory-cards.tsx",
+    "app/(app)/analytics/market-table.tsx",
+  ];
+
+  it("each grid is a ShownCreditGrid, each of its tiles reports what it shows, and none builds its line from the table", () => {
+    for (const file of GRIDS) {
+      const src = readFileSync(file, "utf8");
+      expect(src, file).toContain("<ShownCreditGrid");
+      expect(src, file).toContain("gridPictures(");
+      expect(src, file).not.toMatch(/\bgalleryCredit\(|\bhasSkyline\(|GalleryCreditText\b/);
+      const tiles = src.match(/<CityPhoto\b[\s\S]*?\/>/g) ?? [];
+      expect(tiles.length, file).toBeGreaterThan(0);
+      for (const tile of tiles) expect(tile, file).toMatch(/\breportShown\b/);
+    }
+  });
+
+  it("the homepage's gallery: the server's render credits each tile's first picture, the overhead line for Montgomery County's", () => {
+    const html = render(React.createElement(MarketsGallery, { today: "2026-10-16" }));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html).replace(/\n/g, "");
+    expect(html).toContain('data-qa="gallery-credit"');
+    const ids = ["richmond", "montgomery_county"];
+    const [rich, moco] = gridPictures(ids);
+    expect(text).toContain(rich.skyline!.author.name);
+    expect(moco.skyline).toBeNull();
+    expect(text).toContain(OVERHEAD_GRID_CREDIT);
+  });
+
+  it("the submarket cards: one line under the grid, and none where no card is pictured", () => {
+    const sub = (id: string, metro: string | null): Submarket => ({
+      id,
+      name: `Sub ${id}`,
+      userId: "u",
+      metro,
+      assetClass: "industrial",
+      exclusionRules: EMPTY_RULES,
+      supplyWarningMonths: 24,
+      notes: null,
+      createdAt: "2026-09-01T12:00:00Z",
+    });
+    const html = render(React.createElement(SubmarketCards, { submarkets: [sub("a", "Richmond, VA"), sub("b", "Montgomery County MD")] }));
+    expect(a11yIssues(html)).toEqual([]);
+    expect(html.match(/data-qa="submarket-credit"/g)?.length).toBe(1);
+    const text = visibleText(html).replace(/\n/g, "");
+    expect(text).toContain(galleryCredit(["richmond"]));
+    expect(text).toContain(OVERHEAD_GRID_CREDIT);
+    const none = render(React.createElement(SubmarketCards, { submarkets: [sub("c", null)] }));
+    expect(none).not.toContain('data-qa="submarket-credit"');
+  });
+});
+
 // ── A metro area read without a brief promises no brief (audit C9, M2) ──────
 import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
 import { marketLeadLine, marketPageWord } from "@/app/market/market-lead";

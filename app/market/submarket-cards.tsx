@@ -2,9 +2,10 @@ import Link from "next/link";
 import type { Submarket } from "@/lib/market/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { metroForName } from "@/lib/market-match";
-import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
-import { GalleryCreditText } from "@/app/photo-credit";
+import { OVERHEAD_GRID_CREDIT } from "@/lib/skyline";
 import { CityPhoto } from "@/app/city-photo";
+import { ShownCreditGrid } from "@/app/shown-credit";
+import { gridPictures } from "@/app/market/grid-credit";
 
 /** One line naming what a submarket's persistent exclusion rules drop. */
 export function exclusionLine(rules: Submarket["exclusionRules"]): string | null {
@@ -22,8 +23,9 @@ export function exclusionLine(rules: Submarket["exclusionRules"]): string | null
  * where the metro its owner typed names a market (`metroForName` — the
  * site's own name for one, or a city with its state; nothing guessed). The
  * strip wears the market's name, because the picture is the metro's and
- * not the submarket's. One credit line under the grid names every
- * photographer shown, the way the homepage's gallery does.
+ * not the submarket's. One credit line under the grid names the pictures
+ * the strips actually show (app/shown-credit, audit C10, M3): a photograph
+ * that fails takes its photographer off it and puts the overhead's on.
  *
  * Pure: the panel reads the list and hands it in, so the render test draws
  * this on a fixture.
@@ -31,11 +33,15 @@ export function exclusionLine(rules: Submarket["exclusionRules"]): string | null
 export function SubmarketCards({ submarkets }: { submarkets: readonly Submarket[] }) {
   const cards = submarkets.map((s) => ({ s, market: metroForName(s.metro) }));
   const pictured = [...new Set(cards.flatMap((c) => (c.market ? [c.market.id] : [])))];
-  const credit = galleryCredit(pictured);
-  const anyOverhead = pictured.some((id) => !hasSkyline(id));
 
   return (
-    <>
+    <ShownCreditGrid
+      pictures={gridPictures(pictured)}
+      overheadLine={OVERHEAD_GRID_CREDIT}
+      qa="submarket-credit"
+      className="mt-3 text-[11px] leading-relaxed text-muted"
+      linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink"
+    >
       <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map(({ s, market }) => {
           const excl = exclusionLine(s.exclusionRules);
@@ -56,6 +62,7 @@ export function SubmarketCards({ submarkets }: { submarkets: readonly Submarket[
                       height={192}
                       sizes="(min-width: 1024px) 360px, (min-width: 640px) 47vw, 92vw"
                       showCredit={false}
+                      reportShown
                       className="h-full w-full object-cover object-[50%_42%]"
                     />
                     <span className="absolute bottom-1.5 left-2 rounded bg-black/60 px-1.5 py-px text-[10px] font-medium text-white">
@@ -77,16 +84,6 @@ export function SubmarketCards({ submarkets }: { submarkets: readonly Submarket[
           );
         })}
       </ul>
-      {credit || anyOverhead ? (
-        <p className="mt-3 text-[11px] leading-relaxed text-muted">
-          {credit ? (
-            <>
-              <GalleryCreditText ids={pictured} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />{" "}
-            </>
-          ) : null}
-          {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
-        </p>
-      ) : null}
-    </>
+    </ShownCreditGrid>
   );
 }
