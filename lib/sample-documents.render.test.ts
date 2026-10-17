@@ -106,6 +106,16 @@ describe("the sample's public documents render as the signed-in sample's", () =>
     const a = await textOf(await signedIn.GET(req, ctx));
     const b = await textOf(await demo.GET());
     expect(a).toContain("The actuals");
+    // On a mismatch, name the first passage that differs: the test has
+    // failed now and then under a loaded full suite and passed alone, and a
+    // 40-page diff says nothing.
+    if (b !== a) {
+      let i = 0;
+      while (i < a.length && a[i] === b[i]) i++;
+      expect(b.slice(Math.max(0, i - 120), i + 200), "the public report from here").toBe(
+        a.slice(Math.max(0, i - 120), i + 200),
+      );
+    }
     expect(b).toBe(a);
   }, 120_000);
 
