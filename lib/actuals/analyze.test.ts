@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   consolidateRentRoll,
   summarizeT12,
+  t12SummaryOf,
   compareNoi,
   severityForNoiDelta,
   pickOmNoi,
@@ -131,6 +132,77 @@ describe("summarizeT12", () => {
     expect(s.totalOpex).toBe(400_000); // 250k + 150k
     expect(s.noi).toBe(650_000); // 1.05M − 400k
     expect(s.noiDerived).toBe(true);
+  });
+
+  // The audit of the last merge: a statement filing its deductions as
+  // negatives had its NOI derived as EGI + expenses, and its EGI as rent +
+  // vacancy, each too high by twice the deduction.
+  it("reads a deduction filed as a negative by its magnitude", () => {
+    const s = summarizeT12({
+      ...base,
+      collectedRent: 1_100_000,
+      vacancyLoss: -120_000,
+      otherIncome: 50_000,
+      opex: [
+        { key: "taxes", label: "Real estate taxes", amount: -250_000, page: "p. 2" },
+        { key: "insurance", label: "Insurance", amount: -150_000, page: "p. 2" },
+      ],
+    });
+    expect(s.vacancyLoss).toBe(120_000);
+    expect(s.egi).toBe(1_030_000); // 1.1M − 120k + 50k, never 1.27M
+    expect(s.opex.map((l) => l.amount)).toEqual([250_000, 150_000]);
+    expect(s.totalOpex).toBe(400_000);
+    expect(s.noi).toBe(630_000); // 1.03M − 400k, never 1.43M
+    expect(s.noiDerived).toBe(true);
+    expect(s.opexSignsMixed).toBeUndefined();
+    // A stated total filed as a negative is a deduction too.
+    expect(summarizeT12({ ...base, egi: 1_000_000, totalOpex: -400_000 }).noi).toBe(600_000);
+  });
+
+  it("derives no total and no NOI where the expense lines carry both signs", () => {
+    const s = summarizeT12({
+      ...base,
+      egi: 1_000_000,
+      opex: [
+        { key: "taxes", label: "Real estate taxes", amount: 250_000, page: "p. 2" },
+        { key: "other", label: "Insurance refund", amount: -30_000, page: "p. 2" },
+      ],
+    });
+    expect(s.opexSignsMixed).toBe(true);
+    expect(s.opex.map((l) => l.amount)).toEqual([250_000, -30_000]); // as stated
+    expect(s.totalOpex).toBeNull();
+    expect(s.noi).toBeNull();
+    // The statement's own total and NOI stand.
+    const stated = summarizeT12({ ...base, egi: 1_000_000, totalOpex: 220_000, noi: 780_000, opex: s.opex });
+    expect(stated.totalOpex).toBe(220_000);
+    expect(stated.noi).toBe(780_000);
+  });
+
+  it("re-reads a summary stored before the sign rule (t12SummaryOf)", () => {
+    // What the old summarizer stored for the statement above.
+    const old = {
+      collectedRent: 1_100_000,
+      vacancyLoss: -120_000,
+      otherIncome: 50_000,
+      egi: 1_270_000,
+      opex: [
+        { key: "taxes", label: "Real estate taxes", amount: -250_000, page: "p. 2" },
+        { key: "insurance", label: "Insurance", amount: -150_000, page: "p. 2" },
+      ],
+      totalOpex: -400_000,
+      noi: 1_670_000,
+      noiDerived: true,
+    };
+    const s = t12SummaryOf(old)!;
+    expect(s.egi).toBe(1_030_000);
+    expect(s.totalOpex).toBe(400_000);
+    expect(s.noi).toBe(630_000);
+    // A stated EGI and NOI stand as stated.
+    const stated = t12SummaryOf({ ...old, egi: 1_030_000, noi: 630_000, noiDerived: false })!;
+    expect(stated.egi).toBe(1_030_000);
+    expect(stated.noi).toBe(630_000);
+    expect(stated.noiDerived).toBe(false);
+    expect(t12SummaryOf(null)).toBeNull();
   });
 });
 

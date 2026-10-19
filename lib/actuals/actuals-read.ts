@@ -20,7 +20,7 @@ import { withArticle } from "@/lib/article";
 import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
 import { isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
 import { leasesShort } from "@/lib/rentroll/profiles";
-import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "./analyze";
+import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi, t12SummaryOf } from "./analyze";
 import type { NoiComparison, RentRollSummary, T12Summary } from "./types";
 
 export interface ActualsRead {
@@ -48,7 +48,12 @@ export function readActuals(input: {
   t12: { periodEnd: string | null; summary: T12Summary } | null;
   assetClass?: string | null;
 }): ActualsRead | null {
-  const { metrics, strategy, rentRoll, t12 } = input;
+  const { metrics, strategy, rentRoll } = input;
+  // A stored summary is read by today's sign rule (lib/actuals/analyze
+  // `t12SummaryOf`): one written before it may carry an NOI derived on
+  // expenses filed as negatives.
+  const t12Read = input.t12 ? t12SummaryOf(input.t12.summary) : null;
+  const t12 = input.t12 && t12Read ? { periodEnd: input.t12.periodEnd, summary: t12Read } : null;
   if (!rentRoll && !t12) return null;
   const t12Summary = t12?.summary ?? null;
   const omPick = pickOmNoi(metrics, strategy.kind);
@@ -99,6 +104,18 @@ export function actualsFromRows(
 /** A figure on the actuals surfaces: the card's own dollar writer. */
 export const actualsUsd = (n: number | null | undefined): string =>
   n == null || !Number.isFinite(n) ? "—" : compactUsd(n, { millions: 2 });
+
+/**
+ * A deduction on the T-12's table — the vacancy, an expense line, the total
+ * expenses — in brackets, by its magnitude, on the card and the report alike:
+ * "($120k)", never "(−$120k)". On a statement whose expense lines carry both
+ * signs (`opexSignsMixed`) a LINE is printed as stated, since which is a
+ * credit cannot be read (`asStated`). A blank is a dash.
+ */
+export function t12DeductionText(n: number | null | undefined, opts: { asStated?: boolean } = {}): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return opts.asStated ? actualsUsd(n) : `(${actualsUsd(Math.abs(n))})`;
+}
 
 const pct1 = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;

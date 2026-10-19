@@ -162,6 +162,7 @@ import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { readActuals } from "@/lib/actuals/actuals-read";
+import { t12SummaryOf } from "@/lib/actuals/analyze";
 import {
   signalGoingInCap,
   assessPlausibility,
@@ -890,7 +891,7 @@ export default async function DealPage({
           .eq("team_id", ownership.team_id)
       : Promise.resolve({ data: null }),
   ]);
-  const t12Summary = (t12Res.data?.summary as T12Summary | undefined) ?? null;
+  const t12Summary: T12Summary | null = t12SummaryOf(t12Res.data?.summary);
   // The OM's NOI vs the T-12 actual — the shared picker (word-bounded,
   // per-unit-safe, same one the challenger note uses), which reads the
   // deal's kind: on a plan deal the in-place or Year-1 figure is compared

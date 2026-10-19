@@ -5,6 +5,7 @@ import { isPro } from "@/lib/billing";
 import { SAMPLE_EXPORT_PATH, exportGate, exportGateDealOf } from "@/lib/sample-exports";
 import { buildReportData, renderReportPdf, withActuals } from "@/lib/memo/report-document";
 import { actualsFromRows, type ActualsRead } from "@/lib/actuals/actuals-read";
+import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { shownAssetClass } from "@/lib/asset-class";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
@@ -266,10 +267,10 @@ export async function GET(
                 asOf: (rrRes.data.as_of_date as string | null) ?? null,
               }
             : null,
-          t12: t12Res.data?.summary
+          t12: t12SummaryOf(t12Res.data?.summary)
             ? {
-                summary: t12Res.data.summary as T12Summary,
-                periodEnd: (t12Res.data.period_end_date as string | null) ?? null,
+                summary: t12SummaryOf(t12Res.data?.summary) as T12Summary,
+                periodEnd: (t12Res.data?.period_end_date as string | null) ?? null,
               }
             : null,
         },

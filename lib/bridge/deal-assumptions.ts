@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { HOLD_MONTHS, deriveUnderwriteInputs, type DerivedModel } from "@/lib/underwrite/inputs";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
@@ -72,7 +73,7 @@ export async function currentDealModel(
   const isSample = !!(dealRes.data as { is_sample?: boolean | null } | null)?.is_sample;
 
   const rrSummary = (rrRes.data?.summary as RentRollSummary | null) ?? null;
-  const t12Summary = (t12Res.data?.summary as T12Summary | null) ?? null;
+  const t12Summary: T12Summary | null = t12SummaryOf(t12Res.data?.summary);
 
   return deriveUnderwriteInputs(
     extraction,
