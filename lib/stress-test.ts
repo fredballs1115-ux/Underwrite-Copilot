@@ -358,8 +358,12 @@ const TAX_BILL_ROW = /\b(?:real\s+estate|property|re)\s+tax(?:es)?\b|^tax(?:es)?
 const TAX_BILL_NOT = /abat|exempt|pilot|saving|unabated|phase|\brate\b|\bper\b|\/|psf|millage|credit|transfer|recordation|increase|growth|escalat|reassess/i;
 const ASSESSED_ROW = /\bassess(?:ed|ment)\b/i;
 const ASSESSED_NOT = /special|ratio|\brate\b|\bper\b|\/|millage|reassess/i;
+// The building's premium, never what insurance brings in: a storage
+// facility's "Tenant insurance" row is the platform's income (#471), and a
+// value whose own words say income is no premium whatever its label.
 const INSURANCE_ROW = /\binsurance\b/i;
-const INSURANCE_NOT = /mortgage|title|index|deductible|reserve|\brate\b|\bper\b|\/|psf|increase|growth|claim/i;
+const INSURANCE_NOT = /mortgage|title|index|deductible|reserve|tenant|income|revenue|proceeds|program|\brate\b|\bper\b|\/|psf|increase|growth|claim/i;
+const INSURANCE_VALUE_NOT = /income|revenue|proceeds|commission/i;
 // The acquisition loan's rate, never another loan's: a "Note rate" is the
 // note being sold (lib/note-yield's row), an existing, in-place or current
 // loan's is the seller's, and a balance's row is no rate at all.
@@ -1123,7 +1127,8 @@ function expenseImpact(
 // — Insurance —
 
 function insuranceRow(ctx: Ctx): StressRow | null {
-  const premiumRow = ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
+  const premiumRow =
+    ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
   const premium = premiumRow ? parseUsd(premiumRow.value, 500) : null;
   const evidence: StressEvidence[] = [];
   // The T-12's own insurance line.

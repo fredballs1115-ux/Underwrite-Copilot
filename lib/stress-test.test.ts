@@ -511,6 +511,25 @@ describe("a note secured by the building", () => {
   });
 });
 
+describe("the premium the insurance row reads is the building's, never insurance income", () => {
+  const withRows = (...extra: { label: string; value: string }[]): ExtractionResult => ({
+    ...APARTMENT,
+    metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Insurance"), ...extra.map((r) => row(r.label, r.value, "p. 15"))],
+  });
+
+  it("refuses a storage facility's tenant-insurance income by its label, and a value whose words say income", () => {
+    const ex = withRows({ label: "Tenant insurance", value: "$45,000 annual income" }, { label: "Insurance program revenue", value: "$45,000" }, { label: "Insurance", value: "$45,000 of income" });
+    const i = rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "insurance");
+    expect(i.verdict).toBe("unchecked");
+    expect(i.unchecked).toBe("The OM states no insurance premium.");
+  });
+
+  it("still reads the premium past them", () => {
+    const ex = withRows({ label: "Tenant insurance", value: "$45,000 annual income" }, { label: "Insurance", value: "$120,000" });
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "insurance").omSays).toEqual({ text: "Insurance: $120,000", value: 120_000, page: 15 });
+  });
+});
+
 describe("the loan rate the debt row reads is the acquisition loan's", () => {
   const withRows = (...extra: { label: string; value: string }[]): ExtractionResult => ({
     ...APARTMENT,
