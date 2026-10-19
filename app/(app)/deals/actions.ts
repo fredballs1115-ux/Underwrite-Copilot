@@ -820,7 +820,7 @@ export async function bulkSetStage(formData: FormData): Promise<BulkStageResult>
     .from("deals")
     .select("id, is_sample")
     .in("id", ids);
-  if (readError) return { ok: true, stage, changed: 0, unchanged: 0, refused: ids.length };
+  if (readError) return { ok: true, stage, changed: 0, unchanged: 0, refused: ids.length, settled: [] };
   const writable = new Set(
     ((rows ?? []) as { id: string; is_sample?: boolean | null }[])
       .filter((r) => !r.is_sample)
@@ -831,6 +831,7 @@ export async function bulkSetStage(formData: FormData): Promise<BulkStageResult>
   let changed = 0;
   let unchanged = 0;
   const moved: string[] = [];
+  const settled: string[] = [];
   const now = new Date().toISOString();
   // A few at a time: fifty deals one after another is a long wait, fifty at
   // once a burst the database need not take.
@@ -849,13 +850,19 @@ export async function bulkSetStage(formData: FormData): Promise<BulkStageResult>
       if (written.ok) {
         changed++;
         moved.push(dealId);
-      } else if (written.why === "unchanged") unchanged++;
+        settled.push(dealId);
+      } else if (written.why === "unchanged") {
+        unchanged++;
+        settled.push(dealId);
+      }
     }
   }
 
   for (const dealId of moved) revalidatePath(`/deals/${dealId}`);
-  if (moved.length > 0) revalidatePath("/deals");
-  return { ok: true, stage, changed, unchanged, refused: ids.length - changed - unchanged };
+  // A deal already at the stage means the reader's list was behind the
+  // database (another tab, a teammate): the list is read again for it too.
+  if (moved.length > 0 || unchanged > 0) revalidatePath("/deals");
+  return { ok: true, stage, changed, unchanged, refused: ids.length - changed - unchanged, settled };
 }
 
 /** How many deals a bulk change writes at once. */

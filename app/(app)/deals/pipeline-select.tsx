@@ -12,8 +12,13 @@ import { ConfirmSubmit } from "../team/team-client";
 import { BULK_STAGE_MAX, bulkStageSentence, type BulkStageResult } from "@/lib/bulk-stage";
 import { STAGES, STAGE_LABEL, type Stage } from "@/lib/stages";
 
-/** What the cards and rows are told while select mode is on. */
-export type SelectBoxRender = (d: { id: string; name: string }, checked: boolean, onToggle: (id: string) => void) => ReactNode;
+/** What the cards and rows are told while select mode is on. The sample
+ *  deal (`isSample`) draws no box: no change moves it. */
+export type SelectBoxRender = (
+  d: { id: string; name: string; isSample?: boolean },
+  checked: boolean,
+  onToggle: (id: string) => void,
+) => ReactNode;
 
 /**
  * A deal's checkbox: a real input with a label naming the deal ("Select
@@ -53,10 +58,10 @@ export function SelectBox({
 
 /** The checkbox as the card and the board card draw it, at their foot: one
  *  function for the life of the page, so a memoized card re-renders only
- *  when its own box is ticked. */
-export const selectBoxFor: SelectBoxRender = (d, checked, onToggle) => (
-  <SelectBox id={d.id} name={d.name} checked={checked} onToggle={onToggle} word />
-);
+ *  when its own box is ticked. None on the sample deal, which no change
+ *  moves (the action refuses it). */
+export const selectBoxFor: SelectBoxRender = (d, checked, onToggle) =>
+  d.isSample ? null : <SelectBox id={d.id} name={d.name} checked={checked} onToggle={onToggle} word />;
 
 /** Select mode's state: on or off, the deals picked (`BULK_STAGE_MAX` at
  *  most), and the way out — which hands the focus back to the Select button
@@ -74,6 +79,11 @@ export function useSelectMode(initial: { picked: readonly string[] } | null = nu
     });
   }, []);
   const clear = useCallback(() => setPicked(new Set()), []);
+  /** Unpick these deals (a change settled them), the rest kept. */
+  const drop = useCallback((ids: readonly string[]) => {
+    const gone = new Set(ids.map((id) => id.toLowerCase()));
+    setPicked((prev) => new Set([...prev].filter((id) => !gone.has(id.toLowerCase()))));
+  }, []);
   const leave = useCallback(() => {
     setOn(false);
     setPicked(new Set());
@@ -81,7 +91,7 @@ export function useSelectMode(initial: { picked: readonly string[] } | null = nu
     if (at instanceof HTMLElement && at.closest("[data-select-deal],[data-select-bar]")) buttonRef.current?.focus();
   }, []);
   const enter = useCallback(() => setOn(true), []);
-  return { on, picked, toggle, clear, leave, enter, buttonRef };
+  return { on, picked, toggle, clear, drop, leave, enter, buttonRef };
 }
 
 /** The header's Select button, beside Compare: "Done" while the mode is on. */
@@ -132,17 +142,24 @@ const MOVE_STAGES = STAGES.filter((s) => s !== "dead");
  * The bar while select mode is on: how many are picked, "Move to stage…"
  * and "Mark dead" (asked to confirm, the site's `ConfirmSubmit`), Clear and
  * Done, and one sentence on what the last change did. `apply` is the
- * pipeline's server action; `ids` the deals picked that the page shows.
+ * pipeline's server action; `ids` the deals picked that the page shows;
+ * `hidden` the picks the filters hide — counted against the limit and said,
+ * never sent. After a change the deals it settled are unpicked
+ * (`onSettled`), and a refused one stays picked.
  */
 export function SelectBar({
   ids,
+  hidden = 0,
   apply,
   onClear,
+  onSettled,
   onDone,
 }: {
   ids: readonly string[];
+  hidden?: number;
   apply: (form: FormData) => Promise<BulkStageResult>;
   onClear: () => void;
+  onSettled: (ids: readonly string[]) => void;
   onDone: () => void;
 }) {
   const [said, setSaid] = useState<string | null>(null);
@@ -151,9 +168,9 @@ export function SelectBar({
   const run = async (form: FormData) => {
     const result = await apply(form);
     setSaid(bulkStageSentence(result));
-    if (result.ok && result.changed > 0) onClear();
+    if (result.ok && result.settled.length > 0) onSettled(result.settled);
   };
-  const hidden = ids.map((id) => <input key={id} type="hidden" name="dealId" value={id} />);
+  const idInputs = ids.map((id) => <input key={id} type="hidden" name="dealId" value={id} />);
   const deals = `${n} ${n === 1 ? "deal" : "deals"}`;
   return (
     <div
@@ -163,14 +180,10 @@ export function SelectBar({
       className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3"
     >
       <p className="text-sm font-medium" data-qa="select-count">
-        {n === 0
-          ? "Select deals to move them together."
-          : n >= BULK_STAGE_MAX
-            ? `${n} of ${BULK_STAGE_MAX} selected`
-            : `${n} selected`}
+        {selectCountLine(n, hidden)}
       </p>
       <form action={run} className="flex items-center gap-2">
-        {hidden}
+        {idInputs}
         <label className="flex items-center">
           <span className="sr-only">Move the selected deals to</span>
           <select
@@ -192,7 +205,7 @@ export function SelectBar({
         <MoveButton disabled={n === 0 || stage === ""} />
       </form>
       <form action={run}>
-        {hidden}
+        {idInputs}
         <input type="hidden" name="stage" value="dead" />
         {n === 0 ? (
           <button type="button" disabled className="rounded-lg px-3 py-1.5 text-xs font-medium text-kill opacity-50">
@@ -201,13 +214,13 @@ export function SelectBar({
         ) : (
           <ConfirmSubmit
             label="Mark dead"
-            confirmText={`Mark ${deals} Dead? Each moves to the Dead stage, its history dated today; a stage can be changed back.`}
+            confirmText={`Mark ${deals} Dead? Each that can be moved goes to Dead, its history dated today; a stage can be changed back.`}
             danger
           />
         )}
       </form>
       <span className="ml-auto flex items-center gap-2">
-        {n > 0 ? (
+        {n + hidden > 0 ? (
           <button type="button" onClick={onClear} className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted hover:bg-faint hover:text-ink">
             Clear
           </button>
@@ -223,4 +236,15 @@ export function SelectBar({
       </p>
     </div>
   );
+}
+
+/** The bar's count: the picks shown, and the picks the filters hide —
+ *  counted against `BULK_STAGE_MAX` with the shown ones, and said, since a
+ *  change moves only what the page shows. */
+export function selectCountLine(shown: number, hidden = 0): string {
+  const total = shown + hidden;
+  if (total === 0) return "Select deals to move them together.";
+  const head = total >= BULK_STAGE_MAX ? `${total} of ${BULK_STAGE_MAX} selected` : `${total} selected`;
+  if (hidden <= 0) return head;
+  return `${head} — ${hidden} hidden by the filters, left out of a change`;
 }

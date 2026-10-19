@@ -214,6 +214,8 @@ export function pipelineCard(d: PipelineCardRow, ctx: PipelineCardContext): Deal
   return {
     id: d.id,
     name: d.name,
+    // The sample: select mode draws it no checkbox (no change moves it).
+    ...(d.is_sample ? { isSample: true } : {}),
     // "auto" is the create form's choice, not a class: the row shows what
     // the extraction read the deck as, and nothing until it has.
     assetClass: shownClass,

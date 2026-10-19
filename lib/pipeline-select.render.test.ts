@@ -21,7 +21,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 });
 
 import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
-import { SelectBar } from "@/app/(app)/deals/pipeline-select";
+import { SelectBar, selectBoxFor, selectCountLine } from "@/app/(app)/deals/pipeline-select";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -108,7 +108,11 @@ describe("select mode", () => {
     expect(html).toMatch(/data-qa="select-mode"[^>]*>Done selecting<|aria-pressed="true"[^>]*data-qa="select-mode"/);
     const from = html.indexOf("data-select-bar");
     const bar = html.slice(from, html.indexOf("</p>", html.indexOf('data-qa="select-said"', from)));
-    expect(visibleText(bar.slice(0, bar.indexOf("</p>") + 4))).toContain("2 selected");
+    // The dead deal the list hides is a pick still: counted against the
+    // limit and said, never sent.
+    expect(visibleText(bar.slice(0, bar.indexOf("</p>") + 4))).toContain(
+      "3 selected — 1 hidden by the filters, left out of a change",
+    );
     // Both forms carry the two shown picks — never the dead deal the list hides.
     const sent = [...bar.matchAll(/<input type="hidden" name="dealId" value="([^"]+)"/g)].map((m) => m[1]);
     expect(sent).toEqual(["a", "c", "a", "c"]);
@@ -121,7 +125,15 @@ describe("select mode", () => {
   });
 
   it("asks for a pick before it acts", () => {
-    const html = renderToStaticMarkup(React.createElement(SelectBar, { ids: [], apply: async () => ({ ok: false as const, error: "none" as const }), onClear: () => {}, onDone: () => {} }));
+    const html = renderToStaticMarkup(
+      React.createElement(SelectBar, {
+        ids: [],
+        apply: async () => ({ ok: false as const, error: "none" as const }),
+        onClear: () => {},
+        onSettled: () => {},
+        onDone: () => {},
+      }),
+    );
     expect(visibleText(html)).toContain("Select deals to move them together.");
     expect(html).toMatch(/<button type="button" disabled=""[^>]*>Mark dead<\/button>/);
     expect(html).toMatch(/<button type="submit" disabled=""[^>]*>Move<\/button>/);
@@ -133,6 +145,42 @@ describe("select mode", () => {
     expect(boxesOf(html)).toEqual([]);
     expect(html).not.toContain("data-select-bar");
     expect(html).toMatch(/data-qa="select-mode"[^>]*>Select<\/button><button[^>]*>Compare<\/button>/);
+  });
+
+  it("draws no box for the sample deal, which no change moves", () => {
+    const deals = [...DEALS, card({ id: "s", name: "The Sample Building", isSample: true })];
+    for (const initialView of ["cards", "list", "board"] as const) {
+      const html = render({ deals, initialView, initialSelect: { picked: ["a", "s"] } });
+      expect(boxesOf(html).map((b) => b.deal), initialView).toEqual(["a", "b", "c"]);
+      expect(html, initialView).not.toContain("Select The Sample Building");
+      // a pick of it is never sent
+      const sent = [...html.matchAll(/<input type="hidden" name="dealId" value="([^"]+)"/g)].map((m) => m[1]);
+      expect(sent, initialView).not.toContain("s");
+    }
+    expect(selectBoxFor({ id: "s", name: "Sample", isSample: true }, false, () => {})).toBeNull();
+  });
+
+  it("is a list's mode: the map shows neither its button nor its bar", () => {
+    const html = render({ initialView: "map", initialSelect: { picked: ["a"] } });
+    expect(html).not.toContain('data-qa="select-mode"');
+    expect(html).not.toContain("data-select-bar");
+  });
+
+  it("counts the picks the filters hide with the shown ones, and says them", () => {
+    expect(selectCountLine(0)).toBe("Select deals to move them together.");
+    expect(selectCountLine(4)).toBe("4 selected");
+    expect(selectCountLine(2, 3)).toBe("5 selected — 3 hidden by the filters, left out of a change");
+    expect(selectCountLine(0, 2)).toBe("2 selected — 2 hidden by the filters, left out of a change");
+    expect(selectCountLine(47, 3)).toBe("50 of 50 selected — 3 hidden by the filters, left out of a change");
+    expect(selectCountLine(50)).toBe("50 of 50 selected");
+  });
+
+  it("asks before marking dead in words true of a refused deal", () => {
+    const src = readFileSync("app/(app)/deals/pipeline-select.tsx", "utf8");
+    expect(src).toContain("Each that can be moved goes to Dead, its history dated today");
+    // after a change only the deals it settled are unpicked; a refused one stays
+    expect(src).toMatch(/if \(result\.ok && result\.settled\.length > 0\) onSettled\(result\.settled\)/);
+    expect(readFileSync("app/(app)/deals/pipeline.tsx", "utf8")).toMatch(/onSettled=\{select\.drop\}/);
   });
 
   it("keeps its UI in its own module, the pipeline only wiring it", () => {

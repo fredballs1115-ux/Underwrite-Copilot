@@ -86,6 +86,9 @@ import { verdictCountsOf } from "@/lib/pipeline-counts";
 export type DealCard = {
   id: string;
   name: string;
+  /** the sample deal (lib/sample-deal): select mode draws it no checkbox,
+   *  since no change moves it; absent on every other deal */
+  isSample?: boolean;
   assetClass: string;
   createdAt: string;
   verdict: string | null; // "pass" | "caution" | "pass_on" | null
@@ -588,8 +591,16 @@ export function Pipeline({
   }, [filtered]);
 
   // The deals picked that the list shows: a filter that hides one takes it
-  // out of the change rather than moving a deal the reader cannot see.
-  const pickedShown = useMemo(() => filtered.filter((d) => select.picked.has(d.id)).map((d) => d.id), [filtered, select.picked]);
+  // out of the change rather than moving a deal the reader cannot see. The
+  // hidden picks still count against the limit, and the bar says how many.
+  const pickedShown = useMemo(
+    () => filtered.filter((d) => !d.isSample && select.picked.has(d.id)).map((d) => d.id),
+    [filtered, select.picked],
+  );
+  const pickedHidden = select.picked.size - pickedShown.length;
+  // The map draws no checkbox: select mode is a list's, so the map shows
+  // neither its button nor its bar.
+  const selectShown = select.on && view !== "map";
 
   const deadCount = useMemo(
     () => deals.filter((d) => normalizeStage(d.stage) === "dead").length,
@@ -878,7 +889,7 @@ export function Pipeline({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {deals.length > 0 && (
+          {deals.length > 0 && view !== "map" && (
             <SelectModeButton
               on={select.on}
               buttonRef={select.buttonRef}
@@ -995,7 +1006,16 @@ export function Pipeline({
         </div>
       )}
 
-      {select.on && <SelectBar ids={pickedShown} apply={bulkSetStage} onClear={select.clear} onDone={select.leave} />}
+      {selectShown && (
+        <SelectBar
+          ids={pickedShown}
+          hidden={pickedHidden}
+          apply={bulkSetStage}
+          onClear={select.clear}
+          onSettled={select.drop}
+          onDone={select.leave}
+        />
+      )}
 
       {showForm && !atLimit && (
         <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} viewerId={viewerId} />
@@ -2164,7 +2184,15 @@ const DealRow = memo(function DealRow({
             selecting && checked ? "bg-brand/5" : ""
           }`}
         >
-          {selecting ? <SelectBox id={d.id} name={d.name} checked={checked} onToggle={onToggle} /> : null}
+          {/* The sample deal draws no box (no change moves it): a blank of
+              the box's width keeps the row's columns in line. */}
+          {selecting ? (
+            d.isSample ? (
+              <span className="w-4 shrink-0" aria-hidden />
+            ) : (
+              <SelectBox id={d.id} name={d.name} checked={checked} onToggle={onToggle} />
+            )
+          ) : null}
           <Link
             href={`/deals/${d.id}`}
             data-deal-nav

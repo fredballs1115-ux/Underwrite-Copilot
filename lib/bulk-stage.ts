@@ -25,6 +25,9 @@ export type BulkStageResult =
       /** not the reader's to change — a deal they cannot see or edit, the
        *  sample deal — or a write that did not land */
       refused: number;
+      /** the deals the change settled — moved, or already at the stage — so
+       *  the bar unpicks those and keeps the refused ones picked */
+      settled: string[];
     }
   | { ok: false; error: BulkStageError };
 

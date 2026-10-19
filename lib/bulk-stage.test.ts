@@ -166,11 +166,11 @@ describe("the bulk form's reader", () => {
   });
 
   it("says what a change did, in the stage's own words", () => {
-    expect(bulkStageSentence({ ok: true, stage: "tracking", changed: 3, unchanged: 1, refused: 2 })).toBe(
+    expect(bulkStageSentence({ ok: true, stage: "tracking", changed: 3, unchanged: 1, refused: 2, settled: [] })).toBe(
       "3 deals moved to Tracking; 1 already there; 2 could not be changed.",
     );
-    expect(bulkStageSentence({ ok: true, stage: "dead", changed: 1, unchanged: 0, refused: 0 })).toBe("1 deal marked Dead.");
-    expect(bulkStageSentence({ ok: true, stage: "dead", changed: 0, unchanged: 0, refused: 1 })).toBe(
+    expect(bulkStageSentence({ ok: true, stage: "dead", changed: 1, unchanged: 0, refused: 0, settled: [] })).toBe("1 deal marked Dead.");
+    expect(bulkStageSentence({ ok: true, stage: "dead", changed: 0, unchanged: 0, refused: 1, settled: [] })).toBe(
       "No deals marked Dead; 1 could not be changed.",
     );
     expect(bulkStageSentence({ ok: false, error: "toomany" })).toMatch(/50 deals at most/);
@@ -182,7 +182,7 @@ describe("bulkSetStage", () => {
     put(1);
     put(2, { stage: "tracking", stage_history: [{ stage: "tracking", at: "2026-09-01T00:00:00.000Z" }] });
     const r = await bulkSetStage(form("active_pursuit", [id(1), id(2)]));
-    expect(r).toEqual({ ok: true, stage: "active_pursuit", changed: 2, unchanged: 0, refused: 0 });
+    expect(r).toEqual({ ok: true, stage: "active_pursuit", changed: 2, unchanged: 0, refused: 0, settled: [id(1), id(2)] });
     expect(db.written.map((w) => w.id).sort()).toEqual([id(1), id(2)]);
     const two = db.written.find((w) => w.id === id(2))!.patch;
     expect(two.stage).toBe("active_pursuit");
@@ -201,7 +201,9 @@ describe("bulkSetStage", () => {
     put(4, { is_sample: true }); // the sample deal
     put(5, { stage: "dead" }); // already there
     const r = await bulkSetStage(form("dead", [id(1), id(2), id(3), id(4), id(5)]));
-    expect(r).toEqual({ ok: true, stage: "dead", changed: 1, unchanged: 1, refused: 3 });
+    // Settled: the one moved and the one already there — the refused three
+    // stay picked on the bar.
+    expect(r).toEqual({ ok: true, stage: "dead", changed: 1, unchanged: 1, refused: 3, settled: [id(1), id(5)] });
     expect(db.written.map((w) => w.id)).toEqual([id(1)]);
     expect(db.deals.get(id(2))!.stage).toBe("screening");
     expect(db.deals.get(id(3))!.stage).toBe("screening");
@@ -224,9 +226,22 @@ describe("bulkSetStage", () => {
     expect(revalidated).toEqual([]);
   });
 
-  it("revalidates nothing where nothing moved", async () => {
+  it("reads the list again where a deal was already at the stage: the reader's list was behind", async () => {
     put(1, { stage: "tracking" });
-    expect(await bulkSetStage(form("tracking", [id(1)]))).toEqual({ ok: true, stage: "tracking", changed: 0, unchanged: 1, refused: 0 });
+    expect(await bulkSetStage(form("tracking", [id(1)]))).toEqual({
+      ok: true,
+      stage: "tracking",
+      changed: 0,
+      unchanged: 1,
+      refused: 0,
+      settled: [id(1)],
+    });
+    expect(revalidated).toEqual(["/deals"]);
+  });
+
+  it("revalidates nothing where every deal was refused", async () => {
+    put(1, { is_sample: true });
+    expect(await bulkSetStage(form("tracking", [id(1)]))).toEqual({ ok: true, stage: "tracking", changed: 0, unchanged: 0, refused: 1, settled: [] });
     expect(revalidated).toEqual([]);
   });
 });
