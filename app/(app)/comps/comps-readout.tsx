@@ -105,19 +105,22 @@ export function CompsReadout({
 
   const kept = keptSales(result.comps, out);
   const anyOut = out.size > 0;
+  // Rows of one day, buyer and price (lib/public-comps/picture
+  // `sharedDeedCounts`): flagged in the list, never merged there — a fact of
+  // the record, so read on every row of the FULL list — and counted once in
+  // the figures. The kept rows carry the full list's flags, so leaving one
+  // row of a deed out never re-admits the other's price a foot.
+  const shared = sharedDeedCounts(result.comps);
+  const keptShared = kept.at.map((i) => shared[i] ?? 0);
   // Read again from the rows — the kept rows — so a result stored before a
   // deed recorded once a parcel was counted once (lib/public-comps/core
   // `compStats`) is read by today's rule, and a sale left out counts nowhere.
-  const s: RecordCompsStats | undefined = compStats(kept.comps) ?? (anyOut ? undefined : result.stats);
+  const s: RecordCompsStats | undefined = compStats(kept.comps, keptShared) ?? (anyOut ? undefined : result.stats);
   const keptResult = { ...result, comps: kept.comps };
   const scope = compsScope(result);
   const kLine = keptLine(kept.comps.length, result.comps.length);
   const outPhrase = leftOutPhrase(out);
 
-  // Rows of one day, buyer and price (lib/public-comps/picture
-  // `sharedDeedCounts`): flagged in the list, never merged there — a fact of
-  // the record, so read on every row — and counted once in the figures.
-  const shared = sharedDeedCounts(result.comps);
   const showUnits = result.comps.some((c) => c.units != null);
   const provenance = { providerName: result.providerName, datasetUrl: result.datasetUrl, retrievedAt: result.retrievedAt, subject: result.subject };
   const copyText = compsTableText(result, out);

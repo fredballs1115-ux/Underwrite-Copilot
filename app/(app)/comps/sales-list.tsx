@@ -19,7 +19,7 @@ import { useState, type ReactNode } from "react";
 import { compactUsd } from "@/lib/money";
 import { fmtMiles } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
-import { sharedDeedCounts, type RecordComp } from "@/lib/public-comps/core";
+import type { RecordComp } from "@/lib/public-comps/core";
 import {
   LEAVE_OUT_REASONS,
   barsOnList,
@@ -136,9 +136,10 @@ export function SalesList({
   const order = salesOrder(comps, by);
   // The bars are the kept sales' (the readout's own set), drawn through the
   // one function on that set and put back on their pins. A row possibly of
-  // one deed across parcels — among the kept — sets no scale and draws no bar.
+  // one deed across parcels — flagged on the FULL list, so a deed whose other
+  // rows are left out is still one — sets no scale and draws no bar.
   const kept = keptSales(comps, out);
-  const bars = barsOnList(perSfBars(kept.comps, medianPerSqft, sharedDeedCounts(kept.comps)), kept.at, comps.length);
+  const bars = barsOnList(perSfBars(kept.comps, medianPerSqft, kept.at.map((i) => shared[i] ?? 0)), kept.at, comps.length);
   const first = order.slice(0, SALES_SHOWN);
   const rest = order.slice(SALES_SHOWN);
   const noArea = comps.filter((c) => perSqftOf(c) === null).length;

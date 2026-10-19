@@ -418,6 +418,20 @@ describe("a sale left out of the readout", () => {
     expect(visibleText(one).replace(/\s+/g, " ")).toMatch(/Bars: the price a square foot that 2 of the 5 kept sales state/);
   });
 
+  it("keeps a deed's row a deed's when its other row is left out: its $/SF never comes back", () => {
+    const deed = { buyer: "Acme LLC", saleDate: "2026-01-15", price: 9_000_000, sqft: 2_000 };
+    const set = [sale(0, deed), sale(1, deed), sale(2, { sqft: 2_000 }), sale(3, { sqft: 2_000 }), sale(4, { sqft: 2_000 })];
+    // pin 2, the deed's second row, left out as a possible shared deed
+    const html = onComps("2sd", false, set);
+    const text = visibleText(html).replace(/\s+/g, " ");
+    // pin 1 is still the deed's: no area in the $/SF median ($225, $238, $250)
+    expect(text).toContain("$238/SF on 3 of 4 sales");
+    // and no bar: three drawn (a card and a table row each), the deed's row
+    // named as drawing none
+    expect(count(html, "comps-psf")).toBe(6);
+    expect(text).toContain("One row possibly of one deed across parcels draws no bar");
+  });
+
   it("reads no figures where every sale is left out, and keeps the list to bring one back", () => {
     const html = onComps("1,2,3,4,5,6");
     const text = visibleText(html).replace(/\s+/g, " ");

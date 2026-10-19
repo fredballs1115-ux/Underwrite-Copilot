@@ -125,13 +125,26 @@ describe("the readout recomputed on the kept set", () => {
     expect(barsOnList(null, [], 0)).toBeNull();
   });
 
-  it("reads a deed across parcels on the kept rows: one of its two rows left out is a sale of its own", () => {
+  it("reads a deed across parcels on the FULL list: leaving one of its two rows out never re-admits its $/SF", () => {
     const deed = { buyer: "Acme LLC", saleDate: "2026-01-15", price: 9_000_000 };
     const set = [sale(0, deed), sale(1, deed), sale(2), sale(3), sale(4)];
     expect(compStats(set)!.sharedDeeds).toEqual({ rows: 2, deeds: 1 });
+    const shared = sharedDeedCounts(set);
     const kept = keptSales(set, new Map([[1, "shared_deed"]]));
-    const s = compStats(kept.comps)!;
-    expect(s.sharedDeeds).toBeUndefined();
+    const keptShared = kept.at.map((i) => shared[i]);
+    const s = compStats(kept.comps, keptShared)!;
     expect(s.count).toBe(4);
+    // the deed's kept row is still a deed's: no area, so the $/SF median is
+    // the three kept sales' own — $300, $350, $400 a foot
+    expect(s.medianPerSqft).toBe(350);
+    expect(s.perSqftCount).toBe(3);
+    expect(s.sharedDeeds).toEqual({ rows: 1, deeds: 1 });
+    // read on the kept rows alone, the deed's $9M over 2,000 SF had come back
+    expect(compStats(kept.comps)!.perSqftCount).toBe(4);
+    // and its kept row draws no $/SF bar
+    const bars = barsOnList(perSfBars(kept.comps, s.medianPerSqft, keptShared), kept.at, set.length)!;
+    expect(bars.shares[0]).toBeNull();
+    expect(bars.leftOut).toBe(1);
+    expect(bars.drawn).toBe(3);
   });
 });
