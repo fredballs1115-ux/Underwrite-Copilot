@@ -1334,7 +1334,10 @@ export default async function DealPage({
     cap: rangeCap,
     basis: unit === "unit" ? rangeBasis.perUnit : unit === "sf" ? rangeBasis.perSf : null,
   });
-  const memoryBasis = marketMemory?.perUnit ? { unit: marketMemory.perUnit.basis, noun: marketMemory.perUnit.noun ?? null } : null;
+  // The building prices' basis, else the plan deals' all-in one (the two are
+  // kept apart in the group, lib/market-memory `allInPerUnit`).
+  const memoryBasisStat = marketMemory?.perUnit ?? marketMemory?.allInPerUnit ?? null;
+  const memoryBasis = memoryBasisStat ? { unit: memoryBasisStat.basis, noun: memoryBasisStat.noun ?? null } : null;
   const marketMemoryRanges = memory
     ? compRangeTracks(
         memory.members.map((c) => ({

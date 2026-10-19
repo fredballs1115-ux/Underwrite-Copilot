@@ -1123,6 +1123,7 @@ function MarketMemoryStrip({ group, ranges = [] }: { group: MarketGroup; ranges?
   const bits: string[] = [];
   if (!drawn && group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
   if (!drawn && group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
+  if (!drawn && group.allInPerUnit) bits.push(`plan deals' all-in basis ${fmtBasisRange(group.allInPerUnit)}`);
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
