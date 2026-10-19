@@ -183,12 +183,34 @@ describe("the buy box, drawn: each band a track, the reader's deals on it", () =
     expect(bandsCountLine(1)).toBe("Your one live deal on each band, as saved.");
   });
 
+  // The audit of #466: a teammate's view said "Your N live deals", a read
+  // past its limit counted only what it drew, and a failed read said "No
+  // live deals".
+  it("says whose deals they are, the newest of how many past the limit, and nothing on a failed read", () => {
+    expect(bandsCountLine(5, { team: true })).toBe("The team’s 5 live deals on each band, as saved.");
+    expect(bandsCountLine(0, { team: true })).toBe("No live team deals to place on it yet.");
+    expect(bandsCountLine(200, { total: 340 })).toBe("Your newest 200 of 340 live deals on each band, as saved.");
+    expect(bandsCountLine(200, { team: true, total: 340 })).toBe("The team’s newest 200 of 340 live deals on each band, as saved.");
+    expect(bandsCountLine(200, { total: 200 })).toBe("Your 200 live deals on each band, as saved.");
+    expect(bandsCountLine(null)).toBeNull();
+    const failed = renderToStaticMarkup(h(BoxBands, { bands, deals: null }));
+    expect(failed).toContain('data-bar="buybox-track"');
+    expect(visibleText(failed)).not.toMatch(/live deal/);
+    const team = renderToStaticMarkup(
+      h(ReadOnlyBox, { teamName: "Ridgeline", mandate: null, bands, deals: DEALS.length, lines: [] }),
+    );
+    expect(visibleText(team)).toContain("The team’s 5 live deals on each band, as saved.");
+    const page = readFileSync("app/(app)/criteria/page.tsx", "utf8");
+    expect(page).toContain('{ count: "exact" }');
+    expect(page).toContain("const bandsCount = bandsRead.failed ? null : bandDeals.length;");
+  });
+
   it("is built on the page from the live deals, the sample left out, through the deal page's own source", () => {
     const page = readFileSync("app/(app)/criteria/page.tsx", "utf8");
     expect(page).toContain(".limit(BAND_DEALS_MAX)");
     expect(page).toMatch(/!d\.is_sample && isOpenStage\(normalizeStage\(d\.stage\)\)/);
     expect(page).toMatch(/source: dealCheckSource\(/);
-    expect(page).toContain("<BoxBands bands={bands} deals={bandDeals.length} />");
+    expect(page).toContain("<BoxBands bands={bands} deals={bandsCount}");
   });
 
   it("owns its data-bar markers: no other file in the repo draws them", () => {
@@ -239,7 +261,8 @@ describe("a teammate's read-only view of the team's box: the same tracks, never 
     );
     expect(html).toContain('data-qa="team-box"');
     // The same tracks as the owner's card: the bands' body is one component.
-    const owner = renderToStaticMarkup(h(BoxBands, { bands, deals: DEALS.length }));
+    // (the owner of a team's box sees the team's deals too)
+    const owner = renderToStaticMarkup(h(BoxBands, { bands, deals: DEALS.length, of: { team: true } }));
     const body = (s: string) => s.slice(s.indexOf('<div data-qa="box-bands-body">'), s.indexOf("</ul></div>", s.indexOf('<div data-qa="box-bands-body">')));
     expect(body(html)).toBe(body(owner));
     expect((html.match(/data-bar="buybox-track"/g) ?? []).length).toBe(5);

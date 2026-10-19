@@ -23,10 +23,30 @@ function Dot({ tone }: { tone: string }) {
 /** A row's lift, in px: a dot is 10px and the rows 12px apart. */
 const LANE_PX = 12;
 
-/** The line under the heading: how many live deals the dots are of. */
-export function bandsCountLine(deals: number): string {
-  if (deals === 0) return "No live deals to place on it yet.";
-  return `Your ${deals === 1 ? "one live deal" : `${deals} live deals`} on each band, as saved.`;
+/** Whose live deals the dots are, and how many there are in all. */
+export interface BandsCountOf {
+  /** the team's deals (a box held by a team), not the reader's own */
+  team?: boolean;
+  /** every live deal the read matched, where more than it drew
+   *  (`BAND_DEALS_MAX`, newest first) */
+  total?: number | null;
+}
+
+/**
+ * The line under the heading: how many live deals the dots are of, and
+ * whose — the team's where the box is a team's, a teammate's view
+ * included. Past the read's limit it says the dots are the newest of how
+ * many. Null where the read failed: a count of the deals it never read is
+ * no count.
+ */
+export function bandsCountLine(deals: number | null, of: BandsCountOf = {}): string | null {
+  if (deals === null) return null;
+  if (deals === 0) return of.team ? "No live team deals to place on it yet." : "No live deals to place on it yet.";
+  const whose = of.team ? "The team’s" : "Your";
+  if (of.total != null && of.total > deals) {
+    return `${whose} newest ${deals} of ${of.total} live deals on each band, as saved.`;
+  }
+  return `${whose} ${deals === 1 ? "one live deal" : `${deals} live deals`} on each band, as saved.`;
 }
 
 function dotLabel(d: BandDot, label: string): string {
@@ -102,13 +122,23 @@ function Band({ band }: { band: BoxBand }) {
  * card below, and a teammate's read-only view of the team's box, which
  * draws them inside its own card in place of a list of the criteria.
  */
-export function BoxBandsBody({ bands, deals }: { bands: readonly BoxBand[]; deals: number }) {
+export function BoxBandsBody({
+  bands,
+  deals,
+  of = {},
+}: {
+  bands: readonly BoxBand[];
+  /** the live deals drawn; null where the read failed */
+  deals: number | null;
+  of?: BandsCountOf;
+}) {
   if (!bands.length) return null;
   const tones = new Set(bands.flatMap((b) => b.dots.map((d) => d.tone)));
   const red = bands.some((b) => b.redLine);
+  const count = bandsCountLine(deals, of);
   return (
     <div data-qa="box-bands-body">
-      <p className="text-xs text-muted">{bandsCountLine(deals)}</p>
+      {count && <p className="text-xs text-muted">{count}</p>}
       <ul className="mt-4 space-y-5">
         {bands.map((b) => (
           <Band key={b.key} band={b} />
@@ -163,13 +193,17 @@ export function ReadOnlyBox({
   mandate,
   bands,
   deals,
+  total = null,
   lines,
 }: {
   teamName: string | null;
   /** the active mandate, where the team holds more than one */
   mandate: { name: string; of: number } | null;
   bands: readonly BoxBand[];
-  deals: number;
+  /** the team's live deals drawn; null where the read failed */
+  deals: number | null;
+  /** every live deal the read matched, where more than it drew */
+  total?: number | null;
   /** the criteria beyond the bands (lib/box-bands `boxLinesBeyondBands`);
    *  null where the team has no box */
   lines: readonly string[] | null;
@@ -190,7 +224,7 @@ export function ReadOnlyBox({
         <>
           {bands.length > 0 && (
             <div className="mt-4">
-              <BoxBandsBody bands={bands} deals={deals} />
+              <BoxBandsBody bands={bands} deals={deals} of={{ team: true, total }} />
             </div>
           )}
           {lines.length > 0 && (
@@ -207,7 +241,17 @@ export function ReadOnlyBox({
 }
 
 /** The box's bands, the deals on each, in a card of their own. */
-export function BoxBands({ bands, deals }: { bands: readonly BoxBand[]; deals: number }) {
+export function BoxBands({
+  bands,
+  deals,
+  of = {},
+}: {
+  bands: readonly BoxBand[];
+  /** the live deals drawn; null where the read failed */
+  deals: number | null;
+  /** whose they are (a team's box draws the team's) and how many in all */
+  of?: BandsCountOf;
+}) {
   if (!bands.length) return null;
   return (
     <section aria-labelledby="box-bands-h" data-qa="box-bands" className="rounded-2xl border border-line bg-surface p-5 shadow-card">
@@ -215,7 +259,7 @@ export function BoxBands({ bands, deals }: { bands: readonly BoxBand[]; deals: n
         Your box, drawn
       </h2>
       <div className="mt-0.5">
-        <BoxBandsBody bands={bands} deals={deals} />
+        <BoxBandsBody bands={bands} deals={deals} of={of} />
       </div>
     </section>
   );

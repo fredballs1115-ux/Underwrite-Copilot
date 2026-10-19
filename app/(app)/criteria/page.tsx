@@ -131,18 +131,21 @@ export default async function CriteriaPage({
   // reader's live deals on it — the deals the preview judges, the closed,
   // the dead and the sample left out — each at the figure its check reads
   // through the deal page's own source (lib/buy-box-chip `dealCheckSource`).
-  // A failed read draws the bands with no deals on them.
-  const bandDeals: BandDeal[] = await (async () => {
-    if (!user || !active.box) return [];
+  // A failed read draws the bands with no deals on them and no count line
+  // (`bandsRead.failed`); past BAND_DEALS_MAX the line says the dots are the
+  // newest of how many (`total`, the read's own exact count).
+  const bandsRead: { deals: BandDeal[]; total: number | null; failed: boolean } = await (async () => {
+    if (!user || !active.box) return { deals: [], total: null, failed: false };
     let q = supabase
       .from("deals")
-      .select("id, name, asset_class, extraction, address, first_signal, stage, is_sample")
+      .select("id, name, asset_class, extraction, address, first_signal, stage, is_sample", { count: "exact" })
       .or(OPEN_STAGE_FILTER)
+      .not("is_sample", "is", true)
       .order("created_at", { ascending: false })
       .limit(BAND_DEALS_MAX);
     q = active.scope === "team" && active.teamId ? q.eq("team_id", active.teamId) : q.eq("user_id", user.id).is("team_id", null);
-    const { data, error: readError } = await q;
-    if (readError || !data) return [];
+    const { data, error: readError, count } = await q;
+    if (readError || !data) return { deals: [], total: null, failed: true };
     type Row = {
       id: string;
       name: string | null;
@@ -153,7 +156,7 @@ export default async function CriteriaPage({
       stage: string | null;
       is_sample: boolean | null;
     };
-    return (data as Row[])
+    const deals = (data as Row[])
       .filter((d) => !d.is_sample && isOpenStage(normalizeStage(d.stage)))
       .map((d) => ({
         id: d.id,
@@ -165,7 +168,13 @@ export default async function CriteriaPage({
           (d.address as StructuredAddress | null) ?? null,
         ),
       }));
+    // The total only where the read stopped at its limit and the count
+    // says more matched; otherwise the dots are every live deal.
+    const total = data.length >= BAND_DEALS_MAX && typeof count === "number" && count > deals.length ? count : null;
+    return { deals, total, failed: false };
   })();
+  const bandDeals = bandsRead.deals;
+  const bandsCount = bandsRead.failed ? null : bandDeals.length;
   const bands = active.box ? boxBands(active.box, bandDeals) : [];
 
   const banner = saved
@@ -232,7 +241,8 @@ export default async function CriteriaPage({
           teamName={active.teamName}
           mandate={active.boxes.length > 1 ? { name: activeNamed?.name ?? "Mandate", of: active.boxes.length } : null}
           bands={bands}
-          deals={bandDeals.length}
+          deals={bandsCount}
+          total={bandsRead.total}
           lines={active.box ? boxLinesBeyondBands(active.box) : null}
         />
       ) : (
@@ -315,7 +325,7 @@ export default async function CriteriaPage({
             </section>
           )}
 
-          <BoxBands bands={bands} deals={bandDeals.length} />
+          <BoxBands bands={bands} deals={bandsCount} of={{ team: active.scope === "team" && !!active.teamId, total: bandsRead.total }} />
 
           <form action={saveBuyBox} className="space-y-6">
             {/* Which named box these edits belong to (guards against a switch
