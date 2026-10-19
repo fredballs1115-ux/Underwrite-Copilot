@@ -12,6 +12,7 @@ import {
   keptSales,
   leftOutPhrase,
   readSalesOut,
+  saleKey,
   trackOnList,
   withSaleOut,
   writeSalesOut,
@@ -31,34 +32,74 @@ const sale = (i: number, over: Partial<RecordComp> = {}): RecordComp => ({
 });
 
 describe("reading the set a link leaves out", () => {
-  it("reads each pin with its reason, held to the list, the unknown dropped", () => {
+  const six = Array.from({ length: 6 }, (_, i) => sale(i));
+  const k = (i: number) => saleKey(six[i]);
+
+  it("keys a sale by its day, price and address, whatever its place", () => {
+    expect(k(0)).toMatch(/^[0-9a-z]{7}$/);
+    expect(new Set(six.map(saleKey)).size).toBe(6);
+    // the same sale keys alike however its address is spaced or cased, and
+    // whatever else the row says
+    expect(saleKey({ ...six[2], address: "  102   walnut st " })).toBe(k(2));
+    expect(saleKey({ ...six[2], distanceKm: 9, sourceUrl: "x" } as typeof six[2])).toBe(k(2));
+    // a different day, price or address is a different sale
+    expect(saleKey({ ...six[2], saleDate: "2026-03-16" })).not.toBe(k(2));
+    expect(saleKey({ ...six[2], price: six[2].price + 1 })).not.toBe(k(2));
+    expect(saleKey({ ...six[2], address: "103 Walnut St" })).not.toBe(k(2));
+  });
+
+  it("reads each sale with its reason, held to the list, the unknown dropped", () => {
     expect(SALES_OUT_PARAM).toBe("out");
-    const out = readSalesOut("3nc, 1wc,5sd,6ot", 6);
+    const out = readSalesOut(`${k(2)}-nc, ${k(0)}-wc,${k(4)}-sd,${k(5)}-ot`, six);
     expect([...out.entries()].sort((a, b) => a[0] - b[0])).toEqual([
       [0, "wrong_class"],
       [2, "not_comparable"],
       [4, "shared_deed"],
       [5, "other"],
     ]);
-    // A pin with no reason names none: "Other".
-    expect(readSalesOut("2", 6).get(1)).toBe("other");
-    // Outside the list, a code no reason carries, a pin of zero, junk: dropped.
-    expect(readSalesOut("7nc,0nc,2zz,abc,-1,2.5,,", 6).size).toBe(0);
-    // A pin named twice keeps its first reason; a repeated parameter reads its first.
-    expect(readSalesOut("2nc,2wc", 6).get(1)).toBe("not_comparable");
-    expect(readSalesOut(["4wc", "5nc"], 6)).toEqual(new Map([[3, "wrong_class"]]));
-    expect(readSalesOut(null, 6).size).toBe(0);
-    expect(readSalesOut("1nc", 0).size).toBe(0);
+    // A key with no reason names none: "Other".
+    expect(readSalesOut(k(1), six).get(1)).toBe("other");
+    // A key no sale bears, a code no reason carries, junk: dropped.
+    expect(readSalesOut(`zzzzzzz-nc,${k(2)}-zz,abc,,${k(2)}nc`, six).size).toBe(0);
+    // An old pin-number link reads as nothing.
+    expect(readSalesOut("3nc,1wc,6", six).size).toBe(0);
+    // A key named twice with one sale bearing it keeps its first reason; a
+    // repeated parameter reads its first.
+    expect(readSalesOut(`${k(1)}-nc,${k(1)}-wc`, six)).toEqual(new Map([[1, "not_comparable"]]));
+    expect(readSalesOut([`${k(3)}-wc`, `${k(4)}-nc`], six)).toEqual(new Map([[3, "wrong_class"]]));
+    expect(readSalesOut(null, six).size).toBe(0);
+    expect(readSalesOut(`${k(0)}-nc`, []).size).toBe(0);
+  });
+
+  it("follows a sale to its new place when the pull is fetched again, and drops one that left the window", () => {
+    const link = writeSalesOut(new Map([[1, "not_comparable"], [5, "wrong_class"]]), six);
+    // a newer sale arrives nearest and the oldest-dated one has left: the
+    // same link now finds sale 1 at pin 3 and sale 5 at pin 6
+    const later = [sale(9), sale(8), six[1], six[2], six[3], six[5]];
+    expect(readSalesOut(link, later)).toEqual(new Map([[2, "not_comparable"], [5, "wrong_class"]]));
+    // sale 5 gone too: only sale 1 is left out, never the sale now at its pin
+    expect(readSalesOut(link, [sale(9), six[1], six[2]])).toEqual(new Map([[1, "not_comparable"]]));
+  });
+
+  it("names two rows stating one day, price and address once each", () => {
+    const twins = [sale(0), sale(1), sale(1), sale(2)];
+    expect(saleKey(twins[1])).toBe(saleKey(twins[2]));
+    const both = writeSalesOut(new Map([[1, "other"], [2, "wrong_class"]]), twins);
+    expect(readSalesOut(both, twins)).toEqual(new Map([[1, "other"], [2, "wrong_class"]]));
+    // one of the two: the first bearing the key
+    expect(readSalesOut(writeSalesOut(new Map([[2, "other"]]), twins), twins)).toEqual(new Map([[1, "other"]]));
   });
 
   it("writes the set in pin order with every reason's code, and reads its own writing back", () => {
     const out = withSaleOut(withSaleOut(new Map(), 4, "other"), 1, "not_comparable");
-    expect(writeSalesOut(out)).toBe("2nc,5ot");
-    expect(readSalesOut(writeSalesOut(out), 6)).toEqual(out);
-    expect(writeSalesOut(withSaleOut(out, 4, null))).toBe("2nc");
-    expect(writeSalesOut(new Map())).toBe("");
+    expect(writeSalesOut(out, six)).toBe(`${k(1)}-nc,${k(4)}-ot`);
+    expect(readSalesOut(writeSalesOut(out, six), six)).toEqual(out);
+    expect(writeSalesOut(withSaleOut(out, 4, null), six)).toBe(`${k(1)}-nc`);
+    expect(writeSalesOut(new Map(), six)).toBe("");
+    // a place outside the list is dropped
+    expect(writeSalesOut(new Map([[9, "other"]]), six)).toBe("");
     // every reason round-trips
-    for (const r of LEAVE_OUT_REASONS) expect(readSalesOut(writeSalesOut(new Map([[0, r.key]])), 1).get(0)).toBe(r.key);
+    for (const r of LEAVE_OUT_REASONS) expect(readSalesOut(writeSalesOut(new Map([[0, r.key]]), six), six).get(0)).toBe(r.key);
   });
 
   it("says the kept count and what was left out, by reason", () => {

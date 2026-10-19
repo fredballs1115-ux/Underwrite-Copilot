@@ -10,10 +10,16 @@
 //     track, the $/SF bars — are recomputed through the SAME functions on the
 //     kept set (core `compStats`, picture `priceTrack` and `perSfBars`), so
 //     the floors (MEDIAN_FLOOR, CONFIDENT_FLOOR) apply to the kept count;
-//   - on /comps the set lives in the page's address (`?out=`), so a shared
-//     link shows the same set; a value nobody could have written is dropped,
-//     never guessed at.
+//   - on /comps the set lives in the page's address (`?out=`), each sale named
+//     by its own identity (`saleKey`: its day, price and address), never by
+//     its pin — the pull is fetched again on every load, its window counted
+//     back from that day, so a pin number can name another sale by the time a
+//     link is opened. A reload or a shared link leaves out the same sales
+//     where they are still in the list; one that has left the window, and a
+//     value nobody could have written (an old pin-number link included), is
+//     dropped, never guessed at.
 
+import type { RecordComp } from "./core";
 import type { PerSfBars, PriceTrack } from "./picture";
 
 export type LeaveOutReason = "not_comparable" | "wrong_class" | "shared_deed" | "other";
@@ -28,13 +34,16 @@ export const LEAVE_OUT_REASONS: ReadonlyArray<{ key: LeaveOutReason; label: stri
 ];
 
 /** The /comps page's query parameter holding the sales left out: each one's
- *  pin number with its reason's code, "3nc,7wc". A deal's panel keeps the
- *  set for the visit only. */
+ *  identity (`saleKey`) with its reason's code, "k3f9a2x-nc,0p7d1qa-wc". A
+ *  deal's panel keeps the set for the visit only. */
 export const SALES_OUT_PARAM = "out";
 
-/** Sales left out, keyed by their place in the nearest-first list (the pin
- *  number less one). */
+/** Sales left out, keyed by their place in the nearest-first list as it was
+ *  read this load (the pin number less one). */
 export type SalesOut = ReadonlyMap<number, LeaveOutReason>;
+
+/** What `saleKey` reads of a sale. */
+export type SaleIdentity = Pick<RecordComp, "saleDate" | "price" | "address">;
 
 const BY_CODE = new Map(LEAVE_OUT_REASONS.map((r) => [r.code, r.key]));
 const CODE_OF = new Map(LEAVE_OUT_REASONS.map((r) => [r.key, r.code]));
@@ -50,39 +59,71 @@ export function isLeaveOutReason(v: unknown): v is LeaveOutReason {
   return typeof v === "string" && CODE_OF.has(v as LeaveOutReason);
 }
 
-const TOKEN = /^(\d{1,4})([a-z]{2})?$/;
+/** A key's length: 32 bits in base 36, padded. */
+const KEY_LENGTH = 7;
+
+/**
+ * A sale's identity in a link: a short hash (FNV-1a, 32 bits, base 36, seven
+ * characters) of its day, its whole-dollar price and its address (trimmed,
+ * spaces collapsed, upper case) — what the record states of the sale, so the
+ * same sale keys alike on every pull whatever its place in the list. Two rows
+ * of one deed differ by their addresses; two rows stating all three alike
+ * share a key, and a link names each such row once more (`readSalesOut`).
+ */
+export function saleKey(c: SaleIdentity): string {
+  const text = `${(c.saleDate ?? "").slice(0, 10)}|${Math.round(Number(c.price) || 0)}|${(c.address ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase()}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36).padStart(KEY_LENGTH, "0");
+}
+
+const TOKEN = new RegExp(`^([0-9a-z]{${KEY_LENGTH}})(?:-([a-z]{2}))?$`);
 
 /**
  * The sales a link leaves out, held to the list it is read against: each
- * comma-separated token is a pin number from 1 to `total`, with a reason's
- * code after it ("3nc"); a pin with no code reads as "Other", since the link
- * names no reason. A pin outside the list, a code no reason carries, or
- * anything else is dropped; a pin named twice keeps its first reason. A
- * repeated parameter reads its first.
+ * comma-separated token is a sale's identity (`saleKey`), with a reason's
+ * code after a hyphen ("k3f9a2x-nc"); a key with no code reads as "Other",
+ * since the link names no reason. Each token marks the first sale in the
+ * list bearing its key that no earlier token marked, so two rows stating one
+ * day, price and address are named once each. A key no sale in the list
+ * bears (the sale has left the window), a code no reason carries, an old
+ * pin-number token, or anything else is dropped. A repeated parameter reads
+ * its first.
  */
-export function readSalesOut(raw: string | ReadonlyArray<string> | null | undefined, total: number): Map<number, LeaveOutReason> {
+export function readSalesOut(
+  raw: string | ReadonlyArray<string> | null | undefined,
+  comps: ReadonlyArray<SaleIdentity>,
+): Map<number, LeaveOutReason> {
   const value = (Array.isArray(raw) ? raw[0] : raw) as string | null | undefined;
   const out = new Map<number, LeaveOutReason>();
-  if (typeof value !== "string" || !(total > 0)) return out;
+  if (typeof value !== "string" || comps.length === 0) return out;
+  const keys = comps.map(saleKey);
   for (const token of value.split(",")) {
     const m = TOKEN.exec(token.trim().toLowerCase());
     if (!m) continue;
-    const pin = Number(m[1]);
-    if (!Number.isInteger(pin) || pin < 1 || pin > total) continue;
     const reason = m[2] === undefined ? "other" : BY_CODE.get(m[2]);
-    if (!reason || out.has(pin - 1)) continue;
-    out.set(pin - 1, reason);
+    if (!reason) continue;
+    const at = keys.findIndex((k, i) => k === m[1] && !out.has(i));
+    if (at < 0) continue;
+    out.set(at, reason);
   }
   return out;
 }
 
-/** The set as a link writes it, pin order, every reason's code spelled:
- *  "3nc,7wc"; "" where nothing is left out. */
-export function writeSalesOut(out: SalesOut): string {
+/** The set as a link writes it, in pin order, each sale by its identity with
+ *  its reason's code spelled: "k3f9a2x-nc,0p7d1qa-wc"; "" where nothing is
+ *  left out. A place outside `comps` is dropped. */
+export function writeSalesOut(out: SalesOut, comps: ReadonlyArray<SaleIdentity>): string {
   return [...out.entries()]
-    .filter(([at, r]) => Number.isInteger(at) && at >= 0 && CODE_OF.has(r))
+    .filter(([at, r]) => Number.isInteger(at) && at >= 0 && at < comps.length && CODE_OF.has(r))
     .sort((a, b) => a[0] - b[0])
-    .map(([at, r]) => `${at + 1}${CODE_OF.get(r)}`)
+    .map(([at, r]) => `${saleKey(comps[at])}-${CODE_OF.get(r)}`)
     .join(",");
 }
 

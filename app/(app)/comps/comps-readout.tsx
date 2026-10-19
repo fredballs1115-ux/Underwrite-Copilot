@@ -10,7 +10,10 @@
 // (MEDIAN_FLOOR, CONFIDENT_FLOOR) apply to the kept count, and the line under
 // the readout says "N of M sales kept". A sale left out stays in the list and
 // the CSV, marked. On /comps the set is kept in the page's address (`?out=`),
-// so a shared link shows the same set; on a deal's panel for the visit only.
+// each sale named by its day, price and address (lib/public-comps/kept
+// `saleKey`), so a reload or a shared link — whose pull is fetched again —
+// leaves out the same sales where they are still in the list; on a deal's
+// panel for the visit only.
 
 import { useState, type ReactNode } from "react";
 import { compactUsd } from "@/lib/money";
@@ -92,9 +95,9 @@ export function CompsReadout({
   const keepOutInUrl = outParam !== undefined && !onDeal;
   const [localOut, setLocalOut] = useState<string>("");
   const [outInAddress] = useAddressParam(OUT_IN_ADDRESS, outParam ?? null);
-  const out = readSalesOut(keepOutInUrl ? outInAddress : localOut, result.comps.length);
+  const out = readSalesOut(keepOutInUrl ? outInAddress : localOut, result.comps);
   const setOut = (at: number, reason: LeaveOutReason | null) => {
-    const next = writeSalesOut(withSaleOut(out, at, reason));
+    const next = writeSalesOut(withSaleOut(out, at, reason), result.comps);
     if (keepOutInUrl) OUT_IN_ADDRESS.set(next || null);
     else setLocalOut(next);
   };

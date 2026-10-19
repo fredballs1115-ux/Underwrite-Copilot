@@ -51,8 +51,10 @@ export function CompsResultView({
   sortParam?: string | null;
   /** the /comps page's `?out=` (the sales left out of the readout, with
    *  their reasons; lib/public-comps/kept) as its searchParams read it:
-   *  given, the set is kept in the page's address, so a shared link shows
-   *  it. Left out on a deal's panel, which keeps it for the visit only. */
+   *  given, the set is kept in the page's address, each sale by its day,
+   *  price and address, so a shared link leaves out the same sales where the
+   *  pull, fetched again, still lists them. Left out on a deal's panel, which
+   *  keeps it for the visit only. */
   outParam?: string | null;
 }) {
   if (result.status === "no_provider") {

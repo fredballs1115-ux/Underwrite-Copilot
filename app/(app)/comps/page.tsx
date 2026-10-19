@@ -184,8 +184,10 @@ export default async function PullCompsPage({
               a reload or a shared link opens on it; the list holds the value
               to the orders it offers (lib/public-comps/picture
               `readSalesSort`). So are the sales the reader left out of the
-              readout (`?out=`, lib/public-comps/kept `readSalesOut`), so a
-              shared link shows the same set. */}
+              readout (`?out=`, lib/public-comps/kept `readSalesOut`), each
+              by its day, price and address, so a reload or a shared link
+              leaves out the same sales where the pull, fetched again, still
+              lists them. */}
           <CompsResultView
             result={result}
             showMap
