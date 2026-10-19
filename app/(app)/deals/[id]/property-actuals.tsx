@@ -176,7 +176,7 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
                 {st.opex.map((l, i) => (
                   <Line key={`${l.key}-${i}`} k={l.label} v={`(${usd(Math.abs(l.amount))})`} indent />
                 ))}
-                <Line k="Total operating expenses" v={`(${usd(Math.abs(st.totalOpex))})`} strong />
+                <Line k="Total operating expenses" v={`(${usd(st.totalOpex == null ? null : Math.abs(st.totalOpex))})`} strong />
                 <Line
                   k={st.noiDerived ? "Net operating income (derived)" : "Net operating income"}
                   v={usd(st.noi)}
