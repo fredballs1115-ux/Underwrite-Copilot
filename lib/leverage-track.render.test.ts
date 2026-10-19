@@ -59,7 +59,7 @@ describe("LeverageTrack — the picture", () => {
 
   it("says a screening rate under the owner-occupier survey is no quote, and only then", () => {
     expect(text).toContain(
-      `${SEED.note}. The screening rate sits under the owner-occupier survey, so a lender's quote is likely higher.`,
+      `${SEED.note}. The screening rate sits under the owner-occupier survey; as a rule of thumb, not a quote, a lender's rate is likely higher.`,
     );
     const over = visibleText(
       renderToStaticMarkup(

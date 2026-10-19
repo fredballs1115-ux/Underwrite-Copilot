@@ -78,6 +78,20 @@ describe("briefDelta — what moved since the screen, in each figure's own unit"
     for (const m of [by.unemployment, by.zori_rent, by.permits_ttm]) expect(moveSentence(m)).toContain(moveDelta(m));
   });
 
+  // The audit of #466: "+1 days", "1 places hotter".
+  it("says one day and one place in the singular", () => {
+    const days = { ...by.rdc_days_on_market, kind: "moved" as const, from: 41, to: 42, move: 1 };
+    expect(moveDelta(days)).toBe("+1 day");
+    expect(moveSentence(days)).toBe("Median days on market: +1 day to 42 days");
+    expect(moveDelta({ ...days, move: -1, to: 40 })).toBe("−1 day");
+    expect(moveDelta({ ...days, move: 3, to: 44 })).toBe("+3 days");
+    expect(figureValue("days", 1)).toBe("1 day");
+    const rank = { ...by.rdc_hotness_rank, move: 1, to: 39 };
+    expect(moveDelta(rank)).toBe("1 place hotter");
+    expect(moveSentence({ ...rank, move: -1, to: 41 })).toBe("Hotness rank: 1 place cooler, now #41");
+    for (const m of [days, rank]) expect(moveSentence(m)).toContain(moveDelta(m));
+  });
+
   it("a figure that cannot be read today is left out rather than shown as a move to nothing", () => {
     expect(by.zhvi).toBeUndefined();
   });
