@@ -2559,6 +2559,32 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
   });
 });
 
+describe("runAnalysis — a re-screen snapshots the challenges it replaces beside the verdict (the track record, lib/track-record)", () => {
+  it("writes prior_screen.challenges with the previous verdict's own stamp, so a document this run reads scores the screen made before it", async () => {
+    const previous = { challenges: [{ assumption: "Stabilized vacancy of 5%", severity: "high", challenge: "", question: "", key: "vacancy", omFigure: 5, altFigure: 8 }], summary: "" };
+    state.deals.d1.challenges = previous;
+    state.deals.d1.verdict = { ...VERDICT, generatedAt: "2026-09-10T12:00:00Z" };
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const prior = state.deals.d1.prior_screen as { at: string; extraction: unknown; verdict: { generatedAt?: string } | null; challenges: unknown };
+    expect(prior.extraction).toEqual({ old: true });
+    expect(prior.verdict?.generatedAt).toBe("2026-09-10T12:00:00Z");
+    expect(prior.challenges).toEqual(previous);
+    // The run's own challenges replaced them on the row, as before.
+    expect(state.deals.d1.challenges).toEqual(CHALLENGES);
+  });
+
+  it("a deal with no challenges yet snapshots none, and a resumed attempt never re-snapshots", async () => {
+    state.deals.d1.challenges = null;
+    await runAnalysis("d1");
+    expect((state.deals.d1.prior_screen as { challenges: unknown }).challenges).toBeNull();
+    state = freshState();
+    state.jobs[0].payload = { kind: "screen", completed: ["signal"] };
+    await runAnalysis("d1", { resume: true });
+    expect(state.deals.d1.prior_screen).toBeUndefined();
+  });
+});
+
 describe("runAnalysis — the verdict is handed the stress test, struck in code", () => {
   it("builds the test before the verdict step from the stored results, the deal's T-12 and the model it derives, and the brief carries the section after the deal", async () => {
     const { summarizeT12 } = await import("@/lib/actuals/analyze");

@@ -38,7 +38,7 @@ import type { Challenge, ExtractionResult, FirstSignal } from "@/lib/anthropic/t
 import type { RentRollSummary } from "@/lib/actuals/types";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { askingPriceOf } from "@/lib/deal-strategy";
-import { accountRecord, arrivalOf, scoreDeal } from "@/lib/track-record";
+import { accountRecord, arrivalOf, scoreDeal, type PriorScreenLike } from "@/lib/track-record";
 import { TrackRecordSection } from "./track-record";
 
 /** A stored rent roll or T-12 row as the track record reads it. */
@@ -75,7 +75,7 @@ export default async function AnalyticsPage() {
   // screen, the ones a reader looks for, was missing from every figure, and
   // nothing said so (research pass 42).
   const { data, error } = await readAllResult<
-    AnalyticsRow & { user_id?: string | null; stage_history?: unknown; address?: unknown; team_id?: string | null; challenges?: unknown }
+    AnalyticsRow & { user_id?: string | null; stage_history?: unknown; address?: unknown; team_id?: string | null; challenges?: unknown; prior_screen?: unknown }
   >((from, to) =>
     supabase
       .from("deals")
@@ -84,8 +84,10 @@ export default async function AnalyticsPage() {
       // …and the address and the team, for each deal's buy-box fit by its
       // brokerage, judged as the pipeline judges it.
       // …and the challenges, which the track record scores against what
-      // arrived after each screen (lib/track-record).
-      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, team_id, address, stage_history, challenges, extraction, first_signal")
+      // arrived after each screen (lib/track-record) — with the previous
+      // screen's snapshot, whose challenges score against what arrived
+      // between the two screens.
+      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, team_id, address, stage_history, challenges, extraction, first_signal, prior_screen")
       .not("extraction", "is", null)
       .order("created_at", { ascending: false })
       .order("id")
@@ -236,6 +238,7 @@ export default async function AnalyticsPage() {
       return scoreDeal({
         screenedAt: (r.verdict as { generatedAt?: string } | null)?.generatedAt ?? null,
         challenges: (r.challenges as { challenges?: Challenge[] } | null)?.challenges,
+        priorScreen: (r.prior_screen as PriorScreenLike | null | undefined) ?? null,
         rentRoll: roll?.summary ? { arrivedAt: arrivalOf(roll, docs), dated: roll.as_of_date ?? null, summary: roll.summary as RentRollSummary } : null,
         t12: t12Row && t12Summary ? { arrivedAt: arrivalOf(t12Row, docs), dated: t12Row.period_end_date ?? null, summary: t12Summary } : null,
         stage: r.stage ?? null,

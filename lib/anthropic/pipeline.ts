@@ -1124,10 +1124,16 @@ async function runAnalysisSteps(
     // this run never rewrites it), so a run-time snapshot would just diff
     // the deal against itself — the edit-facts action snapshots the OLD
     // facts instead, where a real before/after exists.
+    // The challenges go with the verdict (2026-10-19): the track record
+    // (lib/track-record) scores a screen's challenges against a document
+    // that arrived after its verdict, and this run reads that document
+    // (`runActualsIngestion`, below) while replacing the challenges it would
+    // be scored against — so the snapshot keeps them, beside the verdict
+    // whose `generatedAt` says which screen they were made on.
     if (snapshotPrior && completed.size === 0 && !manual) try {
       const { data: prev } = await admin
         .from("deals")
-        .select("extraction, verdict")
+        .select("extraction, verdict, challenges")
         .eq("id", dealId)
         .single();
       if (prev?.extraction) {
@@ -1138,6 +1144,7 @@ async function runAnalysisSteps(
               at: new Date().toISOString(),
               extraction: prev.extraction,
               verdict: prev.verdict ?? null,
+              challenges: prev.challenges ?? null,
             },
           })
           .eq("id", dealId);

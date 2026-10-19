@@ -25,7 +25,16 @@
 //     applied to the OM's figure), since the challenger's basis figure may be
 //     per unit or per foot while a trade is the whole price;
 //   - under MEDIAN_FLOOR scored rows the account's record is "a start, not a
-//     record", and no share is printed.
+//     record", and no share is printed;
+//   - the previous screen's challenges are scored too (`priorScreen`, the
+//     snapshot a re-screen writes to deals.prior_screen with the challenges it
+//     replaced): the pipeline reads a T-12 added after a screen only on the
+//     re-screen that also replaces the challenges it would be scored
+//     against, so a document that arrived between the two verdicts scores the
+//     challenge made before it. One later figure scores one challenge a key:
+//     where the current screen's challenge of a key is scored, the prior's
+//     of the same key is dropped, never counted twice; a snapshot written
+//     before the challenges were kept reads as before.
 import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { statedDay } from "@/lib/actuals/actuals-read";
@@ -69,6 +78,11 @@ export interface ScoredRow {
   why: string | null;
   /** one sentence: what was set against what, and where it landed */
   text: string;
+  /** the day of the earlier screen whose challenge this row scores ("Sep
+   *  20, 2026"), where the row is the prior screen's; null on the current
+   *  screen's rows — and on every row of a record scored before the
+   *  snapshot kept challenges */
+  priorScreenedOn?: string | null;
 }
 
 export interface DealRecord {
@@ -83,6 +97,20 @@ export interface DealRecord {
   /** evidence on the deal that is NOT scored, with why: a document the
    *  screen read, one with no arrival time, an outcome recorded before it */
   notScored: string[];
+  /** the earlier screen whose challenges were scored beside the current
+   *  one's (deals.prior_screen with its challenges), where the snapshot
+   *  holds them and a stamp */
+  prior?: { screenedAt: string; screenedOn: string } | null;
+}
+
+/** The previous screen's snapshot as the pipeline writes it to
+ *  deals.prior_screen on a re-screen (migration 0010; lib/screen-diff
+ *  `PriorScreen`): the verdict it replaced, with its own stamp, and — since
+ *  2026-10-19 — the challenges it replaced. A snapshot without challenges is
+ *  one written before they were kept, and scores nothing. */
+export interface PriorScreenLike {
+  verdict?: { generatedAt?: string | null } | null;
+  challenges?: { challenges?: readonly Challenge[] | null } | null;
 }
 
 /** A stored rent roll or T-12 row beside the document it was read from. */
@@ -106,6 +134,11 @@ export interface ScoreDealArgs {
   /** the memorandum's asking price (lib/deal-strategy `askingPriceOf`), so
    *  a trade can be put on the OM figure's basis; null where none is stated */
   askingPrice?: number | null;
+  /** the previous screen's snapshot (the deal row's `prior_screen`), whose
+   *  challenges are scored against what arrived after ITS verdict — a
+   *  document that arrived between the two screens scores the challenge
+   *  made before it, which the re-screen's own challenges were made with */
+  priorScreen?: PriorScreenLike | null;
 }
 
 /**
@@ -188,38 +221,124 @@ function t12VacancyPct(s: T12Summary): number | null {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
+/** One screen's score: its evidence, its rows, and why each later thing on
+ *  the deal was refused — a refusal for arriving BEFORE the screen carries
+ *  the sentence to use instead where the prior screen scored that thing. */
+interface ScreenScore {
+  evidence: LaterEvidence[];
+  rows: ScoredRow[];
+  notScored: { source: LaterSource | null; text: string; instead?: (priorDay: string) => string }[];
+}
+
 /**
  * Score one deal's stored challenges against what arrived after its screen.
  * Every challenge is a row; a row with nothing after the screen to score it
  * on says so. A deal with no verdict stamp scores nothing: there is no
  * "after" without a "when".
+ *
+ * With the previous screen's snapshot (`priorScreen`), that screen's
+ * challenges are scored against what arrived after ITS verdict, and the two
+ * are merged a key at a time: a key the current screen's challenge scores
+ * is the current's (the later figure arrived after both screens, and is
+ * counted once, against the newer challenge); a key only the prior's
+ * challenge scores — the figure arrived between the two verdicts, so the
+ * re-screen's challenge was made with it in hand — is the prior's, in the
+ * current's unscored row's place, said as the earlier screen's.
  */
 export function scoreDeal(args: ScoreDealArgs): DealRecord {
   const screenedAt = args.screenedAt && parseTime(args.screenedAt) != null ? args.screenedAt : null;
+  const current = scoreScreen(screenedAt, args.challenges ?? [], args);
+  const prior = priorOf(args.priorScreen, parseTime(screenedAt));
+  const record = (s: ScreenScore, priorMeta: DealRecord["prior"]): DealRecord => ({
+    screenedAt,
+    screenedOn: screenedAt ? statedDay(screenedAt) : null,
+    evidence: s.evidence,
+    rows: s.rows,
+    notScored: s.notScored.map((n) => n.text),
+    prior: priorMeta,
+  });
+  if (!prior) return record(current, null);
+
+  const earlier = scoreScreen(prior.screenedAt, prior.challenges, args);
+  const priorDay = statedDay(prior.screenedAt);
+  const scoredNow = new Set(current.rows.filter((r) => r.landing !== "unscored").map((r) => r.key));
+  const rows = [...current.rows];
+  for (const row of earlier.rows) {
+    if (row.landing === "unscored" || scoredNow.has(row.key)) continue;
+    const priorRow: ScoredRow = {
+      ...row,
+      priorScreenedOn: priorDay,
+      text: `${row.title} (the screen of ${priorDay}):${row.text.slice(row.title.length + 1)}`,
+    };
+    // In the current screen's unscored row's place for the same key — the
+    // re-screen's challenge was made with the later figure in hand, so the
+    // prediction to score is the earlier one — else after the rest.
+    const at = rows.findIndex((r) => r.key === row.key && r.landing === "unscored");
+    if (at >= 0) rows[at] = priorRow;
+    else rows.push(priorRow);
+    scoredNow.add(row.key);
+  }
+  // The evidence of both screens, once each; a thing admitted only by the
+  // earlier screen is said to have arrived between the two.
+  const seen = new Set(current.evidence.map((e) => `${e.source}@${e.at}`));
+  const evidence = [...current.evidence];
+  const betweenSources = new Set<LaterSource>();
+  for (const e of earlier.evidence) {
+    if (seen.has(`${e.source}@${e.at}`)) continue;
+    betweenSources.add(e.source);
+    evidence.push({ ...e, label: `${e.label.replace(/\)$/, "")}, after the screen of ${priorDay} and before this one)` });
+  }
+  evidence.sort((a, b) => a.at.localeCompare(b.at));
+  // A thing the current screen refused as read by it, and the earlier
+  // screen scored, is said to be scored against the earlier screen instead.
+  const notScored = [
+    ...current.notScored.map((n) => (n.source && n.instead && betweenSources.has(n.source) ? n.instead(priorDay) : n.text)),
+    ...earlier.notScored.filter((n) => !n.instead).map((n) => `The screen of ${priorDay}: ${n.text}`),
+  ];
+  return record({ evidence, rows, notScored: notScored.map((text) => ({ source: null, text })) }, { screenedAt: prior.screenedAt, screenedOn: priorDay });
+}
+
+/** The prior screen's stamp and challenges, where the snapshot holds both
+ *  — and its stamp is before the current screen's, where that has one. */
+function priorOf(prior: PriorScreenLike | null | undefined, currentT: number | null): { screenedAt: string; challenges: readonly Challenge[] } | null {
+  const stamp = prior?.verdict?.generatedAt ?? null;
+  const challenges = prior?.challenges?.challenges;
+  if (!stamp || !Array.isArray(challenges) || challenges.length === 0) return null;
+  const P = parseTime(stamp);
+  if (P == null || (currentT != null && P >= currentT)) return null;
+  return { screenedAt: stamp, challenges };
+}
+
+function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[], args: ScoreDealArgs): ScreenScore {
   const T = parseTime(screenedAt);
-  const challenges = args.challenges ?? [];
   const evidence: LaterEvidence[] = [];
-  const notScored: string[] = [];
+  const notScored: ScreenScore["notScored"] = [];
 
   // The documents, each admitted only where its arrival is on record and
   // after the screen.
   const admit = <S,>(doc: LaterDocument<S> | null | undefined, name: string, datedWord: string): LaterDocument<S> | null => {
     if (!doc) return null;
+    const source: LaterSource = name === "T-12" ? "t12" : "rent_roll";
     const at = parseTime(doc.arrivedAt);
     const dated = doc.dated ? `${name} ${datedWord} ${statedDay(doc.dated)}` : `${name} (${datedWord === "to" ? "period" : "as-of"} not stated)`;
     if (T == null) {
-      notScored.push(`${dated} is on the deal, but the verdict carries no screen time to set it after.`);
+      notScored.push({ source, text: `${dated} is on the deal, but the verdict carries no screen time to set it after.` });
       return null;
     }
     if (at == null) {
-      notScored.push(`${dated} is on the deal with no arrival time on record, so it is not scored.`);
+      notScored.push({ source, text: `${dated} is on the deal with no arrival time on record, so it is not scored.` });
       return null;
     }
     if (at <= T) {
-      notScored.push(`${dated} was on the deal before the screen (added ${statedDay(doc.arrivedAt!)}): the screen read it, so it is not scored against it.`);
+      const added = statedDay(doc.arrivedAt!);
+      notScored.push({
+        source,
+        text: `${dated} was on the deal before the screen (added ${added}): the screen read it, so it is not scored against it.`,
+        instead: (priorDay) => `${dated} was on the deal before this screen (added ${added}): this screen read it, so it is scored against the screen of ${priorDay} instead.`,
+      });
       return null;
     }
-    evidence.push({ source: name === "T-12" ? "t12" : "rent_roll", label: `${dated} (added ${statedDay(doc.arrivedAt!)})`, at: doc.arrivedAt! });
+    evidence.push({ source, label: `${dated} (added ${statedDay(doc.arrivedAt!)})`, at: doc.arrivedAt! });
     return doc;
   };
   const t12 = admit(args.t12, "T-12", "to");
@@ -239,12 +358,14 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
       if (T != null && endedAt != null && endedAt > T) {
         decision = { reason: ended.outcome.reason, at: ended.at };
         evidence.push({ source: "outcome", label: `Moved to Dead on ${reasonLabel} (${statedDay(ended.at)})`, at: ended.at });
+      } else if (T == null) {
+        notScored.push({ source: "outcome", text: `The deal died on ${reasonLabel}, but the verdict carries no screen time to set the decision after.` });
       } else {
-        notScored.push(
-          T == null
-            ? `The deal died on ${reasonLabel}, but the verdict carries no screen time to set the decision after.`
-            : `The deal died on ${reasonLabel} before the screen's verdict (${statedDay(ended.at)}), so the decision is not scored.`,
-        );
+        notScored.push({
+          source: "outcome",
+          text: `The deal died on ${reasonLabel} before the screen's verdict (${statedDay(ended.at)}), so the decision is not scored.`,
+          instead: (priorDay) => `The deal died on ${reasonLabel} before this screen's verdict (${statedDay(ended.at)}), so the decision is scored against the screen of ${priorDay} instead.`,
+        });
       }
     }
     const t = ended.outcome.trade;
@@ -255,12 +376,14 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
       if (T != null && reportedAt != null && reportedAt > T) {
         trade = { price: t.price, at: t.reportedAt, text };
         evidence.push({ source: "trade", label: `The building ${text} (recorded ${statedDay(t.reportedAt)})`, at: t.reportedAt });
+      } else if (T == null) {
+        notScored.push({ source: "trade", text: `A trade is recorded (${text}), but the verdict carries no screen time to set it after.` });
       } else {
-        notScored.push(
-          T == null
-            ? `A trade is recorded (${text}), but the verdict carries no screen time to set it after.`
-            : `The trade (${text}) was recorded before the screen's verdict, so it is not scored.`,
-        );
+        notScored.push({
+          source: "trade",
+          text: `The trade (${text}) was recorded before the screen's verdict, so it is not scored.`,
+          instead: (priorDay) => `The trade (${text}) was recorded before this screen's verdict, so it is scored against the screen of ${priorDay} instead.`,
+        });
       }
     }
   }
@@ -316,7 +439,7 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
     };
   });
 
-  return { screenedAt, screenedOn: screenedAt ? statedDay(screenedAt) : null, evidence, rows, notScored };
+  return { evidence, rows, notScored };
 }
 
 /** The later figure that speaks to a key, where one arrived. A figure beats

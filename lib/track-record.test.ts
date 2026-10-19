@@ -257,6 +257,88 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
   });
 });
 
+describe("scoreDeal — the previous screen's challenges, scored against what arrived between the two screens", () => {
+  // The prior screen on Sep 10; the T-12 added Sep 25; the re-screen on Oct 1
+  // read that T-12 and replaced the challenges it would be scored against.
+  const PRIOR_T = "2026-09-10T12:00:00Z";
+  const BETWEEN = "2026-09-25T09:00:00Z";
+  const priorVacancy: Challenge = { ...vacancy, assumption: "Stabilized vacancy of 5%", omFigure: 5, altFigure: 8 };
+  const priorScreen = { verdict: { verdict: "caution", generatedAt: PRIOR_T }, challenges: { challenges: [priorVacancy, basis] } };
+
+  it("a T-12 arriving between the prior and the current verdict scores the prior screen's challenge, not the current one's", () => {
+    const r = scoreDeal({
+      screenedAt: T,
+      challenges: [vacancy, insurance],
+      priorScreen,
+      t12: { arrivedAt: BETWEEN, dated: "2026-08-31", summary: t12 },
+    });
+    expect(r.prior).toEqual({ screenedAt: PRIOR_T, screenedOn: "Sep 10, 2026" });
+    // The evidence is the earlier screen's, said so.
+    expect(r.evidence.map((e) => e.label)).toEqual(["T-12 to Aug 31, 2026 (added Sep 25, 2026, after the screen of Sep 10, 2026 and before this one)"]);
+    // One row a key: the prior's vacancy row in the current's unscored one's
+    // place, on the prior's own figures (5% and 8%, not 6% and 9%).
+    expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([
+      ["vacancy", "screen_side", "Sep 10, 2026"],
+      ["insurance", "unscored", null],
+    ]);
+    expect(r.rows[0].figures).toEqual({ om: "5.0%", alt: "8.0%", later: "9.1%" });
+    expect(r.rows[0].text).toBe(
+      "Stabilized vacancy (the screen of Sep 10, 2026): the OM's 5.0%, the screen's 8.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Aug 31, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent) — on the screen's side.",
+    );
+    // The current screen's refusal says where the T-12 is scored instead.
+    expect(r.notScored).toEqual([
+      "T-12 to Aug 31, 2026 was on the deal before this screen (added Sep 25, 2026): this screen read it, so it is scored against the screen of Sep 10, 2026 instead.",
+    ]);
+    // The prior's basis challenge has nothing after it either, and an
+    // unscored prior row is never added.
+    expect(r.rows.some((x) => x.key === "basis")).toBe(false);
+  });
+
+  it("a figure that arrived after BOTH screens scores the current challenge once, never the prior's of the same key", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } });
+    expect(r.evidence).toHaveLength(1);
+    expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["vacancy", "screen_side", null]]);
+    expect(r.rows[0].figures?.om).toBe("6.0%");
+    expect(r.notScored).toEqual([]);
+    // …while a key the current screen no longer challenges is the prior's.
+    const basisOnly = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, askingPrice: 65_760_000, ...dead("price") });
+    expect(basisOnly.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([
+      ["vacancy", "unscored", null],
+      ["basis", "screen_side", "Sep 10, 2026"],
+    ]);
+    expect(basisOnly.rows[1].text).toContain("Basis (the screen of Sep 10, 2026): the screen challenged it");
+  });
+
+  it("a decision between the two screens scores the prior's basis challenge, and the current screen's refusal says so", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [basis], priorScreen, ...dead("price", BETWEEN) });
+    expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["basis", "screen_side", "Sep 10, 2026"]]);
+    expect(r.evidence[0].label).toBe("Moved to Dead on price (Sep 25, 2026, after the screen of Sep 10, 2026 and before this one)");
+    expect(r.notScored).toEqual(["The deal died on price before this screen's verdict (Sep 25, 2026), so the decision is scored against the screen of Sep 10, 2026 instead."]);
+  });
+
+  it("an older snapshot without challenges, one without a stamp, or one stamped after the current screen reads exactly as before", () => {
+    const plain = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: BETWEEN, dated: "2026-08-31", summary: t12 } });
+    for (const prior of [
+      { verdict: { generatedAt: PRIOR_T } },
+      { verdict: { generatedAt: PRIOR_T }, challenges: { challenges: [] } },
+      { verdict: null, challenges: { challenges: [priorVacancy] } },
+      { verdict: { generatedAt: "2026-10-02T00:00:00Z" }, challenges: { challenges: [priorVacancy] } },
+      null,
+    ]) {
+      const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen: prior, t12: { arrivedAt: BETWEEN, dated: "2026-08-31", summary: t12 } });
+      expect(r.prior).toBeNull();
+      expect(r.rows).toEqual(plain.rows);
+      expect(r.evidence).toEqual([]);
+      expect(r.notScored).toEqual(plain.notScored);
+    }
+  });
+
+  it("the account's record counts a prior screen's scored row as the deal's", () => {
+    const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: BETWEEN, dated: null, summary: t12 } })]);
+    expect(r).toMatchObject({ dealsTested: 1, dealsWithLater: 1, scored: 1, screenSide: 1 });
+  });
+});
+
 describe("accountRecord — counts, by key, and the floor", () => {
   const scoredDeal = (...extra: Challenge[]): DealRecord =>
     scoreDeal({ screenedAt: T, challenges: [vacancy, ...extra], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } });

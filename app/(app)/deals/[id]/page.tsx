@@ -942,10 +942,13 @@ export default async function DealPage({
   // The track record (lib/track-record): the stored challenges against what
   // arrived AFTER the verdict — a rent roll or T-12 by its document's
   // upload, the decision and the trade off the move that ended the deal.
-  // A document the screen read is named and never scored.
+  // A document the screen read is named and never scored — and the
+  // previous screen's challenges (the re-screen's snapshot) are scored
+  // against what arrived after THAT verdict, since the re-screen read it.
   const trackRecord = scoreDeal({
     screenedAt: verdict?.generatedAt ?? null,
     challenges: challenges?.challenges,
+    priorScreen,
     rentRoll: rrRes.data?.summary
       ? {
           arrivedAt: arrivalOf(rrRes.data as { created_at?: string | null; source_document_id?: string | null }, documents),
