@@ -221,7 +221,7 @@ export default async function AnalyticsPage() {
                 value: middleText(capRead, pct) ?? "—",
                 sub:
                   planDeals.length > 0
-                    ? `${capPoints.length} parsed · ${planPhrase}`
+                    ? `${parsedPhrase(capPoints.length)} · ${planPhrase}`
                     : parsedPhrase(capPoints.length),
               },
               {

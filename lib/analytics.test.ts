@@ -310,6 +310,13 @@ describe("marketRows — the analytics' markets grouped as /market's memory grou
     expect(marketRows(deals, 1).map((r) => r.market)).toEqual(["Philadelphia, PA"]);
   });
 
+  it("the cap tile says its count one way, plan deals or none (parsedPhrase)", () => {
+    const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
+    expect(page).toContain("`${parsedPhrase(capPoints.length)} · ${planPhrase}`");
+    // "1 parsed" had read beside "the one deal that parsed" on the next tile.
+    expect(page).not.toMatch(/\$\{capPoints\.length\} parsed/);
+  });
+
   it("counts the markets as it groups them, and says how many a table left off", () => {
     expect(marketCount(deals)).toBe(3);
     expect(moreText(0, "market")).toBeNull();
