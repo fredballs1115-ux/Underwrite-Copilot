@@ -297,7 +297,14 @@ function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; su
           <figcaption className="text-[11px] font-semibold uppercase tracking-wide text-muted">
             Each sale&apos;s price{track.log ? " · log scale" : ""}
           </figcaption>
-          <div className="relative mt-3 h-8" data-bar="comps-price">
+          {/* The dots speak only to a pointer (their titles); a screen
+              reader gets the track in one sentence. */}
+          <p className="sr-only" data-qa="comps-price-words">
+            {`${track.dots.length} sales from ${track.lowLabel} to ${track.highLabel}${
+              track.medianPct !== null ? `; ${medianLabel(result.stats?.count ?? 0)} ${fmtMoney(result.stats?.medianPrice ?? 0)}` : ""
+            }${track.subjectPct !== null && subjectPrice !== null ? `; this deal's price ${fmtMoney(subjectPrice)}` : ""}.`}
+          </p>
+          <div className="relative mt-3 h-8" data-bar="comps-price" aria-hidden>
             <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-faint" />
             {track.dots.map((d) => (
               <span

@@ -75,6 +75,16 @@ describe("the comps readout as pictures", () => {
     expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
+  it("says the price track in one sentence to a screen reader", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const html = draw(result(comps), 500_000);
+    const words = (/data-qa="comps-price-words">([^<]+)</.exec(html)?.[1] ?? "").replace(/&#x27;/g, "'");
+    expect(words).toMatch(/^6 sales from \$400,000 to \$525,000; median \$\d{3},\d{3}; this deal's price \$500,000\.$/);
+    // two sales: no middle and no subject named
+    const two = /data-qa="comps-price-words">([^<]+)</.exec(draw(result([sale(0), sale(1)]), 68_000_000))?.[1];
+    expect(two).toBe("2 sales from $400,000 to $425,000.");
+  });
+
   it("draws no middle on two sales and no subject outside the band", () => {
     const html = draw(result([sale(0), sale(1)]), 68_000_000);
     expect(count(html, "comps-median")).toBe(0);
