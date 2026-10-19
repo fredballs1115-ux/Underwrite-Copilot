@@ -422,6 +422,17 @@ describe("the homepage's sample figures are the surfaces' own", () => {
   // and the first-draft model card's own body, whose own sentence says the
   // workbook is a separate model. Which model the sample should run is the
   // owner's call.
+  it("the stress bench's levers are 24px tall, a phone's tap (the visual sweep of 2026-10-19 measured 6)", () => {
+    const { inputs, meta } = sampleDerivedInputs();
+    const html = renderToStaticMarkup(React.createElement(StressBench, { base: inputs, units: meta.units }));
+    const levers = [...html.matchAll(/<input[^>]*type="range"[^>]*>/g)].map((m) => m[0]);
+    expect(levers.length).toBe(3);
+    for (const lever of levers) {
+      expect(lever).toMatch(/class="[^"]*\bh-6\b/);
+      expect(lever).not.toMatch(/\bh-1\.5\b/);
+    }
+  });
+
   it("the miniature's Financials tab is the deal page's: the terms, the debt sizer and the model card's own body", () => {
     const { inputs, meta, sources } = sampleDerivedInputs();
     const bench = words(renderToStaticMarkup(React.createElement(StressBench, { base: inputs, units: meta.units })));

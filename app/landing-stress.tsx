@@ -88,7 +88,11 @@ function Lever({
         value={value}
         aria-label={`${label}, base ${base}${unit}`}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-2 h-1.5 w-full cursor-pointer appearance-auto"
+        // 24px tall, so a thumb takes a phone's tap (it had been 6px, and
+        // the thumb's own reach about 13); the negative margin keeps the
+        // track where the 6px box drew it.
+        className="-mb-2 mt-0 h-6 w-full cursor-pointer appearance-auto"
+        data-qa="stress-lever"
         style={{ accentColor: "#7fd6cc" }}
       />
     </label>
