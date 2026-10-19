@@ -158,7 +158,10 @@ export interface StressTestArgs {
   /** the index the derived model's rate was seeded off (lib/debt-index
    *  `debtSeeds`' tenor, the one handed to `deriveUnderwriteInputs`), with
    *  its own date; absent, the index is read back off the seed's note */
-  debtIndex?: DebtIndex | null;
+  /** the tenor the model was seeded from, where the caller has it; read for
+   *  the debt row's evidence, never handed to a model (lib/sample-derive's
+   *  guard) */
+  indexGiven?: DebtIndex | null;
   /** ISO day the published figures were read */
   readOn: string;
 }
@@ -461,7 +464,7 @@ interface Ctx {
   brokerComps: BrokerCompsResult | null;
   recordedSales: RecordedSalesEvidence | null;
   pastScreens: PastScreensEvidence | null;
-  debtIndex: DebtIndex | null;
+  indexGiven: DebtIndex | null;
   readOn: string;
 }
 
@@ -878,7 +881,7 @@ function debtRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, DEBT_RATE_ROW, DEBT_RATE_NOT);
   const evidence: StressEvidence[] = [];
   const seed = ctx.derived?.meta.rateSeed ?? null;
-  const index = seed ? seedIndex(seed, ctx.debtIndex) : null;
+  const index = seed ? seedIndex(seed, ctx.indexGiven) : null;
   // Today's index, the fact, dated and published; then the class's
   // screening spread over it, a rule of thumb named as one — never the two
   // as one published figure, since the spread is nobody's print.
@@ -1580,7 +1583,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     brokerComps: args.brokerComps ?? null,
     recordedSales: args.recordedSales ?? null,
     pastScreens: args.pastScreens ?? null,
-    debtIndex: args.debtIndex ?? null,
+    indexGiven: args.indexGiven ?? null,
     readOn: args.readOn,
   };
   const built: Partial<Record<StressKey, StressRow>> = {

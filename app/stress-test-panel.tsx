@@ -70,6 +70,7 @@ const KIND: Record<EvidenceKind, { word: string; chip: string; mark: string }> =
 const SCOPE: Record<StressEvidence["scope"], string> = {
   deal: "the deal's own figure",
   metro: "the metro's figure, not the building's",
+  region: "the Census region's figure, not the building's",
   state: "the state's figure, not the building's",
   nation: "the nation's figure, not the building's",
   class: "the class's, not this market's",

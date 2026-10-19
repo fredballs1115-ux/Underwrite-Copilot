@@ -557,8 +557,10 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
     expect(brief).toContain("9 assumptions of the memorandum's tested in code — 1 unsupported, 2 stretched, 1 holds, 5 unchecked");
     expect(brief).toContain(
-      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026; the deal's own document); The deal's T-12: vacancy loss over scheduled rent: 10.0% ($651k of $6.5M, TTM to 2026-05-31) (the deal's T-12, May 31, 2026; the deal's own document); Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb). Gap: The OM's 6.0% is 3.1 points under the evidence's 9.1%. The levered IRR: The model already runs vacancy at the deal's rent roll's 9.1%, so its levered IRR of 9.3% carries it. The challenger asks: What's the absorption schedule to get from 9% to 6%?",
+      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026; the deal's own document)",
     );
+    // The engine at the OM's 6.0% against the engine at the rent roll's 9.1%.
+    expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.3%/);
     expect(brief).toContain("- Basis (basis) [STRETCHED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
     expect(brief).toContain("the levered IRR moves from 9.3% to 11.8%");
     expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");

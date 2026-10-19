@@ -316,7 +316,7 @@ describe("a stabilized apartment deal with a T-12", () => {
   });
 
   it("reads the index off the DebtIndex where one is handed in, the same as off the note, and reads a rate under the bare index unsupported", () => {
-    const given = rowOf(buildStressTest(apartmentArgs({ debtIndex: FIVE })), "debt");
+    const given = rowOf(buildStressTest(apartmentArgs({ indexGiven: FIVE })), "debt");
     expect(given.evidence[0]).toEqual(rowOf(test, "debt").evidence[0]);
     expect(given.evidence[1].text).toContain("+200 bps over the index");
     const cheap = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Interest rate" ? { ...m, value: "4.50%" } : m)) };

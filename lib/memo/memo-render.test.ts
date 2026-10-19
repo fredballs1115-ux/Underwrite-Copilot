@@ -1510,13 +1510,13 @@ describe("the memo leads with the stress test", () => {
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
     expect(text).toContain("9 assumptions of the memorandum's tested in code — 1 unsupported, 2 stretched, 1 holds, 5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The vacancy row: the OM's figure with its page, the rent roll with its
-    // date, the gap in points, and the IRR — the model already runs at the
-    // rent roll's 9.1%, so the move is said as none, never as a move.
-    expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.1% (the deal's rent roll, May 31, 2026) · gap 3.1 pts · IRR 9.3%, already run at the evidence");
+    // date, the gap in points, and the IRR — the engine at the OM's 6.0%
+    // against the engine at the rent roll's 9.1%, one input apart.
+    expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.1% (the deal's rent roll, May 31, 2026) · gap 3.1 pts · IRR 12.4% to 9.3%");
     // The basis row carries the engine's move, spelled, since standard
     // Helvetica has no arrow.
     expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $261k/unit (the offering memorandum) · gap 5.1% · IRR 9.3% to 11.8%");
-    expect(text).toContain("STRETCHED Exit cap OM 5.25% (p. 41) · against 5.45% (the offering memorandum) · gap 20 bps · IRR 9.3%, already run at the evidence");
+    expect(text).toContain("STRETCHED Exit cap OM 5.25% (p. 41) · against 5.45% (the offering memorandum) · gap 20 bps · IRR 10.8% to 9.3%");
     expect(text).not.toMatch(/→|->/);
     // The block sits right after the verdict box and before the buy box.
     const verdictAt = text.indexOf(data.verdictReason.slice(0, 40));

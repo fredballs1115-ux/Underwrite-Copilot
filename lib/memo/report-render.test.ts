@@ -2933,11 +2933,13 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026)");
     expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
     expect(page).toContain("Gap: The OM's 6.0% is 3.1 points under the evidence's 9.1%.");
-    expect(page).toContain("The return: The model already runs vacancy at the deal's rent roll's 9.1%, so its levered IRR of 9.3% carries it.");
-    expect(page).toContain("Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at (the deal's rent roll), then");
+    expect(page).toMatch(/The return: If vacancy is the deal's rent roll's 9\.1%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.3%/);
+    expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9% to 6%?");
     // The basis row's move is the engine's, spelled.
-    expect(page).toContain("The return: If the price is the offering memorandum's $64.73M ($261k/unit), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 11.8%");
+    expect(page).toContain(
+      "The return: If the price is the memorandum's sale comps' median, $64.73M ($261k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 11.8%",
+    );
     // An unchecked row says why, and that no return was re-run.
     expect(page).toContain("Unchecked: The OM states no loan rate.");
     expect(page).toContain("The return: No return re-run: No figure to swap.");
