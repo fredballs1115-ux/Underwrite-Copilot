@@ -144,6 +144,52 @@ export interface ModelCheck {
   scope: "metro" | "national";
   /** the one sentence */
   read: string;
+  /** Display only — the deal page's picture of the row: the model's
+   *  assumption as a figure, percent. Absent where the row is said in words
+   *  alone (the exit cap's, a spread against a spread). The report and the
+   *  workbook read the words and the published figures, never this. */
+  modelValue?: number;
+  /** Display only, one a published figure in its order: how the picture
+   *  draws it (`FigureMark`). Absent with `modelValue`. */
+  marks?: FigureMark[];
+}
+
+/**
+ * How the deal page's picture draws one published figure — display only.
+ * `range`: a figure the row's tone reads, drawn on the main track, the
+ * range filled between them; `beside`: on the main track, a tick the tone
+ * does not read (the region's vacancy beside the metro's); `apart`: on a
+ * track of its own under it, never folded into the range — a rent
+ * regulation's allowance, the insurance index, the bond market's breakeven,
+ * a tracker's apartment read beside the survey. `nation` marks the nation's
+ * figure, said so in the key; `moe` the survey's margin, drawn as a
+ * whisker.
+ */
+export interface FigureMark {
+  role: "range" | "beside" | "apart";
+  nation: boolean;
+  moe: number | null;
+}
+
+const mark = (role: FigureMark["role"], nation = false, moe: number | null = null): FigureMark => ({ role, nation, moe });
+
+/**
+ * The read with its pictures left out — the words alone, as before. The
+ * deal page hands this where the model's reads are withheld (lib/underwrite/
+ * report-grid `modelReadsWithheld`: a placeholder price or an assumed NOI),
+ * so no assumption struck on them is drawn.
+ */
+export function wordsOnly(read: ModelVsMarket | null): ModelVsMarket | null {
+  if (!read) return null;
+  return {
+    ...read,
+    checks: read.checks.map((c) => {
+      const words = { ...c };
+      delete words.modelValue;
+      delete words.marks;
+      return words;
+    }),
+  };
 }
 
 export interface ModelVsMarket {
@@ -349,6 +395,9 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
       toneLabel: TONE_LABEL[tone],
       scope: "metro",
       read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f, age)} — a research print, not a feed. ${notHeld.because}, so the model is not held to it; its vacancy sits ${where}.`,
+      // Shown and held to nothing: beside the model, never its range.
+      modelValue: v,
+      marks: published.map(() => mark("beside")),
     };
   }
   const tone: CheckTone = v < t.vacancyLow - SAME ? "tighter" : v > hi + SAME ? "looser" : "inside";
@@ -372,6 +421,8 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
     read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f, age)} — a research print, not a feed. ${clause}`,
+    modelValue: v,
+    marks: published.map(() => mark("range")),
   };
 }
 
@@ -477,6 +528,8 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
     toneLabel: TONE_LABEL[tone],
     scope: "national",
     read: `The model grows rents ${g.toFixed(1)}%/yr. Over the year to ${when} the rents ${idx.lessor} charge moved ${signed(r.value)}% nationally (BLS producer price index, via FRED) — the nation's lessors, not the metro's. ${clause} A trailing year is what the assumption is being asked to beat, not a forecast.`,
+    modelValue: g,
+    marks: [mark("range", true)],
   };
 }
 
@@ -581,6 +634,9 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     read: regulated
       ? `${regulated.lead} For the market-rate units, over the past year ${joinWords(phrases)}. ${clause} ${trailing}`
       : `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} ${trailing}`,
+    // An allowance is the regime's, drawn apart from the market's range.
+    modelValue: g,
+    marks: [...(regulated ? regulated.published.map(() => mark("apart")) : []), ...published.map(() => mark("range"))],
   };
 }
 
@@ -656,6 +712,16 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     toneLabel: TONE_LABEL[tone],
     scope: "national",
     read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}${breakevenClause}`,
+    // Every figure here is the nation's; the price indexes are the range the
+    // tone reads, and the insurance index and the breakeven are drawn apart,
+    // never folded into it.
+    modelValue: e,
+    marks: [
+      mark("range", true),
+      ...(core ? [mark("range", true)] : []),
+      ...(insurance ? [mark("apart", true)] : []),
+      ...(breakeven ? [mark("apart", true)] : []),
+    ],
   };
 }
 
@@ -726,16 +792,27 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
         : anchor.moe !== null
           ? "The model sits inside the survey's margin of the published figure."
           : "The model sits at the published figure.";
+  const trackerPub = t && tAge ? trackerFigures(t, tf, "vacancy", t.vacancyLow!, t.vacancyHigh ?? t.vacancyLow!, tAge) : [];
   return {
     key: "vacancy",
     title: "Stabilized vacancy",
     model: `${v.toFixed(1)}%`,
     modelSource: sourceWords(input.sources?.vacancyPct),
-    published: t && tAge ? [...published, ...trackerFigures(t, tf, "vacancy", t.vacancyLow!, t.vacancyHigh ?? t.vacancyLow!, tAge)] : published,
+    published: [...published, ...trackerPub],
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
     read: `The model holds ${v.toFixed(1)}% vacancy. ${parts.length === 2 ? `${parts[0]}, ${parts[1]}` : parts[0]}. ${clause}${trackerTail}`,
+    // The anchor the tone reads, with the survey's margin as its whisker;
+    // the region's beside it where the metro's anchors; the tracker's
+    // apartment read apart, a different construct and never the anchor.
+    modelValue: v,
+    marks: [
+      ...(metro ? [mark("range", false, metro.moe)] : []),
+      ...(region ? [mark(metro ? "beside" : "range", false, metro ? null : region.moe)] : []),
+      ...(!metro && !region && state ? [mark("range", false, state.moe)] : []),
+      ...trackerPub.map(() => mark("apart")),
+    ],
   };
 }
 

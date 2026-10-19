@@ -191,7 +191,7 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
-import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { modelVsMarketFor, wordsOnly, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { versionBadge } from "@/lib/bridge/version-rules";
@@ -1859,7 +1859,10 @@ export default async function DealPage({
         dealName={deal.name}
         rateSeeds={rateSeeds}
         marketSince={marketSince}
-        modelVsMarket={modelRead}
+        // Its pictures drawn only where the model's reads stand: on a
+        // placeholder price or an assumed NOI the card keeps its words alone
+        // (lib/underwrite/report-grid `modelReadsWithheld`).
+        modelVsMarket={readsWithheld ? wordsOnly(modelRead) : modelRead}
         assumable={assumable}
         sellerNote={sellerNote}
         leaseholdExit={leaseholdExit}
