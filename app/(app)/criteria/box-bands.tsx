@@ -49,10 +49,40 @@ export function bandsCountLine(deals: number | null, of: BandsCountOf = {}): str
   return `${whose} ${deals === 1 ? "one live deal" : `${deals} live deals`} on each band, as saved.`;
 }
 
-function dotLabel(d: BandDot, label: string): string {
+/** What a dot says of its deal on this band: "price $42.0M, inside the box". */
+function dotFacts(d: BandDot, label: string): string {
   const call = d.tone === "line" ? "" : `, ${DOT_WORDS[d.tone]}`;
   const off = d.off ? `, ${d.off === "low" ? "below" : "past"} the track's end` : "";
-  return `${d.name}: ${label.toLowerCase()} ${d.text}${call}${off}`;
+  return `${label.toLowerCase()} ${d.text}${call}${off}`;
+}
+
+function dotLabel(d: BandDot, label: string): string {
+  return `${d.name}: ${dotFacts(d, label)}`;
+}
+
+/** The deals on a band as a list of links: the way a keyboard and a screen
+ *  reader reach them, since the dots themselves are no tab stops (a pipeline
+ *  of 200 deals on five bands would be a thousand). */
+function BandDealList({ band }: { band: BoxBand }) {
+  if (!band.dots.length) return null;
+  const n = band.dots.length;
+  return (
+    <details className="mt-1 text-[11px]" data-qa="band-deals">
+      <summary className="inline-flex min-h-6 cursor-pointer items-center rounded text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/40">
+        {n === 1 ? "The one deal on it" : `The ${n} deals on it`}
+      </summary>
+      <ul className="mt-1 space-y-0.5">
+        {band.dots.map((d) => (
+          <li key={d.id}>
+            <a href={`/deals/${encodeURIComponent(d.id)}`} className="font-medium text-brand underline-offset-2 hover:underline">
+              {d.name}
+            </a>
+            <span className="text-muted">: {dotFacts(d, band.label)}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 function Band({ band }: { band: BoxBand }) {
@@ -97,10 +127,13 @@ function Band({ band }: { band: BoxBand }) {
           ) : null,
         )}
         {band.dots.map((d) => (
+          // A pointer's way to the deal; the list under the track is the
+          // keyboard's and the screen reader's, so a dot is no tab stop.
           <a
             key={d.id}
             href={`/deals/${encodeURIComponent(d.id)}`}
-            aria-label={dotLabel(d, band.label)}
+            tabIndex={-1}
+            aria-hidden
             title={dotLabel(d, band.label)}
             data-bar="buybox-deal"
             data-tone={d.tone}
@@ -113,6 +146,7 @@ function Band({ band }: { band: BoxBand }) {
         <span>{band.ends.low}</span>
         <span>{band.ends.high}</span>
       </div>
+      <BandDealList band={band} />
     </li>
   );
 }

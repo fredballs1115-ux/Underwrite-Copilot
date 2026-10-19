@@ -168,9 +168,25 @@ describe("the buy box, drawn: each band a track, the reader's deals on it", () =
     const dots = bands.reduce((n, b) => n + b.dots.length, 0);
     expect((html.match(/data-bar="buybox-deal"/g) ?? []).length).toBe(dots);
     expect(html).toContain('href="/deals/in"');
-    expect(html).toContain('aria-label="Deal in: price $42.0M, inside the box"');
-    expect(html).toContain('aria-label="Deal out: price $120.0M, outside the box"');
-    expect(html).toContain('aria-label="Deal out: basis $410k / unit, outside the box, past the track&#x27;s end"');
+    expect(html).toContain('title="Deal in: price $42.0M, inside the box"');
+    expect(html).toContain('title="Deal out: price $120.0M, outside the box"');
+    expect(html).toContain('title="Deal out: basis $410k / unit, outside the box, past the track&#x27;s end"');
+    // The audit of #466: every dot was a tab stop, up to a thousand of them.
+    // A dot is a pointer's way in; each band lists its deals as links for the
+    // keyboard and the screen reader.
+    const dotTags = html.match(/<a[^>]*data-bar="buybox-deal"[^>]*>/g) ?? [];
+    expect(dotTags.length).toBe(dots);
+    for (const t of dotTags) {
+      expect(t).toContain('tabindex="-1"');
+      expect(t).toContain('aria-hidden="true"');
+    }
+    const lists = html.match(/<details[^>]*data-qa="band-deals"[\s\S]*?<\/details>/g) ?? [];
+    expect(lists.length).toBe(bands.filter((b) => b.dots.length > 0).length);
+    const listed = lists.flatMap((l) => l.match(/<a href="\/deals\/[^"]+"/g) ?? []);
+    expect(listed.length).toBe(dots);
+    const listText = visibleText(lists.join("")).replace(/\s*\n\s*:/g, ":");
+    expect(listText).toContain("Deal in: price $42.0M, inside the box");
+    expect(listText).toMatch(/The \d+ deals on it|The one deal on it/);
     const text = visibleText(html);
     expect(text).toContain("Your box, drawn");
     expect(text).toContain("Your 5 live deals on each band, as saved.");
