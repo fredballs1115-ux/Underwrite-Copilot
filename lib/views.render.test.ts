@@ -693,12 +693,20 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(tile).toMatch(/<dd[^>]*data-qa="fit-checked"[^>]*>2 of 4 checked<\/dd>/);
     expect(tile).toContain("going-in cap and target return could not be checked");
     // …and the score muted, not the call's green.
-    expect(tile).toMatch(/tabular-nums text-muted"[^>]*>100</);
-    expect(tile).not.toMatch(/tabular-nums text-pass"[^>]*>100</);
+    expect(tile).toMatch(/tabular-nums text-muted"[^>]*><span aria-hidden="true">100</);
+    expect(tile).not.toMatch(/tabular-nums text-pass"[^>]*><span aria-hidden="true">100</);
+    // The call in words for a screen reader and in the tooltip (the header
+    // chip's own label), and no call word under the score where the count
+    // stands in the call's place.
+    expect(tile).toContain('<span class="sr-only">Fit 100 · 2 of 4 checked</span>');
+    expect(tile).toContain('title="Fit 100 · 2 of 4 checked. ');
+    expect(tile).not.toContain('data-qa="fit-call"');
     // A box checked whole reads as it always has.
     const other = tiles(cards).get("b")!;
     expect(other).not.toContain('data-qa="fit-checked"');
-    expect(other).toMatch(/tabular-nums text-pass"[^>]*>88</);
+    expect(other).toMatch(/tabular-nums text-pass"[^>]*><span aria-hidden="true">88</);
+    expect(other).toContain('<span class="sr-only">Fit 88 · Pursue</span>');
+    expect(other).toMatch(/<dd aria-hidden="true" class="truncate text-\[10px\] font-medium text-pass" data-qa="fit-call">Pursue<\/dd>/);
 
     const list = render(React.createElement(Pipeline, { ...props, initialView: "list" as const }));
     expect(a11yIssues(list), "a11y pipeline list").toEqual([]);
