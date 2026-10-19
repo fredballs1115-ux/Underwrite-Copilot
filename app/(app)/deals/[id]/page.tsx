@@ -2008,6 +2008,9 @@ export default async function DealPage({
           rateSeed={rateSeeds.permanent}
           tenYear={debt.tenYear}
           survey30={debt.survey30}
+          // The leverage track draws nothing on a placeholder price or an
+          // assumed NOI (lib/underwrite/report-grid `modelReadsWithheld`).
+          readsWithheld={readsWithheld != null}
         />
       </div>
       {/* Room at the foot for the deal's bar on a phone (#437), so the
