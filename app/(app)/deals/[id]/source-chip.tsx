@@ -131,7 +131,7 @@ function ChipPopover({
     <span className="group/chip relative inline-flex align-middle">
       <button
         type="button"
-        className={`${className} cursor-help focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand`}
+        className={`${className} cursor-help`}
         title={text}
         aria-label={label}
         aria-describedby={id}
