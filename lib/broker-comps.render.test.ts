@@ -75,7 +75,7 @@ describe("the sample's comps are never pinned to real places", () => {
       // still listed, with their pages and bars
       expect(text).toContain("The Alden");
       expect(html).toContain('href="/api/deals/d1/om#page=14"');
-      expect(text).toMatch(/Bars per unit \(1 comp\)/);
+      expect(text).toContain("Bars: the basis per unit that one of the 3 comps states; the tick is the subject at $280k/unit.");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(visibleText(html))).toEqual([]);
     }
@@ -122,11 +122,55 @@ describe("the Comps tab", () => {
   it("draws a per-SF comp on its own track beside the per-unit ones", () => {
     const html = draw();
     const text = visibleText(html).replace(/\s+/g, " ");
-    expect(text).toMatch(/Bars per unit \(1 comp\)/);
-    expect(text).toMatch(/Bars per SF \(1 comp\)/);
+    // the report's own caption (lib/comp-detail `compBarsCaption`): which
+    // of the comps each track draws, and the subject's tick
+    expect(text).toContain("Bars: the basis per unit that one of the 3 comps states; the tick is the subject at $280k/unit.");
+    expect(text).toContain("Bars: the basis per SF that one of the 3 comps states; the tick is the subject at $380/SF.");
     const t = basisTracks(comps.saleComps, { perUnit: 280_000, perSf: 380 })!;
     expect(t.trackOf).toEqual([0, 1, null]);
     expect(t.tracks.map((x) => x.unit)).toEqual(["unit", "sf"]);
+  });
+
+  it("claims no scale for a lone bar with no subject tick", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(
+        ToastProvider,
+        null,
+        React.createElement(BrokerComps, {
+          result: comps,
+          dealId: "d1",
+          compSearch: null,
+          active: false,
+          isPro: true,
+          subject: null,
+          mapContext: null,
+        }),
+      ),
+    );
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toContain("Bars: the basis per unit that one of the 3 comps states.");
+    expect(text).not.toContain("scaled to the widest");
+    expect(html).not.toMatch(/title="\$300k\/unit, scaled/);
+  });
+
+  it("draws a web candidate's stated basis against the subject on its own track", () => {
+    const withBasis: CompSearchResult = {
+      ...search,
+      candidates: [
+        ...search.candidates,
+        { name: "12 Pine St", location: "Philadelphia", detail: "Sold $2.5M, $250k/unit", date: "2026", sourceName: "City paper", sourceUrl: "", note: "" },
+      ],
+    } as unknown as CompSearchResult;
+    const html = draw(false, withBasis);
+    const text = visibleText(html).replace(/\s+/g, " ");
+    // one bar for the OM comp on the unit track, one for the web candidate
+    expect(html).toContain('data-qa="web-comp-bars-caption"');
+    expect(text).toContain("Bars: the basis per unit that one of the 3 comps states; the tick is the subject at $280k/unit.");
+    expect(text).toContain("$250k/unit against the subject's $280k/unit");
+    // no candidate states a basis: no bars and no caption
+    expect(draw(false, search)).not.toContain('data-qa="web-comp-bars-caption"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 
   it("dates the web search and says a listing's figure is an ask", () => {

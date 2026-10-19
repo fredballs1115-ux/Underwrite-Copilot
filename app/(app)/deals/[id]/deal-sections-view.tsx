@@ -23,7 +23,7 @@ import type { CompsMap, MapComp } from "./comps-map";
 import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
-import { basisTracks, fmtBasis, type BasisTracks, type SubjectBasis } from "@/lib/comp-detail";
+import { basisTracks, compBarsCaption, fmtBasis, type BasisTracks, type SubjectBasis } from "@/lib/comp-detail";
 import { LISTING_NOT_SALE, saysListing } from "@/lib/web-comp-read";
 import { gapDisagreementLine, gapScale, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
@@ -579,6 +579,8 @@ export function BrokerComps({
         publicDemo={publicDemo}
         sample={!!mapContext?.sample}
         searchAction={searchAction}
+        subject={subject ?? null}
+        noun={noun}
       />
     </section>
   );
@@ -601,11 +603,18 @@ function PublicWebComps({
   publicDemo = false,
   sample = false,
   searchAction,
+  subject = null,
+  noun = "unit",
 }: {
   dealId: string;
   compSearch: CompSearchResult | null;
   active: boolean;
   hasOmComps: boolean;
+  /** the subject's own basis (lib/comp-detail's subjectBasis): a candidate
+   *  whose detail states a basis is drawn against it, as the OM's comps are */
+  subject?: SubjectBasis | null;
+  /** what a unit is called on this deal, for the bars' captions */
+  noun?: string;
   isPro: boolean;
   publicDemo?: boolean;
   /** the reader's own sample deal: its building and its comps are
@@ -614,6 +623,13 @@ function PublicWebComps({
   sample?: boolean;
   searchAction?: (formData: FormData) => void | Promise<void>;
 }) {
+  // A candidate's stated basis on one track with the subject's tick, read
+  // from its detail line by the OM comps' own reader (lib/comp-detail) —
+  // never inferred, and a figure a listing states stays an ask (said on its
+  // card). Its own track, apart from the memorandum's comps: a web
+  // candidate is unverified, and the two sets are never pooled.
+  const candidates = compSearch?.candidates ?? [];
+  const webScale = candidates.length > 0 ? basisTracks(candidates, subject, noun) : null;
   return (
     <div className="rounded-xl border border-dashed border-line p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -694,6 +710,7 @@ function PublicWebComps({
                   {c.detail && (
                     <p className="mt-1 font-mono text-xs tabular-nums">
                       {c.detail}
+                      {webScale && <CompBasisBar tracks={webScale} index={i} />}
                     </p>
                   )}
                   {c.note && (
@@ -731,6 +748,13 @@ function PublicWebComps({
                     </p>
                   ) : null}
                 </div>
+              ))}
+            </div>
+          )}
+          {webScale && (
+            <div className="mt-1.5 space-y-0.5 text-[11px] text-muted" data-qa="web-comp-bars-caption">
+              {webScale.tracks.map((t, k) => (
+                <p key={t.unit}>{compBarsCaption(t, webScale.counts[k], candidates.length)}</p>
               ))}
             </div>
           )}
@@ -782,10 +806,14 @@ function CompBasisBar({ tracks, index }: { tracks: BasisTracks; index: number })
   const share = scale ? scale.shares[index] : null;
   if (!scale || share == null) return null;
   const own = fmtBasis(share * scale.max, scale.unit, scale.noun);
+  // A lone bar with no subject tick is scaled to nothing but itself, so it
+  // claims no scale (lib/comp-detail `compBarsCaption`'s rule).
   const words =
     scale.subjectValue != null
       ? `${own} against the subject's ${fmtBasis(scale.subjectValue, scale.unit, scale.noun)}`
-      : `${own}, scaled to the widest in the set`;
+      : (tracks.counts[t!] ?? 0) > 1
+        ? `${own}, scaled to the widest in the set`
+        : own;
   return (
     <span data-comp-bar className="relative mt-1.5 block h-1 w-24 rounded-full bg-faint" title={words}>
       <span
@@ -939,21 +967,15 @@ function CompTable({
         </table>
       </div>
       {scale && (
-        // The legend for the bars: a line a yardstick, each saying how many
-        // comps it draws, so the tick needs no guessing and no comp that
-        // states a basis goes undrawn.
-        <div className="mt-1.5 space-y-0.5 text-[11px] text-muted">
-          {scale.tracks.map((t, k) => {
-            const per = t.unit === "unit" ? t.noun : "SF";
-            const drawn = `${scale.counts[k]} ${scale.counts[k] === 1 ? "comp" : "comps"}`;
-            return (
-              <p key={t.unit}>
-                {t.subjectValue != null
-                  ? `Bars per ${per} (${drawn}): each comp's stated basis; the tick is the subject at ${fmtBasis(t.subjectValue, t.unit, t.noun)}.`
-                  : `Bars per ${per} (${drawn}): each comp's stated basis, scaled to the widest of them.`}
-              </p>
-            );
-          })}
+        // The legend for the bars: a line a yardstick, each saying which of
+        // the comps it draws, so the tick needs no guessing and no comp that
+        // states a basis goes undrawn — the report's own caption
+        // (lib/comp-detail `compBarsCaption`), so the page and the PDF say
+        // one thing, and a lone bar claims no scale.
+        <div className="mt-1.5 space-y-0.5 text-[11px] text-muted" data-qa="comp-bars-caption">
+          {scale.tracks.map((t, k) => (
+            <p key={t.unit}>{compBarsCaption(t, scale.counts[k], comps.length)}</p>
+          ))}
         </div>
       )}
       {comps.length > INITIAL && (
