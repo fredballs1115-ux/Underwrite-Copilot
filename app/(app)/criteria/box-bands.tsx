@@ -98,19 +98,17 @@ function Band({ band }: { band: BoxBand }) {
 }
 
 /**
- * The box's bands, the deals on each. `readOnly` is a teammate's view of the
- * team's box, which says the box is the owner's to set.
+ * The bands and their key, with no card around them: the editable page's
+ * card below, and a teammate's read-only view of the team's box, which
+ * draws them inside its own card in place of a list of the criteria.
  */
-export function BoxBands({ bands, deals, readOnly = false }: { bands: readonly BoxBand[]; deals: number; readOnly?: boolean }) {
+export function BoxBandsBody({ bands, deals }: { bands: readonly BoxBand[]; deals: number }) {
   if (!bands.length) return null;
   const tones = new Set(bands.flatMap((b) => b.dots.map((d) => d.tone)));
   const red = bands.some((b) => b.redLine);
   return (
-    <section aria-labelledby="box-bands-h" data-qa="box-bands" className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-      <h2 id="box-bands-h" className="text-sm font-semibold tracking-tight">
-        {readOnly ? "The box, drawn" : "Your box, drawn"}
-      </h2>
-      <p className="mt-0.5 text-xs text-muted">{bandsCountLine(deals)}</p>
+    <div data-qa="box-bands-body">
+      <p className="text-xs text-muted">{bandsCountLine(deals)}</p>
       <ul className="mt-4 space-y-5">
         {bands.map((b) => (
           <Band key={b.key} band={b} />
@@ -150,6 +148,75 @@ export function BoxBands({ bands, deals, readOnly = false }: { bands: readonly B
           </KeyItem>
         )}
       </Key>
+    </div>
+  );
+}
+
+/**
+ * A teammate's read-only view of the team's box: the box drawn, the same
+ * tracks the owner's page draws, then the criteria no track draws (the
+ * classes, the territory, the return floors, the rules among the red lines)
+ * in the box's own words. Where the owner has set nothing, it says so.
+ */
+export function ReadOnlyBox({
+  teamName,
+  mandate,
+  bands,
+  deals,
+  lines,
+}: {
+  teamName: string | null;
+  /** the active mandate, where the team holds more than one */
+  mandate: { name: string; of: number } | null;
+  bands: readonly BoxBand[];
+  deals: number;
+  /** the criteria beyond the bands (lib/box-bands `boxLinesBeyondBands`);
+   *  null where the team has no box */
+  lines: readonly string[] | null;
+}) {
+  return (
+    <section aria-labelledby="team-box-h" data-qa="team-box" className="rounded-2xl border border-line bg-surface p-6 shadow-card">
+      <h2 id="team-box-h" className="text-sm font-semibold tracking-tight">
+        {teamName ? `${teamName}’s criteria` : "The team’s criteria"}
+      </h2>
+      {mandate && (
+        <p className="mt-1 text-xs text-muted">
+          Active mandate: <span className="font-medium text-ink">{mandate.name}</span> (of {mandate.of}).
+        </p>
+      )}
+      {lines === null ? (
+        <p className="mt-2 text-sm text-muted">No criteria set yet — ask the team owner to define them here.</p>
+      ) : (
+        <>
+          {bands.length > 0 && (
+            <div className="mt-4">
+              <BoxBandsBody bands={bands} deals={deals} />
+            </div>
+          )}
+          {lines.length > 0 && (
+            <ul className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm text-muted" data-qa="team-box-lines">
+              {lines.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** The box's bands, the deals on each, in a card of their own. */
+export function BoxBands({ bands, deals }: { bands: readonly BoxBand[]; deals: number }) {
+  if (!bands.length) return null;
+  return (
+    <section aria-labelledby="box-bands-h" data-qa="box-bands" className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+      <h2 id="box-bands-h" className="text-sm font-semibold tracking-tight">
+        Your box, drawn
+      </h2>
+      <div className="mt-0.5">
+        <BoxBandsBody bands={bands} deals={deals} />
+      </div>
     </section>
   );
 }

@@ -5,7 +5,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { ExchangeFields } from "./exchange-fields";
 import { getActiveBuyBox } from "@/lib/criteria-server";
-import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
+import { geoTargets, priceBand } from "@/lib/criteria";
 import {
   saveBuyBox,
   addBuyBox,
@@ -25,8 +25,8 @@ import { isOpenStage, normalizeStage } from "@/lib/stages";
 import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem, OPEN_STAGE_FILTER } from "./box-preview";
 import type { JobLike } from "@/lib/screen-run";
 import { dealCheckSource } from "@/lib/buy-box-chip";
-import { BAND_DEALS_MAX, boxBands, type BandDeal } from "@/lib/box-bands";
-import { BoxBands } from "./box-bands";
+import { BAND_DEALS_MAX, boxBands, boxLinesBeyondBands, type BandDeal } from "@/lib/box-bands";
+import { BoxBands, ReadOnlyBox } from "./box-bands";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 
@@ -226,36 +226,15 @@ export default async function CriteriaPage({
       <BoxPreview items={preview.items} more={preview.more} />
 
       {!active.editable ? (
-        <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
-          <h2 className="text-sm font-semibold tracking-tight">
-            {active.teamName}&apos;s criteria
-          </h2>
-          {active.boxes.length > 1 && (
-            <p className="mt-1 text-xs text-muted">
-              Active mandate:{" "}
-              <span className="font-medium text-ink">
-                {activeNamed?.name ?? "Mandate"}
-              </span>{" "}
-              (of {active.boxes.length}).
-            </p>
-          )}
-          {active.box ? (
-            <ul className="mt-3 space-y-2 text-sm text-muted">
-              {buyBoxLines(active.box).map((l) => (
-                <li key={l} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
-                    ✓
-                  </span>
-                  {l}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-muted">
-              No criteria set yet — ask the team owner to define them here.
-            </p>
-          )}
-        </section>
+        // A teammate who cannot edit sees the box drawn, the same tracks the
+        // owner's page draws, and the criteria no track draws under them.
+        <ReadOnlyBox
+          teamName={active.teamName}
+          mandate={active.boxes.length > 1 ? { name: activeNamed?.name ?? "Mandate", of: active.boxes.length } : null}
+          bands={bands}
+          deals={bandDeals.length}
+          lines={active.box ? boxLinesBeyondBands(active.box) : null}
+        />
       ) : (
         <>
           {/* Named mandates: switch which one every screen is judged against,

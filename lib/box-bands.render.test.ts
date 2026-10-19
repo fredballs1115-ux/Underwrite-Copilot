@@ -7,10 +7,10 @@ import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BAND_MAX_LANES, boxBands, notJudgedText, type BandDeal } from "@/lib/box-bands";
-import { BoxBands, bandsCountLine } from "@/app/(app)/criteria/box-bands";
+import { BAND_MAX_LANES, boxBands, boxLinesBeyondBands, notJudgedText, type BandDeal } from "@/lib/box-bands";
+import { BoxBands, ReadOnlyBox, bandsCountLine } from "@/app/(app)/criteria/box-bands";
 import { dealCheckSource } from "@/lib/buy-box-chip";
-import { boxFigures, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
+import { boxFigures, buyBoxLines, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -203,5 +203,67 @@ describe("the buy box, drawn: each band a track, the reader's deals on it", () =
       const holders = files.filter((f) => readFileSync(f, "utf8").includes(`"${marker}"`)).map((f) => f.slice(process.cwd().length + 1));
       expect(holders, marker).toEqual(["app/(app)/criteria/box-bands.tsx"]);
     }
+  });
+});
+
+describe("a teammate's read-only view of the team's box: the same tracks, never a list of ticks", () => {
+  const TEAM_BOX: BuyBox = {
+    ...BOX,
+    assetClasses: ["multifamily"],
+    geos: [{ label: "Philadelphia PA" }],
+    minIrrPct: 14,
+    dealbreakers: { ...BOX.dealbreakers, requireAssetClass: true },
+    notes: "Value-add only.",
+  };
+
+  it("lists only the criteria no track draws, in the box's own words", () => {
+    const lines = boxLinesBeyondBands(TEAM_BOX);
+    expect(lines).toEqual([
+      "Asset classes: multifamily",
+      "Geography: Philadelphia PA",
+      "Target base-case IRR: 14%+",
+      "Dealbreakers: asset class must be in the mandate",
+      "Priorities: Value-add only.",
+    ]);
+    // Each is a line the full list says, word for word — the red lines'
+    // line less the figures the tracks draw as red lines.
+    for (const l of lines.filter((x) => !x.startsWith("Dealbreakers:"))) expect(buyBoxLines(TEAM_BOX)).toContain(l);
+    // A box of bands alone leaves nothing to list.
+    expect(boxLinesBeyondBands(BOX)).toEqual([]);
+  });
+
+  it("draws the team's box as the owner's page draws it, with nothing to lint", () => {
+    const bands = boxBands(TEAM_BOX, DEALS);
+    const html = renderToStaticMarkup(
+      h(ReadOnlyBox, { teamName: "Ridgeline", mandate: { name: "Core-plus", of: 2 }, bands, deals: DEALS.length, lines: boxLinesBeyondBands(TEAM_BOX) }),
+    );
+    expect(html).toContain('data-qa="team-box"');
+    // The same tracks as the owner's card: the bands' body is one component.
+    const owner = renderToStaticMarkup(h(BoxBands, { bands, deals: DEALS.length }));
+    const body = (s: string) => s.slice(s.indexOf('<div data-qa="box-bands-body">'), s.indexOf("</ul></div>", s.indexOf('<div data-qa="box-bands-body">')));
+    expect(body(html)).toBe(body(owner));
+    expect((html.match(/data-bar="buybox-track"/g) ?? []).length).toBe(5);
+    expect(html).not.toContain("✓");
+    const text = visibleText(html);
+    expect(text).toContain("Ridgeline’s criteria");
+    expect(text.replace(/\s+/g, " ")).toContain("Active mandate: Core-plus (of 2).");
+    expect(text).toContain("Asset classes: multifamily");
+    expect(text).not.toContain("Min going-in cap");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("says the owner has set nothing where the team has no box", () => {
+    const html = renderToStaticMarkup(h(ReadOnlyBox, { teamName: "Ridgeline", mandate: null, bands: [], deals: 0, lines: null }));
+    expect(visibleText(html)).toContain("No criteria set yet — ask the team owner to define them here.");
+    expect(html).not.toContain('data-bar="buybox-track"');
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("is what the page draws for a teammate who cannot edit", () => {
+    const page = readFileSync("app/(app)/criteria/page.tsx", "utf8");
+    expect(page).toMatch(/!active\.editable \? \([\s\S]{0,200}<ReadOnlyBox/);
+    expect(page).toContain("lines={active.box ? boxLinesBeyondBands(active.box) : null}");
+    expect(page).not.toContain("buyBoxLines(active.box)");
   });
 });

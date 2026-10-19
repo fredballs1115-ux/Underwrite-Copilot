@@ -12,6 +12,7 @@
 
 import {
   boxFigures,
+  buyBoxLines,
   evaluateBuyBox,
   priceBand,
   type BuyBox,
@@ -289,6 +290,29 @@ export function boxBands(box: BuyBox, deals: readonly BandDeal[]): BoxBand[] {
       lanes,
       notJudged,
     };
+  });
+}
+
+/**
+ * The box's criteria no track draws, in lib/criteria `buyBoxLines`' own
+ * words: the classes, the territory, the return floors, the red lines that
+ * are rules rather than figures, the priorities and the exchange. A
+ * teammate's read-only view draws the bands and lists these under them.
+ */
+export function boxLinesBeyondBands(box: BuyBox): string[] {
+  const db = box.dealbreakers;
+  return buyBoxLines({
+    ...box,
+    sfMin: undefined,
+    sfMax: undefined,
+    unitsMin: undefined,
+    unitsMax: undefined,
+    priceMinM: undefined,
+    priceMaxM: undefined,
+    maxPriceM: undefined,
+    maxPerUnitK: undefined,
+    minCapPct: undefined,
+    dealbreakers: db ? { ...db, maxPriceM: undefined, minCapPct: undefined, maxPerUnitK: undefined } : undefined,
   });
 }
 
