@@ -7,7 +7,8 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { parsePageNumber } from "@/lib/facts";
 import { renderSampleOm, SAMPLE_OM_PAGES, SAMPLE_OM_STAMP, sampleOmCitations } from "@/lib/sample-om";
 import { GET } from "@/app/api/demo/om/route";
-import { SAMPLE_OM_HREF, SAMPLE_OM_VERSION } from "@/lib/sample-om-link";
+import { createHash } from "node:crypto";
+import { SAMPLE_OM_HREF, SAMPLE_OM_SHA256, SAMPLE_OM_VERSION } from "@/lib/sample-om-link";
 
 const pdfPromise = renderSampleOm();
 
@@ -76,6 +77,16 @@ describe("the sample's fictional memorandum", () => {
   it("is the same bytes every time it is built", async () => {
     const again = await renderSampleOm();
     expect(Buffer.compare(again, await pdfPromise)).toBe(0);
+  });
+
+  it("is the file its version names: new bytes need a new version", async () => {
+    // The route serves the file immutable for a year under ?v=VERSION, so a
+    // browser holding the old bytes keeps them until the version moves.
+    const sha = createHash("sha256").update(await pdfPromise).digest("hex");
+    expect(
+      sha,
+      `The sample memorandum's bytes changed: raise SAMPLE_OM_VERSION (now "${SAMPLE_OM_VERSION}") in lib/sample-om-link.ts and set SAMPLE_OM_SHA256 to "${sha}".`,
+    ).toBe(SAMPLE_OM_SHA256);
   });
 });
 
