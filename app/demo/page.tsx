@@ -8,6 +8,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { fmrToday } from "@/lib/fmr";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
+import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";
 import { SampleDealHero } from "@/app/sample-hero";
 import { DemoSections } from "./sections";
 import { sampleDemoData, samplePlacement } from "./demo-data";
@@ -126,13 +127,20 @@ export default async function DemoPage() {
 
           <DemoSections data={data} />
 
-          {/* The deal page's research panel under its sections, on the
-              sample's address and the checked-in rules and benchmarks. */}
+          {/* Under its sections, as the deal page draws them on the sample:
+              the public-record card in the sample's place (its building is
+              fictional, so no parcel is looked up — the card's own line,
+              public-record-card `SamplePublicRecord`), then the research
+              panel, on the sample's address and the checked-in rules and
+              benchmarks. */}
           <section aria-labelledby="behind-this-screen" className="flex flex-col gap-2">
             <p id="behind-this-screen" className="text-xs font-medium uppercase tracking-wider text-muted">
               Behind this screen
             </p>
-            <ResearchPanelView {...research} />
+            <div className="space-y-4">
+              <SamplePublicRecord />
+              <ResearchPanelView {...research} />
+            </div>
           </section>
 
           {/* What comes after the screen. Rendered from the SAME DEEP_TOOLS

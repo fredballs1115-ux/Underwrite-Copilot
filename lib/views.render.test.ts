@@ -1538,6 +1538,11 @@ describe("ModelView — the sample model renders every panel", () => {
   it("/demo draws the deal page's own header on the sample, read by lib/sample-header, never typed", () => {
     const page = readFileSync("app/demo/page.tsx", "utf8");
     expect(page).toContain("<SampleDealHero header={sampleHeader(new Date(`${today}T12:00:00Z`))} titleAs=\"h2\" />");
+    // Under the sections, the deal page's own public-record card in the
+    // sample's place, then its research panel, in the deal page's order.
+    expect(page).toContain('import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";');
+    expect(page.indexOf("<SamplePublicRecord />")).toBeGreaterThan(-1);
+    expect(page.indexOf("<SamplePublicRecord />")).toBeLessThan(page.indexOf("<ResearchPanelView {...research} />"));
     // No summary bar of its own: no name, call or deal-type chip typed here.
     expect(page).not.toContain("The Maddox at Brewerytown");
     expect(page).not.toMatch(/>\s*Caution\s*</);
