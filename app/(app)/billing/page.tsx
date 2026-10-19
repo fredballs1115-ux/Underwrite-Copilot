@@ -18,6 +18,7 @@ import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
 import { personName } from "@/lib/person";
+import { planShownOf } from "@/lib/billing-view";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -70,6 +71,12 @@ export default async function BillingPage({
   ].filter((x): x is { label: string; pool: AllowancePool } => x !== null);
   // Full team detail (roster, seat count, renewal) for the Team section.
   const team = user && billing?.team ? await getTeam(supabase, user.id) : null;
+  // The plan the reader pays for, else the team's (lib/billing-view): a
+  // Team-plan member has no subscription of their own to manage.
+  const shown = planShownOf(billing);
+  // Each subscription's own dunning: the reader's, and the team's, whose
+  // card only its owner can update.
+  const teamPastDue = !!team?.planActive && team.subscriptionStatus === "past_due";
 
   const banner =
     // Stripe returns the buyer here when checkout completes, which can be a
@@ -123,6 +130,27 @@ export default async function BillingPage({
           </form>
         </div>
       )}
+      {teamPastDue && team && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-caution/30 bg-caution/5 p-4">
+          <p className="text-sm font-medium text-caution">
+            {team.name}&rsquo;s last payment for the Team plan didn&rsquo;t go
+            through. The plan stays active while Stripe retries
+            {team.role === "owner"
+              ? ", but please update the team's payment method."
+              : " — the team's owner can update the payment method."}
+          </p>
+          {team.role === "owner" && (
+            <form action={openTeamPortal}>
+              <PendingButton
+                pendingLabel="Opening Stripe…"
+                className="rounded-lg border border-caution/40 px-3.5 py-1.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
+              >
+                Update team payment method
+              </PendingButton>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Current plan */}
       <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
@@ -131,20 +159,29 @@ export default async function BillingPage({
             <p className="text-xs font-medium uppercase tracking-wider text-muted">
               Current plan
             </p>
-            <p className="mt-1 text-xl font-semibold">
-              {isPro ? "Pro" : "Free"}
-            </p>
+            <p className="mt-1 text-xl font-semibold">{shown.label}</p>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
               isPro ? "bg-pass/10 text-pass" : "bg-faint text-muted"
             }`}
           >
-            {isPro ? "Active" : "Free tier"}
+            {shown.badge}
           </span>
         </div>
 
-        {isPro ? (
+        {shown.kind === "team" ? (
+          <p className="mt-4 text-sm text-muted">
+            Every Pro feature comes with {shown.teamName}&rsquo;s Team plan,
+            and you have no subscription of your own to manage —{" "}
+            {team?.role === "owner"
+              ? "the team's subscription is managed from the Team page."
+              : "the team's owner manages its subscription."}{" "}
+            <Link href="/team" className="font-medium text-brand hover:text-brand-strong">
+              Team page →
+            </Link>
+          </p>
+        ) : shown.kind === "personal" ? (
           <>
             <p className="mt-4 text-sm text-muted">
               {billing?.currentPeriodEnd
@@ -232,7 +269,7 @@ export default async function BillingPage({
             <p className="text-sm font-semibold">Pro</p>
             {isPro && (
               <span className="rounded-full bg-pass/10 px-2.5 py-0.5 text-[11px] font-semibold text-pass">
-                Your plan
+                {shown.kind === "team" ? "Through your team" : "Your plan"}
               </span>
             )}
           </div>
