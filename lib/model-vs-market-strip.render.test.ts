@@ -140,6 +140,19 @@ describe("ModelVsMarketCard — the strips", () => {
     expect(text).toContain("Consumer prices (CPI, all items): +3.4% over the year to Aug 2026, the nation's (BLS via FRED)");
   });
 
+  it("numbers each figure shown apart, on the strip and in its key, so the dashed ticks are told apart", () => {
+    const exp = rowHtml(html, "expense_growth");
+    const numbers = [...exp.matchAll(/data-bar="mvm-apart-number"[^>]*>(\d+)</g)].map((m) => m[1]);
+    expect(numbers).toEqual(["1", "2"]);
+    expect(text).toContain("1. Commercial property insurance premiums");
+    expect(text).toContain("2. Expected inflation, next ten years");
+    // Each number sits where its tick does.
+    const ticks = [...exp.matchAll(/data-bar="mvm-apart" style="left:([^"]+)"/g)].map((m) => m[1]);
+    const placed = [...exp.matchAll(/data-bar="mvm-apart-number" style="left:([^"]+)"/g)].map((m) => m[1]);
+    expect(placed).toEqual(ticks);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
   it("keeps the exit cap in words, and every row's sentence whole in the HTML", () => {
     const exit = rowHtml(html, "exit_cap");
     expect(exit).not.toContain("data-bar=");

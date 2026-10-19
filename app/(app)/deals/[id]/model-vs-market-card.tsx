@@ -184,6 +184,24 @@ function CheckStrip({ check }: { check: ModelCheck }) {
           <Tick at={at(s.model, domain)} bar="mvm-model-apart" tone="bg-brand/40" track="secondary" />
         </div>
       )}
+      {/* Several figures apart share one dashed mark, so each tick wears its
+          number, and its key item the same, so they can be told apart. */}
+      {apart.length > 1 && (
+        <div className="relative mt-0.5 h-3.5" aria-hidden data-qa="model-strip-apart-numbers">
+          <div className="absolute inset-y-0 left-px right-px">
+            {apart.map(({ p }, i) => (
+              <span
+                key={i}
+                className="absolute top-0 -translate-x-1/2 font-mono text-[10px] leading-none tabular-nums text-caution"
+                data-bar="mvm-apart-number"
+                style={{ left: at(p.value, domain) }}
+              >
+                {i + 1}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <Key>
         <KeyItem mark="swatch" tone="bg-brand">
           {`The model: ${check.model}`}
@@ -195,7 +213,7 @@ function CheckStrip({ check }: { check: ModelCheck }) {
         ))}
         {apart.map(({ p, m }, i) => (
           <KeyItem key={`a${i}`} mark="dashed" tone="border-caution">
-            {`${keyWords(p, m)} — shown apart, not in the range`}
+            {`${apart.length > 1 ? `${i + 1}. ` : ""}${keyWords(p, m)} — shown apart, not in the range`}
           </KeyItem>
         ))}
       </Key>
