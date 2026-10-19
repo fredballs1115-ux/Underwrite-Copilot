@@ -3,7 +3,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { DATA_METROS } from "@/lib/market-match";
 import { MARKET_COUNT, MARKETS_READ } from "@/lib/market-count";
 import { SECTORS } from "@/lib/research-sectors";
-import { figuresDrawn, marketMeta, marketPageFor, marketPages, marketPath, sectorPageFor, sectorPages } from "./public-pages";
+import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH, SITE_CARD, figuresDrawn, marketMeta, marketPageFor, marketPages, marketPath, sectorPageFor, sectorPages } from "./public-pages";
 
 describe("public pages — every market and sector page, named for itself (#430)", () => {
   it("lists every briefed market and every metro area read without a brief, each once", () => {
@@ -71,6 +71,13 @@ describe("public pages — every market and sector page, named for itself (#430)
     expect(MARKETS_READ).toBe(MARKET_COUNT + DATA_METROS.length);
     expect(MARKETS_READ).toBeLessThan(marketPages().length);
     expect(marketPath("a b")).toBe("/market?metro=a%20b");
+  });
+
+  it("catalogues the methodology page under its own name and address (2026-10-19)", () => {
+    expect(HOW_WE_TEST_PAGE.canonical).toBe(HOW_WE_TEST_PATH);
+    expect(HOW_WE_TEST_PAGE.title).toBe("How each assumption is tested");
+    expect(HOW_WE_TEST_PAGE.description.length).toBeLessThanOrEqual(200);
+    expect(HOW_WE_TEST_PAGE.image).toEqual(SITE_CARD);
   });
 
   it("gives a metro page its own link preview, and every other page the site's card (#436)", () => {

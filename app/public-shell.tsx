@@ -84,6 +84,9 @@ export async function PublicShell({ children }: { children: ReactNode }) {
             <Link href="/why" className="transition-colors hover:text-ink">
               Why
             </Link>
+            <Link href="/how-we-test" className="transition-colors hover:text-ink">
+              How we test
+            </Link>
             <Link href="/whats-new" className="transition-colors hover:text-ink">
               What&apos;s new
             </Link>

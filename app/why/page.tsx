@@ -181,6 +181,9 @@ export default function WhyPage() {
             <Link href="/why" className="transition-colors hover:text-ink">
               Why
             </Link>
+            <Link href="/how-we-test" className="transition-colors hover:text-ink">
+              How we test
+            </Link>
             <Link href="/security" className="transition-colors hover:text-ink">
               Security
             </Link>

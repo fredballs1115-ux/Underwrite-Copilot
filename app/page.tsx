@@ -1426,6 +1426,11 @@ export default function Home() {
                 </Link>
               </li>
               <li>
+                <Link href="/how-we-test" className="text-muted transition-colors hover:text-ink">
+                  How each assumption is tested
+                </Link>
+              </li>
+              <li>
                 <Link href="/demo" className="text-muted transition-colors hover:text-ink">
                   Sample screen
                 </Link>

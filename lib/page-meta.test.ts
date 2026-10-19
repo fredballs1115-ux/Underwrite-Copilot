@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Metadata } from "next";
 import { metadata as why } from "@/app/why/page";
+import { metadata as howWeTest } from "@/app/how-we-test/page";
 import { metadata as whatsNew } from "@/app/whats-new/page";
 import { metadata as security } from "@/app/security/page";
 import { metadata as privacy } from "@/app/privacy/page";
@@ -35,6 +36,7 @@ function renderedTitle(m: Metadata): string {
 
 const PAGES: Array<[string, Metadata]> = [
   ["/why", why],
+  ["/how-we-test", howWeTest],
   ["/whats-new", whatsNew],
   ["/security", security],
   ["/privacy", privacy],

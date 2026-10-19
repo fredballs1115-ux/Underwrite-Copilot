@@ -53,6 +53,20 @@ export const PLAIN_CARD = {
   alt: "Underwrite Copilot",
 };
 
+/**
+ * The methodology page (app/how-we-test, 2026-10-19): how each of the
+ * memorandum's assumptions is tested. Catalogued here so its metadata, the
+ * sitemap and the footer's link read one name and one address.
+ */
+export const HOW_WE_TEST_PATH = "/how-we-test";
+export const HOW_WE_TEST_PAGE: PageMeta = {
+  title: "How each assumption is tested",
+  description:
+    "How Underwrite Copilot tests an offering memorandum's assumptions: each set against a dated published figure, the deal's own documents or a rule of thumb named as one, and the return re-run in code.",
+  canonical: HOW_WE_TEST_PATH,
+  image: SITE_CARD,
+};
+
 /** A metro page's own card (app/api/og/market/[id]). */
 export function marketCardPath(id: string): string {
   return `/api/og/market/${encodeURIComponent(id)}`;
