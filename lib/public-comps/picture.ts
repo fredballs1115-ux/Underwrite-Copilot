@@ -256,3 +256,102 @@ export function compsTableText(r: Pick<RecordCompsResult, "comps">): string {
   );
   return [head, ...rows].join("\n");
 }
+
+/** The orders the sales table offers. Nearest first is the search's own
+ *  order (and each sale's pin number); the others run the way an analyst
+ *  reads them: the most recent, the dearest, the dearest a square foot. */
+export type SalesSort = "nearest" | "newest" | "price" | "perSf";
+
+export const SALES_SORTS: ReadonlyArray<{ key: SalesSort; label: string }> = [
+  { key: "nearest", label: "Nearest" },
+  { key: "newest", label: "Newest" },
+  { key: "price", label: "Price" },
+  { key: "perSf", label: "$/SF" },
+];
+
+/**
+ * The sales' places in the order asked, as indexes into the nearest-first
+ * list (so each row keeps its pin number). Ties keep the nearest first. On
+ * $/SF a sale stating no area sorts last, nearest first among them — it is
+ * listed, never dropped. A day that does not parse sorts last on "newest".
+ */
+export function salesOrder(
+  comps: ReadonlyArray<Pick<RecordComp, "saleDate" | "price" | "sqft">>,
+  by: SalesSort,
+): number[] {
+  const idx = comps.map((_, i) => i);
+  if (by === "nearest") return idx;
+  const key = (i: number): number | null => {
+    const c = comps[i];
+    if (by === "price") return Number.isFinite(c.price) ? c.price : null;
+    if (by === "perSf") return perSqftOf(c);
+    const t = Date.parse(`${(c.saleDate ?? "").slice(0, 10)}T00:00:00Z`);
+    return Number.isFinite(t) ? t : null;
+  };
+  return idx.sort((a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    if (ka === null && kb === null) return a - b;
+    if (ka === null) return 1;
+    if (kb === null) return -1;
+    return kb - ka || a - b;
+  });
+}
+
+/** The table's heading for an order: "The 12 nearest" where the rest fold
+ *  behind "Show all", else "The sales, nearest first". */
+export function salesHeading(by: SalesSort, total: number, shown: number): string {
+  if (total > shown) {
+    return {
+      nearest: `The ${shown} nearest`,
+      newest: `The ${shown} most recent`,
+      price: `The ${shown} highest-priced`,
+      perSf: `The ${shown} highest a square foot`,
+    }[by];
+  }
+  return {
+    nearest: "The sales, nearest first",
+    newest: "The sales, most recent first",
+    price: "The sales, highest price first",
+    perSf: "The sales, highest a square foot first",
+  }[by];
+}
+
+export interface PerSfBars {
+  /** each sale's $/SF as a share of the widest (0–1), null where it states
+   *  no area — indexed as the nearest-first list */
+  shares: (number | null)[];
+  /** the widest $/SF in the set, the bars' scale */
+  max: number;
+  /** the $/SF median's place on the scale, only where the readout names a
+   *  median (MEDIAN_FLOOR sales stating an area), else null */
+  medianShare: number | null;
+  /** how many sales state an area: the bars drawn */
+  drawn: number;
+}
+
+/**
+ * Each sale's price a square foot as a bar from zero on one scale (the
+ * widest in the set), so the spread reads without a column of figures —
+ * and the $/SF median as a tick, only where the readout names one (the
+ * same floor as `perSqftPhrase`). Null under two sales stating an area:
+ * one bar is scaled to nothing but itself.
+ */
+export function perSfBars(
+  comps: ReadonlyArray<Pick<RecordComp, "price" | "sqft">>,
+  medianPerSqft: number | null,
+): PerSfBars | null {
+  const values = comps.map((c) => perSqftOf(c));
+  const drawn = values.filter((v) => v !== null).length;
+  if (drawn < 2) return null;
+  const max = Math.max(...values.map((v) => v ?? 0));
+  if (!(max > 0)) return null;
+  const ev = compEvidence(drawn);
+  const middle = medianPerSqft !== null && medianPerSqft > 0 && ev !== "individual" && ev !== "none";
+  return {
+    shares: values.map((v) => (v === null ? null : Math.min(1, v / max))),
+    max,
+    medianShare: middle ? Math.min(1, (medianPerSqft as number) / max) : null,
+    drawn,
+  };
+}

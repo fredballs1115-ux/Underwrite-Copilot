@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compsTableText, evidenceThrough, perSqftOf, perUnitOf, sharedDeedCounts, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
+import { compsTableText, evidenceThrough, perSfBars, perSqftOf, perUnitOf, salesHeading, salesOrder, sharedDeedCounts, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
 import { pulledLine, type RecordComp } from "./core";
 import { compGridHref } from "./picture";
 import { MAX_COMPS, readGrid, readGridText } from "@/lib/tools/comp-grid";
@@ -211,5 +211,45 @@ describe("compsTableText", () => {
       "1.00",
       "https://example.gov/1",
     ]);
+  });
+});
+
+describe("salesOrder, salesHeading and perSfBars", () => {
+  const set = [
+    comp({ saleDate: "2026-01-10", price: 900_000, sqft: 3_000, distanceKm: 0.1 }),
+    comp({ saleDate: "2026-06-01", price: 400_000, sqft: null, distanceKm: 0.2 }),
+    comp({ saleDate: "2025-11-20", price: 1_200_000, sqft: 2_000, distanceKm: 0.3 }),
+    comp({ saleDate: "2026-06-01", price: 400_000, sqft: 1_000, distanceKm: 0.4 }),
+  ];
+
+  it("keeps each sale's nearest-first place, so its pin number stays", () => {
+    expect(salesOrder(set, "nearest")).toEqual([0, 1, 2, 3]);
+    // the same day keeps the nearer first
+    expect(salesOrder(set, "newest")).toEqual([1, 3, 0, 2]);
+    expect(salesOrder(set, "price")).toEqual([2, 0, 1, 3]);
+    // $1,200,000 / 2,000 = $600; $400,000 / 1,000 = $400; $300; no area last
+    expect(salesOrder(set, "perSf")).toEqual([2, 3, 0, 1]);
+    // a day that does not parse sorts last
+    expect(salesOrder([comp({ saleDate: "" }), comp({ saleDate: "2026-01-01" })], "newest")).toEqual([1, 0]);
+  });
+
+  it("names the fold by the order", () => {
+    expect(salesHeading("nearest", 15, 12)).toBe("The 12 nearest");
+    expect(salesHeading("newest", 15, 12)).toBe("The 12 most recent");
+    expect(salesHeading("price", 4, 12)).toBe("The sales, highest price first");
+  });
+
+  it("draws $/SF from zero to the widest, and the median only past the floor", () => {
+    const bars = perSfBars(set, 400)!;
+    expect(bars.drawn).toBe(3);
+    expect(bars.max).toBe(600);
+    expect(bars.shares).toEqual([0.5, null, 1, 400 / 600]);
+    expect(bars.medianShare).toBeCloseTo(400 / 600);
+    // two sales stating an area: bars, but no median tick
+    const two = perSfBars([set[0], set[1], set[2]], 450)!;
+    expect(two.drawn).toBe(2);
+    expect(two.medianShare).toBeNull();
+    // one sale stating an area is scaled to itself: no bars
+    expect(perSfBars(set.slice(0, 2), 300)).toBeNull();
   });
 });
