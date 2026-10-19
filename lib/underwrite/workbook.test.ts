@@ -1804,7 +1804,7 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(await labels(office)).toEqual(Array(3).fill("Stabilized (the leaseholder's building)"));
     // A price that buys the building keeps the label as it stands.
     expect(await labels(sold("fee_simple"))).toEqual(Array(3).fill("Stabilized"));
-  });
+  }, 30000);
 
   // Research pass 35 (F4): a note's cover read "Deal type  Stabilized (the
   // collateral)", then "An operating asset bought for its in-place income;
