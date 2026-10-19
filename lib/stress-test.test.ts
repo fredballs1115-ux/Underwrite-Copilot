@@ -643,6 +643,23 @@ describe("the challenger's words ride beside the rows", () => {
     expect(challengeKey({ assumption: "Real estate taxes not reset to the sale price", severity: "low", challenge: "", question: "" })).toBe("taxes");
     expect(challengeKey({ assumption: "Asking price per unit against the comps", severity: "low", challenge: "", question: "" })).toBe("basis");
   });
+
+  it("files a phrase by what it is about, not by a word in it", () => {
+    const k = (assumption: string) => challengeKey({ assumption, severity: "low", challenge: "", question: "" });
+    // "Bad debt" is a collections line, nobody's loan.
+    expect(k("Bad debt at 0.5% of GPR")).toBe("other");
+    expect(k("Debt service coverage of 1.20x")).toBe("debt");
+    // "Tax-exempt bond financing" is the debt's, not the taxes'.
+    expect(k("Tax-exempt bond financing at 4.1%")).toBe("debt");
+    expect(k("Real estate taxes held flat")).toBe("taxes");
+    // A premium over replacement cost is the basis's; an insurance premium is insurance.
+    expect(k("A 20% premium over replacement cost")).toBe("basis");
+    expect(k("Insurance premium at the seller's policy")).toBe("insurance");
+    // A figure per unit is the basis's only beside a price word.
+    expect(k("Payroll of $1,200 per unit")).toBe("other");
+    expect(k("Asking $275,000 per unit")).toBe("basis");
+    expect(k("Pricing at $310 psf")).toBe("basis");
+  });
 });
 
 // ── The methodology is true of the code ──────────────────────────────────

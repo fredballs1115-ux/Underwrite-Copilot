@@ -414,15 +414,19 @@ function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occ
  */
 export const CHALLENGE_KEYWORDS: readonly { key: Exclude<StressKey, "other">; re: RegExp }[] = [
   { key: "renovation_premium", re: /\brenovat|value[- ]add|\bpremium\b[^,;]*\b(?:door|unit)|\bupgrade|interior/i },
-  { key: "taxes", re: /\btax(?:es)?\b|reassess|assessed|millage/i },
-  { key: "insurance", re: /\binsurance\b|\bpremium\b/i },
+  // "Tax-exempt bond financing" is the debt's; "bad debt" is a collections
+  // line, nobody's loan; a "premium over replacement cost" is the basis's;
+  // and a figure per unit is the basis's only beside a price word, so
+  // "payroll per unit" files nowhere.
+  { key: "taxes", re: /\btax(?:es)?\b(?!-exempt)|reassess|assessed|millage/i },
+  { key: "insurance", re: /\binsurance\b|\bpremium\b(?![^,;]*\breplacement cost\b)/i },
   { key: "exit_cap", re: /\b(?:exit|terminal|reversion|residual|disposition)\b|compression/i },
-  { key: "debt", re: /\b(?:debt|loan|financing|interest rate|dscr|coverage|leverage|refinanc|ltv|ltc|sofr|treasury|lender)\b/i },
+  { key: "debt", re: /(?<!\bbad\s)\bdebt\b|\b(?:loan|financing|interest rate|dscr|coverage|leverage|refinanc|ltv|ltc|sofr|treasury|lender)\b/i },
   { key: "vacancy", re: /\b(?:vacancy|occupancy|lease[- ]up|absorption|occupied)\b/i },
   { key: "noi", re: /\bnoi\b|net operating income|\bt-?12\b|trailing/i },
   { key: "rent_growth", re: /\b(?:rent|rental|income|revenue)s?\s+growth|\bgrowth\b[^,;]*\brents?\b|loss[- ]to[- ]lease|mark[- ]to[- ]market|market rent|pro ?forma rent/i },
   { key: "expense_growth", re: /\b(?:expense|opex|operating expense)s?\s+(?:growth|ratio|load|escalation)|expense (?:growth|ratio)/i },
-  { key: "basis", re: /\bprice\b|\bbasis\b|per unit|per door|per key|per sf|\bpsf\b|replacement cost|overpay|\bcomps?\b/i },
+  { key: "basis", re: /\bprice\b|\bpricing\b|\bbasis\b|\bask(?:ing)?\b[^;]*\b(?:per (?:unit|door|key|sf)|psf)\b|replacement cost|overpay|\bcomps?\b/i },
 ];
 
 /** The row a stored challenge belongs to: its own `key` where the
