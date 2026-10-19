@@ -508,7 +508,10 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     if (e.value != null) comparables.push({ value: e.value, tolerance, kind: e.kind });
   };
   // The deal's own documents first: the rent roll's occupancy, the T-12's
-  // vacancy loss over its scheduled rent.
+  // vacancy loss over its rent line — the `collectedRent` figure
+  // lib/actuals/analyze nets the vacancy and adds the other income to for
+  // the EGI, so it is the rent before the vacancy, whatever the statement
+  // called it; never "scheduled rent", which the T-12 reader does not read.
   const rr = ctx.actuals?.rentRoll;
   if (rr) {
     const occ = rr.summary.sfWeightedOccupancy ?? (rr.summary.unitCount > 0 ? rr.summary.occupiedUnits / rr.summary.unitCount : null);
@@ -532,8 +535,8 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     if (v <= 100) {
       push({
         kind: "document",
-        label: "The deal's T-12: vacancy loss over scheduled rent",
-        text: `${pct1(v)} (${money(t12.summary.vacancyLoss)} of ${money(t12.summary.collectedRent)}${t12.periodEnd ? `, TTM to ${t12.periodEnd}` : ", period not stated"})`,
+        label: "The deal's T-12: vacancy loss over its rent line",
+        text: `${pct1(v)} (${money(t12.summary.vacancyLoss)} of the ${money(t12.summary.collectedRent)} rent line its EGI nets the vacancy from${t12.periodEnd ? `, TTM to ${t12.periodEnd}` : ", period not stated"})`,
         value: v,
         asOf: t12.periodEnd,
         publisher: "the deal's T-12",

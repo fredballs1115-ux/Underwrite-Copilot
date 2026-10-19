@@ -155,6 +155,10 @@ describe("a stabilized apartment deal with a T-12", () => {
     const v = rowOf(test, "vacancy");
     expect(v.omSays).toEqual({ text: "Occupancy: 94% as stated, which leaves 6.0% vacancy", value: 6, page: 8 });
     expect(v.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's T-12", scope: "deal", value: 9.1, asOf: "2026-06-30" });
+    // The share is over the T-12's own rent line (the figure its EGI nets
+    // the vacancy from), never a "scheduled rent" the reader does not read.
+    expect(v.evidence[0].label).toBe("The deal's T-12: vacancy loss over its rent line");
+    expect(v.evidence[0].text).toBe("9.1% ($400k of the $4.4M rent line its EGI nets the vacancy from, TTM to 2026-06-30)");
     expect(v.evidence.map((e) => e.kind)).toEqual(["document", "published", "published", "rule_of_thumb"]);
     expect(v.evidence[1]).toMatchObject({ label: "Rental vacancy, metro area", publisher: "Census Bureau", scope: "metro", asOf: "2026-04-01" });
     // The region's figure is the region's, never passed off as the metro's.
@@ -171,7 +175,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(v.impact!.altIrrPct!).toBeLessThan(v.impact!.baseIrrPct!);
     expect(v.impact!.note).toMatch(/^If vacancy is the deal's T-12's 9\.1%, not the OM's 6\.0%, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\.$/);
     expect(v.method).toBe(
-      "The OM's stabilized vacancy against the deal's T-12: vacancy loss over scheduled rent (the deal's T-12), then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb (a rule of thumb).",
+      "The OM's stabilized vacancy against the deal's T-12: vacancy loss over its rent line (the deal's T-12), then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb (a rule of thumb).",
     );
   });
 
