@@ -77,7 +77,7 @@ import type { SubjectForCall } from "@/lib/public-comps/vs-median";
 import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
 import { marketNames } from "@/lib/public-comps/db-markets";
 import { yieldOnCostText } from "@/lib/plan-facts";
-import { capSlotWithheld, goingInCapFigure, modelReturnsRead } from "@/lib/compare-interest";
+import { capSlotWithheld, goingInCapFigure, modelReturnsRead, statedCapRead } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
@@ -151,9 +151,12 @@ import {
   buildComps,
   marketMemoryFor,
   memoryCandidates,
+  memoryMembers,
+  type MarketComp,
   type MarketGroup,
   type MemoryKeyRow,
 } from "@/lib/market-memory";
+import { compRangeTracks, type RangeSubject } from "@/lib/comp-range";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
@@ -456,9 +459,16 @@ export default async function DealPage({
     extraction?.market && ownKeys.data
       ? memoryCandidates(ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction.market)
       : [];
-  const memoryRead: Promise<MarketGroup | null> = memoryIds.length
+  // The group and its members one by one, for the strip's tracks
+  // (lib/comp-range).
+  const memoryRead: Promise<{ group: MarketGroup; members: MarketComp[] } | null> = memoryIds.length
     ? readMemoryGroup(supabase, ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction!.market!)
-        .then((rows) => (rows ? marketMemoryFor(buildComps(rows), deal.id, currentClass, extraction!.market!) : null))
+        .then((rows) => {
+          if (!rows) return null;
+          const comps = buildComps(rows);
+          const group = marketMemoryFor(comps, deal.id, currentClass, extraction!.market!);
+          return group ? { group, members: memoryMembers(comps, deal.id, currentClass, extraction!.market!) } : null;
+        })
         .catch(() => null)
     : Promise.resolve(null);
 
@@ -1299,8 +1309,52 @@ export default async function DealPage({
     null;
 
   const floodLegendEntries = await floodLegendRead;
-  const marketMemory = await memoryRead;
+  const memory = await memoryRead;
+  const marketMemory = memory?.group ?? null;
   const { comps: internalComps, unread: internalCompsUnread } = await internalCompsRead;
+  // This deal against the reader's own comparables, drawn as tracks
+  // (lib/comp-range): its going-in cap as the memories pool one
+  // (`statedCapRead` — none on a plan deal or where the cap slot is
+  // withheld, and none for a leased fee, whose cap is a ground rent's), and
+  // its basis as the comps page reads it (`subjectBasis` — none for a
+  // conversion, a development, or a price that buys no building, so a
+  // placeholder price draws no tick).
+  const rangeCap =
+    interestOf(extraction).kind === "leased_fee" ? null : (statedCapRead(extraction, plan != null, firstSignal)?.pct ?? null);
+  const rangeBasis = subjectBasis(
+    extraction?.metrics ?? [],
+    strategy.kind,
+    screenYearOf(extraction),
+    interestOf(extraction),
+    extraction?.assetClass,
+    condoUnitsOffered(extraction),
+  );
+  const rangeSubject = (unit: "unit" | "sf" | undefined): RangeSubject => ({
+    cap: rangeCap,
+    basis: unit === "unit" ? rangeBasis.perUnit : unit === "sf" ? rangeBasis.perSf : null,
+  });
+  const memoryBasis = marketMemory?.perUnit ? { unit: marketMemory.perUnit.basis, noun: marketMemory.perUnit.noun ?? null } : null;
+  const marketMemoryRanges = memory
+    ? compRangeTracks(
+        memory.members.map((c) => ({
+          name: c.name,
+          cap: c.capPct,
+          basis: c.perUnit != null ? { value: c.perUnit, allIn: c.allIn } : null,
+        })),
+        rangeSubject(memoryBasis?.unit),
+        memoryBasis,
+      )
+    : [];
+  const compBasisOf = internalComps.find((c) => c.basisFigure)?.basisFigure ?? null;
+  const internalCompRanges = compRangeTracks(
+    internalComps.map((c) => ({
+      name: c.name,
+      cap: c.capPct ?? null,
+      basis: c.basisFigure ? { value: c.basisFigure.value, allIn: c.basisFigure.allIn } : null,
+    })),
+    rangeSubject(compBasisOf?.unit),
+    compBasisOf ? { unit: compBasisOf.unit, noun: compBasisOf.noun } : null,
+  );
   const typicalScreen = await typicalScreenRead;
   const sameFile = await twinRead;
 
@@ -1860,6 +1914,7 @@ export default async function DealPage({
         }
         internalComps={internalComps}
         internalCompsUnread={internalCompsUnread}
+        internalCompRanges={internalCompRanges}
         omUrl={omUrl}
         facts={factsByField}
         discrepancies={
@@ -1872,6 +1927,7 @@ export default async function DealPage({
         askerNames={askerNames}
         isSample={!!(deal as { is_sample?: boolean }).is_sample}
         marketMemory={marketMemory}
+        marketMemoryRanges={marketMemoryRanges}
         actuals={actuals}
         playground={playground}
         // The deal's kind the header reads (the first signal included), so

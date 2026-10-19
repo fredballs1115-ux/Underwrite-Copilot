@@ -21,6 +21,8 @@ import { internalCompsLead } from "@/lib/internal-comps-lead";
 import { DealAvatar } from "@/app/(app)/deal-avatar";
 import { DebtSizer } from "./debt-sizer";
 import { ModelVsMarketCard } from "./model-vs-market-card";
+import { CompRangeTracks } from "./comp-range-tracks";
+import type { RangeTrack } from "@/lib/comp-range";
 import { AssumableLoanCard } from "./assumable-card";
 import { LeaseholdExitCard } from "./leasehold-exit-card";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -299,6 +301,7 @@ export function DealView({
   ddChecklist = null,
   internalComps = [],
   internalCompsUnread = false,
+  internalCompRanges = [],
   omUrl,
   facts = {},
   discrepancies = null,
@@ -309,6 +312,7 @@ export function DealView({
   firstSignal = null,
   userId = null,
   marketMemory = null,
+  marketMemoryRanges = [],
   actuals = { rentRoll: null, t12: null, noiComparison: null },
   playground = null,
   dealStrategy = null,
@@ -398,6 +402,9 @@ export function DealView({
   internalComps?: InternalComp[];
   /** the read of the reader's other screens failed (audit C5, LOW-5) */
   internalCompsUnread?: boolean;
+  /** those comps' caps and bases as tracks against this deal's
+   *  (lib/comp-range), drawn under the block's lead; none draws none */
+  internalCompRanges?: RangeTrack[];
   omUrl: string | null;
   facts?: Record<string, DealFact>;
   discrepancies?: ReconcileResult | null;
@@ -414,6 +421,9 @@ export function DealView({
   firstSignal?: FirstSignal | null;
   userId?: string | null;
   marketMemory?: MarketGroup | null;
+  /** the past screens' caps and bases as tracks against this deal's
+   *  (lib/comp-range); none keeps the strip's sentence with its ranges */
+  marketMemoryRanges?: RangeTrack[];
   actuals?: ActualsData;
   playground?: PlaygroundData | null;
   /** the deal's kind as the page's header reads it, the first signal
@@ -769,7 +779,7 @@ export function DealView({
             {discrepancies && discrepancies.discrepancies.length > 0 && (
               <ReconciliationPanel dealId={dealId} result={discrepancies} />
             )}
-            {marketMemory && <MarketMemoryStrip group={marketMemory} />}
+            {marketMemory && <MarketMemoryStrip group={marketMemory} ranges={marketMemoryRanges} />}
             <PropertyActuals data={actuals} />
             {/* Feature 1: prompt for the actuals docs. Hidden while a screen
                 runs, on the sample, and once both docs are folded in. */}
@@ -882,6 +892,7 @@ export function DealView({
             supplements={supplements}
             internalComps={internalComps}
             internalCompsUnread={internalCompsUnread}
+            internalCompRanges={internalCompRanges}
             omUrl={omUrl}
             marketSince={marketSince}
             metroDemand={metroDemand}
@@ -1098,10 +1109,13 @@ function FinancialsPanel({
  *  sentence says so — and says the figures are at the ask: each is struck on
  *  a memorandum's asking price, never a price anyone paid, and read without
  *  the words they read as trades. */
-function MarketMemoryStrip({ group }: { group: MarketGroup }) {
+function MarketMemoryStrip({ group, ranges = [] }: { group: MarketGroup; ranges?: RangeTrack[] }) {
+  // Where the tracks are drawn (lib/comp-range) they carry the ranges, each
+  // labelled at the ask; the sentence keeps the count and says so.
+  const drawn = ranges.length > 0;
   const bits: string[] = [];
-  if (group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
-  if (group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
+  if (!drawn && group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
+  if (!drawn && group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -1124,11 +1138,14 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
           <>
             : <span className="text-ink">{bits.join(" · ")}</span>, at the ask
           </>
+        ) : drawn ? (
+          ", each figure at the ask"
         ) : (
           ""
         )}
         .
       </p>
+      <CompRangeTracks tracks={ranges} bar="pastscreens" qa="past-screens-tracks" />
     </section>
   );
 }
@@ -1152,6 +1169,7 @@ function AnalysesPanel({
   supplements,
   internalComps,
   internalCompsUnread = false,
+  internalCompRanges = [],
   omUrl,
   staleVerdict = false,
   staleWhy = "failed",
@@ -1179,6 +1197,8 @@ function AnalysesPanel({
   internalComps: InternalComp[];
   /** the read of the reader's other screens failed: said, never as none */
   internalCompsUnread?: boolean;
+  /** those comps' caps and bases as tracks (lib/comp-range) */
+  internalCompRanges?: RangeTrack[];
   omUrl: string | null;
   /** the latest screen has not re-run the verdict (lib/screen-run) */
   staleVerdict?: boolean;
@@ -1234,7 +1254,7 @@ function AnalysesPanel({
       {/* Comp memory renders in every state — it comes from OTHER deals, so
           it's useful even before this deal's own comps scrutiny has run. */}
       {analysis === "comps" && internalComps.length > 0 && (
-        <InternalCompsBlock comps={internalComps} />
+        <InternalCompsBlock comps={internalComps} ranges={internalCompRanges} />
       )}
       {analysis === "comps" && internalComps.length === 0 && internalCompsUnread && (
         <section className="rounded-2xl border border-line bg-surface p-5 shadow-card" data-qa="internal-comps-unread">
@@ -1501,7 +1521,7 @@ const COMP_CALL: Record<string, { label: string; cls: string }> = {
 /** Internal comps memory: what the user's OWN screens extracted from other
  *  OMs of the same asset class. A private frame of reference — deliberately
  *  not third-party comp data (and labeled so nobody mistakes it for that). */
-function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
+function InternalCompsBlock({ comps, ranges = [] }: { comps: InternalComp[]; ranges?: RangeTrack[] }) {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
       <h2 className="text-sm font-semibold tracking-tight">
@@ -1514,6 +1534,9 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
           comps.some((c) => c.typedByHand),
         )}
       </p>
+      {/* The table's cap and basis as tracks, this deal ticked on them
+          (lib/comp-range); the table beneath names each deal. */}
+      <CompRangeTracks tracks={ranges} bar="pipelinecomps" qa="pipeline-comps-tracks" />
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">
           <thead>

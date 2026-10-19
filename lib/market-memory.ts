@@ -426,14 +426,23 @@ export function marketMemoryFor(
   assetClass: string,
   market: string,
 ): MarketGroup | null {
-  const cls = classKeyOf(assetClass);
-  const key = normalizeMarketKey(market);
-  if (!cls || !key) return null;
-  const members = comps.filter(
-    (c) => c.dealId !== dealId && c.assetClass === cls && c.marketKey === key,
-  );
+  const members = memoryMembers(comps, dealId, assetClass, market);
   if (!members.length) return null;
   return groupStat(members);
+}
+
+/** The comps `marketMemoryFor` aggregates, one by one — the deal page's
+ *  strip draws each as a dot on its tracks (lib/comp-range). */
+export function memoryMembers(
+  comps: readonly MarketComp[],
+  dealId: string,
+  assetClass: string,
+  market: string,
+): MarketComp[] {
+  const cls = classKeyOf(assetClass);
+  const key = normalizeMarketKey(market);
+  if (!cls || !key) return [];
+  return comps.filter((c) => c.dealId !== dealId && c.assetClass === cls && c.marketKey === key);
 }
 
 // ---- Display helpers (pure formatting) ------------------------------------

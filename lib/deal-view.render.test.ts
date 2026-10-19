@@ -22,6 +22,7 @@ import { evaluateBuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { inferStrategy } from "@/lib/deal-strategy";
+import { compRangeTracks } from "@/lib/comp-range";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
 import {
@@ -1018,6 +1019,37 @@ describe("DealView — the sample deal renders every section without a runtime e
     const strip = hotel.match(/You've screened[\s\S]*?\/key[\s\S]*?\./)?.[0] ?? "";
     expect(strip).toMatch(/other Nashville, TN Hospitality \/ STR\s+deal with a cap or basis on file: basis \$225k\/key\s*, at the ask\s*\./);
     expect(strip).not.toMatch(/\/unit/);
+  });
+
+  it("the past-screens strip draws its ranges as tracks where the page hands them, the sentence keeping the count and the ask", () => {
+    const group = {
+      assetClass: "multifamily",
+      market: "Philadelphia, PA",
+      marketKey: "philadelphia pa",
+      count: 3,
+      cap: { min: 5.2, median: 5.4, max: 5.6 },
+      perUnit: { min: 240_000, median: 250_000, max: 262_000, basis: "unit" },
+      calls: { pass: 1, caution: 2, pass_on: 0 },
+      dealIds: ["a", "b", "c"],
+    };
+    const ranges = compRangeTracks(
+      [
+        { name: "A", cap: 5.2, basis: { value: 240_000, allIn: false } },
+        { name: "B", cap: 5.4, basis: { value: 250_000, allIn: false } },
+        { name: "C", cap: 5.6, basis: { value: 262_000, allIn: false } },
+      ],
+      { cap: 5.5, basis: 255_000 },
+      { unit: "unit", noun: "unit" },
+    );
+    const html = render({ ...sampleProps("overview"), marketMemory: group, marketMemoryRanges: ranges } as unknown as Props);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/deals with a cap or basis on file\s*, each figure at the ask\s*\./);
+    expect(text).not.toMatch(/going-in cap 5\.20–5\.60% · basis/);
+    expect(html.split('data-bar="pastscreens-dot"').length - 1).toBe(6);
+    expect(html.split('data-bar="pastscreens-subject"').length - 1).toBe(2);
+    expect(text).toContain("Going-in cap, at the ask");
   });
 
   it("the overview carries the verdict and the buy-box fit; the financials carry the price", () => {
