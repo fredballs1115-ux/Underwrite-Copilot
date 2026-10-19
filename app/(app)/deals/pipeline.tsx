@@ -61,7 +61,15 @@ import { csvText } from "@/lib/csv-cell";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
 import { checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone } from "@/lib/fit-label";
-import { fitFilterKey, fitFilterOptions, normalizeFitFilter } from "@/lib/fit-filter";
+import { fitFilterKey, fitFilterOptions } from "@/lib/fit-filter";
+import {
+  filterQueryFrom,
+  readFilterQuery,
+  sessionFilterQuery,
+  type FilterOptions,
+  type PipelineFilters,
+} from "@/lib/pipeline-filters";
+import { useFilterQuery } from "./pipeline-filter-store";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { DEAL_NAME_MAX, nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import { COMPARE_MAX } from "@/lib/link-limits";
@@ -251,6 +259,23 @@ const SHORT_STAGE: Record<Stage, string> = {
 
 const PERSIST_KEY = "uc-pipeline-view";
 
+/** Merges into what the tab's session keeps for the pipeline (its filters,
+ *  the folded stages); a browser that keeps no storage keeps it per visit. */
+function saveView(patch: Record<string, unknown>) {
+  try {
+    const prev: unknown = JSON.parse(sessionStorage.getItem(PERSIST_KEY) ?? "null");
+    const base = prev && typeof prev === "object" && !Array.isArray(prev) ? prev : {};
+    sessionStorage.setItem(PERSIST_KEY, JSON.stringify({ ...base, ...patch }));
+  } catch {
+    // storage unavailable — view state is per-visit only
+  }
+}
+
+/** The filters under the names the session has always kept them by. */
+function sessionFields(f: PipelineFilters): Record<string, unknown> {
+  return { verdict: f.verdict, stage: f.stage, asset: f.asset, market: f.market, mfit: f.fit, sharing: f.sharing, showDead: f.dead };
+}
+
 type BillingInfo = {
   isPro: boolean;
   canCreateDeal: boolean;
@@ -283,7 +308,12 @@ export function Pipeline({
   readNote = null,
   sampleCard = null,
   filterBar = null,
+  filterQuery: filterQueryProp = "",
 }: {
+  /** the filters the page's address asks for, as the page read them from
+   *  its searchParams (lib/pipeline-filters `filterQueryOf`): the server's
+   *  render and the browser's first open on them; "" for a bare link */
+  filterQuery?: string;
   deals: DealCard[];
   errorMessage: string | null;
   notice?: string | null;
@@ -337,27 +367,78 @@ export function Pipeline({
       // cookies unavailable — the choice lasts this visit
     }
   }, []);
-  const [verdict, setVerdict] = useState("all");
-  const [stage, setStage] = useState("all");
-  const [asset, setAsset] = useState("all");
-  const [market, setMarket] = useState("all");
-  // The fit filter, in the card's own words (lib/fit-filter): a score band,
-  // "Outside box", or "2 of 4 checked" — a deal files where its chip says.
-  const [mfit, setMfit] = useState("all");
-  // On a team: the shared pipeline's deals, or the reader's own the team
-  // does not see (lib/personal-deal).
-  const [sharing, setSharing] = useState("all");
+  // The filters live in the page's address (lib/pipeline-filters, through
+  // pipeline-filter-store): a link with them opens on them — the server's
+  // HTML included — and a value the list cannot show is dropped. The
+  // verdict, the stage, the asset class, the market; the fit, in the card's
+  // own words (lib/fit-filter: a score band, "Outside box", or "2 of 4
+  // checked" — a deal files where its chip says); on a team, the shared
+  // pipeline's deals or the reader's own the team does not see
+  // (lib/personal-deal); and whether dead deals, kept out of the pipeline
+  // until asked for (or filtered to), are shown. Never the view: the cards,
+  // the list or the map is the reader's cookie.
+  const [filterQuery, setFilterQuery] = useFilterQuery(filterQueryProp);
+  const filterOptions = useMemo<FilterOptions>(
+    () => ({
+      assets: deals.map((d) => d.assetClass).filter(Boolean),
+      markets: deals.map((d) => d.market).filter(Boolean),
+      fits: fitFilterOptions(deals).slice(1).map(([k]) => k),
+      onTeam,
+    }),
+    [deals, onTeam],
+  );
+  const filters = useMemo(() => readFilterQuery(filterQuery, filterOptions), [filterQuery, filterOptions]);
+  const { verdict, stage, asset, market, fit: mfit, sharing, dead: showDead } = filters;
+  const setFilters = useCallback(
+    (patch: Partial<PipelineFilters>) =>
+      setFilterQuery((prev) => {
+        const next = { ...readFilterQuery(prev, filterOptions), ...patch };
+        // Kept in the tab's session at once, so a bare address read after
+        // this (a cleared list, a way back to /deals) finds what was chosen.
+        saveView(sessionFields(next));
+        return filterQueryFrom(next);
+      }),
+    [setFilterQuery, filterOptions],
+  );
+  const setVerdict = useCallback((v: string) => setFilters({ verdict: v }), [setFilters]);
+  const setStage = useCallback((v: string) => setFilters({ stage: v }), [setFilters]);
+  const setAsset = useCallback((v: string) => setFilters({ asset: v }), [setFilters]);
+  const setMarket = useCallback((v: string) => setFilters({ market: v }), [setFilters]);
+  const setMfit = useCallback((v: string) => setFilters({ fit: v }), [setFilters]);
+  const setSharing = useCallback((v: string) => setFilters({ sharing: v }), [setFilters]);
+  const setShowDead = useCallback((v: boolean) => setFilters({ dead: v }), [setFilters]);
   const [sortKey, setSortKey] = useState<SortKey>("added");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  // Dead deals stay out of the pipeline until asked for (or filtered to).
-  const [showDead, setShowDead] = useState(false);
   // Which stage sections the user has explicitly collapsed/expanded — until
   // touched, a section's default is open-when-populated / collapsed-when-empty.
   const [collapsed, setCollapsed] = useState<Partial<Record<Stage, boolean>>>({});
   const searchRef = useRef<HTMLInputElement>(null);
   const [showForm, setShowForm] = useState(!!errorMessage || !!openNew);
 
-  // Filters and view state persist across navigation (deal page and back)
+  // The address and the tab's session agree. An address with filters is
+  // written back without any value the list cannot show, and kept in the
+  // session; a bare address — a plain link to /deals, the way back from a
+  // deal — opens on what the session kept, as it did before the address
+  // carried the filters. After mount, so the server's render and the
+  // browser's first agree.
+  useEffect(() => {
+    if (filterQuery !== "") {
+      const canonical = filterQueryFrom(filters);
+      if (canonical !== filterQuery) setFilterQuery(canonical);
+      else saveView(sessionFields(filters));
+      return;
+    }
+    let saved: unknown = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(PERSIST_KEY) ?? "null");
+    } catch {
+      // corrupt/absent state — no filters
+    }
+    const restored = filterQueryFrom(readFilterQuery(sessionFilterQuery(saved), filterOptions));
+    if (restored) setFilterQuery(restored);
+  }, [filterQuery, filters, filterOptions, setFilterQuery]);
+
+  // Which stages are folded persists across navigation (deal page and back)
   // within the tab. Restored after mount so server and client first paint
   // identically; saves are gated until the restore has run, otherwise the
   // very first render would overwrite the saved state with defaults.
@@ -367,25 +448,8 @@ export function Pipeline({
       try {
         const saved = sessionStorage.getItem(PERSIST_KEY);
         if (saved) {
-          const v = JSON.parse(saved) as Partial<{
-            verdict: string;
-            stage: string;
-            asset: string;
-            market: string;
-            mfit: string;
-            sharing: string;
-            showDead: boolean;
-            collapsed: Partial<Record<Stage, boolean>>;
-          }>;
-          if (typeof v.verdict === "string") setVerdict(v.verdict);
-          if (typeof v.stage === "string") setStage(v.stage);
-          if (typeof v.asset === "string") setAsset(v.asset);
-          if (typeof v.market === "string") setMarket(v.market);
-          if (typeof v.mfit === "string") setMfit(normalizeFitFilter(v.mfit));
-          if (typeof v.sharing === "string") setSharing(v.sharing);
-          if (typeof v.showDead === "boolean") setShowDead(v.showDead);
-          if (v.collapsed && typeof v.collapsed === "object")
-            setCollapsed(v.collapsed);
+          const v = JSON.parse(saved) as Partial<{ collapsed: Partial<Record<Stage, boolean>> }> | null;
+          if (v?.collapsed && typeof v.collapsed === "object") setCollapsed(v.collapsed);
         }
       } catch {
         // corrupt/absent state — defaults stand
@@ -396,15 +460,8 @@ export function Pipeline({
   }, []);
   useEffect(() => {
     if (!viewRestored.current) return;
-    try {
-      sessionStorage.setItem(
-        PERSIST_KEY,
-        JSON.stringify({ verdict, stage, asset, market, mfit, sharing, showDead, collapsed }),
-      );
-    } catch {
-      // storage unavailable — view state is per-visit only
-    }
-  }, [verdict, stage, asset, market, mfit, sharing, showDead, collapsed]);
+    saveView({ collapsed });
+  }, [collapsed]);
 
   // The ⌘K "New deal…" action lands here as ?new=1 — honor it even when the
   // pipeline is already mounted (client-side navigation keeps state). The
@@ -587,12 +644,8 @@ export function Pipeline({
 
   function clearFilters() {
     setQuery("");
-    setVerdict("all");
-    setStage("all");
-    setAsset("all");
-    setMarket("all");
-    setMfit("all");
-    setSharing("all");
+    // The dead deals' toggle stays as the reader left it, as it always has.
+    setFilters({ verdict: "all", stage: "all", asset: "all", market: "all", fit: "all", sharing: "all" });
   }
   const filtersActive =
     query.trim() !== "" ||
@@ -1042,7 +1095,7 @@ export function Pipeline({
               <button
                 type="button"
                 aria-pressed={showDead}
-                onClick={() => setShowDead((v) => !v)}
+                onClick={() => setShowDead(!showDead)}
                 className={`rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors ${
                   showDead
                     ? "border-brand bg-brand/5 text-brand"
