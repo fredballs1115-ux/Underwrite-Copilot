@@ -73,7 +73,7 @@ import { shownAssetClass } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { compFigures, subjectBasis } from "@/lib/comp-detail";
 import { findGoingInCap, findMetric, findPriceRow, occupancyRow, parsePct, screenYearOf, unitCountFromMetrics, buildingSfFromMetrics } from "@/lib/criteria";
-import { BASIS_PER_SF_BAND, BASIS_PER_UNIT_BAND, buildingPriceOf, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { BASIS_PER_SF_BAND, BASIS_PER_UNIT_BAND, askingPriceOf, buildingPriceOf, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 import { locatedPage } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
 import type { ModelCheck, ModelVsMarket, PublishedFigure } from "@/lib/model-vs-market";
@@ -987,7 +987,11 @@ function taxesRow(ctx: Ctx): StressRow | null {
   const bill = billRow ? taxBillOf(billRow.value) : null;
   const assessedRow = findMetric(ctx.rows, ASSESSED_ROW, ASSESSED_NOT);
   const assessed = assessedRow ? parseUsd(assessedRow.value, 10_000) : null;
-  const price = buildingPriceOf(ctx.ex, ctx.derived?.inputs.purchasePrice ?? null);
+  // The building's price off the stated ask (a share's grossed up ONCE to
+  // the whole, none on a note or the land) — never off the derived model's
+  // price, which on a share is already the whole and grossed up again read
+  // a 49% share's $20M as $83M.
+  const price = buildingPriceOf(ctx.ex, askingPriceOf(ctx.ex));
   const evidence: StressEvidence[] = [];
   // The reset bill the memorandum's own figures imply on the price.
   if (bill != null && assessed != null && assessed > 0 && price != null && ctx.derived?.sources.purchasePrice?.provenance !== "assumption") {

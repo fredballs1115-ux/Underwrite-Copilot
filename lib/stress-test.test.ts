@@ -368,6 +368,29 @@ describe("a deal with only published figures", () => {
   });
 });
 
+// ── A share ──────────────────────────────────────────────────────────────
+
+/** A 49% interest at $20M: the whole the price implies is $40.8M, which
+ *  the derived model already runs at. */
+const SHARE: ExtractionResult = {
+  ...APARTMENT,
+  interest: { kind: "partial_interest", summary: "A 49% interest in the owning entity", share: "49%", groundLease: "", loan: "", page: "p. 3" },
+  metrics: APARTMENT.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$20,000,000" } : m)),
+};
+
+describe("a 49% share", () => {
+  const derived = deriveUnderwriteInputs(SHARE, "x", undefined, { debtIndex: FIVE });
+  const test = buildStressTest({ extraction: SHARE, challenger: null, market: null, modelVsMarket: readFor(derived), actuals: null, derived, storedAssetClass: "multifamily", readOn: READ_ON });
+
+  it("works the reset bill on the whole the share's price implies, grossed up once", () => {
+    expect(derived.inputs.purchasePrice).toBeCloseTo(20_000_000 / 0.49, 0);
+    const t = rowOf(test, "taxes");
+    // $380k over $30M is 1.27%; on the $40.8M whole, $517k — not on $83.3M.
+    expect(t.evidence[0]).toMatchObject({ label: "The bill the OM's own figures imply on the price", value: 517_007 });
+    expect(t.evidence[0].text).toContain("on the $40.82M price is $517k a year");
+  });
+});
+
 // ── A tax abatement ──────────────────────────────────────────────────────
 
 describe("a stated tax abatement is read against the model's sale", () => {
