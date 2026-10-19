@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { FigureHow, HeroFigure } from "@/lib/hero-figure";
 
 /**
@@ -70,7 +70,12 @@ function usePopover() {
     // handler above decides that case.
     if (next) setOpen(false);
   };
-  return { open, setOpen, root, button, keys, blur };
+  // Handed out as a callback ref, so a caller never writes to the hook's
+  // own ref object (the compiler's immutability rule).
+  const setRoot = useCallback((el: HTMLElement | null) => {
+    root.current = el;
+  }, []);
+  return { open, setOpen, setRoot, button, keys, blur };
 }
 
 function Glyph() {
@@ -91,7 +96,7 @@ function Glyph() {
  */
 export function HeroFigureTile({ figure: f, reading }: { figure: HeroFigure; reading: boolean }) {
   const id = useId();
-  const pop = usePopover();
+  const { open, setOpen, setRoot, button, keys, blur } = usePopover();
   const value =
     f.value ??
     (reading ? (
@@ -121,22 +126,20 @@ export function HeroFigureTile({ figure: f, reading }: { figure: HeroFigure; rea
   }
   return (
     <div
-      ref={(el) => {
-        pop.root.current = el;
-      }}
-      onKeyDown={pop.keys}
-      onBlur={pop.blur}
+      ref={setRoot}
+      onKeyDown={keys}
+      onBlur={blur}
       className="flex min-w-0 flex-col justify-between bg-surface px-3.5 py-2.5"
     >
       <dt className="line-clamp-2 text-[11px] uppercase tracking-wide text-muted">
         <button
-          ref={pop.button}
+          ref={button}
           type="button"
           data-qa="figure-how"
-          aria-expanded={pop.open}
+          aria-expanded={open}
           aria-controls={id}
           aria-label={`How this is read: ${f.label}`}
-          onClick={() => pop.setOpen((o) => !o)}
+          onClick={() => setOpen((o) => !o)}
           className="inline cursor-help rounded-sm text-left uppercase tracking-wide underline decoration-dotted decoration-1 underline-offset-2 hover:text-ink"
         >
           {f.label}
@@ -147,7 +150,7 @@ export function HeroFigureTile({ figure: f, reading }: { figure: HeroFigure; rea
       </dt>
       <dd className={ddClass} title={f.title}>
         {value}
-        <div id={id} data-qa="figure-how-panel" hidden={!pop.open} tabIndex={-1} className={`absolute inset-x-0 top-full mt-1.5 ${PANEL}`}>
+        <div id={id} data-qa="figure-how-panel" hidden={!open} tabIndex={-1} className={`absolute inset-x-0 top-full mt-1.5 ${PANEL}`}>
           <HowBody how={f.how} />
         </div>
       </dd>
@@ -162,37 +165,35 @@ export function HeroFigureTile({ figure: f, reading }: { figure: HeroFigure; rea
  */
 export function HowChip({ how, label, children }: { how: FigureHow; label: string; children: ReactNode }) {
   const id = useId();
-  const pop = usePopover();
+  const { open, setOpen, setRoot, button, keys, blur } = usePopover();
   const panel = useRef<HTMLDivElement | null>(null);
   const [shift, setShift] = useState(0);
   useLayoutEffect(() => {
-    if (!pop.open || !panel.current) return;
+    if (!open || !panel.current) return;
     // Measured where it opens (the click set the shift back to 0): past the
     // screen's right gutter, it moves left by the overflow, never past the
     // left gutter.
     const box = panel.current.getBoundingClientRect();
     const over = box.right - (document.documentElement.clientWidth - 16);
     setShift(over > 0 ? -Math.max(0, Math.min(over, box.left - 16)) : 0);
-  }, [pop.open]);
+  }, [open]);
   return (
     <span
-      ref={(el) => {
-        pop.root.current = el;
-      }}
-      onKeyDown={pop.keys}
-      onBlur={pop.blur}
+      ref={setRoot}
+      onKeyDown={keys}
+      onBlur={blur}
       className="relative inline-flex"
     >
       <button
-        ref={pop.button}
+        ref={button}
         type="button"
         data-qa="fit-how"
-        aria-expanded={pop.open}
+        aria-expanded={open}
         aria-controls={id}
         aria-label={`How this is read: ${label}`}
         onClick={() => {
           setShift(0);
-          pop.setOpen((o) => !o);
+          setOpen((o) => !o);
         }}
         className="inline-flex cursor-help rounded-full"
       >
@@ -202,7 +203,7 @@ export function HowChip({ how, label, children }: { how: FigureHow; label: strin
         id={id}
         ref={panel}
         data-qa="fit-how-panel"
-        hidden={!pop.open}
+        hidden={!open}
         tabIndex={-1}
         style={shift ? { left: shift } : undefined}
         className={`absolute left-0 top-full mt-1.5 w-80 max-w-[calc(100vw-2rem)] ${PANEL}`}
