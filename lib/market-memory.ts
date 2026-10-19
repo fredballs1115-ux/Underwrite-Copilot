@@ -64,6 +64,9 @@ export interface Stat {
   min: number;
   median: number;
   max: number;
+  /** how many figures the stat is of — a median is drawn only from three
+   *  up (lib/public-comps `MEDIAN_FLOOR`); absent on a stat built by hand */
+  n?: number;
 }
 /** A group's basis range: one basis and, on a unit basis, one noun for the
  *  whole group — the members' own where they all agree, the class's where
@@ -272,7 +275,7 @@ export function median(nums: number[]): number {
 
 function statOf(nums: number[]): Stat | null {
   if (!nums.length) return null;
-  return { min: Math.min(...nums), median: median(nums), max: Math.max(...nums) };
+  return { min: Math.min(...nums), median: median(nums), max: Math.max(...nums), n: nums.length };
 }
 
 /** Aggregate comps into per-(asset class × market) groups, most-screened
