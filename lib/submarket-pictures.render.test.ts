@@ -14,10 +14,11 @@ const h = React.createElement;
 const widths = (html: string, bar: string) =>
   [...html.matchAll(new RegExp(`style="width:([\\d.]+)%"[^>]*data-bar="${bar}"`, "g"))].map((m) => Number(m[1]));
 
-const Q = (quarter: string, sf: number, count: number, hasStale = false): DeliveryQuarter => ({
+const Q = (quarter: string, sf: number, count: number, hasStale = false, unsized = sf > 0 ? 0 : count): DeliveryQuarter => ({
   quarter,
   sf,
   count,
+  unsized,
   names: Array.from({ length: count }, (_, i) => `Building ${quarter} ${i + 1}`),
   hasStale,
 });
@@ -37,6 +38,21 @@ describe("DeliveryBars — the pipeline's deliveries, a bar a quarter on one sca
     expect(text).toContain("480k SF");
     // A quarter whose buildings state no size: no bar, said.
     expect(text).toContain("SF not stated");
+  });
+
+  it("draws a quarter with an unsized building as at least its bar, and says how many state no size", () => {
+    const html = renderToStaticMarkup(
+      h(DeliveryBars, { deliveries: [Q("2027-Q1", 120_000, 2, false, 1), Q("2027-Q2", 480_000, 3)] }),
+    );
+    const text = visibleText(html);
+    expect(text).toContain("120k SF (1 of 2 buildings states no size)");
+    expect(text).toContain("480k SF");
+    expect(text).not.toContain("480k SF (");
+    // The partial quarter's bar ends dashed; the whole one's does not.
+    expect(html.match(/data-partial=""/g)?.length).toBe(1);
+    expect(html).toMatch(/border-dashed[^"]*"[^>]*data-bar="sub-delivery" data-partial/);
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
   });
 
   it("says so where nothing is dated", () => {
