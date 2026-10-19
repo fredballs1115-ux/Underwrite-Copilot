@@ -16,6 +16,7 @@ import { fetchLiveHeadlines } from "@/lib/news/live";
 import type { RankedHeadline } from "@/lib/news/feeds";
 import { BrokerageFilter, type BrokerageOption } from "./brokerage-filter";
 import { brokerageOptions, dealFirms } from "@/lib/brokerage";
+import { countsForFirms, shownInList } from "@/lib/pipeline-counts";
 import { PRIOR_PRICE_COLUMNS, priorScreenOfColumns, type PriorPriceColumns } from "@/lib/price-change";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
@@ -311,7 +312,10 @@ export default async function DealsPage({
   const firmsByDeal = new Map<string, string[]>();
   const dealFirmLists: { key: string; name: string }[][] = [];
   for (const d of rows) {
-    if (d.is_sample) continue;
+    // The list's own rows (lib/pipeline-counts): never the sample, and a
+    // dead deal only behind its toggle, so a firm's count is what its
+    // filter opens on.
+    if (!countsForFirms(d)) continue;
     const firms = dealFirms(d.extraction as ExtractionResult | null);
     firmsByDeal.set(d.id, firms.map((f) => f.key));
     dealFirmLists.push(firms);
@@ -383,7 +387,14 @@ export default async function DealsPage({
         // apart should they ever differ (a deal added or removed between the
         // count and the read), never a total it did not read.
         totalDeals={activeBroker ? null : (dealTotal ?? null)}
-        filterBar={<BrokerageFilter firms={firmOptions} active={activeBroker} shown={shownRows.length} total={rows.length} />}
+        filterBar={
+          <BrokerageFilter
+            firms={firmOptions}
+            active={activeBroker}
+            shown={shownRows.filter((d) => shownInList(d.stage)).length}
+            total={rows.filter((d) => shownInList(d.stage)).length}
+          />
+        }
         // A read beside the deals that failed, said over the list.
         readNote={readNote}
         // An empty pipeline shows the sample's own card, the one the reader

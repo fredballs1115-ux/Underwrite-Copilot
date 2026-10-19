@@ -66,6 +66,7 @@ import { inferStrategy as inferStrategyForTest } from "@/lib/deal-strategy";
 import { shownAssetClass as shownAssetClassForTest } from "@/lib/asset-class";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { fitFilterKey } from "@/lib/fit-filter";
+import { verdictCountsOf } from "@/lib/pipeline-counts";
 import { PERSON_TONES, personName, personToneIndex } from "@/lib/person";
 import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
@@ -717,6 +718,27 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((list.match(/data-qa="fit-checked"[^>]*>2 of 4</g) ?? []).length).toBe(2);
     expect(list).not.toContain("Fit 100 · Pursue");
     expect(list).toContain("Fit 88 · Pursue");
+  });
+
+  // The audit of 2026-10-19: the split counted the dead deal the list hides.
+  it("counts the verdict split over the rows the list shows, the dead folded away", () => {
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withThumbs(CARDS),
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
+        billing: BILLING,
+        todayIso: TODAY,
+      }),
+    );
+    const split = html.match(/<div role="img" aria-label="([^"]*)" class="flex h-2/)?.[1] ?? "";
+    // Tysons Corner Plaza, the fixture's only No-go, is dead.
+    expect(CARDS.filter((c) => c.verdict === "pass_on").map((c) => c.stage)).toEqual(["dead"]);
+    expect(split).not.toContain("No-go");
+    const c = verdictCountsOf(CARDS);
+    expect(c.pass_on).toBe(0);
+    expect(split).toBe(`${c.pass} Go, ${c.caution} Caution, ${c.screening} No verdict`);
   });
 
   it("opens the new-deal form with its name field still required and editable — a chosen PDF only pre-fills it (lib/deal-name)", () => {
