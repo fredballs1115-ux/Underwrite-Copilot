@@ -16,6 +16,9 @@ import { getBilling } from "@/lib/billing";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
+import { cookies } from "next/headers";
+import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
+import { renewsOn } from "@/lib/billing-view";
 
 export const metadata: Metadata = { title: "Team" };
 
@@ -99,6 +102,9 @@ export default async function TeamPage({
     team?.role === "owner" && user
       ? (await getBilling(supabase, user.id)).plan === "pro"
       : false;
+
+  // A renewal day on the reader's own calendar (lib/reader-day).
+  const timeZone = readerTimeZone((await cookies()).get(TZ_COOKIE)?.value);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const invites = team && team.role === "owner"
@@ -346,7 +352,7 @@ export default async function TeamPage({
                   {fmtUsd(teamMonthlyTotal(team.seatCount))}/mo for{" "}
                   {team.seatCount} {team.seatCount === 1 ? "seat" : "seats"}
                   {team.currentPeriodEnd
-                    ? ` · renews ${new Date(team.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+                    ? ` · renews ${renewsOn(team.currentPeriodEnd, timeZone)}`
                     : ""}
                   . Adding or removing a member updates the seat count and
                   Stripe prorates automatically.

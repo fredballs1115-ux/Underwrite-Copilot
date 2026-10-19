@@ -18,7 +18,9 @@ import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
 import { personName } from "@/lib/person";
-import { planShownOf } from "@/lib/billing-view";
+import { planShownOf, renewsOn } from "@/lib/billing-view";
+import { cookies } from "next/headers";
+import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -74,6 +76,8 @@ export default async function BillingPage({
   // The plan the reader pays for, else the team's (lib/billing-view): a
   // Team-plan member has no subscription of their own to manage.
   const shown = planShownOf(billing);
+  // A renewal day on the reader's own calendar, never the server's UTC one.
+  const timeZone = readerTimeZone((await cookies()).get(TZ_COOKIE)?.value);
   // Each subscription's own dunning: the reader's, and the team's, whose
   // card only its owner can update.
   const teamPastDue = !!team?.planActive && team.subscriptionStatus === "past_due";
@@ -185,10 +189,7 @@ export default async function BillingPage({
           <>
             <p className="mt-4 text-sm text-muted">
               {billing?.currentPeriodEnd
-                ? `Renews ${new Date(billing.currentPeriodEnd).toLocaleDateString(
-                    "en-US",
-                    { month: "long", day: "numeric", year: "numeric" },
-                  )}.`
+                ? `Renews ${renewsOn(billing.currentPeriodEnd, timeZone)}.`
                 : "Subscription active."}
             </p>
             <form action={openPortal} className="mt-4">
@@ -352,7 +353,7 @@ export default async function BillingPage({
             {team.planActive
               ? `One subscription, ${team.seatCount} ${team.seatCount === 1 ? "seat" : "seats"} — adding or removing a member updates the seat count immediately and Stripe prorates the difference automatically.${
                   team.currentPeriodEnd
-                    ? ` Renews ${new Date(team.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+                    ? ` Renews ${renewsOn(team.currentPeriodEnd, timeZone)}.`
                     : ""
                 }`
               : `Trial: ${Math.min(team.dealCount, TEAM_TRIAL_DEALS)} of ${TEAM_TRIAL_DEALS} shared deals used. Start the plan from the Team page when you're ready.`}

@@ -140,6 +140,24 @@ describe("a reader's own subscription", () => {
     expect(text).toContain("Manage subscription");
   });
 
+  it("the renewal day is the reader's own, not the server's UTC day", async () => {
+    // 02:00 UTC on Nov 1 is still Oct 31 in New York and Los Angeles.
+    state.billing = billing({ plan: "pro", isPro: true, currentPeriodEnd: "2026-11-01T02:00:00Z" });
+    state.tz = "America%2FLos_Angeles";
+    expect((await page()).text).toContain("Renews October 31, 2026.");
+    state.tz = "Asia/Tokyo";
+    expect((await page()).text).toContain("Renews November 1, 2026.");
+    // No cookie yet: Eastern, the default zone (lib/reader-day).
+    state.tz = undefined;
+    expect((await page()).text).toContain("Renews October 31, 2026.");
+  });
+
+  it("a team owner's renewal on the team section is the reader's day too", async () => {
+    state.billing = billing({ isPro: true, team: { id: "t-1", name: "Meridian Acquisitions", active: true, dealCount: 4 } });
+    state.team = teamInfo({ role: "owner" });
+    expect((await page()).text).toContain("Renews October 31, 2026.");
+  });
+
   it("personal Pro on a team keeps its own plan and portal", async () => {
     state.billing = billing({ plan: "pro", isPro: true, team: { id: "t-1", name: "Meridian Acquisitions", active: true, dealCount: 4 } });
     state.team = teamInfo();

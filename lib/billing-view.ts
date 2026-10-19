@@ -37,3 +37,19 @@ export function planShownOf(billing: PlanBillingLike | null): PlanShown {
   }
   return { kind: "free", label: "Free", badge: "Free tier" };
 }
+
+/**
+ * The day a subscription renews, on the reader's own calendar —
+ * "November 1, 2026". Stripe stamps the period's end as an instant; the
+ * server's clock runs UTC, so a period ending at 2 am UTC had read a day
+ * late from 8 pm Eastern. Read in the zone the reader's browser reports
+ * (lib/reader-day `readerTimeZone`, the `uc_tz` cookie).
+ */
+export function renewsOn(iso: string, timeZone: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone,
+  });
+}
