@@ -121,7 +121,7 @@ export function CompsReadout({
   const s: RecordCompsStats | undefined = compStats(kept.comps, keptShared) ?? (anyOut ? undefined : result.stats);
   const keptResult = { ...result, comps: kept.comps };
   const scope = compsScope(result);
-  const kLine = keptLine(kept.comps.length, result.comps.length);
+  const kLine = keptLine(kept.comps.length, result.comps.length, shared.some((n) => n >= 2));
   const outPhrase = leftOutPhrase(out);
 
   const showUnits = result.comps.some((c) => c.units != null);

@@ -435,6 +435,8 @@ describe("a sale left out of the readout", () => {
     const text = visibleText(html).replace(/\s+/g, " ");
     // pin 1 is still the deed's: no area in the $/SF median ($225, $238, $250)
     expect(text).toContain("$238/SF on 3 of 4 sales");
+    // the kept line counts the list's rows, and says so
+    expect(text).toContain("4 of 5 rows kept");
     // and no bar: three drawn (a card and a table row each), the deed's row
     // named as drawing none
     expect(count(html, "comps-psf")).toBe(6);

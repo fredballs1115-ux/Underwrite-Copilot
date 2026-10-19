@@ -105,6 +105,9 @@ describe("reading the set a link leaves out", () => {
   it("says the kept count and what was left out, by reason", () => {
     expect(keptLine(4, 6)).toBe("4 of 6 sales kept");
     expect(keptLine(6, 6)).toBe("");
+    // rows where some may be one deed across parcels
+    expect(keptLine(5, 6, true)).toBe("5 of 6 rows kept");
+    expect(keptLine(6, 6, true)).toBe("");
     expect(leftOutPhrase(new Map([[0, "wrong_class"], [3, "not_comparable"], [4, "not_comparable"]]))).toBe("not comparable (2), wrong class (1)");
     expect(leftOutPhrase(new Map([[1, "other"]]))).toBe("other (1)");
     expect(leftOutPhrase(new Map())).toBe("");

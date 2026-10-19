@@ -144,10 +144,14 @@ export function keptSales<T>(comps: ReadonlyArray<T>, out: SalesOut): { comps: T
   return { comps: at.map((i) => comps[i]), at };
 }
 
-/** "4 of 6 sales kept"; "" where none is left out. */
-export function keptLine(kept: number, total: number): string {
+/** "4 of 6 sales kept"; "" where none is left out. The counts are of the
+ *  list's rows, so where rows may be one deed across parcels (`rows`, read on
+ *  the full list) they are said as rows — "4 of 6 rows kept" — as the $/SF
+ *  caption says them, since the readout counts such a deed once. */
+export function keptLine(kept: number, total: number, rows = false): string {
   if (kept >= total) return "";
-  return `${kept} of ${total} ${total === 1 ? "sale" : "sales"} kept`;
+  const noun = rows ? (total === 1 ? "row" : "rows") : total === 1 ? "sale" : "sales";
+  return `${kept} of ${total} ${noun} kept`;
 }
 
 /** What was left out, counted by reason in the control's order: "not
