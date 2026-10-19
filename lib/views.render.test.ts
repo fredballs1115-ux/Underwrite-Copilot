@@ -3707,6 +3707,12 @@ describe("News scored feed", () => {
     expect(text.indexOf("Rent cap bill")).toBeLessThan(text.indexOf("Local bakery"));
     expect(text).toContain("Re-run the Maryland deals");
     expect(text).not.toContain("starts with the weekday sweep");
+    // Whose read the scores are, said over the feed, never only in a
+    // tooltip (the audit of 2026-10-19), and before the first story.
+    expect(flat).toContain(
+      "Each story's score, summary and action are an AI's read (Claude's) for one buyer profile — a small East Coast buyer of 2–4 unit buildings — not your buy box, and not advice.",
+    );
+    expect(html.indexOf('data-qa="scored-read"')).toBeLessThan(html.indexOf(">Sep 14, 2026 UTC</h2>"));
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     dumpView("news-scored", html);
@@ -3719,12 +3725,15 @@ describe("News scored feed", () => {
     const all = visibleText(render(React.createElement(ScoredFeedView, { items, alerts: [], wantSector: "nope" })));
     expect(all).toContain("Rent cap bill");
     expect(all).toContain("Fannie tightens");
+    // A sector's feed says whose read it is too.
+    expect(one).toContain("an AI's read (Claude's) for one buyer profile");
   });
 
   it("says the sweep has not run, in one quiet line, when there are no rows", () => {
     const html = render(React.createElement(ScoredFeedView, { items: [], alerts: [], wantSector: "" }));
     const text = visibleText(html);
     expect(text).toContain("starts with the weekday sweep");
+    expect(text.replace(/\s+/g, " ")).toContain("every story rated 0–10 for a small East Coast buyer of 2–4 unit buildings");
     // no law strip, no sector chips, no day group — one line only
     expect(html).not.toContain("<section");
     expect(html).not.toContain("<nav");
