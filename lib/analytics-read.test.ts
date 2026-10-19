@@ -22,6 +22,7 @@ vi.mock("@/lib/supabase/server", () => ({
         select: () => q,
         not: () => q,
         limit: () => q,
+        in: () => q,
         order: (col: string, opts?: { ascending?: boolean }) => {
           db.orders.push(`${col}:${opts?.ascending === false ? "desc" : "asc"}`);
           if (col === "created_at") desc = opts?.ascending === false;
