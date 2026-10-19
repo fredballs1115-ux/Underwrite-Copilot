@@ -40,6 +40,8 @@ interface State {
   /** with `onlySeries`, the `benchmarks` read still answers (empty, as a
    *  state's does: it has no Zillow or Realtor.com rows) */
   benchmarksAnswer?: boolean;
+  /** the deal's stored T-12 row (`deal_t12_statements`), where a test stores one */
+  t12?: Row;
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -168,6 +170,11 @@ class FakeQuery {
     if (table === "benchmarks") {
       const metro = this.where("metro");
       return { data: (state.benchmarks ?? []).filter((r) => r.metro === metro), error: null };
+    }
+    // The deal's newest T-12, where a test stored one (the stress test's
+    // document evidence); the rent-roll table answers nothing.
+    if (table === "deal_t12_statements") {
+      return { data: state.t12 && state.t12.deal_id === this.where("deal_id") ? state.t12 : null, error: null };
     }
     return { data: null, error: null };
   }
@@ -880,7 +887,9 @@ describe("runAnalysis — the happy path", () => {
     // section, beside it, says them no more (research pass 41).
     expect(brief).toContain("Deal type: Conversion — A change of use with construction and downtime first");
     expect(brief.split("A change of use with construction and downtime first").length - 1).toBe(1);
-    expect(brief).not.toContain("Stabilized");
+    // Never the kind's word — the stress test's "Stabilized vacancy" row is
+    // the assumption's name, not the deal's kind.
+    expect(brief.replace(/Stabilized vacancy/g, "")).not.toContain("Stabilized");
   });
 
   it("the verdict is handed the deal page's own buy-box checks and the red lines tripped, not the bare criteria (research pass 18)", async () => {
@@ -2547,5 +2556,69 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(vi.mocked(challengeAssumptions).mock.calls.at(-1)?.[0]).toBe(buffer);
     expect(vi.mocked(scrutinizeComps).mock.calls.at(-1)?.[0]).toBe(buffer);
     expect(vi.mocked(checkMarket).mock.calls.at(-1)?.[0]).toBe(buffer);
+  });
+});
+
+describe("runAnalysis — the verdict is handed the stress test, struck in code", () => {
+  it("builds the test before the verdict step from the stored results, the deal's T-12 and the model it derives, and the brief carries the section after the deal", async () => {
+    const { summarizeT12 } = await import("@/lib/actuals/analyze");
+    // A T-12 whose NOI is $1.0M against the memorandum's $1.2M in place.
+    state.t12 = {
+      deal_id: "d1",
+      period_end_date: "2026-06-30",
+      summary: summarizeT12({
+        periodEndDate: "2026-06-30",
+        collectedRent: 2_000_000,
+        vacancyLoss: -100_000,
+        otherIncome: 0,
+        egi: null,
+        opex: [
+          { key: "taxes", label: "Real estate taxes", amount: 300_000, page: "p. 2" },
+          { key: "insurance", label: "Insurance", amount: 100_000, page: "p. 2" },
+          { key: "rm", label: "Repairs & maintenance", amount: 500_000, page: "p. 2" },
+        ],
+        totalOpex: null,
+        noi: null,
+        page: "p. 2",
+      }),
+    };
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    const test = input.stressTest;
+    expect(test).not.toBeNull();
+    // The model was derived (the price and the NOI are the memorandum's),
+    // so the return is re-run; the NOI row reads the T-12 as its evidence.
+    expect(test!.impactsWithheld).toBeNull();
+    const noi = test!.rows.find((r) => r.key === "noi");
+    expect(noi).toMatchObject({ verdict: "unsupported", omSays: { text: "NOI (in place): $1,200,000", value: 1_200_000, page: 5 } });
+    expect(noi!.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's T-12", asOf: "2026-06-30", value: 1_000_000 });
+    expect(noi!.impact).not.toBeNull();
+    // The brief: the section, after the deal, with the row and the engine's
+    // own figure — and nothing of it in the system prompt.
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    const { ANALYST_SYSTEM } = await vi.importActual<typeof import("./prompts")>("./prompts");
+    const brief = buildBrief(input);
+    const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
+    expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
+    expect(brief).toContain("- NOI (noi) [UNSUPPORTED] — OM says: NOI (in place): $1,200,000 [p. 5]. Set against: The deal's T-12 NOI: $1M (derived: EGI less expenses) (TTM to 2026-06-30) (the deal's T-12, Jun 30, 2026; the deal's own document)");
+    expect(brief).toContain("Gap: The OM's $1.2M is 20.0% ($200k) over the deal's T-12's $1M.");
+    expect(brief).toMatch(/The levered IRR: [^\n]*\d+\.\d%/);
+    expect(brief).toContain("The IRR moves above are the engine's own");
+    expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
+    // Nothing new is stored on the verdict: the test is rebuilt on read.
+    expect(state.deals.d1.verdict).not.toHaveProperty("stressTest");
+  });
+
+  it("with no extraction to derive a model from, the section says no return was re-run", async () => {
+    // A resumed attempt past the extraction, whose deal holds none: the
+    // model cannot be derived, and the test says so rather than guess.
+    state.deals.d1.extraction = null;
+    state.jobs[0].payload = { kind: "screen", completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"] };
+    await runAnalysis("d1", { resume: true });
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.stressTest?.impactsWithheld).toBe("No model was derived for this deal, so no return is re-run.");
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    expect(buildBrief(input)).toContain("No return was re-run for this deal — No model was derived for this deal, so no return is re-run.");
   });
 });

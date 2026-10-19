@@ -1,7 +1,7 @@
 import { buildMemoData, renderMemoPdf, type MemoData, type MemoExchange } from "@/lib/memo/memo-document";
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
-import { sampleActualsLine, sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
+import { sampleActualsLine, sampleCover, sampleDocumentChecks, sampleDocumentRow, sampleStressTest } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
 
@@ -40,7 +40,11 @@ async function renderSampleMemo(dateStr: string, readerDay: string): Promise<Buf
   // The sample's rent roll and T-12 against its memorandum, in the line the
   // signed-in memo sets beside its key terms (audit C8, H1).
   const actualsLine = sampleActualsLine();
-  const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange), actualsLine };
+  // The OM's assumptions tested in code, as the signed-in memo builds it for
+  // the sample: its stored results and documents on the one derivation
+  // (lib/sample-cover `sampleStressTest`), no published figure read today.
+  const stressTest = sampleStressTest(readerDay);
+  const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange, stressTest), actualsLine };
   // Drawn as the signed-in memo is: the line rides where the page has room
   // for it, so the one-page memo stays on one page.
   return renderMemoPdf(memo);

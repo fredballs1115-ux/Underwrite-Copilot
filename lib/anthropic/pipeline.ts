@@ -74,8 +74,13 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { isStateMarket } from "@/lib/market-match";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
-import { debtSeeds, isDebtSeedSeries, ratesPromptLine } from "@/lib/debt-index";
-import { HOLD_MONTHS, permanentLoanSpread } from "@/lib/underwrite/inputs";
+import { NO_DEBT_SEEDS, debtSeeds, isDebtSeedSeries, ratesPromptLine, type DebtSeeds } from "@/lib/debt-index";
+import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread } from "@/lib/underwrite/inputs";
+import { modelMarketFor } from "@/lib/model-market";
+import { actualsFromRows } from "@/lib/actuals/actuals-read";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import { buildStressTest } from "@/lib/stress-test";
+import type { StressTest } from "@/lib/stress-test-types";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
@@ -417,6 +422,96 @@ async function todaysRatesLine(
 }
 
 /**
+ * Today's debt indices for the model the screen derives (lib/debt-index
+ * `debtSeeds`), read bare as the challenger's rates line is — the worker has
+ * no Next cache, so lib/debt-index-read's cached reader is not for it. A
+ * read that fails seeds nothing, and the model keeps its flat default, said
+ * as a placeholder (lib/model-market).
+ */
+async function todaysDebtSeeds(admin: ReturnType<typeof createSupabaseAdminClient>): Promise<DebtSeeds> {
+  try {
+    const rows = await fetchSeriesRows(admin, SERIES.filter(isDebtSeedSeries));
+    return debtSeeds(readRates(rows, new Date()), HOLD_MONTHS);
+  } catch {
+    return NO_DEBT_SEEDS;
+  }
+}
+
+/**
+ * The OM's assumptions tested in code (lib/stress-test) for the verdict
+ * step, from what the deal holds now: the stored results (the challenger,
+ * the market check, the memorandum's comps), the deal's rent roll and T-12,
+ * and the model the screen can derive — the same derivation the deal page,
+ * the workbook and the report make (lib/underwrite/inputs
+ * `deriveUnderwriteInputs` on the actuals, seeded from today's rates, never
+ * on the sample) — so the moves the verdict cites are the engine's own on
+ * the model every other surface runs. The published figures the model's
+ * read sets its assumptions against (lib/model-vs-market) go through Next's
+ * cached readers, which the worker has not: the test here takes none, and
+ * reads the market check's stored figures where the reader reads them. A
+ * model that cannot be derived (no extraction) tests the rows with no
+ * return re-run, and the test says so. Best-effort: a build that throws
+ * hands the verdict no test, logged, never a failed screen.
+ */
+async function screenStressTest(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+  row: {
+    name?: unknown;
+    is_sample?: unknown;
+    asset_class?: unknown;
+    extraction?: unknown;
+    first_signal?: unknown;
+    challenges?: unknown;
+    comps?: unknown;
+    market?: unknown;
+  },
+): Promise<StressTest | null> {
+  try {
+    const extraction = (row.extraction as ExtractionResult | null | undefined) ?? null;
+    const firstSignal = (row.first_signal as FirstSignal | null | undefined) ?? null;
+    const [rrRes, t12Res, seeds] = await Promise.all([
+      admin.from("deal_rent_rolls").select("as_of_date, summary").eq("deal_id", dealId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      admin.from("deal_t12_statements").select("period_end_date, summary").eq("deal_id", dealId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      todaysDebtSeeds(admin),
+    ]);
+    const rr = (rrRes.data as { as_of_date?: string | null; summary?: unknown } | null) ?? null;
+    const t12 = (t12Res.data as { period_end_date?: string | null; summary?: unknown } | null) ?? null;
+    const t12Summary = t12SummaryOf(t12?.summary);
+    // The UTC day the worker keeps (lib/reader-day), at its noon.
+    const today = new Date().toISOString().slice(0, 10);
+    const derived = extraction
+      ? deriveUnderwriteInputs(
+          extraction,
+          typeof row.name === "string" ? row.name : "",
+          {
+            rentRoll: rr?.summary ? { summary: rr.summary as RentRollSummary, asOf: rr.as_of_date ?? null } : null,
+            t12: t12Summary ? { summary: t12Summary as T12Summary, periodEnd: t12?.period_end_date ?? null } : null,
+          },
+          modelMarketFor(!!row.is_sample, seeds),
+          { asOf: new Date(`${today}T12:00:00Z`) },
+        )
+      : null;
+    const assetClass = shownAssetClass((row.asset_class as string | null | undefined) ?? null, extraction) || null;
+    return buildStressTest({
+      extraction,
+      firstSignal,
+      challenger: (row.challenges as ChallengerResult | null | undefined) ?? null,
+      market: (row.market as MarketResult | null | undefined) ?? null,
+      modelVsMarket: null,
+      actuals: actualsFromRows(extraction, inferStrategy(extraction, firstSignal), assetClass, rr, t12),
+      derived,
+      storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
+      brokerComps: (row.comps as BrokerCompsResult | null | undefined) ?? null,
+      readOn: today,
+    });
+  } catch (err) {
+    console.warn(`[pipeline] the stress test was not built for deal ${dealId}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
  * The deal's rent regulation for a screen step (lib/rent-regulation), through
  * the one call every surface makes (`regulationForDeal`), on the UTC day the
  * worker keeps (lib/reader-day): the regimes the site's rules say reach the
@@ -703,7 +798,7 @@ async function regenerateVerdict(
 ): Promise<void> {
   const { data, error: readErr } = await admin
     .from("deals")
-    .select("asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
+    .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
   // A verdict synthesized over a read that failed would judge a deal with
@@ -763,6 +858,12 @@ async function regenerateVerdict(
   // a date holds the price. The deadlines stay on the reader's own surfaces
   // (the deal header's chip, the pipeline's tag, the memo).
 
+  // The OM's assumptions tested in code, built here from the stored results
+  // and the model the screen derives, so the verdict leads with the engine's
+  // own moves. Nothing new is stored on the verdict: every surface rebuilds
+  // the test on read.
+  const stressTest = await screenStressTest(admin, dealId, data);
+
   const verdict = await synthesizeVerdict({
     extraction,
     // The deal's kind is read with the first signal beside the extraction,
@@ -783,6 +884,7 @@ async function regenerateVerdict(
     // debt deal-killer is read against a dated index and the site's own
     // screening spread, never a rate remembered as current.
     ratesLine: await todaysRatesLine(admin, extraction),
+    stressTest,
   });
 
   // generatedAt lets consumers (the weekly digest) know when THIS verdict

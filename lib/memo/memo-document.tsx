@@ -63,6 +63,8 @@ import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
+import type { StressTest } from "@/lib/stress-test-types";
+import { leadRows, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -500,6 +502,12 @@ export type MemoData = {
   verdictColor: string;
   verdictSub: string;
   verdictReason: string;
+  /** the OM's assumptions, tested in code (lib/stress-test): the read line
+   *  and the rows that are unsupported or stretched, at most four, each the
+   *  OM's figure with its page, the evidence it was set against with its
+   *  publisher and date, the gap and the return's move — printed right
+   *  after the verdict box; null or absent on a caller that built none */
+  stressTest?: MemoStressBlock | null;
   /** `sub` is the price tile's basis — "$274k/unit", "$200k/key", the
    *  pipeline card's own figure (lib/pipeline-slots `basisTag`) */
   keyTerms: { label: string; value: string; flagged: boolean; sub?: string }[];
@@ -549,6 +557,38 @@ export type MemoData = {
 export interface MemoCover {
   dataUri: string;
   credit: string;
+}
+
+/** The memo's stress-test block, as the page prints it. */
+export interface MemoStressBlock {
+  /** "9 assumptions of the memorandum's tested in code — 1 unsupported, …" */
+  read: string;
+  /** "1 unsupported · 2 stretched" — the count beside the title */
+  count: string;
+  rows: StressRowWords[];
+}
+
+/** The most rows the one-page memo prints; the full report prints every one. */
+export const MEMO_STRESS_ROWS = 4;
+
+/**
+ * The block from the test (lib/stress-test-words): the read line, the
+ * unsupported and stretched rows (unsupported first, at most four) and the
+ * count. A test with no row at all is no block; one whose every row holds
+ * or is unchecked prints the read line alone, which says so.
+ */
+export function memoStressBlock(test: StressTest | null | undefined): MemoStressBlock | null {
+  if (!test || test.rows.length === 0) return null;
+  const c = verdictCounts(test);
+  const count = [c.unsupported ? `${c.unsupported} unsupported` : "", c.stretched ? `${c.stretched} stretched` : ""].filter(Boolean).join(" · ") || "none past the evidence";
+  return {
+    read: pdfSafe(stressReadLine(test)),
+    count: pdfSafe(count),
+    rows: leadRows(test, MEMO_STRESS_ROWS).map((r) => {
+      const w = rowWords(r);
+      return { ...w, title: pdfSafe(w.title), om: pdfSafe(w.om), against: pdfSafe(w.against), gap: pdfSafe(w.gap), move: pdfSafe(w.move) };
+    }),
+  };
 }
 
 /** Analysis output and user-shaped rows can carry surprises — numbers where
@@ -640,6 +680,11 @@ export function buildMemoData(
    *  from the memo route; absent elsewhere — the report's first page and the
    *  demo carry none */
   exchange?: MemoExchange | null,
+  /** the OM's assumptions tested in code (lib/stress-test), built by the
+   *  route the way the deal page builds it — the stored results, the
+   *  deal's documents and the derived model; absent where a caller built
+   *  none, and then the memo prints no block */
+  stressTest?: StressTest | null,
 ): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
   const dealExchange = exchangeFor(deal, extraction ?? null, exchange);
@@ -766,6 +811,14 @@ export function buildMemoData(
   // When the screen is present it earns the page space — tighten the older
   // sections so the memo stays one page.
   const hasScreen = ranges.length > 0;
+  // The OM's assumptions tested in code (lib/stress-test): where the test
+  // found a row past the evidence, the engine's own run takes the room the
+  // screen's estimates had — the deal-killer cards ("Breaks if (screen's
+  // estimate)") and the flips strip ("the screen's estimate, not the
+  // model's") are the verdict step's guesses at the same question, and the
+  // full report's "The call, in full" page prints both whole.
+  const stressBlock = memoStressBlock(stressTest);
+  const hasStress = !!stressBlock && stressBlock.rows.length > 0;
 
   // Retrade line: what moved since the previous screen, compressed to one
   // sentence-length string. Only when something actually moved.
@@ -841,6 +894,7 @@ export function buildMemoData(
     verdictColor: vmeta?.color ?? C.muted,
     verdictSub: vmeta?.sub ?? "",
     verdictReason: clamp(verdict?.reason ?? "", 280),
+    stressTest: stressBlock,
     keyTerms: hasScreen ? keyTerms.slice(0, 4) : keyTerms,
     topRisks: list(verdict?.topRisks).map(str).slice(0, hasScreen ? 2 : 4),
     // With the screen present, the deal-killers + top risks already carry the
@@ -849,8 +903,8 @@ export function buildMemoData(
     challenges: hasScreen ? [] : ch,
     flags: hasScreen ? [] : flags.slice(0, 4),
     ranges,
-    dealKillers,
-    sensitivity,
+    dealKillers: hasStress ? [] : dealKillers,
+    sensitivity: hasStress ? [] : sensitivity,
     nextSteps: list(verdict?.nextSteps).map(str).slice(0, hasScreen ? 2 : 4),
     buyBox: (buyBoxChecks ?? []).map((c) => ({
       label: clamp(c.label, 20),
@@ -863,6 +917,10 @@ export function buildMemoData(
     cover: cover ?? null,
   };
 }
+
+/** A stress row's tone: unsupported in the kill colour, stretched in
+ *  caution's, a row that holds in the pass colour. */
+const STRESS_TONE: Record<string, string> = { unsupported: "#b23a30", stretched: "#a05a1c", holds: "#1b7a5e", unchecked: "#5f6b69" };
 
 // Verdict-call display names, shared by the retrade line above.
 const CALL_LABEL_GLOBAL: Record<string, string> = {
@@ -987,6 +1045,36 @@ const s = StyleSheet.create({
   verdictSub: { fontSize: 9.5, color: C.muted },
   verdictReason: { marginTop: 6, fontSize: 10, color: C.ink },
   sinceLast: { marginTop: 6, fontSize: 8, color: C.muted },
+
+  // The OM's assumptions, tested: one row an assumption, its five cells in
+  // one line of small type, and the OM's figure against the evidence's as
+  // two ticks on one short track (plain Views, so the fill count can be
+  // read back). It sits right after the verdict box, the product's lead.
+  stressRead: { fontSize: 7.5, color: C.muted, marginBottom: 3 },
+  stressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.line,
+    paddingVertical: 2.5,
+    paddingHorizontal: 2,
+  },
+  stressRowAlt: { backgroundColor: C.faint },
+  stressTag: {
+    width: 54,
+    fontSize: 6,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  stressTitle: { width: "17%", fontSize: 8, fontFamily: "Helvetica-Bold" },
+  stressCell: { fontSize: 7.5, color: C.ink },
+  stressCellMuted: { fontSize: 7.5, color: C.muted },
+  stressBar: { width: 46, paddingRight: 8, paddingTop: 3 },
+  stressTrack: { height: 2, borderRadius: 1, backgroundColor: C.line, position: "relative" },
+  stressSpan: { position: "absolute", top: 0, height: 2, backgroundColor: "#b5cdc9" },
+  stressTick: { position: "absolute", top: -2.5, width: 1.5, height: 7 },
+  stressKey: { fontSize: 6, color: C.muted, marginTop: 2 },
 
   buyBoxRow: {
     flexDirection: "row",
@@ -1271,9 +1359,27 @@ export async function renderMemoPdf(data: MemoData): Promise<Buffer> {
   const draw = (d: MemoData) =>
     renderToBuffer(React.createElement(MemoDocument, { data: d }) as unknown as Parameters<typeof renderToBuffer>[0]);
   const first = await draw(data);
-  if (!data.actualsLine || pdfPageCount(first) <= 1) return first;
-  const without = await draw({ ...data, actualsLine: "" });
-  return pdfPageCount(without) < pdfPageCount(first) ? without : first;
+  if (pdfPageCount(first) <= 1) return first;
+  // Room is given back in this order, each concession kept and the next
+  // added until the memo fits: the actuals line (the report carries the
+  // actuals whole), then the stress block's rows past the second, then past
+  // the first (the report tests every assumption) — the block's read line
+  // and its lead row stay, since the test is the memo's lead. A memo that
+  // still cannot fit flows to a second page with everything on it.
+  const steps: ((d: MemoData) => MemoData | null)[] = [
+    (d) => (d.actualsLine ? { ...d, actualsLine: "" } : null),
+    (d) => (d.stressTest && d.stressTest.rows.length > 2 ? { ...d, stressTest: { ...d.stressTest, rows: d.stressTest.rows.slice(0, 2) } } : null),
+    (d) => (d.stressTest && d.stressTest.rows.length > 1 ? { ...d, stressTest: { ...d.stressTest, rows: d.stressTest.rows.slice(0, 1) } } : null),
+  ];
+  let current = data;
+  for (const step of steps) {
+    const next = step(current);
+    if (!next) continue;
+    current = next;
+    const pdf = await draw(current);
+    if (pdfPageCount(pdf) <= 1) return pdf;
+  }
+  return first;
 }
 
 /** The memo's single page, exported so the full report can lead with it.
@@ -1466,6 +1572,54 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
               <Text style={s.sinceLast}>{data.sinceLast}</Text>
             ) : null}
           </View>
+        )}
+
+        {/* The OM's assumptions, tested in code (lib/stress-test): the read
+            line, then each row past the evidence — the OM's figure with its
+            page, what it was set against with its publisher and date, the
+            gap, and the return's move, the engine's own. The two figures
+            are two ticks on one track: the OM's in the row's tone, the
+            evidence's in ink. */}
+        {data.stressTest && (
+          <Section title="The OM's assumptions, tested" keep>
+            <Text style={s.stressRead}>{data.stressTest.read}</Text>
+            {data.stressTest.rows.map((r, i) => {
+              const tone = STRESS_TONE[r.verdict] ?? C.muted;
+              // The track is the column less its right padding (46 − 8).
+              const track = 38;
+              return (
+                <View key={r.key + i} style={i % 2 === 1 ? [s.stressRow, s.stressRowAlt] : s.stressRow}>
+                  <Text style={[s.stressTag, { color: tone }]}>{r.verdict}</Text>
+                  <Text style={s.stressTitle}>{r.title}</Text>
+                  <View style={s.stressBar}>
+                    {r.ticks ? (
+                      <View style={[s.stressTrack, { width: track }]}>
+                        <View
+                          style={[
+                            s.stressSpan,
+                            { left: Math.min(r.ticks.om, r.ticks.evidence) * track, width: Math.abs(r.ticks.om - r.ticks.evidence) * track },
+                          ]}
+                        />
+                        <View style={[s.stressTick, { left: r.ticks.evidence * track - 0.75, backgroundColor: C.ink }]} />
+                        <View style={[s.stressTick, { left: r.ticks.om * track - 0.75, backgroundColor: tone }]} />
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[s.stressCell, { flex: 1 }]}>
+                    {`OM ${r.om}`}
+                    <Text style={s.stressCellMuted}>{`  ·  against ${r.against}`}</Text>
+                    {r.gap ? <Text style={s.stressCellMuted}>{`  ·  gap ${r.gap}`}</Text> : null}
+                    {r.move ? <Text style={[s.stressCell, { fontFamily: "Helvetica-Bold" }]}>{`  ·  ${r.move}`}</Text> : null}
+                  </Text>
+                </View>
+              );
+            })}
+            {data.stressTest.rows.length > 0 ? (
+              <Text style={s.stressKey}>
+                {"Ticks: the OM's figure in the row's tone, the evidence's in ink. The IRR move is the model re-run with that one input swapped; the report tests every assumption."}
+              </Text>
+            ) : null}
+          </Section>
         )}
 
         {data.buyBox.length > 0 && (

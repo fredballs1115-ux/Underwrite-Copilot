@@ -2880,3 +2880,98 @@ describe("ReportDocument (full report)", () => {
     expect(await pdfTextOf(one)).not.toContain("photographs from the memorandum");
   }, 45000);
 });
+
+// The OM's assumptions, tested in code (lib/stress-test): the report's own
+// page after the call, every row with its method and the challenger's
+// question, and the memo's lead rows on page one.
+describe("the report's stress-test page", () => {
+  const sampleRow = () =>
+    ({
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      is_sample: true,
+      address: SAMPLE_DEAL.address,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      first_signal: null,
+      prior_screen: null,
+    }) as unknown as DealRow;
+  // buildReportData's arguments between the sensitivity and the test: the
+  // thirty-second argument is the test.
+  const between = [undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "2026-10-19"] as const;
+
+  it("prints every row — the OM's figure with its page, each piece of evidence dated and attributed, the gap, the engine's move, the method and the question — between the call and the grids", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const derived = sampleDerivedInputs();
+    const sensitivity = buildSensitivityData(derived.inputs, 13, { sources: derived.sources });
+    const input = buildReportData(sampleRow(), "October 19, 2026", [], sensitivity, ...between, test);
+    expect(input.stressTest).toBe(test);
+    const pdf = await renderReportPdf(input);
+    const pages = pdfPageTextsOf(pdf).map((p) => p.replace(/\s+/g, " "));
+    const at = (needle: string) => pages.findIndex((p) => p.includes(needle));
+    const stress = at("The stress test");
+    expect(stress).toBeGreaterThan(-1);
+    expect(stress).toBeGreaterThan(at("The call, in full"));
+    expect(stress).toBeLessThan(at("Sensitivity analysis"));
+    const page = pages[stress] + (pages[stress + 1] ?? "");
+    expect(page).toContain("9 assumptions · 1 unsupported · 2 stretched");
+    expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
+    expect(page).toContain("The published figures were read on Oct 19, 2026.");
+    // Every row, unsupported first.
+    for (const r of test.rows) expect(page).toContain(`OM says: ${r.omSays.text}`);
+    // The verdict word is the row's tag, printed in capitals.
+    expect(page.indexOf("UNSUPPORTED Stabilized vacancy")).toBeGreaterThan(-1);
+    expect(page.indexOf("UNSUPPORTED Stabilized vacancy")).toBeLessThan(page.indexOf("STRETCHED Basis"));
+    expect(page.indexOf("STRETCHED Basis")).toBeLessThan(page.indexOf("HOLDS NOI"));
+    expect(page.indexOf("HOLDS NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
+    // The vacancy row, whole.
+    expect(page).toContain("OM says: Vacancy (pro forma): 6.0% (p. 8)");
+    expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026)");
+    expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
+    expect(page).toContain("Gap: The OM's 6.0% is 3.1 points under the evidence's 9.1%.");
+    expect(page).toContain("The return: The model already runs vacancy at the deal's rent roll's 9.1%, so its levered IRR of 9.3% carries it.");
+    expect(page).toContain("Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at (the deal's rent roll), then");
+    expect(page).toContain("Ask: What's the absorption schedule to get from 9% to 6%?");
+    // The basis row's move is the engine's, spelled.
+    expect(page).toContain("The return: If the price is the offering memorandum's $64.73M ($261k/unit), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 11.8%");
+    // An unchecked row says why, and that no return was re-run.
+    expect(page).toContain("Unchecked: The OM states no loan rate.");
+    expect(page).toContain("The return: No return re-run: No figure to swap.");
+    expect(page).not.toMatch(/→/);
+    // Page one carries the memo's lead rows.
+    expect(pages[0]).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8)");
+  }, 90000);
+
+  it("draws each row's two ticks on a track (four fills a row: the track, the span and the ticks), and prints no page without a test", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const render = (t: typeof test | null) =>
+      renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(sampleRow(), "October 19, 2026", [], null, ...between, t) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      );
+    const withPage = await render(test);
+    const without = await render(null);
+    expect(await pdfTextOf(without)).not.toContain("The stress test");
+    const drawn = test.rows.filter((r) => r.omSays.value != null && r.evidence.some((e) => e.value != null)).length;
+    expect(drawn).toBeGreaterThanOrEqual(3);
+    // The page's tracks (four fills a row drawn) plus the memo page's own
+    // block (four a lead row): the difference counts both, over whatever
+    // the memo's deal-killer cards and flips drew in their place.
+    const lead = Math.min(4, test.rows.filter((r) => r.verdict === "unsupported" || r.verdict === "stretched").length);
+    expect(pdfFillCountOf(withPage) - pdfFillCountOf(without)).toBeGreaterThanOrEqual(drawn * 4 + lead * 4 - 12);
+  }, 90000);
+
+  it("says no return was re-run, and why, where the model could not be run", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
+    const text = (await pdfTextOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], null, ...between, withheld)))).replace(/\s+/g, " ");
+    expect(text).toContain("No return is re-run: no model was derived for this deal, so no return is re-run.");
+    expect(text).toContain("The return: No return re-run: No model was derived for this deal, so no return is re-run.");
+    expect(text).not.toContain("levered IRR moves");
+  }, 90000);
+});

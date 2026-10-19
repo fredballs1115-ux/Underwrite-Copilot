@@ -12,7 +12,7 @@
 import { buildMemoData, type MemoData, type MemoExchange } from "@/lib/memo/memo-document";
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
-import { sampleActualsLine, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
+import { sampleActualsLine, sampleDocumentChecks, sampleDocumentRow, sampleStressTest } from "@/lib/sample-cover";
 
 /** The memo the download builds at `now`, dated as it dates it (a reader of
  *  no known time zone, lib/reader-day), with no cover. */
@@ -24,6 +24,7 @@ export function sampleMemoData(now: Date = new Date()): MemoData {
   const exchange: MemoExchange | null = SAMPLE_DEMO_BOX.exchange
     ? { block: SAMPLE_DEMO_BOX.exchange, readerDay }
     : null;
-  // The actuals line the download sets beside its key terms (audit C8, H1).
-  return { ...buildMemoData(deal, dateStr, buyBoxChecks, null, null, null, readerDay, exchange), actualsLine: sampleActualsLine() };
+  // The actuals line the download sets beside its key terms (audit C8, H1),
+  // and the stress test the download leads with (lib/sample-cover).
+  return { ...buildMemoData(deal, dateStr, buyBoxChecks, null, null, null, readerDay, exchange, sampleStressTest(readerDay)), actualsLine: sampleActualsLine() };
 }

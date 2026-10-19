@@ -10,16 +10,13 @@ import type { StructuredAddress } from "@/lib/address";
 import type { FloodMapView } from "@/lib/site-flags/core";
 import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import { modelReturnsRead } from "@/lib/compare-interest";
-import { countyOf, placeDeal } from "@/lib/market-county";
-import { todayReads } from "@/lib/model-vs-market-read";
-import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
-import { sampleActuals, sampleCover, sampleDocumentChecks, sampleDocumentRow } from "@/lib/sample-cover";
+import { sampleActuals, sampleCover, sampleDocumentChecks, sampleDocumentRow, sampleModelVsMarket, sampleStressTest } from "@/lib/sample-cover";
 
 export const runtime = "nodejs";
 
@@ -123,24 +120,14 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
 
   // The model's assumptions against the published figures, read today for
   // the market the sample sits in — the signed-in sample's report prints
-  // this block, so the visitor's does too. Its own try, as there: a failed
-  // live read leaves the grids in place and the block out.
-  let assumptions: ModelVsMarket | null = null;
-  try {
-    const metro = placeDeal(address, countyOf(address, null)).live;
-    assumptions = modelVsMarketFor({
-      derived,
-      extraction,
-      firstSignal: null,
-      storedAssetClass: SAMPLE_DEAL.asset_class,
-      metro,
-      reads: await todayReads(metro),
-      regulation: regulationRead,
-    });
-  } catch (err) {
-    console.warn("sample report assumptions read failed:", err instanceof Error ? err.message : err);
-    assumptions = null;
-  }
+  // this block, so the visitor's does too. Its own try, as there (lib/
+  // sample-cover `sampleModelVsMarket`): a failed live read leaves the
+  // grids in place and the block out.
+  const assumptions = await sampleModelVsMarket(readerDay);
+  // The OM's assumptions tested in code, as the signed-in report builds it
+  // for the sample: the same derivation, actuals and published-figure read
+  // (lib/sample-cover `sampleStressTest`).
+  const stressTest = sampleStressTest(readerDay, assumptions);
 
   // What a visitor's copy has none of, by design: no firm's branding (a
   // visitor has no account to brand it), no dismissed submarket checks (the
@@ -163,7 +150,7 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
   const actuals = sampleActuals();
 
   const input = withActuals(
-    buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay),
+    buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay, stressTest),
     actuals,
   );
   // The sample: its stress test is the first-draft model's run, which the
