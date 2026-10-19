@@ -118,8 +118,8 @@ export default async function NewsPage({
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="font-serif text-3xl font-semibold tracking-tight">News</h1>
         <p className="text-sm text-muted">
-          The publishers&apos; own feeds, most decision-relevant first; every headline opens its
-          source.
+          The publishers&apos; feeds and news searches, most decision-relevant first; every
+          headline opens its source.
         </p>
       </header>
 

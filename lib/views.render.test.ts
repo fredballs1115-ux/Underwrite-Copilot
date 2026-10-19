@@ -3549,7 +3549,9 @@ describe("News live section", () => {
   it("leads with the top story — kicker, headline, dek, the publisher's picture — then the sources as one line, and reads clean", () => {
     const html = render(React.createElement(LiveHeadlinesView, { live }));
     const text = visibleText(html);
-    expect(text).toContain("live from 4 of 5 sources");
+    // The Commercial Property Executive line came from an earlier copy: it
+    // is counted apart, never as live (the audit of 2026-10-19).
+    expect(text).toContain("live from 3 of 5 sources · 1 from an earlier copy · refreshed every 30 min");
     expect(text).toContain("Monday, September 14, 2026");
     expect(text).toContain("Investor takes over distressed Atlanta apartment asset");
     // the kicker: what the story touches, and the covered market it names
@@ -3618,7 +3620,13 @@ describe("News live section", () => {
     const text = visibleText(html);
     expect(text).toContain("None of the publishers answered just now");
     expect(text).toContain("live from 0 of 5 sources");
+    expect(text).not.toContain("from an earlier copy");
     expect(text).not.toContain("via ");
+    // The page's header names both ways in: the publishers' feeds and the
+    // news searches behind them (Google News, Bing News).
+    expect(readSource(joinPath(process.cwd(), "app/(app)/news/page.tsx"), "utf8").replace(/\s+/g, " ")).toContain(
+      "The publishers&apos; feeds and news searches, most decision-relevant first",
+    );
     expect(html).not.toContain("<article");
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);

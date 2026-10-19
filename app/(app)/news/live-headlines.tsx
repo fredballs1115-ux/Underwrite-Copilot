@@ -37,7 +37,12 @@ export function LiveHeadlinesView({
    *  from its cookie: the masthead's day is the reader's */
   timeZone?: string;
 }) {
-  const answered = live.sources.filter((s) => s.ok || s.stale);
+  // "Live" is a source that answered this time, or from this process's fresh
+  // copy; one served from its last good copy, because this fetch failed, is
+  // counted apart (the audit of 2026-10-19: the masthead had counted it as
+  // live).
+  const fresh = live.sources.filter((s) => s.ok && !s.stale).length;
+  const earlier = live.sources.filter((s) => s.stale).length;
   const searchHosts = searchHostsAnswering(live.sources);
   const now = Date.parse(live.fetchedAt);
   const [lead, ...rest] = live.headlines;
@@ -52,7 +57,9 @@ export function LiveHeadlinesView({
         </h2>
         <span>{fmtDate(live.fetchedAt, timeZone)}</span>
         <span>
-          live from {answered.length} of {live.sources.length} sources · refreshed every 30 min
+          {`live from ${fresh} of ${live.sources.length} sources${
+            earlier > 0 ? ` · ${earlier} from ${earlier === 1 ? "an earlier copy" : "earlier copies"}` : ""
+          } · refreshed every 30 min`}
         </span>
       </div>
 
