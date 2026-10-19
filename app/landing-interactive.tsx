@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
-import type { SampleLegal } from "@/lib/sample-legal";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
 import type { SampleBuyBoxData } from "./sample-buy-box";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -387,9 +386,6 @@ export function DemoPanel({
   onNavigate = () => {},
 }: {
   tab: Tab;
-  /** no longer drawn: the deal page's research panel sits under its tabs,
-   *  in none of them (accepted until the page stops passing it) */
-  legal?: SampleLegal;
   /** the Buy box tab's panel and the sample's box, read on the server */
   buyBox?: SampleBuyBoxData;
   /** the Financials tab's server reads */
@@ -459,7 +455,6 @@ export function DemoTabs({
   buyBox,
   financials,
 }: {
-  legal?: SampleLegal;
   buyBox: SampleBuyBoxData;
   financials: SampleFinancials;
 }) {

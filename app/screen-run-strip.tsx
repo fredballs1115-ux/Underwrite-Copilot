@@ -93,7 +93,7 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
     ["market", `${plural(checks.length, "assumption")} read against rules of thumb: ${reads}`],
     [
       "verdict",
-      `${verdictWord} · ${plural(screen?.ranges.length ?? 0, "sourced range")} · ${plural(levers.length, "deal-killer")} stressed first: ${levers.map((l) => STRIP_WORDS.lever[l]).join(" · ")}`,
+      `${verdictWord} · ${plural(screen?.ranges.length ?? 0, "sourced range")} · ${plural(levers.length, "deal-killer")} named first: ${levers.map((l) => STRIP_WORDS.lever[l]).join(" · ")}`,
     ],
     // A run of its own, made when the buyer adds their model, after which
     // the verdict is synthesized again (lib/anthropic/pipeline).
@@ -101,7 +101,7 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
   ];
 }
 
-/** The screen, running — a looping replay of the six stages, in the
+/** The test, running — a looping replay of the six stages, in the
  *  pipeline's own order, then the reconciliation (its own run, once a
  *  model is added). Every line is DERIVED from the same sample fixture the
  *  demo renders — counts and the verdict word, not copywriting — so this
@@ -124,7 +124,7 @@ export function ScreenRunStrip() {
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wider text-white/55">
-            The screen, running — a replay of the six stages on the sample
+            The test, running — a replay of the six stages on the sample
             deal
           </p>
           <Link
@@ -135,11 +135,11 @@ export function ScreenRunStrip() {
           </Link>
         </div>
         <p className="sr-only">
-          The screen runs in order: a first read of the headline figures,
+          The test runs in order: a first read of the headline figures,
           extraction with page cites, the assumptions challenged with a
           question for the broker, the broker&apos;s comps rated, the market
           check against rules of thumb, and a verdict with sourced ranges and
-          the three deal-killers stressed first; when you add your own model,
+          the three deal-killers named first; when you add your own model,
           a reconciliation against it re-runs the verdict.
         </p>
         <PausableTicker what="trace" className="mt-4 data-[ticker-paused]:[--screenrun-play:paused]">

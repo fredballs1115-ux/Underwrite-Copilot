@@ -71,7 +71,7 @@ describe("the homepage, as a screen reader hears it", () => {
     // the chip on screen and nothing spaced it for a screen reader.
     const html = await renderHome();
     const text = html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "");
-    expect(text).toContain("Excel model, live formulas Pro");
+    expect(text).toContain("The model, included — Excel, live formulas Pro");
     expect(text).toContain("IC memo Pro");
     expect(text).not.toMatch(/formulasPro|memoPro/);
   }, 60_000);
@@ -321,7 +321,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
 
   it("the Excel tile prints the workbook it links: its base case and two cells of its Sensitivity tab", async () => {
     const html = await renderHome();
-    const at = html.indexOf("Excel model, live formulas");
+    const at = html.indexOf("The model, included — Excel, live formulas");
     expect(at).toBeGreaterThan(-1);
     const tile = words(html.slice(at, html.indexOf("/api/demo/underwrite.xlsx", at)));
     for (const [k, v, e] of sampleWorkbookPreview()) expect(tile).toContain(`${k} ${v} ${e}`);
@@ -342,7 +342,8 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     expect(tile).toContain(`${memo.verdictWord} ${memo.verdictSub}`);
     expect(memo.verdictWord).toBe(sampleHeader().pill!.label);
     for (const t of memo.keyTerms.slice(0, 4)) expect(tile, t.label).toContain(`${t.label} ${t.value}`);
-    const cAt = html.indexOf("Comps, graded");
+    const cAt = html.indexOf("The broker&#x27;s comps, graded");
+    expect(cAt).toBeGreaterThan(-1);
     const comps = words(html.slice(cAt, html.indexOf("Your buy box, checked in code", cAt))).replace(/&#x27;/g, "'");
     const ordered = inCompOrder(SAMPLE_DEAL.comps.saleComps);
     expect(ordered).toHaveLength(SAMPLE_DEAL.comps.saleComps.length);
@@ -517,7 +518,7 @@ describe("the screen-run trace credits each stage with what it writes", () => {
     const l = lines();
     expect(l.challenge).not.toMatch(/deal-killer/);
     const levers = SAMPLE_DEAL.verdict.screen!.dealKillers.map((k) => k.lever);
-    expect(l.verdict).toContain(`${levers.length} deal-killers stressed first: ${["basis", "exit", "debt"].filter((x) => levers.includes(x as never)).join(" · ")}`);
+    expect(l.verdict).toContain(`${levers.length} deal-killers named first: ${["basis", "exit", "debt"].filter((x) => levers.includes(x as never)).join(" · ")}`);
     expect(l.challenge).toContain(`${SAMPLE_DEAL.challenges.challenges.length} assumptions challenged`);
     expect(l.challenge).toContain("each with a question for the broker");
   });

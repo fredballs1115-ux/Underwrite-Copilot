@@ -30,7 +30,6 @@ import { NO_DEBT_SEEDS } from "@/lib/debt-index";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
-import { sampleLegal } from "@/lib/sample-legal";
 import { buyBoxLines } from "@/lib/criteria";
 import type { SampleBuyBoxData } from "./sample-buy-box";
 import { ruleCounts } from "@/lib/research-data";
@@ -67,13 +66,6 @@ const RULES_PHRASE =
   RULES.sourced === RULES.all
     ? `${RULES.all} across the markets, each source-linked`
     : `${RULES.all} across the markets, ${RULES.sourced} of them source-linked`;
-// The sample deal's legal read through the REAL rules engine — feeds the
-// walkthrough widget's Regulation block. Read for the day the page renders
-// (the page is ISR), since a rule's date is marked stale past the research
-// rule's limit (lib/research-age) — never on the day the process started.
-function legalToday() {
-  return sampleLegal(new Date().toISOString().slice(0, 10));
-}
 // Deliberately FOCUSED coverage (per direction): FIFTEEN markets, full stop
 // — the DMV core (one market, four jurisdiction entries) + the rest of the
 // Mid-Atlantic + the biggest US markets. Research and website coverage stop
@@ -142,7 +134,7 @@ const RECONCILE_ICON = (
 // tasks).
 const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   {
-    label: "OM + rent roll + T-12, one model",
+    label: "OM + rent roll + T-12: actuals beat pro forma",
     href: "/demo",
     icon: (
       <Icon>
@@ -183,7 +175,7 @@ const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Financing, sized to the constraint",
+    label: "The loan, sized by whichever lender test binds",
     href: "/demo",
     icon: (
       <Icon>
@@ -327,8 +319,8 @@ const DEAL_KINDS: string[] = [
 ];
 
 const STATS: { value: number; suffix: string; label: string }[] = [
-  { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages" },
-  { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
+  { value: ANALYSIS_STAGES, suffix: "", label: "stages, same order every OM" },
+  { value: DEAL_KILLERS, suffix: "", label: "deal-killers named first" },
   { value: MARKET_COUNT, suffix: "", label: "covered markets" },
   { value: RULES.all, suffix: "", label: "rules checked by address" },
 ];
@@ -394,7 +386,7 @@ const SAMPLE_BUY_BOX: SampleBuyBoxData = {
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: "Just an offering memorandum as a PDF. Upload it and the screen runs on its own — the headline numbers first, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
+    a: "Just an offering memorandum as a PDF. Upload it and the test runs on its own: the headline figures, the extraction, each assumption challenged, the broker's comps graded, the market check, a verdict. Add a rent roll or T-12 and actuals beat the pro forma. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
@@ -406,7 +398,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Why not just ask ChatGPT?",
-    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, every assumption is a sourced range, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
+    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, the headline assumptions are sourced ranges, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
+  },
+  {
+    q: "Does the test make me more accurate?",
+    a: "It cannot say yet. It checks each OM assumption against evidence that exists on the day and shows what the gap does to the return; whether that was right is known only when a later document, your decision or a trade arrives, and the track record will count exactly those.",
   },
   {
     q: "Are my documents private?",
@@ -418,7 +414,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: "A live-formula workbook: a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.",
+    a: "Included with every Pro test: a live-formula workbook — a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.",
   },
   {
     q: "Can my team share one pipeline?",
@@ -462,8 +458,9 @@ const JSON_LD = {
       publisher: { "@id": `${SITE_URL}/#organization` },
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
+      // The layout's own description (app/layout.tsx), word for word.
       description:
-        "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a Go / No-go that shows its work before you open a model.",
+        "Upload an offering memorandum. Each assumption it makes is set against the deal's own documents, dated published figures and the rule of thumb it is asked to beat, named as such; the price, the exit and the debt are named first; a Go / Caution / No-go that shows its work. The model is included.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
         { "@type": "Offer", name: "Pro", price: PRICE_PRO_MONTHLY.replace("$", ""), priceCurrency: "USD" },
@@ -631,7 +628,6 @@ function PeopleStrip({ photos }: { photos: PhotoSlot[] }) {
 
 export default function Home() {
   const photos = photosOnDisk();
-  const legal = legalToday();
   // The sample's header, read on the render's day (the page is ISR).
   const header = sampleHeader();
   // The sample memo's own data, as its download draws it, on the render's
@@ -661,8 +657,8 @@ export default function Home() {
           </div>
           <nav className="hidden items-center gap-1 md:flex">
             {[
-              ["#screen", "How it works"],
-              ["/demo", "Sample screen"],
+              ["#screen", "How it's tested"],
+              ["/demo", "Sample test"],
               ["#pricing", "Pricing"],
               ["#faq", "FAQ"],
             ].map(([href, label]) => (
@@ -710,8 +706,8 @@ export default function Home() {
               </summary>
               <nav className="shadow-float absolute right-0 top-11 z-20 w-48 rounded-xl border border-white/10 bg-sidebar p-1.5">
                 {[
-                  ["#screen", "How it works"],
-                  ["/demo", "Sample screen"],
+                  ["#screen", "How it's tested"],
+                  ["/demo", "Sample test"],
                   ["#pricing", "Pricing"],
                   ["#faq", "FAQ"],
                 ].map(([href, label]) => (
@@ -772,12 +768,12 @@ export default function Home() {
                 <div className="on-photo">
                   <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
                     <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                    AI deal screening for CRE acquisitions
+                    A stress test for offering memoranda
                   </span>
                   <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                    Stop underwriting like a{" "}
+                    Test the OM before you{" "}
                     <span className="relative inline-block whitespace-nowrap">
-                      coin flip.
+                      model it.
                       <svg
                         viewBox="0 0 220 12"
                         preserveAspectRatio="none"
@@ -796,7 +792,7 @@ export default function Home() {
                     </span>
                   </h1>
                   <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                    Upload the OM. Every figure labelled with its page, or marked where none was found, the three deal-killers stressed, a Go / Caution / No-go.
+                    Upload the OM. Each assumption it makes is set against the deal&apos;s own documents, today&apos;s published figures and the rule of thumb it is asked to beat — named as such — then a Go / Caution / No-go that shows its work. The model comes with it.
                   </p>
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link
@@ -809,7 +805,7 @@ export default function Home() {
                       href="/demo"
                       className="rounded-lg border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
                     >
-                      See a full screen
+                      See a full test
                     </Link>
                   </div>
                   <p className="mt-4 text-xs text-white/70">{FREE_DEALS_LINE} · no card</p>
@@ -824,7 +820,7 @@ export default function Home() {
                       href="/demo"
                       className="font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
                     >
-                      open the whole screen →
+                      open the whole test →
                     </Link>
                   </p>
                 </div>
@@ -855,7 +851,7 @@ export default function Home() {
             them. Both ends are neutral on purpose — the spread is the problem. */}
         <section id="problem">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <SectionHead eyebrow="The problem" title={`Same deal, same data room, ${SPREAD_BPS} bps apart.`} />
+            <SectionHead eyebrow="The problem" title="The pro forma is the seller's best case." />
             <Reveal>
               <div className="shadow-card mt-8 rounded-2xl border border-line bg-surface p-6">
                 {/* The two IRRs are a stated illustration, not a measured
@@ -911,7 +907,7 @@ export default function Home() {
         {/* The six-stage screen — a rail of icons, then the trace of it running. */}
         <section id="screen" className="border-t border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <SectionHead eyebrow="How it works" title="Six stages, same order." />
+            <SectionHead eyebrow="How it's tested" title="Read it, challenge it, check it against the evidence." />
             <Reveal delay={60}>
               <ol className="stage-rail mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {SCREEN_STAGES.map((s, i) => (
@@ -948,7 +944,7 @@ export default function Home() {
         <section className="border-b border-line">
           <div className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-[1fr_1.4fr]">
             <Reveal>
-              <SectionHead eyebrow="The verdict" title="Click through what it's built on." />
+              <SectionHead eyebrow="The test, row by row" title="Click through what every call rests on." />
               <Link
                 href="/login?mode=signup"
                 className="mt-6 inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
@@ -957,7 +953,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={legal} buyBox={SAMPLE_BUY_BOX} financials={sampleFinancials()} />
+              <DemoTabs buyBox={SAMPLE_BUY_BOX} financials={sampleFinancials()} />
             </Reveal>
           </div>
         </section>
@@ -978,11 +974,11 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Break it yourself — the deterministic engine, live in the browser. */}
+        {/* What a gap does to the return — the deterministic engine, live in the browser. */}
         <section id="stress" className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
-              <SectionHead eyebrow="Try the engine" title="Break it yourself." dark />
+              <SectionHead eyebrow="What a gap does to the return" title="Move the assumption, watch the return." dark />
             </Reveal>
             <Reveal delay={80}>
               <div className="mt-8">
@@ -1057,12 +1053,69 @@ export default function Home() {
               <SectionHead eyebrow="The artifacts" title="What you walk away with." />
             </Reveal>
             <Reveal delay={80}>
-              <div className="mt-8 grid gap-4 lg:grid-cols-3">
-                {/* Excel model — the flagship tile */}
-                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
+              {/* Two by two: the memo, the comps and the buy box first, and
+                  the model last — it is included, not the product. */}
+              <div className="mt-8 grid gap-4 lg:grid-cols-2">
+                {/* Memo */}
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                    IC memo{" "}
+                    <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
+                  </h3>
+                  {/* The memo it downloads: its own title, call and key
+                      terms, from the download's own inputs. */}
+                  <div className="mt-4 flex-1">
+                    <MemoPreview data={memo} />
+                  </div>
+                  <a
+                    href="/api/demo/memo"
+                    className="mt-3 inline-block text-[11px] font-medium text-brand underline-offset-2 hover:underline"
+                  >
+                    Download the sample memo →
+                  </a>
+                </div>
+
+                {/* Comps */}
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="text-sm font-semibold">The broker&apos;s comps, graded</h3>
+                  {/* The sample's own sale comps, in the deal page's order
+                      and grades (lib/comp-rating), each with the figures its
+                      memorandum line states. */}
+                  <ul className="mt-4 space-y-1.5 text-[10px]">
+                    {inCompOrder(SAMPLE_DEAL.comps.saleComps).map((c) => {
+                      const r = compRating(c.support);
+                      return (
+                        <li key={c.name} className="rounded-md border border-line px-2.5 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate font-medium">{c.name}</span>{" "}
+                            <span
+                              className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
+                            >
+                              {r.label}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 truncate font-mono tabular-nums text-muted">{c.detail}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+
+                {/* Buy box */}
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="text-sm font-semibold">Your buy box, checked in code</h3>
+                  {/* The sample deal's own checks against its demo buy box
+                      (lib/sample-deal SAMPLE_DEMO_BOX), every one the count counts. */}
+                  <div className="mt-4">
+                    <CriteriaChips criteria={SAMPLE_FIT.criteria} />
+                  </div>
+                </div>
+
+                {/* The model — included with the test, so it comes last. */}
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                      Excel model, live formulas
+                      The model, included — Excel, live formulas
                       {/* On your own deals the exports are Pro, as the hero's
                           card marks them; the samples download free
                           (research pass 32). The space keeps "Pro" a word of
@@ -1103,61 +1156,6 @@ export default function Home() {
                   >
                     Download the sample workbook →
                   </a>
-                </div>
-
-                {/* Memo */}
-                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                    IC memo{" "}
-                    <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
-                  </h3>
-                  {/* The memo it downloads: its own title, call and key
-                      terms, from the download's own inputs. */}
-                  <div className="mt-4 flex-1">
-                    <MemoPreview data={memo} />
-                  </div>
-                  <a
-                    href="/api/demo/memo"
-                    className="mt-3 inline-block text-[11px] font-medium text-brand underline-offset-2 hover:underline"
-                  >
-                    Download the sample memo →
-                  </a>
-                </div>
-
-                {/* Comps */}
-                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="text-sm font-semibold">Comps, graded</h3>
-                  {/* The sample's own sale comps, in the deal page's order
-                      and grades (lib/comp-rating), each with the figures its
-                      memorandum line states. */}
-                  <ul className="mt-4 space-y-1.5 text-[10px]">
-                    {inCompOrder(SAMPLE_DEAL.comps.saleComps).map((c) => {
-                      const r = compRating(c.support);
-                      return (
-                        <li key={c.name} className="rounded-md border border-line px-2.5 py-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="min-w-0 truncate font-medium">{c.name}</span>{" "}
-                            <span
-                              className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
-                            >
-                              {r.label}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 truncate font-mono tabular-nums text-muted">{c.detail}</p>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-
-                {/* Buy box */}
-                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
-                  <h3 className="text-sm font-semibold">Your buy box, checked in code</h3>
-                  {/* The sample deal's own checks against its demo buy box
-                      (lib/sample-deal SAMPLE_DEMO_BOX), every one the count counts. */}
-                  <div className="mt-4">
-                    <CriteriaChips criteria={SAMPLE_FIT.criteria} />
-                  </div>
                 </div>
               </div>
             </Reveal>
@@ -1216,7 +1214,7 @@ export default function Home() {
         <section id="pricing" className="border-t border-line">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <Reveal>
-            <SectionHead eyebrow="Pricing" title="Start free. Upgrade when the screen earns it." />
+            <SectionHead eyebrow="Pricing" title="Start free. Upgrade when the test earns it." />
           </Reveal>
           <Reveal delay={80}>
             <div className="mt-8 grid gap-5 md:grid-cols-3">
@@ -1226,7 +1224,7 @@ export default function Home() {
                 <p className="mt-2 flex items-baseline gap-1">
                   <span className="text-4xl font-semibold tracking-tight">$0</span>
                 </p>
-                <p className="mt-1 text-sm text-muted">The full screen on up to {FREE_DEALS} deals.</p>
+                <p className="mt-1 text-sm text-muted">The full test on up to {FREE_DEALS} deals.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {FREE_PLAN.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -1255,7 +1253,7 @@ export default function Home() {
                   <span className="text-4xl font-semibold tracking-tight">{PRICE_PRO_MONTHLY}</span>
                   <span className="text-sm text-muted">/month</span>
                 </p>
-                <p className="mt-1 text-sm text-muted">Unlimited screens, plus the exports for your IC.</p>
+                <p className="mt-1 text-sm text-muted">Unlimited tests, plus the exports for your IC.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {PRO_PLAN_LINES.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -1379,14 +1377,14 @@ export default function Home() {
               The whole point
             </p>
             <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Every deal gets your sharpest screen.
+              Every OM gets the same test.
             </h2>
             <div className="mt-8 flex justify-center">
               <Link
                 href="/login?mode=signup"
                 className="cta-breathe rounded-lg bg-white px-6 py-3 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
               >
-                Screen your first deal free
+                Test your first OM free
               </Link>
             </div>
             <p className="mt-4 text-xs text-white/50">
@@ -1417,7 +1415,7 @@ export default function Home() {
             <ul className="mt-3 space-y-2 text-sm">
               <li>
                 <a href="#screen" className="text-muted transition-colors hover:text-ink">
-                  How it works
+                  How it&apos;s tested
                 </a>
               </li>
               <li>
@@ -1432,7 +1430,7 @@ export default function Home() {
               </li>
               <li>
                 <Link href="/demo" className="text-muted transition-colors hover:text-ink">
-                  Sample screen
+                  Sample test
                 </Link>
               </li>
               <li>

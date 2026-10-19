@@ -1,6 +1,6 @@
 "use client";
 
-// "Break it yourself": the screening model's engine (lib/underwrite/engine,
+// "Move the assumption, watch the return": the screening model's engine (lib/underwrite/engine,
 // through the deal page's own playground layer), running in the reader's
 // browser on the illustrative sample deal. Three levers — exit cap, rent
 // growth, vacancy — and every tick re-runs the engine that prices each deal
@@ -234,8 +234,7 @@ export function StressBench({
           />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs leading-relaxed text-white/60">
-              A stated exit value is a snapshot, not a movie — drag the cap
-              and watch the movie.
+              The OM&apos;s exit value is one point. Drag the cap for the rest.
             </p>
             {touched && (
               <button
