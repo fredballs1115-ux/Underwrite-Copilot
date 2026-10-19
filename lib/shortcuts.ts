@@ -53,6 +53,20 @@ export interface KeyLike {
   isComposing?: boolean;
   defaultPrevented: boolean;
   target: unknown;
+  /** whether a modifier is in a given state: "AltGraph" where AltGr (or
+   *  Ctrl and Alt standing in for it) typed the key's character */
+  getModifierState?: (key: string) => boolean;
+}
+
+/** Whether AltGr typed the key: a layout that needs it for "[" or "]"
+ *  (German, Polish, the Nordic ones) reports Ctrl and Alt held, or Alt, with
+ *  the AltGraph modifier set, and the character is the key's own. */
+export function typedWithAltGraph(e: KeyLike): boolean {
+  try {
+    return e.getModifierState?.("AltGraph") === true;
+  } catch {
+    return false;
+  }
 }
 
 type TargetLike = {
@@ -81,7 +95,9 @@ export function isTypingTarget(target: unknown): boolean {
  * Whether the page's shortcuts stand down for this key: another handler
  * already took it (the palette's Escape), the focus sits inside a dialog or
  * a modal is open anywhere on the page, a modifier other than Shift is held
- * (⌘K and the browser's own keys are not ours; "?" is Shift and "/"), an
+ * (⌘K and the browser's own keys are not ours; "?" is Shift and "/"; Ctrl
+ * and Alt count for nothing where AltGr typed the character,
+ * `typedWithAltGraph`), an
  * input method is composing, or the reader is typing in a field — where
  * Escape cancels autofill and clears a search box, and "j" is a letter.
  */
@@ -90,7 +106,10 @@ export function shortcutsStandDown(e: KeyLike, opts: { modalOpen?: boolean } = {
   if (opts.modalOpen) return true;
   const t = e.target as TargetLike | null;
   if (t && typeof t === "object" && typeof t.closest === "function" && t.closest(DIALOG_SELECTOR)) return true;
-  if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return true;
+  if (e.metaKey || e.isComposing) return true;
+  // Ctrl and Alt are a shortcut's own, unless AltGr typed the character:
+  // there they are how the layout reaches "[" and "]".
+  if ((e.ctrlKey || e.altKey) && !typedWithAltGraph(e)) return true;
   return isTypingTarget(e.target);
 }
 
@@ -152,6 +171,14 @@ export function neighbourIn(order: readonly string[], id: string, delta: 1 | -1)
 /** The session key the pipeline keeps its last shown order under, for the
  *  deal page's "[" and "]". */
 export const PIPELINE_ORDER_KEY = "uc-pipeline-order";
+
+/** The order's key for one signed-in reader, so another account signed in
+ *  later in the same tab never steps through the first one's deals; null
+ *  where the reader is not known, and no order is kept or read. */
+export function pipelineOrderKey(viewerId: string | null | undefined): string | null {
+  const id = (viewerId ?? "").toLowerCase().replace(/[^0-9a-z-]/g, "");
+  return id ? `${PIPELINE_ORDER_KEY}:${id}` : null;
+}
 
 /** At most this many deals are kept: a pipeline larger than this steps
  *  through its first part. */

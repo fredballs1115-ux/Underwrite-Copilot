@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MODAL_SELECTOR, PIPELINE_ORDER_KEY, orderJson, pipelineKeyAction, stepFrom } from "@/lib/shortcuts";
+import { MODAL_SELECTOR, orderJson, pipelineKeyAction, pipelineOrderKey, stepFrom } from "@/lib/shortcuts";
 
 /**
  * The pipeline's keys (lib/shortcuts lists them): "/" to the search, "n" a
@@ -74,15 +74,20 @@ function stepDealFocus(delta: 1 | -1): boolean {
  * Keeps the order the pipeline shows — its filters and sort applied, a stage
  * after a stage — in the tab's session, so the deal page's "[" and "]" step
  * through it without a read of their own. A browser that keeps no storage
- * keeps no order, and the deal page's keys do nothing.
+ * keeps no order, and the deal page's keys do nothing. The order is kept
+ * under the reader's own id (`pipelineOrderKey`), so another account signed
+ * in later in the same tab never steps through it; with no reader known,
+ * none is kept.
  */
-export function useKeepShownOrder(ids: readonly string[]) {
+export function useKeepShownOrder(ids: readonly string[], viewerId: string | null | undefined) {
   const key = ids.join(",");
+  const storeKey = pipelineOrderKey(viewerId);
   useEffect(() => {
+    if (!storeKey) return;
     try {
-      sessionStorage.setItem(PIPELINE_ORDER_KEY, orderJson(key ? key.split(",") : []));
+      sessionStorage.setItem(storeKey, orderJson(key ? key.split(",") : []));
     } catch {
       // storage unavailable — no order kept
     }
-  }, [key]);
+  }, [key, storeKey]);
 }

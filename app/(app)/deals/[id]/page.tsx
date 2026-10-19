@@ -1869,7 +1869,7 @@ export default async function DealPage({
       />
       {/* "[" and "]": the previous and next deal in the pipeline's last
           shown order, kept in the tab's session — no read of its own. */}
-      <DealStepKeys dealId={id} />
+      <DealStepKeys dealId={id} viewerId={user?.id ?? null} />
 
       {/* A portfolio OM's properties, one row each (lib/portfolio): absent
           for a single-property memorandum. */}

@@ -613,7 +613,7 @@ export function Pipeline({
   // The order the list shows, a stage after a stage, kept for the deal
   // page's "[" and "]" (pipeline-keys).
   const shownOrder = STAGES.flatMap((s) => (sectionDrawn(s) ? (groups.get(s) ?? []) : [])).map((d) => d.id);
-  useKeepShownOrder(shownOrder);
+  useKeepShownOrder(shownOrder, viewerId);
   const cardsOnScreen =
     view === "cards" ? STAGES.flatMap((s) => (sectionDrawn(s) && isOpen(s) ? (groups.get(s) ?? []) : [])) : [];
   const marketPhotoCredits = shownMarketCredits(cardsOnScreen, marketShown);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MODAL_SELECTOR, PIPELINE_ORDER_KEY, dealStepOf, neighbourIn, readOrder } from "@/lib/shortcuts";
+import { MODAL_SELECTOR, dealStepOf, neighbourIn, pipelineOrderKey, readOrder } from "@/lib/shortcuts";
 
 /**
  * "[" and "]" on a deal open the previous and the next deal in the order the
@@ -12,18 +12,21 @@ import { MODAL_SELECTOR, PIPELINE_ORDER_KEY, dealStepOf, neighbourIn, readOrder 
  * browser that keeps no storage) or the deal is not in it, or it is the
  * first or last, the key does nothing. The same guard as every page
  * shortcut: never while typing, inside a dialog or with a modifier held.
- * Draws nothing.
+ * The order is the signed-in reader's own (`pipelineOrderKey`): another
+ * account's, kept earlier in the same tab, is never read. Draws nothing.
  */
-export function DealStepKeys({ dealId }: { dealId: string }) {
+export function DealStepKeys({ dealId, viewerId }: { dealId: string; viewerId: string | null }) {
   const router = useRouter();
   useEffect(() => {
+    const storeKey = pipelineOrderKey(viewerId);
+    if (!storeKey) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "[" && e.key !== "]") return;
       const delta = dealStepOf(e, { modalOpen: !!document.querySelector(MODAL_SELECTOR) });
       if (delta == null) return;
       let order: string[] | null = null;
       try {
-        order = readOrder(sessionStorage.getItem(PIPELINE_ORDER_KEY));
+        order = readOrder(sessionStorage.getItem(storeKey));
       } catch {
         // storage unavailable — no order to step through
       }
@@ -35,6 +38,6 @@ export function DealStepKeys({ dealId }: { dealId: string }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dealId, router]);
+  }, [dealId, router, viewerId]);
   return null;
 }

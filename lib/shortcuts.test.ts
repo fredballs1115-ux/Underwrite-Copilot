@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,6 +23,7 @@ import {
   opensShortcuts,
   orderJson,
   pipelineKeyAction,
+  pipelineOrderKey,
   readOrder,
   shortcutsStandDown,
   stepFrom,
@@ -152,6 +154,44 @@ describe("stepping through the deals shown", () => {
     // A path, a number or a repeat is dropped, never followed.
     expect(readOrder('["a","../billing",3,"a","b"]')).toEqual(["a", "b"]);
     expect(JSON.parse(orderJson(Array.from({ length: PIPELINE_ORDER_MAX + 5 }, (_, i) => `d${i}`)))).toHaveLength(PIPELINE_ORDER_MAX);
+  });
+
+  it("keeps each signed-in reader's order under their own key, and none for a reader not known", () => {
+    const a = pipelineOrderKey("0B1C2D3E-0000-4000-8000-000000000001");
+    const b = pipelineOrderKey("0b1c2d3e-0000-4000-8000-000000000002");
+    expect(a).toBe("uc-pipeline-order:0b1c2d3e-0000-4000-8000-000000000001");
+    expect(a).not.toBe(b);
+    expect(pipelineOrderKey(null)).toBeNull();
+    expect(pipelineOrderKey(undefined)).toBeNull();
+    expect(pipelineOrderKey("")).toBeNull();
+    // The pipeline writes and the deal page reads by the reader's key.
+    const keep = readFileSync("app/(app)/deals/pipeline-keys.ts", "utf8");
+    const step = readFileSync("app/(app)/deals/[id]/deal-step-keys.tsx", "utf8");
+    expect(keep).toMatch(/sessionStorage\.setItem\(storeKey,/);
+    expect(step).toMatch(/sessionStorage\.getItem\(storeKey\)/);
+    expect(keep + step).toMatch(/pipelineOrderKey\(viewerId\)[\s\S]*pipelineOrderKey\(viewerId\)/);
+    expect(keep + step).not.toMatch(/PIPELINE_ORDER_KEY/);
+  });
+});
+
+describe("a layout that types \"[\" and \"]\" with AltGr", () => {
+  const altGr = (over: Partial<KeyLike>): Partial<KeyLike> => ({ ...over, getModifierState: (k: string) => k === "AltGraph" });
+  it("steps on a deal: Ctrl and Alt are the layout's, not a shortcut's", () => {
+    // Windows reports AltGr as Ctrl and Alt held; Linux and macOS as Alt.
+    expect(dealStepOf(key("[", altGr({ ctrlKey: true, altKey: true })))).toBe(-1);
+    expect(dealStepOf(key("]", altGr({ ctrlKey: true, altKey: true })))).toBe(1);
+    expect(dealStepOf(key("]", altGr({ altKey: true })))).toBe(1);
+  });
+
+  it("still stands down for ⌘, for Ctrl or Alt without AltGr, and while typing", () => {
+    expect(dealStepOf(key("]", altGr({ ctrlKey: true, altKey: true, metaKey: true })))).toBeNull();
+    expect(dealStepOf(key("]", { ctrlKey: true, altKey: true, getModifierState: () => false }))).toBeNull();
+    expect(dealStepOf(key("]", altGr({ altKey: true, target: el("INPUT") })))).toBeNull();
+    // A browser whose getModifierState throws is read as no AltGr.
+    const throws = () => {
+      throw new Error("no");
+    };
+    expect(dealStepOf(key("]", { altKey: true, getModifierState: throws }))).toBeNull();
   });
 });
 
