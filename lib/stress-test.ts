@@ -27,8 +27,11 @@
 //     survey's margin), `stretched` past it, `unsupported` past it by more
 //     than the key's own threshold, `unchecked` where nothing carries a
 //     figure;
-//   - the impact swaps ONE input of the model for the best evidence's figure
-//     and reports both runs; it is struck only where the model's reads stand
+//   - the impact swaps ONE input of the model, twice: the OM's figure in for
+//     the base run and the best evidence's for the alternative, so the move
+//     is the gap's own and never the model's default's (which reads no
+//     growth rate off the OM, exits at the going-in cap and borrows at the
+//     seed); it is struck only where the model's reads stand
 //     (lib/underwrite/report-grid `modelReadsWithheld`), the price buys the
 //     building and the deal is no plan deal — a plan deal is judged on its
 //     yield on total cost, not a levered return on the price;
@@ -263,27 +266,39 @@ const pctOrNone = (n: number | null): string => (n == null ? "does not solve" : 
 const multOrNone = (n: number | null): string => (n == null ? "—" : `${n.toFixed(2)}x`);
 
 /**
- * The engine on the model's inputs with ONE input replaced, base against
- * alternative — never two. `omValue` and `altValue` are the engine's own
- * unit for that input. Where the model already runs at the evidence's
- * figure (a rent roll's occupancy the derived model took as its vacancy)
- * the two runs are one, and the note says so.
+ * The engine on the model's inputs with ONE input replaced, twice: the base
+ * run with the OM's figure in that input, the alternative with the
+ * evidence's — so the two runs differ in that one input and nothing else,
+ * and the move is the gap's own. The model's default is neither (it never
+ * reads the OM's growth rates, runs its exit at the going-in cap and its
+ * rate at the seed), so where the model's own figure is a third value the
+ * note says what the model itself runs; where the OM's figure IS the
+ * evidence's the two runs are one, and the note says so. `omValue`,
+ * `altValue` and `modelValue` are the engine's own unit for that input.
+ * `words.evidence` names whose figure the alternative is ("the deal's
+ * T-12"), and `words.omSide` whose the OM's is where it is not simply "the
+ * OM's" (an abated bill against the unabated one).
  */
 function runImpact(
-  derived: DerivedModel,
   input: keyof UnderwriteInputs,
+  baseInputs: UnderwriteInputs,
   altInputs: UnderwriteInputs,
   evidenceIndex: number,
   omValue: number,
   altValue: number,
-  words: { what: string; om: string; alt: string; evidence: string },
+  modelValue: number,
+  words: { what: string; om: string; alt: string; evidence: string; omSide?: string; model: string },
 ): StressImpact {
-  const base = computeUnderwrite(derived.inputs).returns;
+  const base = computeUnderwrite(baseInputs).returns;
   const alt = computeUnderwrite(altInputs).returns;
   const same = Math.abs(altValue - omValue) < 1e-9;
+  const omSide = words.omSide ?? "the OM's";
+  const altSaid = words.evidence ? `${words.evidence}'s ${words.alt}` : words.alt;
+  const modelClause =
+    Math.abs(modelValue - omValue) < 1e-9 ? "" : Math.abs(modelValue - altValue) < 1e-9 ? " The model itself already runs at it." : ` The model itself runs ${words.model}.`;
   const note = same
-    ? `The model already runs ${words.what} at ${words.evidence}'s ${words.alt}, so its levered IRR of ${pctOrNone(base.leveredIrrPct)} carries it.`
-    : `If ${words.what} is ${words.evidence}'s ${words.alt}, not the OM's ${words.om}, the levered IRR moves from ${pctOrNone(base.leveredIrrPct)} to ${pctOrNone(alt.leveredIrrPct)} (${multOrNone(base.leveredEquityMultiple)} to ${multOrNone(alt.leveredEquityMultiple)} equity multiple).`;
+    ? `${omSide[0].toUpperCase()}${omSide.slice(1)} ${words.what}, ${words.om}, is ${altSaid}, so the levered IRR of ${pctOrNone(base.leveredIrrPct)} stands on it.${modelClause}`
+    : `If ${words.what} is ${altSaid}, not ${omSide} ${words.om}, the levered IRR moves from ${pctOrNone(base.leveredIrrPct)} to ${pctOrNone(alt.leveredIrrPct)} (${multOrNone(base.leveredEquityMultiple)} to ${multOrNone(alt.leveredEquityMultiple)} equity multiple).${modelClause}`;
   return {
     input,
     evidenceIndex,
@@ -295,6 +310,20 @@ function runImpact(
     altMultiple: alt.leveredEquityMultiple,
     note,
   };
+}
+
+/** `runImpact` for a percent input: the OM's and the evidence's figures in
+ *  percent points, each swapped into the model's inputs on its own. */
+function pctImpact(
+  derived: DerivedModel,
+  input: "vacancyPct" | "rentGrowthPct" | "expenseGrowthPct" | "exitCapPct" | "allInRatePct",
+  evidenceIndex: number,
+  omPct: number,
+  altPct: number,
+  words: { what: string; om: string; alt: string; evidence: string; model: string },
+): StressImpact {
+  const inputs = derived.inputs;
+  return runImpact(input, { ...inputs, [input]: omPct / 100 }, { ...inputs, [input]: altPct / 100 }, evidenceIndex, omPct / 100, altPct / 100, inputs[input], words);
 }
 
 /** The year-1 NOI the model's inputs make, before capital and fees. */
@@ -544,15 +573,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   const evidenceIndex = evidence.findIndex((e) => e.value === best.value);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? runImpact(
-          ctx.derived,
-          "vacancyPct",
-          { ...ctx.derived.inputs, vacancyPct: best.value / 100 },
-          evidenceIndex,
-          ctx.derived.inputs.vacancyPct,
-          best.value / 100,
-          { what: "vacancy", om: pct1(om.pct), alt: pct1(best.value), evidence: evidence[evidenceIndex].publisher },
-        )
+      ? pctImpact(ctx.derived, "vacancyPct", evidenceIndex, om.pct, best.value, {
+          what: "vacancy",
+          om: pct1(om.pct),
+          alt: pct1(best.value),
+          evidence: evidence[evidenceIndex].publisher,
+          model: pct1(ctx.derived.inputs.vacancyPct * 100),
+        })
       : null;
   return { key: "vacancy", title: TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence) };
 }
@@ -593,15 +620,13 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
   const evidenceIndex = evidence.findIndex((e) => e.value === bestValue);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? runImpact(
-          ctx.derived,
-          "rentGrowthPct",
-          { ...ctx.derived.inputs, rentGrowthPct: bestValue / 100 },
-          evidenceIndex,
-          ctx.derived.inputs.rentGrowthPct,
-          bestValue / 100,
-          { what: "rent growth", om: `${pct1(om.pct)}/yr`, alt: `${pct1(bestValue)}/yr`, evidence: evidence[evidenceIndex].publisher },
-        )
+      ? pctImpact(ctx.derived, "rentGrowthPct", evidenceIndex, om.pct, bestValue, {
+          what: "rent growth",
+          om: `${pct1(om.pct)}/yr`,
+          alt: `${pct1(bestValue)}/yr`,
+          evidence: evidence[evidenceIndex].publisher,
+          model: `${pct1(ctx.derived.inputs.rentGrowthPct * 100)}/yr`,
+        })
       : null;
   return { key: "rent_growth", title: TITLES.rent_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("rent_growth", evidence) };
 }
@@ -641,15 +666,13 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
   const evidenceIndex = evidence.findIndex((e) => e.value === bestValue);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? runImpact(
-          ctx.derived,
-          "expenseGrowthPct",
-          { ...ctx.derived.inputs, expenseGrowthPct: bestValue / 100 },
-          evidenceIndex,
-          ctx.derived.inputs.expenseGrowthPct,
-          bestValue / 100,
-          { what: "expense growth", om: `${pct1(om.pct)}/yr`, alt: `${pct1(bestValue)}/yr`, evidence: evidence[evidenceIndex].publisher },
-        )
+      ? pctImpact(ctx.derived, "expenseGrowthPct", evidenceIndex, om.pct, bestValue, {
+          what: "expense growth",
+          om: `${pct1(om.pct)}/yr`,
+          alt: `${pct1(bestValue)}/yr`,
+          evidence: evidence[evidenceIndex].publisher,
+          model: `${pct1(ctx.derived.inputs.expenseGrowthPct * 100)}/yr`,
+        })
       : null;
   return { key: "expense_growth", title: TITLES.expense_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("expense_growth", evidence) };
 }
@@ -736,15 +759,13 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   const evidenceIndex = evidence.findIndex((e) => e.value === alt);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? runImpact(
-          ctx.derived,
-          "exitCapPct",
-          { ...ctx.derived.inputs, exitCapPct: alt / 100 },
-          evidenceIndex,
-          ctx.derived.inputs.exitCapPct,
-          alt / 100,
-          { what: "the exit cap", om: pct2(om.pct), alt: pct2(alt), evidence: goingInOk ? "the going-in cap" : evidence[evidenceIndex].publisher },
-        )
+      ? pctImpact(ctx.derived, "exitCapPct", evidenceIndex, om.pct, alt, {
+          what: "the exit cap",
+          om: pct2(om.pct),
+          alt: pct2(alt),
+          evidence: goingInOk ? "the going-in cap" : evidence[evidenceIndex].publisher,
+          model: pct2(ctx.derived.inputs.exitCapPct * 100),
+        })
       : null;
   return { key: "exit_cap", title: TITLES.exit_cap, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("exit_cap", evidence) };
 }
@@ -845,15 +866,13 @@ function debtRow(ctx: Ctx): StressRow | null {
   judged.gap = { ...judged.gap, value: Math.round((seed.pct - om.pct) * 100), unit: "bps" };
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? runImpact(
-          ctx.derived,
-          "allInRatePct",
-          { ...ctx.derived.inputs, allInRatePct: seed.pct / 100 },
-          0,
-          ctx.derived.inputs.allInRatePct,
-          seed.pct / 100,
-          { what: "the all-in rate", om: pct2(om.pct), alt: pct2(seed.pct), evidence: "the index plus the class's spread" },
-        )
+      ? pctImpact(ctx.derived, "allInRatePct", 0, om.pct, seed.pct, {
+          what: "the all-in rate",
+          om: pct2(om.pct),
+          alt: pct2(seed.pct),
+          evidence: "the index plus the class's spread",
+          model: pct2(ctx.derived.inputs.allInRatePct * 100),
+        })
       : null;
   return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("debt", evidence) };
 }
@@ -942,17 +961,20 @@ function noiRow(ctx: Ctx): StressRow | null {
   const evidenceIndex = evidence.indexOf(best);
   let impact: StressImpact | null = null;
   if (ctx.derived && ctx.impactsWithheld == null) {
-    const rent = rentForNoi(ctx.derived.inputs, best.value!);
-    if (rent != null) {
-      impact = runImpact(
-        ctx.derived,
-        "inPlaceRentAnnual",
-        { ...ctx.derived.inputs, inPlaceRentAnnual: rent },
-        evidenceIndex,
-        ctx.derived.inputs.inPlaceRentAnnual,
-        rent,
-        { what: "year-1 NOI", om: money(year1Noi(ctx.derived.inputs)), alt: money(best.value!), evidence: best.publisher },
-      );
+    // The rent line that makes the OM's NOI, and the one that makes the
+    // evidence's, each swapped in on its own; the model's own year-1 NOI
+    // (the T-12's where one anchors it) is named where it is neither.
+    const inputs = ctx.derived.inputs;
+    const omRent = rentForNoi(inputs, omValue);
+    const altRent = rentForNoi(inputs, best.value!);
+    if (omRent != null && altRent != null) {
+      impact = runImpact("inPlaceRentAnnual", { ...inputs, inPlaceRentAnnual: omRent }, { ...inputs, inPlaceRentAnnual: altRent }, evidenceIndex, omRent, altRent, inputs.inPlaceRentAnnual, {
+        what: "year-1 NOI",
+        om: money(omValue),
+        alt: money(best.value!),
+        evidence: best.publisher,
+        model: money(year1Noi(inputs)),
+      });
     }
   }
   return { key: "noi", title: TITLES.noi, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("noi", evidence) };
@@ -1037,18 +1059,29 @@ function taxesRow(ctx: Ctx): StressRow | null {
           : `The OM's ${money(bill)} is over the ${money(best.value!)} its own figures imply — the conservative side.`,
   };
   const evidenceIndex = evidence.indexOf(best);
-  const impact = ctx.derived && ctx.impactsWithheld == null ? expenseImpact(ctx.derived, best.value! - bill, evidenceIndex, "the tax line", money(bill), money(best.value!), best.publisher) : null;
+  const impact =
+    ctx.derived && ctx.impactsWithheld == null
+      ? expenseImpact(ctx.derived, best.value! - bill, evidenceIndex, { what: "the tax line", om: money(bill), alt: money(best.value!), evidence: best.publisher })
+      : null;
   return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("taxes", evidence) };
 }
 
 /** The model's one expense line moved by `delta`: the one input swapped is
- *  `expenseLines`, its first line's annual figure grown by the gap. */
-function expenseImpact(derived: DerivedModel, delta: number, evidenceIndex: number, what: string, om: string, alt: string, evidence: string): StressImpact | null {
+ *  `expenseLines`, its first line's annual figure grown by the gap. The
+ *  model's lines carry the OM's bill (they are built on its figures), so
+ *  the base run is the model's own. `words.evidence` is "" where `alt` is
+ *  already a whole phrase. */
+function expenseImpact(
+  derived: DerivedModel,
+  delta: number,
+  evidenceIndex: number,
+  words: { what: string; om: string; alt: string; evidence: string; omSide?: string },
+): StressImpact | null {
   const lines = derived.inputs.expenseLines;
   if (lines.length === 0) return null;
   const altLines = lines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + delta } : l));
   const base = lines.reduce((s, l) => s + l.annual, 0);
-  return runImpact(derived, "expenseLines", { ...derived.inputs, expenseLines: altLines }, evidenceIndex, base, base + delta, { what, om, alt, evidence });
+  return runImpact("expenseLines", derived.inputs, { ...derived.inputs, expenseLines: altLines }, evidenceIndex, base, base + delta, base, { ...words, model: money(base) });
 }
 
 // — Insurance —
@@ -1111,7 +1144,10 @@ function insuranceRow(ctx: Ctx): StressRow | null {
           : `The OM's ${money(premium)} is over ${best.publisher}'s ${money(best.value!)} — the conservative side.`,
   };
   const evidenceIndex = evidence.indexOf(best);
-  const impact = ctx.derived && ctx.impactsWithheld == null ? expenseImpact(ctx.derived, best.value! - premium, evidenceIndex, "the insurance line", money(premium), money(best.value!), best.publisher) : null;
+  const impact =
+    ctx.derived && ctx.impactsWithheld == null
+      ? expenseImpact(ctx.derived, best.value! - premium, evidenceIndex, { what: "the insurance line", om: money(premium), alt: money(best.value!), evidence: best.publisher })
+      : null;
   return { key: "insurance", title: TITLES.insurance, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("insurance", evidence) };
 }
 
@@ -1221,11 +1257,12 @@ function basisRow(ctx: Ctx): StressRow | null {
   if (ctx.derived && ctx.impactsWithheld == null && interest.sharePct == null) {
     const price = ctx.derived.inputs.purchasePrice;
     const altPrice = (price * best.value!) / om;
-    impact = runImpact(ctx.derived, "purchasePrice", { ...ctx.derived.inputs, purchasePrice: altPrice }, evidenceIndex, price, altPrice, {
+    impact = runImpact("purchasePrice", ctx.derived.inputs, { ...ctx.derived.inputs, purchasePrice: altPrice }, evidenceIndex, price, altPrice, price, {
       what: "the price",
       om: `${money(price)} (${money(om)}${perWord})`,
       alt: `${money(altPrice)} (${money(best.value!)}${perWord})`,
       evidence: best.publisher,
+      model: money(price),
     });
   }
   return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence) };

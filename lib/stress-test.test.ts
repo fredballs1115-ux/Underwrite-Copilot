@@ -183,8 +183,39 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(n.gap!.value).toBe(2_650_000 - T12.noi!);
     expect(n.verdict).toBe("unsupported");
     expect(n.impact!.input).toBe("inPlaceRentAnnual");
-    // The model already anchors on the T-12's NOI, so the two runs are one.
-    expect(n.impact!.note).toContain("The model already runs year-1 NOI at the deal's T-12's");
+    // The base run is the OM's pro forma, the alternative the T-12's, and
+    // the model — which anchors on the T-12 — is said to run at the latter.
+    expect(n.impact!.note).toMatch(/^If year-1 NOI is the deal's T-12's \$2\.\d\dM, not the OM's \$2\.65M, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\. The model itself already runs at it\.$/);
+    expect(n.impact!.altIrrPct!).toBeLessThan(n.impact!.baseIrrPct!);
+  });
+
+  it("prices every gap from the OM's figure, not the model's default, and names the model's own figure where it is a third value", () => {
+    const args = apartmentArgs();
+    const inputs = args.derived!.inputs;
+    const irrAt = (patch: Partial<UnderwriteInputs>) => computeUnderwrite({ ...inputs, ...patch }).returns.leveredIrrPct! * 100;
+    const t = buildStressTest(args);
+    // The debt: the model runs at the seed's 6.78%, so a base run on the
+    // model's inputs would have priced nothing; the base is the OM's 5.25%.
+    const d = rowOf(t, "debt");
+    expect(d.impact!.baseIrrPct).toBeCloseTo(irrAt({ allInRatePct: 0.0525 }), 6);
+    expect(d.impact!.altIrrPct).toBeCloseTo(irrAt({ allInRatePct: 0.0678 }), 6);
+    expect(d.impact!.altIrrPct!).toBeLessThan(d.impact!.baseIrrPct!);
+    expect(d.impact!.note).toMatch(/^If the all-in rate is the index plus the class's spread's 6\.78%, not the OM's 5\.25%, the levered IRR moves from \d+\.\d% to \d+\.\d% \(.*\)\. The model itself already runs at it\.$/);
+    // The exit: the model exits at the going-in cap, so the compression the
+    // row calls stretched is priced from the OM's 5.50%.
+    const x = rowOf(t, "exit_cap");
+    expect(x.impact!.baseIrrPct).toBeCloseTo(irrAt({ exitCapPct: 0.055 }), 6);
+    expect(x.impact!.altIrrPct).toBeCloseTo(irrAt({ exitCapPct: 0.0571 }), 6);
+    expect(x.impact!.note).toContain("If the exit cap is the going-in cap's 5.71%, not the OM's 5.50%, the levered IRR moves from");
+    expect(x.impact!.note).toContain("The model itself already runs at it.");
+    // Rent growth: the model's 3.0% is neither the OM's 4.0% nor the
+    // trailing year's 5.0%, so the note names it.
+    const g = rowOf(t, "rent_growth");
+    expect(g.impact!.baseIrrPct).toBeCloseTo(irrAt({ rentGrowthPct: 0.04 }), 6);
+    expect(g.impact!.altIrrPct).toBeCloseTo(irrAt({ rentGrowthPct: 0.05 }), 6);
+    expect(g.impact!.note).toMatch(/, not the OM's 4\.0%\/yr, the levered IRR moves from .* The model itself runs 3\.0%\/yr\.$/);
+    // Vacancy: the model's 6.0% is the OM's own, so nothing is added.
+    expect(rowOf(t, "vacancy").impact!.note).not.toContain("The model itself");
   });
 
   it("reads the taxes off the OM's own bill and assessed value, and the insurance off the T-12 and the index", () => {
@@ -270,7 +301,9 @@ describe("a stabilized apartment deal with a T-12", () => {
     const t = buildStressTest(args);
     expect(t.rows.some((r) => r.impact)).toBe(true);
     // Every run the test made is on the model's own inputs or on a copy
-    // with one key swapped — never two.
+    // with one key swapped — never two: the base run carries the OM's
+    // figure in that key and the alternative the evidence's, so the two
+    // differ in it alone, and in nothing else from the model.
     const swapped = (spy.mock.calls as [UnderwriteInputs][]).map(([i]) => i).filter((i) => i !== baseInputs);
     expect(swapped.length).toBeGreaterThan(0);
     const changedKeys = new Set<string>();
@@ -281,16 +314,14 @@ describe("a stabilized apartment deal with a T-12", () => {
     }
     const impacts = t.rows.filter((r) => r.impact).map((r) => r.impact!);
     // Every key a run changed is one an impact names, and every impact whose
-    // alternative differs from the model's own figure changed its key — a
-    // swap the model already runs at (its exit defaults to the going-in cap,
-    // its rate to the seed) is a run with nothing changed, said so.
+    // alternative differs from the OM's figure changed its key; one whose
+    // figures are one is a pair of runs with nothing between them, said so.
     for (const k of changedKeys) expect(impacts.map((i) => i.input)).toContain(k);
     for (const i of impacts) {
       if (Math.abs(i.altValue - i.omValue) > 1e-9) expect(changedKeys.has(i.input), i.input).toBe(true);
-      else expect(i.note).toContain("The model already runs");
+      else expect(i.note).toContain("stands on it");
     }
-    expect(changedKeys.has("vacancyPct")).toBe(true);
-    expect(changedKeys.has("expenseLines")).toBe(true);
+    for (const k of ["vacancyPct", "expenseLines", "exitCapPct", "allInRatePct", "rentGrowthPct"]) expect(changedKeys.has(k), k).toBe(true);
   });
 });
 
