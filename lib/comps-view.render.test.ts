@@ -261,7 +261,7 @@ describe("the comps readout as pictures", () => {
     const html = draw(result(comps));
     // the cards are phone-only, the table wide-only, in a named, focusable region
     expect(html).toMatch(/<ul class="[^"]*sm:hidden[^"]*" aria-label="Recorded sales as cards">/);
-    expect(html).toMatch(/role="region" aria-label="Recorded sales" tabindex="0" class="overflow-x-auto mt-1\.5 hidden sm:block"/);
+    expect(html).toMatch(/role="region" aria-label="Recorded sales" tabindex="0" class="relative overflow-x-auto mt-1\.5 hidden sm:block"/);
     // every sale once in each: its address and its price
     expect(visibleText(html).split("102 Walnut St").length - 1).toBe(2);
     // the number is read out (it had been hidden from a screen reader); no map on a deal's panel

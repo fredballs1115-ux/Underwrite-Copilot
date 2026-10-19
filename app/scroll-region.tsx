@@ -8,6 +8,13 @@ import type { HTMLAttributes, ReactNode } from "react";
  * keys scroll it once it has focus, and a screen reader says what the table
  * is — and it shows the site's own focus ring (globals.css `:focus-visible`).
  * The name is required: a region with no name is no landmark at all.
+ *
+ * It is `relative` so that it holds what is absolutely placed inside it: a
+ * screen reader's `sr-only` note in a cell sits at its cell's place, and in
+ * a box that is not the containing block it escapes the scroll and widens
+ * the page (the visual sweep of 2026-10-19: the deal page's Financials tab
+ * scrolled 28px sideways on a phone, past the sensitivity grid's
+ * "(base case)").
  */
 export function ScrollRegion({
   label,
@@ -21,7 +28,7 @@ export function ScrollRegion({
   children: ReactNode;
 } & Omit<HTMLAttributes<HTMLDivElement>, "role" | "tabIndex" | "aria-label" | "aria-labelledby" | "className" | "children">) {
   return (
-    <div {...rest} role="region" aria-label={label} tabIndex={0} className={`overflow-x-auto ${className}`.trim()}>
+    <div {...rest} role="region" aria-label={label} tabIndex={0} className={`relative overflow-x-auto ${className}`.trim()}>
       {children}
     </div>
   );
