@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  allInBasisLabel,
   basisLabel,
   buildComps,
   explorerLeads,
@@ -560,5 +561,20 @@ describe("buildComps — a plan deal's basis is total cost over the planned unit
     expect(s.perUnit).toBe(300_000);
     expect(s.allIn).toBe(false);
     expect(s.capPct).toBe(5.4);
+  });
+
+  // The audit of the last merge: the group pooled the plan deals' all-in
+  // cost with the building prices, so the card drew one bar and one median
+  // of the mix.
+  it("a group keeps the plan deals' all-in basis apart from the building prices", () => {
+    const groups = summarizeMarkets(comps);
+    const dallas = groups.find((g) => g.dealIds.includes("stab"))!;
+    expect(dallas.perUnit).toEqual({ min: 300_000, median: 300_000, max: 300_000, n: 1, basis: "unit", noun: "unit" });
+    const allIn = dallas.allInPerUnit!;
+    expect(allIn.n).toBe(comps.filter((c) => c.allIn && dallas.dealIds.includes(c.dealId)).length);
+    expect(allIn.max).toBeLessThan(300_000);
+    expect(allInBasisLabel(allIn)).toBe("All-in basis / unit (plan deals)");
+    // A group of building prices alone carries none.
+    expect(summarizeMarkets(comps.filter((c) => !c.allIn))[0].allInPerUnit).toBeUndefined();
   });
 });

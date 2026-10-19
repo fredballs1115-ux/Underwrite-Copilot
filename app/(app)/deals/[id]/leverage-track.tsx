@@ -35,7 +35,12 @@ export function LeverageTrack({ figures }: { figures: LeverageFigures }) {
   const lo = Math.min(...values);
   const hi = Math.max(...values);
   const pad = Math.max((hi - lo) * 0.1, 0.25);
-  const domain: [number, number] = [lo - pad, hi + pad];
+  // The ends rounded outward to the half percent, so they read as a scale
+  // ("4.0%" to "7.0%"), never as figures of their own.
+  const domain: [number, number] = [Math.floor((lo - pad) * 2) / 2, Math.ceil((hi + pad) * 2) / 2];
+  // A screening rate under the owner-occupier survey is under a floor
+  // investor debt usually prices above: said, so it is not read as a quote.
+  const seedUnderSurvey = seed != null && survey != null && seed.pct < survey.pct;
   return (
     <figure className="m-0 mt-2" data-qa="leverage-track">
       <div className="relative h-3 rounded-full bg-faint" aria-hidden>
@@ -56,8 +61,8 @@ export function LeverageTrack({ figures }: { figures: LeverageFigures }) {
       </div>
       {/* The track's two ends, so a reader can place the ticks without the key. */}
       <div className="mt-1 flex justify-between text-[10px] tabular-nums text-muted" aria-hidden>
-        <span>{`${domain[0].toFixed(2)}%`}</span>
-        <span>{`${domain[1].toFixed(2)}%`}</span>
+        <span>{`${domain[0].toFixed(1)}%`}</span>
+        <span>{`${domain[1].toFixed(1)}%`}</span>
       </div>
       <Key stack>
         <KeyItem mark="tick" tone="bg-ink">
@@ -71,6 +76,9 @@ export function LeverageTrack({ figures }: { figures: LeverageFigures }) {
         {seed && (
           <KeyItem mark="tick" tone="bg-brand">
             {`Screening rate ${seed.pct.toFixed(2)}%: ${seed.note}`}
+            {seedUnderSurvey
+              ? `${/[.!?]$/.test(seed.note.trim()) ? "" : "."} The screening rate sits under the owner-occupier survey, so a lender's quote is likely higher.`
+              : null}
           </KeyItem>
         )}
         {tenYear && (

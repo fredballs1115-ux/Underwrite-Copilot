@@ -379,8 +379,13 @@ export function ucShareOfInventory(
 export interface DeliveryQuarter {
   /** "2027-Q2" */
   quarter: string;
+  /** the square feet the quarter's sized buildings state — where `unsized`
+   *  is over zero, at least this much, never the quarter's whole */
   sf: number;
   count: number;
+  /** how many of the quarter's buildings state no size: a blank is not
+   *  zero, so the quarter's figure is a floor wherever this is over zero */
+  unsized: number;
   names: string[];
   /** true when any building in the quarter is flagged stale */
   hasStale: boolean;
@@ -402,8 +407,9 @@ export function deliverySchedule(properties: PipelineProperty[]): DeliveryQuarte
   for (const p of properties) {
     if (p.excluded || p.status === "delivered" || !p.expectedDelivery) continue;
     const q = quarterOf(p.expectedDelivery);
-    const bucket = buckets.get(q) ?? { quarter: q, sf: 0, count: 0, names: [], hasStale: false };
-    bucket.sf += p.sf ?? 0;
+    const bucket = buckets.get(q) ?? { quarter: q, sf: 0, count: 0, unsized: 0, names: [], hasStale: false };
+    if (p.sf != null && Number.isFinite(p.sf)) bucket.sf += p.sf;
+    else bucket.unsized += 1;
     bucket.count += 1;
     if (p.name) bucket.names.push(p.name);
     if (p.staleFlag) bucket.hasStale = true;

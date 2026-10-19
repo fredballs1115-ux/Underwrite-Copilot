@@ -162,6 +162,7 @@ import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { readActuals } from "@/lib/actuals/actuals-read";
+import { t12SummaryOf } from "@/lib/actuals/analyze";
 import {
   signalGoingInCap,
   assessPlausibility,
@@ -890,7 +891,7 @@ export default async function DealPage({
           .eq("team_id", ownership.team_id)
       : Promise.resolve({ data: null }),
   ]);
-  const t12Summary = (t12Res.data?.summary as T12Summary | undefined) ?? null;
+  const t12Summary: T12Summary | null = t12SummaryOf(t12Res.data?.summary);
   // The OM's NOI vs the T-12 actual — the shared picker (word-bounded,
   // per-unit-safe, same one the challenger note uses), which reads the
   // deal's kind: on a plan deal the in-place or Year-1 figure is compared
@@ -1333,7 +1334,10 @@ export default async function DealPage({
     cap: rangeCap,
     basis: unit === "unit" ? rangeBasis.perUnit : unit === "sf" ? rangeBasis.perSf : null,
   });
-  const memoryBasis = marketMemory?.perUnit ? { unit: marketMemory.perUnit.basis, noun: marketMemory.perUnit.noun ?? null } : null;
+  // The building prices' basis, else the plan deals' all-in one (the two are
+  // kept apart in the group, lib/market-memory `allInPerUnit`).
+  const memoryBasisStat = marketMemory?.perUnit ?? marketMemory?.allInPerUnit ?? null;
+  const memoryBasis = memoryBasisStat ? { unit: memoryBasisStat.basis, noun: memoryBasisStat.noun ?? null } : null;
   const marketMemoryRanges = memory
     ? compRangeTracks(
         memory.members.map((c) => ({
@@ -1883,6 +1887,9 @@ export default async function DealPage({
             ? metroDemand(reads.rates, readClass)
             : null
         }
+        // The market check opens on the market's photograph, the one the
+        // picture above leads with where the building has none of its own.
+        marketPicture={marketPicture}
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}

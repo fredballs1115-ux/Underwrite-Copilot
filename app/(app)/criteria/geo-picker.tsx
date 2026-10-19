@@ -2,24 +2,53 @@
 
 import { useState } from "react";
 import { AddressAutocomplete } from "../address-autocomplete";
+import { GalleryCreditPartsText } from "@/app/credit-parts";
 import type { GeoTarget } from "@/lib/criteria";
 import type { StructuredAddress } from "@/lib/address";
+import type { ChipPicture } from "@/lib/geo-chip-pictures";
+
+/** A covered market's thumbnail on its chip: its photograph, cropped to a
+ *  disc, named by the chip's own words beside it. */
+function ChipThumb({ picture }: { picture: ChipPicture | undefined }) {
+  if (!picture) return null;
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element -- the skyline
+       route serves the file; a disc this size needs no optimizer */
+    <img
+      src={picture.src}
+      alt=""
+      aria-hidden
+      loading="lazy"
+      decoding="async"
+      width={20}
+      height={20}
+      data-picture="geo-chip"
+      className="h-5 w-5 shrink-0 rounded-full bg-faint object-cover"
+    />
+  );
+}
 
 /**
  * Geography targets as removable chips, fed by the address autocomplete.
  * Type a city, county, or metro; picking a suggestion adds a structured
  * target (city/county/state) the mandate check matches against. The chips
- * ride along as one hidden JSON field.
+ * ride along as one hidden JSON field. A covered market's chip wears its
+ * market's photograph (lib/geo-chip-pictures, handed in as plain data), and
+ * one line under the chips credits every photograph they show.
  */
 export function GeoPicker({
   initial,
   suggestions = [],
+  pictures = {},
 }: {
   initial: GeoTarget[];
   /** covered markets offered as one-tap territories (server-built) */
   suggestions?: GeoTarget[];
+  /** each covered market's photograph, by its chip's label (server-built) */
+  pictures?: Record<string, ChipPicture>;
 }) {
   const [chips, setChips] = useState<GeoTarget[]>(initial);
+  const pictureOf = (label: string): ChipPicture | undefined => (Object.hasOwn(pictures, label) ? pictures[label] : undefined);
 
   function addTarget(target: GeoTarget) {
     setChips((prev) =>
@@ -48,6 +77,12 @@ export function GeoPicker({
   const unpicked = suggestions.filter(
     (s) => !chips.some((c) => c.label.toLowerCase() === s.label.toLowerCase()),
   );
+  // Every photograph on screen, for the one credit line (which names each
+  // photographer and photograph once).
+  const shown = [...chips.map((c) => c.label), ...unpicked.map((s) => s.label)]
+    .map(pictureOf)
+    .filter((p): p is ChipPicture => !!p)
+    .map((p) => p.credit);
 
   return (
     <div>
@@ -57,8 +92,9 @@ export function GeoPicker({
           {chips.map((c) => (
             <li
               key={c.label}
-              className="flex items-center gap-1 rounded-full border border-line bg-faint py-1 pl-3 pr-1 text-xs font-medium"
+              className={`flex items-center gap-1.5 rounded-full border border-line bg-faint py-1 pr-1 text-xs font-medium ${pictureOf(c.label) ? "pl-1" : "pl-3"}`}
             >
+              <ChipThumb picture={pictureOf(c.label)} />
               {c.label}
               <button
                 type="button"
@@ -89,12 +125,18 @@ export function GeoPicker({
               key={s.label}
               type="button"
               onClick={() => addTarget(s)}
-              className="rounded-full border border-line px-2.5 py-0.5 text-[11px] font-medium text-muted outline-none transition-colors hover:border-brand hover:text-brand focus-visible:ring-2 focus-visible:ring-brand/40"
+              data-qa="geo-suggestion"
+              className={`flex items-center gap-1.5 rounded-full border border-line py-0.5 pr-2.5 text-[11px] font-medium text-muted outline-none transition-colors hover:border-brand hover:text-brand focus-visible:ring-2 focus-visible:ring-brand/40 ${pictureOf(s.label) ? "pl-0.5" : "pl-2.5"}`}
             >
-              + {s.label}
+              <ChipThumb picture={pictureOf(s.label)} />+ {s.label}
             </button>
           ))}
         </div>
+      )}
+      {shown.length > 0 && (
+        <p className="mt-2 text-[10px] leading-snug text-muted" data-qa="geo-credit">
+          <GalleryCreditPartsText credits={shown} />
+        </p>
       )}
     </div>
   );

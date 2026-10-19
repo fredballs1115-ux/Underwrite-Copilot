@@ -10,6 +10,7 @@ import {
   rentRollDateWords,
   statedDay,
   t12DateWords,
+  t12DeductionText,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
 
@@ -170,13 +171,13 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
             <table className="mt-3 w-full text-sm">
               <tbody>
                 <Line k="Collected rent" v={usd(st.collectedRent)} />
-                {st.vacancyLoss != null && <Line k="Vacancy / credit loss" v={`(${usd(Math.abs(st.vacancyLoss))})`} />}
+                {st.vacancyLoss != null && <Line k="Vacancy / credit loss" v={t12DeductionText(st.vacancyLoss)} />}
                 {st.otherIncome != null && <Line k="Other income" v={usd(st.otherIncome)} />}
                 <Line k="Effective gross income" v={usd(st.egi)} strong />
                 {st.opex.map((l, i) => (
-                  <Line key={`${l.key}-${i}`} k={l.label} v={`(${usd(Math.abs(l.amount))})`} indent />
+                  <Line key={`${l.key}-${i}`} k={l.label} v={t12DeductionText(l.amount, { asStated: st.opexSignsMixed })} indent />
                 ))}
-                <Line k="Total operating expenses" v={`(${usd(st.totalOpex == null ? null : Math.abs(st.totalOpex))})`} strong />
+                <Line k="Total operating expenses" v={t12DeductionText(st.totalOpex)} strong />
                 <Line
                   k={st.noiDerived ? "Net operating income (derived)" : "Net operating income"}
                   v={usd(st.noi)}

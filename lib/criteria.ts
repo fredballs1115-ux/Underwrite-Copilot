@@ -1686,6 +1686,94 @@ export function buyBoxCoverage(checks: BuyBoxCheck[], mandate: MandateCoverageLi
   return { checked, total, unchecked, priceUnchecked };
 }
 
+/** What the buy box is judged against: `buyBoxCheckSource`'s answer. */
+export type BuyBoxSource = ExtractionLike;
+
+/** The deal's class as the checks read it: the explicit override, else what
+ *  the screen read — the noun the count and basis checks speak comes from
+ *  it. */
+function checkClassOf(dealAssetClass: string, extraction: ExtractionLike | null): string {
+  return dealAssetClass && dealAssetClass !== "auto" ? dealAssetClass : (extraction?.assetClass ?? "");
+}
+
+// The figure each band is judged on, read ONE way: `evaluateBuyBox` reads
+// through these, and so does `boxFigures`, the buy box page's picture of the
+// reader's deals on each band — so a dot sits at the figure its check judged.
+
+/** The shared count reader: the whole count, never a subset or a row about
+ *  the units — and the OM's own noun where it stated one, the class's where
+ *  it did not, so a hotel is held to the band in keys. */
+function countRead(metrics: MetricLike[], cls: string): { n: number | null; noun: string } {
+  const row = unitCountRow(metrics);
+  return { n: row ? parseCount(row.value) : null, noun: countNoun(row?.label, cls) };
+}
+
+/** The shared price row — on a development the land cost, the same row the
+ *  deal page and the pipeline print, read against the screen's year — and
+ *  the end of a range the band tests (#466): its bottom where it reaches
+ *  under a floor, else its top, never the flattering end against a ceiling. */
+function priceRead(
+  extraction: ExtractionLike | null,
+  band: { min?: number; max?: number },
+): { metric: MetricLike | null; range: { low: number; high: number } | null; dollars: number | null } {
+  const metric = findPriceRow(extraction?.metrics ?? [], extraction?.strategy?.kind, screenYearOf(extraction));
+  const range = metric ? priceRange(metric.value) : null;
+  const dollars = range
+    ? band.min != null && range.low < band.min
+      ? range.low
+      : range.high
+    : metric
+      ? parsePrice(metric.value)
+      : null;
+  return { metric, range, dollars };
+}
+
+/** The per-unit figure in the deal's own noun (lib/asset-words: a hotel is
+ *  held to the mandate per key, a park per pad), and why it is no basis
+ *  where the price is not the building's. */
+function basisRead(extraction: ExtractionLike | null, cls: string): { dollars: number | null; noun: string; withheld: string | null } {
+  const metric = findMetric(extraction?.metrics ?? [], METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
+  const noun = assetWords(cls).noun?.one ?? "unit";
+  return { dollars: metric ? parseMoney(metric.value) : null, noun, withheld: basisWithheldWhy(extraction, noun) };
+}
+
+/** The going-in cap, and why the deal's cap slot holds none of its own. */
+function capRead(extraction: ExtractionLike | null): { pct: number | null; withheld: CapWithheldKind | null } {
+  const metric = findGoingInCap(extraction?.metrics ?? []);
+  return { pct: metric ? parsePct(metric.value) : null, withheld: capWithheldOf(extraction) };
+}
+
+/** The figures a deal is judged on for each band the box can set, by the
+ *  checks' own readers; null wherever the check reads none (a figure not
+ *  stated, a cap or a basis withheld), which is exactly where the check
+ *  says "unknown". */
+export interface BoxFigures {
+  sf: number | null;
+  count: { n: number; noun: string } | null;
+  /** the end of a stated range the band tests, with the range */
+  price: { value: number; range: { low: number; high: number } | null } | null;
+  basis: { value: number; noun: string } | null;
+  cap: number | null;
+}
+
+/** A deal's figures on the box's bands (`BoxFigures`): the buy box page's
+ *  dots, each where its check judged it. */
+export function boxFigures(dealAssetClass: string, extraction: ExtractionLike | null, box: BuyBox): BoxFigures {
+  const cls = checkClassOf(dealAssetClass, extraction);
+  const metrics = extraction?.metrics ?? [];
+  const count = countRead(metrics, cls);
+  const price = priceRead(extraction, priceBand(box));
+  const basis = basisRead(extraction, cls);
+  const cap = capRead(extraction);
+  return {
+    sf: buildingSfFromMetrics(metrics),
+    count: count.n == null ? null : { n: count.n, noun: count.noun },
+    price: price.dollars == null ? null : { value: price.dollars, range: price.range },
+    basis: basis.withheld || basis.dollars == null ? null : { value: basis.dollars, noun: basis.noun },
+    cap: cap.withheld || cap.pct == null ? null : cap.pct,
+  };
+}
+
 export function evaluateBuyBox(
   dealAssetClass: string,
   extraction: ExtractionLike | null,
@@ -1693,12 +1781,7 @@ export function evaluateBuyBox(
 ): BuyBoxCheck[] {
   const checks: BuyBoxCheck[] = [];
   const metrics = extraction?.metrics ?? [];
-  // The deal's class: the explicit override, else what the screen read —
-  // the noun the count and basis checks speak comes from it.
-  const cls =
-    dealAssetClass && dealAssetClass !== "auto"
-      ? dealAssetClass
-      : (extraction?.assetClass ?? "");
+  const cls = checkClassOf(dealAssetClass, extraction);
 
   // ---- Asset class -------------------------------------------------------
   if (box.assetClasses && box.assetClasses.length) {
@@ -1815,9 +1898,7 @@ export function evaluateBuyBox(
     // The shared count reader: the whole count, never a subset or a row
     // about the units — and the OM's own noun where it stated one, the
     // class's where it did not, so a hotel is held to the band in keys.
-    const row = unitCountRow(metrics);
-    const n = row ? parseCount(row.value) : null;
-    const noun = countNoun(row?.label, cls);
+    const { n, noun } = countRead(metrics, cls);
     const label = capWord(noun);
     const bandText = [
       box.unitsMin != null ? `${fmtCount(box.unitsMin)} ${noun} min` : null,
@@ -1861,18 +1942,10 @@ export function evaluateBuyBox(
     // The shared price row — on a development the land cost, the same row
     // the deal page and the pipeline print, read against the screen's year
     // — so the band never says "no asking price" beside a printed one.
-    const metric = findPriceRow(metrics, extraction?.strategy?.kind, screenYearOf(extraction));
     // A range (#466) is judged by the end that tests the band: its bottom
     // where it reaches under a floor, else its top — never the flattering
     // end against a ceiling — and said as the range it is.
-    const range = metric ? priceRange(metric.value) : null;
-    const dollars = range
-      ? band.min != null && range.low < band.min
-        ? range.low
-        : range.high
-      : metric
-        ? parsePrice(metric.value)
-        : null;
+    const { metric, range, dollars } = priceRead(extraction, band);
     const shown = (n: number) => (range ? `${fmtM(range.low)}–${fmtM(range.high)}` : fmtM(n));
     const noun = metric && /\b(land|site)\b/i.test(metric.label) ? "land cost" : "ask";
     const bandText = [
@@ -1927,12 +2000,10 @@ export function evaluateBuyBox(
 
   // ---- Price per unit ----------------------------------------------------
   if (box.maxPerUnitK != null) {
-    const metric = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
-    const dollars = metric ? parseMoney(metric.value) : null;
-    const max = box.maxPerUnitK * 1e3;
     // The deal's own noun (lib/asset-words): a hotel is held to the mandate
     // per key, a park per pad — the figure the OM quotes is the one tested.
-    const noun = assetWords(cls).noun?.one ?? "unit";
+    const { dollars, noun, withheld } = basisRead(extraction, cls);
+    const max = box.maxPerUnitK * 1e3;
     // On a plan deal the figure is the price over the units, and the deal's
     // basis is its total cost (lib/deal-strategy `planSummary`): the check
     // is labelled by what it divides, the mandate's own "max price per
@@ -1944,7 +2015,6 @@ export function evaluateBuyBox(
     // A per-unit figure on a price that is not the building's — a note's, a
     // position's, the land's, a share's — is on a basis the memorandum never
     // says: the box's ceiling is never held to it (the audit of 2026-10-05).
-    const withheld = basisWithheldWhy(extraction, noun);
     if (withheld) {
       checks.push({
         label,
@@ -1982,10 +2052,8 @@ export function evaluateBuyBox(
 
   // ---- Going-in cap ------------------------------------------------------
   if (box.minCapPct != null) {
-    const metric = findGoingInCap(metrics);
-    const pct = metric ? parsePct(metric.value) : null;
+    const { pct, withheld } = capRead(extraction);
     const planKind = planKindLabel(extraction);
-    const withheld = capWithheldOf(extraction);
     if (withheld) {
       // A note's price is a loan's: the cap the memorandum states is the
       // collateral's, which the buyer of the note does not earn (#414). A

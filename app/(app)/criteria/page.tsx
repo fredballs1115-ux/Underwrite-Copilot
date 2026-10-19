@@ -5,7 +5,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { ExchangeFields } from "./exchange-fields";
 import { getActiveBuyBox } from "@/lib/criteria-server";
-import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
+import { geoTargets, priceBand } from "@/lib/criteria";
 import {
   saveBuyBox,
   addBuyBox,
@@ -16,11 +16,19 @@ import {
 import { PendingButton } from "../pending-button";
 import { GeoPicker } from "./geo-picker";
 import { coveredMarketGeoTargets } from "@/lib/market-match";
+// Each covered market's chip picture as plain data: the skyline table stays
+// on the server (lib/client-bundle-tables.test.ts).
+import { coveredMarketChipPictures } from "@/lib/geo-chip-pictures";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 import { pipelineCard, type PipelineCardRow } from "@/lib/pipeline-card";
 import { isOpenStage, normalizeStage } from "@/lib/stages";
 import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem, OPEN_STAGE_FILTER } from "./box-preview";
 import type { JobLike } from "@/lib/screen-run";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { BAND_DEALS_MAX, boxBands, boxLinesBeyondBands, type BandDeal } from "@/lib/box-bands";
+import { BoxBands, ReadOnlyBox } from "./box-bands";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { StructuredAddress } from "@/lib/address";
 
 export const metadata: Metadata = { title: "Buy box" };
 
@@ -119,6 +127,47 @@ export default async function CriteriaPage({
     return { items, more: live.length > BOX_PREVIEW_MAX };
   })();
 
+  // The box, drawn (lib/box-bands): each band it sets as a track with the
+  // reader's live deals on it — the deals the preview judges, the closed,
+  // the dead and the sample left out — each at the figure its check reads
+  // through the deal page's own source (lib/buy-box-chip `dealCheckSource`).
+  // A failed read draws the bands with no deals on them.
+  const bandDeals: BandDeal[] = await (async () => {
+    if (!user || !active.box) return [];
+    let q = supabase
+      .from("deals")
+      .select("id, name, asset_class, extraction, address, first_signal, stage, is_sample")
+      .or(OPEN_STAGE_FILTER)
+      .order("created_at", { ascending: false })
+      .limit(BAND_DEALS_MAX);
+    q = active.scope === "team" && active.teamId ? q.eq("team_id", active.teamId) : q.eq("user_id", user.id).is("team_id", null);
+    const { data, error: readError } = await q;
+    if (readError || !data) return [];
+    type Row = {
+      id: string;
+      name: string | null;
+      asset_class: string | null;
+      extraction: unknown;
+      address: unknown;
+      first_signal: unknown;
+      stage: string | null;
+      is_sample: boolean | null;
+    };
+    return (data as Row[])
+      .filter((d) => !d.is_sample && isOpenStage(normalizeStage(d.stage)))
+      .map((d) => ({
+        id: d.id,
+        name: d.name || "Untitled deal",
+        assetClass: d.asset_class ?? "",
+        source: dealCheckSource(
+          (d.extraction as ExtractionResult | null) ?? null,
+          (d.first_signal as FirstSignal | null) ?? null,
+          (d.address as StructuredAddress | null) ?? null,
+        ),
+      }));
+  })();
+  const bands = active.box ? boxBands(active.box, bandDeals) : [];
+
   const banner = saved
     ? {
         cls: "bg-pass/10 text-pass",
@@ -177,36 +226,15 @@ export default async function CriteriaPage({
       <BoxPreview items={preview.items} more={preview.more} />
 
       {!active.editable ? (
-        <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
-          <h2 className="text-sm font-semibold tracking-tight">
-            {active.teamName}&apos;s criteria
-          </h2>
-          {active.boxes.length > 1 && (
-            <p className="mt-1 text-xs text-muted">
-              Active mandate:{" "}
-              <span className="font-medium text-ink">
-                {activeNamed?.name ?? "Mandate"}
-              </span>{" "}
-              (of {active.boxes.length}).
-            </p>
-          )}
-          {active.box ? (
-            <ul className="mt-3 space-y-2 text-sm text-muted">
-              {buyBoxLines(active.box).map((l) => (
-                <li key={l} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
-                    ✓
-                  </span>
-                  {l}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-muted">
-              No criteria set yet — ask the team owner to define them here.
-            </p>
-          )}
-        </section>
+        // A teammate who cannot edit sees the box drawn, the same tracks the
+        // owner's page draws, and the criteria no track draws under them.
+        <ReadOnlyBox
+          teamName={active.teamName}
+          mandate={active.boxes.length > 1 ? { name: activeNamed?.name ?? "Mandate", of: active.boxes.length } : null}
+          bands={bands}
+          deals={bandDeals.length}
+          lines={active.box ? boxLinesBeyondBands(active.box) : null}
+        />
       ) : (
         <>
           {/* Named mandates: switch which one every screen is judged against,
@@ -287,6 +315,8 @@ export default async function CriteriaPage({
             </section>
           )}
 
+          <BoxBands bands={bands} deals={bandDeals.length} />
+
           <form action={saveBuyBox} className="space-y-6">
             {/* Which named box these edits belong to (guards against a switch
                 mid-edit). */}
@@ -324,7 +354,11 @@ export default async function CriteriaPage({
                     market, address, and county.
                   </p>
                   <div className="mt-2">
-                    <GeoPicker initial={geoTargets(box)} suggestions={coveredMarketGeoTargets()} />
+                    <GeoPicker
+                      initial={geoTargets(box)}
+                      suggestions={coveredMarketGeoTargets()}
+                      pictures={coveredMarketChipPictures()}
+                    />
                   </div>
                 </div>
               </div>

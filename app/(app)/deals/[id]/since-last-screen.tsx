@@ -63,38 +63,70 @@ export function SinceLastScreen({ diff }: { diff: ScreenDiff }) {
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {diff.rows.map((r) => (
-              <div
-                key={r.label}
-                className={`rounded-lg border p-2.5 ${
-                  r.direction === "worse"
-                    ? "border-kill/25 bg-kill/[0.04]"
-                    : r.direction === "better"
-                      ? "border-pass/25 bg-pass/[0.04]"
-                      : "border-line bg-faint"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium">{r.label}</p>
-                  <p
-                    className={`font-mono text-[11px] font-semibold tabular-nums ${
-                      r.direction === "worse"
-                        ? "text-kill"
-                        : r.direction === "better"
-                          ? "text-pass"
-                          : "text-muted"
-                    }`}
-                  >
-                    {r.delta}
-                  </p>
-                </div>
-                <p className="mt-1 font-mono text-[11px] tabular-nums text-muted">
-                  {r.before} → {r.after}
-                </p>
-              </div>
+              <MoveTile key={r.label} label={r.label} delta={r.delta} before={r.before} after={r.after} tone={r.direction} />
             ))}
           </div>
         </>
       )}
     </section>
+  );
+}
+
+/** How a tile is toned: from the buyer's side where the figure has one
+ *  (a price up is worse), `moved` where it has none — a market figure's
+ *  move is a fact, not good or bad news for the deal. */
+export type MoveTone = "worse" | "better" | "flat" | "moved";
+
+const TILE: Record<MoveTone, { box: string; delta: string }> = {
+  worse: { box: "border-kill/25 bg-kill/[0.04]", delta: "text-kill" },
+  better: { box: "border-pass/25 bg-pass/[0.04]", delta: "text-pass" },
+  flat: { box: "border-line bg-faint", delta: "text-muted" },
+  moved: { box: "border-line bg-surface", delta: "text-ink" },
+};
+
+/**
+ * One figure's move as a tile: its label and the move, then before → after.
+ * The retrade card's and the market check's "since this screen" alike.
+ * Given `said`, the figure's sentence, the tile is drawn for the eye and the
+ * sentence is what a screen reader hears, so the move is never read twice.
+ */
+export function MoveTile({
+  label,
+  delta,
+  before,
+  after,
+  tone,
+  said,
+}: {
+  label: string;
+  delta: string;
+  before: string;
+  after: string;
+  tone: MoveTone;
+  said?: string;
+}) {
+  const t = TILE[tone];
+  const body = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium">{label}</p>
+        <p className={`shrink-0 font-mono text-[11px] font-semibold tabular-nums ${t.delta}`}>{delta}</p>
+      </div>
+      <p className="mt-1 font-mono text-[11px] tabular-nums text-muted">
+        {before} → {after}
+      </p>
+    </>
+  );
+  return (
+    <div className={`rounded-lg border p-2.5 ${t.box}`} data-tile="move">
+      {said ? (
+        <>
+          <span className="sr-only">{said}</span>
+          <div aria-hidden>{body}</div>
+        </>
+      ) : (
+        body
+      )}
+    </div>
   );
 }

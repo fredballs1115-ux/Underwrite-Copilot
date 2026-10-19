@@ -22,6 +22,17 @@ export function sfShort(sf: number): string {
   return `${Math.round(sf)} SF`;
 }
 
+/** A quarter's figure: its square feet, and where some of its buildings
+ *  state no size, how many — "120k SF (1 of 2 buildings states no size)",
+ *  since the sum is then a floor, not the quarter's total. A quarter none of
+ *  whose buildings states a size says that. */
+export function deliveryFigure(d: Pick<DeliveryQuarter, "sf" | "count" | "unsized">): string {
+  const unsized = d.unsized ?? 0;
+  if (!(d.sf > 0)) return "SF not stated";
+  if (unsized <= 0) return sfShort(d.sf);
+  return `${sfShort(d.sf)} (${unsized} of ${d.count} building${d.count === 1 ? "" : "s"} ${unsized === 1 ? "states" : "state"} no size)`;
+}
+
 /**
  * The dated deliveries, a bar a quarter on one scale (the largest quarter's
  * square feet), each with its figure and how many buildings make it. A
@@ -44,13 +55,20 @@ export function DeliveryBars({ deliveries }: { deliveries: readonly DeliveryQuar
                 {d.hasStale ? <span className="text-caution">{" · review"}</span> : null}
               </span>
             }
-            figure={d.sf > 0 ? sfShort(d.sf) : "SF not stated"}
+            figure={deliveryFigure(d)}
           >
             {d.sf > 0 && max > 0 ? (
+              // A quarter with a building of no stated size is at least its
+              // bar: the bar ends in a dashed edge, never a closed one.
               <div
-                className={`absolute inset-y-0 left-0 rounded-full ${d.hasStale ? "bg-caution" : "bg-brand"}`}
+                className={`absolute inset-y-0 left-0 ${
+                  (d.unsized ?? 0) > 0
+                    ? "rounded-l-full border-r-2 border-dashed border-ink/70"
+                    : "rounded-full"
+                } ${d.hasStale ? "bg-caution" : "bg-brand"}`}
                 style={{ width: `${Math.max(2, (d.sf / max) * 100)}%` }}
                 data-bar="sub-delivery"
+                data-partial={(d.unsized ?? 0) > 0 ? "" : undefined}
               />
             ) : null}
           </BarRow>

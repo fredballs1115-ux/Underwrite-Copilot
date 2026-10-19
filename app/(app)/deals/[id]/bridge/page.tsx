@@ -16,7 +16,9 @@ import {
   type LeverRefusal,
 } from "@/lib/bridge/scenario-form";
 import { BridgeView, type VersionOption } from "./bridge-view";
-import { saveScenarioVersion, deleteDealVersion } from "./actions";
+import { saveScenarioVersion } from "./actions";
+import { VersionList } from "./version-list";
+import { versionNoIrr } from "@/lib/bridge/version-bars";
 import { DealCrumb } from "../deal-crumb";
 import { EMPTY_GLYPH, EmptyCard } from "@/app/empty-pictures";
 import { dealTitle } from "@/lib/deal-title";
@@ -288,62 +290,26 @@ export default async function BridgePage({
 
       {/* ── Version list ──────────────────────────────────────────────────── */}
       {versions.length > 0 ? (
-        <section className="rounded-lg border border-line bg-surface">
-          <h2 className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">
-            Saved versions
-            {listCut ? (
-              <span className="font-normal text-muted" data-qa="versions-cut">
-                {" — "}
-                {listCut}
-              </span>
-            ) : null}
-          </h2>
-          <ul>
-            {versions.map((v) => (
-              <li
-                key={v.id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line px-5 py-3 text-sm last:border-b-0"
-              >
-                <span className="font-medium text-ink">{v.version_label}</span>
-                <span className="font-mono text-muted">{pct1(v.results?.leveredIrrPct)} levered</span>
-                <span className="font-mono text-muted">
-                  {v.results?.leveredEquityMultiple != null
-                    ? `${v.results.leveredEquityMultiple.toFixed(2)}x`
-                    : "—"}
-                </span>
-                <span className="text-xs text-muted">
-                  {v.automatic ? "auto" : "saved"} ·{" "}
-                  {new Date(v.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-                {v.note ? <span className="text-xs text-muted">{v.note}</span> : null}
-                {v.id === liveId ? (
-                  <span
-                    className="ml-auto rounded bg-faint px-1.5 py-px text-xs text-muted"
-                    title="The deal's assumptions as they stand. It is kept while they do — a visit would only take it again — so it has no Delete."
-                  >
-                    current
-                  </span>
-                ) : (
-                  <form action={deleteDealVersion} className="ml-auto">
-                    <input type="hidden" name="dealId" value={id} />
-                    <input type="hidden" name="versionId" value={v.id} />
-                    <button
-                      type="submit"
-                      aria-label={`Delete version ${v.version_label}`}
-                      className="text-xs text-muted underline-offset-2 hover:text-kill hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </form>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
+        <VersionList
+          dealId={id}
+          liveId={liveId}
+          listCut={listCut}
+          versions={versions.map((v) => {
+            const irr = v.results?.leveredIrrPct ?? null;
+            return {
+              id: v.id,
+              label: v.version_label,
+              note: v.note,
+              automatic: v.automatic,
+              createdAt: v.created_at,
+              leveredIrr: irr,
+              leveredEquityMultiple: v.results?.leveredEquityMultiple ?? null,
+              // Why no rate solved, read off the version's own assumptions
+              // run again — only for a version that stored none.
+              noIrr: irr == null ? versionNoIrr(v.assumptions) : null,
+            };
+          })}
+        />
       ) : null}
     </div>
   );

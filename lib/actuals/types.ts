@@ -108,6 +108,9 @@ export interface T12Summary {
   noi: number | null;
   /** true when noi was reconstructed (egi − opex) rather than stated */
   noiDerived: boolean;
+  /** the expense lines carry both signs, so which is a credit cannot be
+   *  read: the lines are kept as stated and no total is derived from them */
+  opexSignsMixed?: boolean;
 }
 
 // ---- OM-vs-actual NOI comparison ------------------------------------------

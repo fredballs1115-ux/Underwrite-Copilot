@@ -832,6 +832,46 @@ describe("ReportDocument (full report)", () => {
     expect(none).not.toContain("T-12 operating statement");
   }, 60000);
 
+  it("prints a T-12's deductions by their magnitude, whichever sign the statement filed them under", async () => {
+    const extraction = { ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // A summary as the old summarizer stored a statement of negatives.
+    const t12 = {
+      period_end_date: "2026-05-31",
+      summary: {
+        collectedRent: 1_100_000,
+        vacancyLoss: -120_000,
+        otherIncome: 50_000,
+        egi: 1_270_000,
+        opex: [
+          { key: "taxes", label: "Real estate taxes", amount: -250_000, page: "p. 2" },
+          { key: "insurance", label: "Insurance", amount: -150_000, page: "p. 2" },
+        ],
+        totalOpex: -400_000,
+        noi: 1_670_000,
+        noiDerived: true,
+      },
+    };
+    const read = actualsFromRows(extraction, { kind: "stabilized", label: "Stabilized" }, "multifamily", null, t12)!;
+    const text = (await pdfTextOf(await renderReportPdf(withActuals(buildReportData(deal, "September 30, 2026", [], null), read)))).replace(/\s+/g, " ");
+    expect(text).toContain("Vacancy / credit loss ($120k)");
+    expect(text).toContain("Real estate taxes ($250k)");
+    expect(text).toContain("Total operating expenses ($400k)");
+    expect(text).toContain("Effective gross income $1.03M");
+    expect(text).toContain("Net operating income (derived) $630k");
+    expect(text).not.toMatch(/\([−-]\$/);
+  }, 60000);
+
   it("labels the retrade grid's base row the modelled price, never the ask, and says what the model priced it at", async () => {
     const render = async (extraction: ExtractionResult) => {
       const deal = {

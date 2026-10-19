@@ -29,7 +29,7 @@ import { checkPdfOpens } from "@/lib/pdf-open";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
-import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi, t12SummaryOf } from "@/lib/actuals/analyze";
 import {
   askingPriceOf,
   assessPlausibility,
@@ -1311,7 +1311,8 @@ async function runAnalysisSteps(
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-          const t12Noi = (t12Row?.summary as { noi?: number | null } | null)?.noi;
+          // Read by today's sign rule, as the actuals card reads it.
+          const t12Noi = t12SummaryOf(t12Row?.summary)?.noi;
           const exMetrics =
             (dr?.extraction as { metrics?: { label: string; value: string }[] } | null)
               ?.metrics ?? [];

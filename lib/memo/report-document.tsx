@@ -30,6 +30,7 @@ import {
   gapWords,
   rentRollDateWords,
   t12DateWords,
+  t12DeductionText,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
 import { rentQuotedMonthly } from "@/lib/asset-words";
@@ -1754,13 +1755,13 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
         <View wrap={false}>
           <TitleRow title="T-12 operating statement" count={str(t12DateWords(read.t12) ?? "") || undefined} marginTop={4} />
           {line("Collected rent", actualsUsd(st.collectedRent))}
-          {st.vacancyLoss != null ? line("Vacancy / credit loss", `(${actualsUsd(st.vacancyLoss)})`) : null}
+          {st.vacancyLoss != null ? line("Vacancy / credit loss", t12DeductionText(st.vacancyLoss)) : null}
           {st.otherIncome != null ? line("Other income", actualsUsd(st.otherIncome)) : null}
           {line("Effective gross income", actualsUsd(st.egi), { bold: true })}
           {st.opex.map((l, i) => (
-            <View key={`${l.key}-${i}`}>{line(l.label, `(${actualsUsd(l.amount)})`, { indent: true })}</View>
+            <View key={`${l.key}-${i}`}>{line(l.label, t12DeductionText(l.amount, { asStated: st.opexSignsMixed }), { indent: true })}</View>
           ))}
-          {line("Total operating expenses", `(${actualsUsd(st.totalOpex)})`, { bold: true })}
+          {line("Total operating expenses", t12DeductionText(st.totalOpex), { bold: true })}
           {line(st.noiDerived ? "Net operating income (derived)" : "Net operating income", actualsUsd(st.noi), { bold: true })}
         </View>
       ) : null}

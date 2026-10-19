@@ -73,7 +73,8 @@ export function SalesList({
 }) {
   const [by, setBy] = useState<SalesSort>("nearest");
   const order = salesOrder(comps, by);
-  const bars = perSfBars(comps, medianPerSqft);
+  // A row possibly of one deed across parcels sets no scale and draws no bar.
+  const bars = perSfBars(comps, medianPerSqft, shared);
   const first = order.slice(0, SALES_SHOWN);
   const rest = order.slice(SALES_SHOWN);
   const noArea = comps.filter((c) => perSqftOf(c) === null).length;
@@ -123,9 +124,13 @@ export function SalesList({
       )}
       {bars && (
         <p className="mt-1.5 text-[11px] text-muted" data-qa="comps-psf-caption">
-          {`Bars: the price a square foot that ${bars.drawn === comps.length ? `all ${bars.drawn} sales state` : `${bars.drawn} of the ${comps.length} sales state`}, from zero to the highest, ${fmtPsf(bars.max)}${
+          {`Bars: the price a square foot that ${bars.drawn + bars.leftOut === comps.length ? `all ${comps.length} sales state` : `${bars.drawn + bars.leftOut} of the ${comps.length} sales state`}, from zero to the highest, ${fmtPsf(bars.max)}${
             bars.medianShare !== null && medianPerSqft !== null ? `; the tick is the median, ${fmtPsf(medianPerSqft)}` : ""
-          }.`}
+          }.${
+            bars.leftOut > 0
+              ? ` ${bars.leftOut === 1 ? "One sale" : `${bars.leftOut} sales`} possibly of one deed across parcels ${bars.leftOut === 1 ? "draws" : "draw"} no bar.`
+              : ""
+          }`}
         </p>
       )}
     </>

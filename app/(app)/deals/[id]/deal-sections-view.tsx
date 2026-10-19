@@ -9,7 +9,11 @@
 // pieces that act on a deal (the reconcile upload, the additions, the retry).
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MarketPicture } from "@/lib/market-picture";
+import { photographerParts } from "@/lib/credit-parts";
+import { CreditPartsText } from "@/app/credit-parts";
+import { MarketCaption } from "../market-caption";
 import { placedByClause } from "@/lib/placed-by";
 import { andList, figureHolders } from "@/lib/region-line";
 import { stressTestTitle } from "@/lib/stress-test-title";
@@ -46,7 +50,8 @@ import type {
   DealKiller,
   VerdictScenario,
 } from "@/lib/anthropic/types";
-import { moveSentence, type BriefDelta } from "@/lib/brief-delta";
+import { figureValue, moveDelta, moveSentence, type BriefDelta } from "@/lib/brief-delta";
+import { MoveTile } from "./since-last-screen";
 import type { MetroDemand } from "@/lib/metro-demand";
 import { DemandBars } from "@/app/demand-bars";
 import {
@@ -754,7 +759,7 @@ function PublicWebComps({
           {webScale && (
             <div className="mt-1.5 space-y-0.5 text-[11px] text-muted" data-qa="web-comp-bars-caption">
               {webScale.tracks.map((t, k) => (
-                <p key={t.unit}>{compBarsCaption(t, webScale.counts[k], candidates.length)}</p>
+                <p key={t.unit}>{compBarsCaption(t, webScale.counts[k], candidates.length, "candidate")}</p>
               ))}
             </div>
           )}
@@ -1169,6 +1174,7 @@ export function MarketCheck({
   result,
   since = null,
   demand = null,
+  picture = null,
 }: {
   result: MarketResult;
   /** what moved since the check read its figures (lib/brief-delta), read
@@ -1179,6 +1185,10 @@ export function MarketCheck({
    *  sector that fills this building's kind marked; null outside the
    *  covered markets or before the pull has written the rows */
   demand?: MetroDemand | null;
+  /** the photograph the deal's market is known by (lib/market-picture,
+   *  resolved by the page — plain data, so this client module loads none of
+   *  lib/skyline's table); null where no photographed market answers */
+  picture?: MarketPicture | null;
 }) {
   // Aggressive first — that's where the risk is.
   const order = { aggressive: 0, conservative: 1, "in-line": 2 } as const;
@@ -1194,6 +1204,7 @@ export function MarketCheck({
   const readFailed = !brief ? liveReadFailedLine(result.liveReadFailed) : null;
   return (
     <section className="space-y-4">
+      {picture && <MarketPictureBand picture={picture} />}
       <SectionHeader
         title="Market plausibility check"
         aside={
@@ -1236,6 +1247,53 @@ export function MarketCheck({
 }
 
 /**
+ * The market check opens on the place it reads: the photograph its market
+ * is known by (lib/market-picture, the one the pipeline card and the deal
+ * page's Market view draw), named on its face as the market's under the one
+ * caption every market photograph wears, its photographer linked to the
+ * file's page and its licence to its text, "cropped to fit" since the band
+ * crops it. A photograph that does not load takes the band with it, credit
+ * and all: a credit is never left over a picture nobody can see.
+ */
+function MarketPictureBand({ picture }: { picture: MarketPicture }) {
+  const [gone, setGone] = useState(false);
+  const img = useRef<HTMLImageElement>(null);
+  // A load that failed before hydration fired its error with no listener.
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0) setGone(true);
+  }, []);
+  if (gone) return null;
+  return (
+    <figure className="relative overflow-hidden rounded-xl border border-line bg-faint" data-qa="market-check-picture">
+      {/* eslint-disable-next-line @next/next/no-img-element -- the skyline
+          route, proxied from Commons with its own immutable cache headers */}
+      <img
+        ref={img}
+        src={picture.src}
+        alt={`${picture.place}: the ${picture.name} market this check reads`}
+        width={1600}
+        height={560}
+        loading="lazy"
+        decoding="async"
+        className="block h-48 w-full object-cover sm:h-56"
+        onError={() => setGone(true)}
+      />
+      <MarketCaption
+        market={picture.name}
+        credit={
+          <CreditPartsText
+            parts={photographerParts(picture.author, picture.license, true)}
+            linkClassName="pointer-events-auto underline decoration-dotted underline-offset-2 hover:text-white"
+          />
+        }
+        size="hero"
+      />
+    </figure>
+  );
+}
+
+/**
  * The figures the check was handed (lib/live-market-brief), folded: the
  * first line of the summary says which market and which day, the list is
  * one click away — and every line stays in the HTML for the lints and a
@@ -1253,7 +1311,9 @@ function longDate(iso: string): string {
 /**
  * What moved since the check read its figures (lib/brief-delta): the day,
  * how many of the figures have a newer observation and how many moved, and
- * one sentence per figure that moved, in its own unit. A figure the
+ * a before → after tile per figure that moved, in its own unit — the
+ * retrade card's tile (since-last-screen.tsx), its sentence kept in the HTML
+ * as what a screen reader hears. A figure the
  * publisher has not updated since is counted as such, never as unchanged.
  */
 function SinceThisScreen({ since }: { since: BriefDelta }) {
@@ -1271,9 +1331,18 @@ function SinceThisScreen({ since }: { since: BriefDelta }) {
       <p className="font-medium">Since this check ran on {longDate(since.since)}</p>
       <p className="mt-0.5 text-xs text-muted">{summary}</p>
       {moved.length > 0 && (
-        <ul className="mt-2 space-y-1 text-muted">
+        <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {moved.map((m) => (
-            <li key={m.key} className="leading-relaxed">{moveSentence(m)}</li>
+            <li key={m.key}>
+              <MoveTile
+                label={m.label}
+                delta={moveDelta(m)}
+                before={figureValue(m.unit, m.from)}
+                after={figureValue(m.unit, m.to)}
+                tone="moved"
+                said={moveSentence(m)}
+              />
+            </li>
           ))}
         </ul>
       )}

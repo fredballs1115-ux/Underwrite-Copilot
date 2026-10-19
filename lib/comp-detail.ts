@@ -271,16 +271,23 @@ export function basisTracks(
  * L6). "each comp" only where every sale comp is on this track; a lone bar
  * with no subject tick is scaled to nothing but itself, so no scale is
  * claimed for it. `drawn` is the track's count (`BasisTracks.counts`),
- * `total` the sale comps in the set.
+ * `total` the sale comps in the set. `noun` is what the set is of — "comp"
+ * by default, "candidate" under the public-web block, whose rows are
+ * candidates the search returned and never comps the OM states.
  */
-export function compBarsCaption(track: Pick<BasisScale, "unit" | "noun" | "subjectValue">, drawn: number, total: number): string {
+export function compBarsCaption(
+  track: Pick<BasisScale, "unit" | "noun" | "subjectValue">,
+  drawn: number,
+  total: number,
+  noun = "comp",
+): string {
   const per = track.unit === "unit" ? track.noun : "SF";
   const which =
     drawn >= total
-      ? `each comp's basis per ${per}`
+      ? `each ${noun}'s basis per ${per}`
       : drawn === 1
-        ? `the basis per ${per} that one of the ${total} comps states`
-        : `the basis per ${per} that ${drawn} of the ${total} comps state`;
+        ? `the basis per ${per} that one of the ${total} ${noun}s states`
+        : `the basis per ${per} that ${drawn} of the ${total} ${noun}s state`;
   if (track.subjectValue != null) {
     return `Bars: ${which}; the tick is the subject at ${fmtBasis(track.subjectValue, track.unit, track.noun)}.`;
   }

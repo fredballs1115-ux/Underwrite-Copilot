@@ -79,7 +79,14 @@ export interface MarketGroup {
   marketKey: string;
   count: number;
   cap: Stat | null;
+  /** the building's price over its count or area — the operating deals'
+   *  basis, never pooled with a plan deal's all-in cost (`allInPerUnit`) */
   perUnit: BasisStat | null;
+  /** the plan deals' all-in basis — total cost over the planned count —
+   *  kept apart from the building prices, as the comps' tracks keep it
+   *  (lib/comp-range): a finished project's cost and a standing building's
+   *  price are different figures. Absent where no plan deal states one. */
+  allInPerUnit?: BasisStat | null;
   calls: { pass: number; caution: number; pass_on: number };
   dealIds: string[];
 }
@@ -348,11 +355,18 @@ export function marketsIn(groups: readonly Pick<MarketGroup, "marketKey">[]): nu
 
 function groupStat(members: MarketComp[]): MarketGroup {
   const caps = members.map((c) => c.capPct).filter((n): n is number => n != null);
-  // Basis is consistent within an asset class; take the members that carry it.
+  // Basis is consistent within an asset class; take the members that carry
+  // it. A plan deal's all-in cost is never pooled with a building's price:
+  // the two are stats of their own.
   const withBasis = members.filter((c) => c.perUnit != null && c.perUnitBasis);
-  const basisVals = withBasis.map((c) => c.perUnit!);
-  const perUnitStat = statOf(basisVals);
-  const basis = withBasis[0]?.perUnitBasis ?? null;
+  const basisStat = (set: MarketComp[]): BasisStat | null => {
+    const stat = statOf(set.map((c) => c.perUnit!));
+    const basis = set[0]?.perUnitBasis ?? null;
+    return stat && basis
+      ? { ...stat, basis, noun: basis === "unit" ? groupNoun(members[0].assetClass, set) : null }
+      : null;
+  };
+  const allInPerUnit = basisStat(withBasis.filter((c) => c.allIn));
   const calls = { pass: 0, caution: 0, pass_on: 0 };
   for (const c of members) {
     if (c.call && c.call in calls) calls[c.call as keyof typeof calls]++;
@@ -367,14 +381,8 @@ function groupStat(members: MarketComp[]): MarketGroup {
     marketKey: members[0].marketKey,
     count: members.length,
     cap: statOf(caps),
-    perUnit:
-      perUnitStat && basis
-        ? {
-            ...perUnitStat,
-            basis,
-            noun: basis === "unit" ? groupNoun(members[0].assetClass, withBasis) : null,
-          }
-        : null,
+    perUnit: basisStat(withBasis.filter((c) => !c.allIn)),
+    ...(allInPerUnit ? { allInPerUnit } : {}),
     calls,
     dealIds: members.map((c) => c.dealId),
   };
@@ -460,6 +468,12 @@ export const fmtBasis = (dollars: number, basis: "unit" | "sf", noun: string | n
  *  the pipeline card's own (lib/pipeline-slots `basisTag`). */
 function perSfText(dollars: number): string {
   return Math.round(dollars).toLocaleString("en-US");
+}
+
+/** "All-in basis / unit (plan deals)": the plan deals' own track's label,
+ *  in its own noun — the comps' tracks' words (lib/comp-range). */
+export function allInBasisLabel(s: BasisStat): string {
+  return `All-in basis / ${s.basis === "sf" ? "SF" : (s.noun ?? "unit")} (plan deals)`;
 }
 
 /** "Basis / key", "Basis / SF": the group's own noun where it carries a

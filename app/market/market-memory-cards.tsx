@@ -2,6 +2,7 @@ import Link from "next/link";
 import { assetClassLabel } from "@/lib/asset-class";
 import { metroForName } from "@/lib/market-match";
 import {
+  allInBasisLabel,
   basisLabel,
   fmtBasisRange,
   fmtCapRange,
@@ -64,6 +65,12 @@ export function MarketMemoryCards({ groups }: { groups: readonly MarketGroup[] }
   for (const label of new Set(groups.map((g) => basisLabel(g)))) {
     basisScales.set(label, scaleOf(groups.filter((g) => basisLabel(g) === label).map((g) => g.perUnit)));
   }
+  // A plan deal's all-in cost is drawn on a track of its own, never on the
+  // building prices' (lib/market-memory `allInPerUnit`).
+  const allIns = groups.flatMap((g) => (g.allInPerUnit ? [g.allInPerUnit] : []));
+  for (const label of new Set(allIns.map(allInBasisLabel))) {
+    basisScales.set(label, scaleOf(allIns.filter((s) => allInBasisLabel(s) === label)));
+  }
   return (
     <ShownCreditGrid
       pictures={gridPictures(pictured)}
@@ -80,6 +87,7 @@ export function MarketMemoryCards({ groups }: { groups: readonly MarketGroup[] }
             market={market}
             capScale={capScale}
             basisScale={basisScales.get(basisLabel(g)) ?? null}
+            allInScale={g.allInPerUnit ? (basisScales.get(allInBasisLabel(g.allInPerUnit)) ?? null) : null}
           />
         ))}
       </div>
@@ -92,12 +100,15 @@ function MarketCard({
   market,
   capScale,
   basisScale,
+  allInScale = null,
 }: {
   g: MarketGroup;
   market: { id: string; name: string } | null;
   capScale: Scale | null;
   basisScale: Scale | null;
+  allInScale?: Scale | null;
 }) {
+  const allIn = g.allInPerUnit ?? null;
   const calls = (
     [
       ["pass", g.calls.pass],
@@ -172,14 +183,26 @@ function MarketCard({
             value={g.cap ? fmtCapRange(g.cap) : null}
             bar="memory-cap"
           />
-          <RangeStat
-            label={basisLabel(g)}
-            stat={g.perUnit}
-            scale={basisScale}
-            fmt={(v) => (g.perUnit ? fmtBasisRange({ ...g.perUnit, min: v, median: v, max: v }) : "")}
-            value={g.perUnit ? fmtBasisRange(g.perUnit) : null}
-            bar="memory-basis"
-          />
+          {g.perUnit || !allIn ? (
+            <RangeStat
+              label={basisLabel(g)}
+              stat={g.perUnit}
+              scale={basisScale}
+              fmt={(v) => (g.perUnit ? fmtBasisRange({ ...g.perUnit, min: v, median: v, max: v }) : "")}
+              value={g.perUnit ? fmtBasisRange(g.perUnit) : null}
+              bar="memory-basis"
+            />
+          ) : null}
+          {allIn ? (
+            <RangeStat
+              label={allInBasisLabel(allIn)}
+              stat={allIn}
+              scale={allInScale}
+              fmt={(v) => fmtBasisRange({ ...allIn, min: v, median: v, max: v })}
+              value={fmtBasisRange(allIn)}
+              bar="memory-basis-all-in"
+            />
+          ) : null}
         </dl>
 
         {called > 0 && (

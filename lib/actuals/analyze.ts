@@ -154,20 +154,34 @@ export function consolidateRentRoll(
  * Normalize a T-12 statement. EGI is reconstructed from collected rent − vacancy
  * + other income when the subtotal is missing; total opex from the line items;
  * and NOI from EGI − opex when the bottom line isn't stated (flagged derived).
+ *
+ * A deduction is a deduction whichever sign the statement filed it under: a
+ * vacancy of −$120,000 and one of $120,000 both take $120,000 off the rent,
+ * and expense lines filed as negatives are read as their magnitudes. Where
+ * the expense lines carry BOTH signs, which is a credit and which an expense
+ * cannot be read, so no total is derived from them (and no NOI on that
+ * total): the lines are kept as stated and `opexSignsMixed` says so. A
+ * stated EGI and NOI are the statement's own and stand; a stated total is
+ * read as its magnitude, since it is a deduction too.
  */
 export function summarizeT12(x: T12Extraction): T12Summary {
+  const vacancyLoss = x.vacancyLoss == null ? null : Math.abs(x.vacancyLoss);
   const egi =
     x.egi != null
       ? x.egi
       : x.collectedRent != null
-        ? x.collectedRent - (x.vacancyLoss ?? 0) + (x.otherIncome ?? 0)
+        ? x.collectedRent - (vacancyLoss ?? 0) + (x.otherIncome ?? 0)
         : null;
+
+  const lines = x.opex ?? [];
+  const opexSignsMixed = lines.some((l) => l.amount > 0) && lines.some((l) => l.amount < 0);
+  const opex = opexSignsMixed ? lines : lines.map((l) => ({ ...l, amount: Math.abs(l.amount) }));
 
   const totalOpex =
     x.totalOpex != null
-      ? x.totalOpex
-      : x.opex.length
-        ? x.opex.reduce((s, l) => s + l.amount, 0)
+      ? Math.abs(x.totalOpex)
+      : opex.length && !opexSignsMixed
+        ? opex.reduce((s, l) => s + l.amount, 0)
         : null;
 
   let noi = x.noi;
@@ -179,14 +193,63 @@ export function summarizeT12(x: T12Extraction): T12Summary {
 
   return {
     collectedRent: x.collectedRent,
-    vacancyLoss: x.vacancyLoss,
+    vacancyLoss,
     otherIncome: x.otherIncome,
     egi,
-    opex: x.opex,
+    opex,
     totalOpex,
     noi,
     noiDerived,
+    ...(opexSignsMixed ? { opexSignsMixed: true } : {}),
   };
+}
+
+/** Within a dollar: a stored figure that is the old derivation's. */
+const sameFigure = (a: number, b: number) => Math.abs(a - b) < 1;
+
+/**
+ * A STORED summary read by today's sign rule. Summaries are written at
+ * ingest, and one written before `summarizeT12` read a deduction by its
+ * magnitude may carry an EGI or NOI derived on a negative vacancy or on
+ * negative expense lines (EGI = rent + vacancy, NOI = EGI + expenses). The
+ * summary keeps what the statement stated, so it is summarized again: an
+ * EGI equal to the old derivation (rent − vacancy as filed + other) was
+ * derived and is derived again, a total equal to the lines' signed sum was
+ * derived and is derived again, and a derived NOI is derived again; every
+ * figure the statement stated stands. Null for anything that is not a
+ * summary.
+ */
+export function t12SummaryOf(stored: unknown): T12Summary | null {
+  if (!stored || typeof stored !== "object") return null;
+  const st = stored as Partial<T12Summary>;
+  const num = (n: unknown): number | null => (typeof n === "number" && Number.isFinite(n) ? n : null);
+  const collectedRent = num(st.collectedRent);
+  const vacancy = num(st.vacancyLoss);
+  const other = num(st.otherIncome);
+  const opex = Array.isArray(st.opex) ? st.opex.filter((l) => l && Number.isFinite(l.amount)) : [];
+  const storedEgi = num(st.egi);
+  const egiWasDerived =
+    storedEgi != null && collectedRent != null && sameFigure(storedEgi, collectedRent - (vacancy ?? 0) + (other ?? 0));
+  const storedTotal = num(st.totalOpex);
+  const totalWasDerived =
+    storedTotal != null && opex.length > 0 && sameFigure(storedTotal, opex.reduce((s, l) => s + l.amount, 0));
+  const storedNoi = num(st.noi);
+  // A derived NOI is derived again only where it is the old derivation
+  // (the stored EGI less the stored total); any other is kept as stored.
+  const noiWasDerived =
+    !!st.noiDerived && storedNoi != null && storedEgi != null && storedTotal != null && sameFigure(storedNoi, storedEgi - storedTotal);
+  const read = summarizeT12({
+    periodEndDate: "",
+    collectedRent,
+    vacancyLoss: vacancy,
+    otherIncome: other,
+    egi: egiWasDerived ? null : storedEgi,
+    opex,
+    totalOpex: totalWasDerived ? null : storedTotal,
+    noi: noiWasDerived ? null : storedNoi,
+    page: "",
+  });
+  return !noiWasDerived && st.noiDerived && storedNoi != null ? { ...read, noiDerived: true } : read;
 }
 
 /** How the OM's figure reads on the actuals card and in the challenger's

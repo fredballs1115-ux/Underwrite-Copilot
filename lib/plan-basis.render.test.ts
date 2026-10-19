@@ -14,7 +14,8 @@ import { buildPlanReport } from "@/lib/plan-sensitivity";
 import { dealContextFor } from "@/lib/deal-context";
 import { buildBrief } from "@/lib/anthropic/verdict";
 import { buildMemoData } from "@/lib/memo/memo-document";
-import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
+import { PlanCostStack, PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
+import { ConstructionDebtPanel } from "@/app/(app)/deals/[id]/construction-debt-panel";
 import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { visibleText } from "@/lib/render-lint";
 import { devTotalThousands, ex, m } from "@/lib/pass38.fixture";
@@ -164,5 +165,21 @@ describe("a plan's all-in basis the plausibility check finds outside the band (r
     const memo = buildMemoData({ name: "Maple Ridge", asset_class: "auto", extraction: vaCheap } as never, "October 5, 2026");
     expect(memo.strategyLine).toContain("20.00% yield on cost");
     expect(memo.strategyLine).not.toContain("all-in");
+  });
+
+  // The audit of the last merge: the construction panel's pictures were
+  // gated on `planStackable` alone, so they drew the total the plan's own
+  // cost stack refuses to draw.
+  it("draws no construction stack beside it, as the plan's own cost stack draws none; the sizing's figures stand", () => {
+    const plan = checked(vaCheap);
+    const props = { plan, planLabel: "Value-add", exitCapPct: 6, takeOutRatePct: 6.25, amortYears: 30, minDscr: 1.25, minDebtYieldPct: 8, maxLtvPct: 65, numCls: "input" };
+    const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, props));
+    expect(renderToStaticMarkup(React.createElement(PlanCostStack, { plan }))).toBe("");
+    expect(html).not.toContain('data-qa="construction-stack"');
+    expect(html).toContain("Construction loan");
+    // A plan whose basis stands draws it.
+    const fine = ex({ ...vaCheap, metrics: vaCheap.metrics.map((r) => (r.label === "Asking price" ? m("Asking price", "30,000,000") : r)) });
+    const fineHtml = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, plan: checked(fine) }));
+    expect(fineHtml).toContain('data-qa="construction-stack"');
   });
 });

@@ -251,5 +251,15 @@ describe("salesOrder, salesHeading and perSfBars", () => {
     expect(two.medianShare).toBeNull();
     // one sale stating an area is scaled to itself: no bars
     expect(perSfBars(set.slice(0, 2), 300)).toBeNull();
+    expect(bars.leftOut).toBe(0);
+  });
+
+  it("leaves a row possibly of one deed across parcels out of the scale, with no bar", () => {
+    // The $600 sale shares its day, buyer and price with another row.
+    const bars = perSfBars(set, null, [0, 0, 2, 0])!;
+    expect(bars.max).toBe(400);
+    expect(bars.shares).toEqual([300 / 400, null, null, 1]);
+    expect(bars.drawn).toBe(2);
+    expect(bars.leftOut).toBe(1);
   });
 });

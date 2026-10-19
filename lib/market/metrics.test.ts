@@ -503,6 +503,16 @@ describe("deliverySchedule", () => {
     // The 1,000,000 SF proposal carries its stale flag into its quarter.
     expect(q.find((x) => x.quarter === "2029-Q2")!.hasStale).toBe(true);
   });
+
+  it("counts the buildings that state no size apart, never as zero square feet", () => {
+    const base = PIPELINE.find((p) => p.sf != null && !p.excluded && p.status !== "delivered" && p.expectedDelivery)!;
+    const q = deliverySchedule([
+      { ...base, name: "Sized", sf: 120_000, expectedDelivery: "2027-02-01" },
+      { ...base, name: "Unsized", sf: null, expectedDelivery: "2027-03-01" },
+    ]);
+    expect(q).toHaveLength(1);
+    expect(q[0]).toMatchObject({ quarter: "2027-Q1", sf: 120_000, count: 2, unsized: 1 });
+  });
 });
 
 // ---------------------------------------------------------------------------

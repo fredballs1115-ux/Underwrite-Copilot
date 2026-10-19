@@ -32,6 +32,7 @@ import type { ModelVsMarket } from "@/lib/model-vs-market";
 import type { AssumableView } from "@/lib/assumable-debt";
 import type { LeaseholdExitView } from "@/lib/leasehold-exit";
 import type { MetroDemand } from "@/lib/metro-demand";
+import type { MarketPicture } from "@/lib/market-picture";
 import { DecisionLog } from "./decision-log";
 import { DealOutcomeCard } from "./deal-outcome";
 import { OUTCOME_FORM_ERROR } from "@/lib/deal-outcome";
@@ -324,6 +325,7 @@ export function DealView({
   marketSince = null,
   modelVsMarket = null,
   metroDemand = null,
+  marketPicture = null,
   assumable = null,
   sellerNote = null,
   leaseholdExit = null,
@@ -382,6 +384,9 @@ export function DealView({
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
+  /** the photograph the deal's market is known by (lib/market-picture),
+   *  which the market check opens on; null where none answers */
+  marketPicture?: MarketPicture | null;
   /** the deal's resolved location (lib/deal-location), the point its
    *  pictures are drawn around; the comps map measures from it */
   compsSubjectPoint?: SubjectPoint | null;
@@ -840,6 +845,7 @@ export function DealView({
               userId={userId}
               names={askerNames}
               isSample={isSample}
+              today={todayIso || null}
             />
           </div>
         )}
@@ -896,6 +902,7 @@ export function DealView({
             omUrl={omUrl}
             marketSince={marketSince}
             metroDemand={metroDemand}
+            marketPicture={marketPicture}
             isSample={isSample}
             staleVerdict={staleResults.includes("verdict")}
             staleWhy={staleWhy}
@@ -1116,6 +1123,7 @@ function MarketMemoryStrip({ group, ranges = [] }: { group: MarketGroup; ranges?
   const bits: string[] = [];
   if (!drawn && group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
   if (!drawn && group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
+  if (!drawn && group.allInPerUnit) bits.push(`plan deals' all-in basis ${fmtBasisRange(group.allInPerUnit)}`);
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -1177,6 +1185,7 @@ function AnalysesPanel({
   compsSubjectPoint = null,
   marketSince = null,
   metroDemand = null,
+  marketPicture = null,
   isSample = false,
 }: {
   analysis: AnalysisKey;
@@ -1214,6 +1223,8 @@ function AnalysesPanel({
   marketSince?: BriefDelta | null;
   /** the metro area's payrolls by sector today (lib/metro-demand) */
   metroDemand?: MetroDemand | null;
+  /** the photograph the deal's market is known by (lib/market-picture) */
+  marketPicture?: MarketPicture | null;
   /** the sample deal: its stress test is the first-draft model's run, and
    *  the challenger's heading says so (lib/stress-test-title) */
   isSample?: boolean;
@@ -1321,7 +1332,7 @@ function AnalysesPanel({
           }}
         />
       ) : (
-        <MarketCheck result={results.market!} since={marketSince} demand={metroDemand} />
+        <MarketCheck result={results.market!} since={marketSince} demand={metroDemand} picture={marketPicture} />
       );
   } else if (running || pending) {
     content = analysis === "verdict" ? <VerdictSkeleton /> : <CardListSkeleton />;
@@ -1536,7 +1547,12 @@ function InternalCompsBlock({ comps, ranges = [] }: { comps: InternalComp[]; ran
       </p>
       {/* The table's cap and basis as tracks, this deal ticked on them
           (lib/comp-range); the table beneath names each deal. */}
-      <CompRangeTracks tracks={ranges} bar="pipelinecomps" qa="pipeline-comps-tracks" />
+      <CompRangeTracks
+        tracks={ranges}
+        bar="pipelinecomps"
+        qa="pipeline-comps-tracks"
+        dotsWord={(n) => (n === 1 ? "One deal in your pipeline" : `${n} deals in your pipeline`)}
+      />
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">
           <thead>

@@ -62,6 +62,28 @@ describe("MarketMemoryCards — /market's own cards open on their market's photo
     expect(a11yIssues(html), "a11y memory cards, no market").toEqual([]);
   });
 
+  it("draws the plan deals' all-in basis on a track of its own, never on the building prices'", () => {
+    const html = render(
+      React.createElement(MarketMemoryCards, {
+        groups: [
+          group({
+            market: "Richmond, VA",
+            marketKey: "richmond va",
+            perUnit: { min: 300_000, median: 300_000, max: 300_000, n: 1, basis: "unit", noun: "unit" },
+            allInPerUnit: { min: 210_000, median: 224_000, max: 238_000, n: 2, basis: "unit", noun: "unit" },
+          }),
+        ],
+      }),
+    );
+    const text = visibleText(html);
+    expect(text).toContain("Basis / unit");
+    expect(text).toContain("All-in basis / unit (plan deals)");
+    expect(html.match(/data-bar="memory-basis"/g)?.length).toBe(1);
+    expect(html.match(/data-bar="memory-basis-all-in"/g)?.length).toBe(1);
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
   const bars = (html: string, bar: string) =>
     [...html.matchAll(new RegExp(`<div[^>]*style="left:([\\d.]+)%;width:([\\d.]+)%"[^>]*data-bar="${bar}"`, "g"))].map((m) => [
       Number(Number(m[1]).toFixed(2)),

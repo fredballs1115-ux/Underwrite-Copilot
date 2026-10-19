@@ -12,6 +12,7 @@ import type { ExportBranding } from "@/lib/excel-branding";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
@@ -111,7 +112,7 @@ export async function GET(
       : null,
     t12: t12Res.data?.summary
       ? {
-          summary: t12Res.data.summary as T12Summary,
+          summary: (t12SummaryOf(t12Res.data.summary) ?? t12Res.data.summary) as T12Summary,
           periodEnd: (t12Res.data.period_end_date as string | null) ?? null,
         }
       : null,
