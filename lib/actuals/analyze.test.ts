@@ -204,6 +204,75 @@ describe("summarizeT12", () => {
     expect(stated.noiDerived).toBe(false);
     expect(t12SummaryOf(null)).toBeNull();
   });
+
+  // The audit of #466: a stored total equal to the lines' signed sum was
+  // taken for the old derivation, and on lines of both signs the re-read
+  // then derived none — a STATED total and the NOI on it dropped.
+  const mixedLines = [
+    { key: "taxes", label: "Real estate taxes", amount: 200_000, page: "p. 2" },
+    { key: "insurance", label: "Insurance", amount: 100_000, page: "p. 2" },
+    { key: "other", label: "Utility reimbursement", amount: -30_000, page: "p. 2" },
+  ];
+
+  it("keeps a stated total on lines of both signs when re-read (no flags stored)", () => {
+    const old = {
+      collectedRent: null,
+      vacancyLoss: null,
+      otherIncome: null,
+      egi: 1_000_000,
+      opex: mixedLines,
+      totalOpex: 270_000,
+      noi: 730_000,
+      noiDerived: true,
+    };
+    const s = t12SummaryOf(old)!;
+    expect(s.totalOpex).toBe(270_000);
+    expect(s.noi).toBe(730_000);
+    expect(s.noiDerived).toBe(true);
+    expect(s.opex.map((l) => l.amount)).toEqual([200_000, 100_000, -30_000]);
+  });
+
+  it("round-trips a mixed-sign summary written by today's summarizer", () => {
+    const written = summarizeT12({ ...base, egi: 1_000_000, opex: mixedLines, totalOpex: 270_000 });
+    expect(written.totalOpexStated).toBe(true);
+    expect(written.noi).toBe(730_000);
+    expect(t12SummaryOf(JSON.parse(JSON.stringify(written)))).toEqual(written);
+  });
+
+  it("re-derives an old summary whose lines were all filed negative, with no total stated", () => {
+    const old = {
+      collectedRent: 1_000_000,
+      vacancyLoss: 50_000,
+      otherIncome: null,
+      egi: 950_000,
+      opex: [
+        { key: "taxes", label: "Real estate taxes", amount: -200_000, page: "p. 2" },
+        { key: "insurance", label: "Insurance", amount: -100_000, page: "p. 2" },
+      ],
+      totalOpex: -300_000, // the old summarizer's signed sum
+      noi: 1_250_000, // 950k − (−300k)
+      noiDerived: true,
+    };
+    const s = t12SummaryOf(old)!;
+    expect(s.egi).toBe(950_000);
+    expect(s.totalOpex).toBe(300_000);
+    expect(s.noi).toBe(650_000);
+    expect(s.noiDerived).toBe(true);
+  });
+
+  it("round-trips every summary today's summarizer writes", () => {
+    const cases: T12Extraction[] = [
+      { ...base, collectedRent: 1_100_000, vacancyLoss: -120_000, otherIncome: 50_000, opex: mixedLines.slice(0, 2) },
+      { ...base, collectedRent: 1_100_000, vacancyLoss: 100_000, egi: 1_000_000, totalOpex: 400_000, noi: 600_000 },
+      { ...base, egi: 1_000_000, opex: mixedLines },
+      // A stated EGI equal to rent − vacancy + other is the statement's own.
+      { ...base, collectedRent: 1_000_000, vacancyLoss: -50_000, egi: 1_050_000, opex: mixedLines.slice(0, 2) },
+    ];
+    for (const x of cases) {
+      const written = summarizeT12(x);
+      expect(t12SummaryOf(JSON.parse(JSON.stringify(written)))).toEqual(written);
+    }
+  });
 });
 
 describe("expiry buckets — calendar anniversaries, leap-day safe", () => {

@@ -201,6 +201,9 @@ export function summarizeT12(x: T12Extraction): T12Summary {
     noi,
     noiDerived,
     ...(opexSignsMixed ? { opexSignsMixed: true } : {}),
+    egiStated: x.egi != null,
+    totalOpexStated: x.totalOpex != null,
+    noiStated: x.noi != null,
   };
 }
 
@@ -209,15 +212,21 @@ const sameFigure = (a: number, b: number) => Math.abs(a - b) < 1;
 
 /**
  * A STORED summary read by today's sign rule. Summaries are written at
- * ingest, and one written before `summarizeT12` read a deduction by its
- * magnitude may carry an EGI or NOI derived on a negative vacancy or on
- * negative expense lines (EGI = rent + vacancy, NOI = EGI + expenses). The
- * summary keeps what the statement stated, so it is summarized again: an
- * EGI equal to the old derivation (rent − vacancy as filed + other) was
- * derived and is derived again, a total equal to the lines' signed sum was
- * derived and is derived again, and a derived NOI is derived again; every
- * figure the statement stated stands. Null for anything that is not a
- * summary.
+ * ingest. One written by today's `summarizeT12` says which of its EGI,
+ * expense total and NOI the statement stated (`egiStated`,
+ * `totalOpexStated`, `noiStated`) and is read back exactly as written.
+ *
+ * One written before the sign rule says nothing of the kind, and may carry
+ * an EGI or NOI derived on a vacancy or expense lines filed as negatives
+ * (EGI = rent + vacancy, NOI = EGI + expenses). A stated figure is never
+ * dropped, so such a summary is derived again only where the old sign bug
+ * CHANGED the figure: an EGI equal to the old derivation on a vacancy filed
+ * as a negative, and a derived NOI equal to the stored EGI less the stored
+ * total (derived again on the EGI read again and the total's magnitude).
+ * The stored total always stands, read as its magnitude — on lines filed
+ * all-negative that magnitude is the re-derivation itself — so a statement
+ * whose lines carry both signs keeps the total it stored, and the NOI on
+ * it. Null for anything that is not a summary.
  */
 export function t12SummaryOf(stored: unknown): T12Summary | null {
   if (!stored || typeof stored !== "object") return null;
@@ -228,28 +237,48 @@ export function t12SummaryOf(stored: unknown): T12Summary | null {
   const other = num(st.otherIncome);
   const opex = Array.isArray(st.opex) ? st.opex.filter((l) => l && Number.isFinite(l.amount)) : [];
   const storedEgi = num(st.egi);
-  const egiWasDerived =
-    storedEgi != null && collectedRent != null && sameFigure(storedEgi, collectedRent - (vacancy ?? 0) + (other ?? 0));
   const storedTotal = num(st.totalOpex);
-  const totalWasDerived =
-    storedTotal != null && opex.length > 0 && sameFigure(storedTotal, opex.reduce((s, l) => s + l.amount, 0));
   const storedNoi = num(st.noi);
+  const parts = { periodEndDate: "", collectedRent, vacancyLoss: vacancy, otherIncome: other, opex, page: "" };
+
+  // Written by today's summarizer: its own word on what was stated.
+  if (
+    typeof st.egiStated === "boolean" &&
+    typeof st.totalOpexStated === "boolean" &&
+    typeof st.noiStated === "boolean"
+  ) {
+    return summarizeT12({
+      ...parts,
+      egi: st.egiStated ? storedEgi : null,
+      totalOpex: st.totalOpexStated ? storedTotal : null,
+      noi: st.noiStated ? storedNoi : null,
+    });
+  }
+
+  // Written before the sign rule: derived again only where the bug changed it.
+  const egiWasMisderived =
+    storedEgi != null &&
+    collectedRent != null &&
+    vacancy != null &&
+    vacancy < 0 &&
+    sameFigure(storedEgi, collectedRent - vacancy + (other ?? 0));
   // A derived NOI is derived again only where it is the old derivation
   // (the stored EGI less the stored total); any other is kept as stored.
   const noiWasDerived =
     !!st.noiDerived && storedNoi != null && storedEgi != null && storedTotal != null && sameFigure(storedNoi, storedEgi - storedTotal);
   const read = summarizeT12({
-    periodEndDate: "",
-    collectedRent,
-    vacancyLoss: vacancy,
-    otherIncome: other,
-    egi: egiWasDerived ? null : storedEgi,
-    opex,
-    totalOpex: totalWasDerived ? null : storedTotal,
+    ...parts,
+    egi: egiWasMisderived ? null : storedEgi,
+    totalOpex: storedTotal,
     noi: noiWasDerived ? null : storedNoi,
-    page: "",
   });
-  return !noiWasDerived && st.noiDerived && storedNoi != null ? { ...read, noiDerived: true } : read;
+  // What an old summary's statement stated is not known, so the read claims
+  // nothing about it; a derived NOI kept as stored stays marked derived.
+  const { egiStated: _egi, totalOpexStated: _total, noiStated: _noi, ...rest } = read;
+  void _egi;
+  void _total;
+  void _noi;
+  return !noiWasDerived && st.noiDerived && storedNoi != null ? { ...rest, noiDerived: true } : rest;
 }
 
 /** How the OM's figure reads on the actuals card and in the challenger's
