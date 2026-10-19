@@ -53,6 +53,12 @@ export interface RecordCompsStats {
   perSqftCount?: number;
   low: number;
   high: number;
+  /** rows sharing a day, buyer and price (`sharedDeedCounts`) — possibly
+   *  one deed recorded once a parcel, each row at the deed's whole price —
+   *  and how many such deeds: each deed is counted once in `count` and the
+   *  price figures. Absent where no rows share a deed, and on a result
+   *  stored before it was recorded. */
+  sharedDeeds?: { rows: number; deeds: number };
 }
 
 export type RecordCompsStatus =
@@ -755,20 +761,85 @@ const median = (xs: number[]): number => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
+/** The key a row shares with the other rows of one deed: its day, its
+ *  buyer and its price, exactly. A buyer the record leaves blank, or a row
+ *  with no day, is no deed's. */
+function deedKey(c: Pick<RecordComp, "saleDate" | "buyer" | "price">): string | null {
+  return c.buyer && c.buyer.trim() && c.saleDate ? `${c.saleDate}|${c.buyer.trim().toUpperCase()}|${c.price}` : null;
+}
+
+/**
+ * For each sale, how many rows share its exact day, buyer and price — two or
+ * more is a deed that may have been recorded once a parcel, each row at the
+ * deed's whole price — or 0. Exact grouping only: a buyer the record leaves
+ * blank groups with nothing. The list's rows are flagged, never merged or
+ * dropped; `compStats` counts each such deed once. Display only: it says
+ * nothing of whether a sale was at arm's length.
+ */
+export function sharedDeedCounts(comps: Pick<RecordComp, "saleDate" | "buyer" | "price">[]): number[] {
+  const counts = new Map<string, number>();
+  for (const c of comps) {
+    const k = deedKey(c);
+    if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return comps.map((c) => {
+    const k = deedKey(c);
+    const n = k ? (counts.get(k) ?? 0) : 0;
+    return n >= 2 ? n : 0;
+  });
+}
+
+/**
+ * The set's figures, with a deed recorded once a parcel counted ONCE: one
+ * portfolio deed copied onto N rows at its whole price would otherwise lift
+ * the count past the MEDIAN_FLOOR and CONFIDENT_FLOOR it has not earned and
+ * drag the median toward its price. Such a deed is one sale at its price.
+ * It takes no $/SF: its price over one parcel's area is no price a foot,
+ * and over the listed parcels' areas summed it is still not one, since the
+ * deed may convey parcels outside the radius or the class the search kept —
+ * the same rows the $/SF bars leave out (lib/public-comps/picture
+ * `perSfBars`), so the bars and the median's tick are of one set.
+ */
 export function compStats(comps: RecordComp[]): RecordCompsStats | undefined {
   if (comps.length === 0) return undefined;
-  const prices = comps.map((c) => c.price);
-  const perSqft = comps
+  const shared = sharedDeedCounts(comps);
+  const seen = new Set<string>();
+  const sales: { price: number; sqft: number | null }[] = [];
+  let sharedRows = 0;
+  for (let i = 0; i < comps.length; i++) {
+    const c = comps[i];
+    if ((shared[i] ?? 0) >= 2) {
+      sharedRows += 1;
+      const k = deedKey(c) as string;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      sales.push({ price: c.price, sqft: null });
+    } else {
+      sales.push({ price: c.price, sqft: c.sqft ?? null });
+    }
+  }
+  const prices = sales.map((c) => c.price);
+  const perSqft = sales
     .filter((c) => c.sqft && c.sqft > 200)
     .map((c) => c.price / (c.sqft as number));
   return {
-    count: comps.length,
+    count: sales.length,
     medianPrice: Math.round(median(prices)),
     medianPerSqft: perSqft.length >= MEDIAN_FLOOR ? Math.round(median(perSqft)) : null,
     perSqftCount: perSqft.length,
     low: Math.min(...prices),
     high: Math.max(...prices),
+    ...(seen.size > 0 ? { sharedDeeds: { rows: sharedRows, deeds: seen.size } } : {}),
   };
+}
+
+/** What the count leaves out, said after it: "3 rows of one deed counted
+ *  once", "5 rows of 2 deeds, each counted once"; "" where no rows share a
+ *  deed. */
+export function sharedDeedPhrase(stats: Pick<RecordCompsStats, "sharedDeeds">): string {
+  const d = stats.sharedDeeds;
+  if (!d || d.deeds < 1 || d.rows < 2) return "";
+  return d.deeds === 1 ? `${d.rows} rows of one deed counted once` : `${d.rows} rows of ${d.deeds} deeds, each counted once`;
 }
 
 /**

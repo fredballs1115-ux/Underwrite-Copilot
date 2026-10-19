@@ -46,6 +46,14 @@ describe("priceTrack", () => {
     expect(t.medianPct).toBeNull();
   });
 
+  it("holds the middle to the readout's count of sales, not the rows drawn", () => {
+    // One sale and one deed on two parcels: three dots, two sales — no median.
+    const rows = [{ price: 400_000 }, { price: 900_000 }, { price: 900_000 }];
+    expect(priceTrack(rows, 650_000, null)!.medianPct).not.toBeNull();
+    expect(priceTrack(rows, 650_000, null, 2)!.medianPct).toBeNull();
+    expect(priceTrack(rows, 650_000, null, 2)!.dots).toHaveLength(3);
+  });
+
   it("draws the subject only inside the readout's band and the track", () => {
     const comps = [{ price: 400_000 }, { price: 500_000 }, { price: 600_000 }];
     expect(priceTrack(comps, 500_000, 550_000)!.subjectPct).toBe(75);

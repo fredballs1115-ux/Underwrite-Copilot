@@ -232,9 +232,14 @@ describe("the comps readout as pictures", () => {
     expect(html.split('data-bar="comps-psf"').length - 1).toBe(6);
     // The scale is the widest unflagged sale's ($500,000 / 1,800 SF), never the deed's $9M over one parcel.
     expect(text).toContain("from zero to the highest, $278/SF");
-    expect(text).toContain("2 sales possibly of one deed across parcels draw no bar.");
+    expect(text).toContain("2 rows possibly of one deed across parcels draw no bar, and the median leaves them out.");
     // Their figures stay, flagged.
     expect(text).toContain("$5,000/SF");
+    // The deed is one sale in the readout, and the $/SF median is the bars'
+    // own three — the tick on the drawn set, never pulled by the deed.
+    expect(text).toContain("4 recorded sales, 2 rows of one deed counted once");
+    expect(text).toContain("median $264/SF on 3 of 4 sales, thin");
+    expect(text).toContain("the tick is the median, $264/SF");
     expect(html.split('data-qa="comps-shared-deed"').length - 1).toBe(2);
     expect(gluedWords(visibleText(html))).toEqual([]);
   });

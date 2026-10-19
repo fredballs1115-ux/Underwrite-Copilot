@@ -195,11 +195,13 @@ export function SalesList({
       )}
       {bars && (
         <p className="mt-1.5 text-[11px] text-muted" data-qa="comps-psf-caption">
-          {`Bars: the price a square foot that ${bars.drawn + bars.leftOut === comps.length ? `all ${comps.length} sales state` : `${bars.drawn + bars.leftOut} of the ${comps.length} sales state`}, from zero to the highest, ${fmtPsf(bars.max)}${
+          {/* Where rows may be one deed across parcels, the caption counts
+              rows, as the readout does ("2 rows of one deed counted once"). */}
+          {`Bars: the price a square foot that ${bars.drawn + bars.leftOut === comps.length ? `all ${comps.length} ${bars.leftOut > 0 ? "rows" : "sales"} state` : `${bars.drawn + bars.leftOut} of the ${comps.length} ${bars.leftOut > 0 ? "rows" : "sales"} state`}, from zero to the highest, ${fmtPsf(bars.max)}${
             bars.medianShare !== null && medianPerSqft !== null ? `; the tick is the median, ${fmtPsf(medianPerSqft)}` : ""
           }.${
             bars.leftOut > 0
-              ? ` ${bars.leftOut === 1 ? "One sale" : `${bars.leftOut} sales`} possibly of one deed across parcels ${bars.leftOut === 1 ? "draws" : "draw"} no bar.`
+              ? ` ${bars.leftOut === 1 ? "One row" : `${bars.leftOut} rows`} possibly of one deed across parcels ${bars.leftOut === 1 ? "draws" : "draw"} no bar, and the median leaves ${bars.leftOut === 1 ? "it" : "them"} out.`
               : ""
           }`}
         </p>
