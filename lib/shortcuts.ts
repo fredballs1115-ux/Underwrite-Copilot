@@ -27,7 +27,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { keys: ["j"], does: "Move to the next deal", where: "pipeline" },
   { keys: ["k"], does: "Move to the previous deal", where: "pipeline" },
   { keys: ["Enter"], does: "Open the deal in focus", where: "pipeline" },
-  { keys: ["Esc"], does: "Close the new-deal form", where: "pipeline" },
+  { keys: ["Esc"], does: "Close the new-deal form, or leave select mode", where: "pipeline" },
   { keys: ["["], does: "Open the previous deal in the pipeline's order", where: "deal" },
   { keys: ["]"], does: "Open the next deal in the pipeline's order", where: "deal" },
 ];
@@ -71,6 +71,9 @@ export function typedWithAltGraph(e: KeyLike): boolean {
 
 type TargetLike = {
   tagName?: string;
+  /** an input's type: a checkbox, a radio or a button is pressed, never
+   *  typed into */
+  type?: string;
   isContentEditable?: boolean;
   closest?: (selector: string) => unknown;
 };
@@ -83,12 +86,18 @@ export const DIALOG_SELECTOR = '[role="dialog"],[role="alertdialog"]';
  *  down under it as they do inside it. */
 export const MODAL_SELECTOR = '[aria-modal="true"]';
 
+/** The inputs a reader presses rather than types into: the keys go on
+ *  working from one — the pipeline's select mode ticks a checkbox a deal,
+ *  and Escape leaves the mode from it, "j" and "k" step on from it. */
+const PRESSED_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset"]);
+
 /** Whether the focus is in a field a reader types into. */
 export function isTypingTarget(target: unknown): boolean {
   const t = target as TargetLike | null;
   if (!t || typeof t !== "object") return false;
   const tag = (t.tagName ?? "").toUpperCase();
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable === true;
+  if (tag === "INPUT") return !PRESSED_INPUTS.has(String(t.type ?? "").toLowerCase());
+  return tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable === true;
 }
 
 /**

@@ -69,6 +69,22 @@ describe("the keys stand down where a reader is typing or a dialog is open", () 
     expect(isTypingTarget(el("BUTTON"))).toBe(false);
   });
 
+  it("goes on working from an input a reader presses — the pipeline's select-mode checkbox — so Escape leaves the mode from it", () => {
+    for (const type of ["checkbox", "radio", "CHECKBOX", "submit", "button", "reset"]) {
+      const t = { ...el("INPUT"), type };
+      expect(isTypingTarget(t), type).toBe(false);
+      expect(pipelineKeyAction(key("Escape", { target: t }), { canNew: true }), type).toBe("escape");
+      expect(pipelineKeyAction(key("j", { target: t }), { canNew: true }), type).toBe("next");
+    }
+    // A text field of any kind still stands the keys down.
+    for (const type of ["text", "search", "email", "number", "date", ""]) {
+      expect(isTypingTarget({ ...el("INPUT"), type }), type).toBe(true);
+    }
+    // The pipeline leaves select mode on the pipeline's Escape.
+    const pipeline = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
+    expect(pipeline).toMatch(/onEscape: \(\) => \{\s*setShowForm\(false\);\s*if \(select\.on\) select\.leave\(\);/);
+  });
+
   it("stands down inside a dialog, and with a modal open wherever the focus is", () => {
     expect(shortcutsStandDown(key("j", { target: el("BUTTON", { inDialog: true }) }))).toBe(true);
     expect(shortcutsStandDown(key("j"), { modalOpen: true })).toBe(true);

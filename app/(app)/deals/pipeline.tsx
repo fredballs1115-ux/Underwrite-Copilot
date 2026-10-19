@@ -15,7 +15,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createDealFromBatch, createSampleDeal } from "./actions";
+import { bulkSetStage, createDealFromBatch, createSampleDeal } from "./actions";
+import { SelectBar, SelectBox, SelectModeButton, selectBoxFor, useSelectMode } from "./pipeline-select";
 import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealTile, DealTilePreview } from "./deal-tile";
@@ -310,7 +311,11 @@ export function Pipeline({
   sampleCard = null,
   filterBar = null,
   filterQuery: filterQueryProp = "",
+  initialSelect = null,
 }: {
+  /** select mode open from the first render, these deals picked: a render
+   *  test's way in (the page never opens on it) */
+  initialSelect?: { picked: readonly string[] } | null;
   /** the filters the page's address asks for, as the page read them from
    *  its searchParams (lib/pipeline-filters `filterQueryOf`): the server's
    *  render and the browser's first open on them; "" for a bare link */
@@ -475,6 +480,9 @@ export function Pipeline({
   }, [openNew]);
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Select mode (pipeline-select): its own picks, never Compare's, and one
+  // of the two modes on at a time.
+  const select = useSelectMode(initialSelect);
 
   // While any deal is mid-screen — a first screen or a re-screen — refresh
   // the list every few seconds so the verdict lands without a manual reload.
@@ -495,7 +503,10 @@ export function Pipeline({
   usePipelineKeys({
     onSearch: () => searchRef.current?.focus(),
     onNew: () => setShowForm(true),
-    onEscape: () => setShowForm(false),
+    onEscape: () => {
+      setShowForm(false);
+      if (select.on) select.leave();
+    },
     canNew: !atLimitRef,
   });
 
@@ -575,6 +586,10 @@ export function Pipeline({
     for (const d of filtered) byStage.get(normalizeStage(d.stage))!.push(d);
     return byStage;
   }, [filtered]);
+
+  // The deals picked that the list shows: a filter that hides one takes it
+  // out of the change rather than moving a deal the reader cannot see.
+  const pickedShown = useMemo(() => filtered.filter((d) => select.picked.has(d.id)).map((d) => d.id), [filtered, select.picked]);
 
   const deadCount = useMemo(
     () => deals.filter((d) => normalizeStage(d.stage) === "dead").length,
@@ -863,10 +878,26 @@ export function Pipeline({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {deals.length > 0 && (
+            <SelectModeButton
+              on={select.on}
+              buttonRef={select.buttonRef}
+              onClick={() => {
+                if (select.on) {
+                  select.leave();
+                  return;
+                }
+                setCompareMode(false);
+                setSelected(new Set());
+                select.enter();
+              }}
+            />
+          )}
           {deals.length >= 2 && (
             <button
               type="button"
               onClick={() => {
+                if (select.on) select.leave();
                 setCompareMode((c) => !c);
                 setSelected(new Set());
               }}
@@ -963,6 +994,8 @@ export function Pipeline({
           )}
         </div>
       )}
+
+      {select.on && <SelectBar ids={pickedShown} apply={bulkSetStage} onClear={select.clear} onDone={select.leave} />}
 
       {showForm && !atLimit && (
         <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} viewerId={viewerId} />
@@ -1264,10 +1297,11 @@ export function Pipeline({
             <PipelineBoard
               columns={boardColumns({ stageFilter: stage, showDead }).map((s) => ({ stage: s, deals: groups.get(s) ?? [] }))}
               compareMode={compareMode}
-              selected={selected}
-              onToggle={toggleSelected}
+              selected={select.on ? select.picked : selected}
+              onToggle={select.on ? select.toggle : toggleSelected}
               todayIso={todayIso}
               stageControl={tileStage}
+              selectControl={select.on ? selectBoxFor : undefined}
             />
           )}
           {(view === "cards" || view === "list") && (
@@ -1279,6 +1313,7 @@ export function Pipeline({
             {view === "list" && (
             <div className="hidden items-center gap-3 px-5 pb-1.5 md:flex">
               {compareMode && <span className="w-5 shrink-0" />}
+              {select.on && <span className="w-4 shrink-0" />}
               {/* The call for offers is drawn in the deal's own cell, under
                   its name, so its sort sits beside the name's. */}
               <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -1291,7 +1326,7 @@ export function Pipeline({
               <SortHead label="Fit" k="fit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-16 lg:flex" right />
               <SortHead label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-24" right />
               <SortHead label="Added" k="added" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 xl:flex" right />
-              {!compareMode && (
+              {!compareMode && !select.on && (
                 <span className="hidden w-36 shrink-0 text-right text-[10px] font-medium uppercase tracking-wide text-muted lg:block">
                   Stage
                 </span>
@@ -1353,11 +1388,12 @@ export function Pipeline({
                             d={d}
                             i={idx}
                             compareMode={compareMode}
-                            checked={selected.has(d.id)}
-                            onToggle={toggleSelected}
+                            checked={select.on ? select.picked.has(d.id) : selected.has(d.id)}
+                            onToggle={select.on ? select.toggle : toggleSelected}
                             onMarket={reportMarket}
                             todayIso={todayIso}
                             stageControl={tileStage}
+                            selectControl={select.on ? selectBoxFor : undefined}
                           />
                         ))}
                       </ul>
@@ -1370,8 +1406,9 @@ export function Pipeline({
                             d={d}
                             i={idx}
                             compareMode={compareMode}
-                            checked={selected.has(d.id)}
-                            onToggle={toggleSelected}
+                            selecting={select.on}
+                            checked={select.on ? select.picked.has(d.id) : selected.has(d.id)}
+                            onToggle={select.on ? select.toggle : toggleSelected}
                             todayIso={todayIso}
                           />
                         ))}
@@ -1712,6 +1749,7 @@ const DealRow = memo(function DealRow({
   d,
   i,
   compareMode,
+  selecting = false,
   checked,
   onToggle,
   todayIso,
@@ -1719,6 +1757,9 @@ const DealRow = memo(function DealRow({
   d: DealCard;
   i: number;
   compareMode: boolean;
+  /** select mode is on: a checkbox before the row's link, in place of the
+   *  stage select (pipeline-select) */
+  selecting?: boolean;
   checked: boolean;
   onToggle: (id: string) => void;
   /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
@@ -2118,7 +2159,12 @@ const DealRow = memo(function DealRow({
         // The stage select is a form, so it sits BESIDE the link (nesting
         // interactive elements is invalid) — the row still reads and hovers
         // as one unit, and everything except the select navigates.
-        <div className="group flex items-center gap-3 px-5 py-4 transition-colors hover:bg-faint">
+        <div
+          className={`group flex items-center gap-3 px-5 py-4 transition-colors hover:bg-faint ${
+            selecting && checked ? "bg-brand/5" : ""
+          }`}
+        >
+          {selecting ? <SelectBox id={d.id} name={d.name} checked={checked} onToggle={onToggle} /> : null}
           <Link
             href={`/deals/${d.id}`}
             data-deal-nav
@@ -2126,9 +2172,11 @@ const DealRow = memo(function DealRow({
           >
             {inner}
           </Link>
-          <span className="hidden w-36 shrink-0 justify-end lg:flex">
-            <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />
-          </span>
+          {selecting ? null : (
+            <span className="hidden w-36 shrink-0 justify-end lg:flex">
+              <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />
+            </span>
+          )}
           <svg
             viewBox="0 0 24 24"
             fill="none"
