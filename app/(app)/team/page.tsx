@@ -16,6 +16,7 @@ import { getBilling } from "@/lib/billing";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
+import { TeamFaces } from "./team-faces";
 import { LEAVING_KEEPS } from "@/lib/team-leaving";
 import { cookies } from "next/headers";
 import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
@@ -205,6 +206,7 @@ export default async function TeamPage({
                   {team.dealCount} shared{" "}
                   {team.dealCount === 1 ? "deal" : "deals"}
                 </p>
+                <TeamFaces members={team.members} />
               </div>
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
