@@ -54,6 +54,11 @@ export function LeverageTrack({ figures }: { figures: LeverageFigures }) {
         {seed && <Tick at={at(seed.pct, domain)} bar="lev-seed" tone="bg-brand" />}
         <Tick at={at(capPct, domain)} bar="lev-cap" tone="bg-ink" />
       </div>
+      {/* The track's two ends, so a reader can place the ticks without the key. */}
+      <div className="mt-1 flex justify-between text-[10px] tabular-nums text-muted" aria-hidden>
+        <span>{`${domain[0].toFixed(2)}%`}</span>
+        <span>{`${domain[1].toFixed(2)}%`}</span>
+      </div>
       <Key stack>
         <KeyItem mark="tick" tone="bg-ink">
           {`Going-in cap ${capPct.toFixed(2)}%, the deal's own`}

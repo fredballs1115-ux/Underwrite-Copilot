@@ -635,9 +635,7 @@ export function ResearchPanelView({
           // deal's Philadelphia sits exactly in this state (its eviction-
           // diversion mandate keys off a filing, not a purchase).
           <p className="mt-2 text-sm text-muted">
-            Screened: {evals.length} rule{evals.length === 1 ? "" : "s"} on
-            file for {address.city || address.county || address.state} — none
-            triggered by this deal&apos;s facts. Rules that key off events (an
+            {`Screened: ${evals.length} rule${evals.length === 1 ? "" : "s"} on file for ${address.city || address.county || address.state} — none triggered by this deal's facts.`} Rules that key off events (an
             eviction filing, a vacancy registration) stay dormant until those
             events.
           </p>
