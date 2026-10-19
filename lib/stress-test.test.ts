@@ -555,6 +555,16 @@ describe("a note secured by the building", () => {
   });
 });
 
+describe("the vacancy the row reads is the OM's allowance", () => {
+  it("reads 'Vacancy & credit loss: 7.0%' as the allowance, and a dollar vacancy loss as no allowance", () => {
+    const both = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Vacancy loss", "$400,400", "p. 9"), row("Vacancy & credit loss", "7.0%", "p. 21")] };
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: both })), "vacancy").omSays).toEqual({ text: "Vacancy & credit loss: 7.0%", value: 7, page: 21 });
+    const dollars = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Vacancy loss", "$400,400", "p. 9")] };
+    // Only the dollar line: the stated occupancy stands in, as before.
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: dollars })), "vacancy").omSays.text).toBe("Occupancy: 94% as stated, which leaves 6.0% vacancy");
+  });
+});
+
 describe("the premium the insurance row reads is the building's, never insurance income", () => {
   const withRows = (...extra: { label: string; value: string }[]): ExtractionResult => ({
     ...APARTMENT,

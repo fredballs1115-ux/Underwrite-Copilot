@@ -360,8 +360,12 @@ const EXIT_CAP_ROW = /\b(?:exit|terminal|reversion(?:ary)?|residual|disposition|
 const RENT_GROWTH_ROW = /\b(?:rent|rental|income|revenue|rents?)\s+growth\b|\bgrowth\b[^,;]*\brents?\b/i;
 const RENT_GROWTH_NOT = /expense|opex|\bnoi\b|population|job|employment|supply/i;
 const EXPENSE_GROWTH_ROW = /\b(?:expense|opex|operating[- ]expense)s?\s+(?:growth|escalation|inflation)\b/i;
+// A vacancy row is the OM's allowance: "Vacancy & credit loss: 7.0%" is one,
+// and "Vacancy loss: $400,400" is a dollar line, refused by its VALUE, not
+// by the word "loss" in its label.
 const VACANCY_ROW = /\bvacancy\b/i;
-const VACANCY_NOT = /\$|\bloss\b(?!\s*%)|market vacancy|submarket|metro|physical|economic/i;
+const VACANCY_NOT = /\$|market vacancy|submarket|metro|physical|economic/i;
+const VACANCY_VALUE_NOT = /\$/;
 const VACANCY_PLAN = /stabili[sz]ed|pro ?forma|underwritten|year ?\d|yr\.? ?\d/i;
 const TAX_BILL_ROW = /\b(?:real\s+estate|property|re)\s+tax(?:es)?\b|^tax(?:es)?\b/i;
 const TAX_BILL_NOT = /abat|exempt|pilot|saving|unabated|phase|\brate\b|\bper\b|\/|psf|millage|credit|transfer|recordation|increase|growth|escalat|reassess/i;
@@ -388,7 +392,7 @@ function statedPct(rows: Row[], re: RegExp, not?: RegExp): { row: Row; pct: numb
 /** The OM's stabilized vacancy, as a vacancy row (a stabilized or pro forma
  *  one first) or as what its stated occupancy leaves. */
 function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occupancy" } | null {
-  const vacancyRows = rows.filter((m) => VACANCY_ROW.test(m.label) && !VACANCY_NOT.test(m.label) && parsePct(m.value) != null);
+  const vacancyRows = rows.filter((m) => VACANCY_ROW.test(m.label) && !VACANCY_NOT.test(m.label) && !VACANCY_VALUE_NOT.test(m.value) && parsePct(m.value) != null);
   const row = vacancyRows.find((m) => VACANCY_PLAN.test(m.label)) ?? vacancyRows[0] ?? null;
   if (row) {
     const pct = parsePct(row.value)!;
