@@ -770,9 +770,15 @@ function exitCapRow(ctx: Ctx): StressRow | null {
         }
       } else {
         const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
+        const spread = exit != null ? Math.round((exit - f.value) * 100) : null;
         evidence.push({
           ...e,
-          text: exit != null ? `${f.text} — the exit's spread over it is ${bps((exit - f.value) * 100)}` : f.text,
+          text:
+            spread == null
+              ? f.text
+              : spread === 0
+                ? `${f.text} — the exit sits at it`
+                : `${f.text} — the exit's spread ${spread > 0 ? "over" : "under"} it is ${bps(spread)}`,
         });
       }
     }
@@ -812,6 +818,9 @@ function exitCapRow(ctx: Ctx): StressRow | null {
     judged.gap = { ...judged.gap, value: Math.round(judged.gap.value * 100), unit: "bps" };
   }
   if (goingInOk) judged.gap = { ...judged.gap, value: Math.round((goingIn! - om.pct) * 100), unit: "bps" };
+  // 25 bps or more of compression with no published range reaching the
+  // exit is unsupported: the threshold is inclusive, as the rule says.
+  if (judged.verdict === "stretched" && !supported && judged.gap.value >= EXIT_CAP_UNSUPPORTED_BPS) judged.verdict = "unsupported";
   // The engine is re-run at the going-in cap (the entry), else at the
   // published range's low end.
   const alt = goingInOk ? goingIn! : Math.min(...trackerComparables);

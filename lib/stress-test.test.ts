@@ -421,6 +421,26 @@ describe("a deal with only published figures", () => {
   });
 });
 
+// ── The exit cap's threshold and its spread ──────────────────────────────
+
+describe("the exit cap row", () => {
+  const withCaps = (goingIn: string, exit: string): ExtractionResult => ({
+    ...APARTMENT,
+    metrics: APARTMENT.metrics.map((m) => (m.label === "Going-in cap rate" ? { ...m, value: goingIn } : m.label === "Exit cap rate" ? { ...m, value: exit } : m)),
+  });
+
+  it("reads 25 bps of compression unsupported, the threshold inclusive, and 24 bps stretched", () => {
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.75%", "5.50%") })), "exit_cap")).toMatchObject({ gap: { value: 25, unit: "bps" }, verdict: "unsupported" });
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.74%", "5.50%") })), "exit_cap")).toMatchObject({ gap: { value: 24, unit: "bps" }, verdict: "stretched" });
+  });
+
+  it("says the exit's spread under the 10-year where it is under it", () => {
+    const x = rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.71%", "4.50%") })), "exit_cap");
+    expect(x.evidence[1].text).toBe("4.94% on Sep 17, 2026 — the exit's spread under it is 44 bps");
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.71%", "4.94%") })), "exit_cap").evidence[1].text).toBe("4.94% on Sep 17, 2026 — the exit sits at it");
+  });
+});
+
 // ── A share ──────────────────────────────────────────────────────────────
 
 /** A 49% interest at $20M: the whole the price implies is $40.8M, which
