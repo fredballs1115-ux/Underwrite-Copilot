@@ -25,6 +25,7 @@ import {
   type SectionKey,
 } from "@/lib/deal-tabs";
 import { revealScrollLeft } from "@/lib/tab-strip";
+import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
 import type { DealStrategy } from "@/lib/deal-strategy";
@@ -167,7 +168,9 @@ export function DemoSections({
 
         {section === "financials" && (
           <div className="flex flex-col gap-6">
-            <TermsView result={data.extraction} />
+            {/* Each term's page opens the sample's fictional memorandum
+                there (app/api/demo/om). */}
+            <TermsView result={data.extraction} omUrl={SAMPLE_OM_HREF} />
             <DebtSizer
               model={data.model}
               extraction={data.extraction}

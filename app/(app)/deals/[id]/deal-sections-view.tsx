@@ -144,10 +144,28 @@ export function TermsView({
       ) : (
         // Deals screened before citations (migration 0018) keep a plain page
         // — only where it parses and falls inside the deck's own length
-        // (lib/facts' absolute rule): an unvalidated page is no page.
+        // (lib/facts' absolute rule): an unvalidated page is no page. Where
+        // the page has a memorandum to open — the public sample's fictional
+        // one (lib/sample-om-link) — the page opens it there.
         (() => {
           const n = locatedPage(m.page, result.totalPages);
-          return n != null ? <p className="mt-2 text-[10px] text-muted">{`p. ${n}`}</p> : null;
+          if (n == null) return null;
+          return omUrl ? (
+            <p className="mt-2 leading-none">
+              <a
+                href={`${omUrl}#page=${n}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-muted underline-offset-2 hover:text-ink hover:underline"
+                title={`Open the OM at p. ${n}`}
+                data-qa="term-page"
+              >
+                {`p. ${n}`}
+              </a>
+            </p>
+          ) : (
+            <p className="mt-2 text-[10px] text-muted">{`p. ${n}`}</p>
+          );
         })()
       )}
     </div>

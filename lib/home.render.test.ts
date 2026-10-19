@@ -37,7 +37,8 @@ import { skylineSrcSetOf } from "./skyline-srcset";
 import { METRO_VIEWS } from "./metro-imagery";
 import { sampleDealCard } from "./pipeline-card";
 import { loadSampleTile } from "@/app/sample-pipeline-card-lazy";
-import { SAMPLE_ACTUALS_WORDS, SAMPLE_OM_WORDS, SourceDocumentsView } from "@/app/(app)/deals/[id]/source-documents";
+import { SAMPLE_ACTUALS_WORDS, SAMPLE_OM_FILE_WORDS, SAMPLE_OM_WORDS, SourceDocumentsView } from "@/app/(app)/deals/[id]/source-documents";
+import { SAMPLE_OM_HREF } from "./sample-om-link";
 import { rentRollDateWords, t12DateWords } from "./actuals/actuals-read";
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -633,7 +634,11 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     const html = panel("Documents");
     const t = text(html);
     expect(t).toContain("Source documents");
-    expect(visibleText(html)).toContain(SAMPLE_OM_WORDS);
+    // The memorandum's row opens the sample's fictional memorandum, the file
+    // every page chip opens, and says it is fictional.
+    expect(visibleText(html)).toContain(SAMPLE_OM_FILE_WORDS);
+    expect(visibleText(html)).not.toContain(SAMPLE_OM_WORDS);
+    expect(html).toContain(`href="${SAMPLE_OM_HREF}"`);
     expect(t).not.toContain("none uploaded");
     for (const row of ["om", "rent_roll", "t12"]) expect(html).toContain(`data-doc-row="${row}"`);
     const { sampleActuals } = await import("@/lib/sample-cover");
@@ -648,7 +653,7 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
           data: {
             dealId: "sample",
             hasOm: false,
-            omUrl: null,
+            omUrl: SAMPLE_OM_HREF,
             sample: true,
             typedFacts: false,
             documents: [],
@@ -664,6 +669,24 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(t).not.toMatch(/Reconciled|Screened/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("opens the sample's fictional memorandum from every page chip, at its page", () => {
+    const financials = panel("Financials");
+    // The terms the tab shows before "show all": the flagged first, eight.
+    const ms = SAMPLE_DEAL.extraction.metrics;
+    const terms = [...ms.filter((m) => m.flagged), ...ms.filter((m) => !m.flagged)].slice(0, 8).filter((m) => m.page);
+    expect(terms.length).toBeGreaterThan(5);
+    expect([...financials.matchAll(/data-qa="term-page"/g)].length).toBe(terms.length);
+    for (const m of terms) {
+      const n = String(m.page).replace(/\D/g, "");
+      expect(financials, m.label).toContain(`href="${SAMPLE_OM_HREF}#page=${n}"`);
+    }
+    const comps = panel("Analyses", "comps");
+    for (const c of SAMPLE_DEAL.comps.saleComps) {
+      expect(comps, c.name).toContain(`href="${SAMPLE_OM_HREF}#page=${String(c.page).replace(/\D/g, "")}"`);
+    }
+    expect(a11yIssues(financials)).toEqual([]);
   });
 
   it("rates the comps and the challenges in the product's own words", () => {
