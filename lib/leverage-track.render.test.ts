@@ -57,6 +57,27 @@ describe("LeverageTrack — the picture", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 
+  it("says a screening rate under the owner-occupier survey is no quote, and only then", () => {
+    expect(text).toContain(
+      `${SEED.note}. The screening rate sits under the owner-occupier survey, so a lender's quote is likely higher.`,
+    );
+    const over = visibleText(
+      renderToStaticMarkup(
+        React.createElement(LeverageTrack, {
+          figures: { capPct: 5.45, survey: { pct: 6.5, source: "FRED · MORTGAGE30US", dated: "Sep 17, 2026" }, seed: SEED, tenYear: null },
+        }),
+      ),
+    );
+    expect(over).not.toContain("sits under the owner-occupier survey");
+  });
+
+  it("rounds the track's ends outward to the half percent, a scale rather than data", () => {
+    // 4.94 to 6.95, padded by a tenth of the spread: 4.739 to 7.151.
+    expect(text).toContain("4.5%");
+    expect(text).toContain("7.5%");
+    expect(text).not.toMatch(/4\.74%|7\.15%/);
+  });
+
   it("draws nothing with no rate to set the cap against", () => {
     expect(
       renderToStaticMarkup(React.createElement(LeverageTrack, { figures: { capPct: 5.45, survey: null, seed: null, tenYear: null } })),
