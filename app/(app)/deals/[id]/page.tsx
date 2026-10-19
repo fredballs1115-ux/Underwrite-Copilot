@@ -22,6 +22,7 @@ import { PropertyVisual } from "./property-visual";
 import { HeroCover } from "./hero-cover";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
+import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
@@ -1513,167 +1514,46 @@ export default async function DealPage({
                 }
               />
             )}
+            {/* The header's tools (header-tools): the three downloads, Pro
+                where the reader's plan does not include them, then the
+                deal's own engines. The public pages draw the sample's row
+                with the same component (app/sample-hero). */}
             {verdict && (
-              <a
+              <DealTool
+                kind="memo"
                 href={`/api/deals/${id}/memo`}
-                title={
-                  downloadsOpen
-                    ? "One-page IC screening memo — verdict, buy-box fit, flags, next steps"
-                    : "One-page IC screening memo — part of Pro"
-                }
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                  <path d="M15 2v5h5" />
-                  <path d="M10 12h4" />
-                  <path d="M10 16h4" />
-                </svg>
-                IC memo
-                {!downloadsOpen && (
-                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                    Pro
-                  </span>
-                )}
-              </a>
+                title={downloadsOpen ? DEAL_TOOL_TITLE.memo : DEAL_TOOL_PRO_TITLE.memo}
+                pro={!downloadsOpen}
+              />
             )}
             {verdict && (
-              <a
+              <DealTool
+                kind="report"
                 href={`/api/deals/${id}/report`}
-                title={
-                  downloadsOpen
-                    ? "The full screening report — memo plus every term, challenge, comp, and market check"
-                    : "The full screening report — part of Pro"
-                }
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-                </svg>
-                Full report
-                {!downloadsOpen && (
-                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                    Pro
-                  </span>
-                )}
-              </a>
+                title={downloadsOpen ? DEAL_TOOL_TITLE.report : DEAL_TOOL_PRO_TITLE.report}
+                pro={!downloadsOpen}
+              />
             )}
             {extraction && (
-              <a
+              <DealTool
+                kind="model"
                 href={`/api/deals/${id}/underwrite.xlsx`}
-                title={
-                  downloadsOpen
-                    ? "Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates"
-                    : "Institutional acquisition model (Excel) — part of Pro"
-                }
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
-                </svg>
-                Underwrite model
-                {!downloadsOpen && (
-                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                    Pro
-                  </span>
-                )}
-              </a>
+                title={downloadsOpen ? DEAL_TOOL_TITLE.model : DEAL_TOOL_PRO_TITLE.model}
+                pro={!downloadsOpen}
+              />
             )}
-            <Link
-              href={`/deals/${id}/rent-roll`}
-              title="Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model"
-              className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-3.5 w-3.5 text-muted"
-                aria-hidden
-              >
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <path d="M3 10h18M9 4v16" />
-              </svg>
-              Rent roll
-            </Link>
+            <DealTool kind="rentRoll" href={`/deals/${id}/rent-roll`} title={DEAL_TOOL_TITLE.rentRoll} page />
             {extraction && (
-              <Link
-                href={`/deals/${id}/valuations`}
-                title="BOV reconciler — decompose the gap between two opinions of value"
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M12 3v18M5 8l7-5 7 5" />
-                  <path d="M3 12h6l-3 6-3-6zM15 12h6l-3 6-3-6z" />
-                </svg>
-                Valuations
-              </Link>
+              <DealTool kind="valuations" href={`/deals/${id}/valuations`} title={DEAL_TOOL_TITLE.valuations} page />
             )}
             {versionCount >= 2 && (
-              <Link
-                href={`/deals/${id}/bridge`}
-                // The badge counts every saved version of the deal's
-                // assumptions — said, never a bare figure beside the name.
-                title={versionBadge(versionCount).title}
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M4 19V9M10 19V5M16 19v-7M22 19h-20" />
-                </svg>
-                Bridge
+              // The badge counts every saved version of the deal's
+              // assumptions — said, never a bare figure beside the name.
+              <DealTool kind="bridge" href={`/deals/${id}/bridge`} title={versionBadge(versionCount).title} page>
                 <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand" data-qa="bridge-count">
                   {versionBadge(versionCount).text}
                 </span>
-              </Link>
+              </DealTool>
             )}
           </>
         }

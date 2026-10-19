@@ -30,6 +30,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { sampleHeader } from "./sample-header";
 import { sampleMemoData } from "./sample-memo";
 import { SAMPLE_DOWNLOAD_NOTE, SampleHeroTools } from "@/app/sample-hero";
+import { DEAL_TOOL_TITLE, DealTool, type DealToolKind } from "@/app/(app)/deals/[id]/header-tools";
 import { compRating, inCompOrder } from "./comp-rating";
 import { SKYLINES, commonsPage, coverWidth, skylineSrcSet } from "./skyline";
 import { skylineSrcSetOf } from "./skyline-srcset";
@@ -89,6 +90,30 @@ describe("the homepage, as a screen reader hears it", () => {
     }
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  // The tool row had been a hand-drawn copy of the deal page's (its own
+  // classes, icons and tooltips); both draw the deal page's DealTool now.
+  it("draws the sample's tools with the deal page's own DealTool, in the signed-in sample's order", () => {
+    const html = renderToStaticMarkup(React.createElement(SampleHeroTools));
+    const tool = (kind: DealToolKind, href: string, title: string, page = false) =>
+      renderToStaticMarkup(React.createElement(DealTool, { kind, href, title, page }));
+    expect(html).toBe(
+      [
+        tool("memo", "/api/demo/memo", `${DEAL_TOOL_TITLE.memo}. ${SAMPLE_DOWNLOAD_NOTE}`),
+        tool("report", "/api/demo/report", `${DEAL_TOOL_TITLE.report}. ${SAMPLE_DOWNLOAD_NOTE}`),
+        tool("model", "/api/demo/underwrite.xlsx", `${DEAL_TOOL_TITLE.model}. ${SAMPLE_DOWNLOAD_NOTE}`),
+        tool("rentRoll", "/login?mode=signup", `${DEAL_TOOL_TITLE.rentRoll} — on a deal of your own`, true),
+        tool("valuations", "/login?mode=signup", `${DEAL_TOOL_TITLE.valuations} — on a deal of your own`, true),
+      ].join(""),
+    );
+    // The deal page draws the same tools, and neither keeps a copy.
+    const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
+    for (const kind of ["memo", "report", "model", "rentRoll", "valuations", "bridge"]) expect(page).toContain(`kind="${kind}"`);
+    for (const src of [page, readFileSync("app/sample-hero.tsx", "utf8")]) {
+      expect(src).not.toContain("py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm");
+      expect(src).not.toContain('<path d="M15 2v5h5" />');
+    }
   });
 
   // The homepage and /demo against the signed-in product, H1: the card
