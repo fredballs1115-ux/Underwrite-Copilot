@@ -27,7 +27,7 @@ export const revalidate = 300;
 export const metadata = publicMetadata({
   title: "Why Underwrite Copilot",
   description:
-    "Why Underwrite Copilot exists: screen more offering memoranda without cutting corners. Deterministic math, page-level citations, and a fast read on whether a deal fits your mandate.",
+    "Why Underwrite Copilot exists: screen more offering memoranda without cutting corners. Each OM assumption set against the evidence, deterministic math, page citations, a read on fit to your mandate.",
   canonical: "/why",
 });
 
@@ -45,8 +45,9 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "What it does",
     body: [
-      "Upload an OM. The app reads it and returns a screen: the key terms, a red-team of the assumptions, the comps inside the deck, a market check, and a verdict — and, once you add a rent roll, a T-12 or your own model, a reconciliation across them.",
+      "Upload an OM. The app reads it and returns a test of it: each assumption challenged, the comps inside the deck graded, a market check against dated figures, and a verdict — the key terms extracted on the way. Add a rent roll, a T-12 or your own model and it reconciles across them.",
       "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call (Outside box where it misses outright), or says which criteria it could not check. On Pro, it exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
+      "Two calls, kept apart: Go, Caution or No-go is the screen's call on the deal itself; Pursue, Watch or Pass is how the deal fits your buy box.",
     ],
   },
   {
@@ -90,6 +91,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
     body: [
       "This is a screening tool, not a full underwriting model. It runs one rent growth rate, one stabilized vacancy (reached through a lease-up where the plan has one) and one loan, never lease by lease.",
       "It does not replace ARGUS, a lease-by-lease cash-flow build, or your own diligence. It gets you to a fast, honest read on whether a deal earns that work.",
+      "The model is included so the test has something to re-run; it is not the product.",
     ],
   },
 ];
@@ -147,8 +149,8 @@ export default function WhyPage() {
               See it on a real deal
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Start with a fully worked sample, or upload an OM and get a
-              verdict.
+              Start with a fully worked sample, or upload an OM and get its
+              assumptions tested.
             </p>
             <div className="mt-4 flex flex-wrap gap-2.5">
               <Link
