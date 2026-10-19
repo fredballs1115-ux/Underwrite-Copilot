@@ -141,11 +141,13 @@ const BoardCard = memo(function BoardCard({
           {body}
         </Link>
       )}
-      <div className="flex items-center gap-2 border-t border-line px-2.5 py-2">
+      {/* Wraps rather than squeezing: a long call pill ("Reading the OM…")
+          beside the select had cut the stage's name to "Scree". */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-line px-2.5 py-2">
         <span className="flex shrink-0">
           <TileCall d={d} />
         </span>
-        {!compareMode && <span className="ml-auto block w-36 min-w-0">{stageControl(d)}</span>}
+        {!compareMode && <span className="ml-auto block w-36 shrink-0">{stageControl(d)}</span>}
       </div>
     </li>
   );
