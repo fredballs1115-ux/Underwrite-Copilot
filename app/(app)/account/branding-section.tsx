@@ -5,6 +5,8 @@ import { signedSupplementUrl } from "@/lib/storage";
 import { FIRM_NAME_MAX, FOOTER_TEXT_MAX, type Branding } from "@/lib/branding";
 import { saveBranding } from "./actions";
 import { PendingButton } from "../pending-button";
+import { sampleMemoData } from "@/lib/sample-memo";
+import { BrandingPreview, GHOST_BRANDING } from "./branding-preview";
 
 /**
  * Report branding card (Feature 6, Pro/Team): firm name, logo, and footer
@@ -34,13 +36,14 @@ export async function BrandingSection({
               Put your firm&apos;s name, logo, and footer on every exported
               memo and report — your deals go to your IC under your identity.
             </p>
+            <Link
+              href="/billing?upsell=branding"
+              className="mt-3 inline-block rounded-lg bg-brand px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+            >
+              Upgrade to Pro
+            </Link>
           </div>
-          <Link
-            href="/billing?upsell=branding"
-            className="rounded-lg bg-brand px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-          >
-            Upgrade to Pro
-          </Link>
+          <BrandingPreview data={sampleMemoData()} branding={GHOST_BRANDING} ghost />
         </div>
       </section>
     );
@@ -77,15 +80,27 @@ export async function BrandingSection({
 
   return (
     <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
-      <h2 className="text-sm font-semibold tracking-tight">Report branding</h2>
-      <p className="mt-1 max-w-lg text-sm text-muted">
-        Shown on every export{" "}
-        {scope === "team" ? "for your whole team" : "you download"} — name and
-        logo on the memo and report, your name in the Excel workbooks&apos;
-        file properties and print header, and a letterhead on the LOI. Footer
-        text prints on each PDF page. A small &ldquo;Powered by Underwrite
-        Copilot&rdquo; line stays at the very bottom of the PDFs.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold tracking-tight">Report branding</h2>
+          <p className="mt-1 max-w-lg text-sm text-muted">
+            Shown on every export{" "}
+            {scope === "team" ? "for your whole team" : "you download"} — name and
+            logo on the memo and report, your name in the Excel workbooks&apos;
+            file properties and print header, and a letterhead on the LOI. Footer
+            text prints on each PDF page. A small &ldquo;Powered by Underwrite
+            Copilot&rdquo; line stays at the very bottom of the PDFs.
+          </p>
+        </div>
+        <BrandingPreview
+          data={sampleMemoData()}
+          branding={{
+            firmName: branding?.firmName ?? null,
+            logoUrl,
+            footerText: branding?.footerText ?? null,
+          }}
+        />
+      </div>
 
       {readOnly ? (
         <div className="mt-4 space-y-3">
