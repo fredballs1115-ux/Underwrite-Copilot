@@ -240,24 +240,25 @@ type Judged = { gap: NonNullable<StressRow["gap"]>; verdict: StressVerdict };
  * make: inside it, or on its conservative side, holds; past its nearer end
  * by less than `unsupportedPast` is stretched, by more is unsupported.
  * `tolerance` is the margin inside which the OM is at the evidence (a
- * survey's margin of error, else a hair).
+ * survey's margin of error, else a hair) — a comparable may carry its own,
+ * and a survey's margin then reaches the survey's figure and no other's.
  */
 function judge(
   om: number,
-  comparables: readonly number[],
+  comparables: readonly (number | { value: number; tolerance: number })[],
   optimistic: "low" | "high",
   unit: NonNullable<StressRow["gap"]>["unit"],
   unsupportedPast: number,
   tolerance: number,
   text: (gap: number, best: number) => string,
 ): Judged {
-  const best = comparables[0];
-  const lo = Math.min(...comparables);
-  const hi = Math.max(...comparables);
+  const items = comparables.map((c) => (typeof c === "number" ? { value: c, tolerance } : c));
+  const best = items[0].value;
   const gap = optimistic === "low" ? best - om : om - best;
-  // How far past the evidence's nearer end, beyond the tolerance (a
-  // survey's margin is the tolerance, so "past" is measured from its edge).
-  const beyond = (optimistic === "low" ? lo - om : om - hi) - tolerance;
+  // How far past the evidence's nearer edge, each figure's edge its own
+  // value less (or plus) its own tolerance: "past" is measured from the
+  // edge of whichever figure reaches nearest the OM.
+  const beyond = optimistic === "low" ? Math.min(...items.map((c) => c.value - c.tolerance)) - om : om - Math.max(...items.map((c) => c.value + c.tolerance));
   const verdict: StressVerdict = beyond <= 0 ? "holds" : beyond > unsupportedPast ? "unsupported" : "stretched";
   return { gap: { value: round(gap, unit), unit, text: text(gap, best) }, verdict };
 }
@@ -608,7 +609,9 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // default beside a T-12's 9.1% had read the OM's 6% as "inside").
   const best = comparables[0];
   const decisive = comparables.filter((c) => c.kind === best.kind);
-  const judged = judge(om.pct, decisive.map((c) => c.value), "low", "pts", VACANCY_UNSUPPORTED_PTS, best.tolerance, (gap) =>
+  // Each figure carries its own tolerance: the survey's margin reaches the
+  // survey's figure, never the region's or the state's beside it.
+  const judged = judge(om.pct, decisive.map((c) => ({ value: c.value, tolerance: c.tolerance })), "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
       ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(best.value)}.`
       : gap > 0

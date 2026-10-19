@@ -591,6 +591,34 @@ describe("a note secured by the building", () => {
   });
 });
 
+describe("a survey's margin reaches the survey's figure and no other's", () => {
+  it("with the survey over the region, the region's own edge decides how far past the OM is", () => {
+    // Survey 9.5% ±2.2 (its edge 7.3), region 6.2% (its edge 6.15), OM 3.0%:
+    // 3.15 points past the nearer edge, unsupported. Applying the survey's
+    // margin to the region's figure had read 1.0 past — stretched.
+    const rows: RateRow[] = [
+      { series_id: "RRVRSOQ156N", obs_date: "2026-04-01", value: 6.2 },
+      { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 9.5 },
+      { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+    ];
+    const ex = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Occupancy" ? { ...m, value: "97%" } : m)) };
+    const derived = deriveUnderwriteInputs(ex, "x", undefined, { debtIndex: FIVE });
+    const t = buildStressTest({ extraction: ex, challenger: null, market: null, modelVsMarket: readFor(derived, { rates: readMetroRates("dc", rows, FIXTURE_NOW) }), actuals: null, derived, storedAssetClass: "multifamily", readOn: READ_ON });
+    const v = rowOf(t, "vacancy");
+    expect(v.evidence.slice(0, 2).map((e) => [e.label, e.value])).toEqual([
+      ["Rental vacancy, metro area", 9.5],
+      ["Rental vacancy, South Census region", 6.2],
+    ]);
+    expect(v.gap).toMatchObject({ value: 6.5, unit: "pts" });
+    expect(v.verdict).toBe("unsupported");
+    // The OM at 4.5%: 1.65 past the region's edge, inside the survey's — stretched.
+    const near = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Occupancy" ? { ...m, value: "95.5%" } : m)) };
+    const nd = deriveUnderwriteInputs(near, "x", undefined, { debtIndex: FIVE });
+    const n = buildStressTest({ extraction: near, challenger: null, market: null, modelVsMarket: readFor(nd, { rates: readMetroRates("dc", rows, FIXTURE_NOW) }), actuals: null, derived: nd, storedAssetClass: "multifamily", readOn: READ_ON });
+    expect(rowOf(n, "vacancy").verdict).toBe("stretched");
+  });
+});
+
 describe("the vacancy the row reads is the OM's allowance", () => {
   it("reads 'Vacancy & credit loss: 7.0%' as the allowance, and a dollar vacancy loss as no allowance", () => {
     const both = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Vacancy loss", "$400,400", "p. 9"), row("Vacancy & credit loss", "7.0%", "p. 21")] };
