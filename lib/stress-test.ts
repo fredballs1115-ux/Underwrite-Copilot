@@ -1362,17 +1362,19 @@ function basisRow(ctx: Ctx): StressRow | null {
       href: rs.href ?? null,
     });
   }
-  // The reader's own past screens, each at its ask.
+  // The reader's own past screens, each at its ask: other memoranda's
+  // asking prices in the same market, not this deal's own document, so a
+  // published figure of the metro's under the reader's own name.
   const ps = ctx.pastScreens;
   if (ps && ps.count > 0) {
     const v = per === "unit" ? ps.perUnitMedian : ps.perSfMedian;
     evidence.push({
-      kind: "document",
+      kind: "published",
       label: `Your past screens in ${ps.market}, at the ask`,
       text: v != null ? `median ${money(v)}${perWord} over ${ps.count} screens, each at its memorandum's asking price` : `${ps.count} screens, none with a basis ${perWord}`,
       value: v != null ? Math.round(v) : null,
       asOf: null,
-      publisher: "your pipeline",
+      publisher: "your past screens",
       scope: "metro",
     });
   }
@@ -1615,7 +1617,9 @@ export function buildStressTest(args: StressTestArgs): StressTest {
       verdict: "unchecked",
       impact: null,
       challenge: challengeWords(c),
-      method: `The challenger's own critique${c.altFigure != null && basis ? `, holding the figure against ${c.altFigure} (${basis})` : basis ? `, against ${basis}` : ""}; no reader tests it and no figure is swapped.`,
+      // The challenger's `altBasis` says what it held the figure against in
+      // words; its bare `altFigure` carries no unit, so it is never printed.
+      method: `The challenger's own critique${basis ? `, holding the figure against ${basis}` : ""}; no reader tests it and no figure is swapped.`,
       // A challenge whose key has a row carries the first; one whose key
       // built no row on this deal (no premium stated, no value-add program)
       // stands alone, said so rather than as a second.

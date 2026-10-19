@@ -49,16 +49,17 @@ export const WHO_DOES_WHAT = {
 /**
  * The kind an `against` item is marked by, read off the table's own words
  * — a rule of thumb where the item names itself one, a published figure
- * where it names a publisher, an index or a survey, the deal's documents
- * where it names the memorandum, the rent roll, the T-12 or the reader's
- * own screens — and null where the words name none of the three (the
- * lender tests, the break-even, the challenger's words), which the page
- * leaves unmarked rather than guesses.
+ * where it names a publisher, an index, a survey or the reader's own past
+ * screens (other memoranda's asks in the market, not this deal's document:
+ * lib/stress-test files them so), the deal's documents where it names the
+ * memorandum, the rent roll or the T-12 — and null where the words name
+ * none of the three (the lender tests, the break-even, the challenger's
+ * words), which the page leaves unmarked rather than guesses.
  */
 export function evidenceKindOf(item: string): EvidenceKind | null {
   if (/rule of thumb|class's norm/i.test(item)) return "rule_of_thumb";
   if (
-    /\bFRED\b|\bBLS\b|Census|Zillow|Realtor|tracker|Treasury|\bindex\b|\bindexes\b|\bCPI\b|breakeven|public property records|published allowance|consumer prices|producer price/i.test(
+    /\bFRED\b|\bBLS\b|Census|Zillow|Realtor|tracker|Treasury|\bindex\b|\bindexes\b|\bCPI\b|breakeven|public property records|published allowance|consumer prices|producer price|past screens/i.test(
       item,
     )
   ) {
@@ -66,7 +67,7 @@ export function evidenceKindOf(item: string): EvidenceKind | null {
   }
   // "The going-in cap: …" is the memorandum's own figure; "a going-in cap
   // under the all-in rate" (negative leverage) is arithmetic, left unmarked.
-  if (/memorandum|deal's own|deal's T-12|rent roll|T-12|past screens|^The going-in cap\b|achieved premium|stated tax abatement/i.test(item)) {
+  if (/memorandum|deal's own|deal's T-12|rent roll|T-12|^The going-in cap\b|achieved premium|stated tax abatement/i.test(item)) {
     return "document";
   }
   return null;

@@ -707,7 +707,8 @@ describe("the challenger's words ride beside the rows", () => {
     const test = buildStressTest(apartmentArgs({ challenger: keyed }));
     expect(rowOf(test, "insurance").challenge?.challenge).toBe("x");
     const other = test.rows.find((r) => r.key === "other")!;
-    expect(other.method).toBe("The challenger's own critique, holding the figure against 95 (a rule of thumb: a stabilized apartment building runs about 95% occupied); no reader tests it and no figure is swapped.");
+    // The bare altFigure (95, no unit) is never printed; altBasis says it in words.
+    expect(other.method).toBe("The challenger's own critique, holding the figure against a rule of thumb: a stabilized apartment building runs about 95% occupied; no reader tests it and no figure is swapped.");
   });
 
   it("the keyword table covers every key but other, in an order a premium wins before the rents", () => {
@@ -887,7 +888,10 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
 
   it("the basis reads the memorandum's comps, the recorded sales, the past screens and the band, best first", () => {
     const b = rowOf(apartmentTest, "basis");
-    expect(b.evidence.map((e) => e.kind)).toEqual(["om_internal", "published", "document", "rule_of_thumb"]);
+    // The reader's past screens are other memoranda's asks, published
+    // under the reader's own name — not this deal's own document.
+    expect(b.evidence.map((e) => e.kind)).toEqual(["om_internal", "published", "published", "rule_of_thumb"]);
+    expect(b.evidence[2]).toMatchObject({ label: "Your past screens in Washington DC, at the ask", publisher: "your past screens", scope: "metro", value: 255_000 });
     expect(b.evidence[0].value).toBe(256_500);
     expect(b.evidence[1]).toMatchObject({ value: 240_000, href: "https://example.test/records", asOf: "2026-10-01" });
     expect(b.gap).toMatchObject({ unit: "pct", value: 7 });
