@@ -34,23 +34,27 @@ export async function PublicShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-line print:hidden">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-2.5">
-            <LogoMark className="h-8 w-8" />
-            <span className="font-semibold tracking-tight">
+        {/* A phone's row is full: at 390px the name ran into "Sign in" with
+            no gap, and at 360px both links broke onto two lines. The links
+            never wrap; the name may, beside its mark, and on the phone's tighter gaps
+            keeps one line at 390px. */}
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-6 py-4 sm:gap-3" data-qa="public-header-row">
+          <Link href="/" className="flex min-w-0 items-center gap-2.5">
+            <LogoMark className="h-8 w-8 shrink-0" />
+            <span className="font-semibold leading-tight tracking-tight">
               Underwrite Copilot
             </span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/login"
-              className="text-sm font-medium text-muted transition-colors hover:text-ink"
+              className="whitespace-nowrap py-1 text-sm font-medium text-muted transition-colors hover:text-ink"
             >
               Sign in
             </Link>
             <Link
               href="/login?mode=signup"
-              className="rounded-lg bg-brand px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+              className="whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-sm sm:px-3.5 font-medium text-white transition-colors hover:bg-brand-strong"
             >
               Get started
             </Link>
