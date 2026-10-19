@@ -174,9 +174,21 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(v.impact!.altValue).toBeCloseTo(0.091, 6);
     expect(v.impact!.altIrrPct!).toBeLessThan(v.impact!.baseIrrPct!);
     expect(v.impact!.note).toMatch(/^If vacancy is the deal's T-12's 9\.1%, not the OM's 6\.0%, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\.$/);
+    // A publisher the label already names is not said twice.
     expect(v.method).toBe(
-      "The OM's stabilized vacancy against the deal's T-12: vacancy loss over its rent line (the deal's T-12), then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb (a rule of thumb).",
+      "The OM's stabilized vacancy against the deal's T-12: vacancy loss over its rent line, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb.",
     );
+  });
+
+  it("says 'against' for the evidence the verdict is struck on and 'beside' for the rest", () => {
+    // The 10-year is a yield, never compared; the lender tests and the
+    // negative-leverage read carry no figure.
+    expect(rowOf(test, "exit_cap").method).toBe("The OM's exit cap against the OM's going-in cap (the offering memorandum); beside 10-year Treasury (FRED).");
+    expect(rowOf(test, "debt").method).toBe(
+      "The OM's debt against the index the model prices off: 5-yr Treasury (FRED), then the class's screening spread over it, a rule of thumb (a screening default); beside 10-year Treasury, as the market check read it (FRED), lender tests at screening defaults, the binding one named (a rule of thumb) and negative leverage: the going-in cap against the all-in rate (the model's own figures).",
+    );
+    // The T-12 first, then the OM's own in-place figure; "NOI" keeps its letters.
+    expect(rowOf(test, "noi").method).toBe("The OM's NOI against the deal's T-12 NOI, then the OM's in-place NOI against its pro forma (the offering memorandum).");
   });
 
   it("holds the OM's pro forma NOI to the T-12's, in dollars, by the actuals card's own bands", () => {
@@ -807,6 +819,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // is the going-in cap's 21 bps of compression, as in Washington.
     expect(x.gap).toMatchObject({ value: 21, unit: "bps" });
     expect(x.verdict).toBe("stretched");
+    expect(x.method).toMatch(/^The OM's exit cap against the OM's going-in cap \(the offering memorandum\); beside .*cap \(research tracker\)/);
   });
 
   it("the map covers every key, one entry a sentence", () => {

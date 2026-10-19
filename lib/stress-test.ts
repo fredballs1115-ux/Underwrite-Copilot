@@ -182,9 +182,8 @@ function joinWords(parts: string[]): string {
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
-/** "Stabilized vacancy" → "stabilized vacancy"; an initialism ("NOI")
- *  keeps its letters. */
-const lowerFirst = (s: string) => (s && !/^[A-Z]{2,}/.test(s) ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
+/** "The OM's" → "the OM's"; an acronym ("NOI") keeps its letters. */
+const lowerFirst = (s: string) => (s && !/^[A-Z]{2,}\b/.test(s) ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
 
 function pageOf(row: Row | null | undefined, ex: ExtractionResult | null): number | null {
   const count = ex && typeof ex.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
@@ -479,20 +478,34 @@ const TITLES: Record<StressKey, string> = {
   other: "Everything else the challenger raised",
 };
 
-/** "The OM's stabilized vacancy against the deal's T-12, then the Census
- *  Bureau's rental vacancy for the metro area." — the sources actually
- *  attached, in their order; none, said so. */
-function methodSentence(key: StressKey, evidence: StressEvidence[]): string {
+/**
+ * "The OM's stabilized vacancy against the deal's T-12, then rental vacancy,
+ * metro area (Census Bureau); beside the class's norm." — the sources
+ * actually attached, in their order: "against" the ones the row's verdict
+ * is struck on (`compared`, the row's own set; where a row hands none,
+ * every item with a figure), "beside" the rest — a figure shown apart, one
+ * held to nothing, words alone. A publisher the label already names is not
+ * said twice. None, said so.
+ */
+function methodSentence(key: StressKey, evidence: StressEvidence[], compared?: ReadonlySet<number>): string {
   const what = `The OM's ${lowerFirst(TITLES[key])}`;
   if (evidence.length === 0) return `${what}: no evidence with a figure or words could be read for this deal, so it stands unchecked.`;
-  const named = evidence.map((e) => `${lowerFirst(e.label)} (${e.publisher})`);
-  const [first, ...rest] = named;
-  return `${what} against ${first}${rest.length ? `, then ${joinWords(rest)}` : ""}.`;
+  const isCompared = (i: number) => (compared ? compared.has(i) : evidence[i].value != null);
+  const name = (e: StressEvidence) => (e.label.toLowerCase().includes(e.publisher.toLowerCase()) ? lowerFirst(e.label) : `${lowerFirst(e.label)} (${e.publisher})`);
+  const against = evidence.filter((_, i) => isCompared(i)).map(name);
+  const beside = evidence.filter((_, i) => !isCompared(i)).map(name);
+  if (against.length === 0) return `${what} beside ${joinWords(beside)}: none carries a figure it is held to.`;
+  const [first, ...rest] = against;
+  return `${what} against ${first}${rest.length ? `, then ${joinWords(rest)}` : ""}${beside.length ? `; beside ${joinWords(beside)}` : ""}.`;
 }
 
-function unchecked(key: StressKey, omSays: StressRow["omSays"], evidence: StressEvidence[], why: string): StressRow {
-  return { key, title: TITLES[key], omSays, evidence, gap: null, verdict: "unchecked", impact: null, challenge: null, method: methodSentence(key, evidence), unchecked: why };
+function unchecked(key: StressKey, omSays: StressRow["omSays"], evidence: StressEvidence[], why: string, compared?: ReadonlySet<number>): StressRow {
+  return { key, title: TITLES[key], omSays, evidence, gap: null, verdict: "unchecked", impact: null, challenge: null, method: methodSentence(key, evidence, compared), unchecked: why };
 }
+
+/** The indexes of the evidence a row's verdict is struck on. */
+const indexesOf = (evidence: StressEvidence[], pick: (e: StressEvidence, i: number) => boolean): Set<number> =>
+  new Set(evidence.map((e, i) => (pick(e, i) ? i : -1)).filter((i) => i >= 0));
 
 const NO_FIGURE = (what: string) => `The OM states no ${what}.`;
 const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
@@ -503,9 +516,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   const om = omVacancy(ctx.rows);
   const evidence: StressEvidence[] = [];
   const comparables: { value: number; tolerance: number; kind: StressEvidence["kind"] }[] = [];
+  const compared = new Set<number>();
   const push = (e: StressEvidence, tolerance = SAME) => {
     evidence.push(e);
-    if (e.value != null) comparables.push({ value: e.value, tolerance, kind: e.kind });
+    if (e.value != null) {
+      comparables.push({ value: e.value, tolerance, kind: e.kind });
+      compared.add(evidence.length - 1);
+    }
   };
   // The deal's own documents first: the rent roll's occupancy, the T-12's
   // vacancy loss over its rent line — the `collectedRent` figure
@@ -583,8 +600,8 @@ function vacancyRow(ctx: Ctx): StressRow | null {
         page: pageOf(om.row, ctx.ex),
       }
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
-  if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"));
-  if (comparables.length === 0) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE);
+  if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"), compared);
+  if (comparables.length === 0) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, compared);
   // The verdict is the best kind's: the deal's own document where one
   // states the figure, else the published figures, else the rule of thumb.
   // A rule of thumb never widens the range a document decides (a 5% class
@@ -609,7 +626,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
           model: pct1(ctx.derived.inputs.vacancyPct * 100),
         })
       : null;
-  return { key: "vacancy", title: TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence) };
+  return { key: "vacancy", title: TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared) };
 }
 
 // — Rent growth —
@@ -618,6 +635,7 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, RENT_GROWTH_ROW, RENT_GROWTH_NOT);
   const evidence: StressEvidence[] = [];
   const comparables: number[] = [];
+  const compared = new Set<number>();
   const check = checkOf(ctx.mvm, "rent_growth");
   if (check) {
     check.published.forEach((f, i) => {
@@ -625,15 +643,18 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
       evidence.push(e);
       // An allowance is the regime's, for the units it regulates — shown
       // first and never in the market's range (the read's own rule).
-      if (check.marks?.[i]?.role !== "apart") comparables.push(f.value);
+      if (check.marks?.[i]?.role !== "apart") {
+        comparables.push(f.value);
+        compared.add(evidence.length - 1);
+      }
     });
   }
   if (!om && evidence.length === 0) return null;
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("rent growth rate"), value: null, page: null };
-  if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"));
-  if (comparables.length === 0) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE);
+  if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"), compared);
+  if (comparables.length === 0) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE, compared);
   // The best figure is the highest market figure — the generous side of the
   // trailing year, which the assumption is asked to beat.
   const bestValue = Math.max(...comparables);
@@ -656,7 +677,7 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
           model: `${pct1(ctx.derived.inputs.rentGrowthPct * 100)}/yr`,
         })
       : null;
-  return { key: "rent_growth", title: TITLES.rent_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("rent_growth", evidence) };
+  return { key: "rent_growth", title: TITLES.rent_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("rent_growth", evidence, compared) };
 }
 
 // — Expense growth —
@@ -665,6 +686,7 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, EXPENSE_GROWTH_ROW);
   const evidence: StressEvidence[] = [];
   const comparables: number[] = [];
+  const compared = new Set<number>();
   const check = checkOf(ctx.mvm, "expense_growth");
   if (check) {
     check.published.forEach((f, i) => {
@@ -672,15 +694,18 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
       evidence.push(e);
       // The price indexes are the range; the insurance index and the
       // breakeven are shown apart, never averaged in (the read's own rule).
-      if (check.marks?.[i]?.role !== "apart") comparables.push(f.value);
+      if (check.marks?.[i]?.role !== "apart") {
+        comparables.push(f.value);
+        compared.add(evidence.length - 1);
+      }
     });
   }
   if (!om && evidence.length === 0) return null;
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("expense growth rate"), value: null, page: null };
-  if (!om) return unchecked("expense_growth", omSays, evidence, NO_FIGURE("expense growth rate"));
-  if (comparables.length === 0) return unchecked("expense_growth", omSays, evidence, NO_EVIDENCE);
+  if (!om) return unchecked("expense_growth", omSays, evidence, NO_FIGURE("expense growth rate"), compared);
+  if (comparables.length === 0) return unchecked("expense_growth", omSays, evidence, NO_EVIDENCE, compared);
   // Under the lowest price index is the optimistic side for an expense.
   const bestValue = Math.min(...comparables);
   const ordered = [bestValue, ...comparables.filter((v) => v !== bestValue)];
@@ -702,7 +727,7 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
           model: `${pct1(ctx.derived.inputs.expenseGrowthPct * 100)}/yr`,
         })
       : null;
-  return { key: "expense_growth", title: TITLES.expense_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("expense_growth", evidence) };
+  return { key: "expense_growth", title: TITLES.expense_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("expense_growth", evidence, compared) };
 }
 
 // — Exit cap —
@@ -730,13 +755,19 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   // and the tracker's cap range where one is on file and held to.
   const check = checkOf(ctx.mvm, "exit_cap");
   const trackerComparables: number[] = [];
+  // The going-in cap and a tracker range held to are compared; the 10-year
+  // (a yield, not a cap) and a tracker range held to nothing are beside.
+  const compared = new Set<number>(goingInOk ? [0] : []);
   if (check) {
     const held = !/not held to it/.test(check.read);
     for (const f of check.published) {
       const e = published(check, f, ctx.mvm?.grain ?? null);
       if (/research tracker/i.test(f.label)) {
         evidence.push(e);
-        if (held) trackerComparables.push(f.value);
+        if (held) {
+          trackerComparables.push(f.value);
+          compared.add(evidence.length - 1);
+        }
       } else {
         const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
         evidence.push({
@@ -750,8 +781,8 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}${statesRange(om.row.value) ? " (a range, read at its first figure)" : ""}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("exit cap"), value: null, page: null };
-  if (!om) return unchecked("exit_cap", omSays, evidence, NO_FIGURE("exit cap"));
-  if (!goingInOk && trackerComparables.length === 0) return unchecked("exit_cap", omSays, evidence, "No going-in cap and no published cap range to set the exit against.");
+  if (!om) return unchecked("exit_cap", omSays, evidence, NO_FIGURE("exit cap"), compared);
+  if (!goingInOk && trackerComparables.length === 0) return unchecked("exit_cap", omSays, evidence, "No going-in cap and no published cap range to set the exit against.", compared);
   // Against the going-in cap where one stands: holds at or over it; tighter
   // is stretched, and by 25 bps or more with no published range reaching
   // the exit, unsupported. Where a published range supports the exit (its
@@ -795,7 +826,7 @@ function exitCapRow(ctx: Ctx): StressRow | null {
           model: pct2(ctx.derived.inputs.exitCapPct * 100),
         })
       : null;
-  return { key: "exit_cap", title: TITLES.exit_cap, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("exit_cap", evidence) };
+  return { key: "exit_cap", title: TITLES.exit_cap, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("exit_cap", evidence, compared) };
 }
 
 // — Debt —
@@ -1029,7 +1060,8 @@ function noiRow(ctx: Ctx): StressRow | null {
   // The T-12 is the comparable; the OM's own in-place figure stands in only
   // where the figure under test is the pro forma and no T-12 is on file.
   const comparables = evidence.filter((e) => e.value != null && (e.kind === "document" || (e.kind === "om_internal" && omLabel !== e.label && omValue !== e.value)));
-  if (comparables.length === 0) return unchecked("noi", omSays, evidence, "No T-12 is on file, and the OM states no second NOI to hold its figure to.");
+  const compared = indexesOf(evidence, (e) => comparables.includes(e));
+  if (comparables.length === 0) return unchecked("noi", omSays, evidence, "No T-12 is on file, and the OM states no second NOI to hold its figure to.", compared);
   const best = comparables[0];
   const share = (omValue - best.value!) / Math.abs(best.value!);
   // The memorandum's own in-place figure is the memorandum against itself,
@@ -1066,7 +1098,7 @@ function noiRow(ctx: Ctx): StressRow | null {
       });
     }
   }
-  return { key: "noi", title: TITLES.noi, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("noi", evidence) };
+  return { key: "noi", title: TITLES.noi, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("noi", evidence, compared) };
 }
 
 // — Taxes —
@@ -1143,14 +1175,16 @@ function taxesRow(ctx: Ctx): StressRow | null {
   const omSays: StressRow["omSays"] = billRow && bill != null
     ? { text: `${billRow.label}: ${billRow.value}`, value: bill, page: pageOf(billRow, ctx.ex) }
     : { text: NO_FIGURE("tax bill"), value: null, page: null };
-  if (bill == null) return unchecked("taxes", omSays, evidence, NO_FIGURE("tax bill"));
   const comparables = evidence.filter((e) => e.value != null && e.kind === "om_internal");
+  const compared = indexesOf(evidence, (e) => comparables.includes(e));
+  if (bill == null) return unchecked("taxes", omSays, evidence, NO_FIGURE("tax bill"), compared);
   if (comparables.length === 0) {
     return unchecked(
       "taxes",
       omSays,
       evidence,
       assessed == null ? "The OM states no assessed value to work the reset bill from; the rate is the assessor's to give." : NO_EVIDENCE,
+      compared,
     );
   }
   const best = comparables[0];
@@ -1182,7 +1216,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
             : { what: "the tax line", om: money(bill), alt: `the ${money(best.value!)} its own figures imply on the price`, evidence: "" },
         )
       : null;
-  return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("taxes", evidence) };
+  return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("taxes", evidence, compared) };
 }
 
 /** The model's one expense line moved by `delta`: the one input swapped is
@@ -1459,9 +1493,11 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
     r.premium != null
       ? { text: `${dollars(r.premium)} a month a renovated door${r.premiumFrom === "rents" ? " (the renovated rent less the classic rent)" : ", as stated"}`, value: r.premium, page: locatedPage(r.page, ctx.ex?.totalPages) }
       : { text: NO_FIGURE("renovation premium"), value: null, page: locatedPage(r.page, ctx.ex?.totalPages) };
-  if (r.premium == null) return unchecked("renovation_premium", omSays, evidence, NO_FIGURE("renovation premium"));
   const achieved = evidence.find((e) => e.label.startsWith("Achieved"));
   const breakEven = evidence.find((e) => e.label.startsWith("Break-even"));
+  // The achieved premium decides, else the break-even; the rents are words.
+  const compared = indexesOf(evidence, (e) => e.value != null && (e === achieved || (achieved?.value == null && e === breakEven)));
+  if (r.premium == null) return unchecked("renovation_premium", omSays, evidence, NO_FIGURE("renovation premium"), compared);
   let gap: StressRow["gap"] = null;
   let verdict: StressVerdict = "unchecked";
   let why: string | null = null;
@@ -1492,7 +1528,7 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
     why = "No achieved premium is stated and no cost a door to strike a break-even on.";
   }
   // The premium is no model input: the model grows today's rent at one rate.
-  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence), ...(why ? { unchecked: why } : {}) };
+  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence, compared), ...(why ? { unchecked: why } : {}) };
 }
 
 // ── The test ─────────────────────────────────────────────────────────────
