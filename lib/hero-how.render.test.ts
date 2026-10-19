@@ -209,6 +209,11 @@ describe("the deal header's figures say how each is read", () => {
     const src = readFileSync("app/(app)/deals/[id]/figure-how.tsx", "utf8");
     expect(src).toMatch(/e\.key === "Escape" && open[\s\S]{0,80}setOpen\(false\);\s*button\.current\?\.focus\(\)/);
     expect(src).toMatch(/document\.addEventListener\("pointerdown", away\)/);
+    // Escape after a click-open, where Safari leaves the focus on the body:
+    // the document hears it while the popover is open.
+    expect(src).toMatch(/const escape = \(e: KeyboardEvent\) => \{\s*if \(e\.key !== "Escape"\) return;\s*setOpen\(false\);\s*button\.current\?\.focus\(\);/);
+    expect(src).toMatch(/document\.addEventListener\("keydown", escape\)/);
+    expect(src).toMatch(/document\.removeEventListener\("keydown", escape\)/);
     expect(src).not.toMatch(/focus-visible:/);
     // The client module loads no reader: it takes plain strings.
     expect(src).not.toMatch(/^import (?!type )[^;]*from "@\/lib\//m);

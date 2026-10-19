@@ -53,8 +53,21 @@ function usePopover() {
     const away = (e: PointerEvent) => {
       if (root.current && !root.current.contains(e.target as Node)) setOpen(false);
     };
+    // Safari never focuses a button a click opens, so Escape pressed after a
+    // click lands on the body and never reaches `root`: while open, the
+    // document hears it too. A key pressed inside `root` is handled there
+    // (`keys`, which stops it), so it is never handled twice.
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      button.current?.focus();
+    };
     document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", escape);
+    };
   }, [open]);
   const keys = (e: React.KeyboardEvent) => {
     if (e.key === "Escape" && open) {
