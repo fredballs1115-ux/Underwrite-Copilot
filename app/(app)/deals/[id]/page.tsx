@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { addressUpgrade } from "@/lib/address";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { utcToday } from "@/lib/stage-days";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import {
   FILED_PERSONAL,
@@ -846,6 +847,10 @@ export default async function DealPage({
   // server's UTC day had read a position due today as past in the header
   // beside a playground reading it due (the audit of 2026-10-05).
   const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  // The decision log's stage days are UTC days (the days its moves were set
+  // on), so the stage the deal is in counts to this request's UTC day — one
+  // clock, never the reader's local day beside UTC move days (lib/stage-days).
+  const stageToday = utcToday();
   const readerNoon = new Date(`${todayIso}T12:00:00Z`);
   const interest = readInterest(extraction, askingPriceOf(extraction), readerNoon);
   // A note's or a leased fee's deal type describes a building the price does
@@ -1948,6 +1953,7 @@ export default async function DealPage({
         tasks={dealTasks}
         taskAssignees={taskAssignees}
         todayIso={todayIso}
+        stageToday={stageToday}
         compsSubjectPoint={compsSubjectPoint}
       />
 

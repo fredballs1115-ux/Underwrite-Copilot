@@ -136,8 +136,9 @@ export function DecisionLog({
   today = null,
 }: {
   dealId: string;
-  /** the reader's day (ISO), which the stage the deal is in counts its
-   *  days to; without it that stage is left off the timeline */
+  /** the UTC day (ISO) of the reader's moment, which the stage the deal is
+   *  in counts its days to — the moves' own clock (lib/stage-days); without
+   *  it that stage is left off the timeline */
   today?: string | null;
   /** the sample deal, whose own seeded note its reader may remove
    *  (lib/note-remove, the delete action's rule too) */

@@ -320,6 +320,7 @@ export function DealView({
   tasks = null,
   taskAssignees = [],
   todayIso = "",
+  stageToday = "",
   staleResults = [],
   rateSeeds = null,
   marketSince = null,
@@ -445,6 +446,10 @@ export function DealView({
   /** yyyy-mm-dd, the reader's own day from the server (lib/reader-day), for
    *  stable overdue/date rendering */
   todayIso?: string;
+  /** yyyy-mm-dd, the request's UTC day (lib/stage-days `utcDayOf`): the
+   *  decision log's stage days are UTC days, so the stage the deal is in
+   *  counts to this one, on the same clock */
+  stageToday?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -850,7 +855,7 @@ export function DealView({
               userId={userId}
               names={askerNames}
               isSample={isSample}
-              today={todayIso || null}
+              today={stageToday || null}
             />
           </div>
         )}

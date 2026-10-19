@@ -16,7 +16,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { DecisionLog } from "@/app/(app)/deals/[id]/decision-log";
-import { spanDaysWords, stageTimeline } from "./stage-days";
+import { spanDaysWords, stageTimeline, utcDayOf } from "./stage-days";
 import type { StageChange } from "./stages";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -58,6 +58,32 @@ describe("stageTimeline — how long a deal sat in each stage", () => {
       ["active_pursuit", 4, false],
     ]);
     expect(end).toEqual({ stage: "dead", label: "Dead", on: "2026-10-05" });
+  });
+
+  // The audit of #466: the moves' days are UTC days and "today" was the
+  // reader's local day, so a move made on a Los Angeles evening (already
+  // the next UTC day) left the stage it set off the timeline.
+  it("counts the stage it is in on the moves' own clock, a Los Angeles evening included", () => {
+    // 7 pm PDT on Oct 19 is 02:00Z on Oct 20; the page reads at 8 pm PDT.
+    const moved: StageChange[] = [
+      { stage: "screening", at: "2026-10-01T15:00:00Z" },
+      { stage: "tracking", at: "2026-10-19T19:00:00-07:00" },
+    ];
+    const at8pmLA = Date.parse("2026-10-19T20:00:00-07:00");
+    expect(utcDayOf(at8pmLA)).toBe("2026-10-20");
+    const { spans } = stageTimeline(moved, utcDayOf(at8pmLA));
+    expect(spans.map((s) => [s.stage, s.from, s.to, s.days, s.current])).toEqual([
+      ["screening", "2026-10-01", "2026-10-20", 19, false],
+      ["tracking", "2026-10-20", "2026-10-20", 0, true],
+    ]);
+    // A day behind the move's own (a local day handed in) never drops it.
+    expect(stageTimeline(moved, "2026-10-19").spans.at(-1)).toMatchObject({ stage: "tracking", days: 0, current: true });
+    // Ordered by the moment, not the text: 08:00 PDT is after 12:00Z.
+    const offsets: StageChange[] = [
+      { stage: "tracking", at: "2026-10-05T08:00:00-07:00" },
+      { stage: "screening", at: "2026-10-05T12:00:00Z" },
+    ];
+    expect(stageTimeline(offsets, "2026-10-06").spans.map((s) => s.stage)).toEqual(["screening", "tracking"]);
   });
 
   it("gives the stage it is in no end without today, and draws nothing with no move", () => {
