@@ -3,9 +3,15 @@
   "entries": [
     {
       "date": "2026-10-19",
+      "title": "Move deals in bulk, and leave a comp out",
+      "href": "/deals",
+      "blurb": "The pipeline has a Select mode: tick deals on the cards, the list or the board, then move them to a stage or mark them dead in one step. On the comps page, a recorded sale can be left out of the readout with a reason. It stays listed, struck through, and the medians, range and bars are worked out again from the sales kept; a link keeps the same sales out while they are still in the window."
+    },
+    {
+      "date": "2026-10-19",
       "title": "Open the sample's memorandum, and see how a figure is read",
       "href": "/demo",
-      "blurb": "The sample deal's term and comp citations now open its memorandum, a 48-page fictional PDF stamped on every page, at the page each figure cites. On a deal's header, each figure and the fit chip open a small note saying where the figure comes from: the memorandum's row and page, the first read, or what it is derived from. The pipeline has a Board view with a column for each live stage, keyboard shortcuts (press ? for the list), and filters that live in the address so a filtered view can be shared as a link. The comps page downloads its recorded sales as a CSV."
+      "blurb": "The sample deal's term and comp citations now open its memorandum, a 48-page fictional PDF stamped on every page, at the page each figure cites. On a deal's header, each figure and the fit chip open a small note saying where the figure comes from: the memorandum's row and page, the first read, or what it is derived from. The pipeline has a Board view with a column for each stage through Closed, Dead behind its toggle, keyboard shortcuts (press ? for the list), and filters that live in the address so a filtered view can be shared as a link. The comps page downloads its recorded sales as a CSV."
     },
     {
       "date": "2026-10-19",
