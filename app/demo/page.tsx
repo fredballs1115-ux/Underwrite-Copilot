@@ -21,23 +21,23 @@ import { DataNotices } from "@/app/data-notices";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Sample screen — a complete analysis, worked end to end",
+  title: "Sample test — one OM, every assumption checked",
   description:
-    "Browse a full Underwrite Copilot screening: verdict, buy-box fit score, live sensitivity sliders, challenged assumptions, graded comps, market check, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
+    "Browse a full Underwrite Copilot test: each assumption challenged, the broker's comps graded, a market check against dated figures, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
   alternates: { canonical: "/demo" },
   // Child `openGraph`/`twitter` REPLACE the root objects wholesale, so the
   // image and card type must be restated or shares lose their preview.
   openGraph: {
-    title: "A complete CRE screen, worked end to end",
+    title: "A complete CRE test, worked end to end",
     description:
-      "Verdict, fit score, live sliders, graded comps, market check, and a downloadable model — on an illustrative sample deal.",
+      "Challenged assumptions, graded comps, a market check, the verdict, fit score, live sliders, and the model included — on an illustrative sample deal.",
     images: ["/opengraph-image"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "A complete CRE screen, worked end to end",
+    title: "A complete CRE test, worked end to end",
     description:
-      "Verdict, fit score, live sliders, graded comps, market check, and a downloadable model — on an illustrative sample deal.",
+      "Challenged assumptions, graded comps, a market check, the verdict, fit score, live sliders, and the model included — on an illustrative sample deal.",
     images: ["/opengraph-image"],
   },
 };
@@ -109,7 +109,7 @@ export default async function DemoPage() {
         <PlaceBand metro="philadelphia" width="max-w-5xl" eager picture="overhead">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              A complete screen, worked end to end
+              A complete test, worked end to end
             </h1>
             <span className="rounded-full bg-caution/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-caution">
               Illustrative sample
@@ -166,7 +166,7 @@ export default async function DemoPage() {
           {/* The conversion moment — after they've seen the whole screen. */}
           <div className="mt-6 rounded-2xl bg-sidebar p-8 text-center">
             <h2 className="text-xl font-semibold tracking-tight text-white">
-              Run this screen on your own OM
+              Run this test on your own OM
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/70">
               {FREE_DEALS_LINE} · no card.
