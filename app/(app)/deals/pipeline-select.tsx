@@ -39,6 +39,7 @@ export function SelectBox({
     <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] font-medium text-ink">
       <input
         type="checkbox"
+        data-keys-pass
         data-select-deal={id}
         checked={checked}
         onChange={() => onToggle(id)}

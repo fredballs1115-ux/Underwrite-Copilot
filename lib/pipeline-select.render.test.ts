@@ -84,6 +84,9 @@ describe("select mode", () => {
       const boxes = boxesOf(html);
       expect(boxes.map((b) => b.deal)).toEqual(["a", "b", "c"]);
       expect(boxes.map((b) => b.checked)).toEqual([true, false, true]);
+      // Each box hands the page's keys on (lib/shortcuts KEYS_PASS_ATTR), so
+      // Escape leaves the mode from it.
+      expect(html.match(/<input\b[^>]*type="checkbox"[^>]*>/g)!.every((i) => i.includes('data-keys-pass="true"'))).toBe(true);
       for (const b of boxes) {
         const name = DEALS.find((d) => d.id === b.deal)!.name;
         // The label names the deal; "Select" shows beside the box where
