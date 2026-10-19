@@ -61,7 +61,7 @@ describe("MarketMemoryCards — /market's own cards open on their market's photo
 
 // ── The analytics page's market table ───────────────────────────────────────
 import { MarketTable } from "@/app/(app)/analytics/market-table";
-import { deriveAnalytics, marketRows, type AnalyticsRow } from "@/lib/analytics";
+import { deriveAnalytics, marketCount, marketRows, type AnalyticsRow } from "@/lib/analytics";
 
 const analyticsRow = (id: string, market: string, verdict = "pass"): AnalyticsRow => ({
   id,
@@ -105,6 +105,19 @@ describe("MarketTable — /analytics' markets, grouped as /market groups them, e
     expect(text).toContain("5.20%");
     const credit = galleryCredit(["richmond"]);
     expect(text.replace(/\n/g, "")).toContain(credit);
+  });
+
+  // The audit of 2026-10-19: the table listed six markets and said nothing
+  // of the rest, and its note did not say which figures are medians.
+  it("says how many markets it left off, and which figures are medians", () => {
+    const html = render(React.createElement(MarketTable, { rows: marketRows(deals, 1), planNote: false, more: marketCount(deals) - 1 }));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(marketCount(deals)).toBe(2);
+    expect(text).toContain("And 1 more market.");
+    expect(text).toContain("Each cap and $/unit figure is the market’s median from three deals up");
+    expect(gluedWords(text)).toEqual([]);
+    const whole = visibleText(render(React.createElement(MarketTable, { rows: marketRows(deals), planNote: false, more: 0 })));
+    expect(whole).not.toMatch(/more market/);
   });
 
   it("no market named, no picture and no credit owed", () => {

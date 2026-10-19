@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { fmtUsdCompact, middleRead, middleText, type MarketRow, type MiddleRead } from "@/lib/analytics";
+import { fmtUsdCompact, middleRead, middleText, moreText, type MarketRow, type MiddleRead } from "@/lib/analytics";
 import { metroForName } from "@/lib/market-match";
 import { marketPath } from "@/lib/public-pages";
 import { OVERHEAD_GRID_CREDIT } from "@/lib/skyline";
@@ -21,7 +21,17 @@ import { marketPageWord } from "@/app/market/market-lead";
  * Pure: the page groups the deals and hands the rows in, so the render test
  * draws this on a fixture.
  */
-export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; planNote: boolean }) {
+export function MarketTable({
+  rows,
+  planNote,
+  more = 0,
+}: {
+  rows: readonly MarketRow[];
+  planNote: boolean;
+  /** the markets the table leaves off (lib/analytics `marketCount` less the
+   *  rows), said under it */
+  more?: number;
+}) {
   const shown = rows.map((r) => ({
     r,
     place: metroForName(r.market),
@@ -99,9 +109,15 @@ export function MarketTable({ rows, planNote }: { rows: readonly MarketRow[]; pl
           </tbody>
         </table>
       </div>
+      {moreText(more, "market") && (
+        <p className="mt-2 text-xs text-muted" data-qa="markets-more">
+          {moreText(more, "market")}
+        </p>
+      )}
       <p className="mt-2 text-xs text-muted">
-        Each figure is the market&rsquo;s median from three deals up; a
-        market with one or two shows those deals&rsquo; own, marked.
+        Each cap and $/unit figure is the market&rsquo;s median from three
+        deals up; a market with one or two shows those deals&rsquo; own,
+        marked.
         Deals whose figures didn&rsquo;t parse are counted in Screens
         but not in the figures.
         {planNote &&

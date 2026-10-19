@@ -13,6 +13,9 @@ import {
   stageCountLine,
   stageCounts,
   marketRows,
+  marketCount,
+  moreText,
+  BROKER_ROWS_SHOWN,
   unitTileSub,
   type AnalyticsRow,
 } from "@/lib/analytics";
@@ -136,6 +139,8 @@ export default async function AnalyticsPage() {
   // /market's own memory groups them (lib/analytics `marketRows`), so one
   // market's spellings are one row on both pages.
   const markets = marketRows(deals);
+  // The markets the table leaves off, said under it.
+  const marketsMore = marketCount(deals) - markets.length;
 
   const enough = deals.length >= ANALYTICS_MIN_DEALS;
 
@@ -343,7 +348,7 @@ export default async function AnalyticsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {brokers.rows.slice(0, 12).map((b) => (
+                    {brokers.rows.slice(0, BROKER_ROWS_SHOWN).map((b) => (
                       <tr key={b.key} className="border-b border-line/60">
                         <td className="max-w-[16rem] py-2 pr-3">
                           <Link href={`/deals?broker=${encodeURIComponent(b.key)}`} className="font-medium text-brand hover:underline">
@@ -367,13 +372,18 @@ export default async function AnalyticsPage() {
                   </tbody>
                 </table>
               </div>
+              {moreText(brokers.rows.length - BROKER_ROWS_SHOWN, "firm") && (
+                <p className="mt-2 text-xs text-muted" data-qa="brokers-more">
+                  {moreText(brokers.rows.length - BROKER_ROWS_SHOWN, "firm")}
+                </p>
+              )}
               <p className="mt-2 text-xs text-muted">
                 {scorecardNote(brokers.unnamed)}
               </p>
             </section>
           )}
 
-          {markets.length > 0 && <MarketTable rows={markets} planNote={planDeals.length > 0} />}
+          {markets.length > 0 && <MarketTable rows={markets} planNote={planDeals.length > 0} more={marketsMore} />}
         </>
       )}
     </div>

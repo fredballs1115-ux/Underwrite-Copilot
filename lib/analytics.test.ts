@@ -4,6 +4,8 @@ import {
   deriveAnalytics,
   fmtUsdCompact,
   marketRows,
+  marketCount,
+  moreText,
   median,
   middleRead,
   middleText,
@@ -306,6 +308,18 @@ describe("marketRows — the analytics' markets grouped as /market's memory grou
 
   it("keeps the most-screened markets, as many as asked", () => {
     expect(marketRows(deals, 1).map((r) => r.market)).toEqual(["Philadelphia, PA"]);
+  });
+
+  it("counts the markets as it groups them, and says how many a table left off", () => {
+    expect(marketCount(deals)).toBe(3);
+    expect(moreText(0, "market")).toBeNull();
+    expect(moreText(1, "market")).toBe("And 1 more market.");
+    expect(moreText(4, "firm")).toBe("And 4 more firms.");
+    const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
+    expect(page).toContain("const marketsMore = marketCount(deals) - markets.length;");
+    expect(page).toContain("more={marketsMore}");
+    expect(page).toContain("brokers.rows.slice(0, BROKER_ROWS_SHOWN)");
+    expect(page).toContain('moreText(brokers.rows.length - BROKER_ROWS_SHOWN, "firm")');
   });
 
   it("the page groups through it, never by the label alone", () => {
