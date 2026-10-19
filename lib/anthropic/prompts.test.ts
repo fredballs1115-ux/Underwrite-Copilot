@@ -165,6 +165,13 @@ describe("plan deals are judged on their own terms", () => {
     expect(p).toContain("NEVER label a stabilized pro forma as Year 1");
   });
 
+  // The page a figure cites is validated against the PDF's own count
+  // (lib/facts), so it must be the PDF's page, never the printed one.
+  it("the extraction cites the PDF's own page, the cover as page 1", () => {
+    const p = extractionInstruction("multifamily");
+    expect(p).toContain("the PDF's own page, counted from the cover as page 1, never a page number printed on the page");
+  });
+
   // The plan's rows, by the exact labels the readers match (lib/deal-strategy:
   // BUDGET_INCLUDE, LAND_PRICE_INCLUDE, TIMELINE_ROW; the unit-count readers).
   it("the extraction asks for the plan's rows by name, for every plan kind", () => {
