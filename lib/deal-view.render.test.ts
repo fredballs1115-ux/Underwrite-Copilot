@@ -43,7 +43,7 @@ import { placeholderPageLine } from "@/lib/underwrite/report-grid";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { buyBoxRead } from "@/lib/buy-box-chip";
-import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
+import { deriveRisks, TermsView } from "@/app/(app)/deals/[id]/deal-sections";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
 import { SIZER_LENDER_TESTS, modelLoanCoverageLine } from "@/lib/sizer-terms";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
@@ -2219,5 +2219,32 @@ describe("the sample's downloads are free, as the public pages promise (lib/samp
     expect(docs).not.toContain('href="/api/deals/sample/memo"');
     const fin = render({ ...own, initialTab: "financials" } as Props);
     expect(textOf(fin)).toMatch(/Upgrade to Pro to download the OM underwrite model/);
+  });
+});
+
+describe("the extracted terms' pages (lib/facts' absolute rule)", () => {
+  const ex = (metrics: { label: string; value: string; page?: string }[], totalPages?: number) =>
+    ({ ...SAMPLE_DEAL.extraction, totalPages, metrics: metrics.map((m) => ({ flagged: false, basis: "na" as const, ...m })) }) as ExtractionResult;
+
+  it("prints a deal screened before citations' page only inside the deck's length", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(TermsView, {
+        result: ex(
+          [
+            { label: "Asking price", value: "$12,000,000", page: "Page 3" },
+            { label: "NOI", value: "$720,000", page: "p. 61" },
+            { label: "Units", value: "48", page: "see the rent roll" },
+          ],
+          48,
+        ),
+      }),
+    );
+    const text = textOf(html);
+    expect(text).toContain("p. 3");
+    expect(text).not.toContain("Page 3");
+    expect(text).not.toMatch(/p\. 61|see the rent roll/);
+    // No length known: no page validated, none printed.
+    const unknown = textOf(renderToStaticMarkup(React.createElement(TermsView, { result: ex([{ label: "NOI", value: "$720,000", page: "p. 4" }]) })));
+    expect(unknown).not.toContain("p. 4");
   });
 });

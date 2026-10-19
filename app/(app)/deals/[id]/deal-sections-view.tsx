@@ -135,9 +135,13 @@ export function TermsView({
           <SourceChip fact={facts[m.label]} omUrl={omUrl} />
         </p>
       ) : (
-        // Deals screened before citations (migration 0018) keep their plain
-        // page text — real, from the extraction, just not a validated chip.
-        m.page && <p className="mt-2 text-[10px] text-muted">{m.page}</p>
+        // Deals screened before citations (migration 0018) keep a plain page
+        // — only where it parses and falls inside the deck's own length
+        // (lib/facts' absolute rule): an unvalidated page is no page.
+        (() => {
+          const n = locatedPage(m.page, result.totalPages);
+          return n != null ? <p className="mt-2 text-[10px] text-muted">{`p. ${n}`}</p> : null;
+        })()
       )}
     </div>
   ));
