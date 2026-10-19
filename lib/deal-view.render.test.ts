@@ -458,7 +458,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     const picture = marketPictureFor({ city: "Philadelphia", state: "PA", label: "Philadelphia, PA" });
     expect(picture).not.toBeNull();
     const p = sampleProps("analyses", "market");
-    const html = render({ ...p, marketPicture: picture });
+    const html = render({ ...p, marketPicture: picture, marketPictureCheckReads: true });
     dumpView("deal-analyses-market-picture", html);
     expect(a11yIssues(html)).toEqual([]);
     const band = /<figure[^>]*data-qa="market-check-picture"[\s\S]*?<\/figure>/.exec(html)?.[0] ?? "";
@@ -476,6 +476,12 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toContain(creditText(photographerParts(picture!.author, picture!.license, true)));
     if (picture!.author.url) expect(band).toContain(`href="${picture!.author.url.replace(/&/g, "&amp;")}"`);
     if (picture!.license.url) expect(band).toContain(`href="${picture!.license.url.replace(/&/g, "&amp;")}"`);
+    // A photograph of a market whose figures the check did not read (reached
+    // by the county or the memorandum's words) is the place's, never "the
+    // market this check reads".
+    const neutral = render({ ...p, marketPicture: picture });
+    expect(neutral).toContain(`alt="${picture!.place}: the photograph the ${picture!.name} area is known by"`);
+    expect(neutral).not.toContain("market this check reads");
     // No picture, no band.
     expect(render(p)).not.toContain('data-qa="market-check-picture"');
   });

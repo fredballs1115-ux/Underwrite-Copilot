@@ -326,6 +326,7 @@ export function DealView({
   modelVsMarket = null,
   metroDemand = null,
   marketPicture = null,
+  marketPictureCheckReads = false,
   assumable = null,
   sellerNote = null,
   leaseholdExit = null,
@@ -387,6 +388,10 @@ export function DealView({
   /** the photograph the deal's market is known by (lib/market-picture),
    *  which the market check opens on; null where none answers */
   marketPicture?: MarketPicture | null;
+  /** whether the photograph is of the market whose figures the check read
+   *  (its stored brief's market, at the metro's grain): only then does its
+   *  alt text call it the market the check reads */
+  marketPictureCheckReads?: boolean;
   /** the deal's resolved location (lib/deal-location), the point its
    *  pictures are drawn around; the comps map measures from it */
   compsSubjectPoint?: SubjectPoint | null;
@@ -903,6 +908,7 @@ export function DealView({
             marketSince={marketSince}
             metroDemand={metroDemand}
             marketPicture={marketPicture}
+            marketPictureCheckReads={marketPictureCheckReads}
             isSample={isSample}
             staleVerdict={staleResults.includes("verdict")}
             staleWhy={staleWhy}
@@ -1186,6 +1192,7 @@ function AnalysesPanel({
   marketSince = null,
   metroDemand = null,
   marketPicture = null,
+  marketPictureCheckReads = false,
   isSample = false,
 }: {
   analysis: AnalysisKey;
@@ -1225,6 +1232,8 @@ function AnalysesPanel({
   metroDemand?: MetroDemand | null;
   /** the photograph the deal's market is known by (lib/market-picture) */
   marketPicture?: MarketPicture | null;
+  /** whether that photograph is the market whose figures the check read */
+  marketPictureCheckReads?: boolean;
   /** the sample deal: its stress test is the first-draft model's run, and
    *  the challenger's heading says so (lib/stress-test-title) */
   isSample?: boolean;
@@ -1332,7 +1341,7 @@ function AnalysesPanel({
           }}
         />
       ) : (
-        <MarketCheck result={results.market!} since={marketSince} demand={metroDemand} picture={marketPicture} />
+        <MarketCheck result={results.market!} since={marketSince} demand={metroDemand} picture={marketPicture} pictureCheckReads={marketPictureCheckReads} />
       );
   } else if (running || pending) {
     content = analysis === "verdict" ? <VerdictSkeleton /> : <CardListSkeleton />;

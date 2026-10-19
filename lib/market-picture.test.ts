@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MARKET_PHOTO_WIDTH, marketPhotoWidth, marketPictureFor } from "./market-picture";
+import { MARKET_PHOTO_WIDTH, marketPhotoWidth, marketPictureFor, pictureIsCheckedMarket } from "./market-picture";
 import { commonsPage, photographerLine, skylineFor, skylineTag } from "./skyline";
 import { creditText, photographerParts } from "./credit-parts";
 import { marketPageFor, marketPages } from "./public-pages";
@@ -79,6 +79,31 @@ describe("a metro area the site reads no figures for (#472)", () => {
     // A market the site reads keeps its own photograph whatever the county says.
     const pitt = marketPictureFor(null, null, { id: "pittsburgh", name: "Pittsburgh PA" }, { cbsa: "38300", area: "Pittsburgh, PA" });
     expect(pitt?.id).toBe("pittsburgh");
+  });
+});
+
+// The audit of #466: the market tab's photograph said "the X market this
+// check reads" over a photograph reached by the county or the memorandum's
+// words, for a market whose figures the check never read.
+describe("pictureIsCheckedMarket — only the market the check read is called so", () => {
+  const pitt = { id: "pittsburgh", name: "Pittsburgh PA" };
+  it("holds where the brief read this market's figures, at the metro's grain", () => {
+    expect(pictureIsCheckedMarket({ id: "pittsburgh" }, { metro: "Pittsburgh PA", grain: "metro" }, pitt)).toBe(true);
+    // A brief written before the grain was stored is a metro's.
+    expect(pictureIsCheckedMarket({ id: "pittsburgh" }, { metro: "Pittsburgh PA" }, pitt)).toBe(true);
+  });
+  it("fails for a state's figures, another market's brief, a borrowed photograph or no brief", () => {
+    expect(pictureIsCheckedMarket({ id: "pittsburgh" }, { metro: "Pennsylvania", grain: "state" }, pitt)).toBe(false);
+    expect(pictureIsCheckedMarket({ id: "pittsburgh" }, { metro: "Pennsylvania", grain: "state" }, { id: "state:PA", name: "Pennsylvania" })).toBe(false);
+    expect(pictureIsCheckedMarket({ id: "pittsburgh" }, { metro: "Philadelphia PA", grain: "metro" }, pitt)).toBe(false);
+    // Montgomery County's figures under Washington's photograph.
+    expect(
+      pictureIsCheckedMarket({ id: "dc" }, { metro: "Montgomery County MD", grain: "metro" }, { id: "montgomery_county", name: "Montgomery County MD" }),
+    ).toBe(false);
+    // A metro area's photograph reached through the county.
+    expect(pictureIsCheckedMarket({ id: "cbsa:41940" }, { metro: "California", grain: "state" }, { id: "state:CA", name: "California" })).toBe(false);
+    expect(pictureIsCheckedMarket({ id: "pittsburgh" }, null, pitt)).toBe(false);
+    expect(pictureIsCheckedMarket(null, { metro: "Pittsburgh PA" }, pitt)).toBe(false);
   });
 });
 

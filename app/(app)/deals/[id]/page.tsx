@@ -24,7 +24,7 @@ import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
 import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
-import { marketPictureFor } from "@/lib/market-picture";
+import { marketPictureFor, pictureIsCheckedMarket } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
@@ -1364,6 +1364,9 @@ export default async function DealPage({
   // the building has none of its own and no Street View (#439) — the one its
   // pipeline card shows (#438), from the same reader.
   const marketPicture = marketPictureFor(dealAddress, extraction?.market ?? null, placement.briefed ?? placement.read, placement.county);
+  // The market check calls it the market it reads only where it is: the
+  // market whose figures the stored brief holds, at the metro's grain.
+  const marketPictureCheckReads = pictureIsCheckedMarket(marketPicture, storedBrief, liveMarket);
 
   // A development's price row is its land cost, and a plan deal's cap slot is
   // its yield on total cost — the same words the pipeline row and the meeting
@@ -1888,6 +1891,7 @@ export default async function DealPage({
         // The market check opens on the market's photograph, the one the
         // picture above leads with where the building has none of its own.
         marketPicture={marketPicture}
+        marketPictureCheckReads={marketPictureCheckReads}
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}

@@ -1194,6 +1194,7 @@ export function MarketCheck({
   since = null,
   demand = null,
   picture = null,
+  pictureCheckReads = false,
 }: {
   result: MarketResult;
   /** what moved since the check read its figures (lib/brief-delta), read
@@ -1208,6 +1209,12 @@ export function MarketCheck({
    *  resolved by the page — plain data, so this client module loads none of
    *  lib/skyline's table); null where no photographed market answers */
   picture?: MarketPicture | null;
+  /** whether the photograph is of the market whose figures this check read
+   *  (the page holds it to the stored brief's market and grain). One
+   *  reached through the county or the memorandum's words, for a market the
+   *  check read no figures of, is named as the place's photograph, never as
+   *  the market this check reads. */
+  pictureCheckReads?: boolean;
 }) {
   // Aggressive first — that's where the risk is.
   const order = { aggressive: 0, conservative: 1, "in-line": 2 } as const;
@@ -1223,7 +1230,7 @@ export function MarketCheck({
   const readFailed = !brief ? liveReadFailedLine(result.liveReadFailed) : null;
   return (
     <section className="space-y-4">
-      {picture && <MarketPictureBand picture={picture} />}
+      {picture && <MarketPictureBand picture={picture} checkReads={pictureCheckReads} />}
       <SectionHeader
         title="Market plausibility check"
         aside={
@@ -1274,7 +1281,13 @@ export function MarketCheck({
  * crops it. A photograph that does not load takes the band with it, credit
  * and all: a credit is never left over a picture nobody can see.
  */
-function MarketPictureBand({ picture }: { picture: MarketPicture }) {
+function marketPictureAlt(picture: MarketPicture, checkReads: boolean): string {
+  return checkReads
+    ? `${picture.place}: the ${picture.name} market this check reads`
+    : `${picture.place}: the photograph the ${picture.name} area is known by`;
+}
+
+function MarketPictureBand({ picture, checkReads }: { picture: MarketPicture; checkReads: boolean }) {
   const [gone, setGone] = useState(false);
   const img = useRef<HTMLImageElement>(null);
   // A load that failed before hydration fired its error with no listener.
@@ -1290,7 +1303,7 @@ function MarketPictureBand({ picture }: { picture: MarketPicture }) {
       <img
         ref={img}
         src={picture.src}
-        alt={`${picture.place}: the ${picture.name} market this check reads`}
+        alt={marketPictureAlt(picture, checkReads)}
         width={1600}
         height={560}
         loading="lazy"
