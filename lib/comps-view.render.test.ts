@@ -222,6 +222,23 @@ describe("the comps readout as pictures", () => {
     expect(visibleText(draw(result([sale(0), sale(1), sale(2)])))).not.toContain("$/unit");
   });
 
+  it("draws no $/SF bar for a row possibly of one deed across parcels, and keeps it off the scale", () => {
+    const comps = Array.from({ length: 5 }, (_, i) =>
+      sale(i, { sqft: 1_800, ...(i < 2 ? { buyer: "Acme LLC", saleDate: "2026-01-15", price: 9_000_000 } : {}) }),
+    );
+    const html = draw(result(comps));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    // Three bars, drawn in the phone list and the table alike.
+    expect(html.split('data-bar="comps-psf"').length - 1).toBe(6);
+    // The scale is the widest unflagged sale's ($500,000 / 1,800 SF), never the deed's $9M over one parcel.
+    expect(text).toContain("from zero to the highest, $278/SF");
+    expect(text).toContain("2 sales possibly of one deed across parcels draw no bar.");
+    // Their figures stay, flagged.
+    expect(text).toContain("$5,000/SF");
+    expect(html.split('data-qa="comps-shared-deed"').length - 1).toBe(2);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
   it("hands the sales that state an area to the comp grid from /comps, not from a deal", () => {
     const comps = Array.from({ length: 6 }, (_, i) => sale(i));
     const html = draw(result(comps));

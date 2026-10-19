@@ -328,6 +328,9 @@ export interface PerSfBars {
   medianShare: number | null;
   /** how many sales state an area: the bars drawn */
   drawn: number;
+  /** sales that state an area but draw no bar: rows sharing a day, buyer
+   *  and price (`sharedDeedCounts`), possibly one deed across parcels */
+  leftOut: number;
 }
 
 /**
@@ -336,12 +339,20 @@ export interface PerSfBars {
  * and the $/SF median as a tick, only where the readout names one (the
  * same floor as `perSqftPhrase`). Null under two sales stating an area:
  * one bar is scaled to nothing but itself.
+ *
+ * A row `sharedDeedCounts` flags (`shared`, indexed as the list) may be one
+ * deed recorded across parcels at the deed's whole price, so its price a
+ * foot may be the deed's over one parcel's area: it sets no scale and draws
+ * no bar (`leftOut`). Its figure stays in the list with its flag.
  */
 export function perSfBars(
   comps: ReadonlyArray<Pick<RecordComp, "price" | "sqft">>,
   medianPerSqft: number | null,
+  shared: readonly number[] = [],
 ): PerSfBars | null {
-  const values = comps.map((c) => perSqftOf(c));
+  const stated = comps.map((c) => perSqftOf(c));
+  const values = stated.map((v, i) => ((shared[i] ?? 0) >= 2 ? null : v));
+  const leftOut = stated.filter((v, i) => v !== null && values[i] === null).length;
   const drawn = values.filter((v) => v !== null).length;
   if (drawn < 2) return null;
   const max = Math.max(...values.map((v) => v ?? 0));
@@ -353,5 +364,6 @@ export function perSfBars(
     max,
     medianShare: middle ? Math.min(1, (medianPerSqft as number) / max) : null,
     drawn,
+    leftOut,
   };
 }
