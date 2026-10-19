@@ -537,7 +537,7 @@ Give:
 - \`vacancyLoss\`: vacancy + credit loss as a POSITIVE dollar number, null if not shown.
 - \`otherIncome\`: other income (plain number), null if not shown.
 - \`egi\`: effective gross income ONLY if the statement states it, else null. Do not compute it.
-- \`opex\`: one object per operating-expense LINE ITEM, each with \`key\` (snake_case like taxes, insurance, utilities, repairs, management, payroll, admin, cam, marketing, reserves), \`label\` (as written), \`amount\` (annual dollars as a POSITIVE plain number, even where the statement prints expenses as negatives or in brackets), and \`page\`. Exclude debt service, depreciation, capital items, and any total row.
+- \`opex\`: one object per operating-expense LINE ITEM, each with \`key\` (snake_case like taxes, insurance, utilities, repairs, management, payroll, admin, cam, marketing, reserves), \`label\` (as written), \`amount\` (annual dollars as a plain number: an expense line's size as a POSITIVE number, even where the statement prints expenses as negatives or in brackets; a line that REDUCES expenses — a credit, a recovery, a reimbursement, a refund — stays NEGATIVE, whatever sign the statement prints it with), and \`page\`. Exclude debt service, depreciation, capital items, and any total row.
 - \`totalOpex\`: total operating expenses as a POSITIVE dollar number ONLY if stated, else null.
 - \`noi\`: net operating income ONLY if stated, else null. Do not compute it.
 - \`page\`: the page the statement is on.
