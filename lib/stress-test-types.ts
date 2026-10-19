@@ -147,7 +147,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
       "The memorandum's own sale comps, each graded for how hard it supports the ask",
-      "Recorded sales from public property records where the site has them (Philadelphia, Maryland, New Jersey), a median only from three sales up",
+      "Recorded sales from public property records where the site has them, a median only from three sales up",
       "Your own past screens and pipeline in the same market and class, each at its ask",
       "The band of prices per unit or per square foot the class trades in, a rule of thumb named as one",
     ],
@@ -211,7 +211,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The deal's own rent roll or T-12: the occupancy it actually ran at",
       "The Census Bureau's rental vacancy for the metro area, inside its own margin of error, then the region's and the state's",
       "The research tracker's vacancy band for a commercial class, with its period",
-      "The class's norm, a rule of thumb named as one (an apartment building about 95% occupied, a hotel about 70%)",
+      "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied)",
     ],
     engine: "Vacancy is a direct input: the return is re-run at the evidence's vacancy.",
     limits: [
