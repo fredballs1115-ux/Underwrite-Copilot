@@ -170,13 +170,13 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
             <table className="mt-3 w-full text-sm">
               <tbody>
                 <Line k="Collected rent" v={usd(st.collectedRent)} />
-                {st.vacancyLoss != null && <Line k="Vacancy / credit loss" v={`(${usd(st.vacancyLoss)})`} />}
+                {st.vacancyLoss != null && <Line k="Vacancy / credit loss" v={`(${usd(Math.abs(st.vacancyLoss))})`} />}
                 {st.otherIncome != null && <Line k="Other income" v={usd(st.otherIncome)} />}
                 <Line k="Effective gross income" v={usd(st.egi)} strong />
                 {st.opex.map((l, i) => (
-                  <Line key={`${l.key}-${i}`} k={l.label} v={`(${usd(l.amount)})`} indent />
+                  <Line key={`${l.key}-${i}`} k={l.label} v={`(${usd(Math.abs(l.amount))})`} indent />
                 ))}
-                <Line k="Total operating expenses" v={`(${usd(st.totalOpex)})`} strong />
+                <Line k="Total operating expenses" v={`(${usd(Math.abs(st.totalOpex))})`} strong />
                 <Line
                   k={st.noiDerived ? "Net operating income (derived)" : "Net operating income"}
                   v={usd(st.noi)}

@@ -76,6 +76,10 @@ describe("PropertyActuals — the T-12 as a bar", () => {
     // The table stays, beneath the picture.
     expect(html.indexOf('data-qa="t12-bar"')).toBeLessThan(html.indexOf("Effective gross income"));
     expect(text).toContain("Total operating expenses");
+    // A deduction is bracketed once: a vacancy the statement files as a
+    // negative figure never reads as a minus inside brackets.
+    expect(text).toContain("($120k)");
+    expect(text).not.toMatch(/\([−-]\$/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
