@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ANALYSIS_STAGES } from "./marketing-constants";
 import { RECONCILE_RUN, SCREEN_STAGES } from "./screen-stages";
+import { PIPELINE } from "./deal-tabs";
 
 const VIEW = readFileSync(join(__dirname, "..", "app", "(app)", "deals", "[id]", "deal-view.tsx"), "utf8");
 const HOME = readFileSync(join(__dirname, "..", "app", "page.tsx"), "utf8");
@@ -16,8 +17,9 @@ describe("the screen's stages", () => {
     const rail = /const steps = \[([\s\S]*?)\];/.exec(VIEW)?.[1] ?? "";
     const steps = [...rail.matchAll(/\{ key: "([a-z_]+)", label: "([^"]+)" \}/g)].map((m) => ({ key: m[1], label: m[2] }));
     expect(steps).toEqual(SCREEN_STAGES.map((s) => ({ ...s })));
-    const pipeline = /const PIPELINE = \[([^\]]*)\]/.exec(VIEW)?.[1] ?? "";
-    expect([...pipeline.matchAll(/"([a-z_]+)"/g)].map((m) => m[1])).toEqual(SCREEN_STAGES.map((s) => s.key));
+    // The pipeline's order is lib/deal-tabs', which the deal page reads.
+    expect(VIEW).toMatch(/\bPIPELINE,\n[\s\S]*from "@\/lib\/deal-tabs"/);
+    expect([...PIPELINE]).toEqual(SCREEN_STAGES.map((s) => s.key));
   });
 
   it("leave the reconcile run out of the count, as the rail's side jobs do", () => {

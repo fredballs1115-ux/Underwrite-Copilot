@@ -3,6 +3,7 @@ import {
   METRIC_FIND,
   buildingSfFromMetrics,
   findMetric,
+  parseMoney,
   parsePrice,
   priceRange,
   priceRangeShort,
@@ -68,6 +69,13 @@ export interface InternalComp {
    *  who reported it and when */
   tradedLabel?: string | null;
   tradedTitle?: string | null;
+  /** the cap the `capLabel` prints, as a figure (percent) — the block's
+   *  picture draws it (lib/comp-range); absent where none parsed */
+  capPct?: number | null;
+  /** the basis the `basisLabel` prints, as a figure on the class's basis —
+   *  `allIn` on a plan deal's total cost over its planned units; absent
+   *  where none parsed */
+  basisFigure?: { value: number; unit: "unit" | "sf"; noun: string | null; allIn: boolean } | null;
 }
 
 interface MetricLike {
@@ -171,7 +179,7 @@ function deriveBasis(
    *  development its proposed count, never today's building's); absent,
    *  the memorandum's count row */
   count?: number | null,
-): string | null {
+): { label: string; value: number | null; unit: "unit" | "sf"; noun: string | null } | null {
   const suffix = allIn ? " all-in" : "";
 
   // The branch on asset class comes FIRST, as in lib/market-memory: a stray
@@ -182,25 +190,30 @@ function deriveBasis(
   const words = assetWords(assetClass);
   if (words.basis === "acre") return null;
   if (words.basis === "unit") {
+    const noun = perSuffix(words).slice(1);
     if (!allIn && statedLine) {
       // The shared per-unit reader: the price over the units, never a rent
       // or an expense per unit.
       const direct = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
-      if (direct) return direct.value;
+      if (direct) {
+        // The row as stated; its figure only where it parses as one.
+        const v = parseMoney(direct.value);
+        return { label: direct.value, value: v != null && v > 0 ? v : null, unit: "unit", noun };
+      }
     }
     if (price == null) return null;
     // The shared count reader: "312 units" parses, a "Unit mix" row ahead
     // of "Units" never shadows it — and "212 keys" counts the same way. A
     // plan's all-in cost divides by the plan's own count.
     const n = count !== undefined ? count : unitCountFromMetrics(metrics);
-    if (n != null && n > 0) return `${fmtCompact(price / n)}${perSuffix(words)}${suffix}`;
+    if (n != null && n > 0) return { label: `${fmtCompact(price / n)}${perSuffix(words)}${suffix}`, value: price / n, unit: "unit", noun };
     return null;
   }
   if (price == null || !perSfBasis) return null;
   // Priced per SF: dollars per square foot, over the building's size — the
   // shared reader, never the land's or a unit's.
   const n = buildingSfFromMetrics(metrics);
-  if (n != null && n > 0) return `$${Math.round(price / n)}/SF${suffix}`;
+  if (n != null && n > 0) return { label: `$${Math.round(price / n)}/SF${suffix}`, value: price / n, unit: "sf", noun: null };
   return null;
 }
 
@@ -273,6 +286,14 @@ export function deriveInternalComps(
     // shop building.
     const perSfBasis = !isOutdoorStorageYard(extraction?.assetClass) && !isOutdoorStorageYard(row.asset_class);
 
+    const basis = plan
+      ? plan.totalCost != null
+        ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis, plan.units)
+        : null
+      : // A bulk condominium purchase's price is over the units offered
+        // (lib/condo-units `priceUnitCount`, the card's count).
+        deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis, priceUnitCount(ext));
+
     comps.push({
       dealId: row.id,
       name: row.name ?? "Untitled deal",
@@ -289,19 +310,18 @@ export function deriveInternalComps(
           ? `${priceRangeOf(price!.value) ?? fmtCompact(priceNum)}${interestTag(ext) ? ` · ${tagInLine(interestTag(ext)!)}` : ""}`
           : null,
       capLabel: capNum != null ? cap!.text : null,
-      basisLabel: plan
-        ? plan.totalCost != null
-          ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis, plan.units)
-          : null
-        : // A bulk condominium purchase's price is over the units offered
-          // (lib/condo-units `priceUnitCount`, the card's count).
-          deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis, priceUnitCount(ext)),
+      basisLabel: basis?.label ?? null,
       kind: strategy.kind,
       kindLabel: plan ? strategy.label : null,
       // To two decimals, as the sibling's own header and card print it.
       yieldOnCostLabel: yoc != null ? yieldOnCostText(yoc) : null,
       ...(viewerId !== undefined ? { teammate: row.user_id != null && row.user_id !== viewerId } : {}),
       ...(typedByHand(ext) ? { typedByHand: true } : {}),
+      // The two figures as numbers, for the block's picture alone.
+      ...(capNum != null && Number.isFinite(capNum) ? { capPct: capNum } : {}),
+      ...(basis?.value != null
+        ? { basisFigure: { value: basis.value, unit: basis.unit, noun: basis.noun, allIn: plan != null } }
+        : {}),
       // A reported trade, apart from the ask it never joins.
       ...(() => {
         const trade = currentOutcome(row.stage, parseStageHistory(row.stage_history))?.trade ?? null;

@@ -12,6 +12,7 @@ import {
   type BasemapId,
 } from "@/lib/basemaps";
 import { safeHttpUrl } from "@/lib/safe-url";
+import { ScrollRegion } from "@/app/scroll-region";
 import { photonPrecision } from "@/lib/geocode";
 import {
   distanceFrom,
@@ -494,7 +495,9 @@ export function CompsMap({
       )}
 
       {rows.length > 0 && (
-      <div className="mt-3 overflow-x-auto">
+      // A named, focusable scroll box, so a keyboard can reach the far
+      // columns (app/scroll-region, research pass 33).
+      <ScrollRegion label="Comps on the map" className="mt-3">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -517,12 +520,12 @@ export function CompsMap({
               >
                 <td className="py-2 pr-2">
                   <span
-                    aria-hidden
                     className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${
                       c.pos ? "" : "opacity-35"
                     }`}
                     style={{ background: PIN_COLOR[c.kind] }}
                   >
+                    <span className="sr-only">{c.pos ? "Pin " : "No pin, number "}</span>
                     {c.n}
                   </span>
                 </td>
@@ -543,7 +546,11 @@ export function CompsMap({
                     <span className="text-muted">…</span>
                   )}
                 </td>
-                <td className="max-w-72 truncate py-2 pr-3 text-muted">{c.detail}</td>
+                {/* Cut to one line on a wide screen, the whole line in its
+                    title; the figures a comp states are never lost. */}
+                <td className="max-w-72 truncate py-2 pr-3 text-muted" title={c.detail || undefined}>
+                  {c.detail}
+                </td>
                 <td className="whitespace-nowrap py-2 text-xs">
                   {(() => {
                     const href = safeHttpUrl(c.sourceHref);
@@ -566,7 +573,7 @@ export function CompsMap({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
       )}
 
       <p className="mt-2 text-[11px] leading-relaxed text-muted">

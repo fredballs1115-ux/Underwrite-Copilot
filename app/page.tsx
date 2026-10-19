@@ -4,7 +4,8 @@ import { LogoMark } from "./logo";
 import { Reveal, CountUp, CriteriaChips, DemoTabs, type SampleFinancials, type SampleFit } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { ScrollProgress } from "./scroll-progress";
-import { RECONCILE_RUN, SCREEN_STAGES, type ScreenStageKey } from "@/lib/screen-stages";
+import { RECONCILE_RUN, SCREEN_STAGES } from "@/lib/screen-stages";
+import { STAGE_ICON } from "./stage-icons";
 import type { Metadata } from "next";
 import {
   SPREAD_LOW_IRR_PCT,
@@ -118,49 +119,9 @@ function Icon({ children, className = "h-5 w-5" }: { children: ReactNode; classN
   );
 }
 
-// The screen's six stages, named and ordered as the deal page's progress
-// rail names them (lib/screen-stages, which a test holds to the rail): the
-// first pass on the headline figures, then the extraction, the challenger,
-// the broker comps, the market check and the verdict. An icon each; the
-// trace band under the rail shows what each stage produces.
-const STAGE_ICON: Record<ScreenStageKey, ReactNode> = {
-  signal: (
-    <Icon>
-      <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
-    </Icon>
-  ),
-  extract: (
-    <Icon>
-      <path d="M6 2h9l5 5v15H6z" />
-      <path d="M14 2v6h6" />
-      <path d="M9 13h6M9 17h6" />
-    </Icon>
-  ),
-  challenge: (
-    <Icon>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
-    </Icon>
-  ),
-  comps: (
-    <Icon>
-      <path d="M4 20v-9M10 20V5M16 20v-6M2 20h20" />
-    </Icon>
-  ),
-  market: (
-    <Icon>
-      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </Icon>
-  ),
-  verdict: (
-    <Icon>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m8.5 12 2.5 2.5 4.5-5" />
-    </Icon>
-  ),
-};
+// The screen's six stages each wear their icon (app/stage-icons, shared with
+// the deal page's empty states); the trace band under the rail shows what
+// each stage produces.
 
 // Reconciling the buyer's own model is a run of its own, after the screen,
 // which re-runs the verdict (lib/anthropic/pipeline) — drawn apart from the

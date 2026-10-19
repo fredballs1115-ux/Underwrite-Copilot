@@ -202,6 +202,11 @@ export interface ModelReturnsRead extends CompareInterest {
   /** what a withheld return says after "n/a — " (`withheldWord`) */
   word: string | null;
   line: string | null;
+  /** whether the price buys a building at all (`buildingPriceOf`): false
+   *  on a note, a leased fee, a preferred equity position and a share no
+   *  figure grosses up to the building's price, where no capital stack of
+   *  the building is drawn; absent reads as true */
+  priceBuysBuilding?: boolean;
 }
 
 export function modelReturnsRead(
@@ -248,7 +253,15 @@ export function modelReturnsRead(
             ? // The leasehold card's own sentence (lib/leasehold-exit).
               (ci.leaseEnd?.sentence ?? null)
             : null;
-  return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", word: withheldWord(ci), line };
+  return {
+    ...ci,
+    share: !!ex && interestOf(ex).kind === "partial_interest",
+    word: withheldWord(ci),
+    line,
+    // The kind's rule alone, on a nominal price: the model's own price is
+    // what the stack draws, never this figure.
+    priceBuysBuilding: buildingPriceOf(ex, 1) != null,
+  };
 }
 
 /**

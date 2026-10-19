@@ -97,8 +97,8 @@ describe("where a person shows", () => {
     // Eleven chips, each with its icon, the one on screen marked; both edge
     // fades drawn over the row, hidden from a screen reader.
     const strip = header.slice(header.indexOf("<nav"), header.indexOf("</nav>"));
-    expect(strip.match(/<a /g)).toHaveLength(11);
-    expect(strip.match(/<svg /g)).toHaveLength(11);
+    expect(strip.match(/<a /g)).toHaveLength(10);
+    expect(strip.match(/<svg /g)).toHaveLength(10);
     expect(strip).toMatch(/aria-current="page"[^>]*>[\s\S]*?Pipeline/);
     expect(header).toMatch(/<span aria-hidden="true" data-nav-fade="start"[^>]*opacity-0/);
     expect(header).toMatch(/<span aria-hidden="true" data-nav-fade="end"[^>]*opacity-100/);

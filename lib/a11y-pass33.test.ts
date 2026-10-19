@@ -67,6 +67,22 @@ describe("the comps table (research pass 33, item 17)", () => {
     expect(html).toMatch(/<th\b[^>]*><button type="button"[^>]*>Comp<\/button><\/th>/);
     expect(a11yIssues(html)).toEqual([]);
   });
+
+  it("scrolls in a named region, reads each pin's number out, and keeps a cut detail whole in its title", () => {
+    const detail = "Sold Mar 2026 for $41,250,000, 212 units, $194,575/unit, 5.4% cap on in-place NOI";
+    const html = renderToStaticMarkup(
+      h(CompsMap, {
+        subjectLabel: "1 Main St, Philadelphia, PA",
+        market: "Philadelphia",
+        comps: [comp({ id: "a", name: "Riverbend", detail })],
+      }),
+    );
+    expect(html).toMatch(/role="region" aria-label="Comps on the map" tabindex="0"/);
+    // no pin placed yet: the number is still read, and said as no pin
+    expect(html).toContain('<span class="sr-only">No pin, number </span>1');
+    expect(html).toContain(`title="${detail}"`);
+    expect(a11yIssues(html)).toEqual([]);
+  });
 });
 
 describe("a wide table a keyboard can scroll (research pass 33, item 18)", () => {

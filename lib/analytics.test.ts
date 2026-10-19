@@ -4,6 +4,8 @@ import {
   deriveAnalytics,
   fmtUsdCompact,
   marketRows,
+  marketCount,
+  moreText,
   median,
   middleRead,
   middleText,
@@ -306,6 +308,27 @@ describe("marketRows — the analytics' markets grouped as /market's memory grou
 
   it("keeps the most-screened markets, as many as asked", () => {
     expect(marketRows(deals, 1).map((r) => r.market)).toEqual(["Philadelphia, PA"]);
+  });
+
+  it("the cap tile says its count one way, plan deals or none (parsedPhrase)", () => {
+    const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
+    expect(page).toContain("`${parsedPhrase(capPoints.length)} · ${planPhrase}`");
+    // "1 parsed" had read beside "the one deal that parsed" on the next tile.
+    expect(page).not.toMatch(/\$\{capPoints\.length\} parsed/);
+  });
+
+  it("counts the markets as it groups them, and says how many a table left off", () => {
+    expect(marketCount(deals)).toBe(3);
+    expect(moreText(0, "market")).toBeNull();
+    expect(moreText(1, "market")).toBe("And 1 more market.");
+    expect(moreText(4, "firm")).toBe("And 4 more firms.");
+    const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
+    expect(page).toContain("const marketsMore = marketCount(deals) - markets.length;");
+    expect(page).toContain("more={marketsMore}");
+    expect(page).toContain("limit={BROKER_ROWS_SHOWN}");
+    const table = readFileSync(join(__dirname, "..", "app/(app)/analytics/brokerage-table.tsx"), "utf8");
+    expect(table).toContain("rows.slice(0, limit)");
+    expect(table).toContain('moreText(rows.length - shown.length, "firm")');
   });
 
   it("the page groups through it, never by the label alone", () => {

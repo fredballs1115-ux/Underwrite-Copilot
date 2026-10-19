@@ -16,6 +16,7 @@ import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 import { BATCH_MAX_FILES, capNotice, runBatch, runLabel, type BatchStatus } from "@/lib/batch-run";
 import type { BuyBoxCoverage } from "@/lib/criteria";
 import { checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
+import { markFirstRead } from "@/lib/first-read";
 
 const MAX_FILES = BATCH_MAX_FILES;
 const MAX_BYTES = 32 * 1024 * 1024;
@@ -49,12 +50,14 @@ type Triage = { fit: string; provisional: boolean; coverage?: BuyBoxCoverage | n
 /** A deal's triage as a chip: "Fits box", or "Fits box (2 of 4)" where the
  *  box could not be judged whole (lib/fit-label `fitCellText`); null for a
  *  state not worth showing. */
-function triageChip(t: Triage | undefined): { label: string; cls: string; title: string } | null {
+export function triageChip(t: Triage | undefined): { label: string; cls: string; title: string } | null {
   const word = t ? TRIAGE_CHIP[t.fit] : undefined;
   if (!t || !word) return null;
   const fold = t.fit as "fits" | "near" | "outside";
   return {
-    label: `${fitCellText(word, t.coverage)}${t.provisional ? " ~" : ""}`,
+    // A fit judged on the first signal is marked as every other surface
+    // marks it (lib/first-read): "Fits box (first read)", never a bare "~".
+    label: markFirstRead(fitCellText(word, t.coverage), t.provisional),
     cls: TRIAGE_TONE_CLS[fitTone(null, fold, t.coverage)],
     title: [
       t.provisional ? "Provisional — from the first-pass read; the full screen refines it" : "From the completed extraction",
@@ -229,9 +232,12 @@ export function BatchUpload({
         Call-for-offers day? Batch-upload up to {MAX_FILES} OMs →
       </summary>
       <div className="mt-3 space-y-3">
+        {/* The sort's own name (the pipeline's "Sort deals" select): there
+            is no "Buy box" sort. */}
         <p className="text-sm text-muted">
-          Each OM becomes its own deal in Screening. Sort the Screening group by
-          Buy box when they finish to see which are worth the afternoon.
+          Each OM becomes its own deal in Screening. When they finish, sort the
+          deals by &ldquo;Mandate fit: high to low&rdquo; to see which are worth
+          the afternoon.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button

@@ -37,12 +37,6 @@ export default function AppNotFound() {
           >
             Back to the pipeline
           </Link>
-          <Link
-            href="/tasks"
-            className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
-          >
-            My tasks
-          </Link>
         </div>
       </div>
     </div>

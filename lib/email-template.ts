@@ -412,7 +412,8 @@ function pictureCell(entry: { name: string; url: string; pictureUrl?: string | n
   return `<td width="48" style="width:48px;padding:6px 12px 6px 0;vertical-align:middle;line-height:0;font-size:0;">${img}</td>`;
 }
 
-/** The Monday-morning pipeline digest — same dependency-free table style as
+/** The weekly pipeline digest (the worker sends it on WORKER_DIGEST_DOW,
+ *  Monday by default, so the email never names the day) — same dependency-free table style as
  *  the analysis-ready email so clients render it faithfully. */
 export function weeklyDigestEmail(input: DigestInput): {
   subject: string;
@@ -443,7 +444,7 @@ export function weeklyDigestEmail(input: DigestInput): {
         ? `and possibly more due by ${input.offersThrough}`
         : null;
   const tasksTitle = `Your tasks due by ${input.offersThrough}`;
-  const tasksUnreadWords = "Your tasks could not be read for this digest — open My tasks to see them.";
+  const tasksUnreadWords = "Your tasks could not be read for this digest — each deal's page lists its own.";
 
   const text = [
     `Your pipeline this week — ${dealsWord}, by stage:`,
@@ -578,7 +579,7 @@ export function weeklyDigestEmail(input: DigestInput): {
     rows: `
         <tr>
           <td style="padding:28px;">
-            <p style="margin:0;font-size:13px;color:#5f6b69;">Monday pipeline digest</p>
+            <p style="margin:0;font-size:13px;color:#5f6b69;">Weekly pipeline digest</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${dealsWord} in your pipeline</h1>
             ${section("Open deals by stage", stageRows)}
             ${section(offersTitle, offerRows, offersMoreHtml)}

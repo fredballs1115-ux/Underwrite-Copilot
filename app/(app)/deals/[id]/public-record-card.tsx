@@ -2,7 +2,7 @@
 // nearest the deal's geocoded point (nearest_property RPC, migration 0030),
 // with an address-prefix fallback for markets ingested without coordinates
 // (Boston's roll). Assessment context lands where underwriting happens —
-// assessed value, year built, SF, owner + absentee flag, last recorded sale —
+// assessed value, year built, SF, owner + where the record mails, last recorded sale —
 // every row with provenance. Renders nothing when no parcel matches: an
 // empty card would imply coverage the DB doesn't have.
 
@@ -12,8 +12,11 @@ import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import { NEAREST_PARCEL } from "@/lib/public-record-asks";
 import { SAMPLE_PUBLIC_RECORD_LINE } from "@/lib/public-record-subject";
+import { rollYear } from "@/lib/ingest/boston-roll";
+import { datedLong } from "@/lib/debt-index";
+import { dayOf } from "@/lib/utc-day";
 
-interface PropertyRow {
+export interface PropertyRow {
   market: string;
   parcel_id: string;
   address: string | null;
@@ -117,9 +120,42 @@ export async function PublicRecordCard({
     lastSale = null;
   }
 
+  return <PublicRecordView row={row} lastSale={lastSale} />;
+}
+
+/** What the record says of the owner's mailing address against the parcel's
+ *  own: only that, never who lives in or uses the building (the record
+ *  carries a mailing address, not an occupancy). */
+export function ownerMailingWords(absentee: boolean | null): string | null {
+  if (absentee === true) return "mails elsewhere";
+  if (absentee === false) return "mails to the property";
+  return null;
+}
+
+/** The assessed value's label, with the roll's fiscal year where the source
+ *  names one (Boston's resources are named for theirs, lib/ingest/boston-roll);
+ *  no other source states a year, so none is said. */
+export function assessedLabel(sourceDataset: string): string {
+  const year = rollYear(sourceDataset);
+  return year ? `Assessed value (FY${year} roll)` : "Assessed value";
+}
+
+export const ASSESSED_CAVEAT =
+  "An assessed value is the assessor's figure for the tax roll, not a market value or a price.";
+
+/** The card's markup on a row already read: pure, so a test draws it. */
+export function PublicRecordView({
+  row,
+  lastSale,
+}: {
+  row: PropertyRow;
+  lastSale: { sale_date: string; price: number; source_url: string } | null;
+}) {
+  const mailing = ownerMailingWords(row.owner_absentee);
+  const ingested = dayOf(row.ingested_at);
   const facts: { label: string; value: string }[] = [
     { label: "Parcel", value: row.parcel_id },
-    { label: "Assessed value", value: money(row.assessed_value) },
+    { label: assessedLabel(row.source_dataset), value: money(row.assessed_value) },
     { label: "Year built", value: row.year_built ? String(row.year_built) : "—" },
     {
       label: "Building SF",
@@ -128,17 +164,15 @@ export async function PublicRecordCard({
     { label: "Class (source's own code)", value: row.land_use_raw ?? row.asset_class },
     {
       label: "Owner",
-      value: row.owner_name
-        ? `${row.owner_name}${row.owner_absentee === true ? " · absentee mailing" : row.owner_absentee === false ? " · owner-occupied-ish" : ""}`
-        : "—",
+      value: row.owner_name ? `${row.owner_name}${mailing ? ` · ${mailing}` : ""}` : "—",
     },
     ...(lastSale
-      ? [{ label: "Last recorded sale", value: `${money(lastSale.price)} on ${lastSale.sale_date}` }]
+      ? [{ label: "Last recorded sale", value: `${money(lastSale.price)} on ${datedLong(lastSale.sale_date)}` }]
       : []),
   ];
 
   return (
-    <section className="rounded-xl border border-line bg-surface p-4">
+    <section className="rounded-xl border border-line bg-surface p-4" data-qa="public-record">
       <h2 className="text-sm font-semibold">Public record (assessor)</h2>
       <p className="mt-1 text-xs text-muted">
         Nearest ingested parcel{row.address ? ` — ${row.address}` : ""}. Match is
@@ -152,12 +186,13 @@ export async function PublicRecordCard({
           </div>
         ))}
       </dl>
+      {row.assessed_value !== null ? <p className="mt-2 text-xs text-muted">{ASSESSED_CAVEAT}</p> : null}
       <p className="mt-3 text-xs text-muted">
         Source:{" "}
         <a href={row.source_url} className="underline hover:text-brand" target="_blank" rel="noreferrer">
           {row.source_dataset}
-        </a>{" "}
-        · ingested {row.ingested_at.slice(0, 10)}
+        </a>
+        {ingested ? ` · ingested ${ingested}` : null}
       </p>
     </section>
   );

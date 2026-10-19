@@ -75,6 +75,16 @@ describe("the comps readout as pictures", () => {
     expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
+  it("says the price track in one sentence to a screen reader", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const html = draw(result(comps), 500_000);
+    const words = (/data-qa="comps-price-words">([^<]+)</.exec(html)?.[1] ?? "").replace(/&#x27;/g, "'");
+    expect(words).toMatch(/^6 sales from \$400,000 to \$525,000; median \$\d{3},\d{3}; this deal's price \$500,000\.$/);
+    // two sales: no middle and no subject named
+    const two = /data-qa="comps-price-words">([^<]+)</.exec(draw(result([sale(0), sale(1)]), 68_000_000))?.[1];
+    expect(two).toBe("2 sales from $400,000 to $425,000.");
+  });
+
   it("draws no middle on two sales and no subject outside the band", () => {
     const html = draw(result([sale(0), sale(1)]), 68_000_000);
     expect(count(html, "comps-median")).toBe(0);
@@ -227,5 +237,57 @@ describe("the comps readout as pictures", () => {
     expect(text).toContain("The 12 nearest");
     expect(text).toContain("Show all 15");
     expect(text).toContain("Copy as table");
+  });
+
+  it("gives a phone a card a sale and the table from sm, each sale keeping its number", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const html = draw(result(comps));
+    // the cards are phone-only, the table wide-only, in a named, focusable region
+    expect(html).toMatch(/<ul class="[^"]*sm:hidden[^"]*" aria-label="Recorded sales as cards">/);
+    expect(html).toMatch(/role="region" aria-label="Recorded sales" tabindex="0" class="overflow-x-auto mt-1\.5 hidden sm:block"/);
+    // every sale once in each: its address and its price
+    expect(visibleText(html).split("102 Walnut St").length - 1).toBe(2);
+    // the number is read out (it had been hidden from a screen reader); no map on a deal's panel
+    expect(html).toContain('title="Number 1 by distance"');
+    expect(html).not.toContain("Pin 1 on the map");
+    const mapped = renderToStaticMarkup(React.createElement(CompsResultView, { result: result(comps), showMap: true }));
+    expect(mapped).toContain('title="Pin 1 on the map"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("offers the orders as pressed buttons and says the sorted column", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const html = draw(result(comps));
+    expect(html).toContain('role="group" aria-label="Sort the sales"');
+    expect([...html.matchAll(/aria-pressed="(true|false)"[^>]*>([^<]+)</g)].map((m) => [m[1], m[2]])).toEqual([
+      ["true", "Nearest"],
+      ["false", "Newest"],
+      ["false", "Price"],
+      ["false", "$/SF"],
+    ]);
+    // opens nearest first: only the distance column is said to be sorted
+    expect([...html.matchAll(/<th\b[^>]*aria-sort="([^"]+)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]])).toEqual([["ascending", "Dist."]]);
+    // $/SF is no order where under two sales state an area
+    const flat = draw(result(comps.map((c) => ({ ...c, sqft: null }))));
+    expect(flat).not.toMatch(/aria-pressed="false"[^>]*>\$\/SF</);
+    // one sale: nothing to order
+    expect(draw(result([sale(0)]))).not.toContain("Sort the sales");
+  });
+
+  it("draws each sale's $/SF on one scale, the median's tick only where the readout names one", () => {
+    // sales 1, 3, 5 state 1,800 SF: three bars, the thin median named above
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const html = draw(result(comps));
+    // each bar twice: its phone card and its table row
+    expect(count(html, "comps-psf")).toBe(6);
+    expect(count(html, "comps-psf-median")).toBe(6);
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toMatch(/Bars: the price a square foot that 3 of the 6 sales state, from zero to the highest, \$\d{3}\/SF; the tick is the median, \$\d{3}\/SF\./);
+    // two sales stating an area: bars, no median tick, no median in the caption
+    const two = draw(result(Array.from({ length: 4 }, (_, i) => sale(i))));
+    expect(count(two, "comps-psf")).toBe(4);
+    expect(count(two, "comps-psf-median")).toBe(0);
+    expect(visibleText(two)).not.toContain("the tick is the median");
   });
 });

@@ -16,20 +16,16 @@ import { getBilling } from "@/lib/billing";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
+import { TeamFaces } from "./team-faces";
+import { LEAVING_KEEPS } from "@/lib/team-leaving";
+import { cookies } from "next/headers";
+import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
+import { SEAT_SYNC, renewsOn } from "@/lib/billing-view";
 
 export const metadata: Metadata = { title: "Team" };
 
-/** What a member who leaves, or is removed, keeps of the deals they added:
- *  the deals stay in the team's pipeline under their name (removeMember and
- *  leaveTeam move nothing), and row-level security reads a deal by its
- *  creator — so they still open it, mint a share link to it and delete it
- *  (0007's read and delete policies, 0017's share links). An edit to the
- *  deal itself is refused while it stays in a team they are not on (0007's
- *  update check). */
-const LEAVING_KEEPS = {
-  them: "The deals they added stay in the team pipeline, and they keep access to them: they can still open them, share them by link and delete them.",
-  you: "You'll stop seeing your teammates' deals. The deals you added stay in the team pipeline, and you keep access to them: you can still open them, share them by link and delete them.",
-};
+// What a departing member keeps of the deals they added: lib/team-leaving,
+// shared with the billing page's roster.
 
 const TEAM_UNAVAILABLE = { cls: "bg-kill/10 text-kill", text: "Team checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you set up." };
 const MESSAGES: Record<string, { cls: string; text: string }> = {
@@ -99,6 +95,9 @@ export default async function TeamPage({
     team?.role === "owner" && user
       ? (await getBilling(supabase, user.id)).plan === "pro"
       : false;
+
+  // A renewal day on the reader's own calendar (lib/reader-day).
+  const timeZone = readerTimeZone((await cookies()).get(TZ_COOKIE)?.value);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const invites = team && team.role === "owner"
@@ -172,9 +171,11 @@ export default async function TeamPage({
             </h2>
             <ul className="mt-3 space-y-2 text-sm text-muted">
               {[
-                "Everyone on the team sees the shared pipeline — its deals, verdicts, models, and memos.",
+                "Everyone on the team sees the shared pipeline — its deals and their verdicts.",
                 `Up to ${TEAM_TRIAL_DEALS} shared deals are free to try. Past that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
-                "The Team plan unlocks everything in Pro for every member.",
+                // The exports are Pro-gated (lib/billing isPro: a personal
+                // Pro or an ACTIVE team plan), so a trial gives them to no one.
+                "The Team plan unlocks everything in Pro for every member. On the free trial, the memo, the report and the Excel models stay Pro.",
                 "Joining is one click on an invite link. You can be on one team at a time.",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2.5">
@@ -205,6 +206,7 @@ export default async function TeamPage({
                   {team.dealCount} shared{" "}
                   {team.dealCount === 1 ? "deal" : "deals"}
                 </p>
+                <TeamFaces members={team.members} />
               </div>
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -346,10 +348,9 @@ export default async function TeamPage({
                   {fmtUsd(teamMonthlyTotal(team.seatCount))}/mo for{" "}
                   {team.seatCount} {team.seatCount === 1 ? "seat" : "seats"}
                   {team.currentPeriodEnd
-                    ? ` · renews ${new Date(team.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+                    ? ` · renews ${renewsOn(team.currentPeriodEnd, timeZone)}`
                     : ""}
-                  . Adding or removing a member updates the seat count and
-                  Stripe prorates automatically.
+                  . {SEAT_SYNC}
                 </p>
                 {team.role === "owner" && (
                   <form action={openTeamPortal} className="mt-4">

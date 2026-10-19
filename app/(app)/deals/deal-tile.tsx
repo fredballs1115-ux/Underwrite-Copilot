@@ -25,7 +25,7 @@ import { OffersDueBit } from "./offers-due-bit";
 import { PERSONAL_TAG, PICTURE_TIERS, dealTags, olderScreenTag, placeTagsByTier } from "@/lib/pipeline-tags";
 import { FIRST_READ_TITLE } from "@/lib/first-read";
 import { CAP_WITHHELD, ownYieldOf } from "@/lib/cap-slot";
-import { checkedOf, checkedSentence, fitTone } from "@/lib/fit-label";
+import { checkedOf, checkedSentence, fitScoreLabel, fitTone } from "@/lib/fit-label";
 import { STAGE_LABEL, normalizeStage } from "@/lib/stages";
 import {
   FIT_META,
@@ -237,6 +237,16 @@ export const DealTile = memo(function DealTile({
   // every one could be checked: "2 of 4 checked", which ones in its tooltip.
   const fitChecked = scored || d.fit ? checkedOf(d.fitCoverage) : null;
   const fitCheckedNote = fitChecked ? checkedSentence(d.fitCoverage) : null;
+  // The fit in the header chip's and the list row's own words (lib/fit-label
+  // `fitScoreLabel`, the same arguments): "Fit 82 · Pursue", "Fit 63 ·
+  // Outside box · 3 of 4 checked". A score and a bar alone never said the
+  // call in words. Under the score, the call word itself — never a second
+  // copy of the count the line under it already says.
+  const fitWords = scored ? fitScoreLabel(scored.score, scored.verdict, d.fit === "outside", d.fitCoverage) : null;
+  const fitCall =
+    scored && !(fitChecked && d.fit !== "outside")
+      ? fitScoreLabel(scored.score, scored.verdict, d.fit === "outside").replace(/^Fit \d+ · /, "")
+      : null;
   // What the picture must not hide — a Special Flood Hazard Area, how it is
   // sold, what the price buys where it is not the building, the seller's
   // loan… (lib/pipeline-tags). A chip rides on the picture only where it
@@ -393,12 +403,13 @@ export const DealTile = memo(function DealTile({
             {scored ? (
               <span
                 className={`flex items-center gap-1.5 tabular-nums ${fitCls}`}
-                title={[`${scored.score} / 100 mandate fit`, fitCheckedNote?.replace(/\.$/, ""), d.fitFirstRead ? FIRST_READ_TITLE : null]
+                title={[fitWords, fitCheckedNote?.replace(/\.$/, ""), d.fitFirstRead ? FIRST_READ_TITLE : null]
                   .filter(Boolean)
                   .join(". ")}
               >
-                {scored.score}
+                <span aria-hidden>{scored.score}</span>
                 <FitBar score={scored.score} />
+                <span className="sr-only">{fitWords}</span>
               </span>
             ) : d.fit ? (
               <span
@@ -411,6 +422,13 @@ export const DealTile = memo(function DealTile({
               <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
             )}
           </dd>
+          {/* The call in words, under the score (the screen reader has the
+              whole label above). */}
+          {fitCall ? (
+            <dd aria-hidden className={`truncate text-[10px] font-medium ${fitCls}`} data-qa="fit-call">
+              {fitCall}
+            </dd>
+          ) : null}
           {/* Not every criterion of the box could be checked: how many were,
               under the fit, as the deal header's chip says it. */}
           {fitChecked ? (

@@ -55,3 +55,16 @@ export const COMP_SUBJECT = subjectBasis(
 /** What a unit is called on the sample (lib/asset-words), for the comps'
  *  captions. */
 export const COMP_NOUN = assetWords(extraction.assetClass).noun?.one;
+
+/** The comps' map context as the deal page hands it on the sample
+ *  (deal-view's `mapContext`): the street address, the market, no stored
+ *  memorandum to link (the sample's is fictional), its page count, and the
+ *  sample's mark — its comps are fictional, so none is geocoded or pinned. */
+export const COMP_MAP_CONTEXT = {
+  subjectLabel: extraction.address || "",
+  market: extraction.market ?? "",
+  omUrl: null,
+  totalPages: extraction.totalPages ?? null,
+  subjectPoint: null,
+  sample: true,
+};

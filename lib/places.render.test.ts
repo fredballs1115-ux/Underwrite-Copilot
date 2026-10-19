@@ -56,12 +56,68 @@ describe("MarketMemoryCards — /market's own cards open on their market's photo
     expect(html).not.toContain('data-picture="memory"');
     expect(html).not.toContain('data-qa="memory-credit"');
     expect(visibleText(html)).not.toContain("Photographs by");
+    // The drawn cover of its class holds the strip instead.
+    expect(html).toContain('data-picture="memory-cover"');
+    expect(html).toContain('data-deal-cover="housing"');
+    expect(a11yIssues(html), "a11y memory cards, no market").toEqual([]);
+  });
+
+  const bars = (html: string, bar: string) =>
+    [...html.matchAll(new RegExp(`<div[^>]*style="left:([\\d.]+)%;width:([\\d.]+)%"[^>]*data-bar="${bar}"`, "g"))].map((m) => [
+      Number(Number(m[1]).toFixed(2)),
+      Number(Number(m[2]).toFixed(2)),
+    ]);
+
+  it("draws each range as a min–max bar on one scale, a median tick only from three screens up, and the calls as a split bar", () => {
+    const html = render(
+      React.createElement(MarketMemoryCards, {
+        groups: [
+          group({ market: "Richmond, VA", marketKey: "richmond va", cap: { min: 5.0, median: 5.2, max: 5.5, n: 3 } }),
+          group({
+            market: "Portland",
+            marketKey: "portland",
+            count: 2,
+            cap: { min: 5.5, median: 5.75, max: 6.0, n: 2 },
+            perUnit: { min: 200_000, median: 210_000, max: 220_000, n: 2, basis: "unit", noun: "unit" },
+            calls: { pass: 2, caution: 0, pass_on: 0 },
+          }),
+        ],
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    // Caps on one scale, 5.00% to 6.00%: Richmond's 5.00–5.50 the left half,
+    // Portland's 5.50–6.00 the right.
+    expect(bars(html, "memory-cap")).toEqual([
+      [0, 50],
+      [50, 50],
+    ]);
+    // Basis on one scale across the unit cards, $180k to $240k.
+    expect(bars(html, "memory-basis")).toEqual([
+      [0, 100],
+      [33.33, 33.33],
+    ]);
+    // A median only from three screens: Richmond's cap, never Portland's.
+    expect(html.match(/data-bar="memory-cap-median"/g)?.length).toBe(1);
+    const tickAt = /data-bar="memory-cap-median" style="left:([\d.]+)%"/.exec(html)?.[1];
+    expect(Number(tickAt)).toBeCloseTo(20, 6);
+    expect(html).not.toContain('data-bar="memory-basis-median"');
+    expect(text).toContain("median 5.20% of 3 screens");
+    expect(text).toContain("5.50–6.00%");
+    // The calls: a segment a call, in proportion, the counts in words.
+    const calls = [...html.matchAll(/style="width:([\d.]+)%"[^>]*data-bar="memory-calls"/g)].map((m) => Number(Number(m[1]).toFixed(2)));
+    expect(calls).toEqual([33.33, 33.33, 33.33, 100]);
+    const flat = text.replace(/\s+/g, " ");
+    expect(flat).toContain("1 Go");
+    expect(flat).toContain("1 No-go");
+    expect(flat).toContain("2 Go");
   });
 });
 
 // ── The analytics page's market table ───────────────────────────────────────
 import { MarketTable } from "@/app/(app)/analytics/market-table";
-import { deriveAnalytics, marketRows, type AnalyticsRow } from "@/lib/analytics";
+import { deriveAnalytics, marketCount, marketRows, type AnalyticsRow } from "@/lib/analytics";
 
 const analyticsRow = (id: string, market: string, verdict = "pass"): AnalyticsRow => ({
   id,
@@ -107,9 +163,27 @@ describe("MarketTable — /analytics' markets, grouped as /market groups them, e
     expect(text.replace(/\n/g, "")).toContain(credit);
   });
 
+  // The audit of 2026-10-19: the table listed six markets and said nothing
+  // of the rest, and its note did not say which figures are medians.
+  it("says how many markets it left off, and which figures are medians", () => {
+    const html = render(React.createElement(MarketTable, { rows: marketRows(deals, 1), planNote: false, more: marketCount(deals) - 1 }));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(marketCount(deals)).toBe(2);
+    expect(text).toContain("And 1 more market.");
+    expect(text).toContain("Each cap and $/unit figure is the market’s median from three deals up");
+    expect(gluedWords(text)).toEqual([]);
+    const whole = visibleText(render(React.createElement(MarketTable, { rows: marketRows(deals), planNote: false, more: 0 })));
+    expect(whole).not.toMatch(/more market/);
+  });
+
   it("no market named, no picture and no credit owed", () => {
     const html = render(React.createElement(MarketTable, { rows: marketRows(deals.slice(3)), planNote: true }));
     expect(html).not.toContain('data-picture="analytics-market"');
+    // The drawn cover of the row's class holds the slot, never a dashed box.
+    expect(html).toContain('data-picture="analytics-market-cover"');
+    expect(html).toContain('data-deal-cover="housing"');
+    expect(html).not.toContain("border-dashed");
+    expect(a11yIssues(html), "a11y analytics market table, no market").toEqual([]);
     expect(html).not.toContain('data-qa="market-credit"');
     expect(visibleText(html)).toContain("Plan deals are judged on yield on total cost");
   });

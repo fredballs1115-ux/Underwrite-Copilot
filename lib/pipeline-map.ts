@@ -11,6 +11,7 @@
 // is counted and never guessed at.
 
 import { PIPELINE_MAP_PICTURE } from "@/lib/image-frames";
+import type { ListJobStatus } from "@/lib/screen-run";
 
 export type LocationPrecision = "street" | "block" | "area";
 
@@ -43,6 +44,10 @@ export interface MapDeal {
   /** a geocoder definitively found nothing for the address */
   placeMiss?: boolean;
   hasAddress: boolean;
+  /** the latest screen's state, by the pipeline list's own rule
+   *  (lib/screen-run `listJobStatus`): a run in flight, a run that stopped
+   *  writing progress, or a failure that left the call behind */
+  jobStatus?: ListJobStatus;
 }
 
 export interface MapPartition {
@@ -82,9 +87,40 @@ export function pinColor(verdict: string | null): string {
 
 export const PIN_LABEL: Record<string, string> = { pass: "Go", caution: "Caution", pass_on: "No-go" };
 
-/** What a deal's call is called on the map: its label, or "Not screened". */
-function callLabel(verdict: string | null): string {
-  return (verdict && PIN_LABEL[verdict]) || "Not screened";
+/** What a deal's call is called on the map: its label, "Screening" for a
+ *  first screen in flight, or "Not screened". */
+function callLabel(d: Pick<MapDeal, "verdict" | "jobStatus">): string {
+  const label = d.verdict ? PIN_LABEL[d.verdict] : undefined;
+  if (label) return label;
+  return d.jobStatus === "running" ? "Screening" : "Not screened";
+}
+
+/**
+ * What the latest run says over the call, in the pipeline card's and the
+ * list row's own words: "Re-screening" while a run rewrites a deal that has
+ * a call, "Stalled" or "Failed" where it stopped. Null where no run is in
+ * play, and for a first screen in flight, whose "Screening" is the call
+ * itself (`callLabel`). A failed or stalled first screen has no call to
+ * leave behind, and says so all the same.
+ */
+export function runNote(d: Pick<MapDeal, "verdict" | "jobStatus">): string | null {
+  if (d.jobStatus === "failed") return "Failed";
+  if (d.jobStatus === "stalled") return "Stalled";
+  if (d.jobStatus === "running") return d.verdict && PIN_LABEL[d.verdict] ? "Re-screening" : null;
+  return null;
+}
+
+/** Whether a pin's call is drawn dashed: the call on file is behind the run
+ *  the analyst asked for (lib/screen-run `verdictBehind`'s reasons), or a
+ *  first screen is under way. */
+export function pinBehind(d: Pick<MapDeal, "jobStatus">): boolean {
+  return !!d.jobStatus;
+}
+
+/** The map legend's bucket for a deal: its call, "Screening" for a first
+ *  screen in flight (never "Not screened"), else "Not screened". */
+export function legendBucket(d: Pick<MapDeal, "verdict" | "jobStatus">): string {
+  return callLabel(d);
 }
 
 /** The call's first letter, drawn inside its pin — G, C, N — so the call is
@@ -99,8 +135,9 @@ export function pinLetter(verdict: string | null): string | null {
  *  own tooltip — the deal's name with its call beside it. Plain text, never
  *  HTML: Leaflet sets it as the element's `title` property, so it is not
  *  escaped (escaping would print "&amp;" for an "&"). */
-export function pinTitle(d: Pick<MapDeal, "name" | "verdict">): string {
-  return `${d.name} · ${callLabel(d.verdict)}`;
+export function pinTitle(d: Pick<MapDeal, "name" | "verdict" | "jobStatus">): string {
+  const note = runNote(d);
+  return `${d.name} · ${callLabel(d)}${note ? ` · ${note}` : ""}`;
 }
 
 function escapeHtml(s: string): string {
@@ -117,9 +154,11 @@ function escapeHtml(s: string): string {
  *  hollow, since its centre is a district's, not a building's. A deal picked
  *  for comparison wears a second, brand-coloured ring. At its centre, the
  *  call's letter (`pinLetter`), or a dot for a deal with no call. */
-export function pinHtml(verdict: string | null, precision: LocationPrecision, selected = false): string {
+export function pinHtml(verdict: string | null, precision: LocationPrecision, selected = false, behind = false): string {
   const c = pinColor(verdict);
-  const street = precision === "street";
+  // A call behind its run is drawn as the header draws it: dashed, the
+  // disc hollow so the dashes read on any basemap (`pinBehind`).
+  const street = precision === "street" && !behind;
   const size = selected ? 30 : 22;
   const mid = size / 2;
   const mark = street ? "#ffffff" : c;
@@ -127,7 +166,7 @@ export function pinHtml(verdict: string | null, precision: LocationPrecision, se
   return (
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
     (selected ? `<circle cx="${mid}" cy="${mid}" r="${mid - 1.5}" fill="none" stroke="#114e54" stroke-width="3"/>` : "") +
-    `<circle cx="${mid}" cy="${mid}" r="9" fill="${street ? c : "#ffffff"}" stroke="${street ? "#ffffff" : c}" stroke-width="2.5"/>` +
+    `<circle cx="${mid}" cy="${mid}" r="9" fill="${street ? c : "#ffffff"}" stroke="${street ? "#ffffff" : c}" stroke-width="2.5"${behind ? ` stroke-dasharray="3.5 2.5"` : ""}/>` +
     (letter
       ? `<text x="${mid}" y="${mid}" dy="0.35em" text-anchor="middle" font-size="11" font-weight="700" fill="${mark}">${letter}</text>`
       : `<circle cx="${mid}" cy="${mid}" r="2.6" fill="${mark}"/>`) +
@@ -137,7 +176,8 @@ export function pinHtml(verdict: string | null, precision: LocationPrecision, se
 
 /** The card's inside, shared by the hover card and the touch preview. */
 function cardBody(d: MapDeal): string {
-  const call = callLabel(d.verdict);
+  const call = callLabel(d);
+  const note = runNote(d);
   const figures = [d.price, d.figure].filter((x): x is string => !!x).map(escapeHtml).join(" · ");
   // The route's own frame for the card (lib/image-frames), twice its 48px —
   // never a Google picture, since the card sits over a non-Google map
@@ -147,7 +187,7 @@ function cardBody(d: MapDeal): string {
     `<img src="${img}" alt="" width="48" height="48" class="uc-maptip-img"/>` +
     `<div class="uc-maptip-body">` +
     `<div class="uc-maptip-name">${escapeHtml(d.name)}</div>` +
-    `<div class="uc-maptip-meta"><span style="color:${pinColor(d.verdict)};font-weight:600">${call}</span>${figures ? ` · ${figures}` : ""}</div>` +
+    `<div class="uc-maptip-meta"><span style="color:${pinColor(d.verdict)};font-weight:600">${call}</span>${note ? ` · <span style="font-style:italic">${note}</span>` : ""}${figures ? ` · ${figures}` : ""}</div>` +
     `</div>`
   );
 }

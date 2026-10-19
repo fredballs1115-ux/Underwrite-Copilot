@@ -38,6 +38,7 @@ import {
   updateValuation,
 } from "./actions";
 import { DealCrumb } from "../deal-crumb";
+import { EMPTY_GLYPH, EmptyCard } from "@/app/empty-pictures";
 import { dealTitle } from "@/lib/deal-title";
 
 /** "Valuations — <the deal's name>" (lib/deal-title). */
@@ -377,13 +378,10 @@ export default async function ValuationsPage({
       ) : null}
 
       {columns.length === 0 ? (
-        <div className="rounded-lg border border-line bg-surface p-6">
-          <h2 className="text-base font-semibold text-ink">No valuations yet</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Upload a BOV PDF or type one in below. Add two and the gap between them gets
-            decomposed; your own underwriting appears automatically once the deal has been screened.
-          </p>
-        </div>
+        <EmptyCard icon={EMPTY_GLYPH.scales} title="No valuations yet">
+          Upload a BOV PDF or type one in below. Add two and the gap between them gets
+          decomposed; your own underwriting appears automatically once the deal has been screened.
+        </EmptyCard>
       ) : (
         <ValuationsView
           columns={columns}

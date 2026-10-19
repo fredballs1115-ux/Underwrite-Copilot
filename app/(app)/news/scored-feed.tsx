@@ -47,6 +47,16 @@ export const SECTOR_LABEL: Record<string, string> = {
  *  day's heading; the "UTC" says why. */
 const fmtDay = (iso: string): string => dayOf(iso) ?? iso;
 
+/** The one buyer profile the weekday sweep scores every story for — the
+ *  intel job's own criteria, not the reader's buy box. */
+export const SCORED_FOR = "a small East Coast buyer of 2–4 unit buildings";
+
+/** Said over the feed, visibly, whenever it lists a story (the audit of
+ *  2026-10-19): a "8/10" and its "→ next step" had read as a judgement of
+ *  the reader's own deals, the profile named only in a tooltip. The market
+ *  page's intel list says the same (app/market/intel-items.tsx). */
+export const SCORED_READ_LINE = `Each story's score, summary and action are an AI's read (Claude's) for one buyer profile — ${SCORED_FOR} — not your buy box, and not advice.`;
+
 /** Stories the page reads: the sweep's newest. */
 export const SCORED_READ = 200;
 /** Stories the feed lists, newest first. */
@@ -215,65 +225,67 @@ export function ScoredFeedView({
         // No box for what has not started: the headlines above are the
         // page; one quiet line says what the sweep will add.
         <p className="text-[12px] leading-relaxed text-muted">
-          The scored feed — every story rated 0–10 for a small East Coast
-          buyer of 2–4 unit buildings, law and rule changes flagged — starts
-          with the weekday sweep once its GitHub secret is set. Until then the
-          headlines above are the news, unscored.
+          {`The scored feed — every story rated 0–10 for ${SCORED_FOR}, law and rule changes flagged — fills in from the weekday sweep. Until it has run, the headlines above are the news, unscored.`}
         </p>
       ) : (
-        [...byDay.entries()].map(([day, list]) => (
-          <section key={day}>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {fmtDay(day)}
-            </h2>
-            <ul className="mt-2 space-y-2.5">
-              {list.map((it) => (
-                <li
-                  key={it.url}
-                  className="rounded-xl border border-line bg-surface p-3.5 text-sm leading-snug"
-                >
-                  <div className="flex items-start gap-2.5">
-                    {it.relevance !== null && (
-                      <span
-                        className={`mt-px shrink-0 rounded px-1.5 py-px font-mono text-[11px] tabular-nums ${
-                          it.relevance >= 6
-                            ? "bg-brand/10 text-brand"
-                            : "bg-faint text-muted"
-                        }`}
-                        title={`Relevance ${it.relevance} of 10, scored for one buyer profile (a small East Coast buyer of 2–4 unit buildings), not your buy box`}
-                      >
-                        {it.relevance}/10
-                      </span>
-                    )}
-                    <div className="min-w-0">
-                      <a
-                        href={it.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-                      >
-                        {it.title}
-                      </a>{" "}
-                      <span className="ml-1 text-[11px] text-muted">
-                        {it.source ?? "source"}
-                        {" · "}
-                        {SECTOR_LABEL[it.sector] ?? it.sector}
-                      </span>
-                      {it.summary && (
-                        <p className="mt-1 text-[13px] text-muted">{it.summary}</p>
+        <>
+          <p data-qa="scored-read" className="text-[12px] leading-relaxed text-muted">
+            {SCORED_READ_LINE}
+          </p>
+          {[...byDay.entries()].map(([day, list]) => (
+            <section key={day}>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                {fmtDay(day)}
+              </h2>
+              <ul className="mt-2 space-y-2.5">
+                {list.map((it) => (
+                  <li
+                    key={it.url}
+                    className="rounded-xl border border-line bg-surface p-3.5 text-sm leading-snug"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      {it.relevance !== null && (
+                        <span
+                          className={`mt-px shrink-0 rounded px-1.5 py-px font-mono text-[11px] tabular-nums ${
+                            it.relevance >= 6
+                              ? "bg-brand/10 text-brand"
+                              : "bg-faint text-muted"
+                          }`}
+                          title={`Relevance ${it.relevance} of 10, scored for one buyer profile (${SCORED_FOR}), not your buy box`}
+                        >
+                          {it.relevance}/10
+                        </span>
                       )}
-                      {it.action && (
-                        <p className="mt-1 text-[13px] font-medium text-ink/80">
-                          → {it.action}
-                        </p>
-                      )}
+                      <div className="min-w-0">
+                        <a
+                          href={it.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                        >
+                          {it.title}
+                        </a>{" "}
+                        <span className="ml-1 text-[11px] text-muted">
+                          {it.source ?? "source"}
+                          {" · "}
+                          {SECTOR_LABEL[it.sector] ?? it.sector}
+                        </span>
+                        {it.summary && (
+                          <p className="mt-1 text-[13px] text-muted">{it.summary}</p>
+                        )}
+                        {it.action && (
+                          <p className="mt-1 text-[13px] font-medium text-ink/80">
+                            → {it.action}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </>
       )}
     </>
   );

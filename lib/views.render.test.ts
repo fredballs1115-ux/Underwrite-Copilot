@@ -44,6 +44,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 });
 
 import { PhotoFlip, Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
+import { triageChip } from "@/app/(app)/deals/batch-upload";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { DownloadRow, ModelBody } from "@/app/(app)/deals/[id]/model-body";
 import { MarketCheck } from "@/app/(app)/deals/[id]/deal-sections-view";
@@ -59,8 +60,14 @@ import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/sc
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { DemoSections } from "@/app/demo/sections";
 import { loadWalkthrough } from "@/app/landing-interactive";
+import { AnalysisTabs, DealSectionTabs } from "@/app/(app)/deals/[id]/section-tabs";
+import { analysisCounts, sectionCounts, sectionStateOf, type SectionKey } from "@/lib/deal-tabs";
+import { actualsFromRows as actualsFromRowsForTest } from "@/lib/actuals/actuals-read";
+import { inferStrategy as inferStrategyForTest } from "@/lib/deal-strategy";
+import { shownAssetClass as shownAssetClassForTest } from "@/lib/asset-class";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { fitFilterKey } from "@/lib/fit-filter";
+import { verdictCountsOf } from "@/lib/pipeline-counts";
 import { PERSON_TONES, personName, personToneIndex } from "@/lib/person";
 import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
@@ -688,12 +695,20 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(tile).toMatch(/<dd[^>]*data-qa="fit-checked"[^>]*>2 of 4 checked<\/dd>/);
     expect(tile).toContain("going-in cap and target return could not be checked");
     // …and the score muted, not the call's green.
-    expect(tile).toMatch(/tabular-nums text-muted"[^>]*>100</);
-    expect(tile).not.toMatch(/tabular-nums text-pass"[^>]*>100</);
+    expect(tile).toMatch(/tabular-nums text-muted"[^>]*><span aria-hidden="true">100</);
+    expect(tile).not.toMatch(/tabular-nums text-pass"[^>]*><span aria-hidden="true">100</);
+    // The call in words for a screen reader and in the tooltip (the header
+    // chip's own label), and no call word under the score where the count
+    // stands in the call's place.
+    expect(tile).toContain('<span class="sr-only">Fit 100 · 2 of 4 checked</span>');
+    expect(tile).toContain('title="Fit 100 · 2 of 4 checked. ');
+    expect(tile).not.toContain('data-qa="fit-call"');
     // A box checked whole reads as it always has.
     const other = tiles(cards).get("b")!;
     expect(other).not.toContain('data-qa="fit-checked"');
-    expect(other).toMatch(/tabular-nums text-pass"[^>]*>88</);
+    expect(other).toMatch(/tabular-nums text-pass"[^>]*><span aria-hidden="true">88</);
+    expect(other).toContain('<span class="sr-only">Fit 88 · Pursue</span>');
+    expect(other).toMatch(/<dd aria-hidden="true" class="truncate text-\[10px\] font-medium text-pass" data-qa="fit-call">Pursue<\/dd>/);
 
     const list = render(React.createElement(Pipeline, { ...props, initialView: "list" as const }));
     expect(a11yIssues(list), "a11y pipeline list").toEqual([]);
@@ -704,6 +719,27 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((list.match(/data-qa="fit-checked"[^>]*>2 of 4</g) ?? []).length).toBe(2);
     expect(list).not.toContain("Fit 100 · Pursue");
     expect(list).toContain("Fit 88 · Pursue");
+  });
+
+  // The audit of 2026-10-19: the split counted the dead deal the list hides.
+  it("counts the verdict split over the rows the list shows, the dead folded away", () => {
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withThumbs(CARDS),
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
+        billing: BILLING,
+        todayIso: TODAY,
+      }),
+    );
+    const split = html.match(/<div role="img" aria-label="([^"]*)" class="flex h-2/)?.[1] ?? "";
+    // Tysons Corner Plaza, the fixture's only No-go, is dead.
+    expect(CARDS.filter((c) => c.verdict === "pass_on").map((c) => c.stage)).toEqual(["dead"]);
+    expect(split).not.toContain("No-go");
+    const c = verdictCountsOf(CARDS);
+    expect(c.pass_on).toBe(0);
+    expect(split).toBe(`${c.pass} Go, ${c.caution} Caution, ${c.screening} No verdict`);
   });
 
   it("opens the new-deal form with its name field still required and editable — a chosen PDF only pre-fills it (lib/deal-name)", () => {
@@ -727,6 +763,18 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(field).not.toMatch(/readonly|disabled/i);
     expect(html).toContain('accept="application/pdf"');
     expect(html).toContain('data-qa="batch-upload"');
+    // The batch names the sort the select offers (there is no "Buy box"
+    // sort), in the select's own words (the audit of 2026-10-19).
+    const batch = visibleText(html.slice(html.indexOf('data-qa="batch-upload"'))).replace(/\s+/g, " ");
+    expect(batch).toContain("sort the deals by “Mandate fit: high to low”");
+    expect(html).toContain("Mandate fit: high to low</option>");
+    expect(batch).not.toMatch(/by Buy box/);
+  });
+
+  it("marks a batch deal's first-read fit as every surface does, never with a bare ~", () => {
+    expect(triageChip({ fit: "near", provisional: true })?.label).toBe("Near box (first read)");
+    expect(triageChip({ fit: "fits", provisional: false })?.label).toBe("Fits box");
+    expect(triageChip({ fit: "nope", provisional: true })).toBeNull();
   });
 
   it("folds a phone's filters behind one row that says how many are set, the row unchanged from sm up (research pass 29)", () => {
@@ -1363,6 +1411,44 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(text).not.toContain("Financials & model");
     });
 
+    it("draws the bar and the Analyses pills with the deal page's own section-tabs, read by its own readers, never a copy", () => {
+      const results = {
+        extraction: data.extraction,
+        challenges: data.challenges,
+        comps: data.comps,
+        reconciliation: data.reconciliation,
+        market: data.market,
+        verdict: data.verdict,
+      };
+      const counts = analysisCounts(results);
+      const stateOf = (k: SectionKey) => sectionStateOf(k, { results, live: false, step: null, buyBox: data.buyBox });
+      // The bar, markup for markup, as the deal page draws it on a deal
+      // holding the sample's results with no screen running.
+      expect(section("overview")).toContain(
+        renderToStaticMarkup(
+          React.createElement(DealSectionTabs, {
+            active: "overview",
+            stateOf,
+            counts: sectionCounts(counts, data.buyBox.checks),
+            onSelect: () => {},
+          }),
+        ),
+      );
+      expect(section("analyses", "comps")).toContain(
+        renderToStaticMarkup(React.createElement(AnalysisTabs, { active: "comps", counts, has: () => true, onSelect: () => {} })),
+      );
+      // Neither public page keeps a tablist or a tab dot of its own; the
+      // deal page draws the same two components.
+      for (const p of ["app/demo/sections.tsx", "app/landing-interactive.tsx"]) {
+        const code = readFileSync(p, "utf8");
+        expect(code, p).not.toContain('role="tablist"');
+        expect(code, p).not.toMatch(/function TabDot|const ANALYSES =|const TABS =|LEGACY_TABS: Record/);
+      }
+      const view = readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8");
+      expect(view).toContain("<DealSectionTabs");
+      expect(view).toContain("<AnalysisTabs");
+    });
+
     it("opens on the Overview the deal page opens on: the guide, the actuals, the verdict and risk digest, the playground", () => {
       const html = section("overview");
       const text = visibleText(html);
@@ -1424,7 +1510,7 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(a11yIssues(html)).toEqual([]);
     });
 
-    it("draws the Analyses tab as the walkthrough's panel, the challenger by the deal's own name, its broker questions after it", async () => {
+    it("draws the Analyses tab as the walkthrough's panel, the challenger by the deal's own name and its own broker questions", async () => {
       // The walkthrough's views arrive in a chunk of their own, which a page
       // asks for when the tab opens (lib/walkthrough-loading.render.test.ts
       // draws the shape it shows until then); here, landed.
@@ -1433,12 +1519,29 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(verdict).toContain("Caution");
       const html = section("analyses", "challenger");
       expect(html).toContain('aria-label="Analyses"');
-      expect(html).toContain("would you ask the broker");
+      // The deal page's challenger carries each question in its own card;
+      // the page's hand-built "what would you ask the broker?" strip, which
+      // the deal page has none of, is gone.
+      const text = visibleText(html).replace(/&#x27;/g, "'");
+      expect(text).toContain("Assumption challenger");
+      for (const c of SAMPLE_DEAL.challenges.challenges.filter((x) => x.question).slice(0, 3)) expect(text).toContain(c.question!);
+      expect(text).not.toContain("would you ask the broker");
+      expect(text).not.toContain("Reveal the drafted question");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(visibleText(html))).toEqual([]);
     });
 
-    it("draws the Documents tab as the sample's: its fictional memorandum, the rent roll and T-12 it was read with, and the three public downloads", () => {
+    it("draws the comps as the signed-in sample's: fictional, so unmapped and not searched, each comp citing its page", () => {
+      const html = section("analyses", "comps");
+      expect(html).toContain('data-qa="sample-comps-unmapped"');
+      expect(html).toContain('data-qa="sample-no-web-search"');
+      expect(html).not.toContain("Sign up to search");
+      const cited = SAMPLE_DEAL.comps.saleComps.find((c) => c.page);
+      expect(cited).toBeTruthy();
+      expect(visibleText(html)).toMatch(new RegExp(`p\\.\\s*${String(cited!.page).replace(/\D/g, "")}\\b`));
+    });
+
+    it("draws the Documents tab as the sample's: its fictional memorandum, the rent roll and T-12 it was read with, the memo the verdict makes", () => {
       const text = visibleText(section("documents"));
       expect(text).toContain("Offering memorandum");
       // Audit C10, M4: the signed-in sample's card, never "none uploaded"
@@ -1446,9 +1549,21 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(text).toContain("none — the sample's memorandum is fictional");
       expect(text).not.toContain("none uploaded");
       expect(text.match(/read into the sample — no file to open/g)?.length).toBe(2);
-      expect(text).toContain("Take the deliverables with you");
-      const html = section("documents");
-      for (const href of ["/api/demo/memo", "/api/demo/report", "/api/demo/underwrite.xlsx"]) expect(html).toContain(`href="${href}"`);
+      // The deal page's Documents tab has no deliverables card: the memo is
+      // its row here, the report and the workbook the header's tools.
+      expect(text).not.toContain("Take the deliverables with you");
+      expect(section("documents")).toContain('href="/api/demo/memo"');
+    });
+
+    it("reads the actuals and the model as the deal page reads them on the sample", () => {
+      const ex = SAMPLE_DEAL.extraction;
+      const shown = shownAssetClassForTest(SAMPLE_DEAL.asset_class, ex) || null;
+      expect(data.actuals).toEqual(actualsFromRowsForTest(ex, inferStrategyForTest(ex, null), shown, SAMPLE_DEAL.rentRoll, SAMPLE_DEAL.t12));
+      // The demo's own source reads the actuals through the reader, never by hand.
+      const code = readFileSync("app/demo/demo-data.ts", "utf8");
+      expect(code).toContain("actualsFromRows(");
+      expect(code).not.toContain("compareNoi(");
+      expect(code).toContain("sampleDerivedInputs({ regulation, asOf: noon })");
     });
 
     it("types no name, call or rule into the page: they are the readers'", () => {
@@ -1466,6 +1581,11 @@ describe("ModelView — the sample model renders every panel", () => {
   it("/demo draws the deal page's own header on the sample, read by lib/sample-header, never typed", () => {
     const page = readFileSync("app/demo/page.tsx", "utf8");
     expect(page).toContain("<SampleDealHero header={sampleHeader(new Date(`${today}T12:00:00Z`))} titleAs=\"h2\" />");
+    // Under the sections, the deal page's own public-record card in the
+    // sample's place, then its research panel, in the deal page's order.
+    expect(page).toContain('import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";');
+    expect(page.indexOf("<SamplePublicRecord />")).toBeGreaterThan(-1);
+    expect(page.indexOf("<SamplePublicRecord />")).toBeLessThan(page.indexOf("<ResearchPanelView {...research} />"));
     // No summary bar of its own: no name, call or deal-type chip typed here.
     expect(page).not.toContain("The Maddox at Brewerytown");
     expect(page).not.toMatch(/>\s*Caution\s*</);
@@ -3442,7 +3562,9 @@ describe("News live section", () => {
   it("leads with the top story — kicker, headline, dek, the publisher's picture — then the sources as one line, and reads clean", () => {
     const html = render(React.createElement(LiveHeadlinesView, { live }));
     const text = visibleText(html);
-    expect(text).toContain("live from 4 of 5 sources");
+    // The Commercial Property Executive line came from an earlier copy: it
+    // is counted apart, never as live (the audit of 2026-10-19).
+    expect(text).toContain("live from 3 of 5 sources · 1 from an earlier copy · refreshed every 30 min");
     expect(text).toContain("Monday, September 14, 2026");
     expect(text).toContain("Investor takes over distressed Atlanta apartment asset");
     // the kicker: what the story touches, and the covered market it names
@@ -3511,7 +3633,13 @@ describe("News live section", () => {
     const text = visibleText(html);
     expect(text).toContain("None of the publishers answered just now");
     expect(text).toContain("live from 0 of 5 sources");
+    expect(text).not.toContain("from an earlier copy");
     expect(text).not.toContain("via ");
+    // The page's header names both ways in: the publishers' feeds and the
+    // news searches behind them (Google News, Bing News).
+    expect(readSource(joinPath(process.cwd(), "app/(app)/news/page.tsx"), "utf8").replace(/\s+/g, " ")).toContain(
+      "The publishers&apos; feeds and news searches, most decision-relevant first",
+    );
     expect(html).not.toContain("<article");
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
@@ -3599,7 +3727,13 @@ describe("News scored feed", () => {
     // within a day the scored story leads and the unscored one trails
     expect(text.indexOf("Rent cap bill")).toBeLessThan(text.indexOf("Local bakery"));
     expect(text).toContain("Re-run the Maryland deals");
-    expect(text).not.toContain("starts with the weekday sweep");
+    expect(text).not.toContain("fills in from the weekday sweep");
+    // Whose read the scores are, said over the feed, never only in a
+    // tooltip (the audit of 2026-10-19), and before the first story.
+    expect(flat).toContain(
+      "Each story's score, summary and action are an AI's read (Claude's) for one buyer profile — a small East Coast buyer of 2–4 unit buildings — not your buy box, and not advice.",
+    );
+    expect(html.indexOf('data-qa="scored-read"')).toBeLessThan(html.indexOf(">Sep 14, 2026 UTC</h2>"));
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     dumpView("news-scored", html);
@@ -3612,12 +3746,16 @@ describe("News scored feed", () => {
     const all = visibleText(render(React.createElement(ScoredFeedView, { items, alerts: [], wantSector: "nope" })));
     expect(all).toContain("Rent cap bill");
     expect(all).toContain("Fannie tightens");
+    // A sector's feed says whose read it is too.
+    expect(one).toContain("an AI's read (Claude's) for one buyer profile");
   });
 
   it("says the sweep has not run, in one quiet line, when there are no rows", () => {
     const html = render(React.createElement(ScoredFeedView, { items: [], alerts: [], wantSector: "" }));
     const text = visibleText(html);
-    expect(text).toContain("starts with the weekday sweep");
+    expect(text).toContain("fills in from the weekday sweep");
+    expect(text).not.toContain("GitHub");
+    expect(text.replace(/\s+/g, " ")).toContain("every story rated 0–10 for a small East Coast buyer of 2–4 unit buildings");
     // no law strip, no sector chips, no day group — one line only
     expect(html).not.toContain("<section");
     expect(html).not.toContain("<nav");
@@ -9268,6 +9406,10 @@ describe("the offers-due countdown counts from the page's day, read once per req
     expect(words(bit("2026-10-07", "2026-10-07"))).toBe("Offers due today");
     expect(words(bit("2026-10-07", "2026-10-08"))).toBe("Offers were due Oct 7");
     expect(bit("2026-10-07", "2026-10-08")).toContain("text-kill");
+    // A day outside the reader's year says its year (lib/short-day).
+    expect(words(bit("2025-03-03", "2026-10-08"))).toBe("Offers were due Mar 3, 2025");
+    expect(words(bit("2027-01-20", "2026-12-29"))).toBe("Offers due Jan 20, 2027");
+    expect(words(bit("2026-11-20", "2026-10-08"))).toBe("Offers due Nov 20");
     // The header's control says the deadline went by on the day after it.
     expect(visibleText(render(React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-07", today: "2026-10-08" })))).toContain(
       "Offers were due",

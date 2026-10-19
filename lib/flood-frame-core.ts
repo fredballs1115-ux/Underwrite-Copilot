@@ -67,6 +67,13 @@ export interface FloodFrameRecord {
 /** A point as a frame is keyed by: six places, about a tenth of a metre. */
 export const pointKey = (p: { lat: number; lng: number }): string => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
 
+/** The flood frame's URL stem for a deal: the route with the rules and the
+ *  point it is drawn around (`v=`), so a moved deal asks for a new picture.
+ *  Every surface that shows the frame (the Flood view, the site flags'
+ *  thumbnail) builds its URL from this and adds its own `&w=&h=`. */
+export const floodFrameStem = (dealId: string, point: { lat: number; lng: number } | null): string =>
+  `/api/deals/${dealId}/flood?v=${FLOOD_FRAME_VERSION}.${point ? pointKey(point) : "0"}`;
+
 /** Whether a stored frame is the one to show for this point today: drawn
  *  under today's rules, around this point, inside the month. */
 export function floodFrameCurrent(

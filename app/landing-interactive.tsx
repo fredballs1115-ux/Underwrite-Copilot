@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { SampleLegal } from "@/lib/sample-legal";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
@@ -18,6 +12,17 @@ import type { DealStrategy } from "@/lib/deal-strategy";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import type { MetroDemand } from "@/lib/metro-demand";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
+import { AnalysisTabs, DealSectionTabs } from "./(app)/deals/[id]/section-tabs";
+import {
+  ANALYSES,
+  LEGACY_TABS,
+  SECTIONS,
+  analysisCounts,
+  sectionCounts,
+  sectionStateOf,
+  type AnalysisKey,
+  type SectionKey,
+} from "@/lib/deal-tabs";
 import {
   CardListSkeleton,
   StatGridSkeleton,
@@ -232,53 +237,15 @@ const RESULTS = {
   verdict: SAMPLE_DEAL.verdict,
 };
 
-// The REAL deal page's section list and analyses (deal-view.tsx SECTIONS
-// and ANALYSES) — the product's own information architecture.
-const TABS = ["Overview", "Financials", "Buy box", "Analyses", "Documents"] as const;
-type Tab = (typeof TABS)[number];
-/** A tab's id, its label with no space in it ("Buy box" read as two). */
-const tabId = (t: Tab) => `demo-tab-${t.toLowerCase().replace(/\s+/g, "-")}`;
-const ANALYSES = [
-  { key: "verdict", label: "Verdict", result: "verdict" },
-  { key: "challenger", label: "Challenger", result: "challenges" },
-  { key: "comps", label: "Comps", result: "comps" },
-  { key: "market", label: "Market", result: "market" },
-  { key: "reconciler", label: "Reconciler", result: "reconciliation" },
-] as const;
-export type AnalysisKey = (typeof ANALYSES)[number]["key"];
+// The REAL deal page's section list and analyses (lib/deal-tabs, which the
+// deal page reads) — the product's own information architecture. A panel is
+// named by its section's label, as the deal page's section bar says it.
+type Tab = (typeof SECTIONS)[number]["label"];
+export type { AnalysisKey };
 
-/** Where the Overview's jump links land (deal-view's LEGACY_TABS): the
- *  terms are the Financials tab's, each analysis its own sub-tab. */
-function landing(key: string): { tab: Tab; analysis?: AnalysisKey } | null {
-  if (key === "terms") return { tab: "Financials" };
-  const a = ANALYSES.find((x) => x.key === key);
-  return a ? { tab: "Analyses", analysis: a.key } : null;
-}
-
-/** The finding counts the deal page's tabs carry (deal-view's
- *  `analysisCounts` and `sectionCounts`), counted on the sample. */
-const ANALYSIS_COUNTS: Record<AnalysisKey, number> = {
-  verdict: 0,
-  challenger: RESULTS.challenges.challenges.filter((c) => c.severity === "high").length,
-  comps:
-    RESULTS.comps.redFlags.length +
-    [...RESULTS.comps.saleComps, ...RESULTS.comps.leaseComps].filter((c) => c.support === "stretched").length,
-  market: RESULTS.market.checks.filter((c) => c.assessment === "aggressive").length,
-  reconciler: RESULTS.reconciliation.rows.filter((r) => r.direction === "unfavorable").length,
-};
-
-/** The deal page's tab dot (deal-view's TabDot): a finished section's,
- *  or an idle one's ring. */
-function TabDot({ done, active }: { done: boolean; active: boolean }) {
-  const base = "h-1.5 w-1.5 rounded-full";
-  if (done) return <span aria-hidden className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
-  return (
-    <span
-      aria-hidden
-      className={`${base} ${active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"}`}
-    />
-  );
-}
+/** The finding counts the deal page's tabs carry, counted on the sample by
+ *  the deal page's own reader (lib/deal-tabs `analysisCounts`). */
+const ANALYSIS_COUNTS = analysisCounts(RESULTS);
 
 /** The Analyses tab's own sub-tabs and the view each opens — the deal
  *  page's AnalysesPanel, its classes and its components, on the sample. */
@@ -298,54 +265,13 @@ function AnalysesView({
   const label = ANALYSES.find((a) => a.key === analysis)!.label;
   return (
     <div className="flex flex-col gap-5">
-      <div
-        role="tablist"
-        aria-label="Analyses"
-        onKeyDown={(e) => {
-          const at = ANALYSES.findIndex((a) => a.key === analysis);
-          const n = ANALYSES.length;
-          const next =
-            e.key === "ArrowRight" ? (at + 1) % n : e.key === "ArrowLeft" ? (at - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
-          if (next < 0) return;
-          e.preventDefault();
-          onSelect(ANALYSES[next].key);
-          document.getElementById(`demo-analysis-tab-${ANALYSES[next].key}`)?.focus();
-        }}
-        className="flex flex-wrap gap-1.5"
-      >
-        {ANALYSES.map((a) => {
-          const on = a.key === analysis;
-          const count = ANALYSIS_COUNTS[a.key];
-          return (
-            <button
-              key={a.key}
-              id={`demo-analysis-tab-${a.key}`}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              aria-controls="demo-analysis-tabpanel"
-              tabIndex={on ? 0 : -1}
-              onClick={() => onSelect(a.key)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                on ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-ink hover:bg-faint"
-              }`}
-            >
-              {a.label}
-              {count > 0 && (
-                <span className="rounded-full bg-kill/10 px-1.5 py-px font-mono text-[10px] tabular-nums text-kill">
-                  {count}
-                  <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* The deal page's own Analyses pills (section-tabs). */}
+      <AnalysisTabs active={analysis} counts={ANALYSIS_COUNTS} has={() => true} onSelect={onSelect} />
       <div
         key={analysis}
-        id="demo-analysis-tabpanel"
+        id="analysis-tabpanel"
         role="tabpanel"
-        aria-labelledby={`demo-analysis-tab-${analysis}`}
+        aria-labelledby={`analysis-tab-${analysis}`}
         className="animate-fade flex flex-col gap-6"
       >
         {!w && <TabLoading what={`the ${label.toLowerCase()}`}>{ANALYSIS_SKELETON[analysis]()}</TabLoading>}
@@ -359,18 +285,21 @@ function AnalysesView({
           />
         )}
         {w && analysis === "comps" && (
-          // No map: the deal page's comps map geocodes each comp in the
-          // visitor's browser, which a homepage section has no business
-          // doing; /demo's comps tab draws none either.
+          // The deal page's comps on the sample, handed what the signed-in
+          // sample's page hands them (deal-view's AnalysesPanel): its map
+          // context marked the sample's, so no comp is geocoded or pinned
+          // and the table says why, each comp cites its memorandum page, and
+          // no public-web search is offered for a fictional building. No map
+          // component is handed in, so none loads.
           <w.BrokerComps
             result={RESULTS.comps}
             dealId="sample"
             compSearch={null}
             active={false}
             isPro={false}
-            publicDemo
             subject={w.COMP_SUBJECT}
             noun={w.COMP_NOUN}
+            mapContext={w.COMP_MAP_CONTEXT}
           />
         )}
         {w && analysis === "market" && <w.MarketCheck result={RESULTS.market} demand={demand} />}
@@ -530,20 +459,14 @@ export function DemoTabs({
   buyBox: SampleBuyBoxData;
   financials: SampleFinancials;
 }) {
-  const [tab, setTab] = useState<Tab>("Overview");
+  const [section, setSection] = useState<SectionKey>("overview");
   const [analysis, setAnalysis] = useState<AnalysisKey>("verdict");
-  // The deal page's count on its Buy box tab: the criteria missed outright.
-  const missed = buyBox.panel.checks.filter((c) => c.status === "miss").length;
-  const counts: Record<Tab, number> = {
-    Overview: 0,
-    Financials: 0,
-    "Buy box": missed,
-    Analyses: ANALYSIS_COUNTS.challenger + ANALYSIS_COUNTS.comps + ANALYSIS_COUNTS.market + ANALYSIS_COUNTS.reconciler,
-    Documents: 0,
-  };
-  // Every section but the documents holds a finished result on the sample,
-  // so its dot is the deal page's "done" (deal-view's `sectionState`).
-  const done = (t: Tab) => t !== "Documents";
+  // The deal page's dots and finding counts, read by its own readers
+  // (lib/deal-tabs) on the sample: no screen is running on it.
+  const counts = sectionCounts(ANALYSIS_COUNTS, buyBox.panel.checks);
+  const stateOf = (key: SectionKey) =>
+    sectionStateOf(key, { results: RESULTS, live: false, step: null, buyBox: buyBox.panel });
+  const label = (key: SectionKey) => SECTIONS.find((t) => t.key === key)!.label as Tab;
 
   // The tabs past the Overview arrive in a chunk of their own: asked for
   // once the walkthrough nears the screen, or a tab is reached for, and drawn
@@ -574,30 +497,14 @@ export function DemoTabs({
     return () => io.disconnect();
   }, []);
 
-  function onKeys(e: KeyboardEvent<HTMLDivElement>) {
-    const i = TABS.indexOf(tab);
-    const next =
-      e.key === "ArrowRight"
-        ? (i + 1) % TABS.length
-        : e.key === "ArrowLeft"
-          ? (i - 1 + TABS.length) % TABS.length
-          : e.key === "Home"
-            ? 0
-            : e.key === "End"
-              ? TABS.length - 1
-              : -1;
-    if (next < 0) return;
-    e.preventDefault();
-    setTab(TABS[next]);
-    document.getElementById(tabId(TABS[next]))?.focus();
-  }
-
+  /** A jump from the Overview, by the deal page's own keys
+   *  (lib/deal-tabs `LEGACY_TABS`); focus moves to the tab now open. */
   function navigate(key: string) {
-    const to = landing(key);
+    const to = LEGACY_TABS[key];
     if (!to) return;
     if (to.analysis) setAnalysis(to.analysis);
-    setTab(to.tab);
-    requestAnimationFrame(() => document.getElementById(tabId(to.tab))?.focus());
+    setSection(to.section);
+    requestAnimationFrame(() => document.getElementById(`tab-${to.section}`)?.focus());
   }
 
   return (
@@ -608,64 +515,32 @@ export function DemoTabs({
       className="shadow-float overflow-hidden rounded-2xl border border-line bg-surface"
     >
       <div className="flex items-center gap-2 border-b border-line bg-faint p-2">
-        {/* The deal page's section bar, class for class (deal-view). It
-            scrolls sideways where the column is narrower than the five
-            tabs, under the same fade at its edge. */}
+        {/* The deal page's own section bar (section-tabs). It scrolls
+            sideways where the column is narrower than the five tabs, under
+            the same fade at its edge. */}
         <div className="min-w-0 flex-1 overflow-x-auto [mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]">
-          <div
-            role="tablist"
-            aria-label="Sample deal sections"
-            onKeyDown={onKeys}
-            className="mr-8 flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm"
-          >
-            {TABS.map((t) => {
-              const on = tab === t;
-              const count = counts[t];
-              return (
-                <button
-                  key={t}
-                  id={tabId(t)}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  aria-controls="demo-tabpanel"
-                  tabIndex={on ? 0 : -1}
-                  onClick={() => setTab(t)}
-                  className={`relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-                    on ? "bg-brand text-white shadow-sm" : "text-muted hover:bg-faint hover:text-ink"
-                  }`}
-                >
-                  <TabDot done={done(t)} active={on} />
-                  {t}
-                  {count > 0 && (
-                    <span
-                      title={`${count} finding${count === 1 ? "" : "s"}`}
-                      className={`rounded-full px-1.5 py-px font-mono text-[10px] tabular-nums ${
-                        on ? "bg-white/20 text-white" : "bg-kill/10 text-kill"
-                      }`}
-                    >
-                      {count}
-                      <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <DealSectionTabs
+            active={section}
+            stateOf={stateOf}
+            counts={counts}
+            onSelect={setSection}
+            label="Sample deal sections"
+            fadeAlways
+          />
         </div>
         <span className="hidden shrink-0 pr-1 text-[10px] font-medium uppercase tracking-wide text-muted sm:block">
           Sample data
         </span>
       </div>
       <div
-        key={tab}
-        id="demo-tabpanel"
+        key={section}
+        id="deal-tabpanel"
         role="tabpanel"
-        aria-labelledby={tabId(tab)}
+        aria-labelledby={`tab-${section}`}
         className="animate-rise min-h-[24rem] p-4"
       >
         <DemoPanel
-          tab={tab}
+          tab={label(section)}
           buyBox={buyBox}
           financials={financials}
           analysis={analysis}

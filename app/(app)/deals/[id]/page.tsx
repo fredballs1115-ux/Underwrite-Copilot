@@ -22,6 +22,7 @@ import { PropertyVisual } from "./property-visual";
 import { HeroCover } from "./hero-cover";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
+import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
@@ -76,7 +77,7 @@ import type { SubjectForCall } from "@/lib/public-comps/vs-median";
 import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
 import { marketNames } from "@/lib/public-comps/db-markets";
 import { yieldOnCostText } from "@/lib/plan-facts";
-import { capSlotWithheld, goingInCapFigure, modelReturnsRead } from "@/lib/compare-interest";
+import { capSlotWithheld, goingInCapFigure, modelReturnsRead, statedCapRead } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
@@ -93,7 +94,7 @@ import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { VENDORED_LEGEND, ensureFloodFrame, floodLegend } from "@/lib/flood-map";
-import { FLOOD_FRAME_VERSION, floodFrameCurrent, pointKey } from "@/lib/flood-frame-core";
+import { floodFrameCurrent, floodFrameStem } from "@/lib/flood-frame-core";
 import { floodClassOfZone } from "@/lib/flood-style";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
@@ -150,9 +151,12 @@ import {
   buildComps,
   marketMemoryFor,
   memoryCandidates,
+  memoryMembers,
+  type MarketComp,
   type MarketGroup,
   type MemoryKeyRow,
 } from "@/lib/market-memory";
+import { compRangeTracks, type RangeSubject } from "@/lib/comp-range";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
@@ -187,7 +191,7 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
-import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { modelVsMarketFor, wordsOnly, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { versionBadge } from "@/lib/bridge/version-rules";
@@ -455,9 +459,16 @@ export default async function DealPage({
     extraction?.market && ownKeys.data
       ? memoryCandidates(ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction.market)
       : [];
-  const memoryRead: Promise<MarketGroup | null> = memoryIds.length
+  // The group and its members one by one, for the strip's tracks
+  // (lib/comp-range).
+  const memoryRead: Promise<{ group: MarketGroup; members: MarketComp[] } | null> = memoryIds.length
     ? readMemoryGroup(supabase, ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction!.market!)
-        .then((rows) => (rows ? marketMemoryFor(buildComps(rows), deal.id, currentClass, extraction!.market!) : null))
+        .then((rows) => {
+          if (!rows) return null;
+          const comps = buildComps(rows);
+          const group = marketMemoryFor(comps, deal.id, currentClass, extraction!.market!);
+          return group ? { group, members: memoryMembers(comps, deal.id, currentClass, extraction!.market!) } : null;
+        })
         .catch(() => null)
     : Promise.resolve(null);
 
@@ -1298,8 +1309,52 @@ export default async function DealPage({
     null;
 
   const floodLegendEntries = await floodLegendRead;
-  const marketMemory = await memoryRead;
+  const memory = await memoryRead;
+  const marketMemory = memory?.group ?? null;
   const { comps: internalComps, unread: internalCompsUnread } = await internalCompsRead;
+  // This deal against the reader's own comparables, drawn as tracks
+  // (lib/comp-range): its going-in cap as the memories pool one
+  // (`statedCapRead` — none on a plan deal or where the cap slot is
+  // withheld, and none for a leased fee, whose cap is a ground rent's), and
+  // its basis as the comps page reads it (`subjectBasis` — none for a
+  // conversion, a development, or a price that buys no building, so a
+  // placeholder price draws no tick).
+  const rangeCap =
+    interestOf(extraction).kind === "leased_fee" ? null : (statedCapRead(extraction, plan != null, firstSignal)?.pct ?? null);
+  const rangeBasis = subjectBasis(
+    extraction?.metrics ?? [],
+    strategy.kind,
+    screenYearOf(extraction),
+    interestOf(extraction),
+    extraction?.assetClass,
+    condoUnitsOffered(extraction),
+  );
+  const rangeSubject = (unit: "unit" | "sf" | undefined): RangeSubject => ({
+    cap: rangeCap,
+    basis: unit === "unit" ? rangeBasis.perUnit : unit === "sf" ? rangeBasis.perSf : null,
+  });
+  const memoryBasis = marketMemory?.perUnit ? { unit: marketMemory.perUnit.basis, noun: marketMemory.perUnit.noun ?? null } : null;
+  const marketMemoryRanges = memory
+    ? compRangeTracks(
+        memory.members.map((c) => ({
+          name: c.name,
+          cap: c.capPct,
+          basis: c.perUnit != null ? { value: c.perUnit, allIn: c.allIn } : null,
+        })),
+        rangeSubject(memoryBasis?.unit),
+        memoryBasis,
+      )
+    : [];
+  const compBasisOf = internalComps.find((c) => c.basisFigure)?.basisFigure ?? null;
+  const internalCompRanges = compRangeTracks(
+    internalComps.map((c) => ({
+      name: c.name,
+      cap: c.capPct ?? null,
+      basis: c.basisFigure ? { value: c.basisFigure.value, allIn: c.basisFigure.allIn } : null,
+    })),
+    rangeSubject(compBasisOf?.unit),
+    compBasisOf ? { unit: compBasisOf.unit, noun: compBasisOf.noun } : null,
+  );
   const typicalScreen = await typicalScreenRead;
   const sameFile = await twinRead;
 
@@ -1470,7 +1525,7 @@ export default async function DealPage({
               flood={
                 floodStreet && !floodArea
                   ? {
-                      src: `/api/deals/${id}/flood?v=${FLOOD_FRAME_VERSION}.${knownPoint ? pointKey(knownPoint) : "0"}`,
+                      src: floodFrameStem(id, knownPoint),
                       classes: floodFrame ? { page: floodFrame.classes.page, full: floodFrame.classes.full } : null,
                       here:
                         siteFlags?.flood && siteFlags.flood !== "unavailable"
@@ -1513,167 +1568,46 @@ export default async function DealPage({
                 }
               />
             )}
+            {/* The header's tools (header-tools): the three downloads, Pro
+                where the reader's plan does not include them, then the
+                deal's own engines. The public pages draw the sample's row
+                with the same component (app/sample-hero). */}
             {verdict && (
-              <a
+              <DealTool
+                kind="memo"
                 href={`/api/deals/${id}/memo`}
-                title={
-                  downloadsOpen
-                    ? "One-page IC screening memo — verdict, buy-box fit, flags, next steps"
-                    : "One-page IC screening memo — part of Pro"
-                }
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                  <path d="M15 2v5h5" />
-                  <path d="M10 12h4" />
-                  <path d="M10 16h4" />
-                </svg>
-                IC memo
-                {!downloadsOpen && (
-                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                    Pro
-                  </span>
-                )}
-              </a>
+                title={downloadsOpen ? DEAL_TOOL_TITLE.memo : DEAL_TOOL_PRO_TITLE.memo}
+                pro={!downloadsOpen}
+              />
             )}
             {verdict && (
-              <a
+              <DealTool
+                kind="report"
                 href={`/api/deals/${id}/report`}
-                title={
-                  downloadsOpen
-                    ? "The full screening report — memo plus every term, challenge, comp, and market check"
-                    : "The full screening report — part of Pro"
-                }
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-                </svg>
-                Full report
-                {!downloadsOpen && (
-                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                    Pro
-                  </span>
-                )}
-              </a>
+                title={downloadsOpen ? DEAL_TOOL_TITLE.report : DEAL_TOOL_PRO_TITLE.report}
+                pro={!downloadsOpen}
+              />
             )}
             {extraction && (
-              <a
+              <DealTool
+                kind="model"
                 href={`/api/deals/${id}/underwrite.xlsx`}
-                title={
-                  downloadsOpen
-                    ? "Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates"
-                    : "Institutional acquisition model (Excel) — part of Pro"
-                }
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
-                </svg>
-                Underwrite model
-                {!downloadsOpen && (
-                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                    Pro
-                  </span>
-                )}
-              </a>
+                title={downloadsOpen ? DEAL_TOOL_TITLE.model : DEAL_TOOL_PRO_TITLE.model}
+                pro={!downloadsOpen}
+              />
             )}
-            <Link
-              href={`/deals/${id}/rent-roll`}
-              title="Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model"
-              className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-3.5 w-3.5 text-muted"
-                aria-hidden
-              >
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <path d="M3 10h18M9 4v16" />
-              </svg>
-              Rent roll
-            </Link>
+            <DealTool kind="rentRoll" href={`/deals/${id}/rent-roll`} title={DEAL_TOOL_TITLE.rentRoll} page />
             {extraction && (
-              <Link
-                href={`/deals/${id}/valuations`}
-                title="BOV reconciler — decompose the gap between two opinions of value"
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M12 3v18M5 8l7-5 7 5" />
-                  <path d="M3 12h6l-3 6-3-6zM15 12h6l-3 6-3-6z" />
-                </svg>
-                Valuations
-              </Link>
+              <DealTool kind="valuations" href={`/deals/${id}/valuations`} title={DEAL_TOOL_TITLE.valuations} page />
             )}
             {versionCount >= 2 && (
-              <Link
-                href={`/deals/${id}/bridge`}
-                // The badge counts every saved version of the deal's
-                // assumptions — said, never a bare figure beside the name.
-                title={versionBadge(versionCount).title}
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-muted"
-                  aria-hidden
-                >
-                  <path d="M4 19V9M10 19V5M16 19v-7M22 19h-20" />
-                </svg>
-                Bridge
+              // The badge counts every saved version of the deal's
+              // assumptions — said, never a bare figure beside the name.
+              <DealTool kind="bridge" href={`/deals/${id}/bridge`} title={versionBadge(versionCount).title} page>
                 <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand" data-qa="bridge-count">
                   {versionBadge(versionCount).text}
                 </span>
-              </Link>
+              </DealTool>
             )}
           </>
         }
@@ -1925,7 +1859,10 @@ export default async function DealPage({
         dealName={deal.name}
         rateSeeds={rateSeeds}
         marketSince={marketSince}
-        modelVsMarket={modelRead}
+        // Its pictures drawn only where the model's reads stand: on a
+        // placeholder price or an assumed NOI the card keeps its words alone
+        // (lib/underwrite/report-grid `modelReadsWithheld`).
+        modelVsMarket={readsWithheld ? wordsOnly(modelRead) : modelRead}
         assumable={assumable}
         sellerNote={sellerNote}
         leaseholdExit={leaseholdExit}
@@ -1980,6 +1917,7 @@ export default async function DealPage({
         }
         internalComps={internalComps}
         internalCompsUnread={internalCompsUnread}
+        internalCompRanges={internalCompRanges}
         omUrl={omUrl}
         facts={factsByField}
         discrepancies={
@@ -1992,6 +1930,7 @@ export default async function DealPage({
         askerNames={askerNames}
         isSample={!!(deal as { is_sample?: boolean }).is_sample}
         marketMemory={marketMemory}
+        marketMemoryRanges={marketMemoryRanges}
         actuals={actuals}
         playground={playground}
         // The deal's kind the header reads (the first signal included), so
@@ -2012,7 +1951,24 @@ export default async function DealPage({
           today={todayIso}
           dbMarketsLine={compsDbMarketsLine}
         />
-        <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} today={todayIso} />
+        <SiteFlagsCard
+          result={siteFlags}
+          hasAddress={!!dealAddress?.label}
+          today={todayIso}
+          // The Flood view's own frame, small, beside the chip — only where
+          // the header draws a Flood view and the frame is drawn already, so
+          // the thumbnail never waits on a draw it cannot retry.
+          floodFrame={
+            floodStreet && !floodArea && floodFrame
+              ? {
+                  stem: floodFrameStem(id, knownPoint),
+                  label: dealAddress?.label ?? "",
+                  ring: pointIsBuilding(visualCache, dealAddress),
+                  osmPlaced: placedByOpenStreetMap(visualCache, dealAddress),
+                }
+              : null
+          }
+        />
         <PublicRecordCard
           address={dealAddress}
           market={placement.briefed}
@@ -2069,6 +2025,9 @@ export default async function DealPage({
           rateSeed={rateSeeds.permanent}
           tenYear={debt.tenYear}
           survey30={debt.survey30}
+          // The leverage track draws nothing on a placeholder price or an
+          // assumed NOI (lib/underwrite/report-grid `modelReadsWithheld`).
+          readsWithheld={readsWithheld != null}
         />
       </div>
       {/* Room at the foot for the deal's bar on a phone (#437), so the

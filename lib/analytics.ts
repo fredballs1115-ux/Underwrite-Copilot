@@ -254,6 +254,19 @@ export function middleText(r: MiddleRead, fmt: (n: number) => string): string | 
   }
 }
 
+/**
+ * The Go rate's tile figure: a share only on three calls or more (the
+ * median's floor, `MEDIAN_FLOOR`); under that the count itself, as the
+ * brokerage scorecard says its rates ("1 of 1", "1 of 2") — one Go on one
+ * call had read "100%", a portfolio's rate made of one deal. "—" with no
+ * call at all.
+ */
+export function goRateText(go: number, calls: number): string {
+  if (calls <= 0) return "—";
+  if (calls < MEDIAN_FLOOR) return `${go} of ${calls}`;
+  return `${Math.round((go / calls) * 100)}%`;
+}
+
 /** "3 deals parsed", "the one deal that parsed", "the two deals that
  *  parsed", "none parsed" — the count behind a read, said as what it is. */
 export function parsedPhrase(n: number): string {
@@ -287,6 +300,27 @@ export interface MarketRow {
   deals: AnalyticsDeal[];
 }
 
+/** The markets the analytics table lists, most screened first. */
+export const MARKET_ROWS_SHOWN = 6;
+/** The firms the brokerage scorecard lists, most deals first. */
+export const BROKER_ROWS_SHOWN = 12;
+
+/** How many markets the deals fall in, grouped as `marketRows` groups them
+ *  — so the table can say how many it left off. */
+export function marketCount(deals: readonly AnalyticsDeal[]): number {
+  return new Set(deals.map((d) => normalizeMarketKey(d.market))).size;
+}
+
+/**
+ * The line under a table cut short (the audit of 2026-10-19): the analytics
+ * listed its six busiest markets and twelve busiest firms and said nothing
+ * of the rest. "And 3 more markets." — null where nothing was left off.
+ */
+export function moreText(n: number, noun: "market" | "firm"): string | null {
+  if (n <= 0) return null;
+  return `And ${n} more ${noun}${n === 1 ? "" : "s"}.`;
+}
+
 /**
  * The deals grouped by market as /market's own memory groups them — by
  * `normalizeMarketKey`, so "Philadelphia, PA" and "Philadelphia PA" are one
@@ -294,7 +328,7 @@ export interface MarketRow {
  * counted the two apart where /market counted them together) — most deals
  * first, ties by the label.
  */
-export function marketRows(deals: readonly AnalyticsDeal[], limit = 6): MarketRow[] {
+export function marketRows(deals: readonly AnalyticsDeal[], limit = MARKET_ROWS_SHOWN): MarketRow[] {
   const groups = new Map<string, AnalyticsDeal[]>();
   for (const d of deals) {
     const key = normalizeMarketKey(d.market);

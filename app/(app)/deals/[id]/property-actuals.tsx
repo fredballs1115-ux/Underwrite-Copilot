@@ -1,4 +1,6 @@
-import type { NoiComparison } from "@/lib/actuals/types";
+import type { NoiComparison, T12Summary } from "@/lib/actuals/types";
+import { t12Bar } from "@/lib/actuals/t12-bar";
+import { StackBar } from "./stack-bar";
 import { rentQuotedMonthly } from "@/lib/asset-words";
 import {
   OM_NOI_LABEL,
@@ -164,16 +166,17 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
                   report says it (lib/actuals `t12DateWords`). */}
               <span className="text-[11px] text-muted">{t12DateWords(t12)}</span>
             </div>
+            <T12IncomeBar st={st} />
             <table className="mt-3 w-full text-sm">
               <tbody>
                 <Line k="Collected rent" v={usd(st.collectedRent)} />
-                {st.vacancyLoss != null && <Line k="Vacancy / credit loss" v={`(${usd(st.vacancyLoss)})`} />}
+                {st.vacancyLoss != null && <Line k="Vacancy / credit loss" v={`(${usd(Math.abs(st.vacancyLoss))})`} />}
                 {st.otherIncome != null && <Line k="Other income" v={usd(st.otherIncome)} />}
                 <Line k="Effective gross income" v={usd(st.egi)} strong />
                 {st.opex.map((l, i) => (
-                  <Line key={`${l.key}-${i}`} k={l.label} v={`(${usd(l.amount)})`} indent />
+                  <Line key={`${l.key}-${i}`} k={l.label} v={`(${usd(Math.abs(l.amount))})`} indent />
                 ))}
-                <Line k="Total operating expenses" v={`(${usd(st.totalOpex)})`} strong />
+                <Line k="Total operating expenses" v={`(${usd(st.totalOpex == null ? null : Math.abs(st.totalOpex))})`} strong />
                 <Line
                   k={st.noiDerived ? "Net operating income (derived)" : "Net operating income"}
                   v={usd(st.noi)}
@@ -185,6 +188,41 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
         )}
       </div>
     </section>
+  );
+}
+
+// The expense lines' fills, in turn: two tones of the caution colour and two
+// of ink, so neighbouring lines stay apart; the key names every line.
+const EXPENSE_TONES = ["bg-caution/70", "bg-ink/40", "bg-caution/40", "bg-ink/20"] as const;
+
+/**
+ * The statement as one bar, above its table: the effective gross income, each
+ * operating expense line a segment, the NOI what is left (lib/actuals
+ * `t12Bar`). Nothing where the statement's figures do not tie.
+ */
+export function T12IncomeBar({ st }: { st: T12Summary }) {
+  const bar = t12Bar(st);
+  if (!bar) return null;
+  return (
+    <StackBar
+      qa="t12-bar"
+      scale={bar.egi}
+      parts={[
+        ...bar.expenses.map((l, i) => ({
+          bar: "t12-expense",
+          tone: EXPENSE_TONES[i % EXPENSE_TONES.length],
+          label: `${l.label} ${usd(l.amount)}`,
+          value: l.amount,
+        })),
+        {
+          bar: "t12-noi",
+          tone: "bg-brand/70",
+          label: `${bar.noiDerived ? "Net operating income (derived)" : "Net operating income"} ${usd(bar.noi)}`,
+          value: bar.noi,
+        },
+      ]}
+      note={`The whole bar is the ${usd(bar.egi)} effective gross income; the expenses take ${usd(bar.totalOpex)} of it.`}
+    />
   );
 }
 

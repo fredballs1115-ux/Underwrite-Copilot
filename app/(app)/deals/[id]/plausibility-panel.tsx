@@ -1,6 +1,36 @@
 import { withArticle } from "@/lib/article";
 import type { DealStrategy, PlanSummary, PlausibilityFinding } from "@/lib/deal-strategy";
-import { planFacts } from "@/lib/plan-facts";
+import { moneyCompact, planFacts } from "@/lib/plan-facts";
+import { StackBar, planStackable } from "./stack-bar";
+
+/**
+ * The plan's total cost as its two parts, price and budget, on one bar —
+ * the facts beneath say the same figures, in the plan facts' own writer
+ * (`moneyCompact`). Only where both are stated and the price is the
+ * building's own (`planStackable`), and never where the plan suspects a
+ * misread total (`yieldWithheld`, `basisWithheld`) or states an all-in total
+ * whose works cannot be split from the price.
+ */
+export function PlanCostStack({ plan }: { plan: PlanSummary }) {
+  if (!planStackable(plan) || plan.price == null || !plan.budget || plan.budget.isTotal) return null;
+  if (plan.totalCost == null || plan.yieldWithheld || plan.basisWithheld) return null;
+  return (
+    <StackBar
+      className="mt-2.5"
+      qa="plan-cost-stack"
+      parts={[
+        { bar: "plan-price", tone: "bg-brand/60", label: `${plan.priceLabel} ${moneyCompact(plan.price)}`, value: plan.price },
+        {
+          bar: "plan-budget",
+          tone: "bg-caution/60",
+          label: `${plan.budget.program ? "Budget (doors × cost a door)" : "Budget"} ${moneyCompact(plan.budget.budget)}`,
+          value: plan.budget.budget,
+        },
+      ]}
+      note={`Total cost ${moneyCompact(plan.totalCost)}.`}
+    />
+  );
+}
 
 /**
  * The plan, as the OM states it, for a deal that is not a stabilized asset:
@@ -37,6 +67,7 @@ export function PlanStrip({
       {strategy.summary && (
         <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted">{strategy.summary}</p>
       )}
+      <PlanCostStack plan={plan} />
       <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-2">
         {cells.map(([label, value]) => (
           <div key={label}>

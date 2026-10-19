@@ -15,7 +15,9 @@ import { COMP_RATING, LEVER_META, SCENARIO_META, TONE } from "@/app/(app)/deals/
 import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
 import { fmtPct } from "./underwrite/playground";
-import { DemoPanel, loadWalkthrough } from "@/app/landing-interactive";
+import { DemoPanel, DemoTabs, loadWalkthrough } from "@/app/landing-interactive";
+import { AnalysisTabs, DealSectionTabs } from "@/app/(app)/deals/[id]/section-tabs";
+import { PIPELINE, analysisCounts, sectionCounts, sectionStateOf } from "./deal-tabs";
 import { DebtSizer } from "@/app/(app)/deals/[id]/debt-sizer";
 import { SampleModelCard } from "@/app/sample-model-card";
 import { modelReturnsRead } from "./compare-interest";
@@ -28,6 +30,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { sampleHeader } from "./sample-header";
 import { sampleMemoData } from "./sample-memo";
 import { SAMPLE_DOWNLOAD_NOTE, SampleHeroTools } from "@/app/sample-hero";
+import { DEAL_TOOL_TITLE, DealTool, type DealToolKind } from "@/app/(app)/deals/[id]/header-tools";
 import { compRating, inCompOrder } from "./comp-rating";
 import { SKYLINES, commonsPage, coverWidth, skylineSrcSet } from "./skyline";
 import { skylineSrcSetOf } from "./skyline-srcset";
@@ -87,6 +90,30 @@ describe("the homepage, as a screen reader hears it", () => {
     }
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  // The tool row had been a hand-drawn copy of the deal page's (its own
+  // classes, icons and tooltips); both draw the deal page's DealTool now.
+  it("draws the sample's tools with the deal page's own DealTool, in the signed-in sample's order", () => {
+    const html = renderToStaticMarkup(React.createElement(SampleHeroTools));
+    const tool = (kind: DealToolKind, href: string, title: string, page = false) =>
+      renderToStaticMarkup(React.createElement(DealTool, { kind, href, title, page }));
+    expect(html).toBe(
+      [
+        tool("memo", "/api/demo/memo", `${DEAL_TOOL_TITLE.memo}. ${SAMPLE_DOWNLOAD_NOTE}`),
+        tool("report", "/api/demo/report", `${DEAL_TOOL_TITLE.report}. ${SAMPLE_DOWNLOAD_NOTE}`),
+        tool("model", "/api/demo/underwrite.xlsx", `${DEAL_TOOL_TITLE.model}. ${SAMPLE_DOWNLOAD_NOTE}`),
+        tool("rentRoll", "/login?mode=signup", `${DEAL_TOOL_TITLE.rentRoll} — on a deal of your own`, true),
+        tool("valuations", "/login?mode=signup", `${DEAL_TOOL_TITLE.valuations} — on a deal of your own`, true),
+      ].join(""),
+    );
+    // The deal page draws the same tools, and neither keeps a copy.
+    const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
+    for (const kind of ["memo", "report", "model", "rentRoll", "valuations", "bridge"]) expect(page).toContain(`kind="${kind}"`);
+    for (const src of [page, readFileSync("app/sample-hero.tsx", "utf8")]) {
+      expect(src).not.toContain("py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm");
+      expect(src).not.toContain('<path d="M15 2v5h5" />');
+    }
   });
 
   // The homepage and /demo against the signed-in product, H1: the card
@@ -468,8 +495,8 @@ describe("the screen-run trace credits each stage with what it writes", () => {
   const lines = () => Object.fromEntries(screenRunLines());
 
   it("runs in the pipeline's order, the reconciliation after it", () => {
-    const view = readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8");
-    const pipeline = JSON.parse(/const PIPELINE = (\[[^\]]*\]);/.exec(view)![1]) as string[];
+    // The deal page's own order (lib/deal-tabs, which deal-view reads).
+    const pipeline = PIPELINE;
     expect(screenRunLines().map(([stage]) => stage)).toEqual([...pipeline, "reconcile"]);
     expect([...STRIP_STAGES]).toEqual([...pipeline, "reconcile"]);
   });
@@ -531,6 +558,44 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(t).not.toMatch(/Screening verdict|one rubric|Deal-killer|Stress it|Holds up/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("draws the deal page's own section bar and Analyses pills (section-tabs), counted by its own readers", () => {
+    const buyBox = sampleBuyBox();
+    const { inputs, meta, sources } = sampleDerivedInputs();
+    const financials = {
+      underwrite: inputs,
+      underwriteSources: sources,
+      rateSeeds: { permanent: meta.rateSeed ?? null, construction: null },
+      strategy: inferStrategy(SAMPLE_DEAL.extraction, null),
+      modelInterest: null,
+    };
+    const html = renderToStaticMarkup(React.createElement(DemoTabs, { buyBox, financials }));
+    const results = {
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const counts = analysisCounts(results);
+    expect(html).toContain(
+      renderToStaticMarkup(
+        React.createElement(DealSectionTabs, {
+          active: "overview",
+          stateOf: (k) => sectionStateOf(k, { results, live: false, step: null, buyBox: buyBox.panel }),
+          counts: sectionCounts(counts, buyBox.panel.checks),
+          onSelect: () => {},
+          label: "Sample deal sections",
+          fadeAlways: true,
+        }),
+      ),
+    );
+    expect(html).toContain('id="deal-tabpanel" role="tabpanel" aria-labelledby="tab-overview"');
+    expect(panel("Analyses", "market")).toContain(
+      renderToStaticMarkup(React.createElement(AnalysisTabs, { active: "market", counts, has: () => true, onSelect: () => {} })),
+    );
   });
 
   it("opens Analyses on the verdict, with the product's ranges, deal-killers and scenario words", () => {

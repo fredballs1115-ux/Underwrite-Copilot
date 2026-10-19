@@ -69,6 +69,7 @@ import {
   normalizeStage,
   type Stage,
 } from "@/lib/stages";
+import { verdictCountsOf } from "@/lib/pipeline-counts";
 
 export type DealCard = {
   id: string;
@@ -203,6 +204,8 @@ function mapDealOf(d: DealCard): MapDeal {
     place: d.place ?? null,
     placeMiss: d.placeMiss,
     hasAddress: d.hasAddress,
+    // The run the card and the list row read (lib/screen-run listJobStatus).
+    jobStatus: d.jobStatus ?? null,
   };
 }
 
@@ -585,14 +588,12 @@ export function Pipeline({
     }
   }
 
-  const verdictCounts = useMemo(() => {
-    const c = { pass: 0, caution: 0, pass_on: 0, screening: 0 };
-    for (const d of deals) {
-      if (d.verdict && d.verdict in c) c[d.verdict as keyof typeof c]++;
-      else if (!d.verdict) c.screening++;
-    }
-    return c;
-  }, [deals]);
+  // Over the rows the list would show (lib/pipeline-counts): a dead deal
+  // only once the reader asked for the dead.
+  const verdictCounts = useMemo(
+    () => verdictCountsOf(deals, { showDead, stageFilter: stage }),
+    [deals, showDead, stage],
+  );
   // Every deal's rung on the ladder — the funnel's counts (dead deals have
   // their own toggle; the funnel leaves them out).
   const stageCounts = useMemo(() => {

@@ -43,7 +43,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import AnalyticsPage from "@/app/(app)/analytics/page";
-import { analyticsScope } from "./analytics";
+import { analyticsScope, goRateText } from "./analytics";
 import { visibleText } from "./render-lint";
 
 const row = (i: number, user: string) => ({
@@ -78,6 +78,29 @@ describe("analytics — every screen, newest first, and whose", () => {
     expect(db.orders).toContain("created_at:desc");
     expect(text).toContain("What the screens in your pipeline add up to — 2 of yours and 5 of your team's");
     expect(text).not.toContain("an OM you ran");
+  });
+
+  // The audit of 2026-10-19: one Go on one call had read "100%".
+  it("says the Go rate as a count under three calls, a share from three", async () => {
+    expect(goRateText(1, 1)).toBe("1 of 1");
+    expect(goRateText(1, 2)).toBe("1 of 2");
+    expect(goRateText(0, 2)).toBe("0 of 2");
+    expect(goRateText(1, 3)).toBe("33%");
+    expect(goRateText(0, 0)).toBe("—");
+    db.maxRows = 50;
+    // Three screened deals (the page's floor), one of them called.
+    const uncalled = (i: number) => ({ ...row(i, "u1"), verdict: null });
+    db.rows = [row(1, "u1"), uncalled(2), uncalled(3)];
+    let text = visibleText(renderToStaticMarkup(await AnalyticsPage())).replace(/\s+/g, " ");
+    expect(text).toContain("Go rate 1 of 1 1 verdict");
+    expect(text).not.toContain("100%");
+    db.rows = [row(1, "u1"), { ...row(2, "u1"), verdict: { verdict: "caution" } }, uncalled(3)];
+    text = visibleText(renderToStaticMarkup(await AnalyticsPage())).replace(/\s+/g, " ");
+    expect(text).toContain("Go rate 1 of 2 2 verdicts");
+    db.rows = [row(1, "u1"), row(2, "u1"), { ...row(3, "u1"), verdict: { verdict: "caution" } }];
+    text = visibleText(renderToStaticMarkup(await AnalyticsPage())).replace(/\s+/g, " ");
+    expect(text).toContain("Go rate 67% 3 verdicts");
+    db.maxRows = 3;
   });
 
   it("says the reader's own where no teammate's screen is among them", async () => {

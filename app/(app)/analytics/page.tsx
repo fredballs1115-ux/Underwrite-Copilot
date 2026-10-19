@@ -6,18 +6,21 @@ import {
   analyticsScope,
   deriveAnalytics,
   fmtUsdCompact,
+  goRateText,
   middleRead,
   middleText,
   parsedPhrase,
   stageCountLine,
   stageCounts,
   marketRows,
+  marketCount,
+  BROKER_ROWS_SHOWN,
   unitTileSub,
   type AnalyticsRow,
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage, parseStageHistory } from "@/lib/stages";
 import { deathReasons } from "@/lib/deal-outcome";
-import { brokerDealFit, brokerScorecard, dealFirms, partialText, rateText } from "@/lib/brokerage";
+import { brokerDealFit, brokerScorecard, dealFirms } from "@/lib/brokerage";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
@@ -28,7 +31,7 @@ import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { ANALYTICS_MIN_DEALS, AnalyticsEmptyPicture, DotTimeline, VerdictMix, StageFunnel } from "./charts";
 import { MarketTable } from "./market-table";
-import { scorecardNote } from "./scorecard-note";
+import { BrokerageTable } from "./brokerage-table";
 import { readAllResult } from "@/lib/read-all";
 import { typedByHand } from "@/lib/manual-deal";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -118,10 +121,9 @@ export default async function AnalyticsPage() {
   // `isOpenStage`): a closed deal is counted as closed, never live.
   const counts = stageCounts(deals);
   const decided = deals.filter((d) => d.verdict !== null);
-  const goRate =
-    decided.length > 0
-      ? (decided.filter((d) => d.verdict === "pass").length / decided.length) * 100
-      : null;
+  // A share only on three calls or more; under that the count (lib/analytics
+  // `goRateText`, the scorecard's "1 of 2").
+  const goCount = decided.filter((d) => d.verdict === "pass").length;
   const capRead = middleRead(capPoints.map((p) => p.value));
   const unitRead = middleRead(unitPoints.map((p) => p.value));
 
@@ -136,6 +138,8 @@ export default async function AnalyticsPage() {
   // /market's own memory groups them (lib/analytics `marketRows`), so one
   // market's spellings are one row on both pages.
   const markets = marketRows(deals);
+  // The markets the table leaves off, said under it.
+  const marketsMore = marketCount(deals) - markets.length;
 
   const enough = deals.length >= ANALYTICS_MIN_DEALS;
 
@@ -216,7 +220,7 @@ export default async function AnalyticsPage() {
                 value: middleText(capRead, pct) ?? "—",
                 sub:
                   planDeals.length > 0
-                    ? `${capPoints.length} parsed · ${planPhrase}`
+                    ? `${parsedPhrase(capPoints.length)} · ${planPhrase}`
                     : parsedPhrase(capPoints.length),
               },
               {
@@ -226,7 +230,7 @@ export default async function AnalyticsPage() {
               },
               {
                 label: "Go rate",
-                value: goRate != null ? `${Math.round(goRate)}%` : "—",
+                value: goRateText(goCount, decided.length),
                 sub: `${decided.length} verdict${decided.length === 1 ? "" : "s"}`,
               },
             ].map((t) => (
@@ -329,51 +333,9 @@ export default async function AnalyticsPage() {
             </section>
           )}
 
-          {brokers.rows.length > 0 && (
-            <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="by-brokerage">
-              <h2 className="text-sm font-semibold tracking-tight">By brokerage</h2>
-              <div className="scroll-shadows-x mt-3 overflow-x-auto">
-                <table className="w-full min-w-[34rem] text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
-                      <th className="py-2 pr-3 font-medium">Brokerage</th>
-                      <th className="py-2 pr-3 text-right font-medium">Deals</th>
-                      <th className="py-2 pr-3 text-right font-medium">Fit the box</th>
-                      <th className="py-2 text-right font-medium">Go calls</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {brokers.rows.slice(0, 12).map((b) => (
-                      <tr key={b.key} className="border-b border-line/60">
-                        <td className="max-w-[16rem] py-2 pr-3">
-                          <Link href={`/deals?broker=${encodeURIComponent(b.key)}`} className="font-medium text-brand hover:underline">
-                            {b.name}
-                          </Link>
-                          {b.names.length > 1 && (
-                            <span className="block truncate text-[11px] text-muted" title={b.names.join(" · ")}>
-                              {`as ${b.names.join(" · ")}`}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums">{b.received}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums">
-                          {rateText(b.fits, b.judged)}
-                          {b.partial > 0 && " "}
-                          {b.partial > 0 && <span className="block text-[11px] text-muted">{partialText(b.partial)}</span>}
-                        </td>
-                        <td className="py-2 text-right tabular-nums">{rateText(b.go, b.decided)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-2 text-xs text-muted">
-                {scorecardNote(brokers.unnamed)}
-              </p>
-            </section>
-          )}
+          {brokers.rows.length > 0 && <BrokerageTable rows={brokers.rows} unnamed={brokers.unnamed} limit={BROKER_ROWS_SHOWN} />}
 
-          {markets.length > 0 && <MarketTable rows={markets} planNote={planDeals.length > 0} />}
+          {markets.length > 0 && <MarketTable rows={markets} planNote={planDeals.length > 0} more={marketsMore} />}
         </>
       )}
     </div>

@@ -51,6 +51,7 @@ import {
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import Link from "next/link";
 import { MarketBriefCard } from "@/app/market/market-brief-card";
+import { LeverageTrack } from "./leverage-track";
 import type { StructuredAddress } from "@/lib/address";
 import type { DealPlacement } from "@/lib/market-county";
 
@@ -285,6 +286,10 @@ export type ResearchPanelProps = {
   /** the week's 30-year mortgage survey off the same read — the leverage
    *  check's benchmark; the research layer's snapshot serves where null */
   survey30?: SurveyRate | null;
+  /** the model's reads are withheld (lib/underwrite/report-grid
+   *  `modelReadsWithheld`: a placeholder price or an assumed NOI) — the
+   *  leverage check keeps its words and draws no track */
+  readsWithheld?: boolean;
   /** the strategy label when the deal is a plan (Conversion, Development …):
    *  with no going-in cap to spread against debt, the leverage check says
    *  why instead of going silent */
@@ -331,6 +336,7 @@ export function ResearchPanelView({
   rateSeed = null,
   tenYear = null,
   survey30 = null,
+  readsWithheld = false,
   placement,
   census = null,
   rules,
@@ -507,6 +513,23 @@ export function ResearchPanelView({
                   : "positive at benchmark"}
             </span>
           </div>
+          {/* The check on one percent track: the cap against the survey's
+              one-sided floor, the seeded rate and the 10-year, each dated in
+              the key. Nothing drawn where the model's reads are withheld. */}
+          {!readsWithheld && (
+            <LeverageTrack
+              figures={{
+                capPct,
+                survey: {
+                  pct: bench30.value,
+                  source: bench30.source,
+                  dated: bench30.live ? datedLong(bench30.asOf) : asOfLabel(bench30.asOf, today),
+                },
+                seed: rateSeed ? { pct: rateSeed.pct, note: rateSeed.note } : null,
+                tenYear: tenYear ? { pct: tenYear.pct, dated: datedLong(tenYear.asOf) } : null,
+              }}
+            />
+          )}
           <p className="mt-1 text-xs leading-relaxed text-muted">
             {leverage.label} — going-in cap {capPct}% vs {bench30.value}% (
             {bench30.source}, {asOfLabel(bench30.asOf, bench30.live ? undefined : today)}). The benchmark is an
@@ -612,9 +635,7 @@ export function ResearchPanelView({
           // deal's Philadelphia sits exactly in this state (its eviction-
           // diversion mandate keys off a filing, not a purchase).
           <p className="mt-2 text-sm text-muted">
-            Screened: {evals.length} rule{evals.length === 1 ? "" : "s"} on
-            file for {address.city || address.county || address.state} — none
-            triggered by this deal&apos;s facts. Rules that key off events (an
+            {`Screened: ${evals.length} rule${evals.length === 1 ? "" : "s"} on file for ${address.city || address.county || address.state} — none triggered by this deal's facts.`} Rules that key off events (an
             eviction filing, a vacancy registration) stay dormant until those
             events.
           </p>

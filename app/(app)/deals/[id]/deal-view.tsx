@@ -3,15 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type {
-  ExtractionResult,
-  ChallengerResult,
-  BrokerCompsResult,
-  ReconciliationResult,
-  MarketResult,
-  VerdictResult,
-  FirstSignal,
-} from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { screenYearOf } from "@/lib/criteria";
@@ -29,6 +21,8 @@ import { internalCompsLead } from "@/lib/internal-comps-lead";
 import { DealAvatar } from "@/app/(app)/deal-avatar";
 import { DebtSizer } from "./debt-sizer";
 import { ModelVsMarketCard } from "./model-vs-market-card";
+import { CompRangeTracks } from "./comp-range-tracks";
+import type { RangeTrack } from "@/lib/comp-range";
 import { AssumableLoanCard } from "./assumable-card";
 import { LeaseholdExitCard } from "./leasehold-exit-card";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -68,6 +62,7 @@ import {
   type TabSupplement,
 } from "./deal-sections";
 import { ModelView } from "./model-view";
+import { STAGE_ICON } from "@/app/stage-icons";
 import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
 import { SourceDocumentsView } from "./source-documents";
@@ -87,6 +82,18 @@ import { supportMailto } from "@/lib/support-link";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
+import {
+  ANALYSES,
+  LEGACY_TABS,
+  PIPELINE,
+  analysisCounts as countAnalyses,
+  sectionCounts as countSections,
+  sectionStateOf,
+  type AnalysisKey,
+  type DealResults,
+  type SectionKey,
+} from "@/lib/deal-tabs";
+import { AnalysisTabs, DealSectionTabs } from "./section-tabs";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
 // The buy box tab lives in buy-box-panel.tsx, which /demo draws on the
@@ -120,64 +127,8 @@ type Job = {
   ageMs?: number | null;
 } | null;
 
-type Results = {
-  extraction: ExtractionResult | null;
-  challenges: ChallengerResult | null;
-  comps: BrokerCompsResult | null;
-  reconciliation: ReconciliationResult | null;
-  market: MarketResult | null;
-  verdict: VerdictResult | null;
-};
+type Results = DealResults;
 
-/*
-  Information hierarchy: five top-level sections, ONE visible at a time.
-  Inside Analyses, the five analysis views sit behind a secondary pill nav
-  in the order an acquisitions analyst checks them — the verdict first,
-  then the critique that produced it.
-*/
-type SectionKey =
-  | "overview"
-  | "financials"
-  | "buybox"
-  | "analyses"
-  | "documents";
-type AnalysisKey = "verdict" | "challenger" | "comps" | "market" | "reconciler";
-
-const SECTIONS: { key: SectionKey; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "financials", label: "Financials" },
-  { key: "buybox", label: "Buy box" },
-  { key: "analyses", label: "Analyses" },
-  { key: "documents", label: "Documents" },
-];
-
-const ANALYSES: { key: AnalysisKey; label: string; result: keyof Results }[] = [
-  { key: "verdict", label: "Verdict", result: "verdict" },
-  { key: "challenger", label: "Challenger", result: "challenges" },
-  { key: "comps", label: "Comps", result: "comps" },
-  { key: "market", label: "Market", result: "market" },
-  { key: "reconciler", label: "Reconciler", result: "reconciliation" },
-];
-
-/** Old ?tab= values (bookmarks, memo links, OverviewView jump links) map
- *  onto the new section structure instead of 404-ing to Overview. */
-const LEGACY_TABS: Record<string, { section: SectionKey; analysis?: AnalysisKey }> = {
-  overview: { section: "overview" },
-  terms: { section: "financials" },
-  model: { section: "financials" },
-  financials: { section: "financials" },
-  buybox: { section: "buybox" },
-  analyses: { section: "analyses" },
-  verdict: { section: "analyses", analysis: "verdict" },
-  challenger: { section: "analyses", analysis: "challenger" },
-  comps: { section: "analyses", analysis: "comps" },
-  market: { section: "analyses", analysis: "market" },
-  reconciler: { section: "analyses", analysis: "reconciler" },
-  documents: { section: "documents" },
-};
-
-// The automatic pass, in order — drives the progress rail and pending logic.
-const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
 // The jobs that run on their own, outside the six-step screen: the rail draws
 // them as one indicator, and the overview keeps its meter while they run.
 const SIDE_JOBS = new Set(["reconcile", "model", "comps_search"]);
@@ -327,15 +278,6 @@ function completionMessage(step: string | null): string {
   }
 }
 
-/** Which analyses/steps light which section while a run is in flight. */
-const SECTION_STEPS: Record<SectionKey, string[]> = {
-  overview: ["signal"],
-  financials: ["extract", "model"],
-  buybox: [],
-  analyses: ["challenge", "comps", "market", "verdict", "reconcile", "comps_search"],
-  documents: [],
-};
-
 export function DealView({
   dealId,
   dealName,
@@ -359,6 +301,7 @@ export function DealView({
   ddChecklist = null,
   internalComps = [],
   internalCompsUnread = false,
+  internalCompRanges = [],
   omUrl,
   facts = {},
   discrepancies = null,
@@ -369,6 +312,7 @@ export function DealView({
   firstSignal = null,
   userId = null,
   marketMemory = null,
+  marketMemoryRanges = [],
   actuals = { rentRoll: null, t12: null, noiComparison: null },
   playground = null,
   dealStrategy = null,
@@ -458,6 +402,9 @@ export function DealView({
   internalComps?: InternalComp[];
   /** the read of the reader's other screens failed (audit C5, LOW-5) */
   internalCompsUnread?: boolean;
+  /** those comps' caps and bases as tracks against this deal's
+   *  (lib/comp-range), drawn under the block's lead; none draws none */
+  internalCompRanges?: RangeTrack[];
   omUrl: string | null;
   facts?: Record<string, DealFact>;
   discrepancies?: ReconcileResult | null;
@@ -474,6 +421,9 @@ export function DealView({
   firstSignal?: FirstSignal | null;
   userId?: string | null;
   marketMemory?: MarketGroup | null;
+  /** the past screens' caps and bases as tracks against this deal's
+   *  (lib/comp-range); none keeps the strip's sentence with its ranges */
+  marketMemoryRanges?: RangeTrack[];
   actuals?: ActualsData;
   playground?: PlaygroundData | null;
   /** the deal's kind as the page's header reads it, the first signal
@@ -706,89 +656,13 @@ export function DealView({
     requestAnimationFrame(() => document.getElementById(`tab-${target.section}`)?.focus());
   }
 
-  function sectionState(
-    key: SectionKey,
-  ): "done" | "running" | "pending" | "idle" {
-    const steps = SECTION_STEPS[key];
-    if (live && job?.step && steps.includes(job.step)) return "running";
-    switch (key) {
-      case "overview":
-        return results.verdict || results.extraction
-          ? "done"
-          : live
-            ? "running"
-            : "idle";
-      case "financials":
-        if (results.extraction) return "done";
-        break;
-      case "analyses":
-        if (
-          results.verdict ||
-          results.challenges ||
-          results.comps ||
-          results.market
-        )
-          return "done";
-        break;
-      case "buybox":
-        return buyBox.hasBox && buyBox.checks.length ? "done" : "idle";
-      case "documents":
-        return "idle";
-    }
-    if (live && steps.length) {
-      const cur = PIPELINE.indexOf(job?.step ?? "");
-      const first = PIPELINE.indexOf(steps[0]);
-      if (first >= 0 && (cur < 0 || first > cur)) return "pending";
-    }
-    return "idle";
-  }
+  const sectionState = (key: SectionKey) =>
+    sectionStateOf(key, { results, live, step: job?.step ?? null, buyBox });
 
   // Finding counts, so a finished run shows where the problems live without
-  // opening every section.
-  // Each array is guarded: the schemas force these shapes on every write
-  // the app makes, but a legacy or hand-edited row with a null list must
-  // not take every tab down with it.
-  const analysisCounts: Record<AnalysisKey, number> = {
-    verdict: 0,
-    challenger: (results.challenges?.challenges ?? []).filter((c) => c.severity === "high")
-      .length,
-    comps: results.comps
-      ? (results.comps.redFlags ?? []).length +
-        [...(results.comps.saleComps ?? []), ...(results.comps.leaseComps ?? [])].filter(
-          (x) => x.support === "stretched",
-        ).length
-      : 0,
-    market: (results.market?.checks ?? []).filter((c) => c.assessment === "aggressive").length,
-    reconciler: (results.reconciliation?.rows ?? []).filter((r) => r.direction === "unfavorable")
-      .length,
-  };
-  const sectionCounts: Record<SectionKey, number> = {
-    overview: 0,
-    financials: 0,
-    buybox: buyBox.checks.filter((c) => c.status === "miss").length,
-    analyses:
-      analysisCounts.challenger +
-      analysisCounts.comps +
-      analysisCounts.market +
-      analysisCounts.reconciler,
-    documents: 0,
-  };
-
-  // Arrow-key navigation across the tablist (standard tabs pattern).
-  function onTabKeyDown(e: React.KeyboardEvent) {
-    const idx = SECTIONS.findIndex((t) => t.key === section);
-    let next = -1;
-    if (e.key === "ArrowRight") next = (idx + 1) % SECTIONS.length;
-    else if (e.key === "ArrowLeft")
-      next = (idx - 1 + SECTIONS.length) % SECTIONS.length;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = SECTIONS.length - 1;
-    if (next >= 0) {
-      e.preventDefault();
-      selectSection(SECTIONS[next].key);
-      document.getElementById(`tab-${SECTIONS[next].key}`)?.focus();
-    }
-  }
+  // opening every section (lib/deal-tabs).
+  const analysisCounts = countAnalyses(results);
+  const sectionCounts = countSections(analysisCounts, buyBox.checks);
 
   // A deal-level action error (replace-OM, delete, stage, busy, memo…) lands
   // the user back on Overview — surface it as a banner here, not only on the
@@ -887,54 +761,7 @@ export function DealView({
         data-tab-strip
         className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]"
       >
-        <div
-          role="tablist"
-          aria-label="Deal sections"
-          onKeyDown={onTabKeyDown}
-          className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm max-md:mr-8"
-        >
-          {SECTIONS.map((t) => {
-            const state = sectionState(t.key);
-            const isActiveTab = t.key === section;
-            const count = sectionCounts[t.key];
-            return (
-              <button
-                key={t.key}
-                id={`tab-${t.key}`}
-                type="button"
-                role="tab"
-                aria-selected={isActiveTab}
-                aria-controls="deal-tabpanel"
-                tabIndex={isActiveTab ? 0 : -1}
-                onClick={() => selectSection(t.key)}
-                className={`relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-                  isActiveTab
-                    ? "bg-brand text-white shadow-sm"
-                    : "text-muted hover:bg-faint hover:text-ink"
-                }`}
-              >
-                <TabDot state={state} active={isActiveTab} />
-                {t.label}
-                {/* The dot's colour says a section is being worked on; so do
-                    words, to a screen reader (research pass 33). */}
-                {state === "running" ? <span className="sr-only">, running</span> : null}
-                {count > 0 && (
-                  <span
-                    title={`${count} finding${count === 1 ? "" : "s"}`}
-                    className={`rounded-full px-1.5 py-px font-mono text-[10px] tabular-nums ${
-                      isActiveTab ? "bg-white/20 text-white" : "bg-kill/10 text-kill"
-                    }`}
-                  >
-                    {count}
-                    {/* What the figure counts, said: it had been in a title
-                        only (research pass 33). */}
-                    <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <DealSectionTabs active={section} stateOf={sectionState} counts={sectionCounts} onSelect={selectSection} />
       </div>
 
       {/* Active section — re-keyed so it eases in on switch */}
@@ -952,7 +779,7 @@ export function DealView({
             {discrepancies && discrepancies.discrepancies.length > 0 && (
               <ReconciliationPanel dealId={dealId} result={discrepancies} />
             )}
-            {marketMemory && <MarketMemoryStrip group={marketMemory} />}
+            {marketMemory && <MarketMemoryStrip group={marketMemory} ranges={marketMemoryRanges} />}
             <PropertyActuals data={actuals} />
             {/* Feature 1: prompt for the actuals docs. Hidden while a screen
                 runs, on the sample, and once both docs are folded in. */}
@@ -1065,6 +892,7 @@ export function DealView({
             supplements={supplements}
             internalComps={internalComps}
             internalCompsUnread={internalCompsUnread}
+            internalCompRanges={internalCompRanges}
             omUrl={omUrl}
             marketSince={marketSince}
             metroDemand={metroDemand}
@@ -1196,14 +1024,15 @@ function FinancialsPanel({
       ) : active && (step === "extract" || step === "signal") ? (
         <StatGridSkeleton />
       ) : hasOm && stopped ? (
-        <EmptyState title={STOPPED_BEFORE} />
+        <EmptyState title={STOPPED_BEFORE} icon={STAGE_ICON.extract} />
       ) : hasOm ? (
         <EmptyState
           title="The screen hasn’t run for this deal yet."
+          icon={STAGE_ICON.extract}
           action={<RetryForm dealId={dealId} label="Run the screen" />}
         />
       ) : (
-        <EmptyState title="No OM uploaded for this deal." />
+        <EmptyState title="No OM uploaded for this deal." icon={STAGE_ICON.extract} />
       )}
 
       {/* FINANCING & CAPITAL directly after the terms (Bug 11) — the debt
@@ -1280,10 +1109,13 @@ function FinancialsPanel({
  *  sentence says so — and says the figures are at the ask: each is struck on
  *  a memorandum's asking price, never a price anyone paid, and read without
  *  the words they read as trades. */
-function MarketMemoryStrip({ group }: { group: MarketGroup }) {
+function MarketMemoryStrip({ group, ranges = [] }: { group: MarketGroup; ranges?: RangeTrack[] }) {
+  // Where the tracks are drawn (lib/comp-range) they carry the ranges, each
+  // labelled at the ask; the sentence keeps the count and says so.
+  const drawn = ranges.length > 0;
   const bits: string[] = [];
-  if (group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
-  if (group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
+  if (!drawn && group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
+  if (!drawn && group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -1306,11 +1138,14 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
           <>
             : <span className="text-ink">{bits.join(" · ")}</span>, at the ask
           </>
+        ) : drawn ? (
+          ", each figure at the ask"
         ) : (
           ""
         )}
         .
       </p>
+      <CompRangeTracks tracks={ranges} bar="pastscreens" qa="past-screens-tracks" />
     </section>
   );
 }
@@ -1334,6 +1169,7 @@ function AnalysesPanel({
   supplements,
   internalComps,
   internalCompsUnread = false,
+  internalCompRanges = [],
   omUrl,
   staleVerdict = false,
   staleWhy = "failed",
@@ -1361,6 +1197,8 @@ function AnalysesPanel({
   internalComps: InternalComp[];
   /** the read of the reader's other screens failed: said, never as none */
   internalCompsUnread?: boolean;
+  /** those comps' caps and bases as tracks (lib/comp-range) */
+  internalCompRanges?: RangeTrack[];
   omUrl: string | null;
   /** the latest screen has not re-run the verdict (lib/screen-run) */
   staleVerdict?: boolean;
@@ -1388,6 +1226,19 @@ function AnalysesPanel({
     reconciler: "reconcile",
   };
 
+  // The stage's own icon over an empty analysis (app/stage-icons); the
+  // reconciler is a run of its own and never draws an empty state.
+  const analysisIcon =
+    analysis === "verdict"
+      ? STAGE_ICON.verdict
+      : analysis === "challenger"
+        ? STAGE_ICON.challenge
+        : analysis === "comps"
+          ? STAGE_ICON.comps
+          : analysis === "market"
+            ? STAGE_ICON.market
+            : undefined;
+
   const def = ANALYSES.find((a) => a.key === analysis)!;
   const data = results[def.result];
   const running = active && step === STEP_FOR[analysis];
@@ -1403,7 +1254,7 @@ function AnalysesPanel({
       {/* Comp memory renders in every state — it comes from OTHER deals, so
           it's useful even before this deal's own comps scrutiny has run. */}
       {analysis === "comps" && internalComps.length > 0 && (
-        <InternalCompsBlock comps={internalComps} />
+        <InternalCompsBlock comps={internalComps} ranges={internalCompRanges} />
       )}
       {analysis === "comps" && internalComps.length === 0 && internalCompsUnread && (
         <section className="rounded-2xl border border-line bg-surface p-5 shadow-card" data-qa="internal-comps-unread">
@@ -1477,75 +1328,37 @@ function AnalysesPanel({
   } else if (hasOm && analysis === "comps" && (results.verdict || results.market)) {
     // The screen DID run — this OM just offered no comps to scrutinize.
     content = (
-      <EmptyState title="The OM offered no comps to scrutinize — add your own below, or search the public web." />
+      <EmptyState
+        title="The OM offered no comps to scrutinize — add your own below, or search the public web."
+        icon={STAGE_ICON.comps}
+      />
     );
   } else if (hasOm && stopped) {
-    content = <EmptyState title={STOPPED_BEFORE} />;
+    content = <EmptyState title={STOPPED_BEFORE} icon={analysisIcon} />;
   } else if (hasOm) {
     content = (
       <EmptyState
         title="The screen hasn’t run for this deal yet."
+        icon={analysisIcon}
         action={<RetryForm dealId={dealId} label="Run the screen" />}
       />
     );
   } else {
     content = (
-      <EmptyState title="Nothing here from the OM yet — add your own below." />
+      <EmptyState title="Nothing here from the OM yet — add your own below." icon={analysisIcon} />
     );
   }
 
   return (
     <div className="flex flex-col gap-5">
-      {/* The tabs pattern the deal's own sections use: arrow keys, Home and
-          End move through them, one tab stop, each tied to the panel it
-          opens — they had been tabs in name only (research pass 33). */}
-      <div
-        role="tablist"
-        aria-label="Analyses"
-        onKeyDown={(e) => {
-          const at = ANALYSES.findIndex((a) => a.key === analysis);
-          const n = ANALYSES.length;
-          const next =
-            e.key === "ArrowRight" ? (at + 1) % n : e.key === "ArrowLeft" ? (at - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
-          if (next < 0) return;
-          e.preventDefault();
-          onSelect(ANALYSES[next].key);
-          document.getElementById(`analysis-tab-${ANALYSES[next].key}`)?.focus();
-        }}
-        className="flex flex-wrap gap-1.5"
-      >
-        {ANALYSES.map((a) => {
-          const on = a.key === analysis;
-          const has = results[a.result] != null;
-          return (
-            <button
-              key={a.key}
-              id={`analysis-tab-${a.key}`}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              aria-controls="analysis-tabpanel"
-              tabIndex={on ? 0 : -1}
-              onClick={() => onSelect(a.key)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                on
-                  ? "border-brand bg-brand/10 text-brand"
-                  : has
-                    ? "border-line bg-surface text-ink hover:bg-faint"
-                    : "border-line bg-surface text-muted hover:bg-faint"
-              }`}
-            >
-              {a.label}
-              {counts[a.key] > 0 && (
-                <span className="rounded-full bg-kill/10 px-1.5 py-px font-mono text-[10px] tabular-nums text-kill">
-                  {counts[a.key]}
-                  <span className="sr-only">{` finding${counts[a.key] === 1 ? "" : "s"}`}</span>
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* The deal page's Analyses pills (section-tabs): the tabs pattern the
+          sections use, one tab stop, each tied to the panel it opens. */}
+      <AnalysisTabs
+        active={analysis}
+        counts={counts}
+        has={(k) => results[ANALYSES.find((a) => a.key === k)!.result] != null}
+        onSelect={onSelect}
+      />
       <div
         key={analysis}
         id="analysis-tabpanel"
@@ -1672,39 +1485,6 @@ function DocumentsPanel({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Tab bar bits                                                        */
-/* ------------------------------------------------------------------ */
-
-function TabDot({
-  state,
-  active,
-}: {
-  state: "done" | "running" | "pending" | "idle";
-  active: boolean;
-}) {
-  const base = "h-1.5 w-1.5 rounded-full";
-  if (state === "done") {
-    return <span aria-hidden className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
-  }
-  if (state === "running") {
-    return (
-      <span aria-hidden className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`} />
-    );
-  }
-  if (state === "pending") {
-    return <span aria-hidden className={`${base} ${active ? "bg-white/50" : "bg-line"}`} />;
-  }
-  return (
-    <span
-      aria-hidden
-      className={`${base} ${
-        active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"
-      }`}
-    />
-  );
-}
-
 /** m:ss since the run was asked for — the job row's own claim where the
  *  page has it (lib/run-clock), queue wait included, so a reload mid-screen
  *  picks up the run's time rather than starting again once the page has
@@ -1741,7 +1521,7 @@ const COMP_CALL: Record<string, { label: string; cls: string }> = {
 /** Internal comps memory: what the user's OWN screens extracted from other
  *  OMs of the same asset class. A private frame of reference — deliberately
  *  not third-party comp data (and labeled so nobody mistakes it for that). */
-function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
+function InternalCompsBlock({ comps, ranges = [] }: { comps: InternalComp[]; ranges?: RangeTrack[] }) {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
       <h2 className="text-sm font-semibold tracking-tight">
@@ -1754,6 +1534,9 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
           comps.some((c) => c.typedByHand),
         )}
       </p>
+      {/* The table's cap and basis as tracks, this deal ticked on them
+          (lib/comp-range); the table beneath names each deal. */}
+      <CompRangeTracks tracks={ranges} bar="pipelinecomps" qa="pipeline-comps-tracks" />
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">
           <thead>

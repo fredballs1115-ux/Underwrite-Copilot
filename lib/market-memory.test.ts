@@ -158,8 +158,8 @@ describe("summarizeMarkets", () => {
   });
   it("computes cap and basis ranges over the members that carry them", () => {
     const g = groups[0];
-    expect(g.cap).toEqual({ min: 5.0, median: 5.2, max: 5.4 });
-    expect(g.perUnit).toEqual({ min: 250_000, median: 275_000, max: 300_000, basis: "unit", noun: "unit" });
+    expect(g.cap).toEqual({ min: 5.0, median: 5.2, max: 5.4, n: 2 });
+    expect(g.perUnit).toEqual({ min: 250_000, median: 275_000, max: 300_000, n: 2, basis: "unit", noun: "unit" });
   });
   it("tallies the verdict calls", () => {
     expect(groups[0].calls).toEqual({ pass: 1, caution: 1, pass_on: 0 });
@@ -177,7 +177,7 @@ describe("marketMemoryFor — the deal-page strip", () => {
     const g = marketMemoryFor(comps, "d1", "multifamily", "Dallas, TX")!;
     expect(g.count).toBe(1); // excludes d1 itself
     expect(g.dealIds).toEqual(["d2"]);
-    expect(g.cap).toEqual({ min: 5.4, median: 5.4, max: 5.4 });
+    expect(g.cap).toEqual({ min: 5.4, median: 5.4, max: 5.4, n: 1 });
   });
   it("is null when there's no comparable prior screen", () => {
     expect(marketMemoryFor(comps, "d3", "office", "Austin, TX")).toBeNull();
@@ -207,7 +207,7 @@ describe("an outdoor-storage yard's shop building is never a market's per-SF bas
     // The warehouse's $200/SF is the group's whole basis range; the yard's
     // $3,000/SF never joins it.
     expect(by.w1.perUnit).toBe(200);
-    expect(summarizeMarkets(comps)[0].perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf", noun: null });
+    expect(summarizeMarkets(comps)[0].perUnit).toEqual({ min: 200, median: 200, max: 200, n: 1, basis: "sf", noun: null });
   });
 
   it("a yard with no cap is no comp at all", () => {
@@ -325,7 +325,7 @@ describe("basis is consistent within an asset class (no mixed unit/SF range)", (
     expect(comps.every((c) => c.perUnitBasis === "sf")).toBe(true);
     const g = summarizeMarkets(comps)[0];
     // Both $18M/90k and $20M/100k = $200/SF — one clean unit, never mixed.
-    expect(g.perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf", noun: null });
+    expect(g.perUnit).toEqual({ min: 200, median: 200, max: 200, n: 2, basis: "sf", noun: null });
   });
 });
 
@@ -341,7 +341,7 @@ describe("a basis wears its class's noun — a hotel's keys, a park's pads — n
     const [g] = summarizeMarkets(
       buildComps([hotel("h1", "Keys", "200", "$40,000,000"), hotel("h2", "Keys", "160", "$36,000,000")]),
     );
-    expect(g.perUnit).toEqual({ min: 200_000, median: 212_500, max: 225_000, basis: "unit", noun: "key" });
+    expect(g.perUnit).toEqual({ min: 200_000, median: 212_500, max: 225_000, n: 2, basis: "unit", noun: "key" });
     expect(fmtBasisRange(g.perUnit!)).toBe("$200–225k/key");
     expect(basisLabel(g)).toBe("Basis / key");
   });
@@ -464,6 +464,12 @@ describe("range formatting", () => {
   it("basis range shares the unit suffix", () => {
     expect(fmtBasisRange({ min: 250_000, median: 275_000, max: 300_000, basis: "unit" })).toBe("$250–300k/unit");
     expect(fmtBasisRange({ min: 200, median: 200, max: 200, basis: "sf" })).toBe("$200/SF");
+  });
+  it("a per-foot range carries its thousands mark, as every other dollar figure does", () => {
+    expect(fmtBasisRange({ min: 1250, median: 1300, max: 1400, basis: "sf" })).toBe("$1,250–1,400/SF");
+    expect(fmtBasisRange({ min: 1250, median: 1250, max: 1250, basis: "sf" })).toBe("$1,250/SF");
+    // Ends that round to one figure are one figure, never "$212–212/SF".
+    expect(fmtBasisRange({ min: 211.6, median: 212, max: 212.2, basis: "sf" })).toBe("$212/SF");
   });
 });
 

@@ -64,6 +64,9 @@ export interface Stat {
   min: number;
   median: number;
   max: number;
+  /** how many figures the stat is of — a median is drawn only from three
+   *  up (lib/public-comps `MEDIAN_FLOOR`); absent on a stat built by hand */
+  n?: number;
 }
 /** A group's basis range: one basis and, on a unit basis, one noun for the
  *  whole group — the members' own where they all agree, the class's where
@@ -272,7 +275,7 @@ export function median(nums: number[]): number {
 
 function statOf(nums: number[]): Stat | null {
   if (!nums.length) return null;
-  return { min: Math.min(...nums), median: median(nums), max: Math.max(...nums) };
+  return { min: Math.min(...nums), median: median(nums), max: Math.max(...nums), n: nums.length };
 }
 
 /** Aggregate comps into per-(asset class × market) groups, most-screened
@@ -426,14 +429,23 @@ export function marketMemoryFor(
   assetClass: string,
   market: string,
 ): MarketGroup | null {
-  const cls = classKeyOf(assetClass);
-  const key = normalizeMarketKey(market);
-  if (!cls || !key) return null;
-  const members = comps.filter(
-    (c) => c.dealId !== dealId && c.assetClass === cls && c.marketKey === key,
-  );
+  const members = memoryMembers(comps, dealId, assetClass, market);
   if (!members.length) return null;
   return groupStat(members);
+}
+
+/** The comps `marketMemoryFor` aggregates, one by one — the deal page's
+ *  strip draws each as a dot on its tracks (lib/comp-range). */
+export function memoryMembers(
+  comps: readonly MarketComp[],
+  dealId: string,
+  assetClass: string,
+  market: string,
+): MarketComp[] {
+  const cls = classKeyOf(assetClass);
+  const key = normalizeMarketKey(market);
+  if (!cls || !key) return [];
+  return comps.filter((c) => c.dealId !== dealId && c.assetClass === cls && c.marketKey === key);
 }
 
 // ---- Display helpers (pure formatting) ------------------------------------
@@ -442,7 +454,13 @@ export function marketMemoryFor(
  *  noun it was counted in (lib/asset-words), never "unit" for a hotel's keys. */
 export const fmtBasis = (dollars: number, basis: "unit" | "sf", noun: string | null = "unit") =>
   // The pipeline card's own basis writer (lib/pipeline-slots `basisTag`).
-  basis === "unit" ? `${compactUsd(dollars, { trim: true })}/${noun ?? "unit"}` : `$${Math.round(dollars)}/SF`;
+  basis === "unit" ? `${compactUsd(dollars, { trim: true })}/${noun ?? "unit"}` : `$${perSfText(dollars)}/SF`;
+
+/** A per-foot figure in whole dollars with its thousands mark ("1,250"),
+ *  the pipeline card's own (lib/pipeline-slots `basisTag`). */
+function perSfText(dollars: number): string {
+  return Math.round(dollars).toLocaleString("en-US");
+}
 
 /** "Basis / key", "Basis / SF": the group's own noun where it carries a
  *  basis, else the class's (lib/asset-words `perSuffix` — "/acre" on land,
@@ -479,5 +497,9 @@ export function fmtBasisRange(s: BasisStat): string {
     if (lo.endsWith("k") && hi.endsWith("k")) return `${lo.slice(0, -1)}–${hi.slice(1)}/${noun}`;
     return `${lo}–${hi}/${noun}`;
   }
-  return `$${Math.round(s.min)}–${Math.round(s.max)}/SF`;
+  // A foot's figure in whole dollars with its thousands mark, as the
+  // pipeline card prints it: "$1,250–1,400/SF", never "$1250–1400/SF".
+  const lo = perSfText(s.min);
+  const hi = perSfText(s.max);
+  return lo === hi ? `$${lo}/SF` : `$${lo}–${hi}/SF`;
 }

@@ -2,6 +2,7 @@ import type { Submarket } from "@/lib/market/types";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 import { createSubmarket } from "@/app/(app)/submarkets/actions";
 import { SubmarketCards } from "./submarket-cards";
+import { GhostTrend } from "@/app/empty-pictures";
 
 /**
  * "Your submarkets" — the user's own supply / rent-trend / vacancy series,
@@ -64,10 +65,13 @@ export function SubmarketsPanel({
       {submarkets.length ? (
         <SubmarketCards submarkets={submarkets} />
       ) : (
-        <p className="mt-4 rounded-lg border border-dashed border-line px-4 py-5 text-center text-sm text-muted">
-          No submarkets yet. Create one below, then import a market export or
-          enter the periods you know.
-        </p>
+        <div data-qa="submarkets-empty" className="mt-4 rounded-lg border border-dashed border-line px-4 py-5 text-center">
+          <GhostTrend className="max-w-[12rem]" />
+          <p className="mt-2 text-sm text-muted">
+            No submarkets yet. Create one below, then import a market export or
+            enter the periods you know.
+          </p>
+        </div>
       )}
 
       {/* Collapsed once the user has submarkets: the list is what they came
