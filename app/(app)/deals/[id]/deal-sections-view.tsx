@@ -142,11 +142,13 @@ export function TermsView({
           <SourceChip fact={fact} omUrl={omUrl} />
         </p>
       ) : (
-        // Deals screened before citations (migration 0018) keep a plain page
-        // — only where it parses and falls inside the deck's own length
-        // (lib/facts' absolute rule): an unvalidated page is no page. Where
-        // the page has a memorandum to open — the public sample's fictional
-        // one (lib/sample-om-link) — the page opens it there.
+        // A term with no stored citation (a deal screened before citations,
+        // migration 0018) keeps its own page — only where it parses and
+        // falls inside the deck's own length (lib/facts' absolute rule): an
+        // unvalidated page is no page. Wherever the page has a memorandum to
+        // open — every signed-in deal with an OM, and the public sample's
+        // fictional one (lib/sample-om-link) — the validated "p. N" links to
+        // it at that page; with none, it is plain text.
         (() => {
           const n = locatedPage(m.page, result.totalPages);
           if (n == null) return null;
