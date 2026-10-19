@@ -228,6 +228,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(t.verdict).toBe("unsupported");
     expect(t.impact!.input).toBe("expenseLines");
     expect(t.impact!.altIrrPct!).toBeLessThan(t.impact!.baseIrrPct!);
+    expect(t.impact!.note).toMatch(/^If the tax line is the \$532k its own figures imply on the price, not the OM's \$380k, the levered IRR moves from/);
     const i = rowOf(test, "insurance");
     expect(i.omSays.value).toBe(120_000);
     expect(i.evidence[0]).toMatchObject({ kind: "document", label: "The deal's T-12 insurance line", value: 150_000 });
@@ -364,6 +365,44 @@ describe("a deal with only published figures", () => {
     expect(i.evidence.map((e) => e.kind)).toEqual(["published"]);
     expect(i.evidence[0].value).toBeNull();
     expect(test.rows.map((r) => r.key)).not.toContain("taxes");
+  });
+});
+
+// ── A tax abatement ──────────────────────────────────────────────────────
+
+describe("a stated tax abatement is read against the model's sale", () => {
+  // No assessed value, so the abatement is the only figure the bill could
+  // be held to; the OM states the abated bill and the unabated one.
+  const withAbatement = (ends: string): ExtractionResult => ({
+    ...APARTMENT,
+    metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Assessed value"), row("Tax abatement", "421-a", "p. 15"), row("Tax abatement expiration", ends, "p. 15"), row("Unabated real estate taxes", "$900,000", "p. 15")],
+  });
+
+  it("ending after the hold, the full bill is the next buyer's: shown with no figure, and the row stands unchecked", () => {
+    const t = rowOf(buildStressTest(apartmentArgs({ extraction: withAbatement("June 2045") })), "taxes");
+    const a = t.evidence.find((e) => e.label === "The stated tax abatement and when it ends")!;
+    expect(a).toMatchObject({ kind: "om_internal", value: null, asOf: "2045-06-01" });
+    expect(a.text).toContain("it ends after the model's 5-year hold, so the step-up is the next buyer's to price");
+    expect(t.verdict).toBe("unchecked");
+    expect(t.impact).toBeNull();
+  });
+
+  it("ending inside the hold, the full bill is the buyer's: the abated bill is held to the unabated one, and the note says which is which", () => {
+    const t = rowOf(buildStressTest(apartmentArgs({ extraction: withAbatement("June 2029") })), "taxes");
+    expect(t.evidence[0]).toMatchObject({ label: "The stated tax abatement and when it ends", value: 900_000, asOf: "2029-06-01" });
+    expect(t.evidence[0].text).toContain("it ends inside the model's 5-year hold, so the full bill is the buyer's");
+    expect(t.gap).toEqual({ value: 520_000, unit: "usd", text: "The OM's $380k is $520k (57.8%) under the $900k it states as the unabated bill." });
+    expect(t.verdict).toBe("unsupported");
+    expect(t.impact!.note).toMatch(/^If the tax line is the unabated bill's \$900k, not the abated \$380k, the levered IRR moves from/);
+    expect(t.impact!.note).not.toContain("the OM's");
+  });
+
+  it("with no stated end, the step-up is placed against no sale", () => {
+    const ex = { ...withAbatement("June 2029"), metrics: withAbatement("June 2029").metrics.filter((m) => m.label !== "Tax abatement expiration") };
+    const t = rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "taxes");
+    const a = t.evidence.find((e) => e.label === "The stated tax abatement and when it ends")!;
+    expect(a.value).toBeNull();
+    expect(a.text).toContain("the OM states no end, so the step-up is placed against no sale");
   });
 });
 

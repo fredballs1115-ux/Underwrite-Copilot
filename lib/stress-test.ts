@@ -82,7 +82,7 @@ import { SIZER_LENDER_TESTS } from "@/lib/sizer-terms";
 import { readTaxAbatement, taxBillOf } from "@/lib/tax-abatement";
 import { sizeLoan } from "@/lib/tools/deal-math";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
-import { basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { readValueAdd } from "@/lib/value-add";
 import {
@@ -1003,16 +1003,31 @@ function taxesRow(ctx: Ctx): StressRow | null {
       scope: "deal",
     });
   }
-  // A stated abatement: the full bill, read against the model's sale.
+  // A stated abatement: the full bill, read against the model's sale. The
+  // step-up lands on the buyer only where the abatement ends inside the
+  // hold (lib/tax-abatement's own rule, "the sale is the clock"); one that
+  // ends after the sale is the next buyer's to price, and one with no
+  // stated end is placed against nothing — either is shown with no figure
+  // to compare, never run from year 1.
   const abatement = readTaxAbatement(ctx.ex, new Date(`${ctx.readOn}T12:00:00Z`));
+  let abatementInHold = false;
   if (abatement && (abatement.unabatedTaxes != null || abatement.stepUp != null)) {
     const full = abatement.unabatedTaxes ?? (abatement.abatedTaxes != null && abatement.stepUp != null ? abatement.abatedTaxes + abatement.stepUp : null);
+    const holdMonths = ctx.derived?.inputs.holdMonths ?? HOLD_MONTHS;
+    const end = abatement.end;
+    abatementInHold = end != null && end.yearsToTheDay * 12 < holdMonths;
+    const placed =
+      end == null
+        ? "; the OM states no end, so the step-up is placed against no sale"
+        : abatementInHold
+          ? `; it ends inside the model's ${Math.round(holdMonths / 12)}-year hold, so the full bill is the buyer's`
+          : `; it ends after the model's ${Math.round(holdMonths / 12)}-year hold, so the step-up is the next buyer's to price`;
     evidence.push({
       kind: "om_internal",
       label: "The stated tax abatement and when it ends",
-      text: abatement.headline,
-      value: full != null ? Math.round(full) : null,
-      asOf: abatement.end?.ends ?? null,
+      text: `${abatement.headline}${placed}`,
+      value: full != null && abatementInHold ? Math.round(full) : null,
+      asOf: end?.ends ?? null,
       publisher: "the offering memorandum",
       scope: "deal",
     });
@@ -1048,20 +1063,31 @@ function taxesRow(ctx: Ctx): StressRow | null {
   const best = comparables[0];
   const share = (best.value! - bill) / Math.abs(best.value!);
   const verdict: StressVerdict = share <= SAME_SHARE ? "holds" : share > TAX_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
+  // Both figures are the OM's: the bill against the reset its own figures
+  // imply, or the abated bill against the unabated one it states.
+  const abated = best.label.startsWith("The stated tax abatement");
+  const itsOwn = abated ? "it states as the unabated bill" : "its own figures imply";
   const gap: StressRow["gap"] = {
     value: Math.round(best.value! - bill),
     unit: "usd",
     text:
       Math.abs(share) <= SAME_SHARE
-        ? `The OM's ${money(bill)} is at the ${money(best.value!)} its own figures imply.`
+        ? `The OM's ${money(bill)} is at the ${money(best.value!)} ${itsOwn}.`
         : share > 0
-          ? `The OM's ${money(bill)} is ${money(best.value! - bill)} (${pct1(share * 100)}) under the ${money(best.value!)} its own figures imply.`
-          : `The OM's ${money(bill)} is over the ${money(best.value!)} its own figures imply — the conservative side.`,
+          ? `The OM's ${money(bill)} is ${money(best.value! - bill)} (${pct1(share * 100)}) under the ${money(best.value!)} ${itsOwn}.`
+          : `The OM's ${money(bill)} is over the ${money(best.value!)} ${itsOwn} — the conservative side.`,
   };
   const evidenceIndex = evidence.indexOf(best);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? expenseImpact(ctx.derived, best.value! - bill, evidenceIndex, { what: "the tax line", om: money(bill), alt: money(best.value!), evidence: best.publisher })
+      ? expenseImpact(
+          ctx.derived,
+          best.value! - bill,
+          evidenceIndex,
+          abated
+            ? { what: "the tax line", om: money(bill), alt: money(best.value!), evidence: "the unabated bill", omSide: "the abated" }
+            : { what: "the tax line", om: money(bill), alt: `the ${money(best.value!)} its own figures imply on the price`, evidence: "" },
+        )
       : null;
   return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("taxes", evidence) };
 }
