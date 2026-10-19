@@ -75,6 +75,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { marketPictureFor } from "./market-picture";
 import { creditText, photographerParts } from "./credit-parts";
+import { scoreDeal as scoreDealForTest } from "./track-record";
 
 type Props = Parameters<typeof DealView>[0];
 
@@ -2265,5 +2266,28 @@ describe("the extracted terms' pages (lib/facts' absolute rule)", () => {
     expect(html).toContain('href="/api/deals/x/om#page=4"');
     expect(html).toContain('href="/api/deals/x/om#page=31"');
     expect(a11yIssues(html)).toEqual([]);
+  });
+});
+
+// ── The track record on the Overview ────────────────────────────────────────
+
+describe("DealView — what came after the screen (lib/track-record) closes the Overview", () => {
+  const record = scoreDealForTest({
+    screenedAt: "2026-10-01T12:00:00Z",
+    challenges: [{ assumption: "Stabilized vacancy of 6%", severity: "high", challenge: "", question: "", key: "vacancy", omFigure: 6, altFigure: 9, altBasis: "a rule of thumb" }],
+    t12: { arrivedAt: "2026-10-05T09:00:00Z", dated: "2026-09-30", summary: SAMPLE_DEAL.t12.summary },
+  });
+
+  it("draws the card after the decision log where something arrived after the screen, and nothing where nothing did", () => {
+    const html = render({ ...sampleProps("overview"), trackRecord: record } as unknown as Props);
+    const log = html.indexOf("Decision log");
+    const card = html.indexOf('data-qa="track-record"');
+    expect(log).toBeGreaterThan(0);
+    expect(card).toBeGreaterThan(log);
+    expect(textOf(html)).toContain("What came after the screen");
+    expect(a11yIssues(html)).toEqual([]);
+    // The sample itself: its verdict carries no stamp, so nothing is after it.
+    expect(render(sampleProps("overview"))).not.toContain('data-qa="track-record"');
+    expect(render({ ...sampleProps("financials"), trackRecord: record } as unknown as Props)).not.toContain('data-qa="track-record"');
   });
 });

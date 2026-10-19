@@ -1,0 +1,491 @@
+// The track record (2026-10-19, the investor's question: "is it really
+// improving accuracy?"). The honest answer is scored, never claimed: each
+// challenge the screen stored is set against evidence that arrived on the
+// deal AFTER the screen's verdict — a T-12 or a rent roll added after it,
+// the reader's own decision (Dead, and why), and what the building traded
+// for — and each row says which side the later figure landed on. Pure.
+//
+// Its rules:
+//   - evidence counts only where it arrived after the screen: a document the
+//     screen read is circular (the challenger was handed it) and is said so,
+//     never scored; a document with no arrival time on record is not scored
+//     either, since a guessed order is no order;
+//   - a document's arrival is its upload (deal_documents.created_at), never
+//     the day a screen extracted its figures (`arrivalOf`): the pipeline
+//     re-reads every document on each screen, so the extraction row's own
+//     `created_at` is the screen's, not the document's;
+//   - a challenge is scored only on its own figures: the OM's figure and the
+//     screen's alternative as the challenger wrote them (`omFigure`,
+//     `altFigure`, in the assumption's own unit); a challenge stored before
+//     the challenger wrote figures is unscored, with why;
+//   - a decision is a direction, not a figure: a deal walked away from on
+//     price agrees with a basis challenge, one walked away from on financing
+//     with a debt challenge, and such a row says it was a decision;
+//   - a trade is put on the OM figure's own basis (the trade over the ask,
+//     applied to the OM's figure), since the challenger's basis figure may be
+//     per unit or per foot while a trade is the whole price;
+//   - under MEDIAN_FLOOR scored rows the account's record is "a start, not a
+//     record", and no share is printed.
+import type { Challenge } from "@/lib/anthropic/types";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import { statedDay } from "@/lib/actuals/actuals-read";
+import { compactUsd } from "@/lib/money";
+import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
+import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
+import { challengeKey } from "@/lib/stress-test";
+import { STRESS_KEYS, type StressKey } from "@/lib/stress-test-types";
+
+/** Which side of the screen's test the later figure landed on. */
+export type Landing = "om_side" | "screen_side" | "between" | "unscored";
+
+/** What arrived after the screen. */
+export type LaterSource = "t12" | "rent_roll" | "outcome" | "trade";
+
+export interface LaterEvidence {
+  source: LaterSource;
+  /** "T-12 to May 31, 2026 (added Oct 3, 2026)" */
+  label: string;
+  /** ISO: when it arrived on the deal */
+  at: string;
+}
+
+export interface ScoredRow {
+  key: StressKey;
+  title: string;
+  /** the challenge's own words for the assumption */
+  assumption: string;
+  /** the OM's figure, in the assumption's own unit; null where the challenger gave none */
+  omFigure: number | null;
+  /** the screen's alternative, in the same unit; null where it held the OM to words alone */
+  altFigure: number | null;
+  altBasis: string | null;
+  /** the figure that arrived after the screen, or a decision in words */
+  later: { source: LaterSource; value: number | null; text: string } | null;
+  /** the three figures as the card prints them, in the key's own unit —
+   *  only on a row scored on figures, so the card takes plain data */
+  figures: { om: string; alt: string; later: string } | null;
+  landing: Landing;
+  /** why the row is unscored, where it is */
+  why: string | null;
+  /** one sentence: what was set against what, and where it landed */
+  text: string;
+}
+
+export interface DealRecord {
+  /** the verdict's own stamp (`generatedAt`), ISO; null where it carries none */
+  screenedAt: string | null;
+  /** the same day in words ("Oct 1, 2026"); null where there is none */
+  screenedOn: string | null;
+  /** what arrived after the screen, oldest first */
+  evidence: LaterEvidence[];
+  /** every stored challenge, scored or unscored */
+  rows: ScoredRow[];
+  /** evidence on the deal that is NOT scored, with why: a document the
+   *  screen read, one with no arrival time, an outcome recorded before it */
+  notScored: string[];
+}
+
+/** A stored rent roll or T-12 row beside the document it was read from. */
+export interface LaterDocument<S> {
+  /** when the document arrived on the deal (`arrivalOf`), ISO; null where unknown */
+  arrivedAt: string | null;
+  /** the roll's stated as-of, or the T-12's period end; null where unstated */
+  dated: string | null;
+  summary: S;
+}
+
+export interface ScoreDealArgs {
+  /** the verdict's `generatedAt` */
+  screenedAt: string | null | undefined;
+  challenges: readonly Challenge[] | null | undefined;
+  t12?: LaterDocument<T12Summary> | null;
+  rentRoll?: LaterDocument<RentRollSummary> | null;
+  /** the deal's stage and its stage history (lib/stages) */
+  stage?: string | null;
+  history?: readonly StageChange[] | null;
+  /** the memorandum's asking price (lib/deal-strategy `askingPriceOf`), so
+   *  a trade can be put on the OM figure's basis; null where none is stated */
+  askingPrice?: number | null;
+}
+
+/**
+ * When a stored rent roll or T-12 arrived on the deal: its source
+ * document's upload where the document is on record, else the extraction
+ * row's own write — the screen's, which is later than the upload and so the
+ * side that scores LESS, never more. Null where neither is known.
+ */
+export function arrivalOf(
+  row: { created_at?: string | null; source_document_id?: string | null } | null | undefined,
+  documents: readonly { id: string; created_at: string }[],
+): string | null {
+  if (!row) return null;
+  const doc = row.source_document_id ? documents.find((d) => d.id === row.source_document_id) : null;
+  return doc?.created_at ?? row.created_at ?? null;
+}
+
+const TITLES: Record<StressKey, string> = {
+  basis: "Basis",
+  exit_cap: "Exit cap",
+  debt: "Debt",
+  noi: "NOI",
+  vacancy: "Stabilized vacancy",
+  rent_growth: "Rent growth",
+  expense_growth: "Expense growth",
+  taxes: "Real estate taxes",
+  insurance: "Insurance",
+  renovation_premium: "Renovation premium",
+  other: "Everything else the challenger raised",
+};
+
+/** The keys whose figures are percents; the rest are dollars. */
+const PERCENT_KEYS: ReadonlySet<StressKey> = new Set(["exit_cap", "debt", "vacancy", "rent_growth", "expense_growth"]);
+
+/** A figure in the key's own unit: a percent to one place, a dollar compact. */
+export function recordFigure(key: StressKey, n: number): string {
+  if (PERCENT_KEYS.has(key)) return `${n.toFixed(1)}%`;
+  if (key === "renovation_premium") return `$${Math.round(n).toLocaleString("en-US")}/mo`;
+  if (key === "other") return Number.isInteger(n) ? n.toLocaleString("en-US") : n.toFixed(2);
+  return compactUsd(n, { millions: 2 });
+}
+
+const parseTime = (iso: string | null | undefined): number | null => {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : null;
+};
+
+interface Later {
+  source: LaterSource;
+  value: number | null;
+  text: string;
+  /** a decision agrees with the challenge's direction; it has no figure */
+  decision?: boolean;
+}
+
+function t12Line(summary: T12Summary, re: RegExp, key: string): number | null {
+  const line = summary.opex.find((l) => l.key === key) ?? summary.opex.find((l) => re.test(l.label));
+  const n = line?.amount;
+  return n != null && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** The rent roll's vacancy as a percent: by area where the roll carries
+ *  it, else by units; null where the roll counts nothing. */
+function rollVacancyPct(s: RentRollSummary): number | null {
+  if (s.sfWeightedOccupancy != null && Number.isFinite(s.sfWeightedOccupancy)) return round1((1 - s.sfWeightedOccupancy) * 100);
+  if (s.unitCount > 0) return round1((1 - s.occupiedUnits / s.unitCount) * 100);
+  return null;
+}
+
+/** The T-12's economic vacancy: its vacancy loss over gross potential
+ *  rent (the rent collected plus the loss), as a percent. */
+function t12VacancyPct(s: T12Summary): number | null {
+  const loss = s.vacancyLoss;
+  const rent = s.collectedRent;
+  if (loss == null || rent == null || !Number.isFinite(loss) || !Number.isFinite(rent)) return null;
+  const gross = rent + Math.abs(loss);
+  return gross > 0 ? round1((Math.abs(loss) / gross) * 100) : null;
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Score one deal's stored challenges against what arrived after its screen.
+ * Every challenge is a row; a row with nothing after the screen to score it
+ * on says so. A deal with no verdict stamp scores nothing: there is no
+ * "after" without a "when".
+ */
+export function scoreDeal(args: ScoreDealArgs): DealRecord {
+  const screenedAt = args.screenedAt && parseTime(args.screenedAt) != null ? args.screenedAt : null;
+  const T = parseTime(screenedAt);
+  const challenges = args.challenges ?? [];
+  const evidence: LaterEvidence[] = [];
+  const notScored: string[] = [];
+
+  // The documents, each admitted only where its arrival is on record and
+  // after the screen.
+  const admit = <S,>(doc: LaterDocument<S> | null | undefined, name: string, datedWord: string): LaterDocument<S> | null => {
+    if (!doc) return null;
+    const at = parseTime(doc.arrivedAt);
+    const dated = doc.dated ? `${name} ${datedWord} ${statedDay(doc.dated)}` : `${name} (${datedWord === "to" ? "period" : "as-of"} not stated)`;
+    if (T == null) {
+      notScored.push(`${dated} is on the deal, but the verdict carries no screen time to set it after.`);
+      return null;
+    }
+    if (at == null) {
+      notScored.push(`${dated} is on the deal with no arrival time on record, so it is not scored.`);
+      return null;
+    }
+    if (at <= T) {
+      notScored.push(`${dated} was on the deal before the screen (added ${statedDay(doc.arrivedAt!)}): the screen read it, so it is not scored against it.`);
+      return null;
+    }
+    evidence.push({ source: name === "T-12" ? "t12" : "rent_roll", label: `${dated} (added ${statedDay(doc.arrivedAt!)})`, at: doc.arrivedAt! });
+    return doc;
+  };
+  const t12 = admit(args.t12, "T-12", "to");
+  const roll = admit(args.rentRoll, "Rent roll", "as of");
+
+  // The decision and the trade, off the move that ended the deal.
+  const history = args.history ?? [];
+  const last = history.length > 0 ? history[history.length - 1] : null;
+  const stage = args.stage ?? null;
+  const ended = last && (stage === "dead" || stage === "closed") && last.stage === stage ? last : null;
+  let decision: { reason: OutcomeReason; at: string } | null = null;
+  let trade: { price: number; at: string; text: string } | null = null;
+  if (ended?.outcome) {
+    const endedAt = parseTime(ended.at);
+    const reasonLabel = ended.outcome.reason ? OUTCOME_REASON_LABEL[ended.outcome.reason].toLowerCase() : null;
+    if (ended.outcome.reason && ended.stage === "dead") {
+      if (T != null && endedAt != null && endedAt > T) {
+        decision = { reason: ended.outcome.reason, at: ended.at };
+        evidence.push({ source: "outcome", label: `Moved to Dead on ${reasonLabel} (${statedDay(ended.at)})`, at: ended.at });
+      } else {
+        notScored.push(
+          T == null
+            ? `The deal died on ${reasonLabel}, but the verdict carries no screen time to set the decision after.`
+            : `The deal died on ${reasonLabel} before the screen's verdict (${statedDay(ended.at)}), so the decision is not scored.`,
+        );
+      }
+    }
+    const t = ended.outcome.trade;
+    if (t) {
+      const reportedAt = parseTime(t.reportedAt);
+      const who = t.reportedBy ? `, reported by ${t.reportedBy}` : "";
+      const text = `traded at ${compactUsd(t.price, { millions: 2 })}${t.date ? ` on ${statedDay(t.date)}` : ""}${who}`;
+      if (T != null && reportedAt != null && reportedAt > T) {
+        trade = { price: t.price, at: t.reportedAt, text };
+        evidence.push({ source: "trade", label: `The building ${text} (recorded ${statedDay(t.reportedAt)})`, at: t.reportedAt });
+      } else {
+        notScored.push(
+          T == null
+            ? `A trade is recorded (${text}), but the verdict carries no screen time to set it after.`
+            : `The trade (${text}) was recorded before the screen's verdict, so it is not scored.`,
+        );
+      }
+    }
+  }
+  evidence.sort((a, b) => a.at.localeCompare(b.at));
+
+  const rows: ScoredRow[] = challenges.map((c) => {
+    const key = challengeKey(c);
+    const title = TITLES[key];
+    const omFigure = c.omFigure != null && Number.isFinite(c.omFigure) ? c.omFigure : null;
+    const altFigure = c.altFigure != null && Number.isFinite(c.altFigure) ? c.altFigure : null;
+    const altBasis = c.altBasis?.trim() || null;
+    const base = { key, title, assumption: c.assumption, omFigure, altFigure, altBasis };
+    const unscored = (why: string): ScoredRow => ({ ...base, later: null, figures: null, landing: "unscored", why, text: `${title}: ${why}` });
+
+    if (T == null) return unscored("the verdict carries no screen time, so nothing can be said to have come after it.");
+
+    const later = laterFor(key, { t12, roll, decision, trade, omFigure, askingPrice: args.askingPrice ?? null });
+    if (!later) return unscored("nothing that arrived after the screen speaks to it.");
+
+    if (later.decision) {
+      return {
+        ...base,
+        later: { source: later.source, value: null, text: later.text },
+        figures: null,
+        landing: "screen_side",
+        why: null,
+        text: `${title}: the screen challenged it ("${c.assumption}"), and you ${later.text} — a decision on the screen's side, not a figure.`,
+      };
+    }
+    if (omFigure == null || altFigure == null) {
+      return {
+        ...base,
+        later: { source: later.source, value: later.value, text: later.text },
+        figures: null,
+        landing: "unscored",
+        why: omFigure == null ? "the challenger gave no OM figure to score it on." : "the challenger gave no alternative figure to score it on.",
+        text: `${title}: ${later.text}, but ${omFigure == null ? "the challenger gave no OM figure" : "the challenger gave no alternative figure"}, so it is not scored.`,
+      };
+    }
+    if (omFigure === altFigure) return unscored("the screen's figure is the OM's own, so there is no side to land on.");
+    const v = later.value!;
+    const lo = Math.min(omFigure, altFigure);
+    const hi = Math.max(omFigure, altFigure);
+    const landing: Landing = v > lo && v < hi ? "between" : Math.abs(v - omFigure) <= Math.abs(v - altFigure) ? "om_side" : "screen_side";
+    const where = landing === "between" ? "between the two" : landing === "om_side" ? "on the OM's side" : "on the screen's side";
+    return {
+      ...base,
+      later: { source: later.source, value: v, text: later.text },
+      figures: { om: recordFigure(key, omFigure), alt: recordFigure(key, altFigure), later: recordFigure(key, v) },
+      landing,
+      why: null,
+      text: `${title}: the OM's ${recordFigure(key, omFigure)}, the screen's ${recordFigure(key, altFigure)}${altBasis ? ` (${altBasis})` : ""}; ${later.text} — ${where}.`,
+    };
+  });
+
+  return { screenedAt, screenedOn: screenedAt ? statedDay(screenedAt) : null, evidence, rows, notScored };
+}
+
+/** The later figure that speaks to a key, where one arrived. A figure beats
+ *  a decision; the roll's occupancy beats the T-12's economic vacancy. */
+function laterFor(
+  key: StressKey,
+  ev: {
+    t12: LaterDocument<T12Summary> | null;
+    roll: LaterDocument<RentRollSummary> | null;
+    decision: { reason: OutcomeReason; at: string } | null;
+    trade: { price: number; at: string; text: string } | null;
+    omFigure: number | null;
+    askingPrice: number | null;
+  },
+): Later | null {
+  const t12When = ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12";
+  switch (key) {
+    case "vacancy": {
+      const rv = ev.roll ? rollVacancyPct(ev.roll.summary) : null;
+      if (rv != null) {
+        const by = ev.roll!.summary.sfWeightedOccupancy != null ? "by area" : "by units";
+        return { source: "rent_roll", value: rv, text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.toFixed(1)}% vacant ${by}` };
+      }
+      const tv = ev.t12 ? t12VacancyPct(ev.t12.summary) : null;
+      if (tv != null) return { source: "t12", value: tv, text: `${t12When} ran ${tv.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent)` };
+      return null;
+    }
+    case "noi": {
+      const n = ev.t12?.summary.noi;
+      if (n != null && Number.isFinite(n) && n !== 0) return { source: "t12", value: n, text: `${t12When} earned ${compactUsd(n, { millions: 2 })}${ev.t12!.summary.noiDerived ? " (derived)" : ""}` };
+      return null;
+    }
+    case "insurance": {
+      const n = ev.t12 ? t12Line(ev.t12.summary, /\binsurance\b/i, "insurance") : null;
+      if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of insurance` };
+      return null;
+    }
+    case "taxes": {
+      const n = ev.t12 ? t12Line(ev.t12.summary, /\btax/i, "taxes") : null;
+      if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of real estate taxes` };
+      return null;
+    }
+    case "basis": {
+      if (ev.trade) {
+        // On the OM figure's own basis: the trade over the ask, applied to
+        // the figure the challenger wrote (per unit, per foot or whole).
+        if (ev.omFigure != null && ev.askingPrice != null && ev.askingPrice > 0) {
+          const ratio = ev.trade.price / ev.askingPrice;
+          const whole = Math.abs(ev.omFigure - ev.askingPrice) / ev.askingPrice < 0.01;
+          const value = whole ? ev.trade.price : ev.omFigure * ratio;
+          return {
+            source: "trade",
+            value,
+            text: `the building ${ev.trade.text}${whole ? "" : `, ${recordFigure("basis", value)} on the OM figure's basis`}`,
+          };
+        }
+        return { source: "trade", value: null, text: `the building ${ev.trade.text}` };
+      }
+      if (ev.decision?.reason === "price") return { source: "outcome", value: null, text: "walked away on price", decision: true };
+      return null;
+    }
+    case "debt":
+      if (ev.decision?.reason === "financing") return { source: "outcome", value: null, text: "walked away on financing", decision: true };
+      return null;
+    default:
+      return null;
+  }
+}
+
+// ── The account's record ────────────────────────────────────────────────
+
+/** Under this many scored rows the record is a start, and no share is printed. */
+export const RECORD_FLOOR = MEDIAN_FLOOR;
+
+export interface KeyRecord {
+  key: StressKey;
+  title: string;
+  screenSide: number;
+  omSide: number;
+  between: number;
+}
+
+export interface AccountRecord {
+  /** deals with a stamped verdict and at least one stored challenge */
+  dealsTested: number;
+  /** deals with something that arrived after the screen */
+  dealsWithLater: number;
+  scored: number;
+  screenSide: number;
+  omSide: number;
+  between: number;
+  /** the keys with a scored row, most scored first */
+  byKey: KeyRecord[];
+  /** the shares, only at RECORD_FLOOR scored rows or more */
+  shares: { screenSidePct: number; omSidePct: number; betweenPct: number } | null;
+}
+
+export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
+  const byKey = new Map<StressKey, KeyRecord>();
+  let dealsTested = 0;
+  let dealsWithLater = 0;
+  let scored = 0;
+  let screenSide = 0;
+  let omSide = 0;
+  let between = 0;
+  for (const d of deals) {
+    if (d.screenedAt && d.rows.length > 0) dealsTested++;
+    if (d.evidence.length > 0) dealsWithLater++;
+    for (const r of d.rows) {
+      if (r.landing === "unscored") continue;
+      scored++;
+      const k = byKey.get(r.key) ?? { key: r.key, title: TITLES[r.key], screenSide: 0, omSide: 0, between: 0 };
+      if (r.landing === "screen_side") {
+        screenSide++;
+        k.screenSide++;
+      } else if (r.landing === "om_side") {
+        omSide++;
+        k.omSide++;
+      } else {
+        between++;
+        k.between++;
+      }
+      byKey.set(r.key, k);
+    }
+  }
+  const keys = [...byKey.values()].sort(
+    (a, b) => b.screenSide + b.omSide + b.between - (a.screenSide + a.omSide + a.between) || STRESS_KEYS.indexOf(a.key) - STRESS_KEYS.indexOf(b.key),
+  );
+  const pct = (n: number) => Math.round((n / scored) * 100);
+  return {
+    dealsTested,
+    dealsWithLater,
+    scored,
+    screenSide,
+    omSide,
+    between,
+    byKey: keys,
+    shares: scored >= RECORD_FLOOR ? { screenSidePct: pct(screenSide), omSidePct: pct(omSide), betweenPct: pct(between) } : null,
+  };
+}
+
+/** The three states the record can be in, and the one sentence for each. */
+export type RecordState = "none" | "start" | "record";
+
+export function recordState(r: Pick<AccountRecord, "scored">): RecordState {
+  if (r.scored <= 0) return "none";
+  return r.scored < RECORD_FLOOR ? "start" : "record";
+}
+
+/** What the record is scored against — the homepage's FAQ promises exactly
+ *  these three, and this sentence keeps it true. */
+export const RECORD_NONE_LINE =
+  "No track record yet, and none is claimed. Every test is scored later against three things you supply: the T-12 or rent roll you add after the screen, what you decided (dead, and why), and what the building traded for.";
+
+export function recordLine(r: AccountRecord): string {
+  switch (recordState(r)) {
+    case "none":
+      return RECORD_NONE_LINE;
+    case "start":
+      return `${r.scored} scored row${r.scored === 1 ? " is" : "s are"} a start, not a record.`;
+    default: {
+      const s = r.shares!;
+      return `Of ${r.scored} scored rows, ${r.screenSide} landed on the screen's side (${s.screenSidePct}%), ${r.omSide} on the OM's (${s.omSidePct}%) and ${r.between} between (${s.betweenPct}%).`;
+    }
+  }
+}
+
+/** "4 deals tested · 2 with later evidence · 3 rows scored" */
+export function recordCountsLine(r: AccountRecord): string {
+  const n = (c: number, one: string, many: string) => `${c} ${c === 1 ? one : many}`;
+  return [n(r.dealsTested, "deal tested", "deals tested"), `${r.dealsWithLater} with later evidence`, n(r.scored, "row scored", "rows scored")].join(" · ");
+}

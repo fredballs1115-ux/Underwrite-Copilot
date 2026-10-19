@@ -35,6 +35,8 @@ import type { MetroDemand } from "@/lib/metro-demand";
 import type { MarketPicture } from "@/lib/market-picture";
 import { DecisionLog } from "./decision-log";
 import { DealOutcomeCard } from "./deal-outcome";
+import { TrackRecordCard } from "./track-record-card";
+import type { DealRecord } from "@/lib/track-record";
 import { OUTCOME_FORM_ERROR } from "@/lib/deal-outcome";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
@@ -335,6 +337,7 @@ export function DealView({
   askerNames = null,
   modelInterest = null,
   compsSubjectPoint = null,
+  trackRecord = null,
 }: {
   dealId: string;
   dealName: string;
@@ -396,6 +399,10 @@ export function DealView({
   /** the deal's resolved location (lib/deal-location), the point its
    *  pictures are drawn around; the comps map measures from it */
   compsSubjectPoint?: SubjectPoint | null;
+  /** the stored challenges scored against what arrived after the screen
+   *  (lib/track-record) — plain data; the card draws only where something
+   *  did */
+  trackRecord?: DealRecord | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -857,6 +864,7 @@ export function DealView({
               isSample={isSample}
               today={stageToday || null}
             />
+            <TrackRecordCard record={trackRecord} />
           </div>
         )}
 

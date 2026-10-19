@@ -169,6 +169,7 @@ import { type MandateScore } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { readActuals } from "@/lib/actuals/actuals-read";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
+import { arrivalOf, scoreDeal } from "@/lib/track-record";
 import {
   signalGoingInCap,
   assessPlausibility,
@@ -870,16 +871,19 @@ export default async function DealPage({
   // actuals/tasks tables arrived in 0020/0022, and on an older schema the
   // queries error and read null (the cards simply don't render).
   const [rrRes, t12Res, tasksRes, versionsRes, memberRes] = await Promise.all([
+    // …each with when it was written and the document it was read from,
+    // so the track record can tell a document added after the screen from
+    // one the screen read (lib/track-record `arrivalOf`).
     supabase
       .from("deal_rent_rolls")
-      .select("as_of_date, summary")
+      .select("as_of_date, summary, created_at, source_document_id")
       .eq("deal_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
       .from("deal_t12_statements")
-      .select("period_end_date, summary")
+      .select("period_end_date, summary, created_at, source_document_id")
       .eq("deal_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -932,6 +936,32 @@ export default async function DealPage({
     // An apartment roll is read per unit a month, an office's per foot.
     assetClass: readClass,
   }) ?? { rentRoll: null, t12: null, noiComparison: null, noiNote: null, assetClass: readClass };
+
+  // The track record (lib/track-record): the stored challenges against what
+  // arrived AFTER the verdict — a rent roll or T-12 by its document's
+  // upload, the decision and the trade off the move that ended the deal.
+  // A document the screen read is named and never scored.
+  const trackRecord = scoreDeal({
+    screenedAt: verdict?.generatedAt ?? null,
+    challenges: challenges?.challenges,
+    rentRoll: rrRes.data?.summary
+      ? {
+          arrivedAt: arrivalOf(rrRes.data as { created_at?: string | null; source_document_id?: string | null }, documents),
+          dated: (rrRes.data.as_of_date as string | null) ?? null,
+          summary: rrRes.data.summary as RentRollSummary,
+        }
+      : null,
+    t12: t12Summary
+      ? {
+          arrivedAt: arrivalOf(t12Res.data as { created_at?: string | null; source_document_id?: string | null }, documents),
+          dated: (t12Res.data?.period_end_date as string | null) ?? null,
+          summary: t12Summary,
+        }
+      : null,
+    stage: ((deal as { stage?: string }).stage as string) ?? null,
+    history: stageHistory,
+    askingPrice: askingPriceOf(extraction),
+  });
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
   // base underwriting model — actuals folded in — computed once server-side;
@@ -1949,6 +1979,7 @@ export default async function DealPage({
         }}
         screenDiff={screenDiff}
         stageHistory={stageHistory}
+        trackRecord={trackRecord}
         dealStage={((deal as { stage?: string }).stage as string) ?? "screening"}
         // The due-diligence checklist, once the deal is under LOI or
         // contract (research pass 24, B16) — never on the sample.
