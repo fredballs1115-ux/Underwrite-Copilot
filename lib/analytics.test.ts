@@ -325,8 +325,10 @@ describe("marketRows — the analytics' markets grouped as /market's memory grou
     const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
     expect(page).toContain("const marketsMore = marketCount(deals) - markets.length;");
     expect(page).toContain("more={marketsMore}");
-    expect(page).toContain("brokers.rows.slice(0, BROKER_ROWS_SHOWN)");
-    expect(page).toContain('moreText(brokers.rows.length - BROKER_ROWS_SHOWN, "firm")');
+    expect(page).toContain("limit={BROKER_ROWS_SHOWN}");
+    const table = readFileSync(join(__dirname, "..", "app/(app)/analytics/brokerage-table.tsx"), "utf8");
+    expect(table).toContain("rows.slice(0, limit)");
+    expect(table).toContain('moreText(rows.length - shown.length, "firm")');
   });
 
   it("the page groups through it, never by the label alone", () => {
