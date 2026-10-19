@@ -18,7 +18,7 @@ const ROW = {
   asset_class: "multifamily",
   building_sf: 48210.4,
   year_built: 1925,
-  assessed_value: 6_412_300,
+  assessed_value: 6_412_300 as number | null,
   owner_name: "BROAD STREET HOLDINGS LLC",
   owner_absentee: false as boolean | null,
   source_dataset: "Philadelphia OPA properties (opa_properties_public)",

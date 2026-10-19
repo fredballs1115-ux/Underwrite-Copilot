@@ -4,6 +4,7 @@ import type { SubmarketView } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
 import { unverifiedMark } from "@/lib/market/metrics";
 import { periodDay } from "@/lib/period-label";
+import { EMPTY_GLYPH, EmptyGlyph } from "@/app/empty-pictures";
 import { dismissSubmarketWarning, linkSubmarket, restoreSubmarketWarning } from "./submarket-actions";
 
 /**
@@ -56,12 +57,15 @@ export function SubmarketCard({
     return (
       <section className="shadow-card rounded-2xl border border-line bg-surface px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-ink">Submarket supply</h2>
-            <p className="text-xs text-muted">
-              Link a submarket and your rent growth, exit cap and vacancy get checked against what
-              it has actually done.
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <EmptyGlyph>{EMPTY_GLYPH.trend}</EmptyGlyph>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-ink">Submarket supply</h2>
+              <p className="text-xs text-muted">
+                Link a submarket and your rent growth, exit cap and vacancy get checked against what
+                it has actually done.
+              </p>
+            </div>
           </div>
           {picker}
         </div>

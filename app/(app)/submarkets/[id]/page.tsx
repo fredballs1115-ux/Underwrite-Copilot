@@ -18,6 +18,7 @@ import { metroForName } from "@/lib/market-match";
 import { MarketBand } from "@/app/place-band";
 import { DualAxisTrend } from "./trend-chart";
 import { periodDay } from "@/lib/period-label";
+import { EMPTY_GLYPH, EmptyNote } from "@/app/empty-pictures";
 import {
   deleteSubmarket,
   deleteSubmarketPeriod,
@@ -434,8 +435,10 @@ export default async function SubmarketPage({
               ))}
               {!periods.length ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-4 text-sm text-muted">
-                    No periods yet — import a grid or add one below.
+                  <td colSpan={9} className="px-4 py-4">
+                    <EmptyNote icon={EMPTY_GLYPH.trend}>
+                      No periods yet — import a grid or add one below.
+                    </EmptyNote>
                   </td>
                 </tr>
               ) : null}
@@ -568,8 +571,10 @@ export default async function SubmarketPage({
               ))}
               {!properties.length ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-4 text-sm text-muted">
-                    No pipeline loaded — import a property-level export above.
+                  <td colSpan={6} className="px-4 py-4">
+                    <EmptyNote icon={EMPTY_GLYPH.crane}>
+                      No pipeline loaded — import a property-level export above.
+                    </EmptyNote>
                   </td>
                 </tr>
               ) : null}

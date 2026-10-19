@@ -1,6 +1,7 @@
 import type { TrendPoint, TrendSegment } from "@/lib/market/metrics";
 import { chartWidthStyle } from "@/lib/chart-bounds";
 import { periodDay, periodMonth } from "@/lib/period-label";
+import { GhostTrend } from "@/app/empty-pictures";
 
 export { periodDay, periodMonth };
 
@@ -28,7 +29,13 @@ export function DualAxisTrend({
   formatLine: (n: number) => string;
 }) {
   const periods = [...new Set([...bars.map((b) => b.period), ...segments.flatMap((s) => s.points.map((p) => p.period))])].sort();
-  if (!periods.length) return <p className="text-sm text-muted">No periods loaded yet.</p>;
+  if (!periods.length)
+    return (
+      <div data-qa="trend-empty" className="py-2 text-center">
+        <GhostTrend />
+        <p className="mt-2 text-sm text-muted">No periods loaded yet.</p>
+      </div>
+    );
 
   const COL_W = 78;
   const PAD_L = 12;

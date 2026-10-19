@@ -22,6 +22,7 @@ import {
 } from "./task-actions";
 import { unaddedChecklist } from "@/lib/dd-checklist";
 import { PersonBadge } from "../../person-badge";
+import { EMPTY_GLYPH, EmptyNote } from "@/app/empty-pictures";
 
 function AddButton() {
   const { pending } = useFormStatus();
@@ -218,9 +219,9 @@ export function DealTasks({
       </form>
 
       {sorted.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">
+        <EmptyNote icon={EMPTY_GLYPH.tasks} className="mt-4">
           No tasks yet — pull in the verdict’s next steps or add your own.
-        </p>
+        </EmptyNote>
       ) : (
         <ul className="mt-4 space-y-2.5">
           {sorted.map((t) => {

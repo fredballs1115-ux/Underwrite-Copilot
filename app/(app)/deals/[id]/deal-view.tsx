@@ -60,6 +60,7 @@ import {
   type TabSupplement,
 } from "./deal-sections";
 import { ModelView } from "./model-view";
+import { STAGE_ICON } from "@/app/stage-icons";
 import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
 import { SourceDocumentsView } from "./source-documents";
@@ -1012,14 +1013,15 @@ function FinancialsPanel({
       ) : active && (step === "extract" || step === "signal") ? (
         <StatGridSkeleton />
       ) : hasOm && stopped ? (
-        <EmptyState title={STOPPED_BEFORE} />
+        <EmptyState title={STOPPED_BEFORE} icon={STAGE_ICON.extract} />
       ) : hasOm ? (
         <EmptyState
           title="The screen hasn’t run for this deal yet."
+          icon={STAGE_ICON.extract}
           action={<RetryForm dealId={dealId} label="Run the screen" />}
         />
       ) : (
-        <EmptyState title="No OM uploaded for this deal." />
+        <EmptyState title="No OM uploaded for this deal." icon={STAGE_ICON.extract} />
       )}
 
       {/* FINANCING & CAPITAL directly after the terms (Bug 11) — the debt
@@ -1204,6 +1206,19 @@ function AnalysesPanel({
     reconciler: "reconcile",
   };
 
+  // The stage's own icon over an empty analysis (app/stage-icons); the
+  // reconciler is a run of its own and never draws an empty state.
+  const analysisIcon =
+    analysis === "verdict"
+      ? STAGE_ICON.verdict
+      : analysis === "challenger"
+        ? STAGE_ICON.challenge
+        : analysis === "comps"
+          ? STAGE_ICON.comps
+          : analysis === "market"
+            ? STAGE_ICON.market
+            : undefined;
+
   const def = ANALYSES.find((a) => a.key === analysis)!;
   const data = results[def.result];
   const running = active && step === STEP_FOR[analysis];
@@ -1293,20 +1308,24 @@ function AnalysesPanel({
   } else if (hasOm && analysis === "comps" && (results.verdict || results.market)) {
     // The screen DID run — this OM just offered no comps to scrutinize.
     content = (
-      <EmptyState title="The OM offered no comps to scrutinize — add your own below, or search the public web." />
+      <EmptyState
+        title="The OM offered no comps to scrutinize — add your own below, or search the public web."
+        icon={STAGE_ICON.comps}
+      />
     );
   } else if (hasOm && stopped) {
-    content = <EmptyState title={STOPPED_BEFORE} />;
+    content = <EmptyState title={STOPPED_BEFORE} icon={analysisIcon} />;
   } else if (hasOm) {
     content = (
       <EmptyState
         title="The screen hasn’t run for this deal yet."
+        icon={analysisIcon}
         action={<RetryForm dealId={dealId} label="Run the screen" />}
       />
     );
   } else {
     content = (
-      <EmptyState title="Nothing here from the OM yet — add your own below." />
+      <EmptyState title="Nothing here from the OM yet — add your own below." icon={analysisIcon} />
     );
   }
 

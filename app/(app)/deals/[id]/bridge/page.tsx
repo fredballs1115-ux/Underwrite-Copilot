@@ -18,6 +18,7 @@ import {
 import { BridgeView, type VersionOption } from "./bridge-view";
 import { saveScenarioVersion, deleteDealVersion } from "./actions";
 import { DealCrumb } from "../deal-crumb";
+import { EMPTY_GLYPH, EmptyCard } from "@/app/empty-pictures";
 import { dealTitle } from "@/lib/deal-title";
 
 /** "Assumption bridge — <the deal's name>" (lib/deal-title). */
@@ -152,14 +153,11 @@ export default async function BridgePage({
       ) : null}
 
       {versions.length < 2 ? (
-        <div className="rounded-lg border border-line bg-surface p-6">
-          <h2 className="text-base font-semibold text-ink">One version so far</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            {versions.length === 0
-              ? "This deal has no saved assumption sets yet — screen it, or save a scenario below."
-              : `${versions[0].version_label} is the only saved version. Save a second one below (change the price, the exit cap, whatever you're testing) and the bridge will attribute the difference.`}
-          </p>
-        </div>
+        <EmptyCard icon={EMPTY_GLYPH.bridge} title="One version so far">
+          {versions.length === 0
+            ? "This deal has no saved assumption sets yet — screen it, or save a scenario below."
+            : `${versions[0].version_label} is the only saved version. Save a second one below (change the price, the exit cap, whatever you're testing) and the bridge will attribute the difference.`}
+        </EmptyCard>
       ) : bridge && fromVersion && toVersion ? (
         <>
           <form method="get" className="flex flex-wrap items-end gap-3">

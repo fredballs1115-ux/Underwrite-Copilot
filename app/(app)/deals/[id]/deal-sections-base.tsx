@@ -11,6 +11,7 @@ import { useState, type ReactNode } from "react";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { incomeGapShare } from "@/lib/gap-detail";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
+import { EmptyGlyph, StageRailGhost } from "@/app/empty-pictures";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -194,12 +195,18 @@ export function Callout({ icon, children }: { icon?: ReactNode; children: ReactN
 export function EmptyState({
   title,
   action,
+  icon,
 }: {
   title: string;
   action?: ReactNode;
+  /** a picture of what the empty place stands for (a stage's icon,
+   *  app/stage-icons), drawn in a dashed muted ring above the words —
+   *  decorative, never a figure */
+  icon?: ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-8 text-center shadow-sm">
+      {icon ? <EmptyGlyph className="mb-3">{icon}</EmptyGlyph> : null}
       <p className="text-sm text-muted">{title}</p>
       {action && <div className="mt-3 flex justify-center">{action}</div>}
     </div>
@@ -427,6 +434,9 @@ export function OverviewView({
         />
       ) : (
         <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+          {/* Idle, the six stages as a rail none of which is lit; while a
+              screen runs, the page's own rail above is the picture. */}
+          {active ? null : <StageRailGhost className="mb-4 max-w-sm" />}
           <p className="text-sm font-medium">
             {active ? "Screening in progress…" : "No verdict yet"}
           </p>

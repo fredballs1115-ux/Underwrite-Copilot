@@ -8,6 +8,7 @@ import { addDealNote, deleteDealNote } from "../actions";
 import { displayName } from "@/lib/person";
 import { mayRemoveNote } from "@/lib/note-remove";
 import { PersonBadge } from "../../person-badge";
+import { EMPTY_GLYPH, EmptyNote } from "@/app/empty-pictures";
 
 // Module-level cached formatter (creating one per render is measurable).
 // UTC-pinned, date-only: the server and the browser must render the SAME
@@ -121,7 +122,9 @@ export function DecisionLog({
       </form>
 
       {entries.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">Nothing logged yet.</p>
+        <EmptyNote icon={EMPTY_GLYPH.log} className="mt-4">
+          Nothing logged yet.
+        </EmptyNote>
       ) : (
         <ol className="mt-4 space-y-3">
           {entries.map((e, i) => (
