@@ -1575,7 +1575,7 @@ async function FooterTrustLine() {
         <>
           {" · "}
           <span className="text-caution">
-            research data verification overdue (last ran {fmt(verifiedAt)})
+            research data verification overdue (last ran {fmt(verifiedAt)} UTC)
           </span>
         </>
       )}

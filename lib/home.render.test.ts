@@ -739,3 +739,14 @@ describe("the hero's photograph is downloaded once", () => {
     expect(skylineSrcSetOf("https://example.com/api/imagery/skyline/philadelphia?w=1600&v=x")).toBeNull();
   });
 });
+
+describe("the homepage footer's steward line", () => {
+  // The steward's run is stamped in UTC (lib/utc-day): both the verified line
+  // and the overdue one say so; the overdue one had printed a bare day.
+  it("says UTC after every day it prints of the steward's last run", () => {
+    const src = readFileSync("app/page.tsx", "utf8");
+    const days = [...src.matchAll(/\{fmt\(verifiedAt\)\}(.{0,4})/g)].map((m) => m[1]);
+    expect(days.length).toBe(2);
+    for (const after of days) expect(after.startsWith(" UTC")).toBe(true);
+  });
+});
