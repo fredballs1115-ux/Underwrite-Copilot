@@ -206,8 +206,11 @@ export function ConstructionDebtPanel({
   // The pictures stand only on a price that buys the building outright: never
   // beside a price the plan withholds (a note's, the land's under a ground
   // lease), a share's grossed-up whole or the equity's whole beside its
-  // entity's loan (`planStackable`).
-  const stackDrawn = planStackable(plan, { allowTotal: true });
+  // entity's loan (`planStackable`) — and, as the plan's own cost stack
+  // (PlanCostStack), never where the plan suspects a misread total: a yield
+  // on cost it refuses (`yieldWithheld`) or an all-in basis outside the band
+  // (`basisWithheld`). The figures beneath stand; only the pictures go.
+  const stackDrawn = planStackable(plan, { allowTotal: true }) && !plan.yieldWithheld && !plan.basisWithheld;
 
   return (
     <section aria-label="Construction and take-out debt" className="mt-2">
