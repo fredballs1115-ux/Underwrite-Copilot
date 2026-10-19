@@ -19,6 +19,7 @@ import { MarketBand } from "@/app/place-band";
 import { DualAxisTrend } from "./trend-chart";
 import { periodDay } from "@/lib/period-label";
 import { EMPTY_GLYPH, EmptyNote } from "@/app/empty-pictures";
+import { DeliveryBars, PipelineSfCell, SubmarketCoverHead } from "./pipeline-picture";
 import {
   deleteSubmarket,
   deleteSubmarketPeriod,
@@ -114,6 +115,8 @@ export default async function SubmarketPage({
           ? "Not computable"
           : "—";
   const yearBasis = trailingYearBasis(metrics.absorption);
+  // One scale for every building's size bar in the pipeline table.
+  const pipelineMaxSf = Math.max(0, ...properties.map((p) => p.sf ?? 0));
 
   // Each headline figure: its label, its value, where it came from, and how
   // many web-sourced periods went into it — the mark is part of the figure.
@@ -163,7 +166,7 @@ export default async function SubmarketPage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <header className={`flex flex-col ${market ? "gap-3" : "gap-1"}`}>
+      <header className="flex flex-col gap-3">
         <Link
           href="/market#submarkets"
           className="text-sm text-muted underline-offset-2 hover:text-brand hover:underline"
@@ -173,7 +176,7 @@ export default async function SubmarketPage({
         {market ? (
           <MarketBand metro={market.id} eyebrow={market.name} name={submarket.name} as="h1" eager />
         ) : (
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">{submarket.name}</h1>
+          <SubmarketCoverHead submarket={submarket} />
         )}
         <p className="text-sm text-muted">
           {submarket.metro ? `${submarket.metro} · ` : ""}
@@ -515,13 +518,9 @@ export default async function SubmarketPage({
 
       {/* ── Pipeline ──────────────────────────────────────────────────── */}
       <section className="rounded-lg border border-line bg-surface">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-5 py-3">
+        <div className="flex flex-col gap-3 border-b border-line px-5 py-3">
           <h2 className="text-sm font-semibold text-ink">Construction pipeline</h2>
-          <p className="text-xs text-muted">
-            {metrics.deliveries.length
-              ? `Deliveries: ${metrics.deliveries.map((d) => `${d.quarter} ${Math.round(d.sf / 1000)}k`).join(" · ")}`
-              : "No dated deliveries"}
-          </p>
+          <DeliveryBars deliveries={metrics.deliveries} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
@@ -546,7 +545,7 @@ export default async function SubmarketPage({
                     {p.address ? <span className="block text-[11px] text-muted">{p.address}</span> : null}
                   </td>
                   <td className="px-4 py-2 text-right font-mono text-muted">
-                    {p.sf == null ? "—" : sfFmt(p.sf)}
+                    <PipelineSfCell sf={p.sf} max={pipelineMaxSf} />
                   </td>
                   <td className="px-4 py-2 text-xs capitalize text-muted">
                     {p.status.replace("_", " ")}
