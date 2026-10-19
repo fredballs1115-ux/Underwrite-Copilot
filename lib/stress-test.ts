@@ -960,7 +960,11 @@ function noiRow(ctx: Ctx): StressRow | null {
   if (comparables.length === 0) return unchecked("noi", omSays, evidence, "No T-12 is on file, and the OM states no second NOI to hold its figure to.");
   const best = comparables[0];
   const share = (omValue - best.value!) / Math.abs(best.value!);
-  const verdict: StressVerdict = Math.abs(share) <= NOI_IN_LINE_BAND || share < 0 ? "holds" : share > NOI_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
+  // The memorandum's own in-place figure is the memorandum against itself,
+  // not a document of the building's: a pro forma over it reads stretched
+  // at most, and only a T-12 can read it unsupported.
+  const pastBand = Math.abs(share) <= NOI_IN_LINE_BAND || share < 0 ? "holds" : share > NOI_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
+  const verdict: StressVerdict = pastBand === "unsupported" && best.kind === "om_internal" ? "stretched" : pastBand;
   const gap: StressRow["gap"] = {
     value: Math.round(omValue - best.value!),
     unit: "usd",

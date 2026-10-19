@@ -351,6 +351,15 @@ describe("a deal with only published figures", () => {
     expect(v.impact!.note).toContain("Census Bureau's 6.2%");
   });
 
+  it("with no T-12, holds the pro forma NOI to the OM's own in-place figure and reads stretched at most", () => {
+    const n = rowOf(test, "noi");
+    expect(n.evidence.map((e) => e.kind)).toEqual(["om_internal"]);
+    // $2.65M is 10.4% over the OM's own $2.4M: past the 10% band, but the
+    // memorandum against itself never reads unsupported.
+    expect(n.gap).toMatchObject({ value: 250_000, unit: "usd" });
+    expect(n.verdict).toBe("stretched");
+  });
+
   it("marks a row the OM states no figure for as unchecked with the reason, and keeps its evidence", () => {
     const x = rowOf(test, "exit_cap");
     expect(x.omSays).toEqual({ text: "The OM states no exit cap.", value: null, page: null });
