@@ -12,6 +12,8 @@ import {
   UNPLACED_SHOWN,
   PIN_LABEL,
   PIN_UNSCREENED,
+  legendBucket,
+  pinBehind,
   pinColor,
   pinHtml,
   pinTapAction,
@@ -201,7 +203,7 @@ export function PipelineMap({
       const marker = L.marker([place.lat, place.lng], {
         icon: L.divIcon({
           className: "uc-pin",
-          html: pinHtml(deal.verdict, place.precision, isSelected),
+          html: pinHtml(deal.verdict, place.precision, isSelected, pinBehind(deal)),
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
           tooltipAnchor: [0, -size / 2 - 1],
@@ -330,8 +332,12 @@ export function PipelineMap({
       color: pinColor(v),
       n: points.filter((p) => p.deal.verdict === v).length,
     })),
-    { label: "Not screened", color: PIN_UNSCREENED, n: points.filter((p) => !p.deal.verdict || !PIN_LABEL[p.deal.verdict]).length },
-  ];
+    // A first screen in flight is screening, not "not screened".
+    { label: "Screening", color: PIN_UNSCREENED, n: points.filter((p) => legendBucket(p.deal) === "Screening").length },
+    { label: "Not screened", color: PIN_UNSCREENED, n: points.filter((p) => legendBucket(p.deal) === "Not screened").length },
+  ].filter((l) => l.label !== "Screening" || l.n > 0);
+  // The dashed pins: a call behind the run the analyst asked for.
+  const behindCount = points.filter((p) => pinBehind(p.deal)).length;
 
   return (
     <section aria-label="The pipeline on a map" data-view="map" className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
@@ -368,6 +374,13 @@ export function PipelineMap({
               <span className="font-mono tabular-nums text-muted">{l.n}</span>
             </li>
           ))}
+          {behindCount > 0 && (
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted bg-white" />
+              <span>Screening, re-screening, stalled or failed</span>
+              <span className="font-mono tabular-nums text-muted">{behindCount}</span>
+            </li>
+          )}
         </ul>
       </div>
       <p className="border-t border-line px-4 py-2 text-xs text-muted" data-map-count>

@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   MAX_TO_PLACE,
   PIN_UNSCREENED,
+  legendBucket,
+  pinBehind,
+  runNote,
   osmPlacedAny,
   partitionForMap,
   pinColor,
@@ -152,5 +156,55 @@ describe("the pipeline map's rules (#431)", () => {
     expect(off.map(unplacedReason)).toEqual(["No address", "Address not found", "Address not found"]);
     // A lookup still running is no miss yet.
     expect(unplacedDeals(part, {}).map((d) => d.id)).toEqual(["d", "e"]);
+  });
+});
+
+// The audit of 2026-10-19: the map drew a deal being re-screened, stalled or
+// failed with the call it is leaving behind, solid, and counted a first
+// screen in flight as "Not screened". It reads the run the card and the list
+// row read (lib/screen-run listJobStatus), in their words.
+describe("a run in play on the map", () => {
+  it("says Re-screening, Stalled or Failed beside the call, in the card's words", () => {
+    expect(pinTitle({ name: "The Maddox", verdict: "pass", jobStatus: "running" })).toBe("The Maddox · Go · Re-screening");
+    expect(pinTitle({ name: "The Maddox", verdict: "caution", jobStatus: "stalled" })).toBe("The Maddox · Caution · Stalled");
+    expect(pinTitle({ name: "The Maddox", verdict: "pass_on", jobStatus: "failed" })).toBe("The Maddox · No-go · Failed");
+    // A first screen in flight is screening, not unscreened.
+    expect(pinTitle({ name: "The Maddox", verdict: null, jobStatus: "running" })).toBe("The Maddox · Screening");
+    expect(pinTitle({ name: "The Maddox", verdict: null, jobStatus: "failed" })).toBe("The Maddox · Not screened · Failed");
+    expect(pinTitle({ name: "The Maddox", verdict: "pass", jobStatus: null })).toBe("The Maddox · Go");
+    expect(runNote({ verdict: "pass", jobStatus: "running" })).toBe("Re-screening");
+    expect(runNote({ verdict: null, jobStatus: "running" })).toBeNull();
+  });
+
+  it("puts the note on the hover card and the touch preview", () => {
+    const d = deal({ id: "a", verdict: "pass", jobStatus: "running", price: "$9.0M" });
+    for (const html of [tooltipHtml(d), previewHtml(d)]) expect(html).toMatch(/>Go<\/span> · <span[^>]*>Re-screening<\/span> · \$9\.0M/);
+    expect(tooltipHtml(deal({ id: "b", jobStatus: "running" }))).toContain(">Screening</span>");
+    expect(tooltipHtml(deal({ id: "c", verdict: "caution", jobStatus: "stalled" }))).toContain(">Stalled</span>");
+  });
+
+  it("draws the call dashed and hollow while a run is in play, solid otherwise", () => {
+    expect(pinBehind({ jobStatus: "running" })).toBe(true);
+    expect(pinBehind({ jobStatus: null })).toBe(false);
+    expect(pinBehind({})).toBe(false);
+    const dashed = pinHtml("pass", "street", false, true);
+    expect(dashed).toContain('stroke-dasharray="3.5 2.5"');
+    expect(dashed).toContain('fill="#ffffff" stroke="#1b7a5e"');
+    expect(dashed).toMatch(/<text [^>]*fill="#1b7a5e"[^>]*>G<\/text>/);
+    expect(pinHtml("pass", "street")).not.toContain("stroke-dasharray");
+  });
+
+  it("counts a first screen as Screening in the legend, never Not screened", () => {
+    expect(legendBucket({ verdict: null, jobStatus: "running" })).toBe("Screening");
+    expect(legendBucket({ verdict: null, jobStatus: null })).toBe("Not screened");
+    expect(legendBucket({ verdict: "pass", jobStatus: "running" })).toBe("Go");
+  });
+
+  it("the pipeline hands the map the card's own job status", () => {
+    const src = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
+    expect(src).toMatch(/function mapDealOf[\s\S]*?jobStatus: d\.jobStatus \?\? null,/);
+    const map = readFileSync("app/(app)/deals/pipeline-map.tsx", "utf8");
+    expect(map).toContain("pinHtml(deal.verdict, place.precision, isSelected, pinBehind(deal))");
+    expect(map).toContain('legendBucket(p.deal) === "Screening"');
   });
 });

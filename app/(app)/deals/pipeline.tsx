@@ -203,6 +203,8 @@ function mapDealOf(d: DealCard): MapDeal {
     place: d.place ?? null,
     placeMiss: d.placeMiss,
     hasAddress: d.hasAddress,
+    // The run the card and the list row read (lib/screen-run listJobStatus).
+    jobStatus: d.jobStatus ?? null,
   };
 }
 
