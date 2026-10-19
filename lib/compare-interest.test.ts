@@ -219,7 +219,7 @@ describe("modelReturnsRead — the Model tab under the table's rule", () => {
   });
 
   it("a fee simple says nothing and stands", () => {
-    expect(modelReturnsRead(deal(undefined, []), MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null, share: false, word: null, line: null });
+    expect(modelReturnsRead(deal(undefined, []), MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null, share: false, word: null, line: null, priceBuysBuilding: true });
   });
 });
 

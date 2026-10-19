@@ -16,12 +16,99 @@ import {
   FLAT_CONSTRUCTION_RATE_PCT,
   sizeConstructionDebt,
   worksYearsFromTimeline,
+  type ConstructionDebtResult,
 } from "@/lib/construction-debt";
 import { YOC_WITHHELD, yieldOnCostText } from "@/lib/plan-facts";
+import { BarRow, BarRows, Key, KeyItem } from "@/app/panel-parts";
+import { StackBar, planStackable } from "./stack-bar";
 
 const fmtUsd = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const fmtInput = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const pct = (d: number, dp = 1) => `${(d * 100).toFixed(dp)}%`;
+
+/**
+ * The construction sizing in three pictures, above the figures they draw:
+ * the total cost as its price plus works and the interest reserve the loan
+ * carries; the same total as the construction loan and the equity; and the
+ * construction loan against the take-out the finished NOI carries, any
+ * cash-in at take-out in the kill tone. Every figure is in the key or beside
+ * its bar, so nothing rides on colour.
+ */
+export function ConstructionStack({
+  r,
+  maxLtcPct,
+  allInTotal,
+}: {
+  r: ConstructionDebtResult;
+  maxLtcPct: number;
+  /** the OM stated an all-in total with no price: the works part is that total */
+  allInTotal: boolean;
+}) {
+  const takeOut = r.takeOut.loan;
+  const loan = r.constructionLoan;
+  const scale = Math.max(loan, takeOut);
+  const share = (v: number) => `${scale > 0 ? Math.max(0, Math.min(100, (v / scale) * 100)) : 0}%`;
+  const gap = r.refinanceGap > 0 ? r.refinanceGap : 0;
+  const worksWords = allInTotal ? "The stated total" : "Price + works";
+  return (
+    <div data-qa="construction-stack">
+      <StackBar
+        qa="construction-cost-stack"
+        parts={[
+          {
+            bar: "cl-works",
+            tone: "bg-brand/60",
+            label: r.reserveInBudget
+              ? `${worksWords} ${fmtUsd(r.hardSoftCost)}, its interest reserve inside the stated budget`
+              : `${worksWords} ${fmtUsd(r.hardSoftCost)}`,
+            value: r.hardSoftCost,
+          },
+          { bar: "cl-reserve", tone: "bg-caution/60", label: `Interest reserve ${fmtUsd(r.interestReserve)}`, value: r.interestReserve },
+        ]}
+        note={`Total cost, carry included: ${fmtUsd(r.totalCost)}.`}
+      />
+      <StackBar
+        qa="construction-capital-stack"
+        parts={[
+          { bar: "cl-loan", tone: "bg-brand/60", label: `Construction loan ${fmtUsd(loan)}, ${maxLtcPct}% of cost`, value: loan },
+          { bar: "cl-equity", tone: "bg-ink/30", label: `Equity ${fmtUsd(r.equity)}`, value: r.equity },
+        ]}
+      />
+      {scale > 0 && (
+        <div className="mt-3 text-[11px]" data-qa="construction-takeout">
+          <BarRows className="space-y-1">
+            <BarRow label="Construction loan" figure={fmtUsd(loan)}>
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-brand/60"
+                data-bar="cl-debt"
+                style={{ width: share(Math.min(loan, takeOut)) }}
+              />
+              {gap > 0 && (
+                <div
+                  className="absolute inset-y-0 rounded-r-full bg-kill/70"
+                  data-bar="cl-gap"
+                  style={{ left: share(takeOut), width: share(gap) }}
+                />
+              )}
+            </BarRow>
+            <BarRow label="Take-out the NOI carries" figure={fmtUsd(takeOut)}>
+              <div className="absolute inset-y-0 left-0 rounded-full bg-pass/60" data-bar="cl-takeout" style={{ width: share(takeOut) }} />
+            </BarRow>
+          </BarRows>
+          {gap > 0 ? (
+            <Key>
+              <KeyItem mark="swatch" tone="bg-kill/70">
+                <span className="text-kill">{`${fmtUsd(gap)} of the construction loan the take-out does not carry: the sponsor pays it in at stabilization`}</span>
+              </KeyItem>
+            </Key>
+          ) : (
+            <p className="mt-1 text-muted">{`The take-out carries the whole construction loan, ${fmtUsd(takeOut - loan)} to spare.`}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const BINDING_LABEL = {
   dscr: "DSCR binds",
@@ -116,6 +203,12 @@ export function ConstructionDebtPanel({
     [price, budget, noi, worksYears, ratePct, maxLtcPct, budgetIncludesReserve, takeOutRatePct, amortYears, minDscr, minDebtYieldPct, maxLtvPct, exitCap],
   );
 
+  // The pictures stand only on a price that buys the building outright: never
+  // beside a price the plan withholds (a note's, the land's under a ground
+  // lease), a share's grossed-up whole or the equity's whole beside its
+  // entity's loan (`planStackable`).
+  const stackDrawn = planStackable(plan, { allowTotal: true });
+
   return (
     <section aria-label="Construction and take-out debt" className="mt-2">
       <p className="text-sm text-muted">
@@ -182,6 +275,7 @@ export function ConstructionDebtPanel({
         </p>
       ) : r ? (
         <>
+          {stackDrawn && <ConstructionStack r={r} maxLtcPct={maxLtcPct} allInTotal={price === 0} />}
           <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(
               [

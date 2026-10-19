@@ -10,6 +10,8 @@ import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { CAP_WITHHELD } from "@/lib/cap-slot";
 import { noIrrText, noIrrWhy } from "@/lib/underwrite/no-irr";
 import { YOC_WITHHELD, modelYieldWithheld } from "@/lib/plan-facts";
+import { compactUsd } from "@/lib/money";
+import { StackBar } from "./stack-bar";
 
 export const usd = (n: number | null | undefined) =>
   n == null
@@ -65,6 +67,61 @@ const OWN_YIELD_LABEL: Record<"note" | "position", string> = {
  *  different basis (the finished conversion, the renovated building) or a
  *  misread — either way not a return. Mirrors lib/deal-strategy. */
 const IMPLAUSIBLE_CAP = 0.25;
+
+const stackUsd = (n: number) => compactUsd(n, { millions: "auto" });
+
+/**
+ * The model's capital at closing, as one bar: its loan and its equity, with a
+ * tick at the price where the equity also pays the closing costs and fees
+ * (lib/model/compute: equity = price + closing costs + loan fees − loan).
+ * Nothing where the returns are withheld (a note's, a share's, a position's,
+ * a lease's that ends inside the hold) or the price buys no building
+ * (`priceBuysBuilding`), and nothing without a price and an equity cheque.
+ */
+export function ModelCapitalStack({
+  model,
+  interest = null,
+}: {
+  model: UnderwritingModel;
+  interest?: ModelReturnsRead | null;
+}) {
+  const r = model.returns;
+  if (interest?.withheld || interest?.priceBuysBuilding === false) return null;
+  const price = r.purchasePrice;
+  const loan = Number.isFinite(r.loanAmount) && r.loanAmount > 0 ? r.loanAmount : 0;
+  const equity = r.equity;
+  if (!(Number.isFinite(price) && price > 0) || !(Number.isFinite(equity) && equity > 0)) return null;
+  const whole = loan + equity;
+  // What the equity pays past the price, drawn only where it shows at the
+  // key's own rounding; a model with no closing costs or fees has no tick.
+  const beyond = whole - price;
+  const costs = beyond > 0 && stackUsd(beyond) !== "$0";
+  return (
+    <StackBar
+      qa="model-capital-stack"
+      parts={[
+        { bar: "model-loan", tone: "bg-brand/60", label: `Loan ${stackUsd(loan)}`, value: loan },
+        { bar: "model-equity", tone: "bg-caution/60", label: `Equity ${stackUsd(equity)}`, value: equity },
+      ]}
+      tick={
+        costs
+          ? {
+              bar: "model-price",
+              value: price,
+              label: `Price ${stackUsd(price)}; the ${stackUsd(beyond)} past it is closing costs and fees, paid in equity`,
+            }
+          : null
+      }
+      note={
+        costs
+          ? null
+          : loan > 0
+            ? `Loan and equity together pay the ${stackUsd(price)} price.`
+            : `The equity pays the whole ${stackUsd(price)} price; the model carries no loan.`
+      }
+    />
+  );
+}
 
 export function ReturnsHeadline({
   model,
@@ -155,6 +212,7 @@ export function ReturnsHeadline({
           {interest.line}
         </p>
       )}
+      <ModelCapitalStack model={model} interest={interest} />
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label="Levered IRR"
