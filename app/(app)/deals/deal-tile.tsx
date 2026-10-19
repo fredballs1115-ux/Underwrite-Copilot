@@ -521,12 +521,12 @@ export const DealTile = memo(function DealTile({
           </div>
         </>
       ) : compareMode ? (
-        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="row-span-4 grid grid-rows-subgrid text-left">
+        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} data-deal-nav className="row-span-4 grid grid-rows-subgrid text-left">
           {inner}
         </button>
       ) : (
         <>
-          <Link href={`/deals/${d.id}`} className="row-span-4 grid grid-rows-subgrid">
+          <Link href={`/deals/${d.id}`} data-deal-nav className="row-span-4 grid grid-rows-subgrid">
             {inner}
           </Link>
           {/* The deal's other photographs (#450), flipped through where a

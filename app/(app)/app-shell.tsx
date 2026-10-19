@@ -8,6 +8,7 @@ import { LogoMark } from "@/app/logo";
 import { DataNotices } from "@/app/data-notices";
 import { ToastProvider } from "./toaster";
 import { CommandPalette } from "./command-palette";
+import { ShortcutsSheet, useShortcutsKey } from "./shortcuts-sheet";
 import type { MarketNavEntry } from "@/lib/market-match";
 import { personName } from "@/lib/person";
 import { PersonBadge } from "./person-badge";
@@ -307,6 +308,9 @@ export function AppShell({
   // scrolls away (#437), so the footer below the page clears it too.
   const onDealPage = /^\/deals\/[^/]+$/.test(pathname) && pathname !== "/deals/compare";
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // "?" anywhere, or the palette's "Keyboard shortcuts", opens the sheet.
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  useShortcutsKey(() => setShortcutsOpen(true));
   // The reader as every teammate sees them: their name, else the email's
   // local part (lib/person), never the address as a name.
   const shownName = (userName ?? "").trim() || personName(null, userEmail, "You");
@@ -327,7 +331,8 @@ export function AppShell({
 
   return (
     <ToastProvider>
-    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} markets={markets} />
+    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} markets={markets} onShowShortcuts={() => setShortcutsOpen(true)} />
+    {shortcutsOpen ? <ShortcutsSheet onClose={() => setShortcutsOpen(false)} /> : null}
     {/* The skip link is the root layout's (app/skip-link.tsx), shared with
         the public pages; it targets the <main id="main"> below. */}
     <div className="flex min-h-screen bg-canvas">

@@ -40,6 +40,7 @@ import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
 import { PIPELINE_CARD_GRID, PIPELINE_VIEW_COOKIE, filtersFoldLabel, remembersView, type PipelineView } from "@/lib/pipeline-view";
 import { ManualDealForm } from "./manual-deal-form";
+import { useKeepShownOrder, usePipelineKeys } from "./pipeline-keys";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
@@ -426,41 +427,18 @@ export function Pipeline({
     return () => clearInterval(t);
   }, [anyRunning, router]);
 
-  // Keyboard shortcuts: "/" jumps to search, "n" opens the new-deal form,
-  // Escape closes it. Ignored while typing in any field.
+  // Keyboard shortcuts (lib/shortcuts, the sheet "?" opens): "/" jumps to
+  // search, "n" opens the new-deal form, Escape closes it, "j" / "k" step
+  // through the deals shown. Ignored while typing in any field — Escape
+  // there is how a browser cancels autofill and clears a search box — inside
+  // a dialog, or once another handler (the palette's Escape) took the key.
   const atLimitRef = !!billing && !billing.canCreateDeal;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Another handler (the ⌘K palette's Escape) already consumed this key,
-      // or focus sits inside an open dialog — the page shortcuts stand down.
-      if (e.defaultPrevented) return;
-      const t = e.target as HTMLElement | null;
-      if (t && t.closest('[role="dialog"]')) return;
-      const typing =
-        t &&
-        (t.tagName === "INPUT" ||
-          t.tagName === "TEXTAREA" ||
-          t.tagName === "SELECT" ||
-          t.isContentEditable);
-      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
-      // Never let Escape nuke the form while the user is in a field — that's
-      // how browsers cancel autofill/IME, and search inputs clear on Escape.
-      if (typing) return;
-      if (e.key === "Escape") {
-        setShowForm(false);
-        return;
-      }
-      if (e.key === "/") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      } else if (e.key === "n" && !atLimitRef) {
-        e.preventDefault();
-        setShowForm(true);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [atLimitRef]);
+  usePipelineKeys({
+    onSearch: () => searchRef.current?.focus(),
+    onNew: () => setShowForm(true),
+    onEscape: () => setShowForm(false),
+    canNew: !atLimitRef,
+  });
 
   // Stable identity so memoized rows don't re-render on unrelated changes.
   const toggleSelected = useCallback((id: string) => {
@@ -573,6 +551,10 @@ export function Pipeline({
     if (s === "dead" && !showDead && stage !== "dead") return false;
     return (groups.get(s)?.length ?? 0) > 0;
   }
+  // The order the list shows, a stage after a stage, kept for the deal
+  // page's "[" and "]" (pipeline-keys).
+  const shownOrder = STAGES.flatMap((s) => (sectionDrawn(s) ? (groups.get(s) ?? []) : [])).map((d) => d.id);
+  useKeepShownOrder(shownOrder);
   const cardsOnScreen =
     view === "cards" ? STAGES.flatMap((s) => (sectionDrawn(s) && isOpen(s) ? (groups.get(s) ?? []) : [])) : [];
   const marketPhotoCredits = shownMarketCredits(cardsOnScreen, marketShown);
@@ -2051,12 +2033,14 @@ const DealRow = memo(function DealRow({
       className={`border-l-[3px] ${d.assetClass ? asset.rail : "border-l-transparent"} ${
         isDead ? "grayscale" : ""
       }`}
+      data-deal-row={d.id}
     >
       {compareMode ? (
         <button
           type="button"
           onClick={() => onToggle(d.id)}
           aria-pressed={checked}
+          data-deal-nav
           className={`group flex w-full items-center gap-3 px-5 py-4 text-left transition-colors ${
             checked ? "bg-brand/5" : "hover:bg-faint"
           }`}
@@ -2070,6 +2054,7 @@ const DealRow = memo(function DealRow({
         <div className="group flex items-center gap-3 px-5 py-4 transition-colors hover:bg-faint">
           <Link
             href={`/deals/${d.id}`}
+            data-deal-nav
             className="flex min-w-0 flex-1 items-center gap-3"
           >
             {inner}

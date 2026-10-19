@@ -29,6 +29,7 @@ import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor, pictureIsCheckedMarket } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
+import { DealStepKeys } from "./deal-step-keys";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
@@ -1864,6 +1865,9 @@ export default async function DealPage({
         chip={pill ?? null}
         figures={[priceFigure, returnFigure].flatMap((f) => (f.value ? [{ label: f.label, value: f.value, title: f.title }] : []))}
       />
+      {/* "[" and "]": the previous and next deal in the pipeline's last
+          shown order, kept in the tab's session — no read of its own. */}
+      <DealStepKeys dealId={id} />
 
       {/* A portfolio OM's properties, one row each (lib/portfolio): absent
           for a single-property memorandum. */}
