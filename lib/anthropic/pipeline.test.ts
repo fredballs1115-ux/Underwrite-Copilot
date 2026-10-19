@@ -42,6 +42,9 @@ interface State {
   benchmarksAnswer?: boolean;
   /** the deal's stored T-12 row (`deal_t12_statements`), where a test stores one */
   t12?: Row;
+  /** every series id a read of `rates` asked for, in order, where a test
+   *  counts how often a figure is read in one run */
+  reads?: string[];
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -165,6 +168,7 @@ class FakeQuery {
     }
     if (table === "rates") {
       const id = this.where("series_id");
+      state.reads?.push(String(id));
       return { data: (state.rates ?? []).filter((r) => r.series_id === id), error: null };
     }
     if (table === "benchmarks") {
@@ -2634,6 +2638,95 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
     expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
     // Nothing new is stored on the verdict: the test is rebuilt on read.
     expect(state.deals.d1.verdict).not.toHaveProperty("stressTest");
+  });
+
+  // The worker has no Next cache, so the first cut handed the test
+  // `modelVsMarket: null`: no published vacancy, rent or price figure ever
+  // reached the verdict's brief from the worker.
+  describe("the published figures reach the verdict's section from the worker (lib/model-vs-market, read bare)", () => {
+    const washington = () => {
+      state.deals.d1.address = { city: "Washington", state: "DC" };
+      state.rates = [
+        { series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 },
+        { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+        { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+        { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+        // Consumer prices, which the brief never asks for: the verdict's
+        // read tops them up, once.
+        { series_id: "CPIAUCSL_YOY", obs_date: "2026-08-01", value: 2.9 },
+      ];
+      state.benchmarks = [
+        { metric: "zori_rent", metro: "Washington DC", low: 2310, as_of: "2026-08-31", note: "Washington, DC", source: "Zillow" },
+        { metric: "zori_rent_yoy", metro: "Washington DC", low: 2.1, as_of: "2026-08-31", note: "", source: "Zillow" },
+      ];
+      state.reads = [];
+      // The memorandum states an occupancy, so the vacancy row has an OM figure to set against the survey.
+      vi.mocked(extractTerms).mockResolvedValue({
+        ...EXTRACTION,
+        metrics: [...EXTRACTION.metrics, { label: "Occupancy", value: "94%", flagged: false, page: "p. 5", basis: "in_place", locatorSnippet: "" }],
+      } as unknown as ExtractionResult);
+    };
+    const run = async (opts?: Parameters<typeof runAnalysis>[1]) => {
+      // Freshness is judged against today, so pin the clock to the day the fixture's figures are current on.
+      vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+      try {
+        await runAnalysis("d1", opts);
+      } finally {
+        vi.useRealTimers();
+      }
+    };
+
+    it("a Washington deal's vacancy row carries the survey's metro figure, off the rows the market step read — read once in the run", async () => {
+      washington();
+      await run();
+      expect(job().status).toBe("done");
+      const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+      const vacancy = input.stressTest?.rows.find((r) => r.key === "vacancy");
+      expect(vacancy?.omSays).toMatchObject({ value: 6, page: 5 });
+      expect(vacancy?.evidence).toContainEqual(
+        expect.objectContaining({ kind: "published", label: "Rental vacancy, metro area", value: 6.2, asOf: "2026-04-01", publisher: "Census Bureau", scope: "metro" }),
+      );
+      const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+      const brief = buildBrief(input);
+      expect(brief).toContain("- Stabilized vacancy (vacancy)");
+      expect(brief).toContain("Rental vacancy, metro area: 6.2% ±2.2 pts (Q2 2026) (Census Bureau");
+      // The expense-growth check read consumer prices, topped up once; the
+      // survey's figure, in hand from the market step, was never read again.
+      const expense = input.stressTest?.rows.find((r) => r.key === "expense_growth");
+      expect(expense?.evidence.some((e) => e.kind === "published" && /CPI, all items/i.test(e.label))).toBe(true);
+      expect(state.reads!.filter((id) => id === "HVS_RVR_47900")).toHaveLength(1);
+      expect(state.reads!.filter((id) => id === "CPIAUCSL_YOY")).toHaveLength(1);
+      expect(errSpy).not.toHaveBeenCalled();
+    });
+
+    it("an attempt resumed past the market step reads the figures bare, once each, and the row still carries them", async () => {
+      washington();
+      state.deals.d1.extraction = {
+        ...EXTRACTION,
+        metrics: [...EXTRACTION.metrics, { label: "Occupancy", value: "94%", flagged: false, page: "p. 5", basis: "in_place", locatorSnippet: "" }],
+      };
+      state.deals.d1.market = MARKET;
+      state.jobs[0].payload = { kind: "screen", completed: ["signal", "extract", "reconcile_docs", "ingest_actuals", "challenge", "comps", "market"] };
+      await run({ resume: true });
+      expect(job().status).toBe("done");
+      const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+      const vacancy = input.stressTest?.rows.find((r) => r.key === "vacancy");
+      expect(vacancy?.evidence).toContainEqual(expect.objectContaining({ kind: "published", label: "Rental vacancy, metro area", value: 6.2 }));
+      expect(state.reads!.filter((id) => id === "HVS_RVR_47900")).toHaveLength(1);
+      expect(state.reads!.filter((id) => id === "CPIAUCSL_YOY")).toHaveLength(1);
+    });
+
+    it("a read that fails leaves the published figures out of the test, and the screen finishes", async () => {
+      washington();
+      state.failFigureReads = true;
+      await run();
+      expect(job().status).toBe("done");
+      const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+      const vacancy = input.stressTest?.rows.find((r) => r.key === "vacancy");
+      expect(vacancy).toBeTruthy();
+      expect(vacancy!.evidence.some((e) => e.kind === "published")).toBe(false);
+      expect(errSpy).not.toHaveBeenCalled();
+    });
   });
 
   it("with no extraction to derive a model from, the section says no return was re-run", async () => {

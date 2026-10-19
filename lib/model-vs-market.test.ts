@@ -345,6 +345,18 @@ const signalWithCap = (goingInCap: string, assetClass = "industrial"): FirstSign
   take: "Check the rent roll against the market's asking rents.",
 });
 
+describe("MODEL_CHECK_NATIONAL_IDS — every national id the checks read off the table, so the worker's bare read holds them all", () => {
+  it("names each id the source compares a national row to, and the rent and insurance indexes", async () => {
+    const { MODEL_CHECK_NATIONAL_IDS } = await import("./model-vs-market");
+    const { INSURANCE_INDEX_ID, RENT_INDEX_IDS } = await import("./live-market-brief");
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("./model-vs-market.ts", import.meta.url), "utf8");
+    const literal = [...src.matchAll(/input\.national, \(\w+\) => \w+\.meta\.id === "([A-Z0-9_]+)"/g)].map((m) => m[1]);
+    expect(literal.length).toBeGreaterThan(0);
+    for (const id of [...literal, INSURANCE_INDEX_ID, ...RENT_INDEX_IDS]) expect(MODEL_CHECK_NATIONAL_IDS, id).toContain(id);
+  });
+});
+
 describe("modelVsMarketFor — the deal page, the report and the workbook call one function", () => {
   const extraction: ExtractionResult = {
     dealName: "Meridian Logistics Center",

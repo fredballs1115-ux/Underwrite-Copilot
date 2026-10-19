@@ -73,16 +73,17 @@ import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { isStateMarket } from "@/lib/market-match";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
-import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
+import { SERIES, metroSeriesFor, readMetroRates, readRates, type LiveRate, type RateRow } from "@/lib/live-rates";
+import { MODEL_CHECK_NATIONAL_IDS, modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { NO_DEBT_SEEDS, debtSeeds, isDebtSeedSeries, ratesPromptLine, type DebtSeeds } from "@/lib/debt-index";
-import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread, type DerivedModel } from "@/lib/underwrite/inputs";
 import { modelMarketFor } from "@/lib/model-market";
 import { actualsFromRows } from "@/lib/actuals/actuals-read";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { buildStressTest } from "@/lib/stress-test";
 import type { StressTest } from "@/lib/stress-test-types";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
-import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
+import { ZILLOW_METRICS, zoriFor, type ZoriRead } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { assetClassKey } from "@/lib/asset-words";
@@ -437,6 +438,121 @@ async function todaysDebtSeeds(admin: ReturnType<typeof createSupabaseAdminClien
   }
 }
 
+/** The deal's address as every step reads it (lib/address): a typed line
+ *  read for its fields, a deal nobody typed one for placed by the one its
+ *  memorandum states (#441, `addressUpgrade`), a row that still carries
+ *  the form's JSON string parsed the form's way. */
+function dealAddressOf(raw: unknown, ex: ExtractionResult | null): Partial<StructuredAddress> | null {
+  return (
+    addressUpgrade(raw, ex) ??
+    (raw && typeof raw === "object"
+      ? (raw as Partial<StructuredAddress>)
+      : typeof raw === "string"
+        ? parseStructuredAddress(raw)
+        : null)
+  );
+}
+
+/**
+ * The rows the market step read for the deal's own market, kept for the
+ * verdict's model read (lib/model-vs-market `modelVsMarketFor`) so no figure
+ * already in hand is read a second time in one run: the market the deal was
+ * placed in, its series and Zillow's rent as read, the national rows raw
+ * with the ids they were asked for, the clock they were read on — and
+ * whether any read failed, since a model read over a half-answered table
+ * would set an assumption against a blank.
+ */
+interface MarketFigures {
+  metro: { id: string; name: string; placedBy?: { county: string; area: string } } | null;
+  rates: LiveRate[];
+  zori: ZoriRead | null;
+  nationalRows: RateRow[];
+  nationalAsked: readonly string[];
+  failed: boolean;
+  now: Date;
+}
+
+/**
+ * What the run holds for the verdict's model read: the site flags (the
+ * county that places the deal, the rent rules' municipality) and what the
+ * market step read in this attempt — `undefined` where it did not run in
+ * it (an attempt resumed past it, a reconciliation), so the verdict reads
+ * the same tables bare; `null` where it ran and a read failed.
+ */
+interface VerdictReads {
+  flags: SiteFlagsResult | null;
+  market?: MarketFigures | null;
+}
+
+/**
+ * The model's assumptions against the published figures for the verdict's
+ * stress test (lib/model-vs-market `modelVsMarketFor`, the deal page's, the
+ * report's and the workbook's one function), over the same bare queries the
+ * market check makes (lib/live-rates-query; the worker has no Next cache):
+ * the metro's series and Zillow's rent as the market step read them where
+ * it ran in this attempt — never a second read of a figure in hand — topped
+ * up with the national series the checks read and the brief did not ask
+ * for; or, where the step did not run in this attempt, the deal placed
+ * again and every series read once. Null where there is no model to read,
+ * where the market step's read failed, or where a read here fails: the
+ * test then carries the documents' and the rules of thumb's evidence alone,
+ * as it did before, and the screen never fails for it.
+ */
+async function verdictModelRead(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  row: { extraction?: unknown; first_signal?: unknown; address?: unknown; asset_class?: unknown },
+  derived: DerivedModel | null,
+  reads: VerdictReads | undefined,
+): Promise<ModelVsMarket | null> {
+  if (!derived || !reads || reads.market === null) return null;
+  try {
+    const extraction = (row.extraction as ExtractionResult | null | undefined) ?? null;
+    let failed = false;
+    const fail = () => {
+      failed = true;
+    };
+    let market = reads.market;
+    if (!market) {
+      const now = new Date();
+      const address = dealAddressOf(row.address, extraction);
+      const metro = placeDeal(address, countyOf(address, reads.flags)).live ?? null;
+      const [rateRows, bench] = await Promise.all([
+        metro ? fetchSeriesRows(admin, metroSeriesFor(metro.id).series, fail) : Promise.resolve([] as RateRow[]),
+        metro ? fetchBenchRows(admin, metro.name, [...ZILLOW_METRICS], fail) : Promise.resolve([]),
+      ]);
+      market = {
+        metro,
+        rates: metro ? readMetroRates(metro.id, rateRows, now) : [],
+        zori: metro ? zoriFor(bench, metro.name, now) : null,
+        nationalRows: [],
+        nationalAsked: [],
+        failed,
+        now,
+      };
+    }
+    if (market.failed) return null;
+    // Only the national series not already asked for: a figure in hand is
+    // never read twice, and one the brief asked for and found nothing of is
+    // in hand too.
+    const topUp = SERIES.filter((s) => MODEL_CHECK_NATIONAL_IDS.includes(s.id) && !market.nationalAsked.includes(s.id));
+    const more = topUp.length > 0 ? await fetchSeriesRows(admin, topUp, fail) : [];
+    if (failed) return null;
+    return modelVsMarketFor({
+      derived,
+      extraction,
+      firstSignal: (row.first_signal as FirstSignal | null | undefined) ?? null,
+      storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
+      metro: market.metro,
+      reads: { rates: market.rates, zori: market.zori, national: readRates([...market.nationalRows, ...more], market.now), now: market.now },
+      // The rent rules on the UTC day the worker keeps, as every step reads them.
+      regulation: screenRegulation(row, reads.flags),
+    });
+  } catch (err) {
+    console.warn(`[pipeline] the model's published-figure read was not made for the verdict:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 /**
  * The OM's assumptions tested in code (lib/stress-test) for the verdict
  * step, from what the deal holds now: the stored results (the challenger,
@@ -446,12 +562,13 @@ async function todaysDebtSeeds(admin: ReturnType<typeof createSupabaseAdminClien
  * `deriveUnderwriteInputs` on the actuals, seeded from today's rates, never
  * on the sample) — so the moves the verdict cites are the engine's own on
  * the model every other surface runs. The published figures the model's
- * read sets its assumptions against (lib/model-vs-market) go through Next's
- * cached readers, which the worker has not: the test here takes none, and
- * reads the market check's stored figures where the reader reads them. A
- * model that cannot be derived (no extraction) tests the rows with no
- * return re-run, and the test says so. Best-effort: a build that throws
- * hands the verdict no test, logged, never a failed screen.
+ * read sets its assumptions against (lib/model-vs-market) are read bare
+ * (`verdictModelRead`): the deal page reads them through Next's cached
+ * readers, which the worker has not, and the first cut handed the test
+ * none, so no published vacancy, rent or price figure reached the verdict
+ * from the worker. A model that cannot be derived (no extraction) tests the
+ * rows with no return re-run, and the test says so. Best-effort: a build
+ * that throws hands the verdict no test, logged, never a failed screen.
  */
 async function screenStressTest(
   admin: ReturnType<typeof createSupabaseAdminClient>,
@@ -460,12 +577,14 @@ async function screenStressTest(
     name?: unknown;
     is_sample?: unknown;
     asset_class?: unknown;
+    address?: unknown;
     extraction?: unknown;
     first_signal?: unknown;
     challenges?: unknown;
     comps?: unknown;
     market?: unknown;
   },
+  reads: VerdictReads | undefined,
 ): Promise<StressTest | null> {
   try {
     const extraction = (row.extraction as ExtractionResult | null | undefined) ?? null;
@@ -498,7 +617,7 @@ async function screenStressTest(
       firstSignal,
       challenger: (row.challenges as ChallengerResult | null | undefined) ?? null,
       market: (row.market as MarketResult | null | undefined) ?? null,
-      modelVsMarket: null,
+      modelVsMarket: await verdictModelRead(admin, row, derived, reads),
       actuals: actualsFromRows(extraction, inferStrategy(extraction, firstSignal), assetClass, rr, t12),
       derived,
       storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
@@ -526,14 +645,7 @@ function screenRegulation(
   flags: SiteFlagsResult | null,
 ): RegulationRead | null {
   const ex = (row?.extraction as ExtractionResult | null | undefined) ?? null;
-  const raw = row?.address;
-  const address: Partial<StructuredAddress> | null =
-    addressUpgrade(raw, ex) ??
-    (raw && typeof raw === "object"
-      ? (raw as Partial<StructuredAddress>)
-      : typeof raw === "string"
-        ? parseStructuredAddress(raw)
-        : null);
+  const address = dealAddressOf(row?.address, ex);
   return regulationForDeal(
     { extraction: ex, address, siteFlags: flags, assetClass: (row?.asset_class as string | null | undefined) ?? null },
     new Date().toISOString().slice(0, 10),
@@ -616,6 +728,9 @@ interface LiveMarketRead {
    *  check says it reasoned from rules of thumb that day, never that the
    *  market has no figures (lib/market-read-failed, research pass 30) */
   failed: { market: string | null; grain: "metro" | "state" } | null;
+  /** what was read for the address's own market, for the verdict's model
+   *  read; null where the deal's address or a figure could not be read */
+  figures: MarketFigures | null;
 }
 
 /** A failed read, said for the market it was for where the deal was placed. */
@@ -649,24 +764,17 @@ async function liveMarketFromDb(
     // and no figure was read for it.
     if (dealErr) {
       console.warn(`[pipeline] the deal's address could not be read for the market check of ${dealId}: ${dealErr.message}`);
-      return { primary: null, others: [], failed: readFailedFor(null) };
+      return { primary: null, others: [], failed: readFailedFor(null), figures: null };
     }
     // The column holds the structured object the deal form saved (the deals
     // list and the compare page read it the same way); a row that still
     // carries the form's JSON string is parsed the form's way.
-    const raw = data?.address;
     const ex = (data?.extraction as ExtractionResult | null) ?? null;
     // A typed line read for its city and state, and a deal nobody typed an
     // address for placed by the one its memorandum states (#441) — the
     // extraction step writes the same upgrade, so this only matters for a
     // run resumed from before it.
-    const address: Partial<StructuredAddress> | null =
-      addressUpgrade(raw, ex) ??
-      (raw && typeof raw === "object"
-        ? (raw as Partial<StructuredAddress>)
-        : typeof raw === "string"
-          ? parseStructuredAddress(raw)
-          : null);
+    const address = dealAddressOf(data?.address, ex);
     // A covered metro's figures where the address sits in one; the metro
     // area its county sits in where the address names no place a market's
     // keywords know (#447, lib/market-county — said as placed by its
@@ -697,9 +805,16 @@ async function liveMarketFromDb(
     // lease-up's finished building (lib/deal-strategy buildsSomething).
     const builds = buildsSomething(ex, kind);
     const others = otherPortfolioMarkets(ex, metro?.id ?? null);
-    if (!metro && !others) return { primary: null, others: [], failed: null };
+    // Nothing read: the verdict's model read asks for the nation's figures
+    // itself, since none is in hand.
+    if (!metro && !others) {
+      return { primary: null, others: [], failed: null, figures: { metro: null, rates: [], zori: null, nationalRows: [], nationalAsked: [], failed: false, now } };
+    }
     const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)), failedRead);
     const national = readRates(nationalRows, now);
+    // The address's own market's rows, raw, kept for the verdict's model read.
+    type PrimaryRows = { rateRows: RateRow[]; bench: Parameters<typeof zoriFor>[0] };
+    let primaryRows: PrimaryRows | null = null;
     // Whether the reads of the market's OWN figures failed — its series and
     // its benchmarks — apart from the national lines, every one of them or
     // enough to leave no line of its own: a brief left holding only the
@@ -722,6 +837,7 @@ async function liveMarketFromDb(
         fetchSeriesRows(admin, metas, ownFailed),
         fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS], ownFailed),
       ]);
+      if (metro && market.id === metro.id) primaryRows = { rateRows, bench };
       const brief = liveMarketBrief({
         metro: market,
         rates: readMetroRates(market.id, rateRows, now),
@@ -768,14 +884,30 @@ async function liveMarketFromDb(
     // The deal's market was wanted, nothing came back, and reads failed — or
     // every read of its own figures failed, whatever the nation's lines did:
     // a failed read, never a market with no figures to read.
+    // (`primaryRows` is set inside `readMarket`, which the compiler cannot
+    // see from here.)
+    const held = primaryRows as PrimaryRows | null;
     return {
       primary,
       others: read,
       failed: metro && !primary && (failures > 0 || ownReadFailed) ? readFailedFor(metro) : null,
+      // What the verdict's model read takes as in hand: the address's own
+      // market's series and Zillow's rent as read (none where the address
+      // names no market the site reads), the nation's rows and the ids they
+      // were asked for; failed where any read of this run's figures was.
+      figures: {
+        metro: metro ?? null,
+        rates: metro && held ? readMetroRates(metro.id, held.rateRows, now) : [],
+        zori: metro && held ? zoriFor(held.bench, metro.name, now) : null,
+        nationalRows,
+        nationalAsked: BRIEF_NATIONAL_IDS,
+        failed: failures > 0 || ownReadFailed,
+        now,
+      },
     };
   } catch (err) {
     console.warn(`[pipeline] live market figures unavailable for deal ${dealId}:`, err instanceof Error ? err.message : err);
-    return { primary: null, others: [], failed: readFailedFor(placed) };
+    return { primary: null, others: [], failed: readFailedFor(placed), figures: null };
   }
 }
 
@@ -790,11 +922,16 @@ async function liveMarketFromDb(
  * reconciler read, built once by the caller and handed in, so the verdict
  * never judges a share's price over the whole building's units or a note's
  * price as a property's while every step before it was told otherwise.
+ *
+ * `reads` is what the run holds for the stress test's model read
+ * (`verdictModelRead`): the site flags, and the market step's own reads
+ * where it ran in this attempt.
  */
 async function regenerateVerdict(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
   dealContext: string | null,
+  reads: VerdictReads | undefined,
 ): Promise<void> {
   const { data, error: readErr } = await admin
     .from("deals")
@@ -862,7 +999,7 @@ async function regenerateVerdict(
   // and the model the screen derives, so the verdict leads with the engine's
   // own moves. Nothing new is stored on the verdict: every surface rebuilds
   // the test on read.
-  const stressTest = await screenStressTest(admin, dealId, data);
+  const stressTest = await screenStressTest(admin, dealId, data, reads);
 
   const verdict = await synthesizeVerdict({
     extraction,
@@ -1676,9 +1813,13 @@ async function runAnalysisSteps(
     // and — where the deal sits in a covered market — the metro's own
     // published figures, dated, handed in and stored with the result so the
     // page can say what the check read.
+    // What the market step read, kept for the verdict's model read: an
+    // attempt resumed past the step holds nothing, and the verdict reads bare.
+    let marketFigures: MarketFigures | null | undefined;
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const { primary, others, failed } = await liveMarketFromDb(admin, dealId, siteFlags);
+      const { primary, others, failed, figures } = await liveMarketFromDb(admin, dealId, siteFlags);
+      marketFigures = figures;
       // One block a market, the address's first: a portfolio's other
       // markets follow in blocks of their own (#413).
       const handed = [primary, ...others].filter((b): b is LiveMarketBrief => !!b).map((b) => b.text);
@@ -1720,7 +1861,7 @@ async function runAnalysisSteps(
     // Step 5 — verdict (synthesizes everything gathered above), told what
     // the screen established, as the comps and the market check were.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 90 });
-    await regenerateVerdict(admin, dealId, dealContext);
+    await regenerateVerdict(admin, dealId, dealContext, { flags: siteFlags, market: marketFigures });
 
     await patchJob(dealId, {
       status: "done",
@@ -1828,8 +1969,9 @@ async function runReconciliationSteps(
     await writeResult(admin, dealId, "reconciliation", reconciliation);
 
     // Fold the reconciliation into the verdict so the headline reflects it.
+    // The reconciler made no market read: the verdict's model read is bare.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 80 });
-    await regenerateVerdict(admin, dealId, dealContext);
+    await regenerateVerdict(admin, dealId, dealContext, { flags });
 
     await patchJob(dealId, {
       status: "done",
