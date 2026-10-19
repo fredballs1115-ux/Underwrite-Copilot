@@ -3,6 +3,7 @@ import type { AssumptionWarning } from "@/lib/market/checks";
 import type { SubmarketView } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
 import { unverifiedMark } from "@/lib/market/metrics";
+import { periodDay } from "@/lib/period-label";
 import { dismissSubmarketWarning, linkSubmarket, restoreSubmarketWarning } from "./submarket-actions";
 
 /**
@@ -129,7 +130,7 @@ export function SubmarketCard({
       </dl>
       <p className="mt-2 text-[11px] text-muted">
         Source: {metrics.latest?.source ?? "—"}
-        {metrics.latest ? `, as of ${metrics.latest.period}` : ""}
+        {metrics.latest ? `, as of ${periodDay(metrics.latest.period)}` : ""}
         {metrics.latest?.unverified ? " (unverified)" : ""}
       </p>
 

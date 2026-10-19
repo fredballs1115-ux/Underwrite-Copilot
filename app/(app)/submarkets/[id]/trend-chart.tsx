@@ -1,23 +1,8 @@
 import type { TrendPoint, TrendSegment } from "@/lib/market/metrics";
 import { chartWidthStyle } from "@/lib/chart-bounds";
+import { periodDay, periodMonth } from "@/lib/period-label";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** A period (a full date, "2025-03-31") on the axis, as its month and year:
- *  "Mar 2025" — the axis had printed the raw "2025-03". Anything else is
- *  shown as stored. */
-export function periodMonth(period: string): string {
-  const m = /^(\d{4})-(\d{2})/.exec(period);
-  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
-  return m && month ? `${month} ${m[1]}` : period;
-}
-
-/** A period's full day for a mark's title: "Mar 31, 2025". */
-export function periodDay(period: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(period);
-  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
-  return m && month ? `${month} ${Number(m[3])}, ${m[1]}` : periodMonth(period);
-}
+export { periodDay, periodMonth };
 
 /**
  * A dual-axis trend: one series as bars, one as a line, sharing an x of

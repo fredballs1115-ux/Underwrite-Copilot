@@ -17,6 +17,7 @@ import { assetClassLabel } from "@/lib/asset-class";
 import { metroForName } from "@/lib/market-match";
 import { MarketBand } from "@/app/place-band";
 import { DualAxisTrend } from "./trend-chart";
+import { periodDay } from "@/lib/period-label";
 import {
   deleteSubmarket,
   deleteSubmarketPeriod,
@@ -130,7 +131,7 @@ export default async function SubmarketPage({
     {
       label: "UC % of inventory",
       value: pct1(metrics.ucShare),
-      note: metrics.latest ? `as of ${metrics.latest.period}` : "no period",
+      note: metrics.latest ? `as of ${periodDay(metrics.latest.period)}` : "no period",
       unverified: metrics.unverified.ucShare,
     },
     {
@@ -150,7 +151,9 @@ export default async function SubmarketPage({
       note:
         metrics.rent.cagr == null
           ? "needs two periods on one basis"
-          : `${metrics.rent.cagrFrom} → ${metrics.rent.cagrTo}, ${
+          : `${metrics.rent.cagrFrom ? periodDay(metrics.rent.cagrFrom) : "—"} → ${
+              metrics.rent.cagrTo ? periodDay(metrics.rent.cagrTo) : "—"
+            }, ${
               metrics.rent.cagrBasis ? RENT_BASIS_LABEL[metrics.rent.cagrBasis] : "basis not stated"
             }`,
       unverified: metrics.unverified.cagr,
@@ -387,7 +390,7 @@ export default async function SubmarketPage({
             <tbody>
               {periods.map((p) => (
                 <tr key={p.id} className="border-b border-line last:border-b-0">
-                  <td className="px-4 py-2 text-ink">{p.period}</td>
+                  <td className="px-4 py-2 text-ink">{periodDay(p.period)}</td>
                   <td className="px-4 py-2 text-right font-mono text-muted">
                     {p.inventorySf == null ? "—" : sfFmt(p.inventorySf)}
                   </td>
@@ -546,7 +549,7 @@ export default async function SubmarketPage({
                     {p.status.replace("_", " ")}
                   </td>
                   <td className="px-4 py-2 font-mono text-xs text-muted">
-                    {p.expectedDelivery ?? "—"}
+                    {p.expectedDelivery ? periodDay(p.expectedDelivery) : "—"}
                   </td>
                   <td className="px-4 py-2 text-xs text-muted">{p.subtype || "—"}</td>
                   <td className="px-4 py-2 text-xs">

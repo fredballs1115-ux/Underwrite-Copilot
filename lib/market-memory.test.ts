@@ -465,6 +465,12 @@ describe("range formatting", () => {
     expect(fmtBasisRange({ min: 250_000, median: 275_000, max: 300_000, basis: "unit" })).toBe("$250–300k/unit");
     expect(fmtBasisRange({ min: 200, median: 200, max: 200, basis: "sf" })).toBe("$200/SF");
   });
+  it("a per-foot range carries its thousands mark, as every other dollar figure does", () => {
+    expect(fmtBasisRange({ min: 1250, median: 1300, max: 1400, basis: "sf" })).toBe("$1,250–1,400/SF");
+    expect(fmtBasisRange({ min: 1250, median: 1250, max: 1250, basis: "sf" })).toBe("$1,250/SF");
+    // Ends that round to one figure are one figure, never "$212–212/SF".
+    expect(fmtBasisRange({ min: 211.6, median: 212, max: 212.2, basis: "sf" })).toBe("$212/SF");
+  });
 });
 
 describe("a plan deal's stabilized cap never enters the market read", () => {
