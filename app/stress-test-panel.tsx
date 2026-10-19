@@ -35,9 +35,9 @@ import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, 
  *   - HOW THIS WAS TESTED: the row's method sentence, linking to the
  *     methodology page's own section for the key.
  *
- * Where the model already runs at the evidence's figure (the impact's two
- * runs are one), the pair is one figure, "Levered IRR 9.3%, as the model
- * runs", never "9.3% → 9.3%".
+ * Where the OM's figure is the evidence's (the impact's two runs are one,
+ * read off its values), the pair is one figure, "Levered IRR 9.3%, run at
+ * the evidence's figure", never "9.3% → 9.3%".
  *
  * THE UNCHECKED ROWS are one folded group at the end: a summary line
  * naming them ("5 assumptions unchecked: debt, rent growth, …") and a fold
@@ -228,13 +228,14 @@ function ImpactView({ impact }: { impact: StressImpact }) {
   const alt = impact.altIrrPct;
   const top = Math.max(base ?? 0, alt ?? 0, 1) * 1.15;
   const width = alt == null ? "0%" : `${Math.max(0, Math.min(100, (alt / top) * 100)).toFixed(1)}%`;
-  // The two runs are one where the model already runs at the evidence's
-  // figure (lib/stress-test's own note): one figure, not "9.3% → 9.3%".
-  const same = impact.note.startsWith("The model already runs");
+  // The two runs are one where the OM's figure IS the evidence's: one
+  // figure, not "9.3% → 9.3%". Read off the values the engine was run on,
+  // as lib/stress-test-words does, never off the note's words.
+  const same = Math.abs(impact.altValue - impact.omValue) < 1e-9;
   return (
     <div className="mt-2" data-qa="stress-impact">
       <p className="text-xs font-medium tabular-nums text-ink" data-qa="stress-impact-pair">
-        {same ? `Levered IRR ${pctText(base)}, as the model runs` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
+        {same ? `Levered IRR ${pctText(base)}, run at the evidence's figure` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
       </p>
       <BarRows className="mt-1 text-[11px]">
         <BarRow label="At the evidence's figure" figure={pctText(alt)}>

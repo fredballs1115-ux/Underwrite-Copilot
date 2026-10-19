@@ -265,18 +265,29 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(uncheckedName({ ...OTHER, title: "RUBS income" })).toBe("the RUBS income");
   });
 
-  it("draws the pair as one figure where the model already runs at the evidence's", () => {
+  it("draws the pair as one figure where the OM's figure is the evidence's, read off the values, not the note", () => {
+    // lib/stress-test's own note for one run opens on the OM's figure, so a
+    // test of the note's words never matched it and printed "9.3% → 9.3%".
     const same: StressRow = {
       ...VACANCY,
-      impact: { ...VACANCY.impact!, altValue: 0.06, altIrrPct: 9.31, altMultiple: 1.53, note: "The model already runs vacancy at the deal's rent roll's 9.1%, so its levered IRR of 9.3% carries it." },
+      impact: {
+        ...VACANCY.impact!,
+        altValue: 0.06,
+        altIrrPct: 9.31,
+        altMultiple: 1.53,
+        note: "The OM's vacancy, 6.0%, is the deal's T-12's 6.0%, so the levered IRR of 9.3% stands on it.",
+      },
     };
     const s = render({ rows: [same], readOn: "2026-09-21", impactsWithheld: null });
     const t = visibleText(s).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-    expect(t).toContain("Levered IRR 9.3%, as the model runs");
-    expect(t).not.toContain("9.3% → 9.3%");
+    expect(s.match(/data-qa="stress-impact-pair">([^<]*)</)?.[1]).toBe("Levered IRR 9.3%, run at the evidence&#x27;s figure");
+    expect(t).not.toContain("→");
     expect(s).toContain('data-qa="stress-impact"');
     expect(t).toContain(same.impact!.note);
     expect(gluedWords(visibleText(s))).toEqual([]);
+    // Two figures are a move, whatever the note's words.
+    const moved = render({ rows: [{ ...VACANCY, impact: { ...VACANCY.impact!, note: same.impact!.note } }], readOn: "2026-09-21", impactsWithheld: null });
+    expect(moved.match(/data-qa="stress-impact-pair">([^<]*)</)?.[1]).toBe("Levered IRR 9.3% → 7.1%");
   });
 
   it("an unsupported row: the OM's figure with its page, the track, the gap, the impact pair and the folded challenge", () => {
