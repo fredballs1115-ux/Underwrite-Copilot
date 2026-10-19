@@ -35,7 +35,7 @@ function FloodThumb({ frame }: { frame: SiteFloodFrame }) {
           height={FLOOD_STRIP.h}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover"
+          className="h-full w-full overflow-hidden object-cover text-[10px] leading-tight text-muted"
         />
         {frame.ring && (
           <span
