@@ -544,3 +544,44 @@ describe("the verdict is handed the latest published rates the challenger reads"
   });
 });
 
+describe("the verdict is handed the stress test, struck in code", () => {
+  const none = { challenges: null, comps: null, reconciliation: null, market: null };
+
+  it("lists each row — key, verdict, the OM's figure and page, the evidence with its publisher and date, the gap, the engine's move, the question — after the deal and before the buy box, never in the system prompt", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const { ANALYST_SYSTEM } = await import("./prompts");
+    const test = sampleStressTest("2026-10-19");
+    const brief = buildBrief({ extraction: null, ...none, buyBox: ["Target IRR 13%"], stressTest: test });
+    const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
+    expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
+    expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
+    expect(brief).toContain("9 assumptions of the memorandum's tested in code — 1 unsupported, 2 stretched, 1 holds, 5 unchecked");
+    expect(brief).toContain(
+      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026; the deal's own document)",
+    );
+    // The engine at the OM's 6.0% against the engine at the rent roll's 9.1%.
+    expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.3%/);
+    expect(brief).toContain("- Basis (basis) [STRETCHED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
+    expect(brief).toContain("the levered IRR moves from 9.3% to 11.8%");
+    expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");
+    expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: not re-run — No figure to swap.");
+    // The instruction: the moves are the engine's, cited by figure and date.
+    expect(brief).toContain("The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself");
+    expect(brief).toContain("cite it by figure and date and name its publisher");
+    expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
+    // None handed, no section.
+    expect(buildBrief({ extraction: null, ...none })).not.toContain("STRESS TEST");
+  });
+
+  it("says the impacts are withheld, and why, where no model could be built", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
+    const brief = buildBrief({ extraction: null, ...none, stressTest: withheld });
+    expect(brief).toContain("No return is re-run: no model was derived for this deal, so no return is re-run.");
+    expect(brief).toContain("The levered IRR: not re-run — No model was derived for this deal, so no return is re-run.");
+    expect(brief).toContain("No return was re-run for this deal — No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say that no impact was struck in code, and never estimate one.");
+    expect(brief).not.toContain("The IRR moves above are the engine's own");
+  });
+});
+

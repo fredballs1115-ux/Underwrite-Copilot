@@ -82,7 +82,7 @@ export const DEEP_TOOLS: readonly DeepTool[] = [
       "Upload both BOVs and the gap gets decomposed into Year-1 NOI, cap rate and capex treatment — with anything the identity can't explain shown as unexplained rather than smoothed over. Then each broker's price runs through your own model, so you see the levered IRR each one actually implies.",
   },
   {
-    title: "The rent roll, normalized — and a workbook that's alive",
+    title: "The rent roll against the pro forma — and a workbook that's alive",
     where: "Deal → Rent roll",
     blurb:
       "Broker rent rolls are never the same twice: the header is rarely row 1 and the columns never match. Upload one, correct what the mapper missed, and get WALT weighted both ways, the rollover schedule and mark-to-market. Then download an Excel model whose formulas are live — change the exit cap on the Assumptions tab and the IRR recalculates.",
@@ -126,7 +126,7 @@ export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
 
 /** The free plan's card, on the homepage and the billing page alike. */
 export const FREE_PLAN: readonly string[] = [
-  `Up to ${FREE_DEALS} deals, the full six-stage screen on each`,
+  `Up to ${FREE_DEALS} deals, the full six-stage test on each`,
   "Sourced ranges + the three deal-killers",
   // Each said where it holds: the card had promised recorded-sales comps and
   // a local rule check by every address, where the comps run only where a
@@ -169,7 +169,7 @@ export const PRO_PLAN: readonly ProPlanLine[] = [
   { label: "Unlimited deals", gates: ["deal-cap"] },
   { label: "IC memo, full PDF report, and LOI draft", gates: ["memo", "report", "loi"] },
   { label: "Excel models with live formulas — the underwrite and the rent roll", gates: ["underwrite", "rentroll"] },
-  { label: "A first-draft model built from your documents", gates: ["model-build"] },
+  { label: "The model, included: a first draft built from your documents", gates: ["model-build"] },
   { label: "Ask the deal — answers cite the OM's pages", gates: ["ask"] },
   { label: "Public-web comp search", gates: ["comp-search"] },
   { label: "Your firm's branding on memos, reports, workbooks & LOI", gates: ["branding"] },
@@ -178,15 +178,11 @@ export const PRO_PLAN: readonly ProPlanLine[] = [
 /** The Pro card's lines, as both pages draw them. */
 export const PRO_PLAN_LINES: readonly string[] = [...PRO_PLAN.map((l) => l.label), "Everything in Free"];
 
-// ── Sample-deal narrative figures (fixture-sourced) ─────────────────────────
-// All of these come from ONE story — the illustrative Maddox sample deal
-// (lib/sample-deal.ts) — so the hero card, the demo tabs, and the bento tell
-// the same tale. They are labeled illustrative wherever they render.
+// ── Sample-deal narrative figures ───────────────────────────────────────────
+// None typed here: every sample figure a marketing surface prints is read
+// off the sample fixture (lib/sample-deal.ts) by the product's own readers
+// (the comp-premium line that lived here was referenced by nothing).
 //
-// The comp-premium line matches the sample's comp scrutiny narrative.
-export const SAMPLE_COMP_PREMIUM_LINE =
-  "$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it.";
-
 // NOTE deliberately absent: the Excel-preview IRR figures. Those are COMPUTED
 // at render time by the screening engine (lib/underwrite/engine) on the
 // sample's one derivation, the demo workbook's (lib/sample-derive's

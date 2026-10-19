@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-19",
+      "title": "The OM's assumptions, tested — and shown",
+      "href": "/how-we-test",
+      "blurb": "The deal page now leads with the stress test: one row for each assumption the memorandum makes, the figure it was set against with its date and source (the deal's own rent roll or T-12, a published figure, or a rule of thumb named as one), the gap, and what the gap does to the return, computed in code by re-running the model with the evidence's figure. The memo, the report and the verdict read the same rows. A new public page, How we test, says what each assumption is set against and what is not checked. The track record scores each screen only against what arrived after it: a later document, your decision, or a trade."
+    },
+    {
+      "date": "2026-10-19",
       "title": "Move deals in bulk, and leave a comp out",
       "href": "/deals",
       "blurb": "The pipeline has a Select mode: tick deals on the cards, the list or the board, then move them to a stage or mark them dead in one step. On the comps page, a recorded sale can be left out of the readout with a reason. It stays listed, struck through, and the medians, range and bars are worked out again from the sales kept; a link keeps the same sales out while they are still in the window."

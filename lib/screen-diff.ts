@@ -4,6 +4,7 @@
 // (Universal module: used by the deal page; snapshots are written by the
 // pipeline into deals.prior_screen — see migration 0010.)
 
+import type { Challenge } from "@/lib/anthropic/types";
 import { compactUsd } from "@/lib/money";
 import { METRIC_FIND, parseMoney, parsePct, parsePrice, screenYearOf } from "./criteria";
 
@@ -19,6 +20,9 @@ interface ExtractionLike {
 }
 interface VerdictLike {
   verdict?: string;
+  /** the verdict's own stamp — the screen the snapshot's challenges were
+   *  made on, which the track record scores them from */
+  generatedAt?: string | null;
 }
 
 /** What the pipeline snapshots before overwriting a previous run's results. */
@@ -26,6 +30,10 @@ export interface PriorScreen {
   at: string;
   extraction: ExtractionLike | null;
   verdict: VerdictLike | null;
+  /** the challenges the re-screen replaced (since 2026-10-19), so the track
+   *  record (lib/track-record) can score them against a document that
+   *  arrived between the two screens; absent on an older snapshot */
+  challenges?: { challenges?: Challenge[] | null } | null;
 }
 
 export interface DiffRow {

@@ -75,6 +75,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { marketPictureFor } from "./market-picture";
 import { creditText, photographerParts } from "./credit-parts";
+import { scoreDeal as scoreDealForTest } from "./track-record";
+import { sampleStressTest } from "./sample-stress";
 
 type Props = Parameters<typeof DealView>[0];
 
@@ -135,6 +137,9 @@ function sampleProps(initialTab: string | null, initialAnalysis: string | null =
       box: SAMPLE_DEMO_BOX,
     },
     todayIso: "2026-09-08",
+    // The OM's assumptions tested on the sample (lib/sample-stress), as the
+    // deal page builds them on the server and hands them to the Overview.
+    stressTest: sampleStressTest({ today: "2026-09-08", derived }),
   } as unknown as Props;
 }
 
@@ -184,6 +189,28 @@ describe("DealView — the sample deal renders every section without a runtime e
       expect(span.split(" ")).toContain("sm:truncate");
       expect(title.length).toBeGreaterThan(0);
     }
+  });
+
+  it("the Overview leads with the OM's assumptions tested, after the call and before the risk digest (2026-10-19, the refocus)", () => {
+    const html = render(sampleProps("overview"));
+    const text = textOf(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    const panel = html.indexOf('data-qa="stress-test-panel"');
+    expect(panel).toBeGreaterThan(0);
+    // After the compact verdict's reason, before the risk digest.
+    expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(panel);
+    expect(html.indexOf("Risk digest")).toBeGreaterThan(panel);
+    expect(text).toContain("The OM's assumptions, tested");
+    // The sample's 6% vacancy against its rent roll and T-12, a document
+    // row, unsupported, the model already running at the roll's occupancy.
+    const row = html.slice(html.indexOf('data-qa="stress-row-vacancy"'), html.indexOf('data-qa="stress-row-', html.indexOf('data-qa="stress-row-vacancy"') + 10));
+    expect(row).toContain('data-verdict="unsupported"');
+    expect(row).toContain('data-evidence="document"');
+    expect(textOf(row)).toContain("the deal's T-12");
+    expect(row).toContain('data-qa="stress-impact"');
+    expect(html).toContain('href="/how-we-test#vacancy"');
+    // Without a test, the Overview draws no panel.
+    const bare = { ...sampleProps("overview"), stressTest: null };
+    expect(render(bare)).not.toContain('data-qa="stress-test-panel"');
   });
 
   it("the sample's reading guide opens each section it names, never a card that does nothing (research pass 32)", () => {
@@ -2265,5 +2292,28 @@ describe("the extracted terms' pages (lib/facts' absolute rule)", () => {
     expect(html).toContain('href="/api/deals/x/om#page=4"');
     expect(html).toContain('href="/api/deals/x/om#page=31"');
     expect(a11yIssues(html)).toEqual([]);
+  });
+});
+
+// ── The track record on the Overview ────────────────────────────────────────
+
+describe("DealView — what came after the screen (lib/track-record) closes the Overview", () => {
+  const record = scoreDealForTest({
+    screenedAt: "2026-10-01T12:00:00Z",
+    challenges: [{ assumption: "Stabilized vacancy of 6%", severity: "high", challenge: "", question: "", key: "vacancy", omFigure: 6, altFigure: 9, altBasis: "a rule of thumb" }],
+    t12: { arrivedAt: "2026-10-05T09:00:00Z", dated: "2026-09-30", summary: SAMPLE_DEAL.t12.summary },
+  });
+
+  it("draws the card after the decision log where something arrived after the screen, and nothing where nothing did", () => {
+    const html = render({ ...sampleProps("overview"), trackRecord: record } as unknown as Props);
+    const log = html.indexOf("Decision log");
+    const card = html.indexOf('data-qa="track-record"');
+    expect(log).toBeGreaterThan(0);
+    expect(card).toBeGreaterThan(log);
+    expect(textOf(html)).toContain("What came after the screen");
+    expect(a11yIssues(html)).toEqual([]);
+    // The sample itself: its verdict carries no stamp, so nothing is after it.
+    expect(render(sampleProps("overview"))).not.toContain('data-qa="track-record"');
+    expect(render({ ...sampleProps("financials"), trackRecord: record } as unknown as Props)).not.toContain('data-qa="track-record"');
   });
 });

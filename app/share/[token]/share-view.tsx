@@ -60,6 +60,8 @@ import { readPortfolio } from "@/lib/portfolio";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { SharePlan } from "./plan-facts";
 import { SharePicture, type SharePictureSource } from "./share-picture";
+import { StressTestPanel } from "@/app/stress-test-panel";
+import type { StressTest } from "@/lib/stress-test-types";
 
 /**
  * The read-only shared screen, as pure markup. `page.tsx` is the loader: it
@@ -112,6 +114,10 @@ export interface ShareViewProps {
   /** the loader's day, an ISO day: today's tick on a rent allowance's
    *  period — the view itself reads no clock */
   today?: string | null;
+  /** the OM's assumptions tested (lib/stress-test), built by the loader
+   *  from the stored results: no model and no figures read today, so no
+   *  return is re-run, and the panel says so; absent or null draws nothing */
+  stressTest?: StressTest | null;
 }
 
 // A range's confidence, in the deal page's colours (RANGE_CONF there).
@@ -326,6 +332,7 @@ export function ShareView({
   floodLine = null,
   regulation = null,
   today = null,
+  stressTest = null,
 }: ShareViewProps) {
   const vmeta = VERDICT_META[verdict.verdict] ?? UNKNOWN_VERDICT;
   const call: VerdictCall | null = VERDICT_META[verdict.verdict] ? verdict.verdict : null;
@@ -573,6 +580,11 @@ export function ShareView({
           </ul>
         )}
       </section>
+
+      {/* The OM's assumptions, tested (app/stress-test-panel): what the call
+          above rests on, row by row — the stored results alone, so no
+          return is re-run here and the panel says so. */}
+      <StressTestPanel test={stressTest} className="mt-6" />
 
       {/* The basis per the counting row's own noun (a hotel counting "Rooms"
           is per room), as the deal page's plan strip says it — else the

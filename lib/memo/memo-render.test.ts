@@ -1472,3 +1472,118 @@ describe("the memo's wording (research pass 35)", () => {
     );
   });
 });
+
+// The OM's assumptions, tested in code (lib/stress-test), right after the
+// verdict box: the product's lead on the memo. On the sample the test is
+// built as the memo route builds it (lib/sample-cover `sampleStressTest`):
+// the stored results and documents on the one derivation.
+describe("the memo leads with the stress test", () => {
+  const dealOf = () =>
+    ({
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      is_sample: true,
+      address: SAMPLE_DEAL.address,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      first_signal: null,
+      prior_screen: null,
+    }) as unknown as DealRow;
+
+  it("prints the read line and each row past the evidence — the vacancy row with its IRR — and stays one page on the sample", async () => {
+    const { sampleStressTest, sampleActualsLine, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const data = { ...buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test), actualsLine: sampleActualsLine() };
+    expect(data.stressTest?.rows.map((r) => [r.key, r.verdict])).toEqual([
+      ["vacancy", "unsupported"],
+      ["basis", "stretched"],
+      ["exit_cap", "stretched"],
+    ]);
+    const pdf = await renderMemoPdf(data);
+    // One page, every row on it: the block takes the room the screen's
+    // estimates had, and the actuals line still fits beside the key terms.
+    expect(pdfPageCount(pdf)).toBe(1);
+    const text = pdfTextOf(pdf).replace(/\s+/g, " ");
+    expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
+    expect(text).toContain("9 assumptions of the memorandum's tested in code — 1 unsupported, 2 stretched, 1 holds, 5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    // The vacancy row: the OM's figure with its page, the rent roll with its
+    // date, the gap in points, and the IRR — the engine at the OM's 6.0%
+    // against the engine at the rent roll's 9.1%, one input apart.
+    expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.1% (the deal's rent roll, May 31, 2026) · gap 3.1 pts · IRR 12.4% to 9.3%");
+    // The basis row carries the engine's move, spelled, since standard
+    // Helvetica has no arrow.
+    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $261k/unit (the offering memorandum) · gap 5.1% · IRR 9.3% to 11.8%");
+    expect(text).toContain("STRETCHED Exit cap OM 5.25% (p. 41) · against 5.45% (the offering memorandum) · gap 20 bps · IRR 10.8% to 9.3%");
+    expect(text).not.toMatch(/→|->/);
+    // The block sits right after the verdict box and before the buy box.
+    const verdictAt = text.indexOf(data.verdictReason.slice(0, 40));
+    const blockAt = text.indexOf("THE OM'S ASSUMPTIONS, TESTED");
+    const buyBoxAt = text.indexOf("BUY BOX");
+    expect(verdictAt).toBeGreaterThan(-1);
+    expect(blockAt).toBeGreaterThan(verdictAt);
+    expect(buyBoxAt).toBeGreaterThan(blockAt);
+    // The screen's own estimates gave the room: no deal-killer cards and no
+    // flips strip on a memo that carries the engine's run (the report's
+    // "The call, in full" page prints both whole).
+    expect(data.dealKillers).toEqual([]);
+    expect(data.sensitivity).toEqual([]);
+    expect(text).not.toContain("Breaks if (screen's estimate)");
+    expect(text).not.toContain("Where the call flips");
+    expect(text).toContain("T-12 NOI");
+  }, 60000);
+
+  it("draws the OM's figure against the evidence's as two ticks on a track, four fills a row (counted)", async () => {
+    const { sampleStressTest, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const data = buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, sampleStressTest("2026-10-19"));
+    const render = (d: typeof data) =>
+      renderToBuffer(React.createElement(MemoDocument, { data: d }) as unknown as Parameters<typeof renderToBuffer>[0]);
+    const withTicks = await render(data);
+    const withoutTicks = await render({ ...data, stressTest: { ...data.stressTest!, rows: data.stressTest!.rows.map((r) => ({ ...r, ticks: null })) } });
+    const drawn = data.stressTest!.rows.filter((r) => r.ticks).length;
+    expect(drawn).toBe(3);
+    // The track, the span between the two and a tick each: four fills a row.
+    expect(pdfFillCountOf(withTicks) - pdfFillCountOf(withoutTicks)).toBe(drawn * 4);
+  }, 60000);
+
+  it("prints no block without a test, and a test with no row past the evidence prints the read line alone", async () => {
+    const { sampleStressTest, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const bare = buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks());
+    expect(bare.stressTest).toBeNull();
+    // The screen's estimates stand where the test gives the memo nothing
+    // to lead with.
+    expect(bare.dealKillers.length).toBeGreaterThan(0);
+    const test = sampleStressTest("2026-10-19");
+    const allHold = { ...test, rows: test.rows.map((r) => ({ ...r, verdict: "holds" as const })) };
+    const data = buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, allHold);
+    expect(data.stressTest?.rows).toEqual([]);
+    expect(data.stressTest?.count).toBe("none past the evidence");
+    expect(data.dealKillers.length).toBeGreaterThan(0);
+    const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
+    expect(text).toContain("9 assumptions of the memorandum's tested in code — 9 hold;");
+    expect(text).not.toContain("Ticks:");
+  }, 60000);
+
+  it("gives room back in order where a memo would run to a second page: the actuals line first, then the rows past the second, never the lead row", async () => {
+    const { sampleStressTest, sampleActualsLine, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    // Two overridden submarket checks, each two lines: more than the page
+    // holds with every row and the actuals line (the sample fits with some
+    // fifty points to spare).
+    const override = "Supply check overridden: the 1,200 units under construction are two miles away across the river, and the analyst reads the submarket as the near side alone, which the deal's own leasing bears out.";
+    const data = { ...buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, [override, override], null, "2026-10-19", null, test), actualsLine: sampleActualsLine() };
+    const whole = await renderMemoPdf({ ...data, overrides: [] });
+    expect(pdfPageCount(whole)).toBe(1);
+    const pdf = await renderMemoPdf(data);
+    const text = pdfTextOf(pdf).replace(/\s+/g, " ");
+    // It fit by giving something back — the actuals line first — and the
+    // lead row, the unsupported vacancy, is the last thing to go.
+    expect(pdfPageCount(pdf)).toBe(1);
+    expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
+    expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8)");
+    expect(text).not.toContain("T-12 NOI");
+    expect(text).toContain("SUBMARKET CHECKS OVERRIDDEN");
+  }, 60000);
+});

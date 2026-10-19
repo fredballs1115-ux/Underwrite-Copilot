@@ -149,7 +149,7 @@ describe("the free allowance is said as the cap counts it", () => {
 
   it("the plan card and the calls to sign up read one line", () => {
     expect(FREE_DEALS_LINE).toBe(`Up to ${FREE_DEALS} deals free`);
-    expect(FREE_PLAN[0]).toBe(`Up to ${FREE_DEALS} deals, the full six-stage screen on each`);
+    expect(FREE_PLAN[0]).toBe(`Up to ${FREE_DEALS} deals, the full six-stage test on each`);
     expect(read("app/page.tsx").match(/\{FREE_DEALS_LINE\}/g) ?? []).toHaveLength(2);
     expect(read("app/demo/page.tsx")).toContain("{FREE_DEALS_LINE}");
   });

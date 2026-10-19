@@ -7,6 +7,52 @@ six-step analysis loop, all sharing one "deal":
 **extract → challenge → scrutinize broker comps → reconcile (vs the user's own model) → market check → verdict.**
 Plus accounts + saved deals. (Stripe billing is a later phase.)
 
+## The product, since 2026-10-19
+
+An investor who built the same tools in-house said it plainly: converting an
+OM to a model will be a commodity; **stress-testing the OM's assumptions is
+the product**, and it sells only if a buyer can see how each assumption is
+tested and whether that is right. So:
+
+- **The stress test is struck in code** (`lib/stress-test-types.ts` is the
+  contract, `lib/stress-test.ts` the pure reader). One row an assumption
+  (`STRESS_KEYS`): the OM's figure with its validated page; the evidence it
+  is set against, each piece typed (`published` with publisher, date and
+  scope; `document` — the deal's own rent roll or T-12; `rule_of_thumb`,
+  named as one; `om_internal` — the OM against itself); the gap, signed
+  from the buyer's side; a verdict word decided by code (holds / stretched
+  / unsupported / unchecked); and the return's move — `computeUnderwrite`
+  run twice on the derived model, the OM's figure in one run and the
+  evidence's in the other, ONE input apart. The AI names the assumption,
+  the figure and the question (the challenger's optional `key`, `omFigure`,
+  `altFigure`, `altBasis`; older screens link by `CHALLENGE_KEYWORDS`);
+  code does every comparison and every re-run. A row's `method` names only
+  the evidence actually attached.
+- **Every surface leads with it**: `app/stress-test-panel.tsx`
+  (`StressTestPanel`, pure) first on the deal page's Overview after the
+  call, on the shared screen (impacts withheld, said), on /demo and the
+  homepage walkthrough on the sample; the memo's block right after the
+  verdict box (`lib/stress-test-words.ts` is the one set of sentences the
+  memo, the report and the verdict's brief read); the report's "The stress
+  test" page; and the verdict's brief carries "STRESS TEST, STRUCK IN CODE"
+  so the call cites the engine's moves by figure, date and publisher
+  (`lib/anthropic/pipeline.ts` `screenStressTest`).
+- **How it is done is public**: `/how-we-test` draws `STRESS_METHODS` (the
+  claim, what it is set against, what the engine does, what is NOT
+  checked), and `lib/stress-test.test.ts` holds every "set against"
+  sentence to a label the reader emits.
+- **Whether it is right is scored, never claimed** (`lib/track-record.ts`,
+  pure): a screen's challenges are scored only against evidence that
+  arrived AFTER its verdict — a rent roll or T-12 by its document's upload,
+  a Dead decision with its reason, a reported trade — on the deal page
+  ("What came after the screen") and on /analytics, with the comps' floor
+  of three scored rows before any share is printed; the sample has no
+  worked case because nothing on it postdates its screen, and none is
+  faked. A re-screen snapshots the previous challenges into
+  `prior_screen` so the record can score them.
+- **The model is included, not the product**: every public page says so,
+  and no public sentence promises a re-run the code does not make.
+
 ## Architecture
 
 - **Next.js 16 App Router + TypeScript**, Tailwind v4. Server Components by default.

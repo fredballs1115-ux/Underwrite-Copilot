@@ -40,6 +40,7 @@ import { loadSampleTile } from "@/app/sample-pipeline-card-lazy";
 import { SAMPLE_ACTUALS_WORDS, SAMPLE_OM_FILE_WORDS, SAMPLE_OM_WORDS, SourceDocumentsView } from "@/app/(app)/deals/[id]/source-documents";
 import { SAMPLE_OM_HREF } from "./sample-om-link";
 import { rentRollDateWords, t12DateWords } from "./actuals/actuals-read";
+import { sampleStressTest } from "./sample-stress";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -71,7 +72,7 @@ describe("the homepage, as a screen reader hears it", () => {
     // the chip on screen and nothing spaced it for a screen reader.
     const html = await renderHome();
     const text = html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "");
-    expect(text).toContain("Excel model, live formulas Pro");
+    expect(text).toContain("The model, included — Excel, live formulas Pro");
     expect(text).toContain("IC memo Pro");
     expect(text).not.toMatch(/formulasPro|memoPro/);
   }, 60_000);
@@ -321,7 +322,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
 
   it("the Excel tile prints the workbook it links: its base case and two cells of its Sensitivity tab", async () => {
     const html = await renderHome();
-    const at = html.indexOf("Excel model, live formulas");
+    const at = html.indexOf("The model, included — Excel, live formulas");
     expect(at).toBeGreaterThan(-1);
     const tile = words(html.slice(at, html.indexOf("/api/demo/underwrite.xlsx", at)));
     for (const [k, v, e] of sampleWorkbookPreview()) expect(tile).toContain(`${k} ${v} ${e}`);
@@ -342,7 +343,8 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     expect(tile).toContain(`${memo.verdictWord} ${memo.verdictSub}`);
     expect(memo.verdictWord).toBe(sampleHeader().pill!.label);
     for (const t of memo.keyTerms.slice(0, 4)) expect(tile, t.label).toContain(`${t.label} ${t.value}`);
-    const cAt = html.indexOf("Comps, graded");
+    const cAt = html.indexOf("The broker&#x27;s comps, graded");
+    expect(cAt).toBeGreaterThan(-1);
     const comps = words(html.slice(cAt, html.indexOf("Your buy box, checked in code", cAt))).replace(/&#x27;/g, "'");
     const ordered = inCompOrder(SAMPLE_DEAL.comps.saleComps);
     expect(ordered).toHaveLength(SAMPLE_DEAL.comps.saleComps.length);
@@ -517,7 +519,7 @@ describe("the screen-run trace credits each stage with what it writes", () => {
     const l = lines();
     expect(l.challenge).not.toMatch(/deal-killer/);
     const levers = SAMPLE_DEAL.verdict.screen!.dealKillers.map((k) => k.lever);
-    expect(l.verdict).toContain(`${levers.length} deal-killers stressed first: ${["basis", "exit", "debt"].filter((x) => levers.includes(x as never)).join(" · ")}`);
+    expect(l.verdict).toContain(`${levers.length} deal-killers named first: ${["basis", "exit", "debt"].filter((x) => levers.includes(x as never)).join(" · ")}`);
     expect(l.challenge).toContain(`${SAMPLE_DEAL.challenges.challenges.length} assumptions challenged`);
     expect(l.challenge).toContain("each with a question for the broker");
   });
@@ -570,6 +572,31 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(t).not.toMatch(/Screening verdict|one rubric|Deal-killer|Stress it|Holds up/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("leads the Overview with the OM's assumptions tested on the sample, after the call and before the risk digest (2026-10-19)", () => {
+    const stressTest = sampleStressTest({ today: "2026-09-21", derived: sampleDerivedInputs() });
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Overview" as never, stressTest }));
+    const t = text(html);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const panel = html.indexOf('data-qa="stress-test-panel"');
+    expect(panel).toBeGreaterThan(0);
+    expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(panel);
+    expect(html.indexOf("Risk digest")).toBeGreaterThan(panel);
+    expect(t).toContain("The OM's assumptions, tested");
+    // The sample's 6% vacancy against its rent roll and T-12: a document
+    // row with an impact, drawn on the homepage from the same build /demo
+    // draws (lib/sample-stress), with no figure read today.
+    const from = html.indexOf('data-qa="stress-row-vacancy"');
+    const row = html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
+    expect(row).toContain('data-verdict="unsupported"');
+    expect(row).toContain('data-evidence="document"');
+    expect(visibleText(row)).toContain("the deal's T-12");
+    expect(row).toContain('data-qa="stress-impact"');
+    expect(t).not.toContain("Published figures read");
+    // The page hands the walkthrough the same build.
+    expect(readFileSync("app/page.tsx", "utf8")).toContain("stressTest={sampleStressTest(");
   });
 
   it("draws the deal page's own section bar and Analyses pills (section-tabs), counted by its own readers", () => {

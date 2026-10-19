@@ -1452,12 +1452,35 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(view).toContain("<AnalysisTabs");
     });
 
-    it("opens on the Overview the deal page opens on: the guide, the actuals, the verdict and risk digest, the playground", () => {
+    it("opens on the Overview the deal page opens on: the guide, the actuals, the verdict, the OM's assumptions tested, the risk digest, the playground", () => {
       const html = section("overview");
       const text = visibleText(html);
       expect(text).toContain("How to read this screen");
       expect(text).toContain("Property actuals");
       expect(text).toContain("Risk digest");
+      // The stress test (app/stress-test-panel) leads after the call and
+      // before the risk digest, on the sample's own documents: its 6%
+      // vacancy against the rent roll and the T-12, a document row with an
+      // impact, the model already running at the roll's occupancy.
+      const panel = html.indexOf('data-qa="stress-test-panel"');
+      expect(panel).toBeGreaterThan(0);
+      expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(panel);
+      expect(html.indexOf("Risk digest")).toBeGreaterThan(panel);
+      expect(text).toContain("The OM's assumptions, tested");
+      const from = html.indexOf('data-qa="stress-row-vacancy"');
+      const row = html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
+      expect(row).toContain('data-verdict="unsupported"');
+      expect(row).toContain('data-evidence="document"');
+      expect(visibleText(row)).toContain("the deal's T-12");
+      // The engine at the OM's 6.0% against the engine at the roll's 9.1%.
+      expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.3%");
+      // The sample's five unchecked rows are one folded group at the end.
+      expect(visibleText(html)).toContain("5 assumptions unchecked: debt, rent growth, real estate taxes, insurance, the renovation premium");
+      expect(visibleText(html)).toContain("Read why (5)");
+      expect(html.indexOf('data-qa="stress-unchecked-group"')).toBeGreaterThan(html.indexOf('data-qa="stress-row-noi"'));
+      expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));
+      expect(row).toContain('data-qa="stress-impact"');
+      expect(data.stressTest!.rows.find((r) => r.key === "vacancy")!.evidence.some((e) => e.kind === "document" && e.publisher === "the deal's T-12")).toBe(true);
       expect(text).toContain("The screening model — the one the Excel workbook and the full report carry.");
       expect(text).toContain("Levered IRR 9.3%, the base case");
       expect(a11yIssues(html)).toEqual([]);
@@ -2948,6 +2971,53 @@ import { SHARE_AERIAL, SHARE_AERIAL_FRAMES } from "@/lib/image-frames";
 import type { BrokerCompsResult, ExtractionResult, MarketResult, VerdictResult } from "@/lib/anthropic/types";
 
 describe("ShareView — the read-only screen a partner or lender opens", () => {
+  it("draws the OM's assumptions tested under the call, from the stored results alone, no return re-run and said so (2026-10-19)", async () => {
+    const { buildStressTest } = await import("@/lib/stress-test");
+    // As the loader builds it: the extraction, the challenger, the comps and
+    // the market check, no model and no figure read today.
+    const stressTest = buildStressTest({
+      extraction: SAMPLE_DEAL.extraction,
+      firstSignal: null,
+      challenger: SAMPLE_DEAL.challenges,
+      market: SAMPLE_DEAL.market,
+      modelVsMarket: null,
+      actuals: null,
+      derived: null,
+      storedAssetClass: SAMPLE_DEAL.asset_class,
+      brokerComps: SAMPLE_DEAL.comps,
+      readOn: "2026-09-21",
+    });
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      extraction: SAMPLE_DEAL.extraction,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, stressTest }));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const panel = html.indexOf('data-qa="stress-test-panel"');
+    expect(panel).toBeGreaterThan(html.indexOf("First-pass verdict"));
+    expect(text).toContain("The OM's assumptions, tested");
+    expect(text).toContain("No return struck: No model was derived for this deal, so no return is re-run.");
+    expect(html).not.toContain('data-bar="stress-impact"');
+    // The exit cap against the going-in cap, the OM against itself, stands
+    // without a model; the loader reads the challenger's words for it.
+    expect(html).toContain('data-qa="stress-row-exit_cap"');
+    expect(text).toContain("The OM's 5.25% exit is 20 bps tighter than its 5.45% going-in cap — cap compression.");
+    // The loader selects the challenger result for it.
+    expect(readFileSync("lib/share-resolve.ts", "utf8")).toMatch(/SHARED_DEAL_COLUMNS =\s*"[^"]*\bchallenges\b/);
+    expect(readFileSync("app/share/[token]/page.tsx", "utf8")).toContain("challenger: (deal.challenges as ChallengerResult | null) ?? null");
+    // Without a test, the screen draws no panel.
+    expect(renderToStaticMarkup(React.createElement(ShareView, props))).not.toContain('data-qa="stress-test-panel"');
+  });
+
   it("renders the sample deal: the verdict mark, the flip dots, every range, the killers, key terms and the folded reads", () => {
     const html = renderToStaticMarkup(
       React.createElement(ShareView, {

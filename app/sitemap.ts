@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { latestChange } from "@/lib/changelog";
-import { marketPages, marketPath, sectorPages, sectorPath } from "@/lib/public-pages";
+import { HOW_WE_TEST_PATH, marketPages, marketPath, sectorPages, sectorPath } from "@/lib/public-pages";
 
 // Generated at /sitemap.xml. Only the public, indexable pages belong here —
 // the app itself sits behind auth and is disallowed in robots.txt.
@@ -29,6 +29,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${APP_URL}/why`,
       changeFrequency: "monthly",
       priority: 0.7,
+    },
+    {
+      // The methodology page: how each assumption is tested, from the
+      // stress test's own table (lib/stress-test-types).
+      url: `${APP_URL}${HOW_WE_TEST_PATH}`,
+      changeFrequency: "monthly",
+      priority: 0.6,
     },
     {
       // The covered-market briefs — public since the marquee and coverage

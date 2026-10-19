@@ -17,7 +17,7 @@ const PANELS = readdirSync(join(process.cwd(), "app"))
   .map((f) => ({ f, src: readFileSync(join(process.cwd(), "app", f), "utf8") }));
 
 describe("app/panel-parts — the parts every deal-type panel draws with", () => {
-  it("covers the eighteen deal-type panels", () => {
+  it("covers the eighteen deal-type panels and the stress test's", () => {
     expect(PANELS.map((p) => p.f).sort()).toEqual(
       [
         "affordable",
@@ -35,6 +35,7 @@ describe("app/panel-parts — the parts every deal-type panel draws with", () =>
         "self-storage",
         "single-tenant",
         "site-reports",
+        "stress-test",
         "student-housing",
         "tax-abatement",
         "value-add",

@@ -8,6 +8,7 @@ import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, challengerInstruction, type KeyedTrapList } from "./prompts";
 import { todayLine } from "./today";
 import type { AssetClass, ChallengerResult } from "./types";
+import { STRESS_KEYS } from "@/lib/stress-test-types";
 
 const ChallengerSchema = z.object({
   challenges: z.array(
@@ -17,6 +18,15 @@ const ChallengerSchema = z.object({
       challenge: z.string(),
       question: z.string(),
       page: z.string(),
+      // The stress test's structure (lib/stress-test-types): the assumption
+      // by its key, the OM's figure in its own unit, and the figure the
+      // challenger holds it against with where that came from. A result
+      // stored before these were asked carries none, and lib/stress-test
+      // matches its assumption text by keyword instead.
+      key: z.enum(STRESS_KEYS),
+      omFigure: z.number().nullable(),
+      altFigure: z.number().nullable(),
+      altBasis: z.string(),
     }),
   ),
   stressTest: z.string(),

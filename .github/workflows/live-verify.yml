@@ -47,7 +47,7 @@ jobs:
           # The Sep 8 simplification (#240) cut the homepage to one idea per
           # section — the markers below are the pieces that still exist. The
           # decisive freshness evidence is the build sha stamp, not any copy.
-          grep -c "Stop underwriting like a" body.html && echo "HERO: CURRENT (coin-flip headline)" || echo "HERO: OLD OR MISSING"
+          grep -c "Test the OM before you model it" body.html && echo "HERO: CURRENT (the stress-test headline)" || echo "HERO: OLD OR MISSING"
           grep -c "The OM lands Thursday" body.html && echo "SUPERSEDED HERO STILL PRESENT" || true
           grep -o "page rendered[^<]*" body.html || echo "no render stamp found"
           grep -o "data last verified[^<]*" body.html && echo "STEWARD MARKER: present" || echo "STEWARD MARKER: absent (no steward run yet — expected until the nightly cron lands)"
@@ -55,7 +55,7 @@ jobs:
           grep -c "feature-grid" body.html && echo "FEATURE ICON GRID (Sep 8, #240): present" || echo "FEATURE ICON GRID (Sep 8, #240): not yet deployed"
           grep -c "trust-strip" body.html && echo "TRUST STRIP under pricing (Sep 14, #273): present" || echo "TRUST STRIP under pricing (Sep 14, #273): not yet deployed"
           grep -c "screenrun-line" body.html && echo "SCREEN-RUN TRACE: present" || echo "SCREEN-RUN TRACE: missing"
-          grep -c "Break it yourself" body.html && echo "STRESS BENCH: present" || echo "STRESS BENCH: missing"
+          grep -c "Move the assumption, watch the return" body.html && echo "STRESS BENCH: present" || echo "STRESS BENCH: missing"
           grep -c "irr-gauge" body.html && echo "IRR GAUGE: present" || echo "IRR GAUGE: missing"
           grep -c "stamp-in" body.html && echo "VERDICT STAMP: present" || echo "VERDICT STAMP: missing"
           grep -c "scroll-progress" body.html && echo "SCROLL PROGRESS: present" || echo "SCROLL PROGRESS: missing"
@@ -98,10 +98,13 @@ jobs:
           done
       - name: Public pages spot-check
         run: |
-          for path in demo why whats-new market; do
+          for path in demo why whats-new market how-we-test; do
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
           done
           grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
+          # /how-we-test (2026-10-19, the refocus): the methodology page, its
+          # marker one JS string with no interpolation inside it.
+          grep -q "The arithmetic is run in code, never by the AI." p_how-we-test.html && echo "/how-we-test: methodology page present" || echo "/how-we-test: not yet deployed"
           # /demo draws the deal page's own header and section bar on the
           # sample (2026-10-16); the old hand-built legal panel, pack position
           # and deal-type chip markers are retired with the parts they read.
@@ -463,7 +466,7 @@ jobs:
         # beside this run's main tip) is what tells a fresh build from a stale
         # one — no copy marker can, since copy is exactly what changes.
         run: |
-          if ! grep -q "Stop underwriting like a" body.html; then
+          if ! grep -q "Test the OM before you model it" body.html; then
             echo "VERDICT: LIVE SITE IS SERVING AN OLD BUILD — Render is not deploying main. Check dashboard.render.com → underwrite-copilot-web → Events for failed deploys (likely build OOM on the starter instance) or auto-deploy toggled off."
             exit 1
           fi

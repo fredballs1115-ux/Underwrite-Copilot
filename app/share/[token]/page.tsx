@@ -4,6 +4,7 @@ import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import type {
   ExtractionResult,
   BrokerCompsResult,
+  ChallengerResult,
   FirstSignal,
   MarketResult,
   VerdictResult,
@@ -21,6 +22,7 @@ import { SITE_NAME } from "@/lib/page-meta";
 import { PLAIN_CARD } from "@/lib/public-pages";
 import type { SharePictureSource } from "./share-picture";
 import { regulationForDeal } from "@/lib/rent-regulation";
+import { buildStressTest } from "@/lib/stress-test";
 
 /** The aerial's credit on the public screen: The National Map is a US
  *  federal work in the public domain, and the line says so. */
@@ -144,9 +146,26 @@ export default async function SharePage({
     },
     today,
   );
+  // The OM's assumptions, tested (lib/stress-test), from the stored results
+  // the token resolves: the extraction, the challenger, the memorandum's
+  // comps and the market check. A shared screen carries no model and reads
+  // no figures today, so no return is re-run, and the panel says so.
+  const stressTest = buildStressTest({
+    extraction,
+    firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
+    challenger: (deal.challenges as ChallengerResult | null) ?? null,
+    market: (deal.market as MarketResult | null) ?? null,
+    modelVsMarket: null,
+    actuals: null,
+    derived: null,
+    storedAssetClass: (deal.asset_class as string | null) ?? null,
+    brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+    readOn: today,
+  });
 
   return (
     <ShareView
+      stressTest={stressTest}
       dealName={deal.name}
       // The class as every page shows it: the sender's where they filed one,
       // the deck's where they left "Auto" (which read as no class here).

@@ -319,6 +319,18 @@ const PLAN_CLAUSE = `IF THE OM DESCRIBES A PLAN — a conversion, a ground-up de
  *  `forwardNote`). */
 const FORWARD_CLAUSE = `THIS OM SELLS A FORWARD PURCHASE — a building bought when it is finished: the buyer pays the price at delivery and the developer funds the works, so the buyer carries no construction. Read the NOI it states at delivery as the delivered building's figure, not today's income, and grill the purchase on its own terms: BASIS is the price — the buyer's whole cost, never the price plus the developer's budget — per unit or per SF against comparable trades of finished product; EXIT is the yield at delivery against the exit cap, and whether a buyer exists for the finished product at that cap; DEBT is the buyer's own loan at closing, struck at the rates of the closing day rather than today's — no construction or bridge loan, no interest reserve and no carry through the works is the buyer's. Then test the clock and the deposit: what the contract calls complete and who certifies it, the delivery against the outside date, and what becomes of the deposit if delivery runs late. The purchase's facts as the OM states them and its traps by name are set out with the notes on this deal: apply them. A going-in cap on a building that stands is not a test of a forward purchase; the yield at delivery, the clock and the deposit are.`;
 
+/**
+ * The structure each challenge carries beside its words (2026-10-19, the
+ * stress test: lib/stress-test-types): which assumption it tests, by the
+ * stress test's own key, the OM's figure in the assumption's own unit, and
+ * the figure the challenger holds it against with where that came from —
+ * a figure already in the notes it was handed, or a rule of thumb named as
+ * one. The reader (lib/stress-test) files the challenge on its row by the
+ * key, and never takes `altFigure` for evidence: evidence is what the code
+ * read, and the challenger's figure rides with its words.
+ */
+const CHALLENGE_STRUCTURE_CLAUSE = `For each challenge, also fill four fields so the screen can file it beside its own evidence. \`key\`: which assumption it tests, one of "basis" (the price per unit or per SF), "exit_cap", "debt" (the loan's rate, coverage or leverage), "noi" (the NOI against the actuals or the OM's own in-place figure), "vacancy" (vacancy, occupancy or lease-up), "rent_growth" (rent, income or revenue growth, loss to lease, a pro forma rent), "expense_growth" (the expense growth rate or ratio), "taxes" (the real estate tax line and its reset), "insurance" (the premium), "renovation_premium" (a value-add premium or return on cost), or "other" for anything no key names. \`omFigure\`: the OM's own figure for that assumption in the assumption's own unit — a percent as a bare percent (6 for 6%, 5.5 for a 5.5% cap), a dollar amount as dollars, a premium as dollars a month — or null where the OM states no figure. \`altFigure\`: the figure you hold it against, in the same unit, or null where you hold it to words alone. \`altBasis\`: where that figure came from, in one phrase — a figure already in the notes on this deal ("the T-12's $1.42M NOI", "the metro's 6.2% rental vacancy, Census Bureau, Q2 2026") or a rule of thumb named as one ("a rule of thumb: a stabilized apartment building runs about 95% occupied") — and an empty string where there is none. Never invent a figure for \`altFigure\`: a figure the notes do not carry and no rule of thumb names is null.`;
+
 /** Step 2 — Assumption Challenger. `keyed` adds the trap lists the
  *  memorandum's own words call for (`keyedTrapsFor`) after the class's.
  *  `forward` is a forward purchase (lib/forward-purchase): its paragraph
@@ -335,7 +347,9 @@ Overlay the down-cycle discipline the industry keeps re-learning in every crash:
 
 ${forward ? FORWARD_CLAUSE : PLAN_CLAUSE}
 
-Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.${sectorTrapsClause(
+Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.
+
+${CHALLENGE_STRUCTURE_CLAUSE}${sectorTrapsClause(
     assetClass,
     keyed,
   )}`;

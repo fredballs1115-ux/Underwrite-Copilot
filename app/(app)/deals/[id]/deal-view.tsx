@@ -35,6 +35,8 @@ import type { MetroDemand } from "@/lib/metro-demand";
 import type { MarketPicture } from "@/lib/market-picture";
 import { DecisionLog } from "./decision-log";
 import { DealOutcomeCard } from "./deal-outcome";
+import { TrackRecordCard } from "./track-record-card";
+import type { DealRecord } from "@/lib/track-record";
 import { OUTCOME_FORM_ERROR } from "@/lib/deal-outcome";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
@@ -108,6 +110,7 @@ import { documentFailure } from "@/lib/anthropic/document-failures";
 import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type { SubjectPoint } from "@/lib/public-comps/subject-point";
+import type { StressTest } from "@/lib/stress-test-types";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
 
@@ -335,6 +338,8 @@ export function DealView({
   askerNames = null,
   modelInterest = null,
   compsSubjectPoint = null,
+  trackRecord = null,
+  stressTest = null,
 }: {
   dealId: string;
   dealName: string;
@@ -396,6 +401,14 @@ export function DealView({
   /** the deal's resolved location (lib/deal-location), the point its
    *  pictures are drawn around; the comps map measures from it */
   compsSubjectPoint?: SubjectPoint | null;
+  /** the stored challenges scored against what arrived after the screen
+   *  (lib/track-record) — plain data; the card draws only where something
+   *  did */
+  trackRecord?: DealRecord | null;
+  /** the OM's assumptions tested (lib/stress-test), built on the server
+   *  from what the page already holds — plain data, which the Overview
+   *  leads with after the call */
+  stressTest?: StressTest | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -824,6 +837,7 @@ export function DealView({
               stale={staleResults}
               staleWhy={staleWhy}
               stopped={stopped != null}
+              stressTest={stressTest}
             />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
@@ -857,6 +871,7 @@ export function DealView({
               isSample={isSample}
               today={stageToday || null}
             />
+            <TrackRecordCard record={trackRecord} />
           </div>
         )}
 

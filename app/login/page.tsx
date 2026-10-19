@@ -11,7 +11,7 @@ import { PlaceBackdrop, WINDOW_BOXES } from "@/app/place-band";
 export const metadata = publicMetadata({
   title: "Sign in",
   description:
-    "Sign in to Underwrite Copilot — upload an offering memorandum and get a sourced, adversarial screen of the deal.",
+    "Sign in to Underwrite Copilot — upload an offering memorandum and get its assumptions tested against the evidence.",
   canonical: "/login",
 });
 
@@ -79,7 +79,7 @@ export default async function LoginPage({
           <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
             <h1 className="text-xl font-semibold tracking-tight">Welcome</h1>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Screen your first deal from its offering memorandum. Up to {FREE_DEALS} deals are
+              Test your first OM. Up to {FREE_DEALS} deals are
               free — no card required — and one click inside adds a
               fully-worked sample deal to your pipeline.
             </p>
@@ -110,7 +110,7 @@ export default async function LoginPage({
               prefetch={false}
               className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
             >
-              fully worked sample screen
+              fully worked sample test
             </Link>{" "}
             — no account needed.
           </p>

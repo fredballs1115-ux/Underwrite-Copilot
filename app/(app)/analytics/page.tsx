@@ -32,9 +32,25 @@ import { pctText } from "@/lib/plan-facts";
 import { ANALYTICS_MIN_DEALS, AnalyticsEmptyPicture, DotTimeline, VerdictMix, StageFunnel } from "./charts";
 import { MarketTable } from "./market-table";
 import { BrokerageTable } from "./brokerage-table";
-import { readAllResult } from "@/lib/read-all";
+import { readAll, readAllResult } from "@/lib/read-all";
 import { typedByHand } from "@/lib/manual-deal";
-import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { Challenge, ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { RentRollSummary } from "@/lib/actuals/types";
+import { t12SummaryOf } from "@/lib/actuals/analyze";
+import { askingPriceOf } from "@/lib/deal-strategy";
+import { accountRecord, arrivalOf, scoreDeal, type PriorScreenLike } from "@/lib/track-record";
+import { TrackRecordSection } from "./track-record";
+
+/** A stored rent roll or T-12 row as the track record reads it. */
+interface ActualsRowLike {
+  id: string;
+  deal_id: string;
+  as_of_date?: string | null;
+  period_end_date?: string | null;
+  summary?: unknown;
+  created_at?: string | null;
+  source_document_id?: string | null;
+}
 
 export const metadata: Metadata = { title: "Analytics" };
 
@@ -59,7 +75,7 @@ export default async function AnalyticsPage() {
   // screen, the ones a reader looks for, was missing from every figure, and
   // nothing said so (research pass 42).
   const { data, error } = await readAllResult<
-    AnalyticsRow & { user_id?: string | null; stage_history?: unknown; address?: unknown; team_id?: string | null }
+    AnalyticsRow & { user_id?: string | null; stage_history?: unknown; address?: unknown; team_id?: string | null; challenges?: unknown; prior_screen?: unknown }
   >((from, to) =>
     supabase
       .from("deals")
@@ -67,7 +83,11 @@ export default async function AnalyticsPage() {
       // The stage moves too: why each dead deal died (lib/deal-outcome).
       // …and the address and the team, for each deal's buy-box fit by its
       // brokerage, judged as the pipeline judges it.
-      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, team_id, address, stage_history, extraction, first_signal")
+      // …and the challenges, which the track record scores against what
+      // arrived after each screen (lib/track-record) — with the previous
+      // screen's snapshot, whose challenges score against what arrived
+      // between the two screens.
+      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, team_id, address, stage_history, challenges, extraction, first_signal, prior_screen")
       .not("extraction", "is", null)
       .order("created_at", { ascending: false })
       .order("id")
@@ -180,6 +200,51 @@ export default async function AnalyticsPage() {
         partial: judged?.partial ?? false,
         verdict: (r.verdict as { verdict?: string } | null)?.verdict ?? null,
       };
+    }),
+  );
+
+  // The track record (lib/track-record): every pooled deal's stored
+  // challenges against what arrived AFTER its verdict — its rent roll and
+  // T-12 by their documents' upload, the decision and the trade off the
+  // move that ended it. Best-effort reads of the actuals tables (0020): on
+  // an older schema they error and read as none, and the record is scored
+  // on decisions and trades alone.
+  const ids = new Set(pooled.map((r) => r.id));
+  const [rollRows, t12Rows, docRows] = await Promise.all([
+    readAll<ActualsRowLike>((from, to) =>
+      supabase.from("deal_rent_rolls").select("id, deal_id, as_of_date, summary, created_at, source_document_id").order("created_at", { ascending: false }).order("id").range(from, to),
+    ),
+    readAll<ActualsRowLike>((from, to) =>
+      supabase.from("deal_t12_statements").select("id, deal_id, period_end_date, summary, created_at, source_document_id").order("created_at", { ascending: false }).order("id").range(from, to),
+    ),
+    readAll<{ id: string; deal_id: string; created_at: string }>((from, to) =>
+      supabase.from("deal_documents").select("id, deal_id, created_at").in("kind", ["rent_roll", "t12"]).order("created_at", { ascending: false }).order("id").range(from, to),
+    ),
+  ]);
+  const newestByDeal = (rows: ActualsRowLike[] | null) => {
+    const out = new Map<string, ActualsRowLike>();
+    for (const r of rows ?? []) if (ids.has(r.deal_id) && !out.has(r.deal_id)) out.set(r.deal_id, r);
+    return out;
+  };
+  const rollByDeal = newestByDeal(rollRows);
+  const t12ByDeal = newestByDeal(t12Rows);
+  const docs = docRows ?? [];
+  const trackRecord = accountRecord(
+    pooled.map((r) => {
+      const extraction = r.extraction as ExtractionResult | null;
+      const roll = rollByDeal.get(r.id);
+      const t12Row = t12ByDeal.get(r.id);
+      const t12Summary = t12SummaryOf(t12Row?.summary);
+      return scoreDeal({
+        screenedAt: (r.verdict as { generatedAt?: string } | null)?.generatedAt ?? null,
+        challenges: (r.challenges as { challenges?: Challenge[] } | null)?.challenges,
+        priorScreen: (r.prior_screen as PriorScreenLike | null | undefined) ?? null,
+        rentRoll: roll?.summary ? { arrivedAt: arrivalOf(roll, docs), dated: roll.as_of_date ?? null, summary: roll.summary as RentRollSummary } : null,
+        t12: t12Row && t12Summary ? { arrivedAt: arrivalOf(t12Row, docs), dated: t12Row.period_end_date ?? null, summary: t12Summary } : null,
+        stage: r.stage ?? null,
+        history: parseStageHistory(r.stage_history),
+        askingPrice: askingPriceOf(extraction),
+      });
     }),
   );
 
@@ -338,6 +403,10 @@ export default async function AnalyticsPage() {
           {markets.length > 0 && <MarketTable rows={markets} planNote={planDeals.length > 0} more={marketsMore} />}
         </>
       )}
+
+      {/* The track record stands whatever the count: under three screened
+          deals it says, in its own words, that none is claimed. */}
+      <TrackRecordSection record={trackRecord} />
     </div>
   );
 }

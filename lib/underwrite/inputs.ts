@@ -433,6 +433,19 @@ export function permanentLoanSpread(assetClass: string | null | undefined): Perm
   return { bps, label: `${(assetClassLabel(key) || "generic").toLowerCase()} spread` };
 }
 
+/**
+ * The class's screening vacancy — the figure `deriveUnderwriteInputs` runs
+ * where no document states an occupancy — read as that function reads it
+ * (the extraction's class, else the generic row), with the class's word, so
+ * the stress test (lib/stress-test) can set the memorandum's vacancy beside
+ * it and name it as the rule of thumb it is. A read of the table, never a
+ * change to it. Percent (5 means 5%).
+ */
+export function classVacancyDefault(assetClass: string | null | undefined): { pct: number; classWord: string } {
+  const key = normalizeClass(assetClass ?? "auto");
+  return { pct: CLASS_DEFAULTS[key].vacancy * 100, classWord: (assetClassLabel(key) || "generic").toLowerCase() };
+}
+
 /** The cover's line about what is being sold, and what the model is and
  *  is not on it — null for a plain fee simple. */
 function interestMeta(extraction: ExtractionResult | null, asOf: Date): WorkbookMeta["interest"] {

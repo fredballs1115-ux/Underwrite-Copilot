@@ -20,10 +20,18 @@ import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { verdictBehind } from "@/lib/screen-run";
 import { coverPictureFor } from "@/lib/memo/cover-aerial";
 import { actualsFromRows, actualsShortLine } from "@/lib/actuals/actuals-read";
+import { t12SummaryOf } from "@/lib/actuals/analyze";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { shownAssetClass } from "@/lib/asset-class";
 import { pdfSafe } from "@/lib/memo/pdf-text";
 import type { DealVisualCache } from "@/lib/deal-location";
+import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { modelMarketFor } from "@/lib/model-market";
+import { buildStressTest } from "@/lib/stress-test";
+import type { StressTest } from "@/lib/stress-test-types";
+import type { BrokerCompsResult, ChallengerResult, MarketResult } from "@/lib/anthropic/types";
 
 // PDF generation needs the Node runtime (not edge).
 export const runtime = "nodejs";
@@ -223,21 +231,62 @@ export async function GET(
         .limit(1)
         .maybeSingle(),
     ]);
-    const actualsLine =
+    const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
+    const actuals =
       rrRes.error || t12Res.error
-        ? ""
-        : pdfSafe(
-            actualsShortLine(
-              actualsFromRows(
-                extraction,
-                inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null),
-                shownAssetClass(deal.asset_class as string | null, extraction) || null,
-                rrRes.data,
-                t12Res.data,
-              ),
-            ),
+        ? null
+        : actualsFromRows(
+            extraction,
+            inferStrategy(extraction, firstSignal),
+            shownAssetClass(deal.asset_class as string | null, extraction) || null,
+            rrRes.data,
+            t12Res.data,
           );
-    const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange), actualsLine };
+    const actualsLine = actuals ? pdfSafe(actualsShortLine(actuals)) : "";
+    // The OM's assumptions tested in code (lib/stress-test), the way the
+    // deal page builds it: the stored results, the deal's documents and the
+    // model derived as the deal page and the report derive it — the same
+    // rate read, the actuals folded in, never seeded on the sample
+    // (lib/model-market). The memo reads no published figure today, so its
+    // test sets none beside the stored market check's; the report, which
+    // reads them for its assumptions block, hands them to its test. A
+    // derivation that fails prints a memo without the block, never no memo.
+    let stressTest: StressTest | null = null;
+    try {
+      if (extraction && !rrRes.error && !t12Res.error) {
+        const debt = await liveDebtSeeds(HOLD_MONTHS);
+        const t12Summary = t12SummaryOf(t12Res.data?.summary);
+        const derived = deriveUnderwriteInputs(
+          extraction,
+          deal.name,
+          {
+            rentRoll: rrRes.data?.summary
+              ? { summary: rrRes.data.summary as RentRollSummary, asOf: (rrRes.data.as_of_date as string | null) ?? null }
+              : null,
+            t12: t12Summary ? { summary: t12Summary as T12Summary, periodEnd: (t12Res.data?.period_end_date as string | null) ?? null } : null,
+          },
+          modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+          // Its noon, the day every dated reader of the model reads on.
+          { asOf: new Date(`${readerDay}T12:00:00Z`) },
+        );
+        stressTest = buildStressTest({
+          extraction,
+          firstSignal,
+          challenger: (deal.challenges as ChallengerResult | null) ?? null,
+          market: (deal.market as MarketResult | null) ?? null,
+          modelVsMarket: null,
+          actuals,
+          derived,
+          storedAssetClass: deal.asset_class as string | null,
+          brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+          readOn: readerDay,
+        });
+      }
+    } catch (err) {
+      console.warn(`memo stress test not built for ${id}:`, err instanceof Error ? err.message : err);
+      stressTest = null;
+    }
+    const memo = { ...buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange, stressTest), actualsLine };
     // The line rides where the page has room for it (`renderMemoPdf`): the
     // one-page memo stays on one page.
     const buffer = await renderMemoPdf(memo);

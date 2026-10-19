@@ -1,0 +1,254 @@
+import Link from "next/link";
+import {
+  CADENCE_RULE,
+  CANNOT,
+  HOW_WE_TEST_MARKER,
+  HOW_WE_TEST_TITLE,
+  KIND_LABEL,
+  PUBLISHERS,
+  STRESS_METHODS,
+  WHO_DOES_WHAT,
+  engineReruns,
+  evidenceKindOf,
+} from "@/lib/how-we-test";
+import type { StressMethod } from "@/lib/stress-test-types";
+
+/**
+ * The methodology page, pure (2026-10-19): one section an assumption the
+ * screen tests, drawn from lib/stress-test-types' STRESS_METHODS in the
+ * table's order and the table's words, never copied by hand — so what the
+ * page says of a test is what the reader of a stress-test row does. The
+ * page's own words (who does what, the publishers, the cadence rule, what
+ * a test cannot do) are lib/how-we-test's. No hooks and no I/O:
+ * lib/how-we-test.render.test.ts draws it and reads its text.
+ *
+ * The public pages' rule: one idea a section, a picture where a picture
+ * will do, no paragraph past a line.
+ */
+
+const KIND_TONE: Record<string, string> = {
+  published: "bg-brand/10 text-brand",
+  document: "bg-amber-100 text-amber-800",
+  rule_of_thumb: "bg-faint text-muted",
+  om_internal: "bg-faint text-muted",
+};
+
+/**
+ * The schematic a section opens on: a track with the OM's mark and the
+ * evidence's, and an arrow to the IRR — the gap between the two marks is
+ * what the engine runs. Purely illustrative: no figures, and hidden from a
+ * screen reader, which has the words beneath it. Where the engine swaps no
+ * figure (the renovation premium, the challenger's other points) the arrow
+ * is dashed.
+ */
+function MethodPicture({ reruns }: { reruns: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 320 60"
+      className="h-14 w-full max-w-sm"
+      aria-hidden="true"
+      focusable="false"
+      data-qa="method-picture"
+    >
+      {/* the track */}
+      <line x1="16" y1="30" x2="208" y2="30" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" strokeLinecap="round" />
+      {/* the OM's mark */}
+      <line x1="72" y1="18" x2="72" y2="42" stroke="currentColor" strokeOpacity="0.55" strokeWidth="2" strokeLinecap="round" />
+      <text x="72" y="12" textAnchor="middle" fontSize="10" fill="currentColor" fillOpacity="0.7">
+        OM
+      </text>
+      {/* the evidence's mark */}
+      <circle cx="152" cy="30" r="5" className="fill-brand" />
+      <text x="152" y="54" textAnchor="middle" fontSize="10" fill="currentColor" fillOpacity="0.7">
+        evidence
+      </text>
+      {/* the gap between them */}
+      <line x1="72" y1="30" x2="152" y2="30" className="stroke-brand" strokeWidth="3" strokeLinecap="round" />
+      {/* the arrow to the return */}
+      <line
+        x1="222"
+        y1="30"
+        x2="268"
+        y2="30"
+        stroke="currentColor"
+        strokeOpacity="0.55"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray={reruns ? undefined : "4 4"}
+      />
+      <path d="M262 24 L270 30 L262 36" fill="none" stroke="currentColor" strokeOpacity="0.55" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <text x="296" y="34" textAnchor="middle" fontSize="11" fontWeight="600" fill="currentColor">
+        IRR
+      </text>
+    </svg>
+  );
+}
+
+function KindMark({ item }: { item: string }) {
+  const kind = evidenceKindOf(item);
+  if (!kind) return null;
+  return (
+    <span
+      className={`mr-2 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-medium ${KIND_TONE[kind]}`}
+      data-kind={kind}
+    >
+      {KIND_LABEL[kind]}
+    </span>
+  );
+}
+
+function MethodSection({ method, index }: { method: StressMethod; index: number }) {
+  return (
+    <section id={method.key} className="rounded-2xl border border-line bg-surface p-5 sm:p-6" data-method={method.key}>
+      <p className="text-xs font-medium uppercase tracking-wider text-muted">
+        {`${index + 1} of ${STRESS_METHODS.length}`}
+      </p>
+      <h2 className="mt-1 text-lg font-semibold tracking-tight">{method.title}</h2>
+      <p className="mt-2 text-sm italic text-muted">{`The OM's claim: ${method.claim}`}</p>
+      <div className="mt-3 text-ink">
+        <MethodPicture reruns={engineReruns(method)} />
+      </div>
+      <h3 className="mt-3 text-xs font-medium uppercase tracking-wider text-muted">Set against</h3>
+      <ul className="mt-1.5 space-y-1.5 text-sm leading-relaxed">
+        {method.against.map((item) => (
+          <li key={item} className="flex items-start gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+            <span>
+              <KindMark item={item} />
+              {item}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">What the engine does</h3>
+      <p className="mt-1.5 text-sm leading-relaxed">{method.engine}</p>
+      <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">Not checked</h3>
+      <ul className="mt-1.5 space-y-1.5 text-sm leading-relaxed text-muted">
+        {method.limits.map((item) => (
+          <li key={item} className="flex items-start gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-line" aria-hidden="true" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function HowWeTestView() {
+  return (
+    <div className="mx-auto w-full max-w-3xl" data-qa="how-we-test">
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{HOW_WE_TEST_TITLE}</h1>
+      <p className="mt-4 text-base leading-relaxed text-muted">
+        A memorandum&apos;s assumptions are each set against evidence a buyer can check.
+      </p>
+      <p className="mt-1 text-base leading-relaxed text-muted">
+        A dated published figure, the deal&apos;s own documents, or a rule of thumb named as one.
+      </p>
+      <p className="mt-1 text-base leading-relaxed text-muted">
+        Then the return is run again with the evidence&apos;s figure in the OM&apos;s place.
+      </p>
+      <p className="mt-3 text-sm font-medium text-ink" data-qa="how-we-test-marker">
+        {HOW_WE_TEST_MARKER}
+      </p>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2" data-qa="who-does-what">
+        {[WHO_DOES_WHAT.ai, WHO_DOES_WHAT.code].map((side) => (
+          <section key={side.heading} className="rounded-2xl border border-line bg-surface p-5">
+            <h2 className="text-sm font-semibold tracking-tight">{side.heading}</h2>
+            <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-muted">
+              {side.items.map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      <nav aria-label="The assumptions tested" className="mt-8">
+        <ul className="flex flex-wrap gap-2 text-xs">
+          {STRESS_METHODS.map((m) => (
+            <li key={m.key}>
+              <a href={`#${m.key}`} className="rounded-full border border-line px-2.5 py-1 text-muted transition-colors hover:text-ink">
+                {m.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <div className="mt-6 space-y-5">
+        {STRESS_METHODS.map((m, i) => (
+          <MethodSection key={m.key} method={m} index={i} />
+        ))}
+      </div>
+
+      <section className="mt-12" id="sources" data-qa="figure-sources">
+        <h2 className="text-lg font-semibold tracking-tight">Where the figures come from</h2>
+        <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-surface">
+          {PUBLISHERS.map((p) => (
+            <li key={p.name} className="p-4 text-sm leading-relaxed">
+              <p className="font-medium">
+                {p.href ? (
+                  p.href.startsWith("/") ? (
+                    <Link href={p.href} className="text-brand hover:text-brand-strong">
+                      {p.name}
+                    </Link>
+                  ) : (
+                    <a href={p.href} className="text-brand hover:text-brand-strong" rel="noreferrer">
+                      {p.name}
+                    </a>
+                  )
+                ) : (
+                  p.name
+                )}
+              </p>
+              <p className="text-muted">{p.reads}</p>
+              {p.notice && (
+                <p className="mt-1 text-xs text-muted" data-qa="publisher-notice">
+                  {p.notice}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 rounded-2xl border border-line bg-faint p-4" data-qa="cadence-rule">
+          <h3 className="text-sm font-semibold tracking-tight">{CADENCE_RULE.heading}</h3>
+          <ul className="mt-2 space-y-1 text-sm leading-relaxed text-muted">
+            {CADENCE_RULE.lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="mt-12" id="limits" data-qa="cannot">
+        <h2 className="text-lg font-semibold tracking-tight">What a stress test cannot do</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {CANNOT.map((c) => (
+            <div key={c.heading} className="rounded-2xl border border-line bg-surface p-4">
+              <h3 className="text-sm font-semibold tracking-tight">{c.heading}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted">{c.line}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="mt-12 rounded-2xl border border-line bg-surface p-6">
+        <h2 className="text-lg font-semibold tracking-tight">See it on a real deal</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">Start with a fully worked sample, or upload an OM and get a verdict.</p>
+        <div className="mt-4 flex flex-wrap gap-2.5">
+          <Link href="/demo" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong">
+            Sample screen
+          </Link>
+          <Link href="/why" className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint">
+            Why Underwrite Copilot
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

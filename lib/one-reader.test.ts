@@ -491,7 +491,9 @@ describe("analytics, the market memory and the internal comps read a deal's kind
 
   it("the analytics page and the market page select the first signal for it", () => {
     const analytics = readFileSync(join(process.cwd(), "app/(app)/analytics/page.tsx"), "utf8");
-    expect(analytics).toMatch(/\.select\("id, name, asset_class, created_at, is_sample,[^"]*extraction, first_signal"\)/);
+    // The track record reads `prior_screen` after it (2026-10-19); the claim
+    // held here is that the first signal is selected beside the extraction.
+    expect(analytics).toMatch(/\.select\("id, name, asset_class, created_at, is_sample,[^"]*extraction, first_signal(, prior_screen)?"\)/);
     // The market page reads its memory through the one read the deal page's
     // strip shares (lib/market-memory-read, research pass 42).
     expect(readFileSync(join(process.cwd(), "app/market/page.tsx"), "utf8")).toContain("readMarketMemory(supabase, user.id)");

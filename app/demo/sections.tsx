@@ -41,6 +41,7 @@ import type {
 } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
+import type { StressTest } from "@/lib/stress-test-types";
 
 /** The sample deal as the signed-in sample deal's page hands it to its
  *  sections (app/(app)/deals/[id]/page.tsx → DealView), each part read on
@@ -75,6 +76,9 @@ export interface DemoData {
   modelVsMarket: ModelVsMarket | null;
   /** the metro area's payrolls by sector, read today; null where nothing was */
   demand: MetroDemand | null;
+  /** the OM's assumptions tested on the sample (lib/sample-stress), which
+   *  the Overview leads with after the call */
+  stressTest: StressTest | null;
 }
 
 /**
@@ -161,7 +165,7 @@ export function DemoSections({
           <div className="flex flex-col gap-6">
             <SampleGuide onNavigate={navigate} />
             <PropertyActuals data={data.actuals} />
-            <OverviewView results={results} active={false} onNavigate={navigate} />
+            <OverviewView results={results} active={false} onNavigate={navigate} stressTest={data.stressTest} />
             <SensitivityPlayground data={data.playground} />
           </div>
         )}

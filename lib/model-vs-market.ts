@@ -4,7 +4,7 @@ import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import { INSURANCE_INDEX_ID, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
+import { INSURANCE_INDEX_ID, RENT_INDEX_IDS, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { isStateMarket } from "@/lib/market-match";
 import { datedLong } from "@/lib/debt-index";
 import {
@@ -965,6 +965,24 @@ export function modelVsMarket(input: ModelVsMarketInput): ModelVsMarket | null {
     checks,
   };
 }
+
+/**
+ * The national series the checks read off `national`: consumer prices and
+ * core (the expense-growth check), the 10-year breakeven beside them, the
+ * 10-year (the exit cap's spread), the insurance premium index and the
+ * lessor rent indexes (`rentIndexFor`). The page reads the whole table
+ * through Next's cache; the worker's verdict (lib/anthropic/pipeline) reads
+ * these bare, topping up what its market check already holds, and a test
+ * holds the checks' own ids to the list.
+ */
+export const MODEL_CHECK_NATIONAL_IDS: readonly string[] = [
+  "CPIAUCSL_YOY",
+  "CPILFESL_YOY",
+  "T10YIE",
+  "DGS10",
+  INSURANCE_INDEX_ID,
+  ...RENT_INDEX_IDS,
+];
 
 /** The figures a surface read today (lib/model-vs-market-read's `todayReads`,
  *  or a test's fixtures): the metro's own series, Zillow's rents, the

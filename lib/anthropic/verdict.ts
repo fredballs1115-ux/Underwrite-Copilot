@@ -32,6 +32,8 @@ import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-sl
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { regionClause } from "@/lib/live-market-brief";
+import type { StressTest } from "@/lib/stress-test-types";
+import { VERDICT_WORD, noMoveWhy, stressReadLine, whenWords } from "@/lib/stress-test-words";
 import type {
   ExtractionResult,
   FirstSignal,
@@ -116,6 +118,62 @@ export interface VerdictInputs {
    *  adds for the deal's class (lib/debt-index `ratesPromptLine`) — the line
    *  the challenger is handed; absent where the table seeds nothing */
   ratesLine?: string | null;
+  /** the OM's assumptions tested in code (lib/stress-test), built by the
+   *  pipeline before this step from the stored results, the deal's
+   *  documents and the model it could derive: each row's figures and the
+   *  return's move, the engine's own, which the verdict cites and never
+   *  estimates; absent on a caller that built none */
+  stressTest?: StressTest | null;
+}
+
+/** The stress test's section of the brief: "## STRESS TEST, STRUCK IN CODE"
+ *  (exported for its test). */
+export const STRESS_SECTION_HEADING = "## STRESS TEST, STRUCK IN CODE";
+
+/**
+ * The stress test as the synthesizer reads it: one line a row — the key, the
+ * verdict word, what the OM says with its page, every piece of evidence
+ * with its publisher and date, the gap in the assumption's own unit, the
+ * return's move (the engine's own run of the model with that one input
+ * swapped) and the challenger's question — then the instruction: the moves
+ * are the engine's, cited by figure and date and never estimated.
+ */
+export function stressSection(test: StressTest): string[] {
+  const lines: string[] = [stressReadLine(test)];
+  for (const r of test.rows) {
+    const page = r.omSays.page != null ? ` [p. ${r.omSays.page}]` : "";
+    const evidence = r.evidence.length
+      ? r.evidence
+          .map((e) => {
+            // What the evidence is, after its publisher and date — left out
+            // where the publisher already says it ("a rule of thumb").
+            const kind =
+              e.kind === "published"
+                ? `the ${e.scope === "nation" ? "nation's" : e.scope === "state" ? "state's" : "metro's"} figure`
+                : e.kind === "document"
+                  ? "the deal's own document"
+                  : e.kind === "rule_of_thumb"
+                    ? "a rule of thumb"
+                    : "the memorandum's own figure";
+            const when = e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : "";
+            return `${e.label}: ${e.text} (${e.publisher}${when}${kind === e.publisher ? "" : `; ${kind}`})`;
+          })
+          .join("; ")
+      : "no evidence with a figure or words could be read";
+    const gap = r.gap ? r.gap.text : `unchecked — ${r.unchecked ?? "no figure to set against the OM's"}`;
+    const move = r.impact ? r.impact.note : `not re-run — ${noMoveWhy(test, r)}`;
+    const ask = r.challenge?.question ? ` The challenger asks: ${r.challenge.question}` : "";
+    // The OM's text may end in its own full stop ("The OM states no loan rate.").
+    lines.push(`- ${r.title} (${r.key}) [${VERDICT_WORD[r.verdict].toUpperCase()}] — OM says: ${r.omSays.text.replace(/\.$/, "")}${page}. Set against: ${evidence}. Gap: ${gap} The levered IRR: ${move}${ask}`);
+  }
+  lines.push(
+    "",
+    test.impactsWithheld
+      ? `No return was re-run for this deal — ${test.impactsWithheld} The rows carry the gaps alone: cite each gap by its figure and date, say that no impact was struck in code, and never estimate one.`
+      : "The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing.",
+    "Lead the reason with the unsupported rows, then the stretched. Wherever a figure above decides a sentence — the reason, a screen range, a deal-killer's read, a next step — cite it by figure and date and name its publisher (\"the rent roll's 9.1% vacancy, May 31, 2026\"; \"the Census Bureau's 6.2% for the metro, Q2 2026\"): an unsupported figure is the range's conservative end, and the matching next step is what the broker must show to support the OM's figure. A row the test leaves unchecked has nothing in code to cite, and you say so if you raise it.",
+  );
+  return lines;
 }
 
 /** A check's call in words — never "pass", which is the verdict's own word
@@ -365,6 +423,16 @@ export function buildBrief(input: VerdictInputs): string {
       !!input.dealContext?.trim(),
     );
     if (note) sections.push("## Deal strategy, the plan, and figures that do not tie", note);
+  }
+
+  // The OM's assumptions tested in code (lib/stress-test), before any
+  // step's own words: the figures the reason, the ranges and the next
+  // steps cite, and the return's moves — the engine's, never the
+  // synthesizer's estimate. Appended inside the brief, which rides after
+  // the instruction in the user turn: never in ANALYST_SYSTEM, so the
+  // cached prefix never moves.
+  if (input.stressTest) {
+    sections.push(STRESS_SECTION_HEADING, stressSection(input.stressTest).join("\n"));
   }
 
   // The buyer's standing criteria — the verdict must judge fit against THEIR

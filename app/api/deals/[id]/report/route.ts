@@ -38,6 +38,9 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { floodMapFor } from "@/lib/flood-map";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
+import { buildStressTest } from "@/lib/stress-test";
+import type { StressTest } from "@/lib/stress-test-types";
+import type { BrokerCompsResult, ChallengerResult, MarketResult } from "@/lib/anthropic/types";
 
 export const runtime = "nodejs";
 
@@ -228,6 +231,11 @@ export async function GET(
   // B3), from the rows the model reads: "The actuals" page and the memo's
   // line beside its key terms.
   let actuals: ActualsRead | null = null;
+  // The OM's assumptions tested in code (lib/stress-test), built off the
+  // very model, actuals and published-figure read this route makes below —
+  // never a figure recomputed — the way the deal page builds it. Null where
+  // no model was derived, and then the report prints no test.
+  let stressTest: StressTest | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -380,6 +388,22 @@ export async function GET(
         console.warn(`report assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
         assumptions = null;
       }
+      // The test on this route's own reads: the derived model, the actuals
+      // and the assumptions read (its dated figures are the test's
+      // published evidence), with the stored challenger, market check and
+      // memorandum comps, on the reader's day.
+      stressTest = buildStressTest({
+        extraction,
+        firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
+        challenger: (deal.challenges as ChallengerResult | null) ?? null,
+        market: (deal.market as MarketResult | null) ?? null,
+        modelVsMarket: assumptions,
+        actuals,
+        derived,
+        storedAssetClass: deal.asset_class as string | null,
+        brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+        readOn: readerDay,
+      });
     }
   } catch (err) {
     console.error(`report heatmap build failed for ${id}:`, err);
@@ -437,7 +461,7 @@ export async function GET(
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
     const input = withActuals(
-      buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay),
+      buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay, stressTest),
       actuals,
     );
     // The memo's target-return chip names the page the model's IRR is

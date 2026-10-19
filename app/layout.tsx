@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { SPREAD_BPS } from "@/lib/marketing-constants";
 import { SkipLink } from "./skip-link";
 import "./globals.css";
 
@@ -29,14 +28,19 @@ export const viewport: Viewport = {
   colorScheme: "only light",
 };
 
+// The link preview's one sentence (Open Graph and Twitter alike), beside the
+// card app/opengraph-image.tsx draws with the same words.
+const OG_DESCRIPTION =
+  "Each assumption the memorandum makes, set against the evidence with its date and source. The model is included.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "Underwrite Copilot — Consistent CRE underwriting, every deal",
+    default: "Underwrite Copilot — The OM's assumptions, tested",
     template: "%s · Underwrite Copilot",
   },
   description:
-    "Run every commercial real estate deal through the same disciplined screen: rent, expenses, and cap as sourced ranges; the three deal-killers stressed first; a Go / No-go that shows its work before you open a model. One method, every deal.",
+    "Upload an offering memorandum. Each assumption it makes is set against the deal's own documents, dated published figures and the rule of thumb it is asked to beat, named as such; the price, the exit and the debt are named first; a Go / Caution / No-go that shows its work. The model is included.",
   keywords: [
     "CRE underwriting",
     "commercial real estate underwriting software",
@@ -51,14 +55,13 @@ export const metadata: Metadata = {
     type: "website",
     url: APP_URL,
     siteName: "Underwrite Copilot",
-    title: "Stop underwriting like a coin flip.",
-    description: `An illustration: same deal, same afternoon, ${SPREAD_BPS} bps apart — that's a coin flip with a spreadsheet attached. Underwrite Copilot gives every deal the same rigor: sourced ranges, the three deal-killers first, a verdict that shows its work.`,
+    title: "The OM's assumptions, tested.",
+    description: OG_DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Stop underwriting like a coin flip.",
-    description:
-      "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a Go / No-go that shows its work. One method, every deal.",
+    title: "The OM's assumptions, tested.",
+    description: OG_DESCRIPTION,
   },
   robots: { index: true, follow: true },
   // Search Console and Bing Webmaster Tools prove ownership with a meta tag

@@ -109,6 +109,8 @@ import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
 import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { stressTestTitle } from "@/lib/stress-test-title";
+import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
+import { VERDICT_WORD, noMoveWhy, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -365,6 +367,116 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
         </Text>
       ))}
     </View>
+  );
+}
+
+/** A stress row's tone: unsupported in the kill colour, stretched in
+ *  caution's, a row that holds in the pass colour, unchecked muted. */
+const STRESS_TONE: Record<string, string> = { unsupported: C.kill, stretched: C.caution, holds: C.pass, unchecked: C.muted };
+
+/** What a piece of evidence is, said before it (lib/stress-test-types
+ *  `EvidenceKind`): a published figure is the metro's, the state's or the
+ *  nation's, never the building's; a document is the deal's own; a rule of
+ *  thumb is named as one; an internal figure is the memorandum's own. */
+const EVIDENCE_KIND_WORD: Record<StressEvidence["kind"], string> = {
+  published: "Published",
+  document: "The deal's document",
+  rule_of_thumb: "Rule of thumb",
+  om_internal: "The OM's own figure",
+};
+
+/**
+ * One row of the stress test on paper: the verdict and the title, the two
+ * figures as ticks on one track (the OM's in the row's tone, the evidence's
+ * in ink — plain Views, so a test can count them), what the OM says with
+ * its page, each piece of evidence typed, dated and attributed, the gap in
+ * the assumption's own unit, the return's move (the engine's own, or why
+ * none), the method and the challenger's words.
+ */
+function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
+  const tone = STRESS_TONE[row.verdict] ?? C.muted;
+  const ticks = tickPositions(row);
+  const track = 120;
+  const page = row.omSays.page != null ? ` (p. ${row.omSays.page})` : "";
+  const move = row.impact ? row.impact.note : `No return re-run: ${noMoveWhy(test, row)}`;
+  return (
+    <View style={[s.block, { marginBottom: 11 }]} wrap={false}>
+      <View style={s.blockTitleRow}>
+        <Text style={[s.tag, { backgroundColor: tone }]}>{VERDICT_WORD[row.verdict]}</Text>
+        <Text style={s.blockTitle}>{str(row.title)}</Text>
+        {ticks ? (
+          <View style={{ width: track, height: 8, justifyContent: "center", marginLeft: 8 }}>
+            <View style={{ height: 2, borderRadius: 1, backgroundColor: C.line, position: "relative" }}>
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  height: 2,
+                  backgroundColor: "#b5cdc9",
+                  left: Math.min(ticks.om, ticks.evidence) * track,
+                  width: Math.abs(ticks.om - ticks.evidence) * track,
+                }}
+              />
+              <View style={{ position: "absolute", top: -3, width: 1.5, height: 8, backgroundColor: C.ink, left: ticks.evidence * track - 0.75 }} />
+              <View style={{ position: "absolute", top: -3, width: 1.5, height: 8, backgroundColor: tone, left: ticks.om * track - 0.75 }} />
+            </View>
+          </View>
+        ) : null}
+      </View>
+      <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 1 }}>{str(`OM says: ${row.omSays.text}${page}`)}</Text>
+      {row.evidence.map((e, i) => (
+        <Text key={i} style={{ fontSize: 8, color: C.muted, marginTop: 1, marginLeft: 8 }}>
+          {str(`${EVIDENCE_KIND_WORD[e.kind]} — ${e.label}: ${e.text} (${e.publisher}${e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : ""})`)}
+        </Text>
+      ))}
+      {row.evidence.length === 0 ? <Text style={{ fontSize: 8, color: C.muted, marginTop: 1, marginLeft: 8 }}>{str("No evidence with a figure or words could be read for this deal.")}</Text> : null}
+      <Text style={{ fontSize: 8.5, color: tone, fontFamily: "Helvetica-Bold", marginTop: 2 }}>
+        {str(row.gap ? `Gap: ${row.gap.text}` : `Unchecked: ${row.unchecked ?? "no figure to set against the OM's"}`)}
+      </Text>
+      <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 1 }}>{str(`The return: ${move}`)}</Text>
+      <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(`Method: ${row.method}`)}</Text>
+      {row.challenge ? (
+        <View style={{ marginTop: 2 }}>
+          <Text style={{ fontSize: 8, color: C.muted }}>{str(`The challenger (${row.challenge.severity}): ${row.challenge.challenge}`)}</Text>
+          {str(row.challenge.question) ? <Text style={s.question}>{str(`Ask: ${row.challenge.question}`)}</Text> : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * The stress test's page (lib/stress-test): every assumption the screen
+ * tested in code — unsupported first, then stretched, then those that hold,
+ * then the unchecked — each with what the OM says, what it was set against,
+ * the gap and the return's move, the engine's own. The memo prints the lead
+ * rows; this prints them all, the method and the challenger's question on
+ * each.
+ */
+function StressTestPage({ test, dealName, branding }: { test: StressTest; dealName: string; branding?: MemoData["branding"] }) {
+  const c = verdictCounts(test);
+  const rank: Record<StressRow["verdict"], number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
+  const rows = test.rows.map((r, i) => ({ r, i })).sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || a.i - b.i).map((x) => x.r);
+  const count = [`${test.rows.length} ${test.rows.length === 1 ? "assumption" : "assumptions"}`, c.unsupported ? `${c.unsupported} unsupported` : "", c.stretched ? `${c.stretched} stretched` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  const publishers = test.rows.flatMap((r) => r.evidence.filter((e) => e.kind === "published").map((e) => e.publisher));
+  return (
+    <PageChrome title="The stress test" count={count} dealName={dealName} branding={branding}>
+      <Text style={s.sub}>
+        {str(
+          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the state's or the nation's, never the building's; the gap in the assumption's own unit; the return's move, the engine's own run of the model with that one input swapped, never an estimate; the method; and the challenger's question. The published figures were read on ${whenWords(test.readOn)}.`,
+        )}
+      </Text>
+      {rows.map((r, i) => (
+        <StressRowBlock key={`${r.key}-${i}`} row={r} test={test} />
+      ))}
+      {documentNotices(publishers).map((n) => (
+        <Text key={n} style={{ fontSize: 6.5, color: C.muted, marginTop: 4 }}>
+          {str(n)}
+        </Text>
+      ))}
+    </PageChrome>
   );
 }
 
@@ -1165,6 +1277,12 @@ export interface ReportInput {
    *  one-page memo and call; `renderReportPdf` draws again where the page
    *  landed elsewhere. Null where the chip names none. */
   targetReturnPage?: number | null;
+  /** the OM's assumptions tested in code (lib/stress-test), built by the
+   *  route the way the deal page builds it: "The stress test" page after
+   *  the call, every row with its method and the challenger's question, and
+   *  the memo's lead rows on page one; null or absent where the caller built
+   *  none, and then neither prints */
+  stressTest?: StressTest | null;
 }
 
 /** The chip the target-return check prints, as the memo clamps its label. */
@@ -1274,6 +1392,9 @@ export function buildReportData(
    *  lines (the rent allowance in force) read it, as the route's own
    *  regulation read does. The clock's UTC day where a caller passes none. */
   today?: string,
+  /** the OM's assumptions tested in code (lib/stress-test), as the route
+   *  built it beside the model it derived; absent where none was built */
+  stressTest?: StressTest | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -1306,12 +1427,16 @@ export function buildReportData(
   // The grids the report prints, and the page they land on where the memo
   // and the call each take one: the memo's target-return chip names it.
   const graded = planDeal || withheld ? null : (sensitivity ?? null);
-  const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, today);
+  const test = stressTest && stressTest.rows.length > 0 ? stressTest : null;
+  const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, today, null, test);
   const irr = graded ? gradedIrrOf(graded) : null;
   const chip = memo.buyBox.some((c) => c.label === TARGET_RETURN && c.status === "unknown");
+  // The stress test's page sits between the call and the grids, so it
+  // counts toward the page the chip names (renderReportPdf redraws where
+  // the page lands elsewhere).
   const targetReturnPage =
     graded && chip && irr != null && Number.isFinite(irr) && gridSubjectOf(extraction) == null
-      ? 2 + ((deal.verdict as VerdictResult | null) ? 1 : 0) + (plan ? 1 : 0)
+      ? 2 + ((deal.verdict as VerdictResult | null) ? 1 : 0) + (test ? 1 : 0) + (plan ? 1 : 0)
       : null;
   const annotated = targetReturnPage != null ? withTargetReturnNote(memo, irr, targetReturnPage) : memo;
   return {
@@ -1351,6 +1476,7 @@ export function buildReportData(
     planLeftOut,
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
     targetReturnPage,
+    stressTest: test,
   };
 }
 
@@ -2357,6 +2483,13 @@ export function ReportDocument({
       {/* What the memo shortens to fit or leaves out, as the verdict
           states it, before any page the model computed. */}
       {verdict && <CallInFullPage verdict={verdict} memo={memo} />}
+
+      {/* The OM's assumptions, tested in code (lib/stress-test): every row,
+          right after the call and before any page the model computed —
+          the product's lead. */}
+      {input.stressTest && input.stressTest.rows.length > 0 && (
+        <StressTestPage test={input.stressTest} dealName={dealName} branding={memo.branding} />
+      )}
 
       {/* The plan page, before the IRR grids, on a deal that is not a
           stabilized asset: the plan as the OM states it, then yield on total
