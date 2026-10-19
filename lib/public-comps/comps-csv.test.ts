@@ -65,6 +65,11 @@ describe("csvText and csvNumber, the one escaper", () => {
   it("leads a formula-opening cell with an apostrophe and quotes every text cell", () => {
     expect(csvText("=HYPERLINK(\"http://x\")")).toBe(`"'=HYPERLINK(""http://x"")"`);
     for (const lead of ["=", "+", "-", "@", "\t", "\r"]) expect(csvText(`${lead}1`)).toBe(`"'${lead}1"`);
+    // Spaces before the sign, and the sign's full-width form, are led too.
+    for (const lead of [" =", "   +", " \t-", "\u00a0@", "＝", "＋", "－", "＠", "  ＝"]) expect(csvText(`${lead}1`)).toBe(`"'${lead}1"`);
+    // A sign inside the words, or spaces before a plain word, is no formula.
+    expect(csvText("  Smith")).toBe('"  Smith"');
+    expect(csvText("A-1 Holdings")).toBe('"A-1 Holdings"');
     expect(csvText("Smith, John")).toBe('"Smith, John"');
     expect(csvText("")).toBe('""');
   });
@@ -90,7 +95,7 @@ describe("csvText and csvNumber, the one escaper", () => {
     };
     walk("app");
     walk("lib");
-    const escapers = files.filter((f) => readFileSync(f, "utf8").includes("^[=+\\-@"));
+    const escapers = files.filter((f) => readFileSync(f, "utf8").includes("[=+\\-@"));
     expect(escapers).toEqual([join("lib", "csv-cell.ts")]);
     const pipeline = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
     expect(pipeline).toContain('import { csvText } from "@/lib/csv-cell"');
