@@ -123,6 +123,11 @@ describe("MarketTable — /analytics' markets, grouped as /market groups them, e
   it("no market named, no picture and no credit owed", () => {
     const html = render(React.createElement(MarketTable, { rows: marketRows(deals.slice(3)), planNote: true }));
     expect(html).not.toContain('data-picture="analytics-market"');
+    // The drawn cover of the row's class holds the slot, never a dashed box.
+    expect(html).toContain('data-picture="analytics-market-cover"');
+    expect(html).toContain('data-deal-cover="housing"');
+    expect(html).not.toContain("border-dashed");
+    expect(a11yIssues(html), "a11y analytics market table, no market").toEqual([]);
     expect(html).not.toContain('data-qa="market-credit"');
     expect(visibleText(html)).toContain("Plan deals are judged on yield on total cost");
   });

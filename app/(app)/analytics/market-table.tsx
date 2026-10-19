@@ -8,6 +8,18 @@ import { CityPhoto } from "@/app/city-photo";
 import { ShownCreditGrid } from "@/app/shown-credit";
 import { gridPictures } from "@/app/market/grid-credit";
 import { marketPageWord } from "@/app/market/market-lead";
+import { DealCover } from "@/app/(app)/deals/deal-cover";
+import { coverFor } from "@/lib/deal-cover";
+
+/** The class most of a market's deals are, the first on a tie: the class its
+ *  drawn cover shows. */
+function commonestClass(r: MarketRow): string | null {
+  const counts = new Map<string, number>();
+  for (const d of r.deals) counts.set(d.assetClass, (counts.get(d.assetClass) ?? 0) + 1);
+  let best: string | null = null;
+  for (const [cls, n] of counts) if (best == null || n > (counts.get(best) ?? 0)) best = cls;
+  return best;
+}
 
 /**
  * The analytics page's "By market" table: the markets grouped as /market's
@@ -81,7 +93,18 @@ export function MarketTable({
                         />
                       </span>
                     ) : (
-                      <span aria-hidden className="h-9 w-14 shrink-0 rounded-md border border-dashed border-line" />
+                      // No market the site has a photograph for: the drawn
+                      // cover of the row's commonest class (lib/deal-cover,
+                      // the pipeline's last resort) — an illustration, owing
+                      // no credit and hidden from a screen reader.
+                      <span className="h-9 w-14 shrink-0" data-picture="analytics-market-cover">
+                        <DealCover
+                          cover={coverFor({ seed: r.key || "unlabeled", assetClass: commonestClass(r) })}
+                          label={r.market}
+                          size="thumb"
+                          className="h-9 w-14 rounded-md"
+                        />
+                      </span>
                     )}
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{r.market}</span>
