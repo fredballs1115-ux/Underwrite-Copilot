@@ -125,7 +125,7 @@ describe("compsCsv", () => {
       "Possibly one deed across parcels (rows sharing its day, buyer and price)",
       "Dataset",
       "Dataset URL",
-      "Retrieved",
+      "Retrieved (UTC)",
     ]);
     // Every row as wide as the header.
     for (const r of rows) expect(r).toHaveLength(rows[0].length);

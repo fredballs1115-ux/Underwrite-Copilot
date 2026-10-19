@@ -259,10 +259,11 @@ const isoDay = (iso: string | null | undefined): string => {
  * columns, then the record's link, a flag on a row that may be one deed
  * across parcels (`sharedDeedCounts`: how many rows share its day, buyer and
  * price; blank where none does), and the dataset with the day it was
- * retrieved, on every row so a filtered or pasted row keeps its source. The
- * numbers are raw (no $, no commas: a price, a distance in miles to two
- * places) and every text cell goes through lib/csv-cell's escaper, the
- * pipeline CSV's own, so a deed's buyer that opens on "=" never runs.
+ * retrieved (its UTC day, the header says so), on every row so a filtered or
+ * pasted row keeps its source. The numbers are raw (no $, no commas: a
+ * price, a distance in miles to two places) and every text cell goes
+ * through lib/csv-cell's escaper, the pipeline CSV's own, so a deed's buyer
+ * that opens on "=" never runs.
  */
 export function compsCsv(r: CompsCsvSource, order: ReadonlyArray<number> = r.comps.map((_, i) => i)): string {
   const head = [
@@ -282,7 +283,7 @@ export function compsCsv(r: CompsCsvSource, order: ReadonlyArray<number> = r.com
     "Possibly one deed across parcels (rows sharing its day, buyer and price)",
     "Dataset",
     "Dataset URL",
-    "Retrieved",
+    "Retrieved (UTC)",
   ];
   const shared = sharedDeedCounts(r.comps);
   const retrieved = isoDay(r.retrievedAt);
@@ -328,7 +329,7 @@ export function addressSlug(label: string | null | undefined): string {
   return slug || "address";
 }
 
-/** The download's name: the address searched and the day the sales were
+/** The download's name: the address searched and the UTC day the sales were
  *  retrieved — "recorded-sales-1500-walnut-st-philadelphia-pa-2026-10-08.csv". */
 export function compsCsvFileName(r: Pick<RecordCompsResult, "subject" | "retrievedAt">): string {
   const day = isoDay(r.retrievedAt);
