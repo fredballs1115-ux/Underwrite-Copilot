@@ -199,6 +199,12 @@ describe("compBarsCaption — the report's comp-bar captions", () => {
     expect(compBarsCaption(unit, 2, 3)).not.toMatch(/per unit, per unit/);
   });
 
+  it("counts the set in the noun it is handed: candidates under the public-web block", () => {
+    expect(compBarsCaption(unit, 3, 3, "candidate")).toBe("Bars: each candidate's basis per unit, scaled to the widest in the set.");
+    expect(compBarsCaption(unit, 2, 3, "candidate")).toBe("Bars: the basis per unit that 2 of the 3 candidates state, scaled to the widest in the set.");
+    expect(compBarsCaption(sf, 1, 3, "candidate")).toBe("Bars: the basis per SF that one of the 3 candidates states.");
+  });
+
   it("puts the subject's tick on the track, in the class's noun", () => {
     expect(compBarsCaption({ unit: "unit", noun: "key", subjectValue: 200_000 }, 1, 2)).toBe(
       `Bars: the basis per key that one of the 2 comps states; the tick is the subject at ${fmtBasis(200_000, "unit", "key")}.`,

@@ -759,7 +759,7 @@ function PublicWebComps({
           {webScale && (
             <div className="mt-1.5 space-y-0.5 text-[11px] text-muted" data-qa="web-comp-bars-caption">
               {webScale.tracks.map((t, k) => (
-                <p key={t.unit}>{compBarsCaption(t, webScale.counts[k], candidates.length)}</p>
+                <p key={t.unit}>{compBarsCaption(t, webScale.counts[k], candidates.length, "candidate")}</p>
               ))}
             </div>
           )}

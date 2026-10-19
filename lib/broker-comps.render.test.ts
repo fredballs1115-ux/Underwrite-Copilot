@@ -166,6 +166,10 @@ describe("the Comps tab", () => {
     // one bar for the OM comp on the unit track, one for the web candidate
     expect(html).toContain('data-qa="web-comp-bars-caption"');
     expect(text).toContain("Bars: the basis per unit that one of the 3 comps states; the tick is the subject at $280k/unit.");
+    // The web block's caption counts candidates, never comps.
+    const at = html.indexOf('data-qa="web-comp-bars-caption"');
+    const web = visibleText(html.slice(html.indexOf(">", at) + 1)).replace(/\s+/g, " ").trim();
+    expect(web.startsWith("Bars: the basis per unit that one of the 3 candidates states; the tick is the subject at $280k/unit.")).toBe(true);
     expect(text).toContain("$250k/unit against the subject's $280k/unit");
     // no candidate states a basis: no bars and no caption
     expect(draw(false, search)).not.toContain('data-qa="web-comp-bars-caption"');
