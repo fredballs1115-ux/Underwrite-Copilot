@@ -168,7 +168,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The exit's spread over the latest 10-year Treasury, dated, beside the going-in cap's spread",
       "The research tracker's cap range for the class and market, with its period, where one is on file",
     ],
-    engine: "The exit cap is a direct input: the return is re-run at the going-in cap, and at the evidence's cap where one is published.",
+    engine: "The exit cap is a direct input: the return is re-run at the going-in cap, or at the published cap range's low end where no going-in cap stands.",
     limits: [
       "No forecast of where caps go: the test asks what the exit assumes against today's figures.",
       "A stale tracker figure (over a year old by its own period) is shown and held against nothing.",
@@ -183,7 +183,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named",
       "Negative leverage: a going-in cap under the all-in rate loses money on every borrowed dollar until growth bails it out",
     ],
-    engine: "The all-in rate is a direct input: the return is re-run at the index plus spread, and the year-one coverage is read at it.",
+    engine: "The all-in rate is a direct input: the return is re-run at the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's own rate.",
     limits: [
       "A benchmark is not a quote: only a rate a loan document states is treated as one.",
       "A floating-rate or supplemental loan is read as stated and priced on nothing.",
@@ -269,7 +269,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers",
       "The deal's T-12 premium against the pro forma's",
     ],
-    engine: "The insurance line is an expense input: the return is re-run with the premium moved by the index's year.",
+    engine: "The insurance line is an expense input: the return is re-run at the T-12's premium where one is on file, else at the OM's premium moved by the index's year.",
     limits: ["A quote is the carrier's: the index says how far the market moved, not what this building is quoted."],
   },
   {
