@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 // The deal page's parts from the modules that carry no server action and
 // no comps map (deal-sections.tsx and deal-view.tsx carry both); /demo draws
 // no map. lib/home-bundle.test.ts holds this page to it.
@@ -14,7 +14,16 @@ import { SensitivityPlayground, type PlaygroundData } from "../(app)/deals/[id]/
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import { ModelVsMarketCard } from "../(app)/deals/[id]/model-vs-market-card";
 import { SampleGuide } from "../(app)/deals/[id]/sample-guide";
-import { DemoPanel, type AnalysisKey } from "../landing-interactive";
+import { DemoPanel } from "../landing-interactive";
+import { DealSectionTabs } from "../(app)/deals/[id]/section-tabs";
+import {
+  LEGACY_TABS,
+  analysisCounts,
+  sectionCounts,
+  sectionStateOf,
+  type AnalysisKey,
+  type SectionKey,
+} from "@/lib/deal-tabs";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
@@ -68,44 +77,11 @@ export interface DemoData {
   demand: MetroDemand | null;
 }
 
-// The deal page's sections and their legacy jump keys (deal-view.tsx
-// SECTIONS and LEGACY_TABS), so the Overview's links land where they land
-// on the signed-in sample.
-const SECTIONS = [
-  { key: "overview", label: "Overview" },
-  { key: "financials", label: "Financials" },
-  { key: "buybox", label: "Buy box" },
-  { key: "analyses", label: "Analyses" },
-  { key: "documents", label: "Documents" },
-] as const;
-type SectionKey = (typeof SECTIONS)[number]["key"];
-
-const LEGACY_TABS: Record<string, { section: SectionKey; analysis?: AnalysisKey }> = {
-  overview: { section: "overview" },
-  terms: { section: "financials" },
-  model: { section: "financials" },
-  financials: { section: "financials" },
-  buybox: { section: "buybox" },
-  analyses: { section: "analyses" },
-  verdict: { section: "analyses", analysis: "verdict" },
-  challenger: { section: "analyses", analysis: "challenger" },
-  comps: { section: "analyses", analysis: "comps" },
-  market: { section: "analyses", analysis: "market" },
-  reconciler: { section: "analyses", analysis: "reconciler" },
-  documents: { section: "documents" },
-};
-
-/** The deal page's tab dot on a finished section, or an idle one's ring. */
-function TabDot({ done, active }: { done: boolean; active: boolean }) {
-  const base = "h-1.5 w-1.5 rounded-full";
-  if (done) return <span aria-hidden className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
-  return <span aria-hidden className={`${base} ${active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"}`} />;
-}
-
 /**
  * The sample deal's sections, as the signed-in sample deal's page draws
- * them: the deal page's section bar (its segmented control, each tab's dot
- * and finding count, class for class), then each section's components in
+ * them: the deal page's own section bar (section-tabs: its segmented
+ * control, each tab's dot and finding count, read by lib/deal-tabs on the
+ * sample), then each section's components in
  * the deal page's order on the fixture. The Analyses and Documents tabs are
  * the homepage walkthrough's own panel (`DemoPanel`), so the homepage and
  * this page draw one product. What a visitor cannot use — the tasks, Ask,
@@ -124,24 +100,6 @@ export function DemoSections({
 }) {
   const [section, setSection] = useState<SectionKey>(initialSection);
   const [analysis, setAnalysis] = useState<AnalysisKey>(initialAnalysis);
-
-  // The finding counts the deal page's tabs carry (deal-view's
-  // `analysisCounts` and `sectionCounts`), counted on the sample.
-  const counts: Record<SectionKey, number> = {
-    overview: 0,
-    financials: 0,
-    buybox: data.buyBox.checks.filter((c) => c.status === "miss").length,
-    analyses:
-      data.challenges.challenges.filter((c) => c.severity === "high").length +
-      data.comps.redFlags.length +
-      [...data.comps.saleComps, ...data.comps.leaseComps].filter((c) => c.support === "stretched").length +
-      data.market.checks.filter((c) => c.assessment === "aggressive").length +
-      data.reconciliation.rows.filter((r) => r.direction === "unfavorable").length,
-    documents: 0,
-  };
-  // Every section but the documents holds a finished result on the sample
-  // (deal-view's `sectionState`).
-  const done = (k: SectionKey) => k !== "documents";
 
   // The strip scrolls the selected tab into view on a phone (lib/tab-strip),
   // its own scrollLeft, never the page's — as the deal page's does.
@@ -163,17 +121,6 @@ export function DemoSections({
     if (left != null) strip.scrollLeft = left;
   }, [section]);
 
-  function onTabKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    const idx = SECTIONS.findIndex((t) => t.key === section);
-    const n = SECTIONS.length;
-    const next =
-      e.key === "ArrowRight" ? (idx + 1) % n : e.key === "ArrowLeft" ? (idx - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
-    if (next < 0) return;
-    e.preventDefault();
-    setSection(SECTIONS[next].key);
-    document.getElementById(`tab-${SECTIONS[next].key}`)?.focus();
-  }
-
   /** A jump from the Overview or the guide, by the deal page's own keys;
    *  focus moves to the tab now open. */
   function navigate(key: string) {
@@ -192,54 +139,21 @@ export function DemoSections({
     market: data.market,
     verdict: data.verdict,
   };
+  // The deal page's dots and finding counts, by its own readers
+  // (lib/deal-tabs) on the sample: no screen is running on it.
+  const counts = sectionCounts(analysisCounts(results), data.buyBox.checks);
+  const stateOf = (key: SectionKey) =>
+    sectionStateOf(key, { results, live: false, step: null, buyBox: data.buyBox });
 
   return (
     <div className="flex flex-col gap-5">
-      {/* The deal page's section bar, class for class (deal-view). */}
+      {/* The deal page's own section bar (section-tabs), in the deal page's
+          strip. */}
       <div
         ref={tabStrip}
         className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]"
       >
-        <div
-          role="tablist"
-          aria-label="Deal sections"
-          onKeyDown={onTabKeyDown}
-          className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm max-md:mr-8"
-        >
-          {SECTIONS.map((t) => {
-            const on = t.key === section;
-            const count = counts[t.key];
-            return (
-              <button
-                key={t.key}
-                id={`tab-${t.key}`}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                aria-controls="deal-tabpanel"
-                tabIndex={on ? 0 : -1}
-                onClick={() => setSection(t.key)}
-                className={`relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-                  on ? "bg-brand text-white shadow-sm" : "text-muted hover:bg-faint hover:text-ink"
-                }`}
-              >
-                <TabDot done={done(t.key)} active={on} />
-                {t.label}
-                {count > 0 && (
-                  <span
-                    title={`${count} finding${count === 1 ? "" : "s"}`}
-                    className={`rounded-full px-1.5 py-px font-mono text-[10px] tabular-nums ${
-                      on ? "bg-white/20 text-white" : "bg-kill/10 text-kill"
-                    }`}
-                  >
-                    {count}
-                    <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <DealSectionTabs active={section} stateOf={stateOf} counts={counts} onSelect={setSection} />
       </div>
 
       <div key={section} id="deal-tabpanel" role="tabpanel" aria-labelledby={`tab-${section}`} className="animate-rise">

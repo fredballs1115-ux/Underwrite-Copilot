@@ -59,6 +59,8 @@ import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/sc
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { DemoSections } from "@/app/demo/sections";
 import { loadWalkthrough } from "@/app/landing-interactive";
+import { AnalysisTabs, DealSectionTabs } from "@/app/(app)/deals/[id]/section-tabs";
+import { analysisCounts, sectionCounts, sectionStateOf, type SectionKey } from "@/lib/deal-tabs";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { fitFilterKey } from "@/lib/fit-filter";
 import { PERSON_TONES, personName, personToneIndex } from "@/lib/person";
@@ -1361,6 +1363,44 @@ describe("ModelView — the sample model renders every panel", () => {
       // No round pill tabs of the old design.
       expect(text).not.toContain("Buy box & fit");
       expect(text).not.toContain("Financials & model");
+    });
+
+    it("draws the bar and the Analyses pills with the deal page's own section-tabs, read by its own readers, never a copy", () => {
+      const results = {
+        extraction: data.extraction,
+        challenges: data.challenges,
+        comps: data.comps,
+        reconciliation: data.reconciliation,
+        market: data.market,
+        verdict: data.verdict,
+      };
+      const counts = analysisCounts(results);
+      const stateOf = (k: SectionKey) => sectionStateOf(k, { results, live: false, step: null, buyBox: data.buyBox });
+      // The bar, markup for markup, as the deal page draws it on a deal
+      // holding the sample's results with no screen running.
+      expect(section("overview")).toContain(
+        renderToStaticMarkup(
+          React.createElement(DealSectionTabs, {
+            active: "overview",
+            stateOf,
+            counts: sectionCounts(counts, data.buyBox.checks),
+            onSelect: () => {},
+          }),
+        ),
+      );
+      expect(section("analyses", "comps")).toContain(
+        renderToStaticMarkup(React.createElement(AnalysisTabs, { active: "comps", counts, has: () => true, onSelect: () => {} })),
+      );
+      // Neither public page keeps a tablist or a tab dot of its own; the
+      // deal page draws the same two components.
+      for (const p of ["app/demo/sections.tsx", "app/landing-interactive.tsx"]) {
+        const code = readFileSync(p, "utf8");
+        expect(code, p).not.toContain('role="tablist"');
+        expect(code, p).not.toMatch(/function TabDot|const ANALYSES =|const TABS =|LEGACY_TABS: Record/);
+      }
+      const view = readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8");
+      expect(view).toContain("<DealSectionTabs");
+      expect(view).toContain("<AnalysisTabs");
     });
 
     it("opens on the Overview the deal page opens on: the guide, the actuals, the verdict and risk digest, the playground", () => {

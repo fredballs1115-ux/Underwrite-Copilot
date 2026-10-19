@@ -18,7 +18,7 @@ export const STRIP_WORDS = {
   market: { aggressive: "aggressive", conservative: "conservative", "in-line": "in-line" } satisfies Record<MarketAssessment, string>,
 };
 
-/** The pipeline's own steps, in its order (deal-view's PIPELINE, which the
+/** The pipeline's own steps, in its order (lib/deal-tabs' PIPELINE, which the
  *  deal page's progress rail counts as "Step N of 6"); the reconciliation
  *  is a run of its own, made once the buyer adds a model. */
 export const STRIP_STAGES = ["signal", "extract", "challenge", "comps", "market", "verdict", "reconcile"] as const;

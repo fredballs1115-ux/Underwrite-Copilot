@@ -3,15 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type {
-  ExtractionResult,
-  ChallengerResult,
-  BrokerCompsResult,
-  ReconciliationResult,
-  MarketResult,
-  VerdictResult,
-  FirstSignal,
-} from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { screenYearOf } from "@/lib/criteria";
@@ -87,6 +79,18 @@ import { supportMailto } from "@/lib/support-link";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
+import {
+  ANALYSES,
+  LEGACY_TABS,
+  PIPELINE,
+  analysisCounts as countAnalyses,
+  sectionCounts as countSections,
+  sectionStateOf,
+  type AnalysisKey,
+  type DealResults,
+  type SectionKey,
+} from "@/lib/deal-tabs";
+import { AnalysisTabs, DealSectionTabs } from "./section-tabs";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
 // The buy box tab lives in buy-box-panel.tsx, which /demo draws on the
@@ -120,64 +124,8 @@ type Job = {
   ageMs?: number | null;
 } | null;
 
-type Results = {
-  extraction: ExtractionResult | null;
-  challenges: ChallengerResult | null;
-  comps: BrokerCompsResult | null;
-  reconciliation: ReconciliationResult | null;
-  market: MarketResult | null;
-  verdict: VerdictResult | null;
-};
+type Results = DealResults;
 
-/*
-  Information hierarchy: five top-level sections, ONE visible at a time.
-  Inside Analyses, the five analysis views sit behind a secondary pill nav
-  in the order an acquisitions analyst checks them — the verdict first,
-  then the critique that produced it.
-*/
-type SectionKey =
-  | "overview"
-  | "financials"
-  | "buybox"
-  | "analyses"
-  | "documents";
-type AnalysisKey = "verdict" | "challenger" | "comps" | "market" | "reconciler";
-
-const SECTIONS: { key: SectionKey; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "financials", label: "Financials" },
-  { key: "buybox", label: "Buy box" },
-  { key: "analyses", label: "Analyses" },
-  { key: "documents", label: "Documents" },
-];
-
-const ANALYSES: { key: AnalysisKey; label: string; result: keyof Results }[] = [
-  { key: "verdict", label: "Verdict", result: "verdict" },
-  { key: "challenger", label: "Challenger", result: "challenges" },
-  { key: "comps", label: "Comps", result: "comps" },
-  { key: "market", label: "Market", result: "market" },
-  { key: "reconciler", label: "Reconciler", result: "reconciliation" },
-];
-
-/** Old ?tab= values (bookmarks, memo links, OverviewView jump links) map
- *  onto the new section structure instead of 404-ing to Overview. */
-const LEGACY_TABS: Record<string, { section: SectionKey; analysis?: AnalysisKey }> = {
-  overview: { section: "overview" },
-  terms: { section: "financials" },
-  model: { section: "financials" },
-  financials: { section: "financials" },
-  buybox: { section: "buybox" },
-  analyses: { section: "analyses" },
-  verdict: { section: "analyses", analysis: "verdict" },
-  challenger: { section: "analyses", analysis: "challenger" },
-  comps: { section: "analyses", analysis: "comps" },
-  market: { section: "analyses", analysis: "market" },
-  reconciler: { section: "analyses", analysis: "reconciler" },
-  documents: { section: "documents" },
-};
-
-// The automatic pass, in order — drives the progress rail and pending logic.
-const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
 // The jobs that run on their own, outside the six-step screen: the rail draws
 // them as one indicator, and the overview keeps its meter while they run.
 const SIDE_JOBS = new Set(["reconcile", "model", "comps_search"]);
@@ -326,15 +274,6 @@ function completionMessage(step: string | null): string {
       return "Screening complete — the verdict is ready.";
   }
 }
-
-/** Which analyses/steps light which section while a run is in flight. */
-const SECTION_STEPS: Record<SectionKey, string[]> = {
-  overview: ["signal"],
-  financials: ["extract", "model"],
-  buybox: [],
-  analyses: ["challenge", "comps", "market", "verdict", "reconcile", "comps_search"],
-  documents: [],
-};
 
 export function DealView({
   dealId,
@@ -706,89 +645,13 @@ export function DealView({
     requestAnimationFrame(() => document.getElementById(`tab-${target.section}`)?.focus());
   }
 
-  function sectionState(
-    key: SectionKey,
-  ): "done" | "running" | "pending" | "idle" {
-    const steps = SECTION_STEPS[key];
-    if (live && job?.step && steps.includes(job.step)) return "running";
-    switch (key) {
-      case "overview":
-        return results.verdict || results.extraction
-          ? "done"
-          : live
-            ? "running"
-            : "idle";
-      case "financials":
-        if (results.extraction) return "done";
-        break;
-      case "analyses":
-        if (
-          results.verdict ||
-          results.challenges ||
-          results.comps ||
-          results.market
-        )
-          return "done";
-        break;
-      case "buybox":
-        return buyBox.hasBox && buyBox.checks.length ? "done" : "idle";
-      case "documents":
-        return "idle";
-    }
-    if (live && steps.length) {
-      const cur = PIPELINE.indexOf(job?.step ?? "");
-      const first = PIPELINE.indexOf(steps[0]);
-      if (first >= 0 && (cur < 0 || first > cur)) return "pending";
-    }
-    return "idle";
-  }
+  const sectionState = (key: SectionKey) =>
+    sectionStateOf(key, { results, live, step: job?.step ?? null, buyBox });
 
   // Finding counts, so a finished run shows where the problems live without
-  // opening every section.
-  // Each array is guarded: the schemas force these shapes on every write
-  // the app makes, but a legacy or hand-edited row with a null list must
-  // not take every tab down with it.
-  const analysisCounts: Record<AnalysisKey, number> = {
-    verdict: 0,
-    challenger: (results.challenges?.challenges ?? []).filter((c) => c.severity === "high")
-      .length,
-    comps: results.comps
-      ? (results.comps.redFlags ?? []).length +
-        [...(results.comps.saleComps ?? []), ...(results.comps.leaseComps ?? [])].filter(
-          (x) => x.support === "stretched",
-        ).length
-      : 0,
-    market: (results.market?.checks ?? []).filter((c) => c.assessment === "aggressive").length,
-    reconciler: (results.reconciliation?.rows ?? []).filter((r) => r.direction === "unfavorable")
-      .length,
-  };
-  const sectionCounts: Record<SectionKey, number> = {
-    overview: 0,
-    financials: 0,
-    buybox: buyBox.checks.filter((c) => c.status === "miss").length,
-    analyses:
-      analysisCounts.challenger +
-      analysisCounts.comps +
-      analysisCounts.market +
-      analysisCounts.reconciler,
-    documents: 0,
-  };
-
-  // Arrow-key navigation across the tablist (standard tabs pattern).
-  function onTabKeyDown(e: React.KeyboardEvent) {
-    const idx = SECTIONS.findIndex((t) => t.key === section);
-    let next = -1;
-    if (e.key === "ArrowRight") next = (idx + 1) % SECTIONS.length;
-    else if (e.key === "ArrowLeft")
-      next = (idx - 1 + SECTIONS.length) % SECTIONS.length;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = SECTIONS.length - 1;
-    if (next >= 0) {
-      e.preventDefault();
-      selectSection(SECTIONS[next].key);
-      document.getElementById(`tab-${SECTIONS[next].key}`)?.focus();
-    }
-  }
+  // opening every section (lib/deal-tabs).
+  const analysisCounts = countAnalyses(results);
+  const sectionCounts = countSections(analysisCounts, buyBox.checks);
 
   // A deal-level action error (replace-OM, delete, stage, busy, memo…) lands
   // the user back on Overview — surface it as a banner here, not only on the
@@ -887,54 +750,7 @@ export function DealView({
         data-tab-strip
         className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]"
       >
-        <div
-          role="tablist"
-          aria-label="Deal sections"
-          onKeyDown={onTabKeyDown}
-          className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm max-md:mr-8"
-        >
-          {SECTIONS.map((t) => {
-            const state = sectionState(t.key);
-            const isActiveTab = t.key === section;
-            const count = sectionCounts[t.key];
-            return (
-              <button
-                key={t.key}
-                id={`tab-${t.key}`}
-                type="button"
-                role="tab"
-                aria-selected={isActiveTab}
-                aria-controls="deal-tabpanel"
-                tabIndex={isActiveTab ? 0 : -1}
-                onClick={() => selectSection(t.key)}
-                className={`relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-                  isActiveTab
-                    ? "bg-brand text-white shadow-sm"
-                    : "text-muted hover:bg-faint hover:text-ink"
-                }`}
-              >
-                <TabDot state={state} active={isActiveTab} />
-                {t.label}
-                {/* The dot's colour says a section is being worked on; so do
-                    words, to a screen reader (research pass 33). */}
-                {state === "running" ? <span className="sr-only">, running</span> : null}
-                {count > 0 && (
-                  <span
-                    title={`${count} finding${count === 1 ? "" : "s"}`}
-                    className={`rounded-full px-1.5 py-px font-mono text-[10px] tabular-nums ${
-                      isActiveTab ? "bg-white/20 text-white" : "bg-kill/10 text-kill"
-                    }`}
-                  >
-                    {count}
-                    {/* What the figure counts, said: it had been in a title
-                        only (research pass 33). */}
-                    <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <DealSectionTabs active={section} stateOf={sectionState} counts={sectionCounts} onSelect={selectSection} />
       </div>
 
       {/* Active section — re-keyed so it eases in on switch */}
@@ -1496,56 +1312,14 @@ function AnalysesPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* The tabs pattern the deal's own sections use: arrow keys, Home and
-          End move through them, one tab stop, each tied to the panel it
-          opens — they had been tabs in name only (research pass 33). */}
-      <div
-        role="tablist"
-        aria-label="Analyses"
-        onKeyDown={(e) => {
-          const at = ANALYSES.findIndex((a) => a.key === analysis);
-          const n = ANALYSES.length;
-          const next =
-            e.key === "ArrowRight" ? (at + 1) % n : e.key === "ArrowLeft" ? (at - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
-          if (next < 0) return;
-          e.preventDefault();
-          onSelect(ANALYSES[next].key);
-          document.getElementById(`analysis-tab-${ANALYSES[next].key}`)?.focus();
-        }}
-        className="flex flex-wrap gap-1.5"
-      >
-        {ANALYSES.map((a) => {
-          const on = a.key === analysis;
-          const has = results[a.result] != null;
-          return (
-            <button
-              key={a.key}
-              id={`analysis-tab-${a.key}`}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              aria-controls="analysis-tabpanel"
-              tabIndex={on ? 0 : -1}
-              onClick={() => onSelect(a.key)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                on
-                  ? "border-brand bg-brand/10 text-brand"
-                  : has
-                    ? "border-line bg-surface text-ink hover:bg-faint"
-                    : "border-line bg-surface text-muted hover:bg-faint"
-              }`}
-            >
-              {a.label}
-              {counts[a.key] > 0 && (
-                <span className="rounded-full bg-kill/10 px-1.5 py-px font-mono text-[10px] tabular-nums text-kill">
-                  {counts[a.key]}
-                  <span className="sr-only">{` finding${counts[a.key] === 1 ? "" : "s"}`}</span>
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* The deal page's Analyses pills (section-tabs): the tabs pattern the
+          sections use, one tab stop, each tied to the panel it opens. */}
+      <AnalysisTabs
+        active={analysis}
+        counts={counts}
+        has={(k) => results[ANALYSES.find((a) => a.key === k)!.result] != null}
+        onSelect={onSelect}
+      />
       <div
         key={analysis}
         id="analysis-tabpanel"
@@ -1669,39 +1443,6 @@ function DocumentsPanel({
 
       <AddData dealId={dealId} tab="documents" />
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Tab bar bits                                                        */
-/* ------------------------------------------------------------------ */
-
-function TabDot({
-  state,
-  active,
-}: {
-  state: "done" | "running" | "pending" | "idle";
-  active: boolean;
-}) {
-  const base = "h-1.5 w-1.5 rounded-full";
-  if (state === "done") {
-    return <span aria-hidden className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
-  }
-  if (state === "running") {
-    return (
-      <span aria-hidden className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`} />
-    );
-  }
-  if (state === "pending") {
-    return <span aria-hidden className={`${base} ${active ? "bg-white/50" : "bg-line"}`} />;
-  }
-  return (
-    <span
-      aria-hidden
-      className={`${base} ${
-        active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"
-      }`}
-    />
   );
 }
 

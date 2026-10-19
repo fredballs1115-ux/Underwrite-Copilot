@@ -15,7 +15,9 @@ import { COMP_RATING, LEVER_META, SCENARIO_META, TONE } from "@/app/(app)/deals/
 import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { sampleBaseReturns, sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
 import { fmtPct } from "./underwrite/playground";
-import { DemoPanel, loadWalkthrough } from "@/app/landing-interactive";
+import { DemoPanel, DemoTabs, loadWalkthrough } from "@/app/landing-interactive";
+import { AnalysisTabs, DealSectionTabs } from "@/app/(app)/deals/[id]/section-tabs";
+import { PIPELINE, analysisCounts, sectionCounts, sectionStateOf } from "./deal-tabs";
 import { DebtSizer } from "@/app/(app)/deals/[id]/debt-sizer";
 import { SampleModelCard } from "@/app/sample-model-card";
 import { modelReturnsRead } from "./compare-interest";
@@ -468,8 +470,8 @@ describe("the screen-run trace credits each stage with what it writes", () => {
   const lines = () => Object.fromEntries(screenRunLines());
 
   it("runs in the pipeline's order, the reconciliation after it", () => {
-    const view = readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8");
-    const pipeline = JSON.parse(/const PIPELINE = (\[[^\]]*\]);/.exec(view)![1]) as string[];
+    // The deal page's own order (lib/deal-tabs, which deal-view reads).
+    const pipeline = PIPELINE;
     expect(screenRunLines().map(([stage]) => stage)).toEqual([...pipeline, "reconcile"]);
     expect([...STRIP_STAGES]).toEqual([...pipeline, "reconcile"]);
   });
@@ -531,6 +533,44 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(t).not.toMatch(/Screening verdict|one rubric|Deal-killer|Stress it|Holds up/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("draws the deal page's own section bar and Analyses pills (section-tabs), counted by its own readers", () => {
+    const buyBox = sampleBuyBox();
+    const { inputs, meta, sources } = sampleDerivedInputs();
+    const financials = {
+      underwrite: inputs,
+      underwriteSources: sources,
+      rateSeeds: { permanent: meta.rateSeed ?? null, construction: null },
+      strategy: inferStrategy(SAMPLE_DEAL.extraction, null),
+      modelInterest: null,
+    };
+    const html = renderToStaticMarkup(React.createElement(DemoTabs, { buyBox, financials }));
+    const results = {
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const counts = analysisCounts(results);
+    expect(html).toContain(
+      renderToStaticMarkup(
+        React.createElement(DealSectionTabs, {
+          active: "overview",
+          stateOf: (k) => sectionStateOf(k, { results, live: false, step: null, buyBox: buyBox.panel }),
+          counts: sectionCounts(counts, buyBox.panel.checks),
+          onSelect: () => {},
+          label: "Sample deal sections",
+          fadeAlways: true,
+        }),
+      ),
+    );
+    expect(html).toContain('id="deal-tabpanel" role="tabpanel" aria-labelledby="tab-overview"');
+    expect(panel("Analyses", "market")).toContain(
+      renderToStaticMarkup(React.createElement(AnalysisTabs, { active: "market", counts, has: () => true, onSelect: () => {} })),
+    );
   });
 
   it("opens Analyses on the verdict, with the product's ranges, deal-killers and scenario words", () => {
