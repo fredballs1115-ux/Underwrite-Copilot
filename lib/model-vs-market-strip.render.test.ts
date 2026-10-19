@@ -12,7 +12,7 @@ import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { modelVsMarket, wordsOnly, type ModelVsMarketInput } from "./model-vs-market";
 import { ModelVsMarketCard } from "@/app/(app)/deals/[id]/model-vs-market-card";
-import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 const national = readRates(REAL_ROWS, FIXTURE_NOW);
 const rentIndex: RateRow[] = [];
@@ -116,6 +116,7 @@ describe("the checks' picture fields — display only", () => {
 describe("ModelVsMarketCard — the strips", () => {
   const html = renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read }));
   const text = visibleText(html);
+  dumpView("model-vs-market-strips", html);
 
   it("draws the model as a marker and the published figures as ticks, the survey's margin a whisker", () => {
     expect(count(html, "mvm-model")).toBe(3);

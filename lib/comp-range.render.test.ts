@@ -9,7 +9,7 @@ import { deriveInternalComps } from "@/lib/internal-comps";
 import { buildComps, memoryMembers } from "@/lib/market-memory";
 import { statedCapRead } from "@/lib/compare-interest";
 import { CompRangeTracks } from "@/app/(app)/deals/[id]/comp-range-tracks";
-import { a11yIssues, gluedWords, visibleText } from "@/lib/render-lint";
+import { a11yIssues, dumpView, gluedWords, visibleText } from "@/lib/render-lint";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 const m = (label: string, value: string) => ({ label, value, flagged: false, page: "" });
@@ -137,6 +137,7 @@ describe("CompRangeTracks — the picture", () => {
   );
   const html = renderToStaticMarkup(React.createElement(CompRangeTracks, { tracks, bar: "pastscreens", qa: "past-screens-tracks" }));
   const text = visibleText(html);
+  dumpView("comp-range-tracks", html);
 
   it("draws a dot a comparable, this deal a tick, the median and the span", () => {
     expect(count(html, "pastscreens-dot")).toBe(3 + 3 + 1);
