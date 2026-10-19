@@ -131,6 +131,7 @@ describe("compsCsv", () => {
       "Dataset",
       "Dataset URL",
       "Retrieved (UTC)",
+      "Left out of the readout",
     ]);
     // Every row as wide as the header.
     for (const r of rows) expect(r).toHaveLength(rows[0].length);
@@ -167,7 +168,29 @@ describe("compsCsv", () => {
 
   it("carries the dataset and its retrieval day on every row", () => {
     const rows = parse(compsCsv(source(comps)));
-    for (const r of rows.slice(1)) expect(r.slice(14)).toEqual(["Philadelphia OPA", "https://opendataphilly.org/", "2026-10-08"]);
+    for (const r of rows.slice(1)) expect(r.slice(14, 17)).toEqual(["Philadelphia OPA", "https://opendataphilly.org/", "2026-10-08"]);
+  });
+
+  it("marks a sale left out of the readout in a column of its own, never dropping its row", () => {
+    const out = new Map([
+      [0, "not_comparable" as const],
+      [2, "shared_deed" as const],
+    ]);
+    const order = salesOrder(comps, "price");
+    const rows = parse(compsCsv(source(comps), order, out));
+    expect(rows).toHaveLength(1 + comps.length);
+    // Each row's pin and its reason, in the list's order; a kept sale's cell blank.
+    const byPin = new Map(rows.slice(1).map((r) => [r[0], r[17]]));
+    expect(byPin).toEqual(
+      new Map([
+        ["1", "Not comparable"],
+        ["2", ""],
+        ["3", "Possible shared deed"],
+      ]),
+    );
+    for (const r of rows) expect(r).toHaveLength(rows[0].length);
+    // With none left out, the column is there and blank.
+    expect(parse(compsCsv(source(comps))).slice(1).map((r) => r[17])).toEqual(["", "", ""]);
   });
 
   it("follows the list's order, each row keeping its pin number, and lists every sale", () => {

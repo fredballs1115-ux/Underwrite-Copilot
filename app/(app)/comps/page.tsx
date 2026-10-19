@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 export default async function PullCompsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; addr?: string; cls?: string; r?: string; m?: string; sort?: string | string[] }>;
+  searchParams: Promise<{ q?: string; addr?: string; cls?: string; r?: string; m?: string; sort?: string | string[]; out?: string | string[] }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/comps");
@@ -183,12 +183,15 @@ export default async function PullCompsPage({
           {/* The list's order is kept in this page's address (`?sort=`), so
               a reload or a shared link opens on it; the list holds the value
               to the orders it offers (lib/public-comps/picture
-              `readSalesSort`). */}
+              `readSalesSort`). So are the sales the reader left out of the
+              readout (`?out=`, lib/public-comps/kept `readSalesOut`), so a
+              shared link shows the same set. */}
           <CompsResultView
             result={result}
             showMap
             dbMarketsLine={marketNames(dbMarkets)}
             sortParam={(Array.isArray(params.sort) ? params.sort[0] : params.sort) ?? null}
+            outParam={(Array.isArray(params.out) ? params.out[0] : params.out) ?? null}
           />
         </section>
       ) : (

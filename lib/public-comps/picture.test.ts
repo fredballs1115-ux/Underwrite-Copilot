@@ -203,7 +203,7 @@ describe("compsTableText", () => {
       comps: [comp({ address: "12 Oak\tSt", price: 1_250_000, sqft: 5_000, distanceKm: 1.609344 })],
     });
     const [head, row] = text.split("\n");
-    expect(head.split("\t")).toEqual(["#", "Sold", "Address", "Price", "$/SF", "Units", "$/unit", "Type", "Buyer", "Seller", "Deed type", "Miles", "Source"]);
+    expect(head.split("\t")).toEqual(["#", "Sold", "Address", "Price", "$/SF", "Units", "$/unit", "Type", "Buyer", "Seller", "Deed type", "Miles", "Source", "Left out of the readout"]);
     expect(row.split("\t")).toEqual([
       "1",
       "2026-05-01",
@@ -218,7 +218,15 @@ describe("compsTableText", () => {
       "",
       "1.00",
       "https://example.gov/1",
+      "",
     ]);
+  });
+
+  it("keeps a sale left out of the readout as a row, its reason in the last column", () => {
+    const text = compsTableText({ comps: [comp({}), comp({ address: "2 Main St" })] }, new Map([[1, "wrong_class" as const]]));
+    const rows = text.split("\n").slice(1).map((r) => r.split("\t"));
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r[r.length - 1])).toEqual(["", "Wrong class"]);
   });
 });
 
