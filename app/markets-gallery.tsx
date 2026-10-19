@@ -116,7 +116,12 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
               <Link
                 href={`/market?metro=${m.id}`}
                 title={m.cite ?? undefined}
-                className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                // The tile holds its own 4:3, not the picture's: a market whose
+                // photograph and overhead both fail renders no <img>, and a
+                // tile sized by its picture collapsed to its border, its name
+                // and figures clipped out of sight.
+                className="group relative block aspect-[4/3] overflow-hidden rounded-xl border border-line bg-faint outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                data-qa="gallery-tile"
               >
                 {/* A 4:3 tile filled by a panorama up to 2.5:1 wide is covered by
                     its height, so the width a tile must be drawn at is up to
@@ -136,7 +141,7 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
                   describe
                   showCredit={false}
                   reportShown
-                  className="aspect-[4/3] w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"
+                  className="h-full w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"
                 />
                 {/* The scrim is what keeps the label legible over a photograph
                     whose brightness we do not control. */}

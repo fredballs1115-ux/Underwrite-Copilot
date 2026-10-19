@@ -351,6 +351,13 @@ describe("every grid of market tiles credits the pictures its tiles report, neve
     expect(text).toContain(OVERHEAD_GRID_CREDIT);
   });
 
+  it("the homepage's gallery: each tile holds its own 4:3, so a market whose pictures both fail keeps its name and figures in view", () => {
+    const html = render(React.createElement(MarketsGallery, { today: "2026-10-16" }));
+    const tiles = [...html.matchAll(/<a [^>]*data-qa="gallery-tile"[^>]*>/g)].map((m) => m[0]);
+    expect(tiles.length).toBeGreaterThan(10);
+    for (const tile of tiles) expect(tile).toMatch(/class="[^"]*\baspect-\[4\/3\]/);
+  });
+
   it("the submarket cards: one line under the grid, and none where no card is pictured", () => {
     const sub = (id: string, metro: string | null): Submarket => ({
       id,
