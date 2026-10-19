@@ -11,6 +11,7 @@ import type { DealRateSeeds } from "@/lib/debt-index";
 import type { DealStrategy } from "@/lib/deal-strategy";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import type { MetroDemand } from "@/lib/metro-demand";
+import type { StressTest } from "@/lib/stress-test-types";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
 import { AnalysisTabs, DealSectionTabs } from "./(app)/deals/[id]/section-tabs";
 import {
@@ -380,6 +381,7 @@ export function DemoPanel({
   tab,
   buyBox,
   financials,
+  stressTest = null,
   demand = null,
   analysis = "verdict",
   onAnalysis = () => {},
@@ -390,6 +392,9 @@ export function DemoPanel({
   buyBox?: SampleBuyBoxData;
   /** the Financials tab's server reads */
   financials?: SampleFinancials;
+  /** the OM's assumptions tested on the sample (lib/sample-stress), built
+   *  on the server, which the Overview leads with after the call */
+  stressTest?: StressTest | null;
   /** the market check's demand card's rows, read today (/demo reads them;
    *  the homepage reads none) */
   demand?: MetroDemand | null;
@@ -401,7 +406,7 @@ export function DemoPanel({
 }) {
   switch (tab) {
     case "Overview":
-      return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} />;
+      return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} stressTest={stressTest} />;
     case "Financials":
       return <FinancialsView financials={financials} />;
     case "Buy box":
@@ -454,9 +459,12 @@ function DocumentsTab() {
 export function DemoTabs({
   buyBox,
   financials,
+  stressTest = null,
 }: {
   buyBox: SampleBuyBoxData;
   financials: SampleFinancials;
+  /** the OM's assumptions tested on the sample, built on the server */
+  stressTest?: StressTest | null;
 }) {
   const [section, setSection] = useState<SectionKey>("overview");
   const [analysis, setAnalysis] = useState<AnalysisKey>("verdict");
@@ -542,6 +550,7 @@ export function DemoTabs({
           tab={label(section)}
           buyBox={buyBox}
           financials={financials}
+          stressTest={stressTest}
           analysis={analysis}
           onAnalysis={setAnalysis}
           onNavigate={navigate}

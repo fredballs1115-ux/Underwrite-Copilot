@@ -12,6 +12,8 @@ import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { incomeGapShare } from "@/lib/gap-detail";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { EmptyGlyph, StageRailGhost } from "@/app/empty-pictures";
+import { StressTestPanel } from "@/app/stress-test-panel";
+import type { StressTest } from "@/lib/stress-test-types";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -383,9 +385,15 @@ export function OverviewView({
   stale = [],
   staleWhy = "failed",
   stopped = false,
+  stressTest = null,
 }: {
   results: Results;
   active: boolean;
+  /** the OM's assumptions tested (lib/stress-test), built on the server
+   *  from what the page holds — drawn first after the call, before the
+   *  risk digest, since the test is what the call rests on; null draws
+   *  nothing */
+  stressTest?: StressTest | null;
   /** a screen (not a side job) is running: the progress rail above counts
    *  its six steps, so the meter's own count of five results stands down —
    *  "0/5" under "Step 2 of 6" read as two answers to one question */
@@ -449,6 +457,10 @@ export function OverviewView({
           </p>
         </div>
       )}
+
+      {/* The OM's assumptions, tested (app/stress-test-panel): the product
+          leads with it, right after the call. */}
+      <StressTestPanel test={stressTest} />
 
       {/* Completeness meter — a card while results are missing or a side job
           runs; a single quiet line once everything is done (it earns no card

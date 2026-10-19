@@ -23,6 +23,7 @@ import { regulationForDeal, rulesSizeText } from "@/lib/rent-regulation";
 import { placeDeal } from "@/lib/market-county";
 import { modelVsMarketFor } from "@/lib/model-vs-market";
 import { metroDemand } from "@/lib/metro-demand";
+import { sampleStressTest } from "@/lib/sample-stress";
 import type { ResearchPanelProps } from "@/app/(app)/deals/[id]/research-panel";
 import type { RegulatoryRule, Benchmark } from "@/lib/research";
 import type { DemoData } from "./sections";
@@ -143,6 +144,9 @@ export function sampleDemoData({
     strategy,
     modelVsMarket: modelRead,
     demand,
+    // The OM's assumptions tested (lib/sample-stress): the same derivation,
+    // the same read of today's figures, the sample's stored results.
+    stressTest: sampleStressTest({ today, derived, modelVsMarket: modelRead }),
   };
 
   // The research panel's props, read as the deal page reads them for its

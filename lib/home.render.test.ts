@@ -40,6 +40,7 @@ import { loadSampleTile } from "@/app/sample-pipeline-card-lazy";
 import { SAMPLE_ACTUALS_WORDS, SAMPLE_OM_FILE_WORDS, SAMPLE_OM_WORDS, SourceDocumentsView } from "@/app/(app)/deals/[id]/source-documents";
 import { SAMPLE_OM_HREF } from "./sample-om-link";
 import { rentRollDateWords, t12DateWords } from "./actuals/actuals-read";
+import { sampleStressTest } from "./sample-stress";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -571,6 +572,31 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(t).not.toMatch(/Screening verdict|one rubric|Deal-killer|Stress it|Holds up/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("leads the Overview with the OM's assumptions tested on the sample, after the call and before the risk digest (2026-10-19)", () => {
+    const stressTest = sampleStressTest({ today: "2026-09-21", derived: sampleDerivedInputs() });
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Overview" as never, stressTest }));
+    const t = text(html);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const panel = html.indexOf('data-qa="stress-test-panel"');
+    expect(panel).toBeGreaterThan(0);
+    expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(panel);
+    expect(html.indexOf("Risk digest")).toBeGreaterThan(panel);
+    expect(t).toContain("The OM's assumptions, tested");
+    // The sample's 6% vacancy against its rent roll and T-12: a document
+    // row with an impact, drawn on the homepage from the same build /demo
+    // draws (lib/sample-stress), with no figure read today.
+    const from = html.indexOf('data-qa="stress-row-vacancy"');
+    const row = html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
+    expect(row).toContain('data-verdict="unsupported"');
+    expect(row).toContain('data-evidence="document"');
+    expect(visibleText(row)).toContain("the deal's T-12");
+    expect(row).toContain('data-qa="stress-impact"');
+    expect(t).not.toContain("Published figures read");
+    // The page hands the walkthrough the same build.
+    expect(readFileSync("app/page.tsx", "utf8")).toContain("stressTest={sampleStressTest(");
   });
 
   it("draws the deal page's own section bar and Analyses pills (section-tabs), counted by its own readers", () => {

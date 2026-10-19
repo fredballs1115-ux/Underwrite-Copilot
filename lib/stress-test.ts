@@ -173,7 +173,9 @@ function joinWords(parts: string[]): string {
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
-const lowerFirst = (s: string) => (s ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
+/** "Stabilized vacancy" → "stabilized vacancy"; an initialism ("NOI")
+ *  keeps its letters. */
+const lowerFirst = (s: string) => (s && !/^[A-Z]{2,}/.test(s) ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
 
 function pageOf(row: Row | null | undefined, ex: ExtractionResult | null): number | null {
   const count = ex && typeof ex.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
@@ -1394,7 +1396,15 @@ export function buildStressTest(args: StressTestArgs): StressTest {
       impact: null,
       challenge: challengeWords(c),
       method: `The challenger's own critique${c.altFigure != null && basis ? `, holding the figure against ${c.altFigure} (${basis})` : basis ? `, against ${basis}` : ""}; no reader tests it and no figure is swapped.`,
-      unchecked: key === "other" ? "No reader tests this assumption; the challenger's words stand alone." : `A second challenge on the ${TITLES[key].toLowerCase()}; its row carries the first.`,
+      // A challenge whose key has a row carries the first; one whose key
+      // built no row on this deal (no premium stated, no value-add program)
+      // stands alone, said so rather than as a second.
+      unchecked:
+        key === "other"
+          ? "No reader tests this assumption; the challenger's words stand alone."
+          : row
+            ? `A second challenge on the ${TITLES[key].toLowerCase()}; its row carries the first.`
+            : `No ${TITLES[key].toLowerCase()} row could be built for this deal; the challenger's words stand alone.`,
     });
   }
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));

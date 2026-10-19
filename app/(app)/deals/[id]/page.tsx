@@ -95,7 +95,8 @@ import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
-import type { RecordCompsResult } from "@/lib/public-comps/core";
+import { MEDIAN_FLOOR, lastGoodOf, type RecordCompsResult } from "@/lib/public-comps/core";
+import { buildStressTest, type PastScreensEvidence, type RecordedSalesEvidence } from "@/lib/stress-test";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { VENDORED_LEGEND, ensureFloodFrame, floodLegend } from "@/lib/flood-map";
@@ -167,7 +168,7 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
-import { readActuals } from "@/lib/actuals/actuals-read";
+import { readActuals, type ActualsRead } from "@/lib/actuals/actuals-read";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { arrivalOf, scoreDeal } from "@/lib/track-record";
 import {
@@ -189,7 +190,6 @@ import { PlanStrip, PlausibilityPanel } from "./plausibility-panel";
 import { PlanSensitivity } from "./plan-sensitivity";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
-import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { modelReadsWithheld, screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { type DealRateSeeds } from "@/lib/debt-index";
@@ -918,7 +918,9 @@ export default async function DealPage({
   // infinite delta.
   // One reader for the card, the report's actuals page and the memo's line
   // (lib/actuals/actuals-read, research pass 24 B3).
-  const actuals: ActualsData = readActuals({
+  // Typed as the reader's own shape (the card's `ActualsData` is a looser
+  // copy of it), so the stress test takes it as read, never re-read.
+  const actuals: ActualsRead = readActuals({
     metrics,
     strategy,
     rentRoll: rrRes.data?.summary
@@ -1403,6 +1405,51 @@ export default async function DealPage({
   );
   const typicalScreen = await typicalScreenRead;
   const sameFile = await twinRead;
+
+  // The OM's assumptions, tested (lib/stress-test): each set against what
+  // this page already holds — the extraction, the challenger, the market
+  // check, the model's read against the published figures, the actuals, the
+  // derived model, the memorandum's own comps, the recorded sales and the
+  // reader's past screens — and the engine run again with ONE input swapped.
+  // Nothing is re-read or recomputed here: the shapes are the page's own.
+  // The recorded sales' $/SF median only from three sales up, the comps
+  // page's own floor (lib/public-comps `MEDIAN_FLOOR`); the past screens'
+  // median as the market memory pooled it, each at its ask.
+  const recordedSet = lastGoodOf(publicComps);
+  const recordedSales: RecordedSalesEvidence | null =
+    recordedSet?.stats && recordedSet.stats.count > 0
+      ? {
+          count: recordedSet.stats.count,
+          medianPerSqft: (recordedSet.stats.perSqftCount ?? recordedSet.stats.count) >= MEDIAN_FLOOR ? recordedSet.stats.medianPerSqft : null,
+          medianPerUnit: null,
+          providerName: recordedSet.providerName ?? "public property records",
+          retrievedAt: recordedSet.retrievedAt ?? null,
+          href: recordedSet.datasetUrl ?? null,
+        }
+      : null;
+  const pastScreens: PastScreensEvidence | null =
+    marketMemory?.perUnit && marketMemory.count > 0
+      ? {
+          count: marketMemory.count,
+          perUnitMedian: marketMemory.perUnit.basis === "unit" ? marketMemory.perUnit.median : null,
+          perSfMedian: marketMemory.perUnit.basis === "sf" ? marketMemory.perUnit.median : null,
+          market: marketMemory.market,
+        }
+      : null;
+  const stressTest = buildStressTest({
+    extraction,
+    firstSignal,
+    challenger: challenges,
+    market,
+    modelVsMarket: modelRead,
+    actuals,
+    derived,
+    storedAssetClass: deal.asset_class as string | null,
+    brokerComps: comps,
+    recordedSales,
+    pastScreens,
+    readOn: todayIso,
+  });
 
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
@@ -2014,6 +2061,8 @@ export default async function DealPage({
         todayIso={todayIso}
         stageToday={stageToday}
         compsSubjectPoint={compsSubjectPoint}
+        // The OM's assumptions tested, which the Overview leads with.
+        stressTest={stressTest}
       />
 
       <div className="mt-6 space-y-4">
