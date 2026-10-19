@@ -443,7 +443,7 @@ export function weeklyDigestEmail(input: DigestInput): {
         ? `and possibly more due by ${input.offersThrough}`
         : null;
   const tasksTitle = `Your tasks due by ${input.offersThrough}`;
-  const tasksUnreadWords = "Your tasks could not be read for this digest — open My tasks to see them.";
+  const tasksUnreadWords = "Your tasks could not be read for this digest — each deal's page lists its own.";
 
   const text = [
     `Your pipeline this week — ${dealsWord}, by stage:`,

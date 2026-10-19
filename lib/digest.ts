@@ -257,7 +257,7 @@ export function buildDigest(
   const myTasks = mine.slice(0, LIST_MAX).map((t) => ({
     title: t.title,
     dealName: names.get(t.deal_id)!.name,
-    url: dealUrl(t.deal_id),
+    url: `${dealUrl(t.deal_id)}#tasks`,
     due: DUE_FMT.format(new Date(`${t.due_date}T00:00:00Z`)),
     overdue: t.due_date < today,
     pictureUrl: pictureUrl(t.deal_id),

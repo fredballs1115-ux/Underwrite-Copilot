@@ -41,12 +41,6 @@ const IconLayers = (p: { className?: string }) => (
     <path d="m3 17 9 5 9-5" />
   </NavIcon>
 );
-const IconCheck = (p: { className?: string }) => (
-  <NavIcon className={p.className}>
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <path d="m8 12 3 3 5-6" />
-  </NavIcon>
-);
 const IconCard = (p: { className?: string }) => (
   <NavIcon className={p.className}>
     <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -298,7 +292,6 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const inPipeline = pathname.startsWith("/deals");
-  const inTasks = pathname.startsWith("/tasks");
   const inCriteria = pathname.startsWith("/criteria");
   const inComps = pathname.startsWith("/comps");
   const inAnalytics = pathname.startsWith("/analytics");
@@ -321,7 +314,6 @@ export function AppShell({
   // draw, each with its icon: the phone's chips had been words alone.
   const nav = [
     ["/deals", "Pipeline", inPipeline, IconLayers],
-    ["/tasks", "My tasks", inTasks, IconCheck],
     ["/criteria", "Buy box", inCriteria, IconTarget],
     ["/comps", "Pull comps", inComps, IconPin],
     ["/market", "Market data", inMarket, IconMemory],
