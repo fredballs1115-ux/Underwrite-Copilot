@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-10-19",
+      "title": "More of the deal page in pictures",
+      "href": "/deals",
+      "blurb": "Your past screens and the pipeline's comparable deals now draw the going-in cap and the basis as ranges with this deal marked on them. The model's assumptions sit as strips against the published figures, and the leverage check is one rate track. The capital stack, the construction loan and the T-12 are bars. On the comps page, recorded sales read as cards on a phone and can be ordered by distance, date, price or price a square foot. Analytics, submarkets and the market memory cards draw their figures too, and empty sections show a picture of what will fill them. The cross-deal task list is gone; each deal's tasks stay on its own page."
+    },
+    {
       "date": "2026-10-05",
       "title": "Ten more cities, pictured",
       "href": "/deals",
