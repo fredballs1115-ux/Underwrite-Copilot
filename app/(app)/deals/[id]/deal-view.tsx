@@ -1547,7 +1547,12 @@ function InternalCompsBlock({ comps, ranges = [] }: { comps: InternalComp[]; ran
       </p>
       {/* The table's cap and basis as tracks, this deal ticked on them
           (lib/comp-range); the table beneath names each deal. */}
-      <CompRangeTracks tracks={ranges} bar="pipelinecomps" qa="pipeline-comps-tracks" />
+      <CompRangeTracks
+        tracks={ranges}
+        bar="pipelinecomps"
+        qa="pipeline-comps-tracks"
+        dotsWord={(n) => (n === 1 ? "One deal in your pipeline" : `${n} deals in your pipeline`)}
+      />
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">
           <thead>

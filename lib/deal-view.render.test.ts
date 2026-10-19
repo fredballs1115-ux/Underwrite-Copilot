@@ -880,6 +880,29 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(a11yIssues(html)).toEqual([]);
   });
 
+  it("keys the pipeline block's dots as deals in the reader's pipeline, never past screens", () => {
+    const internalCompRanges = compRangeTracks(
+      [
+        { name: "A", cap: 5.2, basis: { value: 240_000, allIn: false } },
+        { name: "B", cap: 5.6, basis: { value: 262_000, allIn: false } },
+      ],
+      { cap: 5.5, basis: 255_000 },
+      { unit: "unit", noun: "unit" },
+    );
+    const html = render({
+      ...sampleProps("analyses", "comps"),
+      internalComps: [
+        { dealId: "a", name: "A", market: "Philadelphia, PA", screenedAt: "2026-08-12T15:00:00Z", call: null, priceLabel: "", capLabel: "5.2%", basisLabel: "", kind: "stabilized", kindLabel: null, yieldOnCostLabel: null },
+        { dealId: "b", name: "B", market: "Philadelphia, PA", screenedAt: "2026-08-12T15:00:00Z", call: null, priceLabel: "", capLabel: "5.6%", basisLabel: "", kind: "stabilized", kindLabel: null, yieldOnCostLabel: null },
+      ],
+      internalCompRanges,
+    } as unknown as Props);
+    const block = html.slice(html.indexOf('data-qa="pipeline-comps-tracks"'));
+    const text = textOf(block);
+    expect(text).toContain("2 deals in your pipeline");
+    expect(text).not.toContain("past screens");
+  });
+
   it("says a failed read of the reader's other screens, never shows it as no comps (audit C5, LOW-5)", () => {
     const failed = render({ ...sampleProps("analyses", "comps"), internalComps: [], internalCompsUnread: true } as unknown as Props);
     expect(failed).toContain('data-qa="internal-comps-unread"');

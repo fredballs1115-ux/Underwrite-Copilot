@@ -18,7 +18,19 @@ function rangeAt(value: number, domain: readonly [number, number]): string {
  * carries no reader. `bar` names the picture's `data-bar` markers
  * ("pastscreens", "pipelinecomps"), one family a block.
  */
-export function CompRangeTracks({ tracks, bar, qa }: { tracks: readonly RangeTrack[]; bar: string; qa?: string }) {
+export function CompRangeTracks({
+  tracks,
+  bar,
+  qa,
+  dotsWord = (n) => (n === 1 ? "One past screen" : `${n} past screens`),
+}: {
+  tracks: readonly RangeTrack[];
+  bar: string;
+  qa?: string;
+  /** what the dots are, counted, in the key: the past screens by default,
+   *  "N deals in your pipeline" for the pipeline's block */
+  dotsWord?: (n: number) => string;
+}) {
   if (tracks.length === 0) return null;
   return (
     <div className="mt-3 flex flex-col gap-3" data-qa={qa}>
@@ -56,7 +68,7 @@ export function CompRangeTracks({ tracks, bar, qa }: { tracks: readonly RangeTra
           </div>
           <Key>
             <KeyItem mark="swatch" tone="bg-brand">
-              {t.dots.length === 1 ? "One past screen" : `${t.dots.length} past screens`}
+              {dotsWord(t.dots.length)}
             </KeyItem>
             {t.subjectText != null && (
               <KeyItem mark="tick" tone="bg-ink">
