@@ -61,6 +61,9 @@ import { DemoSections } from "@/app/demo/sections";
 import { loadWalkthrough } from "@/app/landing-interactive";
 import { AnalysisTabs, DealSectionTabs } from "@/app/(app)/deals/[id]/section-tabs";
 import { analysisCounts, sectionCounts, sectionStateOf, type SectionKey } from "@/lib/deal-tabs";
+import { actualsFromRows as actualsFromRowsForTest } from "@/lib/actuals/actuals-read";
+import { inferStrategy as inferStrategyForTest } from "@/lib/deal-strategy";
+import { shownAssetClass as shownAssetClassForTest } from "@/lib/asset-class";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { fitFilterKey } from "@/lib/fit-filter";
 import { PERSON_TONES, personName, personToneIndex } from "@/lib/person";
@@ -1464,7 +1467,7 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(a11yIssues(html)).toEqual([]);
     });
 
-    it("draws the Analyses tab as the walkthrough's panel, the challenger by the deal's own name, its broker questions after it", async () => {
+    it("draws the Analyses tab as the walkthrough's panel, the challenger by the deal's own name and its own broker questions", async () => {
       // The walkthrough's views arrive in a chunk of their own, which a page
       // asks for when the tab opens (lib/walkthrough-loading.render.test.ts
       // draws the shape it shows until then); here, landed.
@@ -1473,12 +1476,29 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(verdict).toContain("Caution");
       const html = section("analyses", "challenger");
       expect(html).toContain('aria-label="Analyses"');
-      expect(html).toContain("would you ask the broker");
+      // The deal page's challenger carries each question in its own card;
+      // the page's hand-built "what would you ask the broker?" strip, which
+      // the deal page has none of, is gone.
+      const text = visibleText(html).replace(/&#x27;/g, "'");
+      expect(text).toContain("Assumption challenger");
+      for (const c of SAMPLE_DEAL.challenges.challenges.filter((x) => x.question).slice(0, 3)) expect(text).toContain(c.question!);
+      expect(text).not.toContain("would you ask the broker");
+      expect(text).not.toContain("Reveal the drafted question");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(visibleText(html))).toEqual([]);
     });
 
-    it("draws the Documents tab as the sample's: its fictional memorandum, the rent roll and T-12 it was read with, and the three public downloads", () => {
+    it("draws the comps as the signed-in sample's: fictional, so unmapped and not searched, each comp citing its page", () => {
+      const html = section("analyses", "comps");
+      expect(html).toContain('data-qa="sample-comps-unmapped"');
+      expect(html).toContain('data-qa="sample-no-web-search"');
+      expect(html).not.toContain("Sign up to search");
+      const cited = SAMPLE_DEAL.comps.saleComps.find((c) => c.page);
+      expect(cited).toBeTruthy();
+      expect(visibleText(html)).toMatch(new RegExp(`p\\.\\s*${String(cited!.page).replace(/\D/g, "")}\\b`));
+    });
+
+    it("draws the Documents tab as the sample's: its fictional memorandum, the rent roll and T-12 it was read with, the memo the verdict makes", () => {
       const text = visibleText(section("documents"));
       expect(text).toContain("Offering memorandum");
       // Audit C10, M4: the signed-in sample's card, never "none uploaded"
@@ -1486,9 +1506,21 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(text).toContain("none — the sample's memorandum is fictional");
       expect(text).not.toContain("none uploaded");
       expect(text.match(/read into the sample — no file to open/g)?.length).toBe(2);
-      expect(text).toContain("Take the deliverables with you");
-      const html = section("documents");
-      for (const href of ["/api/demo/memo", "/api/demo/report", "/api/demo/underwrite.xlsx"]) expect(html).toContain(`href="${href}"`);
+      // The deal page's Documents tab has no deliverables card: the memo is
+      // its row here, the report and the workbook the header's tools.
+      expect(text).not.toContain("Take the deliverables with you");
+      expect(section("documents")).toContain('href="/api/demo/memo"');
+    });
+
+    it("reads the actuals and the model as the deal page reads them on the sample", () => {
+      const ex = SAMPLE_DEAL.extraction;
+      const shown = shownAssetClassForTest(SAMPLE_DEAL.asset_class, ex) || null;
+      expect(data.actuals).toEqual(actualsFromRowsForTest(ex, inferStrategyForTest(ex, null), shown, SAMPLE_DEAL.rentRoll, SAMPLE_DEAL.t12));
+      // The demo's own source reads the actuals through the reader, never by hand.
+      const code = readFileSync("app/demo/demo-data.ts", "utf8");
+      expect(code).toContain("actualsFromRows(");
+      expect(code).not.toContain("compareNoi(");
+      expect(code).toContain("sampleDerivedInputs({ regulation, asOf: noon })");
     });
 
     it("types no name, call or rule into the page: they are the readers'", () => {

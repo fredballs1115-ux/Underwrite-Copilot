@@ -285,18 +285,21 @@ function AnalysesView({
           />
         )}
         {w && analysis === "comps" && (
-          // No map: the deal page's comps map geocodes each comp in the
-          // visitor's browser, which a homepage section has no business
-          // doing; /demo's comps tab draws none either.
+          // The deal page's comps on the sample, handed what the signed-in
+          // sample's page hands them (deal-view's AnalysesPanel): its map
+          // context marked the sample's, so no comp is geocoded or pinned
+          // and the table says why, each comp cites its memorandum page, and
+          // no public-web search is offered for a fictional building. No map
+          // component is handed in, so none loads.
           <w.BrokerComps
             result={RESULTS.comps}
             dealId="sample"
             compSearch={null}
             active={false}
             isPro={false}
-            publicDemo
             subject={w.COMP_SUBJECT}
             noun={w.COMP_NOUN}
+            mapContext={w.COMP_MAP_CONTEXT}
           />
         )}
         {w && analysis === "market" && <w.MarketCheck result={RESULTS.market} demand={demand} />}

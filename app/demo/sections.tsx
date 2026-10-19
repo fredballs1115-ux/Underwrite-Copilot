@@ -40,7 +40,6 @@ import type {
 } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
-import { BrokerQuestions } from "./broker-questions";
 
 /** The sample deal as the signed-in sample deal's page hands it to its
  *  sections (app/(app)/deals/[id]/page.tsx → DealView), each part read on
@@ -191,58 +190,27 @@ export function DemoSections({
         )}
 
         {section === "analyses" && (
-          <div className="flex flex-col gap-6">
-            <DemoPanel
-              tab="Analyses"
-              analysis={analysis}
-              demand={data.demand}
-              onAnalysis={setAnalysis}
-              onNavigate={navigate}
-            />
-            {analysis === "challenger" && <BrokerQuestions />}
-          </div>
+          // The deal page's Analyses tab: its pills and each view, the
+          // challenger's broker questions in its own cards and email list.
+          <DemoPanel
+            tab="Analyses"
+            analysis={analysis}
+            demand={data.demand}
+            onAnalysis={setAnalysis}
+            onNavigate={navigate}
+          />
         )}
 
         {section === "documents" && (
+          // The deal page's Documents tab on the sample: its source
+          // documents card, the memo's row linking the public sample's memo.
+          // The report and the workbook are the header's tools, as on the
+          // signed-in sample.
           <div className="flex flex-col gap-6">
             <DemoPanel tab="Documents" onNavigate={navigate} />
-            <Deliverables />
           </div>
         )}
       </div>
     </div>
-  );
-}
-
-/** The sample's three documents, free here: the files the header's tools
- *  download, which a Pro account exports from a deal of its own. */
-function Deliverables() {
-  return (
-    <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5 shadow-card">
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight">Take the deliverables with you</h2>
-        <p className="mt-1 text-sm text-muted">The files a Pro analyst exports, free for the sample.</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <a
-          href="/api/demo/memo"
-          className="rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-        >
-          Sample IC memo (PDF)
-        </a>
-        <a
-          href="/api/demo/report"
-          className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
-        >
-          Full report (PDF)
-        </a>
-        <a
-          href="/api/demo/underwrite.xlsx"
-          className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
-        >
-          Sample model (.xlsx)
-        </a>
-      </div>
-    </section>
   );
 }

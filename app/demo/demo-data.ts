@@ -8,7 +8,7 @@
 import type { DebtSeeds } from "@/lib/debt-index";
 import type { TodayReads } from "@/lib/model-vs-market-read";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import { actualsFromRows } from "@/lib/actuals/actuals-read";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buyBoxLines, findGoingInCap } from "@/lib/criteria";
 import { buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
@@ -53,17 +53,23 @@ export function sampleDemoData({
   const address = SAMPLE_DEAL.address;
   const strategy = inferStrategy(ex, null);
   const shownClass = shownAssetClass(SAMPLE_DEAL.asset_class, ex);
-  // One derivation with the demo workbook and the demo report
-  // (lib/sample-derive): actuals included, never seeded from today's rates.
-  const derived = sampleDerivedInputs();
   const placement = samplePlacement();
 
-  // The model's assumptions against the published figures and the market
-  // check's demand card, off the deal page's one read of today's figures.
+  // The rent rules that reach the sample, read through the one call every
+  // surface makes (lib/rent-regulation), on the page's day.
   const regulation = regulationForDeal(
     { extraction: ex, address, siteFlags: null, assetClass: SAMPLE_DEAL.asset_class },
     today,
   );
+  // One derivation with the demo workbook and the demo report
+  // (lib/sample-derive): actuals included, never seeded from today's rates,
+  // and told what the deal page tells its derivation — the rent rules and
+  // the day its dated readers read on — as the demo workbook's route tells
+  // it. Neither reaches a figure the model runs on.
+  const derived = sampleDerivedInputs({ regulation, asOf: noon });
+
+  // The model's assumptions against the published figures and the market
+  // check's demand card, off the deal page's one read of today's figures.
   const modelRead = reads
     ? modelVsMarketFor({
         derived,
@@ -89,10 +95,6 @@ export function sampleDemoData({
   const checkSource = dealCheckSource(ex, null, address);
   const boxRead = buyBoxRead(SAMPLE_DEAL.asset_class, checkSource, SAMPLE_DEMO_BOX);
 
-  // The OM's NOI against the T-12, through the deal page's own picker.
-  const omPick = pickOmNoi(ex.metrics, strategy.kind);
-  const t12Noi = SAMPLE_DEAL.t12.summary.noi;
-
   const data: DemoData = {
     extraction: ex,
     challenges: SAMPLE_DEAL.challenges,
@@ -108,11 +110,13 @@ export function sampleDemoData({
       { ...SAMPLE_DEAL.model.returns, holdYears: SAMPLE_DEAL.model.holdYears },
       noon,
     ),
-    actuals: {
-      rentRoll: { asOf: SAMPLE_DEAL.rentRoll.as_of_date, summary: SAMPLE_DEAL.rentRoll.summary },
-      t12: { periodEnd: SAMPLE_DEAL.t12.period_end_date, summary: SAMPLE_DEAL.t12.summary },
-      noiComparison:
-        omPick && t12Noi != null && Number.isFinite(t12Noi) && t12Noi !== 0 ? compareNoi(omPick.noi, t12Noi, omPick) : null,
+    // The rent roll and the T-12 against the OM, through the deal page's one
+    // reader (lib/actuals/actuals-read, which its actuals card, the report
+    // and the memo read), on the deal's kind and its one class.
+    actuals: actualsFromRows(ex, strategy, shownClass || null, SAMPLE_DEAL.rentRoll, SAMPLE_DEAL.t12) ?? {
+      rentRoll: null,
+      t12: null,
+      noiComparison: null,
       noiNote: null,
       assetClass: shownClass || null,
     },
