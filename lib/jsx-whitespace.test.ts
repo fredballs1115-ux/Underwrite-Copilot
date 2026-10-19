@@ -29,7 +29,9 @@ function tsxFiles(dir: string, out: string[] = []): string[] {
 export function gluedTextSites(src: string): Array<{ line: number; text: string }> {
   const hits: Array<{ line: number; text: string }> = [];
   const lines = src.split("\n");
-  const re = /[}>]( )(?=[A-Za-z0-9("'“‘])/g;
+  // A dash too: /whats-new read "since Wed, Sep 16— every one" (the visual
+  // sweep of 2026-10-19).
+  const re = /[}>]( )(?=[A-Za-z0-9("'“‘—–$])/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
     const start = m.index + 1;
@@ -57,6 +59,8 @@ describe("JSX text that the compiler would glue to the expression before it", ()
     // a multi-line node without one does too — neither is a hit.
     expect(gluedTextSites(`<p>{n} with entity &amp; same line</p>`)).toHaveLength(0);
     expect(gluedTextSites(`<p>{n} two lines no entity\n  here — dash</p>`)).toHaveLength(0);
+    // A node that opens on a dash is glued the same way.
+    expect(gluedTextSites(`<p>{d} —\n  every one in this build&apos;s code</p>`)).toHaveLength(1);
   });
 
   it("no page in app/ or lib/ carries the shape", () => {

@@ -85,7 +85,7 @@ export async function BrandingSection({
           <h2 className="text-sm font-semibold tracking-tight">Report branding</h2>
           <p className="mt-1 max-w-lg text-sm text-muted">
             Shown on every export{" "}
-            {scope === "team" ? "for your whole team" : "you download"} — name and
+            {scope === "team" ? "for your whole team" : "you download"}{" "}— name and
             logo on the memo and report, your name in the Excel workbooks&apos;
             file properties and print header, and a letterhead on the LOI. Footer
             text prints on each PDF page. A small &ldquo;Powered by Underwrite
