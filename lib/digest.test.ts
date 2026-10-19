@@ -63,6 +63,9 @@ describe("the digest counts open deals, never a closed one as live", () => {
     expect(subject).toBe("Your pipeline this week — 3 open deals");
     expect(html).toContain("3 open deals in your pipeline</h1>");
     expect(html).toContain("Open deals by stage");
+    // The worker's day is WORKER_DIGEST_DOW, so the email never names one.
+    expect(html).toContain(">Weekly pipeline digest</p>");
+    expect(html).not.toContain("Monday");
     expect(text).toContain("3 open deals, by stage:");
     for (const out of [subject, html, text]) {
       expect(out).not.toMatch(/\blive\b/);
