@@ -1543,6 +1543,16 @@ describe("the debt sizer lists a stated loan under whose loan it is (2026-09-30)
     expect(amortOnly.offered.map((r) => r.label)).toEqual(["LTV"]);
   });
 
+  it("cites a loan term's page only inside the deck's length, never as the model wrote it", () => {
+    const t = omLoanTerms(
+      withRows([row("Assumable loan balance", "$40,000,000", "Page 12"), row("Assumable loan rate", "3.45%", "p. 61"), row("Assumption fee", "1%", "see the term sheet")]),
+    );
+    expect(t.assumable.map((r) => r.page)).toEqual(["p. 12", undefined, undefined]);
+    // No length known, no page validated.
+    const noLength = omLoanTerms({ ...withRows([row("Assumable loan balance", "$40,000,000")]), totalPages: undefined } as Ex);
+    expect(noLength.assumable[0].page).toBeUndefined();
+  });
+
   it("lists the note the seller offers to carry as the seller's note", () => {
     const t = omLoanTerms(
       withRows([
