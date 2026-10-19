@@ -271,16 +271,42 @@ describe("a stabilized apartment deal with a T-12", () => {
 
     const d = rowOf(test, "debt");
     expect(d.omSays).toEqual({ text: "Interest rate: 5.25%", value: 5.25, page: 30 });
-    expect(d.evidence[0]).toMatchObject({ kind: "published", value: 6.78, asOf: "Sep 17, 2026", scope: "nation" });
+    // The index is the fact, dated by its own day (read back off the seed's
+    // note, lib/debt-index's `debtRateNote`); the spread is a rule of thumb.
+    expect(d.evidence[0]).toEqual({
+      kind: "published",
+      label: "The index the model prices off: 5-yr Treasury",
+      text: "4.78% (FRED, Sep 17, 2026)",
+      value: 4.78,
+      asOf: "2026-09-17",
+      publisher: "FRED",
+      scope: "nation",
+    });
+    expect(d.evidence[1]).toMatchObject({ kind: "rule_of_thumb", value: 6.78, asOf: null, publisher: "a screening default", scope: "class" });
+    expect(d.evidence[1].text).toContain("+200 bps over the index, the class's screening default, not a quote: 6.78% all in");
     expect(d.evidence.map((e) => e.label)).toEqual([
-      "The index the model prices off, plus the class's screening spread",
+      "The index the model prices off: 5-yr Treasury",
+      "The class's screening spread over it, a rule of thumb",
       "10-year Treasury, as the market check read it",
       "Lender tests at screening defaults, the binding one named",
       "Negative leverage: the going-in cap against the all-in rate",
     ]);
     expect(d.gap).toEqual({ value: 153, unit: "bps", text: "The OM's 5.25% is 153 bps under the index plus the class's spread, 6.78%." });
-    expect(d.verdict).toBe("unsupported");
+    // 153 bps under the index plus a default spread, but over the bare
+    // 4.78% index: stretched, never unsupported on a rule of thumb.
+    expect(d.verdict).toBe("stretched");
     expect(d.impact!.input).toBe("allInRatePct");
+    expect(d.impact!.evidenceIndex).toBe(1);
+  });
+
+  it("reads the index off the DebtIndex where one is handed in, the same as off the note, and reads a rate under the bare index unsupported", () => {
+    const given = rowOf(buildStressTest(apartmentArgs({ debtIndex: FIVE })), "debt");
+    expect(given.evidence[0]).toEqual(rowOf(test, "debt").evidence[0]);
+    expect(given.evidence[1].text).toContain("+200 bps over the index");
+    const cheap = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Interest rate" ? { ...m, value: "4.50%" } : m)) };
+    const d = rowOf(buildStressTest(apartmentArgs({ extraction: cheap })), "debt");
+    expect(d.gap).toMatchObject({ value: 228, unit: "bps" });
+    expect(d.verdict).toBe("unsupported");
   });
 
   it("strikes the basis on the price over the units, and withholds a verdict with no comp", () => {

@@ -74,8 +74,10 @@ import { assetWords } from "@/lib/asset-words";
 import { compFigures, subjectBasis } from "@/lib/comp-detail";
 import { findGoingInCap, findMetric, findPriceRow, occupancyRow, parsePct, screenYearOf, unitCountFromMetrics, buildingSfFromMetrics } from "@/lib/criteria";
 import { BASIS_PER_SF_BAND, BASIS_PER_UNIT_BAND, askingPriceOf, buildingPriceOf, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { datedLong, indexName, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import { locatedPage } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
+import { publisherTag } from "@/lib/live-rates-core";
 import type { ModelCheck, ModelVsMarket, PublishedFigure } from "@/lib/model-vs-market";
 import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 import { SIZER_LENDER_TESTS } from "@/lib/sizer-terms";
@@ -153,6 +155,10 @@ export interface StressTestArgs {
   brokerComps?: BrokerCompsResult | null;
   recordedSales?: RecordedSalesEvidence | null;
   pastScreens?: PastScreensEvidence | null;
+  /** the index the derived model's rate was seeded off (lib/debt-index
+   *  `debtSeeds`' tenor, the one handed to `deriveUnderwriteInputs`), with
+   *  its own date; absent, the index is read back off the seed's note */
+  debtIndex?: DebtIndex | null;
   /** ISO day the published figures were read */
   readOn: string;
 }
@@ -447,6 +453,7 @@ interface Ctx {
   brokerComps: BrokerCompsResult | null;
   recordedSales: RecordedSalesEvidence | null;
   pastScreens: PastScreensEvidence | null;
+  debtIndex: DebtIndex | null;
   readOn: string;
 }
 
@@ -782,6 +789,34 @@ function exitCapRow(ctx: Ctx): StressRow | null {
 
 // — Debt —
 
+const MONTHS: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+/** `debtRateNote`'s own shape: "5-yr Treasury 4.78% (FRED, Sep 17, 2026) +
+ *  200 bps multifamily spread, a screening default — enter your quote". */
+const SEED_NOTE = /^(.+?) (\d+(?:\.\d+)?)% \((.+), ([A-Z][a-z]{2}) (\d{1,2}), (\d{4})\) \+ (\d+) bps /;
+
+/**
+ * The index a seeded rate was built on — the fact under the spread — with
+ * its own ISO date: from the `DebtIndex` the caller hands in, else read
+ * back off the seed's note, whose one writer is lib/debt-index's
+ * `debtRateNote` (a test holds the two paths to one answer). Null where
+ * the note is not that writer's.
+ */
+function seedIndex(seed: RateSeed, given: DebtIndex | null): { name: string; pct: number; asOf: string; credit: string; spreadBps: number } | null {
+  if (given) {
+    return {
+      name: indexName(given),
+      pct: given.pct,
+      asOf: given.asOf,
+      credit: publisherTag({ id: given.id, source: "fred", label: given.short }) ?? "FRED",
+      spreadBps: Math.round((seed.pct - given.pct) * 100),
+    };
+  }
+  const m = seed.note.match(SEED_NOTE);
+  if (!m || !(m[4] in MONTHS)) return null;
+  const asOf = new Date(Date.UTC(Number(m[6]), MONTHS[m[4]], Number(m[5]))).toISOString().slice(0, 10);
+  return { name: m[1], pct: Number(m[2]), asOf, credit: m[3], spreadBps: Number(m[7]) };
+}
+
 function debtRow(ctx: Ctx): StressRow | null {
   // A note's buyer takes no acquisition loan on the collateral: the rate
   // on file is the note's own coupon (#416), and no row is built.
@@ -789,17 +824,38 @@ function debtRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, DEBT_RATE_ROW, DEBT_RATE_NOT);
   const evidence: StressEvidence[] = [];
   const seed = ctx.derived?.meta.rateSeed ?? null;
-  // Today's index plus the class's screening spread — the index the fact,
-  // the spread the default, the note naming both with the index's date.
-  if (seed) {
+  const index = seed ? seedIndex(seed, ctx.debtIndex) : null;
+  // Today's index, the fact, dated and published; then the class's
+  // screening spread over it, a rule of thumb named as one — never the two
+  // as one published figure, since the spread is nobody's print.
+  if (seed && index) {
     evidence.push({
       kind: "published",
+      label: `The index the model prices off: ${index.name}`,
+      text: `${pct2(index.pct)} (${index.credit}, ${datedLong(index.asOf)})`,
+      value: index.pct,
+      asOf: index.asOf,
+      publisher: index.credit,
+      scope: "nation",
+    });
+    evidence.push({
+      kind: "rule_of_thumb",
+      label: "The class's screening spread over it, a rule of thumb",
+      text: `+${index.spreadBps} bps over the index, the class's screening default, not a quote: ${pct2(seed.pct)} all in — ${seed.note}`,
+      value: seed.pct,
+      asOf: null,
+      publisher: "a screening default",
+      scope: "class",
+    });
+  } else if (seed) {
+    evidence.push({
+      kind: "rule_of_thumb",
       label: "The index the model prices off, plus the class's screening spread",
       text: `${pct2(seed.pct)} — ${seed.note}`,
       value: seed.pct,
-      asOf: seed.note.match(/\b([A-Z][a-z]{2} \d{1,2}, \d{4})\b/)?.[1] ?? null,
-      publisher: "FRED, with a screening default",
-      scope: "nation",
+      asOf: null,
+      publisher: "a screening default",
+      scope: "class",
     });
   }
   const ten = ctx.market?.liveBrief?.figures?.find((f) => f.key === "dgs10") ?? null;
@@ -877,9 +933,14 @@ function debtRow(ctx: Ctx): StressRow | null {
         : `The OM's ${pct2(om.pct)} is ${bps(d)} over the index plus the class's spread, ${pct2(seed.pct)} — the conservative side.`;
   });
   judged.gap = { ...judged.gap, value: Math.round((seed.pct - om.pct) * 100), unit: "bps" };
+  // The spread is a screening default, so a rate under the index plus the
+  // spread is stretched at most; only a rate under the bare index — under
+  // the fact — reads unsupported.
+  if (judged.verdict === "unsupported" && index && om.pct >= index.pct - SAME) judged.verdict = "stretched";
+  const seedIndexAt = evidence.findIndex((e) => e.value === seed.pct);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? pctImpact(ctx.derived, "allInRatePct", 0, om.pct, seed.pct, {
+      ? pctImpact(ctx.derived, "allInRatePct", seedIndexAt, om.pct, seed.pct, {
           what: "the all-in rate",
           om: pct2(om.pct),
           alt: pct2(seed.pct),
@@ -1458,6 +1519,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     brokerComps: args.brokerComps ?? null,
     recordedSales: args.recordedSales ?? null,
     pastScreens: args.pastScreens ?? null,
+    debtIndex: args.debtIndex ?? null,
     readOn: args.readOn,
   };
   const built: Partial<Record<StressKey, StressRow>> = {
