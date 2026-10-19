@@ -269,6 +269,32 @@ export const SALES_SORTS: ReadonlyArray<{ key: SalesSort; label: string }> = [
   { key: "perSf", label: "$/SF" },
 ];
 
+/** The /comps page's query parameter that keeps the order the reader chose,
+ *  so a reload or a shared link opens on it (nearest first is the bare
+ *  link). The deal page's panel keeps no order in its address. */
+export const SALES_SORT_PARAM = "sort";
+
+/** Whether "$/SF" is an order the list offers: two sales or more state an
+ *  area. Under that there is nothing to rank by the foot. */
+export function perSfSortOffered(comps: ReadonlyArray<Pick<RecordComp, "price" | "sqft">>): boolean {
+  return comps.filter((c) => perSqftOf(c) !== null).length >= 2;
+}
+
+/**
+ * The order a link asks for, held to the orders offered: one of the
+ * SALES_SORTS keys, exactly, else nearest first — a value anyone edited in
+ * the address is never a fifth order, and "$/SF" stands only where it is
+ * offered (`perSfSortOffered`). A repeated parameter reads its first.
+ */
+export function readSalesSort(
+  raw: string | ReadonlyArray<string> | null | undefined,
+  perSfOffered: boolean,
+): SalesSort {
+  const value = (Array.isArray(raw) ? raw[0] : raw) as string | null | undefined;
+  const hit = SALES_SORTS.find((s) => s.key === value?.trim())?.key ?? "nearest";
+  return hit === "perSf" && !perSfOffered ? "nearest" : hit;
+}
+
 /**
  * The sales' places in the order asked, as indexes into the nearest-first
  * list (so each row keeps its pin number). Ties keep the nearest first. On

@@ -52,6 +52,7 @@ export function CompsResultView({
   showMap = false,
   dbMarketsLine = "",
   onDeal = false,
+  sortParam,
 }: {
   result: RecordCompsResult;
   /** the deal the sales are read for, where there is one: its building
@@ -67,6 +68,11 @@ export function CompsResultView({
   /** the readout sits on a deal (its panel refreshes the pull) rather than
    *  on /comps, where the reader pulls again */
   onDeal?: boolean;
+  /** the /comps page's `?sort=` as its searchParams read it (null where the
+   *  link names none): given, the list keeps its order in the page's
+   *  address and opens on this one (./sales-list). Left out on a deal's
+   *  panel, whose order is kept for the visit only. */
+  sortParam?: string | null;
 }) {
   if (result.status === "no_provider") {
     return (
@@ -235,6 +241,8 @@ export function CompsResultView({
         medianPerSqft={sfPhrase ? s.medianPerSqft : null}
         copyText={compsTableText(result)}
         mapped={showMap && !!result.subject}
+        keepSortInUrl={sortParam !== undefined && !onDeal}
+        sortParam={sortParam ?? null}
       >
         {gridHref && (
           // A plain link, a whole page load: /tools reads its fields from the

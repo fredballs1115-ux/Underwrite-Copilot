@@ -292,6 +292,31 @@ describe("the comps readout as pictures", () => {
     expect(draw(result([sale(0)]))).not.toContain("Sort the sales");
   });
 
+  it("opens /comps on the order its link keeps (?sort=), the server's HTML included", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const onComps = (sortParam: string | null, cs = comps, onDeal = false) =>
+      renderToStaticMarkup(React.createElement(CompsResultView, { result: result(cs), showMap: true, sortParam, onDeal }));
+    // the sort group's pressed button (the map has buttons of its own)
+    const pressed = (html: string) =>
+      [...html.slice(html.indexOf('aria-label="Sort the sales"')).matchAll(/aria-pressed="true"[^>]*>([^<]+)</g)].map((m) => m[1]);
+    const price = onComps("price");
+    expect(pressed(price)).toEqual(["Price"]);
+    expect(visibleText(price)).toContain("The sales, highest price first");
+    expect([...price.matchAll(/<th\b[^>]*aria-sort="([^"]+)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]])).toEqual([["descending", "Price"]]);
+    // the dearest (sale 5, pin 6) leads the table
+    expect(price.indexOf("105 Walnut St")).toBeLessThan(price.indexOf("100 Walnut St"));
+    expect(pressed(onComps("newest"))).toEqual(["Newest"]);
+    expect(pressed(onComps("perSf"))).toEqual(["$/SF"]);
+    // no order, an unknown one, or $/SF where under two sales state an area: nearest
+    expect(pressed(onComps(null))).toEqual(["Nearest"]);
+    expect(pressed(onComps("cheapest"))).toEqual(["Nearest"]);
+    expect(pressed(onComps("perSf", comps.map((c) => ({ ...c, sqft: null }))))).toEqual(["Nearest"]);
+    // a deal's panel keeps no order in its page's address
+    expect(pressed(onComps("price", comps, true))).toEqual(["Nearest"]);
+    expect(a11yIssues(price)).toEqual([]);
+    expect(gluedWords(visibleText(price))).toEqual([]);
+  });
+
   it("draws each sale's $/SF on one scale, the median's tick only where the readout names one", () => {
     // sales 1, 3, 5 state 1,800 SF: three bars, the thin median named above
     const comps = Array.from({ length: 6 }, (_, i) => sale(i));
