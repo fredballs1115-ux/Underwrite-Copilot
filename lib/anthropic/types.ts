@@ -409,6 +409,25 @@ export interface Challenge {
   question: string;
   /** OM page of the challenged figure ("" if unknown). Optional pre-cites. */
   page?: string;
+  /** The assumption the challenge tests, by the stress test's own name
+   *  (lib/stress-test-types `STRESS_KEYS`: "basis", "exit_cap", "debt",
+   *  "noi", "vacancy", "rent_growth", "expense_growth", "taxes",
+   *  "insurance", "renovation_premium", or "other"). Absent on a result
+   *  stored before 2026-10-19, which lib/stress-test matches on its
+   *  `assumption` text by keyword instead. */
+  key?: string;
+  /** The OM's figure for that assumption in the assumption's own unit — a
+   *  percent as a percent (6 for 6%), a dollar as a dollar — or null where
+   *  the OM states none. Absent on an older result. */
+  omFigure?: number | null;
+  /** The figure the challenger holds it against, in the same unit, or null
+   *  where it holds it to words alone. Absent on an older result. */
+  altFigure?: number | null;
+  /** Where `altFigure` came from, in one phrase: a figure already in the
+   *  notes the challenger was handed, or a rule of thumb named as one
+   *  ("a rule of thumb: a stabilized apartment building runs about 95%
+   *  occupied"). "" where there is none. Absent on an older result. */
+  altBasis?: string;
 }
 export interface ChallengerResult {
   challenges: Challenge[];
