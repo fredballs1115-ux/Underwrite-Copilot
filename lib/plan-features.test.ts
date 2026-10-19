@@ -107,6 +107,15 @@ describe("the homepage and the billing page draw the one list", () => {
     expect(src).toContain("Object.hasOwn(PRO_UPSELL, upsell)");
     expect(src).not.toContain("UPSELL_LABELS");
   });
+
+  // A memo that cannot fit one page flows to a second (lib/memo), so the
+  // upsell and the header's tool say "IC memo", never "one-page".
+  it("promises no one-page memo where a memo can run to two", () => {
+    expect(PRO_UPSELL.memo).toBe("export the IC memo");
+    const tools = read("app/(app)/deals/[id]/header-tools.tsx");
+    expect(tools).toContain('memo: "IC screening memo — part of Pro"');
+    for (const text of [PRO_UPSELL.memo, tools]) expect(text).not.toMatch(/one-page/i);
+  });
 });
 
 // The free cap counts the deals a reader has now — the create actions read

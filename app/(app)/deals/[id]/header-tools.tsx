@@ -34,7 +34,7 @@ export const DEAL_TOOL_TITLE: Record<Exclude<DealToolKind, "bridge">, string> = 
 
 /** A download's tooltip where the reader's plan does not include it. */
 export const DEAL_TOOL_PRO_TITLE: Record<"memo" | "report" | "model", string> = {
-  memo: "One-page IC screening memo — part of Pro",
+  memo: "IC screening memo — part of Pro",
   report: "The full screening report — part of Pro",
   model: "Institutional acquisition model (Excel) — part of Pro",
 };

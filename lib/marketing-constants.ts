@@ -33,7 +33,9 @@ export const SPREAD_BPS = (SPREAD_HIGH_IRR_PCT - SPREAD_LOW_IRR_PCT) * 100; // 4
 export const ANALYSIS_STAGES = 6;
 // The three deal-killers the challenger stresses first: basis, exit, debt.
 export const DEAL_KILLERS = 3;
-// The IC memo is exactly one page (lib/memo/memo-document.tsx).
+// The IC memo is laid out for one page (lib/memo/memo-document.tsx); a memo
+// that cannot fit flows to a second rather than over its footer, so no
+// surface promises one page.
 export const MEMO_PAGES = 1;
 // The sensitivity playground's exit-cap slider sweep, each way
 // (lib/underwrite/playground.ts LEVER_STEPS: 8 × 25bps).
@@ -142,7 +144,7 @@ export const FREE_PLAN: readonly string[] = [
 /** Each `/billing?upsell=` key a Pro refusal sends the reader with, and
  *  what the billing page says they were trying to do. */
 export const PRO_UPSELL = {
-  memo: "export the one-page IC memo",
+  memo: "export the IC memo",
   report: "export the full multi-page report",
   underwrite: "export the institutional Excel model",
   rentroll: "export the live-formula rent-roll workbook",
