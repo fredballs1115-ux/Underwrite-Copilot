@@ -12,6 +12,7 @@ import { compStats } from "./public-comps/core";
 import type { SubjectForCall } from "./public-comps/vs-median";
 import { DB_MARKETS, marketNames } from "./public-comps/db-markets";
 import { CoverageChips } from "../app/(app)/comps/coverage-chips";
+import { SalesList } from "../app/(app)/comps/sales-list";
 import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 const sale = (i: number, over: Partial<RecordComp> = {}): RecordComp => ({
@@ -259,6 +260,34 @@ describe("the comps readout as pictures", () => {
     expect(text).toContain("The 12 nearest");
     expect(text).toContain("Show all 15");
     expect(text).toContain("Copy as table");
+  });
+
+  it("offers a Download CSV beside the copy only where there are sales, off paper", () => {
+    const comps = Array.from({ length: 15 }, (_, i) => sale(i));
+    const html = draw(result(comps));
+    expect(html.split('data-qa="comps-download-csv"').length - 1).toBe(1);
+    expect(visibleText(html)).toContain("Download CSV");
+    const button = /<button[^>]*data-qa="comps-download-csv"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(button).toContain("print:hidden");
+    expect(button).toContain("recorded-sales-1500-walnut-st-philadelphia-pa-2026-10-08.csv");
+    expect(a11yIssues(html)).toEqual([]);
+    // No sales, no button: the readout says none were found and draws no list.
+    const none = draw({ ...result([]), status: "no_sales", stats: undefined });
+    expect(none).not.toContain("comps-download-csv");
+    expect(visibleText(none)).not.toContain("Download CSV");
+    // And the list itself draws none over an empty set.
+    const r = result([]);
+    const empty = renderToStaticMarkup(
+      React.createElement(SalesList, {
+        comps: [],
+        shared: [],
+        showUnits: false,
+        medianPerSqft: null,
+        copyText: "",
+        provenance: { providerName: r.providerName, datasetUrl: r.datasetUrl, retrievedAt: r.retrievedAt, subject: r.subject },
+      }),
+    );
+    expect(empty).not.toContain("comps-download-csv");
   });
 
   it("gives a phone a card a sale and the table from sm, each sale keeping its number", () => {

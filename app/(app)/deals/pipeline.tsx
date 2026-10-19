@@ -56,6 +56,7 @@ import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-dea
 // extraction lands — the deal page's buy-box panel says the same, and the
 // CSV and the meeting workbook mark the figure with the same words.
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import { csvText } from "@/lib/csv-cell";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
 import { checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone } from "@/lib/fit-label";
@@ -637,11 +638,9 @@ export function Pipeline({
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
     // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
-    // text are untrusted and must never execute when the CSV opens in Excel.
-    const esc = (v: string) => {
-      const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
-      return `"${safe.replaceAll('"', '""')}"`;
-    };
+    // text are untrusted and must never execute when the CSV opens in Excel
+    // (lib/csv-cell, the one escaper every download writes through).
+    const esc = csvText;
     // A plan deal's cap cell says "n/a — plan" and its yield on cost sits in
     // its own column — the same two cells the meeting .xlsx writes, in its
     // words (lib/cap-slot `PLAN_CAP_NA`); the cell had been blank, which
