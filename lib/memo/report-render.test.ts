@@ -870,6 +870,33 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Effective gross income $1.03M");
     expect(text).toContain("Net operating income (derived) $630k");
     expect(text).not.toMatch(/\([−-]\$/);
+    expect(text).not.toContain("carry both signs");
+    // The audit of #466: a statement whose expense lines carry both signs
+    // prints its blank total and NOI with the reason.
+    const mixed = {
+      period_end_date: "2026-05-31",
+      summary: {
+        collectedRent: 1_100_000,
+        vacancyLoss: 120_000,
+        otherIncome: 50_000,
+        egi: 1_030_000,
+        opex: [
+          { key: "taxes", label: "Real estate taxes", amount: 250_000, page: "p. 2" },
+          { key: "other", label: "Utility reimbursement", amount: -30_000, page: "p. 2" },
+        ],
+        totalOpex: null,
+        noi: null,
+        noiDerived: false,
+        opexSignsMixed: true,
+        egiStated: true,
+        totalOpexStated: false,
+        noiStated: false,
+      },
+    };
+    const mixedRead = actualsFromRows(extraction, { kind: "stabilized", label: "Stabilized" }, "multifamily", null, mixed)!;
+    const mixedText = (await pdfTextOf(await renderReportPdf(withActuals(buildReportData(deal, "September 30, 2026", [], null), mixedRead)))).replace(/\s+/g, " ");
+    expect(mixedText).toContain("Total operating expenses —");
+    expect(mixedText).toContain("Its expense lines carry both signs, so no total is derived.");
   }, 60000);
 
   it("labels the retrade grid's base row the modelled price, never the ask, and says what the model priced it at", async () => {

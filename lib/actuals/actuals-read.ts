@@ -117,6 +117,16 @@ export function t12DeductionText(n: number | null | undefined, opts: { asStated?
   return opts.asStated ? actualsUsd(n) : `(${actualsUsd(Math.abs(n))})`;
 }
 
+/** Why a statement whose expense lines carry both signs shows no total
+ *  (and no NOI on one): the card and the report say it under the table. */
+export const T12_SIGNS_MIXED_NOTE = "Its expense lines carry both signs, so no total is derived.";
+
+/** The note under the T-12's table where its blank total is the mixed signs'
+ *  doing (`opexSignsMixed` with no stated total); null otherwise. */
+export function t12SignsNote(st: Pick<T12Summary, "opexSignsMixed" | "totalOpex">): string | null {
+  return st.opexSignsMixed && st.totalOpex == null ? T12_SIGNS_MIXED_NOTE : null;
+}
+
 const pct1 = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;
 

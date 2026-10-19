@@ -31,6 +31,7 @@ import {
   rentRollDateWords,
   t12DateWords,
   t12DeductionText,
+  t12SignsNote,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
 import { rentQuotedMonthly } from "@/lib/asset-words";
@@ -1763,6 +1764,9 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
           ))}
           {line("Total operating expenses", t12DeductionText(st.totalOpex), { bold: true })}
           {line(st.noiDerived ? "Net operating income (derived)" : "Net operating income", actualsUsd(st.noi), { bold: true })}
+          {t12SignsNote(st) ? (
+            <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 3 }}>{str(t12SignsNote(st)!)}</Text>
+          ) : null}
         </View>
       ) : null}
     </View>
