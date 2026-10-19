@@ -21,6 +21,11 @@ import { pipelineCard, type PipelineCardRow } from "@/lib/pipeline-card";
 import { isOpenStage, normalizeStage } from "@/lib/stages";
 import { BOX_PREVIEW_MAX, BoxPreview, boxPreviewItem, OPEN_STAGE_FILTER } from "./box-preview";
 import type { JobLike } from "@/lib/screen-run";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { BAND_DEALS_MAX, boxBands, type BandDeal } from "@/lib/box-bands";
+import { BoxBands } from "./box-bands";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { StructuredAddress } from "@/lib/address";
 
 export const metadata: Metadata = { title: "Buy box" };
 
@@ -118,6 +123,47 @@ export default async function CriteriaPage({
     );
     return { items, more: live.length > BOX_PREVIEW_MAX };
   })();
+
+  // The box, drawn (lib/box-bands): each band it sets as a track with the
+  // reader's live deals on it — the deals the preview judges, the closed,
+  // the dead and the sample left out — each at the figure its check reads
+  // through the deal page's own source (lib/buy-box-chip `dealCheckSource`).
+  // A failed read draws the bands with no deals on them.
+  const bandDeals: BandDeal[] = await (async () => {
+    if (!user || !active.box) return [];
+    let q = supabase
+      .from("deals")
+      .select("id, name, asset_class, extraction, address, first_signal, stage, is_sample")
+      .or(OPEN_STAGE_FILTER)
+      .order("created_at", { ascending: false })
+      .limit(BAND_DEALS_MAX);
+    q = active.scope === "team" && active.teamId ? q.eq("team_id", active.teamId) : q.eq("user_id", user.id).is("team_id", null);
+    const { data, error: readError } = await q;
+    if (readError || !data) return [];
+    type Row = {
+      id: string;
+      name: string | null;
+      asset_class: string | null;
+      extraction: unknown;
+      address: unknown;
+      first_signal: unknown;
+      stage: string | null;
+      is_sample: boolean | null;
+    };
+    return (data as Row[])
+      .filter((d) => !d.is_sample && isOpenStage(normalizeStage(d.stage)))
+      .map((d) => ({
+        id: d.id,
+        name: d.name || "Untitled deal",
+        assetClass: d.asset_class ?? "",
+        source: dealCheckSource(
+          (d.extraction as ExtractionResult | null) ?? null,
+          (d.first_signal as FirstSignal | null) ?? null,
+          (d.address as StructuredAddress | null) ?? null,
+        ),
+      }));
+  })();
+  const bands = active.box ? boxBands(active.box, bandDeals) : [];
 
   const banner = saved
     ? {
@@ -286,6 +332,8 @@ export default async function CriteriaPage({
               </p>
             </section>
           )}
+
+          <BoxBands bands={bands} deals={bandDeals.length} />
 
           <form action={saveBuyBox} className="space-y-6">
             {/* Which named box these edits belong to (guards against a switch
