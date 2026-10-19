@@ -360,8 +360,11 @@ const ASSESSED_ROW = /\bassess(?:ed|ment)\b/i;
 const ASSESSED_NOT = /special|ratio|\brate\b|\bper\b|\/|millage|reassess/i;
 const INSURANCE_ROW = /\binsurance\b/i;
 const INSURANCE_NOT = /mortgage|title|index|deductible|reserve|\brate\b|\bper\b|\/|psf|increase|growth|claim/i;
-const DEBT_RATE_ROW = /\b(?:interest|loan|note|all[- ]in|mortgage|debt|financing)\s+rate\b|\bcoupon\b|^rate$/i;
-const DEBT_RATE_NOT = /assumable|seller|\bcap\b|strike|floor|exit|tax|growth|vacancy|occupancy|ground|lease|escalat|increase|supplemental|mezz/i;
+// The acquisition loan's rate, never another loan's: a "Note rate" is the
+// note being sold (lib/note-yield's row), an existing, in-place or current
+// loan's is the seller's, and a balance's row is no rate at all.
+const DEBT_RATE_ROW = /\b(?:interest|loan|all[- ]in|mortgage|debt|financing)\s+rate\b|\bcoupon\b|^rate$/i;
+const DEBT_RATE_NOT = /assumable|seller|existing|in[- ]place|current|\bnote\b|unpaid|\bupb\b|\bcap\b|strike|floor|exit|tax|growth|vacancy|occupancy|ground|lease|escalat|increase|supplemental|mezz/i;
 
 function statedPct(rows: Row[], re: RegExp, not?: RegExp): { row: Row; pct: number } | null {
   const row = findMetric(rows, re, not);
@@ -773,6 +776,9 @@ function exitCapRow(ctx: Ctx): StressRow | null {
 // — Debt —
 
 function debtRow(ctx: Ctx): StressRow | null {
+  // A note's buyer takes no acquisition loan on the collateral: the rate
+  // on file is the note's own coupon (#416), and no row is built.
+  if (interestOf(ctx.ex).kind === "note") return null;
   const om = statedPct(ctx.rows, DEBT_RATE_ROW, DEBT_RATE_NOT);
   const evidence: StressEvidence[] = [];
   const seed = ctx.derived?.meta.rateSeed ?? null;

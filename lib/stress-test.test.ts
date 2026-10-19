@@ -505,6 +505,29 @@ describe("a note secured by the building", () => {
     expect(test.impactsWithheld).toBe("No return is re-run: the price buys a note secured by the building, not the building.");
     expect(test.rows.every((r) => r.impact === null)).toBe(true);
   });
+
+  it("builds no debt row: the note's coupon is the note's, not an acquisition loan's", () => {
+    expect(test.rows.map((r) => r.key)).not.toContain("debt");
+  });
+});
+
+describe("the loan rate the debt row reads is the acquisition loan's", () => {
+  const withRows = (...extra: { label: string; value: string }[]): ExtractionResult => ({
+    ...APARTMENT,
+    metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Interest rate"), ...extra.map((r) => row(r.label, r.value, "p. 30"))],
+  });
+
+  it("reads the interest rate past an existing, in-place or current loan's, and a note rate on a fee simple", () => {
+    const ex = withRows({ label: "Existing loan rate", value: "3.50%" }, { label: "In-place loan rate", value: "3.60%" }, { label: "Current loan rate", value: "3.70%" }, { label: "Note rate", value: "3.80%" }, { label: "Interest rate", value: "5.25%" });
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "debt").omSays).toEqual({ text: "Interest rate: 5.25%", value: 5.25, page: 30 });
+  });
+
+  it("with only another loan's rate on file, the OM states no loan rate", () => {
+    const ex = withRows({ label: "Existing loan rate", value: "3.50%" }, { label: "Unpaid principal balance rate", value: "6.50%" });
+    const d = rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "debt");
+    expect(d.verdict).toBe("unchecked");
+    expect(d.unchecked).toBe("The OM states no loan rate.");
+  });
 });
 
 // ── The challenger's words ───────────────────────────────────────────────
