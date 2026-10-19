@@ -21,7 +21,7 @@ import { DataNotices } from "@/app/data-notices";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Sample test — one OM, every assumption checked",
+  title: "Sample test — one OM, its assumptions tested",
   description:
     "Browse a full Underwrite Copilot test: each assumption challenged, the broker's comps graded, a market check against dated figures, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
   alternates: { canonical: "/demo" },
