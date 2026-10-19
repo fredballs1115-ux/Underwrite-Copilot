@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-19",
+      "title": "Open the sample's memorandum, and see how a figure is read",
+      "href": "/demo",
+      "blurb": "The sample deal's page citations now open its memorandum, a 48-page fictional PDF stamped on every page, at the page each figure cites. On a deal's header, each figure and the fit chip open a small note saying where the figure comes from: the memorandum's row and page, the first read, or what it is derived from. The pipeline has a Board view with a column for each stage, keyboard shortcuts (press ? for the list), and filters that live in the address so a filtered view can be shared as a link. The comps page downloads its recorded sales as a CSV."
+    },
+    {
+      "date": "2026-10-19",
       "title": "The buy box, drawn",
       "href": "/criteria",
       "blurb": "The buy box page now draws each band it sets, with your live deals as dots on it, and the geography chips wear their market's photograph. The deal page's market tab opens on the market, the decision log shows the days spent in each stage, and the bridge draws each saved version's return. A T-12 that files its expenses as negatives now reads them as deductions, so its NOI is no longer overstated; recorded sales that are one deed across several parcels count once; and every page cited beside a figure is held to the memorandum's own length."
