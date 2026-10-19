@@ -10,6 +10,7 @@ import {
   COVERAGE_DISCOVERY,
   COVERAGE_SUMMARY,
   compsCutNote,
+  compStats,
   compsScope,
   evidenceNote,
   medianLabel,
@@ -18,7 +19,9 @@ import {
   noSalesSentence,
   perSqftPhrase,
   salesPhrase,
+  sharedDeedPhrase,
   type RecordCompsResult,
+  type RecordCompsStats,
 } from "@/lib/public-comps/core";
 import { vsMedianRead, vsMedianSentence, type SubjectForCall } from "@/lib/public-comps/vs-median";
 import { placementNote } from "@/lib/public-comps/subject-point";
@@ -52,6 +55,7 @@ export function CompsResultView({
   showMap = false,
   dbMarketsLine = "",
   onDeal = false,
+  sortParam,
 }: {
   result: RecordCompsResult;
   /** the deal the sales are read for, where there is one: its building
@@ -67,6 +71,11 @@ export function CompsResultView({
   /** the readout sits on a deal (its panel refreshes the pull) rather than
    *  on /comps, where the reader pulls again */
   onDeal?: boolean;
+  /** the /comps page's `?sort=` as its searchParams read it (null where the
+   *  link names none): given, the list keeps its order in the page's
+   *  address and opens on this one (./sales-list). Left out on a deal's
+   *  panel, whose order is kept for the visit only. */
+  sortParam?: string | null;
 }) {
   if (result.status === "no_provider") {
     return (
@@ -115,7 +124,11 @@ export function CompsResultView({
     );
   }
 
-  const s = result.stats;
+  // Read again from the rows, so a result stored before a deed recorded
+  // once a parcel was counted once (lib/public-comps/core `compStats`) is
+  // read by today's rule.
+  const s = compStats(result.comps) ?? result.stats;
+  const deedPhrase = sharedDeedPhrase(s);
   // The call against the middle (lib/public-comps/vs-median): made only
   // where the sales are the deal's own kind, the deal is one building and
   // its price a building's, per square foot where both state an area, and
@@ -132,7 +145,8 @@ export function CompsResultView({
   const subjectPrice = call && subject ? subject.price : null;
   const note = evidenceNote(s.count);
   // Rows of one day, buyer and price (lib/public-comps/picture
-  // `sharedDeedCounts`): flagged, never merged. And the units column only
+  // `sharedDeedCounts`): flagged in the list, never merged there, and
+  // counted once in the figures above (`deedPhrase`). And the units column only
   // where some record states units.
   const shared = sharedDeedCounts(result.comps);
   const showUnits = result.comps.some((c) => c.units != null);
@@ -148,7 +162,13 @@ export function CompsResultView({
   return (
     <>
       <p className="mt-2 text-sm leading-relaxed">
-        <span className="font-semibold">{salesPhrase(s.count)}</span>{" "}
+        <span className="font-semibold">{`${salesPhrase(s.count)}${deedPhrase ? "," : ""}`}</span>
+        {deedPhrase && (
+          <>
+            {" "}
+            <span data-qa="comps-shared-deeds">{deedPhrase}</span>
+          </>
+        )}{" "}
         <span className="text-muted">{scope}</span> — {medianLabel(s.count)}{" "}
         <span className="font-mono font-semibold tabular-nums">{fmtMoney(s.medianPrice)}</span>
         {sfPhrase && (
@@ -202,7 +222,7 @@ export function CompsResultView({
         <p className="mt-1.5 text-xs leading-relaxed text-caution">{note}</p>
       )}
 
-      <CompsPictures result={result} subjectPrice={subjectPrice} />
+      <CompsPictures result={result} stats={s} subjectPrice={subjectPrice} />
 
       {showMap && result.subject && (
         <RecordSalesMap
@@ -235,6 +255,8 @@ export function CompsResultView({
         medianPerSqft={sfPhrase ? s.medianPerSqft : null}
         copyText={compsTableText(result)}
         mapped={showMap && !!result.subject}
+        keepSortInUrl={sortParam !== undefined && !onDeal}
+        sortParam={sortParam ?? null}
       >
         {gridHref && (
           // A plain link, a whole page load: /tools reads its fields from the
@@ -276,8 +298,17 @@ export function CompsResultView({
  * subject ticked where the readout would name them), and the sales by
  * quarter across the window. Each is left out where it has nothing to draw.
  */
-function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; subjectPrice: number | null }) {
-  const track = priceTrack(result.comps, result.stats?.medianPrice ?? null, subjectPrice);
+function CompsPictures({
+  result,
+  stats,
+  subjectPrice,
+}: {
+  result: RecordCompsResult;
+  /** the readout's own figures, a shared deed counted once */
+  stats: RecordCompsStats;
+  subjectPrice: number | null;
+}) {
+  const track = priceTrack(result.comps, stats.medianPrice, subjectPrice, stats.count);
   // The bars run through the evidence's own day — the search's, or the
   // database's last ingest where earlier — never today; a capped newest-
   // first source's window starts at its oldest sale kept, not the months
@@ -300,8 +331,8 @@ function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; su
           {/* The dots speak only to a pointer (their titles); a screen
               reader gets the track in one sentence. */}
           <p className="sr-only" data-qa="comps-price-words">
-            {`${track.dots.length} sales from ${track.lowLabel} to ${track.highLabel}${
-              track.medianPct !== null ? `; ${medianLabel(result.stats?.count ?? 0)} ${fmtMoney(result.stats?.medianPrice ?? 0)}` : ""
+            {`${track.dots.length} ${stats.sharedDeeds ? "rows" : "sales"} from ${track.lowLabel} to ${track.highLabel}${
+              track.medianPct !== null ? `; ${medianLabel(stats.count)} ${fmtMoney(stats.medianPrice)}` : ""
             }${track.subjectPct !== null && subjectPrice !== null ? `; this deal's price ${fmtMoney(subjectPrice)}` : ""}.`}
           </p>
           <div className="relative mt-3 h-8" data-bar="comps-price" aria-hidden>
@@ -320,7 +351,7 @@ function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; su
                 className="absolute top-0 h-8 w-0.5 -translate-x-1/2 rounded bg-ink"
                 style={{ left: `${track.medianPct}%` }}
                 data-bar="comps-median"
-                title={`${medianLabel(result.stats?.count ?? 0)} ${fmtMoney(result.stats?.medianPrice ?? 0)}`}
+                title={`${medianLabel(stats.count)} ${fmtMoney(stats.medianPrice)}`}
               />
             )}
             {track.subjectPct !== null && (
@@ -343,7 +374,7 @@ function CompsPictures({ result, subjectPrice }: { result: RecordCompsResult; su
             {track.medianPct !== null && (
               <span className="inline-flex items-center gap-1">
                 <span aria-hidden className="h-3 w-0.5 rounded bg-ink" />
-                {medianLabel(result.stats?.count ?? 0)}
+                {medianLabel(stats.count)}
               </span>
             )}
             {track.subjectPct !== null && (

@@ -90,7 +90,9 @@ describe("a wide table a keyboard can scroll (research pass 33, item 18)", () =>
     // A data attribute rides through, as the plan grid's `data-qa` does.
     const props = { label: "Rollover schedule", className: "mt-3 rounded-xl", "data-qa": "grid", children: h("table", null) };
     const html = renderToStaticMarkup(h(ScrollRegion, props));
-    expect(html).toBe('<div data-qa="grid" role="region" aria-label="Rollover schedule" tabindex="0" class="overflow-x-auto mt-3 rounded-xl"><table></table></div>');
+    // `relative`: the box holds a cell's sr-only note, which otherwise
+    // escapes the scroll and widens a phone's page (the 2026-10-19 sweep).
+    expect(html).toBe('<div data-qa="grid" role="region" aria-label="Rollover schedule" tabindex="0" class="relative overflow-x-auto mt-3 rounded-xl"><table></table></div>');
   });
 
   // The containers the pass flagged (axe's scrollable-region-focusable), each

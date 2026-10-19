@@ -15,7 +15,7 @@
 
 import { compactUsd } from "@/lib/money";
 import { MAX_COMPS } from "@/lib/tools/comp-grid";
-import { compEvidence, MEDIAN_FLOOR, type RecordComp, type RecordCompsResult } from "./core";
+import { compEvidence, MEDIAN_FLOOR, sharedDeedCounts, type RecordComp, type RecordCompsResult } from "./core";
 
 /** The readout's own band for comparing the subject with the middle. */
 export const SUBJECT_BAND: Readonly<{ low: number; high: number }> = { low: 0.25, high: 4 };
@@ -46,11 +46,14 @@ export interface PriceTrack {
 }
 
 /** Each sale on one track from the lowest price to the highest. Null with
- *  fewer than two priced sales, where a track has no length. */
+ *  fewer than two priced sales, where a track has no length. The middle is
+ *  drawn on the readout's own count (`salesCount`, compStats' — a deed
+ *  recorded once a parcel counted once), never on the rows drawn. */
 export function priceTrack(
   comps: Pick<RecordComp, "price">[],
   medianPrice: number | null,
   subjectPrice: number | null,
+  salesCount?: number,
 ): PriceTrack | null {
   const priced = comps
     .map((c, i) => ({ n: i + 1, price: c.price }))
@@ -64,7 +67,7 @@ export function priceTrack(
     const t = log ? Math.log(v / low) / Math.log(high / low) : (v - low) / (high - low);
     return Math.round(Math.min(1, Math.max(0, t)) * 1000) / 10;
   };
-  const middleDrawn = medianPrice !== null && medianPrice > 0 && compEvidence(priced.length) !== "individual";
+  const middleDrawn = medianPrice !== null && medianPrice > 0 && compEvidence(salesCount ?? priced.length) !== "individual";
   const ratio = subjectPrice && medianPrice ? subjectPrice / medianPrice : null;
   const subjectIn =
     subjectPrice !== null &&
@@ -165,28 +168,8 @@ export function perUnitOf(c: Pick<RecordComp, "price" | "units">): number | null
   return c.units != null && c.units > 1 ? Math.round(c.price / c.units) : null;
 }
 
-/**
- * For each sale, how many rows share its exact day, buyer and price — two or
- * more is a deed that may have been recorded once a parcel, each row at the
- * deed's whole price — or 0. Exact grouping only: a buyer the record leaves
- * blank groups with nothing, and nothing is merged or dropped; the rows are
- * flagged, never deduplicated. Display only: it says nothing of whether a
- * sale was at arm's length.
- */
-export function sharedDeedCounts(comps: Pick<RecordComp, "saleDate" | "buyer" | "price">[]): number[] {
-  const key = (c: Pick<RecordComp, "saleDate" | "buyer" | "price">) =>
-    c.buyer && c.buyer.trim() && c.saleDate ? `${c.saleDate}|${c.buyer.trim().toUpperCase()}|${c.price}` : null;
-  const counts = new Map<string, number>();
-  for (const c of comps) {
-    const k = key(c);
-    if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  return comps.map((c) => {
-    const k = key(c);
-    const n = k ? (counts.get(k) ?? 0) : 0;
-    return n >= 2 ? n : 0;
-  });
-}
+/** Rows of one day, buyer and price — core's, re-exported for the pictures. */
+export { sharedDeedCounts };
 
 /** Whole months from a sale's day to the search's, never below zero. */
 function monthsBetween(fromIso: string, toIso: string): number | null {
@@ -268,6 +251,32 @@ export const SALES_SORTS: ReadonlyArray<{ key: SalesSort; label: string }> = [
   { key: "price", label: "Price" },
   { key: "perSf", label: "$/SF" },
 ];
+
+/** The /comps page's query parameter that keeps the order the reader chose,
+ *  so a reload or a shared link opens on it (nearest first is the bare
+ *  link). The deal page's panel keeps no order in its address. */
+export const SALES_SORT_PARAM = "sort";
+
+/** Whether "$/SF" is an order the list offers: two sales or more state an
+ *  area. Under that there is nothing to rank by the foot. */
+export function perSfSortOffered(comps: ReadonlyArray<Pick<RecordComp, "price" | "sqft">>): boolean {
+  return comps.filter((c) => perSqftOf(c) !== null).length >= 2;
+}
+
+/**
+ * The order a link asks for, held to the orders offered: one of the
+ * SALES_SORTS keys, exactly, else nearest first — a value anyone edited in
+ * the address is never a fifth order, and "$/SF" stands only where it is
+ * offered (`perSfSortOffered`). A repeated parameter reads its first.
+ */
+export function readSalesSort(
+  raw: string | ReadonlyArray<string> | null | undefined,
+  perSfOffered: boolean,
+): SalesSort {
+  const value = (Array.isArray(raw) ? raw[0] : raw) as string | null | undefined;
+  const hit = SALES_SORTS.find((s) => s.key === value?.trim())?.key ?? "nearest";
+  return hit === "perSf" && !perSfOffered ? "nearest" : hit;
+}
 
 /**
  * The sales' places in the order asked, as indexes into the nearest-first

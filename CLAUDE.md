@@ -1055,6 +1055,27 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   a special assessment, and every term filed beside the levy's balance
   goes with it. A levy sits beside a mortgage on the tax bill; it replaces
   none.
+- **A T-12's deductions are sizes** (2026-10-19). `summarizeT12`
+  (lib/actuals/analyze) reads the vacancy and each expense line as an amount
+  to deduct, whichever sign the statement filed it with; a line that reduces
+  expenses (a credit, a recovery, a reimbursement) stays negative, and
+  where the lines carry both signs no total or NOI is derived and the card
+  and the report say why. Stated figures are flagged at ingest
+  (`egiStated`, `totalOpexStated`, `noiStated`) and never dropped;
+  `t12SummaryOf` re-reads a summary stored before the flags, re-deriving
+  only the old all-negative case. A deduction prints once,
+  `t12DeductionText` ("($120k)", never "(−$120k)").
+- **The signed-in pages draw their figures** (2026-10-19). The deal page's
+  comparable ranges (`lib/comp-range.ts`, a plan deal's all-in basis on its
+  own track), the model-vs-market strips (`ModelCheck.marks`, display
+  only), the leverage track, the capital stacks, the T-12 bar
+  (`lib/actuals/t12-bar.ts`), the buy box's bands (`lib/box-bands.ts`, read
+  through lib/criteria's own figure readers), the decision log's stage days
+  (`lib/stage-days.ts`, UTC days), the bridge's version bars, and the
+  analytics, submarket and market-memory bars. A median waits for three
+  figures, a bar starts at zero, and a withheld figure gets no tick. Empty
+  sections show a muted placeholder (`app/empty-pictures.tsx`). The
+  cross-deal "My tasks" page is retired; `/tasks` redirects to the pipeline.
 - **A phased forward purchase** (research pass 37). A delivery row naming
   several dates is read at the latest, the side that does not flatter.
   Where its words name phases, tranches, takedowns or numbered buildings,

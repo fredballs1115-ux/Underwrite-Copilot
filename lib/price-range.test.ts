@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { evaluateBuyBox, parseMoney, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
+import { evaluateBuyBox, parseMoney, parsePrice, priceRange, priceRangeEnd, priceRangeShort } from "@/lib/criteria";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildPipelineWorkbook, type PipelineExportRow } from "@/lib/pipeline-workbook";
@@ -89,6 +89,32 @@ describe("a price stated as a range (#466)", () => {
     expect(under.find((c) => c.label === "Price")!.detail).toContain("its bottom 2% under");
     const inside = evaluateBuyBox("multifamily", ex([m("Pricing guidance", "$40M – $42M")]), { priceMinM: 30, priceMaxM: 50 });
     expect(inside.find((c) => c.label === "Price")!.detail).toBe("Mandate is $30.0M min, $50.0M max — the ask is $40.0M–$42.0M. Inside the band.");
+  });
+
+  // The audit of #466: a range under the floor AND over the ceiling was
+  // judged by its bottom alone, whichever end missed by more.
+  it("holds a range past both ends of the band by the end that misses by more, and says the other", () => {
+    // $30M–$60M against $40M–$50M: the bottom 25% under, the top 20% over.
+    const wide = evaluateBuyBox("multifamily", ex([m("Pricing guidance", "$30M – $60M")]), { priceMinM: 40, priceMaxM: 50 });
+    const p = wide.find((c) => c.label === "Price")!;
+    expect(p.status).toBe("miss");
+    expect(p.detail).toBe(
+      "Mandate is $40.0M min, $50.0M max — the ask is $30.0M–$60.0M, its bottom below the mandate (its top over the max too).",
+    );
+    // $38M–$70M against the same: the top misses by more (40% over, 5% under).
+    const top = evaluateBuyBox("multifamily", ex([m("Pricing guidance", "$38M – $70M")]), { priceMinM: 40, priceMaxM: 50 });
+    expect(top.find((c) => c.label === "Price")!.detail).toBe(
+      "Mandate is $40.0M min, $50.0M max — the ask is $38.0M–$70.0M, its top beyond the mandate (its bottom under the min too).",
+    );
+    // Both ends near (2.5% under, 3% over): still a near-miss, said by the
+    // end that misses by more, with its percentage.
+    const near = evaluateBuyBox("multifamily", ex([m("Pricing guidance", "$39M – $51.5M")]), { priceMinM: 40, priceMaxM: 50 });
+    const n = near.find((c) => c.label === "Price")!;
+    expect(n.status).toBe("near");
+    expect(n.detail).toContain("its top 3% over (its bottom under the min too). Close enough to price");
+    expect(priceRangeEnd({ low: 30e6, high: 60e6 }, { min: 40e6, max: 50e6 })).toEqual({ dollars: 30e6, bothMiss: true });
+    expect(priceRangeEnd({ low: 38e6, high: 70e6 }, { min: 40e6, max: 50e6 })).toEqual({ dollars: 70e6, bothMiss: true });
+    expect(priceRangeEnd({ low: 40e6, high: 42e6 }, { max: 41e6 })).toEqual({ dollars: 42e6, bothMiss: false });
   });
 
   it("writes the top into the meeting workbook's price cell, the range in its note", async () => {

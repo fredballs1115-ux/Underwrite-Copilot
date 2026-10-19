@@ -6,6 +6,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { compareNoi } from "@/lib/actuals/analyze";
 import type { T12Summary } from "@/lib/actuals/types";
+import { T12_SIGNS_MIXED_NOTE, t12SignsNote } from "@/lib/actuals/actuals-read";
 import { PropertyActuals, actualsSourceLine, statedDay } from "@/app/(app)/deals/[id]/property-actuals";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -185,5 +186,30 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
       noiComparison: compareNoi(1_200_000, 1_150_000),
     });
     expect(html).toContain("OM assumed NOI");
+  });
+
+  // The audit of #466: a statement whose expense lines carry both signs
+  // showed a blank total and NOI with no reason.
+  it("says why a mixed-sign statement's total and NOI are blank", () => {
+    const mixed: T12Summary = {
+      ...T12,
+      opex: [
+        { key: "taxes", label: "Real estate taxes", amount: 200_000, page: "p. 2" },
+        { key: "other", label: "Utility reimbursement", amount: -30_000, page: "p. 2" },
+      ],
+      totalOpex: null,
+      noi: null,
+      opexSignsMixed: true,
+    };
+    const html = render({ rentRoll: null, t12: { periodEnd: "2026-06-30", summary: mixed }, noiComparison: null });
+    expect(visibleText(html)).toContain(T12_SIGNS_MIXED_NOTE);
+    expect(T12_SIGNS_MIXED_NOTE).toBe("Its expense lines carry both signs, so no total is derived.");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    // A stated total stands and needs no note; a one-sign statement none.
+    expect(t12SignsNote({ opexSignsMixed: true, totalOpex: 170_000 })).toBeNull();
+    expect(visibleText(render({ rentRoll: null, t12: { periodEnd: "2026-06-30", summary: T12 }, noiComparison: null }))).not.toContain(
+      T12_SIGNS_MIXED_NOTE,
+    );
   });
 });

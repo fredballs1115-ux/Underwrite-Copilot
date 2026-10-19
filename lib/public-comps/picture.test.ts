@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compsTableText, evidenceThrough, perSfBars, perSqftOf, perUnitOf, salesHeading, salesOrder, sharedDeedCounts, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
+import { compsTableText, evidenceThrough, perSfBars, perSfSortOffered, perSqftOf, perUnitOf, readSalesSort, salesHeading, salesOrder, sharedDeedCounts, priceTrack, salesByQuarter, SPREAD_FOR_LOG } from "./picture";
 import { pulledLine, type RecordComp } from "./core";
 import { compGridHref } from "./picture";
 import { MAX_COMPS, readGrid, readGridText } from "@/lib/tools/comp-grid";
@@ -44,6 +44,14 @@ describe("priceTrack", () => {
   it("draws no middle below the median floor", () => {
     const t = priceTrack([{ price: 400_000 }, { price: 600_000 }], 500_000, null)!;
     expect(t.medianPct).toBeNull();
+  });
+
+  it("holds the middle to the readout's count of sales, not the rows drawn", () => {
+    // One sale and one deed on two parcels: three dots, two sales — no median.
+    const rows = [{ price: 400_000 }, { price: 900_000 }, { price: 900_000 }];
+    expect(priceTrack(rows, 650_000, null)!.medianPct).not.toBeNull();
+    expect(priceTrack(rows, 650_000, null, 2)!.medianPct).toBeNull();
+    expect(priceTrack(rows, 650_000, null, 2)!.dots).toHaveLength(3);
   });
 
   it("draws the subject only inside the readout's band and the track", () => {
@@ -231,6 +239,26 @@ describe("salesOrder, salesHeading and perSfBars", () => {
     expect(salesOrder(set, "perSf")).toEqual([2, 3, 0, 1]);
     // a day that does not parse sorts last
     expect(salesOrder([comp({ saleDate: "" }), comp({ saleDate: "2026-01-01" })], "newest")).toEqual([1, 0]);
+  });
+
+  it("reads a link's order, held to the orders offered", () => {
+    for (const s of ["nearest", "newest", "price", "perSf"] as const) expect(readSalesSort(s, true)).toBe(s);
+    // no order, or one no button offers, opens nearest first
+    expect(readSalesSort(null, true)).toBe("nearest");
+    expect(readSalesSort(undefined, true)).toBe("nearest");
+    expect(readSalesSort("", true)).toBe("nearest");
+    expect(readSalesSort("cheapest", true)).toBe("nearest");
+    expect(readSalesSort("PRICE", true)).toBe("nearest");
+    expect(readSalesSort("toString", true)).toBe("nearest");
+    expect(readSalesSort(" price ", true)).toBe("price");
+    // a repeated parameter reads its first
+    expect(readSalesSort(["newest", "price"], true)).toBe("newest");
+    // $/SF stands only where two sales state an area
+    expect(readSalesSort("perSf", false)).toBe("nearest");
+    expect(readSalesSort("price", false)).toBe("price");
+    expect(perSfSortOffered(set)).toBe(true);
+    expect(perSfSortOffered([set[0], set[1]])).toBe(false);
+    expect(perSfSortOffered([])).toBe(false);
   });
 
   it("names the fold by the order", () => {

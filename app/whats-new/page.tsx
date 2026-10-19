@@ -73,7 +73,7 @@ export default function WhatsNewPage() {
         </p>
         {entries.length > 0 && oldest && (
           <p className="mt-2 text-xs font-medium text-brand">
-            {logged} improvements logged since {fmt(oldest.date)} —
+            {logged} improvements logged since {fmt(oldest.date)}{" "}—{" "}
             every one in this build&apos;s code, every one linking to where it landed.
           </p>
         )}

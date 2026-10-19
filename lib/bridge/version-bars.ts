@@ -22,13 +22,18 @@ export interface IrrScale {
   zeroAt: number;
 }
 
+/** The span the scale runs to where every version's IRR is 0%: a small,
+ *  fixed one (0% to 5%), so the key reads as a scale an IRR could sit on and
+ *  never "0% to 100%". */
+export const ZERO_IRR_SPAN = 0.05;
+
 /** The one scale for every version that has an IRR; null where none has. */
 export function versionIrrScale(irrs: readonly (number | null | undefined)[]): IrrScale | null {
   const vals = irrs.filter((v): v is number => v != null && Number.isFinite(v));
   if (vals.length === 0) return null;
   const lo = Math.min(0, ...vals);
   const hi = Math.max(0, ...vals);
-  if (hi === lo) return { lo, hi: lo + 1, zeroAt: 0 };
+  if (hi === lo) return { lo, hi: lo + ZERO_IRR_SPAN, zeroAt: 0 };
   return { lo, hi, zeroAt: ((0 - lo) / (hi - lo)) * 100 };
 }
 

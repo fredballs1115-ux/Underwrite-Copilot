@@ -1708,24 +1708,32 @@ function countRead(metrics: MetricLike[], cls: string): { n: number | null; noun
   return { n: row ? parseCount(row.value) : null, noun: countNoun(row?.label, cls) };
 }
 
+/** The end of a stated range the price band tests (#466): its bottom where
+ *  it reaches under a floor, else its top, never the flattering end against
+ *  a ceiling — and, where it reaches past BOTH ends of the band, whichever
+ *  end misses by more (the share of its bound), with `bothMiss` set so the
+ *  check says the other end misses too. */
+export function priceRangeEnd(
+  range: { low: number; high: number },
+  band: { min?: number; max?: number },
+): { dollars: number; bothMiss: boolean } {
+  const under = band.min != null && range.low < band.min ? (band.min - range.low) / band.min : null;
+  const over = band.max != null && range.high > band.max ? (range.high - band.max) / band.max : null;
+  if (under != null && over != null) return { dollars: over > under ? range.high : range.low, bothMiss: true };
+  return { dollars: under != null ? range.low : range.high, bothMiss: false };
+}
+
 /** The shared price row — on a development the land cost, the same row the
  *  deal page and the pipeline print, read against the screen's year — and
- *  the end of a range the band tests (#466): its bottom where it reaches
- *  under a floor, else its top, never the flattering end against a ceiling. */
+ *  the end of a range the band tests (`priceRangeEnd`). */
 function priceRead(
   extraction: ExtractionLike | null,
   band: { min?: number; max?: number },
-): { metric: MetricLike | null; range: { low: number; high: number } | null; dollars: number | null } {
+): { metric: MetricLike | null; range: { low: number; high: number } | null; dollars: number | null; bothMiss: boolean } {
   const metric = findPriceRow(extraction?.metrics ?? [], extraction?.strategy?.kind, screenYearOf(extraction));
   const range = metric ? priceRange(metric.value) : null;
-  const dollars = range
-    ? band.min != null && range.low < band.min
-      ? range.low
-      : range.high
-    : metric
-      ? parsePrice(metric.value)
-      : null;
-  return { metric, range, dollars };
+  if (range) return { metric, range, ...priceRangeEnd(range, band) };
+  return { metric, range, dollars: metric ? parsePrice(metric.value) : null, bothMiss: false };
 }
 
 /** The per-unit figure in the deal's own noun (lib/asset-words: a hotel is
@@ -1944,8 +1952,9 @@ export function evaluateBuyBox(
     // — so the band never says "no asking price" beside a printed one.
     // A range (#466) is judged by the end that tests the band: its bottom
     // where it reaches under a floor, else its top — never the flattering
-    // end against a ceiling — and said as the range it is.
-    const { metric, range, dollars } = priceRead(extraction, band);
+    // end against a ceiling; past both ends, the end that misses by more —
+    // and said as the range it is.
+    const { metric, range, dollars, bothMiss } = priceRead(extraction, band);
     const shown = (n: number) => (range ? `${fmtM(range.low)}–${fmtM(range.high)}` : fmtM(n));
     const noun = metric && /\b(land|site)\b/i.test(metric.label) ? "land cost" : "ask";
     const bandText = [
@@ -1982,16 +1991,18 @@ export function evaluateBuyBox(
         const bound = belowMin ? band.min! : band.max!;
         const off = Math.abs(dollars - bound) / bound;
         const near = off <= NEAR_REL;
-        // Which end of a range missed.
+        // Which end of a range missed — and, where both did, that the other
+        // did too.
         const end = range ? `its ${belowMin ? "bottom" : "top"} ` : "";
+        const other = bothMiss ? ` (its ${belowMin ? "top over the max" : "bottom under the min"} too)` : "";
         checks.push({
           label: "Price",
           onPrice: true,
           status: near ? "near" : "miss",
           detail: near
-            ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. Close enough to price; a retrade could land it inside.`
+            ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${Math.round(off * 100)}% ${belowMin ? "under" : "over"}${other}. Close enough to price; a retrade could land it inside.`
             : range
-              ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${belowMin ? "below" : "beyond"} the mandate.`
+              ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${belowMin ? "below" : "beyond"} the mandate${other}.`
               : `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}. ${belowMin ? "Below" : "Beyond"} the mandate.`,
         });
       }

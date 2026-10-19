@@ -15,7 +15,7 @@ vi.mock("@/app/(app)/deals/[id]/bridge/actions", () => ({
 }));
 
 import { VersionList, type VersionRow } from "@/app/(app)/deals/[id]/bridge/version-list";
-import { irrBar, versionIrrScale, versionNoIrr } from "./bridge/version-bars";
+import { ZERO_IRR_SPAN, irrBar, versionIrrScale, versionNoIrr } from "./bridge/version-bars";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import { NO_IRR_WHY } from "./underwrite/no-irr";
@@ -48,6 +48,14 @@ describe("versionIrrScale — one scale for every version", () => {
     expect(loss.left).toBeCloseTo(0, 9);
     expect(loss.width).toBeCloseTo(25, 9);
     expect(versionIrrScale([null, undefined])).toBeNull();
+  });
+
+  // The audit of #466: every version at 0% drew a scale of 0% to 100%.
+  it("runs a small fixed span where every IRR is 0%", () => {
+    const s = versionIrrScale([0, 0, null])!;
+    expect(s).toEqual({ lo: 0, hi: ZERO_IRR_SPAN, zeroAt: 0 });
+    expect(ZERO_IRR_SPAN).toBeLessThanOrEqual(0.1);
+    expect(irrBar(s, 0)).toEqual({ left: 0, width: 0 });
   });
 
   it("says why no rate solved off the version's own assumptions, and nothing where one does", () => {

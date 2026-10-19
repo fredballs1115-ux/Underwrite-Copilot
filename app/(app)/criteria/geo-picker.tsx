@@ -1,29 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AddressAutocomplete } from "../address-autocomplete";
 import { GalleryCreditPartsText } from "@/app/credit-parts";
 import type { GeoTarget } from "@/lib/criteria";
 import type { StructuredAddress } from "@/lib/address";
 import type { ChipPicture } from "@/lib/geo-chip-pictures";
 
+/** The picture a chip shows: its market's, unless that photograph did not
+ *  load (`gone`, by URL), in which case the chip and the credit line both
+ *  go without it. */
+export function chipPictureShown(
+  pictures: Record<string, ChipPicture>,
+  gone: ReadonlySet<string>,
+  label: string,
+): ChipPicture | undefined {
+  const p = Object.hasOwn(pictures, label) ? pictures[label] : undefined;
+  return p && !gone.has(p.src) ? p : undefined;
+}
+
 /** A covered market's thumbnail on its chip: its photograph, cropped to a
- *  disc, named by the chip's own words beside it. */
-function ChipThumb({ picture }: { picture: ChipPicture | undefined }) {
+ *  disc, named by the chip's own words beside it. One that does not load
+ *  says so (`onGone`), so the chip drops it and the credit line drops its
+ *  photographer: a credit follows the picture that loaded. */
+function ChipThumb({
+  picture,
+  onGone,
+}: {
+  picture: ChipPicture | undefined;
+  onGone: (src: string) => void;
+}) {
+  const img = useRef<HTMLImageElement>(null);
+  const src = picture?.src;
+  // A load that failed before hydration fired its error with no listener.
+  useEffect(() => {
+    const el = img.current;
+    if (src && el && el.complete && el.naturalWidth === 0) onGone(src);
+  }, [src, onGone]);
   if (!picture) return null;
   return (
     /* eslint-disable-next-line @next/next/no-img-element -- the skyline
        route serves the file; a disc this size needs no optimizer */
     <img
+      ref={img}
       src={picture.src}
       alt=""
       aria-hidden
+      title={picture.title}
       loading="lazy"
       decoding="async"
       width={20}
       height={20}
       data-picture="geo-chip"
       className="h-5 w-5 shrink-0 rounded-full bg-faint object-cover"
+      onError={() => onGone(picture.src)}
     />
   );
 }
@@ -48,7 +78,14 @@ export function GeoPicker({
   pictures?: Record<string, ChipPicture>;
 }) {
   const [chips, setChips] = useState<GeoTarget[]>(initial);
-  const pictureOf = (label: string): ChipPicture | undefined => (Object.hasOwn(pictures, label) ? pictures[label] : undefined);
+  // The photographs that did not load, by their URL: dropped from the chips
+  // and from the credit line.
+  const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
+  const onGone = useCallback(
+    (src: string) => setGone((prev) => (prev.has(src) ? prev : new Set(prev).add(src))),
+    [],
+  );
+  const pictureOf = (label: string) => chipPictureShown(pictures, gone, label);
 
   function addTarget(target: GeoTarget) {
     setChips((prev) =>
@@ -94,7 +131,7 @@ export function GeoPicker({
               key={c.label}
               className={`flex items-center gap-1.5 rounded-full border border-line bg-faint py-1 pr-1 text-xs font-medium ${pictureOf(c.label) ? "pl-1" : "pl-3"}`}
             >
-              <ChipThumb picture={pictureOf(c.label)} />
+              <ChipThumb picture={pictureOf(c.label)} onGone={onGone} />
               {c.label}
               <button
                 type="button"
@@ -128,7 +165,7 @@ export function GeoPicker({
               data-qa="geo-suggestion"
               className={`flex items-center gap-1.5 rounded-full border border-line py-0.5 pr-2.5 text-[11px] font-medium text-muted outline-none transition-colors hover:border-brand hover:text-brand focus-visible:ring-2 focus-visible:ring-brand/40 ${pictureOf(s.label) ? "pl-0.5" : "pl-2.5"}`}
             >
-              <ChipThumb picture={pictureOf(s.label)} />+ {s.label}
+              <ChipThumb picture={pictureOf(s.label)} onGone={onGone} />+ {s.label}
             </button>
           ))}
         </div>

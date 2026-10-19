@@ -144,3 +144,23 @@ function picture(id: string, name: string, shot: SkylineShot): MarketPicture {
     license,
   };
 }
+
+/**
+ * Whether the market photograph is of the market whose figures the market
+ * check read: the stored brief's market (`brief.metro`, the name it was
+ * read under) is the market the deal is read for today, at the metro's
+ * grain (a state's figures have no photograph of their own), and the
+ * photograph is that market's own, never one borrowed from its metro
+ * (`metroAliasOf`) or reached through the county (`cbsa:`) or the
+ * memorandum's words. A check that read no figures reads no market. Only
+ * then may the picture's words call it "the market this check reads".
+ */
+export function pictureIsCheckedMarket(
+  picture: Pick<MarketPicture, "id"> | null,
+  brief: { metro: string; grain?: "metro" | "state" } | null | undefined,
+  live: { id: string; name: string } | null | undefined,
+): boolean {
+  if (!picture || !brief || !live) return false;
+  if (brief.grain === "state") return false;
+  return brief.metro === live.name && picture.id === live.id;
+}

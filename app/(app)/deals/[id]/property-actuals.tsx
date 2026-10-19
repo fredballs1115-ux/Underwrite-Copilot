@@ -11,6 +11,7 @@ import {
   statedDay,
   t12DateWords,
   t12DeductionText,
+  t12SignsNote,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
 
@@ -185,6 +186,11 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
                 />
               </tbody>
             </table>
+            {t12SignsNote(st) && (
+              <p className="mt-2 text-[11px] text-muted" data-qa="t12-signs-mixed">
+                {t12SignsNote(st)}
+              </p>
+            )}
           </div>
         )}
       </div>

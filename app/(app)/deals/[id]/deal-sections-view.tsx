@@ -32,7 +32,7 @@ import { LISTING_NOT_SALE, saysListing } from "@/lib/web-comp-read";
 import { gapDisagreementLine, gapScale, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { basePosition, firstNumber, rangeInOrder } from "@/lib/verdict-range";
-import { locatedPage, type DealFact } from "@/lib/facts";
+import { factsForMetrics, locatedPage, type DealFact } from "@/lib/facts";
 import { useToast } from "../../toaster";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type {
@@ -82,19 +82,26 @@ export { EmptyState, OverviewView, deriveRisks } from "./deal-sections-base";
 
 export function TermsView({
   result,
-  facts = {},
+  facts = [],
   omUrl = null,
 }: {
   result: ExtractionResult;
-  facts?: Record<string, DealFact>;
+  /** the deal's stored citations (deal_facts), each matched to its own
+   *  row by label and value (lib/facts `factsForMetrics`) */
+  facts?: readonly DealFact[];
   omUrl?: string | null;
 }) {
+  // Each row's own citation: two rows sharing a label get their own pages.
+  const matched = factsForMetrics(result.metrics, facts);
+  const factOf = new Map(result.metrics.map((m, i) => [m, matched[i]] as const));
   // Surface flagged + first figures; collapse the long tail.
   const ordered = [
     ...result.metrics.filter((m) => m.flagged),
     ...result.metrics.filter((m) => !m.flagged),
   ];
-  const cards = ordered.map((m, i) => (
+  const cards = ordered.map((m, i) => {
+    const fact = factOf.get(m) ?? null;
+    return (
     <div
       key={i}
       className={`rounded-xl bg-surface p-4 shadow-sm transition-shadow hover:shadow-md ${
@@ -103,8 +110,15 @@ export function TermsView({
           : "border border-line"
       }`}
     >
-      <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-        <span className="truncate">{m.label}</span>
+      {/* Below `sm` the label wraps and its marks follow it: a phone's
+          two-column card had cut "Pro forma cap rate" to "PRO FOR…" beside
+          its own "pro forma" badge (the visual sweep of 2026-10-19). From
+          `sm` it keeps one line, its whole text in the title. */}
+      <p
+        className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] font-medium uppercase tracking-wide text-muted sm:flex-nowrap"
+        data-qa="term-label"
+      >
+        <span className="min-w-0 break-words sm:truncate" title={m.label}>{m.label}</span>
         {/* The property's reality vs the sponsor's story, on the card
             itself — on a plan deal the difference between a $21M stabilized
             pro forma and today's income is the whole deal. */}
@@ -123,17 +137,22 @@ export function TermsView({
       <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
         {m.value}
       </p>
-      {facts[m.label] ? (
+      {fact ? (
         <p className="mt-2 leading-none">
-          <SourceChip fact={facts[m.label]} omUrl={omUrl} />
+          <SourceChip fact={fact} omUrl={omUrl} />
         </p>
       ) : (
-        // Deals screened before citations (migration 0018) keep their plain
-        // page text — real, from the extraction, just not a validated chip.
-        m.page && <p className="mt-2 text-[10px] text-muted">{m.page}</p>
+        // Deals screened before citations (migration 0018) keep a plain page
+        // — only where it parses and falls inside the deck's own length
+        // (lib/facts' absolute rule): an unvalidated page is no page.
+        (() => {
+          const n = locatedPage(m.page, result.totalPages);
+          return n != null ? <p className="mt-2 text-[10px] text-muted">{`p. ${n}`}</p> : null;
+        })()
       )}
     </div>
-  ));
+    );
+  });
 
   const INITIAL = 8;
   const [open, setOpen] = useState(false);
@@ -1175,6 +1194,7 @@ export function MarketCheck({
   since = null,
   demand = null,
   picture = null,
+  pictureCheckReads = false,
 }: {
   result: MarketResult;
   /** what moved since the check read its figures (lib/brief-delta), read
@@ -1189,6 +1209,12 @@ export function MarketCheck({
    *  resolved by the page — plain data, so this client module loads none of
    *  lib/skyline's table); null where no photographed market answers */
   picture?: MarketPicture | null;
+  /** whether the photograph is of the market whose figures this check read
+   *  (the page holds it to the stored brief's market and grain). One
+   *  reached through the county or the memorandum's words, for a market the
+   *  check read no figures of, is named as the place's photograph, never as
+   *  the market this check reads. */
+  pictureCheckReads?: boolean;
 }) {
   // Aggressive first — that's where the risk is.
   const order = { aggressive: 0, conservative: 1, "in-line": 2 } as const;
@@ -1204,7 +1230,7 @@ export function MarketCheck({
   const readFailed = !brief ? liveReadFailedLine(result.liveReadFailed) : null;
   return (
     <section className="space-y-4">
-      {picture && <MarketPictureBand picture={picture} />}
+      {picture && <MarketPictureBand picture={picture} checkReads={pictureCheckReads} />}
       <SectionHeader
         title="Market plausibility check"
         aside={
@@ -1255,7 +1281,13 @@ export function MarketCheck({
  * crops it. A photograph that does not load takes the band with it, credit
  * and all: a credit is never left over a picture nobody can see.
  */
-function MarketPictureBand({ picture }: { picture: MarketPicture }) {
+function marketPictureAlt(picture: MarketPicture, checkReads: boolean): string {
+  return checkReads
+    ? `${picture.place}: the ${picture.name} market this check reads`
+    : `${picture.place}: the photograph the ${picture.name} area is known by`;
+}
+
+function MarketPictureBand({ picture, checkReads }: { picture: MarketPicture; checkReads: boolean }) {
   const [gone, setGone] = useState(false);
   const img = useRef<HTMLImageElement>(null);
   // A load that failed before hydration fired its error with no listener.
@@ -1271,7 +1303,7 @@ function MarketPictureBand({ picture }: { picture: MarketPicture }) {
       <img
         ref={img}
         src={picture.src}
-        alt={`${picture.place}: the ${picture.name} market this check reads`}
+        alt={marketPictureAlt(picture, checkReads)}
         width={1600}
         height={560}
         loading="lazy"

@@ -23,6 +23,7 @@ import type { ModelSources } from "@/lib/underwrite/report-grid";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 import { interestOf } from "@/lib/interest";
+import { locatedPage } from "@/lib/facts";
 import { assumableLevyRows, assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 import { assetWords } from "@/lib/asset-words";
 import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
@@ -128,7 +129,8 @@ function amortPreview(
 type OmTerm = { label: string; value: string; page?: string };
 
 /**
- * Loan terms the OM itself states — shown with their page references, each
+ * Loan terms the OM itself states — shown with their page references (only
+ * a page inside the deck's length, lib/facts' rule), each
  * under whose loan it is. The seller's loan offered for assumption (#417)
  * and the note the seller offers to carry (#462) are read by their own
  * finders and listed as theirs, never as the buyer's new financing. On a
@@ -147,7 +149,13 @@ export function omLoanTerms(extraction: ExtractionResult | null): {
   const { kind } = interestOf(extraction);
   if (kind === "note" || kind === "leased_fee" || kind === "preferred_equity") return none;
   const metrics = extraction?.metrics ?? [];
-  const as = (term: string, m: { value: string; page?: string }): OmTerm => ({ label: term, value: m.value, page: m.page });
+  // A page is cited only where it parses and falls inside the deck's own
+  // length (lib/facts `locatedPage`): an unvalidated page is no page.
+  const pages = extraction?.totalPages ?? null;
+  const as = (term: string, m: { value: string; page?: string }): OmTerm => {
+    const n = locatedPage(m.page, pages);
+    return n != null ? { label: term, value: m.value, page: `p. ${n}` } : { label: term, value: m.value };
+  };
   const assumableRows = assumableStatedRows(metrics);
   const sellerRows = sellerNoteStatedRows(metrics);
   // A PACE assessment or a special district's levy filed under the seller's

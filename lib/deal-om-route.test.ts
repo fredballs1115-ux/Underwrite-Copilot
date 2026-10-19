@@ -66,6 +66,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import { GET } from "@/app/api/deals/[id]/om/route";
 import { SourceChip } from "@/app/(app)/deals/[id]/source-chip";
 import { omLinkFor } from "./om-link";
+import { a11yIssues } from "./render-lint";
 
 const ask = (id: string) =>
   GET(new Request(`https://underwrite.example/api/deals/${id}/om`), { params: Promise.resolve({ id }) });
@@ -155,5 +156,39 @@ describe("the page's OM link and its chips", () => {
     );
     expect(html).toContain(`href="/api/deals/${DEAL}/om#page=14"`);
     expect(html).toContain(">p.14<");
+    // The memorandum's words are a button's popover, not the link's title alone.
+    expect(html).toMatch(/<button[^>]*aria-label="The OM&#x27;s words on p\.14"[^>]*aria-describedby="([^"]+)"/);
+    const id = /aria-describedby="([^"]+)"/.exec(html)![1];
+    expect(html).toMatch(new RegExp(`role="tooltip" id="${id.replace(/[:]/g, "\\:")}"[^>]*>“Offered at \\$68,000,000” · Offering memorandum, p\\.14<`));
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("explains every other chip in a popover a keyboard and a tap reach, the title kept", () => {
+    const base = {
+      field: "NOI",
+      value: "$720,000",
+      unit: null,
+      docLabel: "OM",
+      pageNumber: null,
+      located: false,
+      locatorSnippet: null,
+      confidence: "high" as const,
+    };
+    const cases = [
+      [{ ...base, provenance: "extracted" as const }, "Why the source is not located", "The extraction couldn&#x27;t tie this to a page in the OM"],
+      [{ ...base, provenance: "derived" as const }, "How this figure is derived", "Derived figure — see the model for how it&#x27;s computed"],
+      [{ ...base, provenance: "assumption" as const }, "An assumption, not a figure from the OM", "Underwrite Copilot default — edit in the model&#x27;s Assumptions tab"],
+    ] as const;
+    for (const [fact, label, why] of cases) {
+      const html = renderToStaticMarkup(React.createElement(SourceChip, { fact }));
+      expect(html).toMatch(/^<span class="group\/chip[^"]*"><button type="button"/);
+      expect(html).toContain(`aria-label="${label}"`);
+      expect(html).toContain(`title="${why}"`);
+      expect(html).toContain('aria-expanded="false"');
+      expect(html).toMatch(new RegExp(`role="tooltip"[^>]*>${why.replace(/[()]/g, "\\$&")}</span>`));
+      // Shown while focused or hovered, as well as once tapped open.
+      expect(html).toContain("group-focus-within/chip:block");
+      expect(a11yIssues(html)).toEqual([]);
+    }
   });
 });

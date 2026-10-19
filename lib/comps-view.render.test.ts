@@ -232,9 +232,14 @@ describe("the comps readout as pictures", () => {
     expect(html.split('data-bar="comps-psf"').length - 1).toBe(6);
     // The scale is the widest unflagged sale's ($500,000 / 1,800 SF), never the deed's $9M over one parcel.
     expect(text).toContain("from zero to the highest, $278/SF");
-    expect(text).toContain("2 sales possibly of one deed across parcels draw no bar.");
+    expect(text).toContain("2 rows possibly of one deed across parcels draw no bar, and the median leaves them out.");
     // Their figures stay, flagged.
     expect(text).toContain("$5,000/SF");
+    // The deed is one sale in the readout, and the $/SF median is the bars'
+    // own three — the tick on the drawn set, never pulled by the deed.
+    expect(text).toContain("4 recorded sales, 2 rows of one deed counted once");
+    expect(text).toContain("median $264/SF on 3 of 4 sales, thin");
+    expect(text).toContain("the tick is the median, $264/SF");
     expect(html.split('data-qa="comps-shared-deed"').length - 1).toBe(2);
     expect(gluedWords(visibleText(html))).toEqual([]);
   });
@@ -261,7 +266,7 @@ describe("the comps readout as pictures", () => {
     const html = draw(result(comps));
     // the cards are phone-only, the table wide-only, in a named, focusable region
     expect(html).toMatch(/<ul class="[^"]*sm:hidden[^"]*" aria-label="Recorded sales as cards">/);
-    expect(html).toMatch(/role="region" aria-label="Recorded sales" tabindex="0" class="overflow-x-auto mt-1\.5 hidden sm:block"/);
+    expect(html).toMatch(/role="region" aria-label="Recorded sales" tabindex="0" class="relative overflow-x-auto mt-1\.5 hidden sm:block"/);
     // every sale once in each: its address and its price
     expect(visibleText(html).split("102 Walnut St").length - 1).toBe(2);
     // the number is read out (it had been hidden from a screen reader); no map on a deal's panel
@@ -290,6 +295,31 @@ describe("the comps readout as pictures", () => {
     expect(flat).not.toMatch(/aria-pressed="false"[^>]*>\$\/SF</);
     // one sale: nothing to order
     expect(draw(result([sale(0)]))).not.toContain("Sort the sales");
+  });
+
+  it("opens /comps on the order its link keeps (?sort=), the server's HTML included", () => {
+    const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+    const onComps = (sortParam: string | null, cs = comps, onDeal = false) =>
+      renderToStaticMarkup(React.createElement(CompsResultView, { result: result(cs), showMap: true, sortParam, onDeal }));
+    // the sort group's pressed button (the map has buttons of its own)
+    const pressed = (html: string) =>
+      [...html.slice(html.indexOf('aria-label="Sort the sales"')).matchAll(/aria-pressed="true"[^>]*>([^<]+)</g)].map((m) => m[1]);
+    const price = onComps("price");
+    expect(pressed(price)).toEqual(["Price"]);
+    expect(visibleText(price)).toContain("The sales, highest price first");
+    expect([...price.matchAll(/<th\b[^>]*aria-sort="([^"]+)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]])).toEqual([["descending", "Price"]]);
+    // the dearest (sale 5, pin 6) leads the table
+    expect(price.indexOf("105 Walnut St")).toBeLessThan(price.indexOf("100 Walnut St"));
+    expect(pressed(onComps("newest"))).toEqual(["Newest"]);
+    expect(pressed(onComps("perSf"))).toEqual(["$/SF"]);
+    // no order, an unknown one, or $/SF where under two sales state an area: nearest
+    expect(pressed(onComps(null))).toEqual(["Nearest"]);
+    expect(pressed(onComps("cheapest"))).toEqual(["Nearest"]);
+    expect(pressed(onComps("perSf", comps.map((c) => ({ ...c, sqft: null }))))).toEqual(["Nearest"]);
+    // a deal's panel keeps no order in its page's address
+    expect(pressed(onComps("price", comps, true))).toEqual(["Nearest"]);
+    expect(a11yIssues(price)).toEqual([]);
+    expect(gluedWords(visibleText(price))).toEqual([]);
   });
 
   it("draws each sale's $/SF on one scale, the median's tick only where the readout names one", () => {

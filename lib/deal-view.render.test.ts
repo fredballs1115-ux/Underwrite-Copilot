@@ -43,7 +43,8 @@ import { placeholderPageLine } from "@/lib/underwrite/report-grid";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { buyBoxRead } from "@/lib/buy-box-chip";
-import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
+import { deriveRisks, TermsView } from "@/app/(app)/deals/[id]/deal-sections";
+import { buildDealFacts } from "@/lib/facts";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
 import { SIZER_LENDER_TESTS, modelLoanCoverageLine } from "@/lib/sizer-terms";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
@@ -172,6 +173,18 @@ describe("DealView — the sample deal renders every section without a runtime e
       expect(text).toMatch(/Buy box/);
     });
   }
+
+  it("an extracted term's label wraps on a phone rather than truncating, its whole text in its title (the 2026-10-19 sweep)", () => {
+    const html = render(sampleProps("financials"));
+    const labels = [...html.matchAll(/<p class="([^"]*)" data-qa="term-label"><span class="([^"]*)" title="([^"]*)">/g)];
+    expect(labels.length).toBeGreaterThan(4);
+    for (const [, row, span, title] of labels) {
+      expect(row).toMatch(/\bflex-wrap\b/);
+      expect(span.split(" ")).not.toContain("truncate");
+      expect(span.split(" ")).toContain("sm:truncate");
+      expect(title.length).toBeGreaterThan(0);
+    }
+  });
 
   it("the sample's reading guide opens each section it names, never a card that does nothing (research pass 32)", () => {
     const html = render(sampleProps("overview"));
@@ -445,7 +458,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     const picture = marketPictureFor({ city: "Philadelphia", state: "PA", label: "Philadelphia, PA" });
     expect(picture).not.toBeNull();
     const p = sampleProps("analyses", "market");
-    const html = render({ ...p, marketPicture: picture });
+    const html = render({ ...p, marketPicture: picture, marketPictureCheckReads: true });
     dumpView("deal-analyses-market-picture", html);
     expect(a11yIssues(html)).toEqual([]);
     const band = /<figure[^>]*data-qa="market-check-picture"[\s\S]*?<\/figure>/.exec(html)?.[0] ?? "";
@@ -463,6 +476,12 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toContain(creditText(photographerParts(picture!.author, picture!.license, true)));
     if (picture!.author.url) expect(band).toContain(`href="${picture!.author.url.replace(/&/g, "&amp;")}"`);
     if (picture!.license.url) expect(band).toContain(`href="${picture!.license.url.replace(/&/g, "&amp;")}"`);
+    // A photograph of a market whose figures the check did not read (reached
+    // by the county or the memorandum's words) is the place's, never "the
+    // market this check reads".
+    const neutral = render({ ...p, marketPicture: picture });
+    expect(neutral).toContain(`alt="${picture!.place}: the photograph the ${picture!.name} area is known by"`);
+    expect(neutral).not.toContain("market this check reads");
     // No picture, no band.
     expect(render(p)).not.toContain('data-qa="market-check-picture"');
   });
@@ -1531,6 +1550,16 @@ describe("the debt sizer lists a stated loan under whose loan it is (2026-09-30)
     expect(amortOnly.offered.map((r) => r.label)).toEqual(["LTV"]);
   });
 
+  it("cites a loan term's page only inside the deck's length, never as the model wrote it", () => {
+    const t = omLoanTerms(
+      withRows([row("Assumable loan balance", "$40,000,000", "Page 12"), row("Assumable loan rate", "3.45%", "p. 61"), row("Assumption fee", "1%", "see the term sheet")]),
+    );
+    expect(t.assumable.map((r) => r.page)).toEqual(["p. 12", undefined, undefined]);
+    // No length known, no page validated.
+    const noLength = omLoanTerms({ ...withRows([row("Assumable loan balance", "$40,000,000")]), totalPages: undefined } as Ex);
+    expect(noLength.assumable[0].page).toBeUndefined();
+  });
+
   it("lists the note the seller offers to carry as the seller's note", () => {
     const t = omLoanTerms(
       withRows([
@@ -2197,5 +2226,44 @@ describe("the sample's downloads are free, as the public pages promise (lib/samp
     expect(docs).not.toContain('href="/api/deals/sample/memo"');
     const fin = render({ ...own, initialTab: "financials" } as Props);
     expect(textOf(fin)).toMatch(/Upgrade to Pro to download the OM underwrite model/);
+  });
+});
+
+describe("the extracted terms' pages (lib/facts' absolute rule)", () => {
+  const ex = (metrics: { label: string; value: string; page?: string }[], totalPages?: number) =>
+    ({ ...SAMPLE_DEAL.extraction, totalPages, metrics: metrics.map((m) => ({ flagged: false, basis: "na" as const, ...m })) }) as ExtractionResult;
+
+  it("prints a deal screened before citations' page only inside the deck's length", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(TermsView, {
+        result: ex(
+          [
+            { label: "Asking price", value: "$12,000,000", page: "Page 3" },
+            { label: "NOI", value: "$720,000", page: "p. 61" },
+            { label: "Units", value: "48", page: "see the rent roll" },
+          ],
+          48,
+        ),
+      }),
+    );
+    const text = textOf(html);
+    expect(text).toContain("p. 3");
+    expect(text).not.toContain("Page 3");
+    expect(text).not.toMatch(/p\. 61|see the rent roll/);
+    // No length known: no page validated, none printed.
+    const unknown = textOf(renderToStaticMarkup(React.createElement(TermsView, { result: ex([{ label: "NOI", value: "$720,000", page: "p. 4" }]) })));
+    expect(unknown).not.toContain("p. 4");
+  });
+
+  it("gives two cards sharing a label their own page chips", () => {
+    const metrics = [
+      { label: "Cap rate", value: "5.50%", page: "p. 4" },
+      { label: "Cap rate", value: "6.25%", page: "p. 31" },
+    ];
+    const facts = buildDealFacts(metrics, 48).reverse();
+    const html = renderToStaticMarkup(React.createElement(TermsView, { result: ex(metrics, 48), facts, omUrl: "/api/deals/x/om" }));
+    expect(html).toContain('href="/api/deals/x/om#page=4"');
+    expect(html).toContain('href="/api/deals/x/om#page=31"');
+    expect(a11yIssues(html)).toEqual([]);
   });
 });

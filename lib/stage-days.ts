@@ -4,7 +4,8 @@
 // 2, 2026"), which says when and never how long. This turns the same
 // entries into spans: each stage from the day it was set to the day the
 // next one was, the last one open to today, in whole UTC days (the log's
-// dates are UTC days, so a span is the difference of two printed dates).
+// dates are UTC days, so a span is the difference of two printed dates, and
+// "today" is the UTC day of the same moment, one clock throughout).
 //
 // Only what the history records: a deal created before its first recorded
 // move has no span before it, and a history with no moves has none at all.
@@ -48,15 +49,33 @@ function daysBetween(from: string, to: string): number {
   return Math.max(0, Math.round((b - a) / DAY_MS));
 }
 
+/** The UTC day of a moment: the clock the moves' days are on, so the stage
+ *  the deal is in counts to the same calendar as the days it was set on. */
+export function utcDayOf(at: Date | number): string {
+  return new Date(at).toISOString().slice(0, 10);
+}
+
+/** Today's UTC day, read once per request by the page that hands it down
+ *  (as `readerToday` reads the reader's). */
+export function utcToday(): string {
+  return utcDayOf(Date.now());
+}
+
 /**
- * The spans, oldest first. `today` is the reader's day (ISO); without it the
- * stage the deal is in has no end, and is left out rather than given one.
+ * The spans, oldest first. `today` is the UTC day of the reader's moment
+ * (`utcDayOf`) — the moves' own clock, never the reader's local day, which
+ * on a Los Angeles evening is a day behind the UTC day a move made that
+ * evening was set on; without it the stage the deal is in has no end, and
+ * is left out rather than given one. A `today` before the stage's own day
+ * (a clock behind the move's) counts it as set today, never drops it.
  */
 export function stageTimeline(history: readonly StageChange[], today: string | null): StageTimeline {
   const moves = history
-    .map((h) => ({ stage: h.stage, day: isoDay(h.at), at: h.at }))
-    .filter((h): h is { stage: Stage; day: string; at: string } => h.day !== null)
-    .sort((a, b) => a.at.localeCompare(b.at));
+    .map((h) => ({ stage: h.stage, day: isoDay(h.at), t: Date.parse(h.at) }))
+    .filter((h): h is { stage: Stage; day: string; t: number } => h.day !== null)
+    // By the moment itself: "2026-10-05T12:00:00Z" and "2026-10-05T08:00:00-07:00"
+    // do not order as text.
+    .sort((a, b) => a.t - b.t);
   // One entry a move: the same stage set twice in a row is one span.
   const runs = moves.filter((m, i) => i === 0 || moves[i - 1].stage !== m.stage);
   const spans: StageSpan[] = [];
@@ -68,7 +87,13 @@ export function stageTimeline(history: readonly StageChange[], today: string | n
       end = { stage: r.stage, label: STAGE_LABEL[r.stage], on: r.day };
       break;
     }
-    const to = next ? next.day : today && /^\d{4}-\d{2}-\d{2}$/.test(today) && today >= r.day ? today : null;
+    const to = next
+      ? next.day
+      : today && /^\d{4}-\d{2}-\d{2}$/.test(today)
+        ? today >= r.day
+          ? today
+          : r.day
+        : null;
     if (!to) continue;
     spans.push({ stage: r.stage, label: STAGE_LABEL[r.stage], from: r.day, to, days: daysBetween(r.day, to), current: !next });
   }

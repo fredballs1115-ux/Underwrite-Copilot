@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { addressUpgrade } from "@/lib/address";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { utcToday } from "@/lib/stage-days";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import {
   FILED_PERSONAL,
@@ -24,7 +25,7 @@ import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
 import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
-import { marketPictureFor } from "@/lib/market-picture";
+import { marketPictureFor, pictureIsCheckedMarket } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
@@ -846,6 +847,10 @@ export default async function DealPage({
   // server's UTC day had read a position due today as past in the header
   // beside a playground reading it due (the audit of 2026-10-05).
   const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  // The decision log's stage days are UTC days (the days its moves were set
+  // on), so the stage the deal is in counts to this request's UTC day — one
+  // clock, never the reader's local day beside UTC move days (lib/stage-days).
+  const stageToday = utcToday();
   const readerNoon = new Date(`${todayIso}T12:00:00Z`);
   const interest = readInterest(extraction, askingPriceOf(extraction), readerNoon);
   // A note's or a leased fee's deal type describes a building the price does
@@ -1129,13 +1134,11 @@ export default async function DealPage({
     }
   }
 
-  // Citation facts, keyed by field label for the source chips (Feature 2).
+  // Citation facts for the source chips (Feature 2), every row: the terms
+  // match each to its own extracted row by label and value (lib/facts
+  // `factsForMetrics`), so two rows sharing a label keep their own pages.
   // Empty for deals screened before migration 0018 — no chips, never faked.
-  const factsByField: Record<string, DealFact> = {};
-  for (const row of (factsRes.data ?? []) as Record<string, unknown>[]) {
-    const f = parseFactRow(row);
-    if (!(f.field in factsByField)) factsByField[f.field] = f;
-  }
+  const dealFacts: DealFact[] = ((factsRes.data ?? []) as Record<string, unknown>[]).map(parseFactRow);
   // The shared price reader; on a development with no asking price the land
   // or site cost is what is being bought. Before the extraction lands the
   // first signal's ask fills the slot — only when it is a figure, never an
@@ -1366,6 +1369,9 @@ export default async function DealPage({
   // the building has none of its own and no Street View (#439) — the one its
   // pipeline card shows (#438), from the same reader.
   const marketPicture = marketPictureFor(dealAddress, extraction?.market ?? null, placement.briefed ?? placement.read, placement.county);
+  // The market check calls it the market it reads only where it is: the
+  // market whose figures the stored brief holds, at the metro's grain.
+  const marketPictureCheckReads = pictureIsCheckedMarket(marketPicture, storedBrief, liveMarket);
 
   // A development's price row is its land cost, and a plan deal's cap slot is
   // its yield on total cost — the same words the pipeline row and the meeting
@@ -1890,6 +1896,7 @@ export default async function DealPage({
         // The market check opens on the market's photograph, the one the
         // picture above leads with where the building has none of its own.
         marketPicture={marketPicture}
+        marketPictureCheckReads={marketPictureCheckReads}
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}
@@ -1926,7 +1933,7 @@ export default async function DealPage({
         internalCompsUnread={internalCompsUnread}
         internalCompRanges={internalCompRanges}
         omUrl={omUrl}
-        facts={factsByField}
+        facts={dealFacts}
         discrepancies={
           ((deal as { discrepancies?: ReconcileResult | null }).discrepancies) ?? null
         }
@@ -1946,6 +1953,7 @@ export default async function DealPage({
         tasks={dealTasks}
         taskAssignees={taskAssignees}
         todayIso={todayIso}
+        stageToday={stageToday}
         compsSubjectPoint={compsSubjectPoint}
       />
 

@@ -111,6 +111,13 @@ export interface T12Summary {
   /** the expense lines carry both signs, so which is a credit cannot be
    *  read: the lines are kept as stated and no total is derived from them */
   opexSignsMixed?: boolean;
+  /** Whether the statement itself stated the EGI, the expense total and
+   *  the NOI (true) or the summary derived them (false). Written at ingest
+   *  so a stored summary is read back exactly as it was written; a summary
+   *  stored before these were written carries none. */
+  egiStated?: boolean;
+  totalOpexStated?: boolean;
+  noiStated?: boolean;
 }
 
 // ---- OM-vs-actual NOI comparison ------------------------------------------

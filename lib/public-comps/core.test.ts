@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   compEvidence,
   compStats,
+  sharedDeedCounts,
+  sharedDeedPhrase,
   CONFIDENT_FLOOR,
   COVERAGE_DISCOVERY,
   COVERAGE_SUMMARY,
@@ -13,6 +15,7 @@ import {
   providerFor,
   salesPhrase,
 } from "./core";
+import { perSfBars } from "./picture";
 
 const philly = PROVIDERS.find((p) => p.id === "philly_opa")!;
 const dc = PROVIDERS.find((p) => p.id === "dc_its")!;
@@ -365,6 +368,58 @@ describe("how much a comp set can actually support", () => {
     expect(one.medianPrice).toBe(400_000);
     expect(one.low).toBe(400_000);
     expect(one.high).toBe(400_000);
+  });
+});
+
+describe("a deed recorded once a parcel is one sale", () => {
+  const row = (i: number, over: Record<string, unknown> = {}) =>
+    ({
+      address: `${i} Main St`,
+      lat: 39.95,
+      lng: -75.16,
+      saleDate: "2026-02-01",
+      price: 400_000 + i * 10_000,
+      sqft: 2_000,
+      propertyType: "apartment",
+      distanceKm: 0.1 * i,
+      sourceUrl: "https://example.gov/1",
+      ...over,
+    }) as never;
+  const deed = { saleDate: "2026-01-15", buyer: "Acme Portfolio LLC", price: 9_000_000 };
+
+  it("counts the deed once, so it cannot lift a set past the floors or drag the median", () => {
+    // Two sales and one portfolio deed copied onto three parcels: five rows,
+    // three sales — thin, never "usable", and the median is the middle of
+    // the three, not the deed's $9M twice over.
+    const s = compStats([row(1), row(2), row(3, deed), row(4, deed), row(5, deed)])!;
+    expect(s.count).toBe(3);
+    expect(compEvidence(s.count)).toBe("thin");
+    expect(s.medianPrice).toBe(420_000);
+    expect(s.low).toBe(410_000);
+    expect(s.high).toBe(9_000_000);
+    expect(s.sharedDeeds).toEqual({ rows: 3, deeds: 1 });
+    expect(sharedDeedPhrase(s)).toBe("3 rows of one deed counted once");
+  });
+
+  it("gives the deed no price a foot, so the $/SF median is the bars' own set", () => {
+    const rows = [row(1), row(2), row(3), row(4, deed), row(5, deed)];
+    const s = compStats(rows)!;
+    // $9M over one parcel's 2,000 SF is no price a foot.
+    expect(s.perSqftCount).toBe(3);
+    expect(s.medianPerSqft).toBe(210);
+    const bars = perSfBars(rows, s.medianPerSqft, sharedDeedCounts(rows))!;
+    expect(bars.drawn).toBe(s.perSqftCount);
+    expect(bars.medianShare).not.toBeNull();
+  });
+
+  it("says two deeds, and nothing where no rows share one", () => {
+    const other = { saleDate: "2026-03-01", buyer: "Second Owner LLC", price: 5_000_000 };
+    const s = compStats([row(1), row(2, deed), row(3, deed), row(4, other), row(5, other), row(6, other)])!;
+    expect(s.count).toBe(3);
+    expect(sharedDeedPhrase(s)).toBe("5 rows of 2 deeds, each counted once");
+    const plain = compStats([row(1), row(2), row(3)])!;
+    expect(plain.sharedDeeds).toBeUndefined();
+    expect(sharedDeedPhrase(plain)).toBe("");
   });
 });
 

@@ -304,7 +304,7 @@ export function DealView({
   internalCompsUnread = false,
   internalCompRanges = [],
   omUrl,
-  facts = {},
+  facts = [],
   discrepancies = null,
   notes = [],
   userEmail = null,
@@ -320,12 +320,14 @@ export function DealView({
   tasks = null,
   taskAssignees = [],
   todayIso = "",
+  stageToday = "",
   staleResults = [],
   rateSeeds = null,
   marketSince = null,
   modelVsMarket = null,
   metroDemand = null,
   marketPicture = null,
+  marketPictureCheckReads = false,
   assumable = null,
   sellerNote = null,
   leaseholdExit = null,
@@ -387,6 +389,10 @@ export function DealView({
   /** the photograph the deal's market is known by (lib/market-picture),
    *  which the market check opens on; null where none answers */
   marketPicture?: MarketPicture | null;
+  /** whether the photograph is of the market whose figures the check read
+   *  (its stored brief's market, at the metro's grain): only then does its
+   *  alt text call it the market the check reads */
+  marketPictureCheckReads?: boolean;
   /** the deal's resolved location (lib/deal-location), the point its
    *  pictures are drawn around; the comps map measures from it */
   compsSubjectPoint?: SubjectPoint | null;
@@ -411,7 +417,7 @@ export function DealView({
    *  (lib/comp-range), drawn under the block's lead; none draws none */
   internalCompRanges?: RangeTrack[];
   omUrl: string | null;
-  facts?: Record<string, DealFact>;
+  facts?: readonly DealFact[];
   discrepancies?: ReconcileResult | null;
   notes?: DealNote[];
   userEmail?: string | null;
@@ -440,6 +446,10 @@ export function DealView({
   /** yyyy-mm-dd, the reader's own day from the server (lib/reader-day), for
    *  stable overdue/date rendering */
   todayIso?: string;
+  /** yyyy-mm-dd, the request's UTC day (lib/stage-days `utcDayOf`): the
+   *  decision log's stage days are UTC days, so the stage the deal is in
+   *  counts to this one, on the same clock */
+  stageToday?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -845,7 +855,7 @@ export function DealView({
               userId={userId}
               names={askerNames}
               isSample={isSample}
-              today={todayIso || null}
+              today={stageToday || null}
             />
           </div>
         )}
@@ -903,6 +913,7 @@ export function DealView({
             marketSince={marketSince}
             metroDemand={metroDemand}
             marketPicture={marketPicture}
+            marketPictureCheckReads={marketPictureCheckReads}
             isSample={isSample}
             staleVerdict={staleResults.includes("verdict")}
             staleWhy={staleWhy}
@@ -981,7 +992,7 @@ function FinancialsPanel({
   isPro,
   downloadsOpen = isPro,
   supplement,
-  facts = {},
+  facts = [],
   omUrl = null,
   underwrite = null,
   underwriteSources = null,
@@ -1008,7 +1019,7 @@ function FinancialsPanel({
    *  (lib/sample-exports) */
   downloadsOpen?: boolean;
   supplement: TabSupplement | undefined;
-  facts?: Record<string, DealFact>;
+  facts?: readonly DealFact[];
   omUrl?: string | null;
   underwrite?: UnderwriteInputs | null;
   underwriteSources?: PlaygroundData["sources"];
@@ -1186,6 +1197,7 @@ function AnalysesPanel({
   marketSince = null,
   metroDemand = null,
   marketPicture = null,
+  marketPictureCheckReads = false,
   isSample = false,
 }: {
   analysis: AnalysisKey;
@@ -1225,6 +1237,8 @@ function AnalysesPanel({
   metroDemand?: MetroDemand | null;
   /** the photograph the deal's market is known by (lib/market-picture) */
   marketPicture?: MarketPicture | null;
+  /** whether that photograph is the market whose figures the check read */
+  marketPictureCheckReads?: boolean;
   /** the sample deal: its stress test is the first-draft model's run, and
    *  the challenger's heading says so (lib/stress-test-title) */
   isSample?: boolean;
@@ -1332,7 +1346,7 @@ function AnalysesPanel({
           }}
         />
       ) : (
-        <MarketCheck result={results.market!} since={marketSince} demand={metroDemand} picture={marketPicture} />
+        <MarketCheck result={results.market!} since={marketSince} demand={metroDemand} picture={marketPicture} pictureCheckReads={marketPictureCheckReads} />
       );
   } else if (running || pending) {
     content = analysis === "verdict" ? <VerdictSkeleton /> : <CardListSkeleton />;

@@ -120,6 +120,11 @@ export function briefDelta(
 
 const usd = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
 const signed = (v: number, dp: number): string => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(dp)}`;
+/** A count's noun, singular for one: "1 day", "3 days", "1 place". */
+const nounFor = (n: number, one: string, many: string): string => (Math.abs(Math.round(n)) === 1 ? one : many);
+const daysMove = (v: number): string => `${signed(v, 0)} ${nounFor(v, "day", "days")}`;
+const placesMove = (v: number): string =>
+  `${Math.abs(v)} ${nounFor(v, "place", "places")} ${v > 0 ? "hotter" : "cooler"}`;
 
 /** A figure's value as the page prints it, in its own unit. */
 export function figureValue(unit: LiveFigure["unit"], value: number): string {
@@ -132,7 +137,7 @@ export function figureValue(unit: LiveFigure["unit"], value: number): string {
     case "count":
       return Math.round(value).toLocaleString("en-US");
     case "days":
-      return `${Math.round(value)} days`;
+      return `${Math.round(value)} ${nounFor(value, "day", "days")}`;
     case "rank":
       return `#${Math.round(value)}`;
     case "years":
@@ -157,9 +162,9 @@ export function moveDelta(m: FigureMove): string {
         case "pct":
           return `${signed(m.move, 1)}%`;
         case "days":
-          return `${signed(m.move, 0)} days`;
+          return daysMove(m.move);
         case "places":
-          return `${Math.abs(m.move)} places ${m.move > 0 ? "hotter" : "cooler"}`;
+          return placesMove(m.move);
       }
   }
 }
@@ -180,9 +185,9 @@ export function moveSentence(m: FigureMove): string {
         case "pct":
           return `${m.label}: ${signed(m.move, 1)}% to ${to}`;
         case "days":
-          return `${m.label}: ${signed(m.move, 0)} days to ${to}`;
+          return `${m.label}: ${daysMove(m.move)} to ${to}`;
         case "places":
-          return `${m.label}: ${Math.abs(m.move)} places ${m.move > 0 ? "hotter" : "cooler"}, now ${to}`;
+          return `${m.label}: ${placesMove(m.move)}, now ${to}`;
       }
   }
 }

@@ -77,7 +77,7 @@ export function LeverageTrack({ figures }: { figures: LeverageFigures }) {
           <KeyItem mark="tick" tone="bg-brand">
             {`Screening rate ${seed.pct.toFixed(2)}%: ${seed.note}`}
             {seedUnderSurvey
-              ? `${/[.!?]$/.test(seed.note.trim()) ? "" : "."} The screening rate sits under the owner-occupier survey, so a lender's quote is likely higher.`
+              ? `${/[.!?]$/.test(seed.note.trim()) ? "" : "."} The screening rate sits under the owner-occupier survey; as a rule of thumb, not a quote, a lender's rate is likely higher.`
               : null}
           </KeyItem>
         )}

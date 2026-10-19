@@ -7,18 +7,23 @@
 // a sale (a 600px table scrolled sideways hid the price behind the
 // address); from `sm` up the table takes over. Each sale's $/SF is a bar on
 // one scale with the median's tick where the readout names one
-// (lib/public-comps/picture `perSfBars`).
+// (lib/public-comps/picture `perSfBars`). On /comps the order is kept in the
+// page's address (`?sort=`), so a reload or a shared link opens on it; the
+// deal page's panel keeps it for the visit only.
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, useSyncExternalStore, type ReactNode } from "react";
 import { compactUsd } from "@/lib/money";
 import { fmtMiles } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import type { RecordComp } from "@/lib/public-comps/core";
 import {
   SALES_SORTS,
+  SALES_SORT_PARAM,
   perSfBars,
+  perSfSortOffered,
   perSqftOf,
   perUnitOf,
+  readSalesSort,
   salesHeading,
   salesOrder,
   type PerSfBars,
@@ -39,6 +44,59 @@ const fmtDate = (iso: string) => {
     : d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 };
 
+/**
+ * The order in the page's address, the way /tools keeps its fields
+ * (app/tools/deal-math-tools `useShared`): `history.replaceState`, never the
+ * router — no navigation, nothing re-rendered on the server, and Back still
+ * leaves the page — debounced, and every other parameter the page carries
+ * (the address, the radius, the window, the class) kept as it is.
+ *
+ * Read through useSyncExternalStore, whose server snapshot is the value the
+ * page handed down from its own searchParams: the server's HTML and the
+ * browser's first render agree, and window.location is never read while
+ * rendering on the server. A choice not yet written is held here until the
+ * write, which then hands the truth back to the address.
+ */
+let pendingSort: SalesSort | undefined;
+let sortTimer: ReturnType<typeof setTimeout> | null = null;
+const sortListeners = new Set<() => void>();
+
+function subscribeSort(fn: () => void): () => void {
+  sortListeners.add(fn);
+  return () => {
+    sortListeners.delete(fn);
+  };
+}
+
+function sortInAddress(): string | null {
+  if (pendingSort !== undefined) return pendingSort;
+  return new URLSearchParams(window.location.search).get(SALES_SORT_PARAM);
+}
+
+function writeSort() {
+  sortTimer = null;
+  if (pendingSort === undefined) return;
+  const q = new URLSearchParams(window.location.search);
+  // Nearest first is the bare link.
+  if (pendingSort === "nearest") q.delete(SALES_SORT_PARAM);
+  else q.set(SALES_SORT_PARAM, pendingSort);
+  const query = q.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+  pendingSort = undefined;
+}
+
+function useSortInAddress(fromServer: string | null): [string | null, (by: SalesSort) => void] {
+  const raw = useSyncExternalStore(subscribeSort, sortInAddress, () => fromServer);
+  const set = useCallback((by: SalesSort) => {
+    pendingSort = by;
+    for (const fn of sortListeners) fn();
+    if (sortTimer) clearTimeout(sortTimer);
+    // Debounced: a reader clicking through the orders writes the last one.
+    sortTimer = setTimeout(writeSort, 400);
+  }, []);
+  return [raw, set];
+}
+
 const SORT_ARIA: Record<SalesSort, "ascending" | "descending"> = {
   nearest: "ascending",
   newest: "descending",
@@ -53,6 +111,8 @@ export function SalesList({
   medianPerSqft,
   copyText,
   mapped = false,
+  keepSortInUrl = false,
+  sortParam = null,
   children,
 }: {
   /** the sales nearest first — each one's place is its pin number */
@@ -68,18 +128,29 @@ export function SalesList({
   /** the sales are drawn as numbered pins on a map beside the list (the
    *  comps page): each number says it is its pin */
   mapped?: boolean;
+  /** keep the order in the page's address (the comps page; never the deal
+   *  page's panel, which sits on a page with an address of its own) */
+  keepSortInUrl?: boolean;
+  /** the page's own `?sort=` as its searchParams read it, where the order is
+   *  kept there: the server's render and the first client render open on it
+   *  (`readSalesSort` holds it to the orders offered) */
+  sortParam?: string | null;
   /** set between the heading and the list (the comp grid's hand-off) */
   children?: ReactNode;
 }) {
-  const [by, setBy] = useState<SalesSort>("nearest");
+  const [local, setLocal] = useState<SalesSort>("nearest");
+  const [inAddress, setInAddress] = useSortInAddress(sortParam);
+  // $/SF is offered as an order only where two sales or more state an area.
+  const perSfOffered = perSfSortOffered(comps);
+  const by = keepSortInUrl ? readSalesSort(inAddress, perSfOffered) : local;
+  const setBy = keepSortInUrl ? setInAddress : setLocal;
   const order = salesOrder(comps, by);
   // A row possibly of one deed across parcels sets no scale and draws no bar.
   const bars = perSfBars(comps, medianPerSqft, shared);
   const first = order.slice(0, SALES_SHOWN);
   const rest = order.slice(SALES_SHOWN);
   const noArea = comps.filter((c) => perSqftOf(c) === null).length;
-  // $/SF is offered as an order only where two sales or more state an area.
-  const sorts = SALES_SORTS.filter((s) => s.key !== "perSf" || comps.length - noArea >= 2);
+  const sorts = SALES_SORTS.filter((s) => s.key !== "perSf" || perSfOffered);
   return (
     <>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -124,11 +195,13 @@ export function SalesList({
       )}
       {bars && (
         <p className="mt-1.5 text-[11px] text-muted" data-qa="comps-psf-caption">
-          {`Bars: the price a square foot that ${bars.drawn + bars.leftOut === comps.length ? `all ${comps.length} sales state` : `${bars.drawn + bars.leftOut} of the ${comps.length} sales state`}, from zero to the highest, ${fmtPsf(bars.max)}${
+          {/* Where rows may be one deed across parcels, the caption counts
+              rows, as the readout does ("2 rows of one deed counted once"). */}
+          {`Bars: the price a square foot that ${bars.drawn + bars.leftOut === comps.length ? `all ${comps.length} ${bars.leftOut > 0 ? "rows" : "sales"} state` : `${bars.drawn + bars.leftOut} of the ${comps.length} ${bars.leftOut > 0 ? "rows" : "sales"} state`}, from zero to the highest, ${fmtPsf(bars.max)}${
             bars.medianShare !== null && medianPerSqft !== null ? `; the tick is the median, ${fmtPsf(medianPerSqft)}` : ""
           }.${
             bars.leftOut > 0
-              ? ` ${bars.leftOut === 1 ? "One sale" : `${bars.leftOut} sales`} possibly of one deed across parcels ${bars.leftOut === 1 ? "draws" : "draw"} no bar.`
+              ? ` ${bars.leftOut === 1 ? "One row" : `${bars.leftOut} rows`} possibly of one deed across parcels ${bars.leftOut === 1 ? "draws" : "draw"} no bar, and the median leaves ${bars.leftOut === 1 ? "it" : "them"} out.`
               : ""
           }`}
         </p>

@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 export default async function PullCompsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; addr?: string; cls?: string; r?: string; m?: string }>;
+  searchParams: Promise<{ q?: string; addr?: string; cls?: string; r?: string; m?: string; sort?: string | string[] }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/comps");
@@ -180,7 +180,16 @@ export default async function PullCompsPage({
               </Link>
             </p>
           ) : null}
-          <CompsResultView result={result} showMap dbMarketsLine={marketNames(dbMarkets)} />
+          {/* The list's order is kept in this page's address (`?sort=`), so
+              a reload or a shared link opens on it; the list holds the value
+              to the orders it offers (lib/public-comps/picture
+              `readSalesSort`). */}
+          <CompsResultView
+            result={result}
+            showMap
+            dbMarketsLine={marketNames(dbMarkets)}
+            sortParam={(Array.isArray(params.sort) ? params.sort[0] : params.sort) ?? null}
+          />
         </section>
       ) : (
         <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
