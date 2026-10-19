@@ -19,6 +19,11 @@ import type { PhotoCredit } from "@/lib/credit-parts";
 export interface ChipPicture {
   src: string;
   credit: PhotoCredit;
+  /** where the chip's market has no photograph of its own and wears its
+   *  metro's: the title saying whose photograph it is ("Washington DC's
+   *  photograph: Montgomery County MD has none of its own"), so it never
+   *  passes for the suburb's */
+  title?: string;
 }
 
 /** The width a chip's thumbnail is asked at: the skyline route's smallest
@@ -39,9 +44,13 @@ export function coveredMarketChipPictures(): Record<string, ChipPicture> {
       if (!id) continue;
       const shot = skylineFor(id);
       if (!shot) continue;
+      const lender = id === m.id ? null : (metrosSeed.metros ?? []).find((x) => x.id === id);
       out[label] = {
         src: `/api/imagery/skyline/${encodeURIComponent(id)}?w=${CHIP_PICTURE_WIDTH}&v=${skylineTag(id)}`,
         credit: skylineCredit(shot),
+        ...(id !== m.id
+          ? { title: `${(lender?.name as string | undefined) ?? shot.name ?? id}'s photograph: ${label} has none of its own` }
+          : {}),
       };
       break;
     }

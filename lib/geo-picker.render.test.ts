@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { GeoPicker } from "@/app/(app)/criteria/geo-picker";
+import { GeoPicker, chipPictureShown } from "@/app/(app)/criteria/geo-picker";
 import { CHIP_PICTURE_WIDTH, coveredMarketChipPictures } from "@/lib/geo-chip-pictures";
 import { coveredMarketGeoTargets } from "@/lib/market-match";
 import { SKYLINE_WIDTHS, skylineCredit, skylineFor, skylineTag } from "@/lib/skyline";
@@ -29,9 +29,12 @@ describe("the geography picker's covered-market chips, each with its market's ph
         expect(pic, m.id).toBeUndefined();
         continue;
       }
+      const lender = metrosSeed.metros.find((x) => x.id === id);
       expect(pic, m.id).toEqual({
         src: `/api/imagery/skyline/${encodeURIComponent(id)}?w=${CHIP_PICTURE_WIDTH}&v=${skylineTag(id)}`,
         credit: skylineCredit(skylineFor(id)!),
+        // A suburb wearing its metro's photograph says whose it is.
+        ...(id !== m.id ? { title: `${lender!.name}'s photograph: ${m.name} has none of its own` } : {}),
       });
     }
     // Asked at a width the route serves, so no request is snapped.
@@ -70,6 +73,34 @@ describe("the geography picker's covered-market chips, each with its market's ph
     expect(text).toContain("Covered markets, one tap:");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+
+  // The audit of #466: a photograph that failed left an empty disc with its
+  // credit still under the chips.
+  it("drops a photograph that did not load, and its credit with it", () => {
+    const labels = suggestions.filter((s) => pictures[s.label]).map((s) => s.label);
+    const failed = pictures[labels[0]];
+    const gone = new Set([failed.src]);
+    expect(chipPictureShown(pictures, gone, labels[0])).toBeUndefined();
+    expect(chipPictureShown(pictures, gone, labels[1])).toBe(pictures[labels[1]]);
+    expect(chipPictureShown(pictures, new Set(), labels[0])).toBe(failed);
+    expect(chipPictureShown(pictures, gone, "No such market")).toBeUndefined();
+    // The thumbnail tells the picker when it fails, after hydration or
+    // before it; the credit line is built from the pictures still shown.
+    const picker = readFileSync("app/(app)/criteria/geo-picker.tsx", "utf8");
+    expect(picker).toContain("onError={() => onGone(picture.src)}");
+    expect(picker).toMatch(/el\.complete && el\.naturalWidth === 0\) onGone\(src\)/);
+    expect(picker).toMatch(/\.map\(pictureOf\)/);
+  });
+
+  it("titles a suburb's borrowed photograph with whose it is", () => {
+    const borrowed = Object.entries(pictures).filter(([, p]) => p.title);
+    expect(borrowed.length).toBeGreaterThan(0);
+    const html = renderToStaticMarkup(h(GeoPicker, { initial: [], suggestions, pictures }));
+    for (const [label, p] of borrowed) {
+      expect(p.title).toMatch(new RegExp(`'s photograph: ${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} has none of its own$`));
+      expect(html).toContain(`title="${p.title!.replace(/'/g, "&#x27;")}"`);
+    }
   });
 
   it("draws no picture and no credit where it is handed none", () => {
