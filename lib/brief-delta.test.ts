@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { briefDelta, figureValue, moveSentence } from "./brief-delta";
+import { briefDelta, figureValue, moveDelta, moveSentence } from "./brief-delta";
 import type { LiveFigure } from "./live-market-brief";
 
 const stored: LiveFigure[] = [
@@ -66,6 +66,16 @@ describe("briefDelta — what moved since the screen, in each figure's own unit"
     expect(moveSentence(by.permits_ttm)).toBe("Units permitted, trailing year: −5.0% to 11,400");
     expect(moveSentence(by.rdc_hotness_rank)).toBe("Hotness rank: 12 places hotter, now #28");
     expect(moveSentence({ ...by.rdc_hotness_rank, move: -3, to: 43 })).toBe("Hotness rank: 3 places cooler, now #43");
+  });
+
+  it("a tile's move says the sentence's words alone", () => {
+    expect(moveDelta(by.unemployment)).toBe("+0.4 pt");
+    expect(moveDelta(by.zori_rent)).toBe("+1.1%");
+    expect(moveDelta(by.permits_ttm)).toBe("−5.0%");
+    expect(moveDelta(by.rdc_hotness_rank)).toBe("12 places hotter");
+    expect(moveDelta(by.rdc_days_on_market)).toBe("unchanged");
+    expect(moveDelta(by.rental_vacancy_msa)).toBe("no newer figure");
+    for (const m of [by.unemployment, by.zori_rent, by.permits_ttm]) expect(moveSentence(m)).toContain(moveDelta(m));
   });
 
   it("a figure that cannot be read today is left out rather than shown as a move to nothing", () => {

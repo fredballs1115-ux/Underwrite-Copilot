@@ -140,6 +140,30 @@ export function figureValue(unit: LiveFigure["unit"], value: number): string {
   }
 }
 
+/** A move alone, in its own unit, for a tile that draws the before and
+ *  after beside it: "+0.4 pt", "−5.0%", "+3 days", "12 places hotter";
+ *  "unchanged" or "no newer figure" where nothing moved. The same words
+ *  `moveSentence` says, so a tile and its sentence never disagree. */
+export function moveDelta(m: FigureMove): string {
+  switch (m.kind) {
+    case "no_newer":
+      return "no newer figure";
+    case "unchanged":
+      return "unchanged";
+    case "moved":
+      switch (m.moveUnit) {
+        case "pts":
+          return `${signed(m.move, 1)} pt`;
+        case "pct":
+          return `${signed(m.move, 1)}%`;
+        case "days":
+          return `${signed(m.move, 0)} days`;
+        case "places":
+          return `${Math.abs(m.move)} places ${m.move > 0 ? "hotter" : "cooler"}`;
+      }
+  }
+}
+
 /** "+1.1% to $2,335 (Sep 30)" / "+0.4 pt to 6.6% (Q3 2026)" / "12 places hotter to #28" —
  *  one string per move, so a surface prints it whole. */
 export function moveSentence(m: FigureMove): string {

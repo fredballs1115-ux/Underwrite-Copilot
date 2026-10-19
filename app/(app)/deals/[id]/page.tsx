@@ -1883,6 +1883,9 @@ export default async function DealPage({
             ? metroDemand(reads.rates, readClass)
             : null
         }
+        // The market check opens on the market's photograph, the one the
+        // picture above leads with where the building has none of its own.
+        marketPicture={marketPicture}
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}

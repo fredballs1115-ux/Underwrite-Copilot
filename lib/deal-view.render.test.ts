@@ -72,6 +72,8 @@ import {
 } from "./anthropic/document-failures";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { marketPictureFor } from "./market-picture";
+import { creditText, photographerParts } from "./credit-parts";
 
 type Props = Parameters<typeof DealView>[0];
 
@@ -407,6 +409,62 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(laterText).toMatch(/2 of the 3 figures the check read have a newer observation; 1 moved\./);
     expect(laterText).toMatch(/Unemployment: \+0\.3 pt to 4\.4%/);
     expect(laterText).not.toMatch(/Asking rent, all home types: unchanged/);
+  });
+
+  it("each move since the check ran is a before → after tile, its sentence kept for a screen reader", () => {
+    const p = sampleProps("analyses", "market");
+    const html = render({
+      ...p,
+      marketSince: {
+        since: "2026-09-02",
+        newer: 3,
+        moved: 2,
+        moves: [
+          { key: "unemployment", label: "Unemployment", unit: "pts", from: 4.1, to: 4.4, fromAsOf: "2026-07-01", toAsOf: "2026-08-01", move: 0.3, moveUnit: "pts", kind: "moved" },
+          { key: "rdc_hotness_rank", label: "Hotness rank", unit: "rank", from: 40, to: 28, fromAsOf: "2026-07-01", toAsOf: "2026-08-01", move: 12, moveUnit: "places", kind: "moved" },
+          { key: "zori_rent", label: "Asking rent, all home types", unit: "usd", from: 1890, to: 1890, fromAsOf: "2026-08-31", toAsOf: "2026-09-30", move: 0, moveUnit: "pct", kind: "unchanged" },
+        ],
+      },
+    });
+    expect(a11yIssues(html)).toEqual([]);
+    const since = /<div[^>]*data-qa="since-this-screen"[\s\S]*?<\/ul>/.exec(html)?.[0] ?? "";
+    // One tile a figure that moved; the unchanged one is counted, not drawn.
+    expect((since.match(/data-tile="move"/g) ?? []).length).toBe(2);
+    const text = textOf(since);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/\+0\.3 pt\s+4\.1% → 4\.4%/);
+    expect(text).toMatch(/12 places hotter\s+#40 → #28/);
+    // The sentence is in the HTML, for the ear; the tile is for the eye.
+    expect(since).toContain('<span class="sr-only">Unemployment: +0.3 pt to 4.4%</span>');
+    expect(since).toContain('<span class="sr-only">Hotness rank: 12 places hotter, now #28</span>');
+    expect(since).toMatch(/<div aria-hidden="true">/);
+    expect(text).not.toMatch(/Asking rent, all home types/);
+  });
+
+  it("the market check opens on the market's photograph, named and credited on its face", () => {
+    const picture = marketPictureFor({ city: "Philadelphia", state: "PA", label: "Philadelphia, PA" });
+    expect(picture).not.toBeNull();
+    const p = sampleProps("analyses", "market");
+    const html = render({ ...p, marketPicture: picture });
+    dumpView("deal-analyses-market-picture", html);
+    expect(a11yIssues(html)).toEqual([]);
+    const band = /<figure[^>]*data-qa="market-check-picture"[\s\S]*?<\/figure>/.exec(html)?.[0] ?? "";
+    expect(band).not.toBe("");
+    // First in the section, before its heading.
+    expect(html.indexOf('data-qa="market-check-picture"')).toBeLessThan(html.indexOf("Market plausibility check"));
+    expect(band).toContain(`src="${picture!.src.replace(/&/g, "&amp;")}"`);
+    expect(band).toContain(`alt="${picture!.place}: the ${picture!.name} market this check reads"`);
+    const text = textOf(band).replace(/\s+/g, " ");
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Market photo");
+    expect(text).toContain(picture!.name);
+    // The photographer linked to the file's page, the licence to its text,
+    // and "cropped to fit": the band crops it.
+    expect(text).toContain(creditText(photographerParts(picture!.author, picture!.license, true)));
+    if (picture!.author.url) expect(band).toContain(`href="${picture!.author.url.replace(/&/g, "&amp;")}"`);
+    if (picture!.license.url) expect(band).toContain(`href="${picture!.license.url.replace(/&/g, "&amp;")}"`);
+    // No picture, no band.
+    expect(render(p)).not.toContain('data-qa="market-check-picture"');
   });
 
   it("the market section draws the metro area's payrolls by sector, with this building's sector drawn full", () => {
