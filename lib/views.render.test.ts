@@ -9384,6 +9384,10 @@ describe("the offers-due countdown counts from the page's day, read once per req
     expect(words(bit("2026-10-07", "2026-10-07"))).toBe("Offers due today");
     expect(words(bit("2026-10-07", "2026-10-08"))).toBe("Offers were due Oct 7");
     expect(bit("2026-10-07", "2026-10-08")).toContain("text-kill");
+    // A day outside the reader's year says its year (lib/short-day).
+    expect(words(bit("2025-03-03", "2026-10-08"))).toBe("Offers were due Mar 3, 2025");
+    expect(words(bit("2027-01-20", "2026-12-29"))).toBe("Offers due Jan 20, 2027");
+    expect(words(bit("2026-11-20", "2026-10-08"))).toBe("Offers due Nov 20");
     // The header's control says the deadline went by on the day after it.
     expect(visibleText(render(React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-07", today: "2026-10-08" })))).toContain(
       "Offers were due",

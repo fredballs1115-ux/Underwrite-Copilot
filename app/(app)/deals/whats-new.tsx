@@ -1,18 +1,22 @@
 import Link from "next/link";
 import { changelogEntries } from "@/lib/changelog";
+import { shortDay } from "@/lib/short-day";
 
 /** Compact "what's new" card for the pipeline page — the product tells you
  *  what improved instead of hoping you notice. Server component, checked-in
  *  data, no dismissal state to manage: it stays small and stays honest. */
-export function WhatsNewCard({ limit = 3 }: { limit?: number }) {
+export function WhatsNewCard({
+  limit = 3,
+  today = new Date().toISOString().slice(0, 10),
+}: {
+  limit?: number;
+  /** the reader's day (lib/reader-day), so an entry from another year says
+   *  its year (lib/short-day) */
+  today?: string;
+}) {
   const entries = changelogEntries(limit);
   if (entries.length === 0) return null;
-  const fmt = (iso: string) =>
-    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    });
+  const fmt = (iso: string) => shortDay(iso, today);
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
       <div className="flex items-baseline justify-between gap-2">

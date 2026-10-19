@@ -411,7 +411,7 @@ export default async function DealsPage({
       <Suspense fallback={null}>
         <TodaysNews />
       </Suspense>
-      <WhatsNewCard />
+      <WhatsNewCard today={todayIso} />
     </>
   );
 }

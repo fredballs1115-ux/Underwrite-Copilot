@@ -9,6 +9,7 @@ import { emailUnsubscribeUrl, oneClickHeaders } from "@/lib/email-unsubscribe";
 import { appUrl } from "@/lib/app-url";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
 import { readAll } from "@/lib/read-all";
+import { shortDay } from "@/lib/short-day";
 
 /** A failed read's message, for the log. */
 const messageOf = (e: unknown): string =>
@@ -20,12 +21,10 @@ const VERDICT_EMAIL: Record<string, { label: string; color: string }> = {
   pass_on: { label: "No-go", color: "#b23a30" },
 };
 
-const DUE_FMT = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
+/** "Mon, Oct 22" — with its year wherever the day is not in the run's own
+ *  UTC year (lib/short-day): an overdue task from last December, or a
+ *  deadline in the new year on a digest sent the last week of December. */
+const dueText = (iso: string, today: string): string => shortDay(iso, today, { weekday: true });
 
 const DAY_MS = 86_400_000;
 
@@ -205,7 +204,7 @@ export function buildDigest(
     .sort((a, b) => (a.offers_due! < b.offers_due! ? -1 : a.offers_due! > b.offers_due! ? 1 : 0));
   const offersDue = dueThisWeek.slice(0, LIST_MAX).map((d) => ({
     name: d.name,
-    due: DUE_FMT.format(new Date(`${d.offers_due}T00:00:00Z`)),
+    due: dueText(d.offers_due!, today),
     url: dealUrl(d.id),
     pictureUrl: pictureUrl(d.id),
   }));
@@ -258,7 +257,7 @@ export function buildDigest(
     title: t.title,
     dealName: names.get(t.deal_id)!.name,
     url: `${dealUrl(t.deal_id)}#tasks`,
-    due: DUE_FMT.format(new Date(`${t.due_date}T00:00:00Z`)),
+    due: dueText(t.due_date, today),
     overdue: t.due_date < today,
     pictureUrl: pictureUrl(t.deal_id),
   }));
@@ -267,7 +266,7 @@ export function buildDigest(
     stages,
     offersDue,
     offersDueTotal: dueThisWeek.length,
-    offersThrough: DUE_FMT.format(through),
+    offersThrough: dueText(lastDay, today),
     verdicts,
     verdictsTotal: calls.length,
     moved,

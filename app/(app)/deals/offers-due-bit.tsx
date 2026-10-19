@@ -15,12 +15,12 @@
 // midnight; it had been UTC's, so from 8 pm Eastern it read "today". The
 // tasks count from the same day; the Monday digest keeps the UTC day.
 
-function fmtDue(iso: string): string {
-  return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+import { shortDay } from "@/lib/short-day";
+
+/** The deadline's day, with its year wherever it is not the reader's
+ *  current year (lib/short-day): "Offers were due Mar 3, 2025". */
+function fmtDue(iso: string, today: string): string {
+  return shortDay(iso, today);
 }
 
 /** Days from `today` (the reader's day, yyyy-mm-dd) to the call-for-offers
@@ -38,13 +38,13 @@ export function OffersDueBit({ iso, today }: { iso: string; today: string }) {
   const cls = d < 0 ? "text-kill" : d <= 5 ? "text-caution" : "text-muted";
   const text =
     d < 0
-      ? `Offers were due ${fmtDue(iso)}`
+      ? `Offers were due ${fmtDue(iso, today)}`
       : d === 0
         ? "Offers due today"
         : d === 1
           ? "Offers due tomorrow"
           : d <= 14
             ? `Offers due in ${d}d`
-            : `Offers due ${fmtDue(iso)}`;
+            : `Offers due ${fmtDue(iso, today)}`;
   return <span className={`font-medium ${cls}`}>{text}</span>;
 }

@@ -496,6 +496,26 @@ describe("the digest says what moved and the reader's own tasks (research pass 2
     expect(email.html).toContain("Moved since last week");
   });
 
+  // The audit of 2026-10-19: a task overdue from last year read as this
+  // year's, and a window running into the new year named no year.
+  it("says a date's year wherever it is not the run's own UTC year", () => {
+    const harbor = deal({ name: "Harbor Point", offers_due: "2027-01-02" });
+    const yearEnd = Date.parse("2026-12-28T13:00:00Z");
+    const out = buildDigest([harbor], new Map(), {
+      now: yearEnd,
+      appUrl: SITE,
+      recipient: "u1",
+      pictureUrl: () => null,
+      tasks: [
+        { title: "Order the PCA", due_date: "2025-11-14", deal_id: harbor.id },
+        { title: "Call the broker", due_date: "2026-12-30", deal_id: harbor.id },
+      ],
+    })!;
+    expect(out.myTasks!.map((t) => t.due)).toEqual(["Fri, Nov 14, 2025", "Wed, Dec 30"]);
+    expect(out.offersDue!.map((d) => d.due)).toEqual(["Sat, Jan 2, 2027"]);
+    expect(out.offersThrough).toBe("Sun, Jan 3, 2027");
+  });
+
   it("lists the reader's overdue tasks and the week's, soonest first, never a dead deal's or a deal they cannot see", () => {
     const harbor = deal({ name: "Harbor Point" });
     const dead = deal({ name: "Gone", stage: "dead" });
