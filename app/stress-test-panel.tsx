@@ -11,9 +11,9 @@ import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, 
  * homepage's walkthrough on the sample. Plain data in: the deal page builds
  * the test on the server from what it already holds, and this draws it.
  *
- * One row an assumption, most severe first (unsupported, stretched, holds,
- * unchecked). Each row has its words beside its picture, so nothing rides
- * on colour:
+ * One row an assumption, most severe first (unsupported, stretched, holds).
+ * Each tested row has its words beside its picture, so nothing rides on
+ * colour:
  *
  *   - THE OM'S FIGURE, with its page as a chip, and the verdict code gave
  *     the row;
@@ -34,6 +34,19 @@ import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, 
  *     broker, folded;
  *   - HOW THIS WAS TESTED: the row's method sentence, linking to the
  *     methodology page's own section for the key.
+ *
+ * Where the model already runs at the evidence's figure (the impact's two
+ * runs are one), the pair is one figure, "Levered IRR 9.3%, as the model
+ * runs", never "9.3% → 9.3%".
+ *
+ * THE UNCHECKED ROWS are one folded group at the end: a summary line
+ * naming them ("5 assumptions unchecked: debt, rent growth, …") and a fold
+ * ("Read why (5)") whose body lists each in two lines — the title with the
+ * OM's figure and its page chip, then why it stands unchecked — with the
+ * challenger's words folded where there are any and the method link. Drawn
+ * as fully as a tested row, five of the sample's nine rows were noise. Every
+ * word stays in the HTML (the lints, a screen reader), and each row keeps
+ * its `data-qa="stress-row-<key>"`.
  *
  * Every dollar goes through `compactUsd`, one option set for the panel.
  */
@@ -110,6 +123,40 @@ export function stressReadLine(rows: readonly StressRow[]): string {
   return `${tested} assumption${tested === 1 ? "" : "s"} tested: ${said.map(([c, w]) => `${c} ${w}`).join(", ")}`;
 }
 
+/** What each key is called in the unchecked line, mid-sentence. */
+const UNCHECKED_NAME: Record<Exclude<StressKey, "other">, string> = {
+  basis: "the basis",
+  exit_cap: "the exit cap",
+  debt: "debt",
+  noi: "the NOI",
+  vacancy: "vacancy",
+  rent_growth: "rent growth",
+  expense_growth: "expense growth",
+  taxes: "real estate taxes",
+  insurance: "insurance",
+  renovation_premium: "the renovation premium",
+};
+
+/** How an unchecked row is named in the summary line: the key's own name,
+ *  or, for the challenger's own row, its title read mid-sentence — a
+ *  leading figure dropped ("$200/mo renovation premium" is "the renovation
+ *  premium"), the first word lowercased unless it is an acronym, and "the"
+ *  put before it where no article leads. */
+export function uncheckedName(row: StressRow): string {
+  if (row.key !== "other") return UNCHECKED_NAME[row.key];
+  let t = row.title.trim().replace(/^[$€£]?\d[\d,.]*[a-zA-Z%]*(?:\/[a-zA-Z]+)?\s+/, "");
+  // A capital followed by a lowercase letter, a space or the end is a word,
+  // not an acronym ("A 4% fee" is "a 4% fee"; "RUBS income" keeps its case).
+  if (/^[A-Z](?:[a-z]|\s|$)/.test(t)) t = t[0].toLowerCase() + t.slice(1);
+  return /^(?:the|a|an)\s/i.test(t) ? t : `the ${t}`;
+}
+
+/** "5 assumptions unchecked: debt, rent growth, real estate taxes, insurance, the renovation premium" */
+export function uncheckedLine(rows: readonly StressRow[]): string {
+  const n = rows.length;
+  return `${n} assumption${n === 1 ? "" : "s"} unchecked: ${rows.map(uncheckedName).join(", ")}`;
+}
+
 /** The survey's margin, read back off the figure's own text ("6.2% ±2.2 pts"). */
 function marginOf(e: StressEvidence): number | null {
   const m = e.text.match(/±\s*(\d+(?:\.\d+)?)\s*pts?/);
@@ -180,9 +227,14 @@ function ImpactView({ impact }: { impact: StressImpact }) {
   const alt = impact.altIrrPct;
   const top = Math.max(base ?? 0, alt ?? 0, 1) * 1.15;
   const width = alt == null ? "0%" : `${Math.max(0, Math.min(100, (alt / top) * 100)).toFixed(1)}%`;
+  // The two runs are one where the model already runs at the evidence's
+  // figure (lib/stress-test's own note): one figure, not "9.3% → 9.3%".
+  const same = impact.note.startsWith("The model already runs");
   return (
     <div className="mt-2" data-qa="stress-impact">
-      <p className="text-xs font-medium tabular-nums text-ink" data-qa="stress-impact-pair">{`Levered IRR ${pctText(base)} → ${pctText(alt)}`}</p>
+      <p className="text-xs font-medium tabular-nums text-ink" data-qa="stress-impact-pair">
+        {same ? `Levered IRR ${pctText(base)}, as the model runs` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
+      </p>
       <BarRows className="mt-1 text-[11px]">
         <BarRow label="At the evidence's figure" figure={pctText(alt)}>
           <div className="h-full rounded-full bg-caution/60" data-bar="stress-impact" style={{ width }} />
@@ -218,6 +270,80 @@ function EvidenceList({ evidence }: { evidence: readonly StressEvidence[] }) {
   );
 }
 
+function PageChip({ page }: { page: number | null }) {
+  return (
+    <span className="rounded-full border border-line px-1.5 py-px text-[10px] text-muted" data-qa="stress-page">
+      {page != null ? `OM p. ${page}` : "OM"}
+    </span>
+  );
+}
+
+function ChallengeFold({ challenge }: { challenge: NonNullable<StressRow["challenge"]> }) {
+  return (
+    <div className="mt-1.5" data-qa="stress-challenge">
+      <p className="text-[11px] font-semibold text-muted">{`The challenge · ${SEVERITY[challenge.severity]} severity`}</p>
+      <PanelFold rest={[challenge.challenge, `Ask the broker: ${challenge.question}`]} />
+    </div>
+  );
+}
+
+function MethodLine({ row }: { row: StressRow }) {
+  return (
+    <p className={`mt-1.5 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-method">
+      <span>{`How this was tested: ${row.method}`}</span>{" "}
+      <Link href={`/how-we-test#${row.key}`} className="text-brand hover:underline">
+        The method
+      </Link>
+    </p>
+  );
+}
+
+/** An unchecked row inside the fold: the title with the OM's figure and its
+ *  page, then why it stands unchecked. The OM's text is printed only where
+ *  it says something the title and the reason do not ("The OM states no
+ *  loan rate." is the reason already). */
+function UncheckedRow({ row }: { row: StressRow }) {
+  const why = row.unchecked ?? "No evidence with a figure could be read for this deal.";
+  const hasFigure = row.omSays.value != null;
+  const figure = row.omSays.text !== row.title && row.omSays.text !== why ? row.omSays.text : null;
+  return (
+    <li className="py-2 first:pt-1 last:pb-0" data-qa={`stress-row-${row.key}`} data-verdict="unchecked">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <h3 className="text-xs font-semibold text-ink">{row.title}</h3>
+        {figure && <span className={`${MEASURE} text-xs text-muted`}>{figure}</span>}
+        {hasFigure && <PageChip page={row.omSays.page} />}
+      </div>
+      <p className={`mt-0.5 ${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked">{why}</p>
+      <EvidenceList evidence={row.evidence} />
+      {row.challenge && <ChallengeFold challenge={row.challenge} />}
+      <MethodLine row={row} />
+    </li>
+  );
+}
+
+/** The unchecked rows as one group: the line naming them, and the fold. The
+ *  fold is PanelFold's own shape (app/panel-parts) with a body of rows in
+ *  place of its paragraph, its control a thumb's height on a touch screen. */
+function UncheckedGroup({ rows }: { rows: readonly StressRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-2 border-t border-line pt-2" data-qa="stress-unchecked-group">
+      <p className={`${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked-line">{uncheckedLine(rows)}</p>
+      <details className="group mt-1">
+        <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline pointer-coarse:py-2.5">
+          <span className="group-open:hidden">{`Read why (${rows.length})`}</span>
+          <span className="hidden group-open:inline">Less</span>
+        </summary>
+        <ul className="mt-1 divide-y divide-line" data-qa="stress-unchecked-rows">
+          {rows.map((r, i) => (
+            <UncheckedRow key={`${r.key}-${i}`} row={r} />
+          ))}
+        </ul>
+      </details>
+    </div>
+  );
+}
+
 function RowView({ row, withheld }: { row: StressRow; withheld: string | null }) {
   const v = VERDICT[row.verdict];
   const at = trackScale(row);
@@ -227,11 +353,7 @@ function RowView({ row, withheld }: { row: StressRow; withheld: string | null })
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${v.chip}`}>{v.label}</span>
         <h3 className="text-sm font-semibold text-ink">{row.title}</h3>
-        {hasFigure && (
-          <span className="rounded-full border border-line px-1.5 py-px text-[10px] text-muted" data-qa="stress-page">
-            {row.omSays.page != null ? `OM p. ${row.omSays.page}` : "OM"}
-          </span>
-        )}
+        {hasFigure && <PageChip page={row.omSays.page} />}
       </div>
       <p className={`mt-0.5 ${MEASURE} text-xs text-muted`}>{row.omSays.text}</p>
 
@@ -252,19 +374,8 @@ function RowView({ row, withheld }: { row: StressRow; withheld: string | null })
         </p>
       )}
 
-      {row.challenge && (
-        <div className="mt-1.5" data-qa="stress-challenge">
-          <p className="text-[11px] font-semibold text-muted">{`The challenge · ${SEVERITY[row.challenge.severity]} severity`}</p>
-          <PanelFold rest={[row.challenge.challenge, `Ask the broker: ${row.challenge.question}`]} />
-        </div>
-      )}
-
-      <p className={`mt-1.5 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-method">
-        <span>{`How this was tested: ${row.method}`}</span>{" "}
-        <Link href={`/how-we-test#${row.key}`} className="text-brand hover:underline">
-          The method
-        </Link>
-      </p>
+      {row.challenge && <ChallengeFold challenge={row.challenge} />}
+      <MethodLine row={row} />
     </li>
   );
 }
@@ -272,6 +383,8 @@ function RowView({ row, withheld }: { row: StressRow; withheld: string | null })
 export function StressTestPanel({ test, className = "" }: { test: StressTest | null; className?: string }) {
   if (!test || test.rows.length === 0) return null;
   const rows = sortStressRows(test.rows);
+  const tested = rows.filter((r) => r.verdict !== "unchecked");
+  const unchecked = rows.filter((r) => r.verdict === "unchecked");
   const worst = rows[0].verdict;
   // An assumption the evidence cannot support sets the tone; one past the
   // evidence by a margin to price is a question to answer.
@@ -296,11 +409,14 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       </PanelHead>
       {test.impactsWithheld && <PanelNote>{`No return struck: ${test.impactsWithheld}`}</PanelNote>}
 
-      <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">
-        {rows.map((r, i) => (
-          <RowView key={`${r.key}-${i}`} row={r} withheld={test.impactsWithheld} />
-        ))}
-      </ol>
+      {tested.length > 0 && (
+        <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">
+          {tested.map((r, i) => (
+            <RowView key={`${r.key}-${i}`} row={r} withheld={test.impactsWithheld} />
+          ))}
+        </ol>
+      )}
+      <UncheckedGroup rows={unchecked} />
 
       <Key className="mt-2 border-t border-line pt-2" qa="stress-key">
         <KeyItem mark="tick" tone="bg-ink">

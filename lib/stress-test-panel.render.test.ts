@@ -1,14 +1,16 @@
 // Render smoke tests for the stress test's panel (app/stress-test-panel): a
 // static server render on hand-built rows, so the markup is held to the
 // contract — most severe first, the OM's figure a dark tick, each piece of
-// evidence typed, dated and attributed, the impact a before-and-after pair,
-// the challenge folded, the method linked — and its markers to the panel.
+// evidence typed, dated and attributed, the impact a before-and-after pair
+// (one figure where the model already runs at the evidence's), the
+// challenge folded, the method linked, the unchecked rows one folded group
+// at the end — and its markers to the panel.
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StressTestPanel, sortStressRows, stressReadLine } from "@/app/stress-test-panel";
+import { StressTestPanel, sortStressRows, stressReadLine, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { STRESS_KEYS, STRESS_METHODS, type StressRow, type StressTest } from "./stress-test-types";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -201,6 +203,80 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(verdicts).toEqual(["unsupported", "stretched", "holds", "unchecked", "unchecked"]);
     // Every row is named for its key, so a test can find it.
     for (const k of ["vacancy", "exit_cap", "taxes", "rent_growth", "other"]) expect(html).toContain(`data-qa="stress-row-${k}"`);
+    // The tested rows are the list; the unchecked ones come after it, as one group.
+    expect(html.indexOf('data-qa="stress-unchecked-group"')).toBeGreaterThan(html.indexOf('data-qa="stress-row-taxes"'));
+    expect(html.slice(html.indexOf('data-qa="stress-rows"'), html.indexOf('data-qa="stress-unchecked-group"'))).not.toContain('data-verdict="unchecked"');
+  });
+
+  it("collapses the unchecked rows into one folded group at the end: a line naming them, then 'Read why', each row two lines", () => {
+    const group = html.slice(html.indexOf('data-qa="stress-unchecked-group"'), html.indexOf('data-qa="stress-key"'));
+    const g = visibleText(group).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    // The read line at the top is unchanged: it still counts the unchecked.
+    expect(text).toContain("5 assumptions tested: 1 unsupported, 1 stretched, 1 holds, 2 unchecked");
+    expect(g).toContain("2 assumptions unchecked: rent growth, the broker's narrative on the submarket");
+    expect(uncheckedLine([GROWTH])).toBe("1 assumption unchecked: rent growth");
+    // The fold is PanelFold's own shape: the control a thumb's height on a
+    // touch screen, the whole body in the HTML.
+    expect(group).toMatch(/<details class="group mt-1"><summary class="[^"]*\bpointer-coarse:py-2\.5\b[^"]*">/);
+    expect(g).toContain("Read why (2)");
+    expect(group.indexOf("<details")).toBeLessThan(group.indexOf('data-qa="stress-row-rent_growth"'));
+    // Each unchecked row is inside the fold, named for its key, two lines:
+    // the title with the OM's figure and its page, then why.
+    const growth = group.slice(group.indexOf('data-qa="stress-row-rent_growth"'), group.indexOf('data-qa="stress-row-other"'));
+    const t = visibleText(growth).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(growth).toContain('data-verdict="unchecked"');
+    expect(t).toContain("Rent growth Rent growth: 4.0%/yr OM p. 40 No evidence with a figure could be read for this deal.");
+    expect(growth).not.toContain('data-qa="stress-track"');
+    expect(growth).not.toContain('data-qa="stress-gap"');
+    expect(growth).not.toContain('data-qa="stress-impact"');
+    expect(growth).not.toContain('data-qa="stress-no-impact"');
+    expect(growth).not.toContain('data-qa="stress-challenge"');
+    expect(growth).toContain('href="/how-we-test#rent_growth"');
+    expect(t).toContain(`How this was tested: ${GROWTH.method} The method`);
+    // The challenger's own row: no page chip (it states no figure), its
+    // title said once, its words folded under it.
+    const other = group.slice(group.indexOf('data-qa="stress-row-other"'));
+    const o = visibleText(other).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(o).toContain("The broker's narrative on the submarket No reader tests this assumption; the challenger's words stand alone.");
+    expect(o.match(/The broker's narrative on the submarket/g)).toHaveLength(1);
+    expect(other).not.toContain('data-qa="stress-page"');
+    expect(o).toContain("The challenge · Low severity");
+    expect(other).toContain("<details");
+    expect(o).toContain("Nothing numerate. Ask the broker: Which comps?");
+    expect(other).toContain('href="/how-we-test#other"');
+    // Nothing unchecked, no group; nothing tested, no list.
+    expect(render({ rows: [EXIT], readOn: "2026-09-21", impactsWithheld: null })).not.toContain('data-qa="stress-unchecked-group"');
+    const only = render({ rows: [GROWTH], readOn: "2026-09-21", impactsWithheld: null });
+    expect(only).not.toContain('data-qa="stress-rows"');
+    expect(only).toContain('data-qa="stress-row-rent_growth"');
+    expect(a11yIssues(only)).toEqual([]);
+  });
+
+  it("names an unchecked row mid-sentence: the key's own name, or the challenger's title read as one", () => {
+    expect(uncheckedName(GROWTH)).toBe("rent growth");
+    expect(uncheckedName({ ...GROWTH, key: "debt" })).toBe("debt");
+    expect(uncheckedName({ ...GROWTH, key: "taxes" })).toBe("real estate taxes");
+    expect(uncheckedName({ ...GROWTH, key: "noi" })).toBe("the NOI");
+    expect(uncheckedName({ ...GROWTH, key: "renovation_premium" })).toBe("the renovation premium");
+    expect(uncheckedName(OTHER)).toBe("the broker's narrative on the submarket");
+    // The sample's own: the challenger's "$200/mo renovation premium".
+    expect(uncheckedName({ ...OTHER, title: "$200/mo renovation premium" })).toBe("the renovation premium");
+    expect(uncheckedName({ ...OTHER, title: "A 4% management fee" })).toBe("a 4% management fee");
+    expect(uncheckedName({ ...OTHER, title: "RUBS income" })).toBe("the RUBS income");
+  });
+
+  it("draws the pair as one figure where the model already runs at the evidence's", () => {
+    const same: StressRow = {
+      ...VACANCY,
+      impact: { ...VACANCY.impact!, altValue: 0.06, altIrrPct: 9.31, altMultiple: 1.53, note: "The model already runs vacancy at the deal's rent roll's 9.1%, so its levered IRR of 9.3% carries it." },
+    };
+    const s = render({ rows: [same], readOn: "2026-09-21", impactsWithheld: null });
+    const t = visibleText(s).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(t).toContain("Levered IRR 9.3%, as the model runs");
+    expect(t).not.toContain("9.3% → 9.3%");
+    expect(s).toContain('data-qa="stress-impact"');
+    expect(t).toContain(same.impact!.note);
+    expect(gluedWords(visibleText(s))).toEqual([]);
   });
 
   it("an unsupported row: the OM's figure with its page, the track, the gap, the impact pair and the folded challenge", () => {
@@ -247,29 +323,12 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(exit).toMatch(/border-2 border-caution bg-surface" data-bar="stress-evidence"/);
     expect(visibleText(exit)).toContain("Stretched");
     expect(visibleText(exit)).toContain("Levered IRR 9.3% → 8.6%");
-    const taxes = html.slice(html.indexOf('data-qa="stress-row-taxes"'), html.indexOf('data-qa="stress-row-rent_growth"'));
+    const taxes = html.slice(html.indexOf('data-qa="stress-row-taxes"'), html.indexOf('data-qa="stress-unchecked-group"'));
     const t = visibleText(taxes).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(t).toContain("Holds Real estate taxes OM p. 15");
     expect(t).toContain("The OM against the evidence $532k");
     expect(t).toContain("No return struck: no figure the engine can take.");
     expect(taxes).not.toContain('data-qa="stress-impact"');
-  });
-
-  it("an unchecked row says why, draws no track, and the challenger's own row stands with its words", () => {
-    const growth = html.slice(html.indexOf('data-qa="stress-row-rent_growth"'), html.indexOf('data-qa="stress-row-other"'));
-    const t = visibleText(growth).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-    expect(t).toContain("Unchecked Rent growth OM p. 40 Rent growth: 4.0%/yr");
-    expect(t).toContain("No evidence with a figure could be read for this deal.");
-    expect(growth).not.toContain('data-qa="stress-track"');
-    expect(growth).not.toContain('data-qa="stress-gap"');
-    expect(growth).toContain('href="/how-we-test#rent_growth"');
-    const other = html.slice(html.indexOf('data-qa="stress-row-other"'));
-    const o = visibleText(other).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-    expect(o).toContain("Unchecked The broker's narrative on the submarket");
-    expect(other).not.toContain('data-qa="stress-page"');
-    expect(o).toContain("No reader tests this assumption; the challenger's words stand alone.");
-    expect(o).toContain("The challenge · Low severity");
-    expect(other).toContain('href="/how-we-test#other"');
   });
 
   it("keys the marks it draws, and dates the published figures' read", () => {
@@ -291,7 +350,8 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(a11yIssues(w)).toEqual([]);
     expect(gluedWords(visibleText(w))).toEqual([]);
     expect(t.match(/No return struck: The model runs on the \$10,000,000 placeholder price/g)).toHaveLength(1);
-    expect(w.match(/data-qa="stress-no-impact"/g)).toHaveLength(3);
+    // The two tested rows point up; the unchecked row's reason is its own.
+    expect(w.match(/data-qa="stress-no-impact"/g)).toHaveLength(2);
     expect(t).toContain("No return struck: the model's reads are withheld (see above).");
     expect(w).not.toContain('data-bar="stress-impact"');
     // The track still draws: the evidence stands whether or not the engine runs.

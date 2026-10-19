@@ -1472,7 +1472,14 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(row).toContain('data-verdict="unsupported"');
       expect(row).toContain('data-evidence="document"');
       expect(visibleText(row)).toContain("the deal's T-12");
-      expect(visibleText(row)).toContain("Levered IRR 9.3% → 9.3%");
+      // The model already runs at the roll's occupancy: one figure, not "9.3% → 9.3%".
+      expect(visibleText(row)).toContain("Levered IRR 9.3%, as the model runs");
+      expect(visibleText(row)).not.toContain("→");
+      // The sample's five unchecked rows are one folded group at the end.
+      expect(visibleText(html)).toContain("5 assumptions unchecked: debt, rent growth, real estate taxes, insurance, the renovation premium");
+      expect(visibleText(html)).toContain("Read why (5)");
+      expect(html.indexOf('data-qa="stress-unchecked-group"')).toBeGreaterThan(html.indexOf('data-qa="stress-row-noi"'));
+      expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));
       expect(row).toContain('data-qa="stress-impact"');
       expect(data.stressTest!.rows.find((r) => r.key === "vacancy")!.evidence.some((e) => e.kind === "document" && e.publisher === "the deal's T-12")).toBe(true);
       expect(text).toContain("The screening model — the one the Excel workbook and the full report carry.");
