@@ -26,7 +26,8 @@ import {
   signalGoingInCap,
   unitCountRow,
 } from "@/lib/deal-strategy";
-import { type HeroFigure, buildingFacts, priceFigureOf } from "@/lib/hero-figure";
+import { type FigureHow, type HeroFigure, buildingFacts, priceFigureOf } from "@/lib/hero-figure";
+import { fitHow, heroHow } from "@/lib/hero-how";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { type MarketPicture, marketPictureFor } from "@/lib/market-picture";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -46,6 +47,9 @@ export interface HeaderChip {
   label: string;
   cls: string;
   note?: string;
+  /** how the chip is read, opened from it (lib/hero-how `fitHow`): the
+   *  buy-box fit's criteria and their lines */
+  how?: FigureHow;
 }
 
 /** Everything `DealHero` is handed but the picture's markup and the tools. */
@@ -102,8 +106,10 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
   const plan = planWithBasisChecked(extraction, strategy, planSummary(extraction, strategy));
   const summaryStrategy = strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction);
 
-  const summaryPrice = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(firstSignal);
-  const sizeSf = buildingSfRow(metrics)?.value ?? null;
+  const priceRow = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
+  const summaryPrice = priceRow?.value ?? signalAskPrice(firstSignal);
+  const sizeSfRow = buildingSfRow(metrics);
+  const sizeSf = sizeSfRow?.value ?? null;
   const sizeUnitsRow = unitCountRow(metrics);
   const sizeUnits = sizeUnitsRow?.value ?? null;
   const shownClass = shownAssetClass(input.storedAssetClass, extraction);
@@ -115,7 +121,8 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
         : sizeUnits
       : null) ??
     (firstSignal?.size.trim() || null);
-  const summaryCap = plan ? null : (findGoingInCap(metrics)?.value ?? signalGoingInCap(firstSignal)?.text ?? null);
+  const capRow = plan ? null : findGoingInCap(metrics);
+  const summaryCap = plan ? null : (capRow?.value ?? signalGoingInCap(firstSignal)?.text ?? null);
   const summaryYoc = plan?.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : null;
   const priceTag = interestTag(extraction, asOf);
 
@@ -123,11 +130,21 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
     `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
     summaryPrice ?? null,
   );
+  const capFigure = plan ? null : { ...goingInCapFigure(extraction, summaryCap ?? null, asOf), figure: true };
   const returnFigure: HeroFigure = plan
     ? plan.yieldWithheld && summaryYoc == null
       ? { label: "Yield on cost", value: "n/a", figure: true, title: plan.yieldWithheld }
       : { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
-    : { ...goingInCapFigure(extraction, summaryCap ?? null, asOf), figure: true };
+    : capFigure!;
+  const how = heroHow({
+    extraction,
+    strategy,
+    plan,
+    price: { row: priceRow, stated: summaryPrice ?? null, figure: priceFigure, tag: priceTag },
+    size: { sfRow: sizeSfRow, unitsRow: sizeUnitsRow, value: summarySize ?? null },
+    cap: capFigure ? { row: capRow, figure: capFigure } : null,
+    dealType: summaryStrategy ?? null,
+  });
 
   const boxRead = input.box
     ? buyBoxRead(input.storedAssetClass ?? "", dealCheckSource(extraction, firstSignal, input.address), input.box)
@@ -137,6 +154,7 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
         label: buyBoxChipText(boxRead.chip),
         cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone],
         ...(boxRead.chip.note ? { note: boxRead.chip.note } : {}),
+        how: fitHow(boxRead),
       }
     : null;
   const pill: HeaderChip | null = input.verdict ? { ...VERDICT_PILL[input.verdict.verdict] } : null;
@@ -150,10 +168,10 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
     fit,
     subtitle,
     figures: [
-      priceFigure,
-      { label: "Size", value: summarySize ?? null, figure: true },
-      returnFigure,
-      { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
+      { ...priceFigure, how: how.price },
+      { label: "Size", value: summarySize ?? null, figure: true, how: how.size },
+      { ...returnFigure, how: how.ret },
+      { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined, how: how.dealType },
     ],
     facts: buildingFacts(metrics, { screenYear: screenYearOf(extraction), notYetDelivered: notYetDelivered(strategy.kind) }),
     market: marketPictureFor(input.address, extraction?.market ?? null, input.placed, input.county),

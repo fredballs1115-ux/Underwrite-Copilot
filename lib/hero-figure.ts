@@ -14,6 +14,25 @@ export interface HeroFigure {
   /** hover text — the deal type's one-line summary, or a price range as
    *  the memorandum states it */
   title?: string;
+  /** how the figure was reached, opened from the tile's label (lib/hero-how
+   *  `heroHow`); absent, the label is plain text */
+  how?: FigureHow;
+}
+
+/**
+ * How a header figure is read, in words a person checks it against: where it
+ * comes from (the memorandum's row and its validated page, the first read, or
+ * what it is derived from), this deal's own inputs behind it as the readers
+ * state them, and what else the reading turns on. Plain strings, so the
+ * client tile that opens it loads no reader.
+ */
+export interface FigureHow {
+  /** where the figure comes from, in one sentence */
+  source: string;
+  /** this deal's own inputs, each as its reader states it */
+  inputs?: { label: string; value: string }[];
+  /** what else the reading turns on, a sentence each */
+  notes?: string[];
 }
 
 /**

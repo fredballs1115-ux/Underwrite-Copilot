@@ -297,7 +297,7 @@ describe("the going-in cap: the memorandum's, else the first signal's, withheld 
     );
     expect(capSlotWithheld(recap)).toBe("share");
     // The header (and the bar that repeats it), with its reason.
-    expect(goingInCapFigure(recap, "5.40%")).toEqual({ label: "Going-in cap", value: "n/a — share", title: SHARE_CAP_WORDS.title });
+    expect(goingInCapFigure(recap, "5.40%")).toEqual({ label: "Going-in cap", value: "n/a — share", title: SHARE_CAP_WORDS.title, provenance: "share" });
     // The card: no cap, and why.
     expect(pickSlots(recap, null)).toMatchObject({ cap: null, capWithheld: "share" });
     // The workbook's cell says so rather than a dash.

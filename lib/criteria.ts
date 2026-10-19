@@ -381,7 +381,7 @@ export function findPriceRow(
  * the mandate score and the market memory, so no surface can drift back to
  * reading a plan deal's yield on cost as the cap on the price.
  */
-export function findGoingInCap(metrics: MetricLike[]): MetricLike | null {
+export function findGoingInCap<M extends MetricLike>(metrics: readonly M[]): M | null {
   return (
     findMetric(metrics, METRIC_FIND.goingInCap.inc, METRIC_FIND.goingInCap.exc) ??
     findMetric(metrics, METRIC_FIND.capRate.inc, METRIC_FIND.capRate.exc)
@@ -958,11 +958,14 @@ export function basisWithheldWhy(ex: ExtractionLike | null | undefined, noun: st
   }
 }
 
-export function findMetric(
-  metrics: MetricLike[],
+// Generic over the row, so a caller that holds the extraction's rows gets
+// back the row itself — its page and its words — not a narrowed copy of its
+// type (the deal header cites the row a figure came from, lib/hero-how).
+export function findMetric<M extends MetricLike>(
+  metrics: readonly M[],
   include: RegExp,
   exclude?: RegExp,
-): MetricLike | null {
+): M | null {
   return (
     metrics.find(
       (m) => include.test(m.label) && !(exclude && exclude.test(m.label)),
@@ -1074,7 +1077,7 @@ export function parseSf(value: string): number | null {
  *  so a "Land SF" or "Average unit size" row ahead of "Total SF" never
  *  shadows it — or null. For surfaces that show the OM's own wording or
  *  cite its page. */
-export function buildingSfRow(metrics: MetricLike[]): MetricLike | null {
+export function buildingSfRow<M extends MetricLike>(metrics: readonly M[]): M | null {
   // A bare "Size" row on a deck that also states the lot — as an acreage
   // ("Acres: 12.5", "Site: 12.5 acres") or in square feet ("Lot size:
   // 544,500 SF") — is the land's when the two agree: 12.5 acres is 544,500

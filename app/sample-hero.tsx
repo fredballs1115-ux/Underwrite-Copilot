@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { DealHero } from "@/app/(app)/deals/[id]/deal-hero";
+import { HowChip } from "@/app/(app)/deals/[id]/figure-how";
 import { DEAL_TOOL_TITLE, DealTool } from "@/app/(app)/deals/[id]/header-tools";
 import { photographerParts } from "@/lib/credit-parts";
 import type { HeaderFacts } from "@/lib/sample-header";
@@ -45,11 +46,18 @@ export function SampleDealHero({
       chips={
         <>
           {call && stamp ? <span className="stamp-in inline-flex">{call}</span> : call}
-          {fit && (
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${fit.cls}`} title={fit.note}>
-              {fit.label}
-            </span>
-          )}
+          {fit &&
+            (fit.how ? (
+              <HowChip how={fit.how} label={fit.label}>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${fit.cls}`} title={fit.note}>
+                  {fit.label}
+                </span>
+              </HowChip>
+            ) : (
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${fit.cls}`} title={fit.note}>
+                {fit.label}
+              </span>
+            ))}
         </>
       }
       subtitle={header.subtitle}

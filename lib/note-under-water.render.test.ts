@@ -105,7 +105,7 @@ describe("a note under water (research pass 38, item 11)", () => {
 
   it("puts no yield in the cap slot: the deal header, the Model tab, the compare table, the card, its CSV and the meeting workbook", async () => {
     // The deal header and the bar that repeats it.
-    expect(goingInCapFigure(noteUnder, null, ASOF)).toEqual({ label: "Yield to maturity", value: "n/a — under water", title: UNDER_WATER_WORDS.title });
+    expect(goingInCapFigure(noteUnder, null, ASOF)).toEqual({ label: "Yield to maturity", value: "n/a — under water", title: UNDER_WATER_WORDS.title, provenance: "under_water" });
     expect(goingInCapFigure(noteCovered, null, ASOF).value).toMatch(/^\d+\.\d%$/);
     // The Model tab's read, and the compare table's.
     expect(modelReturnsRead(noteUnder, null, ASOF)).toMatchObject({ noteYtmPct: null, underWater: true, withheld: "note" });

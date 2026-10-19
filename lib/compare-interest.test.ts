@@ -121,12 +121,13 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
   });
 
   it("the header's slot: the stated cap on a building, the note's yield or the cap withheld on a note", () => {
-    expect(goingInCapFigure(deal(undefined, terms), "9.50%", AS_OF)).toEqual({ label: "Going-in cap", value: "9.50%" });
+    expect(goingInCapFigure(deal(undefined, terms), "9.50%", AS_OF)).toEqual({ label: "Going-in cap", value: "9.50%", provenance: "stated" });
     expect(goingInCapFigure(note, "9.50%", AS_OF)).toEqual({
       label: "Yield to maturity",
       value: `${compareInterest(note, null, AS_OF).noteYtmPct!.toFixed(1)}%`,
+      provenance: "note_yield",
     });
-    expect(goingInCapFigure(npl, "9.50%", AS_OF)).toEqual({ label: "Going-in cap", value: "n/a — note" });
+    expect(goingInCapFigure(npl, "9.50%", AS_OF)).toEqual({ label: "Going-in cap", value: "n/a — note", provenance: "note_withheld" });
   });
 
   it("the deal page's header reads the slot, and its leverage read never runs on a note's collateral cap", () => {
@@ -174,11 +175,11 @@ describe("a preferred equity position's going-in cap slot, and its model returns
     const slot = noteCapSlot(position, AS_OF);
     expect(slot?.of).toBe("position");
     expect(slot?.ytmPct).not.toBeNull();
-    expect(goingInCapFigure(position, "5.50%", AS_OF)).toEqual({ label: "Yield to redemption", value: `${slot!.ytmPct!.toFixed(1)}%` });
+    expect(goingInCapFigure(position, "5.50%", AS_OF)).toEqual({ label: "Yield to redemption", value: `${slot!.ytmPct!.toFixed(1)}%`, provenance: "position_yield" });
     // Past its redemption date there is no yield to state.
     const late = new Date("2029-08-01T12:00:00Z");
     expect(noteCapSlot(position, late)).toEqual({ ytmPct: null, of: "position" });
-    expect(goingInCapFigure(position, "5.50%", late)).toEqual({ label: "Going-in cap", value: "n/a — position" });
+    expect(goingInCapFigure(position, "5.50%", late)).toEqual({ label: "Going-in cap", value: "n/a — position", provenance: "position_withheld" });
   });
 
   it("withholds the model's returns as the building's, and says why", () => {
