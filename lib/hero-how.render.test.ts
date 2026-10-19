@@ -17,6 +17,9 @@ import type { HeroFigure } from "./hero-figure";
 import { PLAN_YOC_TITLE } from "./plan-facts";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { headerFacts, sampleHeader } from "./sample-header";
+import { buildManualExtraction, typedByHand } from "./manual-deal";
+import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
+import { fitHow } from "./hero-how";
 
 const AS_OF = new Date("2025-09-30T12:00:00Z");
 const m = (label: string, value: string, page = "") => ({ label, value, flagged: false, page });
@@ -87,7 +90,7 @@ describe("the deal header's figures say how each is read", () => {
     expect(yoc).toContain(PLAN_YOC_TITLE);
     // A count with no page says so, never a page made up.
     expect(p.get("Size")).toContain("“Units” row (page not located)");
-    expect(p.get("Deal type")).toContain("In its words Renovate 120 units");
+    expect(p.get("Deal type")).toContain("As the extraction summarises it Renovate 120 units");
   });
 
   it("a note: its yield to maturity in the cap's place, and where none stands the cap withheld, saying why", () => {
@@ -123,6 +126,59 @@ describe("the deal header's figures say how each is read", () => {
     const w = popovers(withheld).get("Going-in cap")!;
     expect(w).toContain("Withheld: no yield to maturity stands for this note.");
     expect(w).toContain(NOTE_CAP_TITLE);
+  });
+
+  it("a deal typed by hand: each figure is the field it was entered in, never a memorandum's row or page", () => {
+    const typed = buildManualExtraction({
+      name: "4-unit on Maple St",
+      assetClass: "multifamily",
+      market: "Woodbridge, VA",
+      address: "123 Maple St, Woodbridge, VA 22191",
+      price: 1_250_000,
+      capPct: 6.2,
+      noiAnnual: null,
+      units: 4,
+      sf: null,
+      occupancyPct: 100,
+      yearBuilt: 1968,
+      avgRentMo: 1_450,
+      notes: "",
+    });
+    expect(typedByHand(typed)).toBe(true);
+    const html = hero(figuresOf(typed));
+    clean(html);
+    const p = popovers(html);
+    expect(p.get("Price")).toBe("From the figures entered by hand: the “Asking price” field. As stated $1,250,000");
+    expect(p.get("Size")).toContain("From the figures entered by hand: the “Units” field.");
+    expect(p.get("Size")).toContain("No area was entered by hand");
+    expect(p.get("Going-in cap")).toContain("From the figures entered by hand: the “Going-in cap rate” field.");
+    expect(p.get("Deal type")).toContain("Inferred: no plan was entered by hand");
+    for (const words of p.values()) {
+      expect(words).not.toMatch(/memorandum/);
+      expect(words).not.toMatch(/page/);
+    }
+  });
+
+  it("a plan whose yield is not struck says what it needs, and why its price is withheld", () => {
+    const plan = ex([m("Asking price", "$18,500,000", "p. 4"), m("Units", "120")], {
+      strategy: { kind: "value_add", summary: "Renovate 120 units", capitalBudget: "", timeline: "" },
+    });
+    const p = popovers(hero(figuresOf(plan)));
+    expect(p.get("Yield on cost")).toContain(
+      "Not struck: the yield needs a stabilized NOI and a total cost (the price plus the budget), each the memorandum states.",
+    );
+  });
+
+  it("the fit's popover lists every criterion its count holds, the cash-on-cash floor included", () => {
+    const deal = ex([m("Asking price", "$20,000,000", "p. 2"), m("Units", "120", "p. 3")], {
+      strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+    });
+    const read = buyBoxRead("multifamily", dealCheckSource(deal, null, null), { assetClasses: ["multifamily"], minCapPct: 5, minCoCPct: 8 });
+    const how = fitHow(read);
+    const count = read.chip.label.match(/(\d+) of (\d+) checked/);
+    expect(count, read.chip.label).not.toBeNull();
+    expect(how.inputs!.length).toBe(Number(count![2]));
+    expect(how.inputs).toContainEqual({ label: "Cash-on-cash", value: "Could not be checked." });
   });
 
   it("a figure with no `how` keeps its plain label", () => {

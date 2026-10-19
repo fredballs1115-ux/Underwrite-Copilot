@@ -25,6 +25,7 @@ import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
 import { HowChip } from "./figure-how";
 import { fitHow, heroHow } from "@/lib/hero-how";
+import { typedByHand } from "@/lib/manual-deal";
 import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor, pictureIsCheckedMarket } from "@/lib/market-picture";
@@ -1413,6 +1414,7 @@ export default async function DealPage({
     size: { sfRow: sizeSfRow, unitsRow: sizeUnitsRow, value: summarySize ?? null },
     cap: capFigure ? { row: capRow, figure: capFigure } : null,
     dealType: summaryStrategy ?? null,
+    byHand: typedByHand(extraction),
   });
   const capWithheld = capSlotWithheld(extraction);
 

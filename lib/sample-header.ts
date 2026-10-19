@@ -28,6 +28,7 @@ import {
 } from "@/lib/deal-strategy";
 import { type FigureHow, type HeroFigure, buildingFacts, priceFigureOf } from "@/lib/hero-figure";
 import { fitHow, heroHow } from "@/lib/hero-how";
+import { typedByHand } from "@/lib/manual-deal";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { type MarketPicture, marketPictureFor } from "@/lib/market-picture";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -144,6 +145,7 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
     size: { sfRow: sizeSfRow, unitsRow: sizeUnitsRow, value: summarySize ?? null },
     cap: capFigure ? { row: capRow, figure: capFigure } : null,
     dealType: summaryStrategy ?? null,
+    byHand: typedByHand(extraction),
   });
 
   const boxRead = input.box
