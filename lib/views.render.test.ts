@@ -3727,7 +3727,7 @@ describe("News scored feed", () => {
     // within a day the scored story leads and the unscored one trails
     expect(text.indexOf("Rent cap bill")).toBeLessThan(text.indexOf("Local bakery"));
     expect(text).toContain("Re-run the Maryland deals");
-    expect(text).not.toContain("starts with the weekday sweep");
+    expect(text).not.toContain("fills in from the weekday sweep");
     // Whose read the scores are, said over the feed, never only in a
     // tooltip (the audit of 2026-10-19), and before the first story.
     expect(flat).toContain(
@@ -3753,7 +3753,8 @@ describe("News scored feed", () => {
   it("says the sweep has not run, in one quiet line, when there are no rows", () => {
     const html = render(React.createElement(ScoredFeedView, { items: [], alerts: [], wantSector: "" }));
     const text = visibleText(html);
-    expect(text).toContain("starts with the weekday sweep");
+    expect(text).toContain("fills in from the weekday sweep");
+    expect(text).not.toContain("GitHub");
     expect(text.replace(/\s+/g, " ")).toContain("every story rated 0–10 for a small East Coast buyer of 2–4 unit buildings");
     // no law strip, no sector chips, no day group — one line only
     expect(html).not.toContain("<section");

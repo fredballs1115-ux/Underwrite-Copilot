@@ -225,7 +225,7 @@ export function ScoredFeedView({
         // No box for what has not started: the headlines above are the
         // page; one quiet line says what the sweep will add.
         <p className="text-[12px] leading-relaxed text-muted">
-          {`The scored feed — every story rated 0–10 for ${SCORED_FOR}, law and rule changes flagged — starts with the weekday sweep once its GitHub secret is set. Until then the headlines above are the news, unscored.`}
+          {`The scored feed — every story rated 0–10 for ${SCORED_FOR}, law and rule changes flagged — fills in from the weekday sweep. Until it has run, the headlines above are the news, unscored.`}
         </p>
       ) : (
         <>
