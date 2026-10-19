@@ -16,6 +16,9 @@ import {
 import { PendingButton } from "../pending-button";
 import { GeoPicker } from "./geo-picker";
 import { coveredMarketGeoTargets } from "@/lib/market-match";
+// Each covered market's chip picture as plain data: the skyline table stays
+// on the server (lib/client-bundle-tables.test.ts).
+import { coveredMarketChipPictures } from "@/lib/geo-chip-pictures";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 import { pipelineCard, type PipelineCardRow } from "@/lib/pipeline-card";
 import { isOpenStage, normalizeStage } from "@/lib/stages";
@@ -372,7 +375,11 @@ export default async function CriteriaPage({
                     market, address, and county.
                   </p>
                   <div className="mt-2">
-                    <GeoPicker initial={geoTargets(box)} suggestions={coveredMarketGeoTargets()} />
+                    <GeoPicker
+                      initial={geoTargets(box)}
+                      suggestions={coveredMarketGeoTargets()}
+                      pictures={coveredMarketChipPictures()}
+                    />
                   </div>
                 </div>
               </div>
