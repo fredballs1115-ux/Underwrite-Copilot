@@ -400,6 +400,13 @@ describe("a 49% share", () => {
     expect(t.evidence[0]).toMatchObject({ label: "The bill the OM's own figures imply on the price", value: 517_007 });
     expect(t.evidence[0].text).toContain("on the $40.82M price is $517k a year");
   });
+
+  it("says the basis is struck on the whole the share's price implies, never the share's price over every unit", () => {
+    const b = rowOf(test, "basis");
+    expect(b.omSays).toEqual({ text: "$267k/unit (the whole the 49% share's $20,000,000 price implies, $40.82M, over 153 units)", value: 266_773, page: 5 });
+    // The model's price is the whole, not the building's as stated: no re-run.
+    expect(b.impact).toBeNull();
+  });
 });
 
 // ── A tax abatement ──────────────────────────────────────────────────────
@@ -769,6 +776,11 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(b.verdict).toBe("stretched");
     expect(b.impact!.input).toBe("purchasePrice");
     expect(b.impact!.altValue).toBeCloseTo((42_000_000 * 256_500) / 274_510, 0);
+    // The note names whose median the price is re-run at, and that the loan
+    // re-sizes with the price — the median is the comps', not "the OM's".
+    expect(b.impact!.note).toMatch(
+      /^If the price is the memorandum's sale comps' median, \$39\.24M \(\$257k\/unit\), at the model's loan-to-cost \(the loan re-sizes with the price\), not the OM's \$42M \(\$275k\/unit\), the levered IRR moves from/,
+    );
   });
 
   it("the office deal's vacancy and exit read the tracker as published figures, the metro's", () => {

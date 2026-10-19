@@ -1273,9 +1273,19 @@ function basisRow(ctx: Ctx): StressRow | null {
   }
   if (om == null && evidence.length === 0) return null;
   const withheld = basisWithheldOf(ctx.ex);
+  // The basis is the whole building's: on a share, the whole its price
+  // implies (lib/comp-detail's own rule), said so rather than the share's
+  // price over every unit.
+  const whole = interest.sharePct != null ? buildingPriceOf(ctx.ex, askingPriceOf(ctx.ex)) : null;
+  const over = per === "unit" ? `over ${unitCountFromMetrics(ctx.rows)?.toLocaleString("en-US") ?? "?"} ${words.noun?.many ?? "units"}` : `over ${buildingSfFromMetrics(ctx.rows)?.toLocaleString("en-US") ?? "?"} SF`;
+  const priced = priceRow
+    ? whole != null
+      ? ` (the whole the ${interest.sharePct}% share's ${priceRow.value} price implies, ${money(whole)}, ${over})`
+      : ` (${priceRow.label} ${priceRow.value} ${over})`
+    : "";
   const omSays: StressRow["omSays"] =
     om != null
-      ? { text: `${money(om)}${perWord}${priceRow ? ` (${priceRow.label} ${priceRow.value}${per === "unit" ? ` over ${unitCountFromMetrics(ctx.rows)?.toLocaleString("en-US") ?? "?"} ${words.noun?.many ?? "units"}` : ` over ${buildingSfFromMetrics(ctx.rows)?.toLocaleString("en-US") ?? "?"} SF`})` : ""}`, value: om, page: pageOf(priceRow, ctx.ex) }
+      ? { text: `${money(om)}${perWord}${priced}`, value: om, page: pageOf(priceRow, ctx.ex) }
       : { text: withheld ? `No basis is struck: ${withheld.why}.` : ctx.kind === "conversion" || ctx.kind === "development" ? "No price basis on a plan deal: the basis is the all-in cost." : NO_FIGURE(`price ${perWord}`), value: null, page: pageOf(priceRow, ctx.ex) };
   if (om == null) return unchecked("basis", omSays, evidence, omSays.text);
   const comparables = evidence.filter((e) => e.value != null);
@@ -1305,11 +1315,15 @@ function basisRow(ctx: Ctx): StressRow | null {
   if (ctx.derived && ctx.impactsWithheld == null && interest.sharePct == null) {
     const price = ctx.derived.inputs.purchasePrice;
     const altPrice = (price * best.value!) / om;
+    // Whose median the alternative is — the memorandum's comps', the
+    // recorded sales' or the reader's past screens' — and that the model's
+    // loan is a share of the price, so it re-sizes with it.
+    const median = best.kind === "om_internal" ? "the memorandum's sale comps' median" : best.label.startsWith("Recorded sales") ? `the recorded sales' median (${best.publisher})` : `${lowerFirst(best.label)}' median`;
     impact = runImpact("purchasePrice", ctx.derived.inputs, { ...ctx.derived.inputs, purchasePrice: altPrice }, evidenceIndex, price, altPrice, price, {
       what: "the price",
       om: `${money(price)} (${money(om)}${perWord})`,
-      alt: `${money(altPrice)} (${money(best.value!)}${perWord})`,
-      evidence: best.publisher,
+      alt: `${median}, ${money(altPrice)} (${money(best.value!)}${perWord}), at the model's loan-to-cost (the loan re-sizes with the price)`,
+      evidence: "",
       model: money(price),
     });
   }
