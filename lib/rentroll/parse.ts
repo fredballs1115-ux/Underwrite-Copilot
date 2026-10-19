@@ -42,7 +42,7 @@ export type Grid = (string | number | boolean | Date | null)[][];
  * a UTF-8 BOM, and CRLF line endings inside quoted fields.
  */
 export function parseCsv(text: string): Grid {
-  const src = text.replace(/^﻿/, "");
+  const src = text.replace(/^\uFEFF/, "");
   const rows: Grid = [];
   let row: (string | null)[] = [];
   let field = "";

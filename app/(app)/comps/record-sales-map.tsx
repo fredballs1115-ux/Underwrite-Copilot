@@ -251,7 +251,7 @@ export function DownloadSalesButton({ fileName, csv }: { fileName: string; csv: 
     <button
       type="button"
       onClick={() => {
-        const url = URL.createObjectURL(new Blob(["﻿" + csv()], { type: "text/csv;charset=utf-8" }));
+        const url = URL.createObjectURL(new Blob(["\uFEFF" + csv()], { type: "text/csv;charset=utf-8" }));
         const a = document.createElement("a");
         a.href = url;
         a.download = fileName;
