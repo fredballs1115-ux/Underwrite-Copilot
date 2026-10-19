@@ -254,6 +254,19 @@ export function middleText(r: MiddleRead, fmt: (n: number) => string): string | 
   }
 }
 
+/**
+ * The Go rate's tile figure: a share only on three calls or more (the
+ * median's floor, `MEDIAN_FLOOR`); under that the count itself, as the
+ * brokerage scorecard says its rates ("1 of 1", "1 of 2") — one Go on one
+ * call had read "100%", a portfolio's rate made of one deal. "—" with no
+ * call at all.
+ */
+export function goRateText(go: number, calls: number): string {
+  if (calls <= 0) return "—";
+  if (calls < MEDIAN_FLOOR) return `${go} of ${calls}`;
+  return `${Math.round((go / calls) * 100)}%`;
+}
+
 /** "3 deals parsed", "the one deal that parsed", "the two deals that
  *  parsed", "none parsed" — the count behind a read, said as what it is. */
 export function parsedPhrase(n: number): string {

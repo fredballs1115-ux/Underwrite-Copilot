@@ -6,6 +6,7 @@ import {
   analyticsScope,
   deriveAnalytics,
   fmtUsdCompact,
+  goRateText,
   middleRead,
   middleText,
   parsedPhrase,
@@ -118,10 +119,9 @@ export default async function AnalyticsPage() {
   // `isOpenStage`): a closed deal is counted as closed, never live.
   const counts = stageCounts(deals);
   const decided = deals.filter((d) => d.verdict !== null);
-  const goRate =
-    decided.length > 0
-      ? (decided.filter((d) => d.verdict === "pass").length / decided.length) * 100
-      : null;
+  // A share only on three calls or more; under that the count (lib/analytics
+  // `goRateText`, the scorecard's "1 of 2").
+  const goCount = decided.filter((d) => d.verdict === "pass").length;
   const capRead = middleRead(capPoints.map((p) => p.value));
   const unitRead = middleRead(unitPoints.map((p) => p.value));
 
@@ -226,7 +226,7 @@ export default async function AnalyticsPage() {
               },
               {
                 label: "Go rate",
-                value: goRate != null ? `${Math.round(goRate)}%` : "—",
+                value: goRateText(goCount, decided.length),
                 sub: `${decided.length} verdict${decided.length === 1 ? "" : "s"}`,
               },
             ].map((t) => (
