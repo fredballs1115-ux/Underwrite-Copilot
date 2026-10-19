@@ -132,6 +132,44 @@ export function toFactRows(dealId: string, facts: DealFact[]): DealFactRow[] {
   }));
 }
 
+/**
+ * Each extracted row's own citation, in the metrics' order (null where none
+ * is stored). Two rows may share a label — a cap rate in place and one pro
+ * forma, each on its own page — so a fact is matched by its label AND its
+ * value, never by the label alone, which handed the first row's page to
+ * both. The stored rows' order cannot break a tie (deal_facts' id is a
+ * random uuid), so rows sharing a label and a value share their facts'
+ * citation only where those facts agree on it; where they disagree, which
+ * page is whose is unknowable, and each reads "source not located" rather
+ * than a page that may be the other's. A row whose value is not among the
+ * facts takes the fact of its label only where that label is the only row
+ * and the only fact of its name.
+ */
+export function factsForMetrics(
+  metrics: ReadonlyArray<Pick<FactMetric, "label" | "value">>,
+  facts: readonly DealFact[],
+): (DealFact | null)[] {
+  const key = (label: string, value: string) => `${label}\u0000${value}`;
+  const byPair = new Map<string, DealFact[]>();
+  const byLabel = new Map<string, DealFact[]>();
+  for (const f of facts) {
+    byPair.set(key(f.field, f.value), [...(byPair.get(key(f.field, f.value)) ?? []), f]);
+    byLabel.set(f.field, [...(byLabel.get(f.field) ?? []), f]);
+  }
+  const rowsOfLabel = new Map<string, number>();
+  for (const m of metrics) rowsOfLabel.set(m.label, (rowsOfLabel.get(m.label) ?? 0) + 1);
+  const cite = (f: DealFact) => `${f.provenance}|${f.located}|${f.pageNumber}|${f.locatorSnippet ?? ""}|${f.docLabel}`;
+  return metrics.map((m) => {
+    const group = byPair.get(key(m.label, m.value));
+    if (group && group.length) {
+      if (group.every((f) => cite(f) === cite(group[0]))) return group[0];
+      return { ...group[0], located: false, pageNumber: null, locatorSnippet: null };
+    }
+    const named = byLabel.get(m.label) ?? [];
+    return named.length === 1 && rowsOfLabel.get(m.label) === 1 ? named[0] : null;
+  });
+}
+
 /** Parse a deal_facts DB row back into a DealFact for the UI. */
 export function parseFactRow(row: Record<string, unknown>): DealFact {
   return {

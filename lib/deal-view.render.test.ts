@@ -44,6 +44,7 @@ import { modelReturnsRead } from "@/lib/compare-interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { buyBoxRead } from "@/lib/buy-box-chip";
 import { deriveRisks, TermsView } from "@/app/(app)/deals/[id]/deal-sections";
+import { buildDealFacts } from "@/lib/facts";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
 import { SIZER_LENDER_TESTS, modelLoanCoverageLine } from "@/lib/sizer-terms";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
@@ -2246,5 +2247,17 @@ describe("the extracted terms' pages (lib/facts' absolute rule)", () => {
     // No length known: no page validated, none printed.
     const unknown = textOf(renderToStaticMarkup(React.createElement(TermsView, { result: ex([{ label: "NOI", value: "$720,000", page: "p. 4" }]) })));
     expect(unknown).not.toContain("p. 4");
+  });
+
+  it("gives two cards sharing a label their own page chips", () => {
+    const metrics = [
+      { label: "Cap rate", value: "5.50%", page: "p. 4" },
+      { label: "Cap rate", value: "6.25%", page: "p. 31" },
+    ];
+    const facts = buildDealFacts(metrics, 48).reverse();
+    const html = renderToStaticMarkup(React.createElement(TermsView, { result: ex(metrics, 48), facts, omUrl: "/api/deals/x/om" }));
+    expect(html).toContain('href="/api/deals/x/om#page=4"');
+    expect(html).toContain('href="/api/deals/x/om#page=31"');
+    expect(a11yIssues(html)).toEqual([]);
   });
 });

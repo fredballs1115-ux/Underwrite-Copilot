@@ -1129,13 +1129,11 @@ export default async function DealPage({
     }
   }
 
-  // Citation facts, keyed by field label for the source chips (Feature 2).
+  // Citation facts for the source chips (Feature 2), every row: the terms
+  // match each to its own extracted row by label and value (lib/facts
+  // `factsForMetrics`), so two rows sharing a label keep their own pages.
   // Empty for deals screened before migration 0018 — no chips, never faked.
-  const factsByField: Record<string, DealFact> = {};
-  for (const row of (factsRes.data ?? []) as Record<string, unknown>[]) {
-    const f = parseFactRow(row);
-    if (!(f.field in factsByField)) factsByField[f.field] = f;
-  }
+  const dealFacts: DealFact[] = ((factsRes.data ?? []) as Record<string, unknown>[]).map(parseFactRow);
   // The shared price reader; on a development with no asking price the land
   // or site cost is what is being bought. Before the extraction lands the
   // first signal's ask fills the slot — only when it is a figure, never an
@@ -1926,7 +1924,7 @@ export default async function DealPage({
         internalCompsUnread={internalCompsUnread}
         internalCompRanges={internalCompRanges}
         omUrl={omUrl}
-        facts={factsByField}
+        facts={dealFacts}
         discrepancies={
           ((deal as { discrepancies?: ReconcileResult | null }).discrepancies) ?? null
         }

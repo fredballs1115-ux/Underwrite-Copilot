@@ -4,6 +4,7 @@ import {
   deriveUnit,
   confidenceFor,
   buildDealFacts,
+  factsForMetrics,
   type FactMetric,
 } from "./facts";
 import { citablePageCount, countPdfPages } from "./pdf";
@@ -155,6 +156,35 @@ describe("citablePageCount — the length a cited page is held to without a read
     // A stored count that is no count is none.
     expect(citablePageCount(0, 12)).toBe(12);
     expect(citablePageCount(Number.NaN, null)).toBeNull();
+  });
+});
+
+describe("factsForMetrics — each row its own citation", () => {
+  const row = (label: string, value: string, page: string): FactMetric => ({ label, value, page });
+
+  it("gives two rows sharing a label their own pages, whichever order the facts come back in", () => {
+    const metrics = [row("Cap rate", "5.50%", "p. 4"), row("Cap rate", "6.25%", "p. 31"), row("NOI", "$720,000", "p. 12")];
+    const facts = buildDealFacts(metrics, 48);
+    for (const order of [facts, [...facts].reverse()]) {
+      expect(factsForMetrics(metrics, order).map((f) => f?.pageNumber)).toEqual([4, 31, 12]);
+    }
+  });
+
+  it("refuses to guess between facts of one label and value that disagree on the page", () => {
+    const metrics = [row("Occupancy", "95%", "p. 4"), row("Occupancy", "95%", "p. 20")];
+    const got = factsForMetrics(metrics, buildDealFacts(metrics, 48));
+    expect(got.map((f) => f?.located)).toEqual([false, false]);
+    expect(got.map((f) => f?.pageNumber)).toEqual([null, null]);
+    // Agreeing facts are one citation, shared.
+    const same = [row("Occupancy", "95%", "p. 4"), row("Occupancy", "95%", "p. 4")];
+    expect(factsForMetrics(same, buildDealFacts(same, 48)).map((f) => f?.pageNumber)).toEqual([4, 4]);
+  });
+
+  it("matches a row whose value moved only where its label is the only one of its name", () => {
+    const facts = buildDealFacts([row("NOI", "$720,000", "p. 12"), row("Cap rate", "5.50%", "p. 4"), row("Cap rate", "6.25%", "p. 31")], 48);
+    const now = [row("NOI", "$725,000", "p. 12"), row("Cap rate", "5.75%", "p. 4"), row("Cap rate", "6.25%", "p. 31")];
+    expect(factsForMetrics(now, facts).map((f) => f?.pageNumber ?? null)).toEqual([12, null, 31]);
+    expect(factsForMetrics(now, [])).toEqual([null, null, null]);
   });
 });
 

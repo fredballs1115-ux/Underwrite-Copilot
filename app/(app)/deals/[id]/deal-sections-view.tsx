@@ -32,7 +32,7 @@ import { LISTING_NOT_SALE, saysListing } from "@/lib/web-comp-read";
 import { gapDisagreementLine, gapScale, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { basePosition, firstNumber, rangeInOrder } from "@/lib/verdict-range";
-import { locatedPage, type DealFact } from "@/lib/facts";
+import { factsForMetrics, locatedPage, type DealFact } from "@/lib/facts";
 import { useToast } from "../../toaster";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type {
@@ -82,19 +82,26 @@ export { EmptyState, OverviewView, deriveRisks } from "./deal-sections-base";
 
 export function TermsView({
   result,
-  facts = {},
+  facts = [],
   omUrl = null,
 }: {
   result: ExtractionResult;
-  facts?: Record<string, DealFact>;
+  /** the deal's stored citations (deal_facts), each matched to its own
+   *  row by label and value (lib/facts `factsForMetrics`) */
+  facts?: readonly DealFact[];
   omUrl?: string | null;
 }) {
+  // Each row's own citation: two rows sharing a label get their own pages.
+  const matched = factsForMetrics(result.metrics, facts);
+  const factOf = new Map(result.metrics.map((m, i) => [m, matched[i]] as const));
   // Surface flagged + first figures; collapse the long tail.
   const ordered = [
     ...result.metrics.filter((m) => m.flagged),
     ...result.metrics.filter((m) => !m.flagged),
   ];
-  const cards = ordered.map((m, i) => (
+  const cards = ordered.map((m, i) => {
+    const fact = factOf.get(m) ?? null;
+    return (
     <div
       key={i}
       className={`rounded-xl bg-surface p-4 shadow-sm transition-shadow hover:shadow-md ${
@@ -130,9 +137,9 @@ export function TermsView({
       <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
         {m.value}
       </p>
-      {facts[m.label] ? (
+      {fact ? (
         <p className="mt-2 leading-none">
-          <SourceChip fact={facts[m.label]} omUrl={omUrl} />
+          <SourceChip fact={fact} omUrl={omUrl} />
         </p>
       ) : (
         // Deals screened before citations (migration 0018) keep a plain page
@@ -144,7 +151,8 @@ export function TermsView({
         })()
       )}
     </div>
-  ));
+    );
+  });
 
   const INITIAL = 8;
   const [open, setOpen] = useState(false);

@@ -304,7 +304,7 @@ export function DealView({
   internalCompsUnread = false,
   internalCompRanges = [],
   omUrl,
-  facts = {},
+  facts = [],
   discrepancies = null,
   notes = [],
   userEmail = null,
@@ -411,7 +411,7 @@ export function DealView({
    *  (lib/comp-range), drawn under the block's lead; none draws none */
   internalCompRanges?: RangeTrack[];
   omUrl: string | null;
-  facts?: Record<string, DealFact>;
+  facts?: readonly DealFact[];
   discrepancies?: ReconcileResult | null;
   notes?: DealNote[];
   userEmail?: string | null;
@@ -981,7 +981,7 @@ function FinancialsPanel({
   isPro,
   downloadsOpen = isPro,
   supplement,
-  facts = {},
+  facts = [],
   omUrl = null,
   underwrite = null,
   underwriteSources = null,
@@ -1008,7 +1008,7 @@ function FinancialsPanel({
    *  (lib/sample-exports) */
   downloadsOpen?: boolean;
   supplement: TabSupplement | undefined;
-  facts?: Record<string, DealFact>;
+  facts?: readonly DealFact[];
   omUrl?: string | null;
   underwrite?: UnderwriteInputs | null;
   underwriteSources?: PlaygroundData["sources"];
