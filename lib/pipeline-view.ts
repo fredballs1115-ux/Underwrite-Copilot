@@ -9,28 +9,47 @@
 // the cards whatever the reader had chosen. Nothing failed; the choice was
 // silently never read. Both sides import this module now.
 
-/** Photograph-led cards (#428), the dense list, or every deal on one map
- *  (#431). */
-export type PipelineView = "cards" | "list" | "map";
+import { STAGES, type Stage } from "./stages";
 
-/** The cookie that remembers the cards or the list, so the server draws
- *  the view the reader left — no flash of another on the next visit. */
+/** Photograph-led cards (#428), the dense list, every deal on one map
+ *  (#431), or the board: a column a stage, the deals as compact cards. */
+export type PipelineView = "cards" | "list" | "map" | "board";
+
+/** The cookie that remembers the cards, the list or the board, so the
+ *  server draws the view the reader left — no flash of another on the next
+ *  visit. */
 export const PIPELINE_VIEW_COOKIE = "uc_pipeline_view";
 
 /**
- * The view the page opens on: the list where the reader chose it, the cards
- * otherwise — never the map (#438). The pipeline's main view is its
- * pictures; the map is opened for a visit, and a map remembered from one
- * visit would greet the reader on every one after it.
+ * The view the page opens on: the list or the board where the reader chose
+ * it, the cards otherwise — never the map (#438). The pipeline's main view
+ * is its pictures; the map is opened for a visit, and a map remembered from
+ * one visit would greet the reader on every one after it.
  */
 export function landingView(cookie: string | null | undefined): PipelineView {
-  return cookie === "list" ? "list" : "cards";
+  return cookie === "list" || cookie === "board" ? cookie : "cards";
 }
 
-/** Whether a chosen view is remembered: the cards and the list are, the map
- *  is not. */
+/** Whether a chosen view is remembered: the cards, the list and the board
+ *  are, the map is not. The board is remembered by the list's reasoning,
+ *  not the map's: it is a way of working the whole pipeline — every deal,
+ *  each moved along its stages from where it sits — that a reader who
+ *  chooses it works in visit after visit, where the map is a look at where
+ *  the deals are, taken for a visit. */
 export function remembersView(view: PipelineView): boolean {
   return view !== "map";
+}
+
+/**
+ * The board's columns, in ladder order (lib/stages): every live stage and
+ * Closed after them, each drawn even when empty so a deal can be moved
+ * there; Dead only where the dead filter shows it — its toggle, or the
+ * stage filter set to Dead. A stage filter draws its own column alone, as
+ * the cards and the list draw its section alone.
+ */
+export function boardColumns({ stageFilter, showDead }: { stageFilter: string; showDead: boolean }): Stage[] {
+  if ((STAGES as readonly string[]).includes(stageFilter)) return [stageFilter as Stage];
+  return STAGES.filter((s) => s !== "dead" || showDead);
 }
 
 /** What the phone's folded filters say (research pass 29): "Filters", and

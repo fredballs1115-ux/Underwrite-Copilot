@@ -70,7 +70,7 @@ const TILE_CALL: Record<string, string> = {
   pass_on: "bg-kill text-white",
 };
 
-function TileCall({ d }: { d: DealCard }) {
+export function TileCall({ d }: { d: DealCard }) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
   const pill = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none shadow-sm";
   if (d.jobStatus === "failed") {

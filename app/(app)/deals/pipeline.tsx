@@ -38,7 +38,8 @@ import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
-import { PIPELINE_CARD_GRID, PIPELINE_VIEW_COOKIE, filtersFoldLabel, remembersView, type PipelineView } from "@/lib/pipeline-view";
+import { PipelineBoard } from "./pipeline-board";
+import { PIPELINE_CARD_GRID, PIPELINE_VIEW_COOKIE, boardColumns, filtersFoldLabel, remembersView, type PipelineView } from "@/lib/pipeline-view";
 import { ManualDealForm } from "./manual-deal-form";
 import { useKeepShownOrder, usePipelineKeys } from "./pipeline-keys";
 import { FileDrop } from "../file-drop";
@@ -359,7 +360,8 @@ export function Pipeline({
   const [view, setViewState] = useState<PipelineView>(initialView);
   const setView = useCallback((v: PipelineView) => {
     setViewState(v);
-    // Only the cards or the list is remembered: the map is for this visit.
+    // The cards, the list or the board is remembered: the map is for this
+    // visit (lib/pipeline-view `remembersView`).
     if (!remembersView(v)) return;
     try {
       document.cookie = `${PIPELINE_VIEW_COOKIE}=${v}; path=/; max-age=31536000; samesite=lax`;
@@ -376,7 +378,7 @@ export function Pipeline({
   // pipeline's deals or the reader's own the team does not see
   // (lib/personal-deal); and whether dead deals, kept out of the pipeline
   // until asked for (or filtered to), are shown. Never the view: the cards,
-  // the list or the map is the reader's cookie.
+  // the list, the board or the map is the reader's cookie.
   const [filterQuery, setFilterQuery] = useFilterQuery(filterQueryProp);
   const filterOptions = useMemo<FilterOptions>(
     () => ({
@@ -1256,7 +1258,19 @@ export function Pipeline({
               onToggle={toggleSelected}
             />
           )}
-          {view !== "map" && (
+          {view === "board" && (
+            // A column a stage (pipeline-board.tsx), the same rows grouped
+            // as the sections below group them.
+            <PipelineBoard
+              columns={boardColumns({ stageFilter: stage, showDead }).map((s) => ({ stage: s, deals: groups.get(s) ?? [] }))}
+              compareMode={compareMode}
+              selected={selected}
+              onToggle={toggleSelected}
+              todayIso={todayIso}
+              stageControl={tileStage}
+            />
+          )}
+          {(view === "cards" || view === "list") && (
           <div>
             {/* One header row labels the columns for every group — each label
                 is a sort control (sorting applies within each stage group).
@@ -2133,8 +2147,8 @@ const DealRow = memo(function DealRow({
   );
 });
 
-/** The two views as one control: an icon and a word each, the current one
- *  pressed. */
+/** The views as one control — the cards, the list, the board and the map:
+ *  an icon and a word each, the current one pressed. */
 function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: PipelineView) => void }) {
   const opt = (v: PipelineView, label: string, icon: ReactNode) => (
     <button
@@ -2166,6 +2180,15 @@ function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: Pipe
         "List",
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
           <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+        </svg>,
+      )}
+      {opt(
+        "board",
+        "Board",
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+          <rect x="3" y="3" width="5" height="18" rx="1.5" />
+          <rect x="9.5" y="3" width="5" height="12" rx="1.5" />
+          <rect x="16" y="3" width="5" height="8" rx="1.5" />
         </svg>,
       )}
       {opt(

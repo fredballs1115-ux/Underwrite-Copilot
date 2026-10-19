@@ -171,7 +171,7 @@ export default async function DealsPage({
   }
 
   // The card view's pictures (#428): the reader's choice of view from its
-  // cookie — the cards or the list, never the map (#438) — and whether
+  // cookie — the cards, the list or the board, never the map (#438) — and whether
   // Street View can be tried at all.
   const initialView = landingView((await cookies()).get(PIPELINE_VIEW_COOKIE)?.value);
   const googleEnabled = !!process.env.GOOGLE_MAPS_API_KEY;

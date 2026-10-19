@@ -207,8 +207,8 @@ describe("the pipeline marks each deal's own control for j and k", () => {
   const render = (over: object) =>
     renderToStaticMarkup(React.createElement(ToastProvider, null, React.createElement(Pipeline, { ...props, ...over })));
 
-  it("one link a card and a row, in the order shown — a dead deal only once asked for", () => {
-    for (const initialView of ["cards", "list"] as const) {
+  it("one link a card, a row and a board card, in the order shown — a dead deal only once asked for", () => {
+    for (const initialView of ["cards", "list", "board"] as const) {
       const html = render({ initialView });
       const navs = [...html.matchAll(/<a\b[^>]*data-deal-nav="[^"]*"[^>]*>/g)].map((m) => m[0].match(/href="\/deals\/([^"]+)"/)?.[1]);
       expect(navs, initialView).toEqual(["a", "b"]);
