@@ -94,7 +94,7 @@ import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { VENDORED_LEGEND, ensureFloodFrame, floodLegend } from "@/lib/flood-map";
-import { FLOOD_FRAME_VERSION, floodFrameCurrent, pointKey } from "@/lib/flood-frame-core";
+import { floodFrameCurrent, floodFrameStem } from "@/lib/flood-frame-core";
 import { floodClassOfZone } from "@/lib/flood-style";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
@@ -1525,7 +1525,7 @@ export default async function DealPage({
               flood={
                 floodStreet && !floodArea
                   ? {
-                      src: `/api/deals/${id}/flood?v=${FLOOD_FRAME_VERSION}.${knownPoint ? pointKey(knownPoint) : "0"}`,
+                      src: floodFrameStem(id, knownPoint),
                       classes: floodFrame ? { page: floodFrame.classes.page, full: floodFrame.classes.full } : null,
                       here:
                         siteFlags?.flood && siteFlags.flood !== "unavailable"
@@ -1951,7 +1951,24 @@ export default async function DealPage({
           today={todayIso}
           dbMarketsLine={compsDbMarketsLine}
         />
-        <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} today={todayIso} />
+        <SiteFlagsCard
+          result={siteFlags}
+          hasAddress={!!dealAddress?.label}
+          today={todayIso}
+          // The Flood view's own frame, small, beside the chip — only where
+          // the header draws a Flood view and the frame is drawn already, so
+          // the thumbnail never waits on a draw it cannot retry.
+          floodFrame={
+            floodStreet && !floodArea && floodFrame
+              ? {
+                  stem: floodFrameStem(id, knownPoint),
+                  label: dealAddress?.label ?? "",
+                  ring: pointIsBuilding(visualCache, dealAddress),
+                  osmPlaced: placedByOpenStreetMap(visualCache, dealAddress),
+                }
+              : null
+          }
+        />
         <PublicRecordCard
           address={dealAddress}
           market={placement.briefed}
