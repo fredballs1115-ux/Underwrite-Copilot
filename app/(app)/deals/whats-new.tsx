@@ -7,12 +7,12 @@ import { shortDay } from "@/lib/short-day";
  *  data, no dismissal state to manage: it stays small and stays honest. */
 export function WhatsNewCard({
   limit = 3,
-  today = new Date().toISOString().slice(0, 10),
+  today,
 }: {
   limit?: number;
-  /** the reader's day (lib/reader-day), so an entry from another year says
-   *  its year (lib/short-day) */
-  today?: string;
+  /** the reader's day (lib/reader-day), read once by the page, so an entry
+   *  from another year says its year (lib/short-day) */
+  today: string;
 }) {
   const entries = changelogEntries(limit);
   if (entries.length === 0) return null;
