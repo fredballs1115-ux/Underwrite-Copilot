@@ -1,6 +1,7 @@
 // The team page, rendered on fixtures, its reads faked and its markup
 // linted: what it says about the plan's renewal, the seat count and what a
 // teammate sees, each held to the code behind it.
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TeamInfo } from "./teams";
@@ -83,6 +84,19 @@ describe("the team's renewal", () => {
     expect((await page()).text).toContain("renews October 31, 2026.");
     state.tz = "Europe/London";
     expect((await page()).text).toContain("renews November 1, 2026.");
+  });
+});
+
+describe("what a teammate sees", () => {
+  it("never promises the Pro exports on the free trial", async () => {
+    // lib/billing: Pro features are a personal Pro or an ACTIVE team plan.
+    const billing = readFileSync("lib/billing.ts", "utf8");
+    expect(billing).toContain("isPro: personalPro || (team?.active ?? false),");
+    state.team = null;
+    const { text } = await page();
+    expect(text).toContain("Everyone on the team sees the shared pipeline — its deals and their verdicts.");
+    expect(text).toContain("On the free trial, the memo, the report and the Excel models stay Pro.");
+    expect(text).not.toMatch(/sees the shared pipeline[^.]*memos/);
   });
 });
 

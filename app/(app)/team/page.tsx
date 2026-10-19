@@ -170,9 +170,11 @@ export default async function TeamPage({
             </h2>
             <ul className="mt-3 space-y-2 text-sm text-muted">
               {[
-                "Everyone on the team sees the shared pipeline — its deals, verdicts, models, and memos.",
+                "Everyone on the team sees the shared pipeline — its deals and their verdicts.",
                 `Up to ${TEAM_TRIAL_DEALS} shared deals are free to try. Past that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
-                "The Team plan unlocks everything in Pro for every member.",
+                // The exports are Pro-gated (lib/billing isPro: a personal
+                // Pro or an ACTIVE team plan), so a trial gives them to no one.
+                "The Team plan unlocks everything in Pro for every member. On the free trial, the memo, the report and the Excel models stay Pro.",
                 "Joining is one click on an invite link. You can be on one team at a time.",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2.5">
