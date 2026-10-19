@@ -45,7 +45,7 @@ export async function* csvObjects(
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   let header: string[] | null = null;
   for await (const raw of rl) {
-    const line = raw.replace(/^﻿/, "");
+    const line = raw.replace(/^\uFEFF/, "");
     if (!line.trim()) continue;
     const fields = parseCsvLine(line);
     if (!header) {

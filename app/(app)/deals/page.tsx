@@ -20,6 +20,7 @@ import { countsForFirms, shownInList } from "@/lib/pipeline-counts";
 import { PRIOR_PRICE_COLUMNS, priorScreenOfColumns, type PriorPriceColumns } from "@/lib/price-change";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
+import { filterQueryOf } from "@/lib/pipeline-filters";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import type { DealVisualCache } from "@/lib/deal-location";
@@ -72,9 +73,15 @@ export default async function DealsPage({
     new?: string;
     addr?: string;
     broker?: string;
+    // The pipeline's filters (lib/pipeline-filters `FILTER_PARAMS`).
+    [filter: string]: string | string[] | undefined;
   }>;
 }) {
-  const { error: errorCode, deleted, joined, new: newParam, addr, broker } = await searchParams;
+  const params = await searchParams;
+  const { error: errorCode, deleted, joined, new: newParam, addr, broker } = params;
+  // The filters a link carries, so the server's HTML opens on them; each is
+  // held to what the list can show by the pipeline itself.
+  const filterQuery = filterQueryOf(params);
   // Pull Comps hand-off: a structured address arrives as ?addr=<json> and
   // opens the new-deal form on the manual tab with the address pre-picked.
   const prefillAddress = parseStructuredAddress(addr ?? "");
@@ -164,7 +171,7 @@ export default async function DealsPage({
   }
 
   // The card view's pictures (#428): the reader's choice of view from its
-  // cookie — the cards or the list, never the map (#438) — and whether
+  // cookie — the cards, the list or the board, never the map (#438) — and whether
   // Street View can be tried at all.
   const initialView = landingView((await cookies()).get(PIPELINE_VIEW_COOKIE)?.value);
   const googleEnabled = !!process.env.GOOGLE_MAPS_API_KEY;
@@ -380,6 +387,7 @@ export default async function DealsPage({
             : null
         }
         initialView={initialView}
+        filterQuery={filterQuery}
         viewerId={user?.id ?? null}
         onTeam={!!billing?.team}
         todayIso={todayIso}

@@ -21,6 +21,9 @@ import { rentRollDateWords, t12DateWords, type ActualsRead } from "@/lib/actuals
 
 /** What the sample's OM row says in place of a file. */
 export const SAMPLE_OM_WORDS = "none — the sample's memorandum is fictional";
+/** What it says on a public page, where the fictional memorandum opens
+ *  (app/api/demo/om). */
+export const SAMPLE_OM_FILE_WORDS = "fictional, made up for the sample";
 /** What the sample's rent roll and T-12 rows say in place of a link. */
 export const SAMPLE_ACTUALS_WORDS = "read into the sample — no file to open";
 
@@ -144,7 +147,7 @@ export function SourceDocumentsView({
               href={omUrl}
               target="_blank"
               rel="noopener noreferrer"
-              title="Opens the uploaded OM"
+              title={sample ? "Opens the sample's fictional memorandum" : "Opens the uploaded OM"}
               className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
             >
               View
@@ -152,7 +155,9 @@ export function SourceDocumentsView({
           )}
           {omActions}
           {!hasOm && !typedFacts && (
-            <span className="text-xs text-muted">{sample ? SAMPLE_OM_WORDS : "none uploaded"}</span>
+            <span className="text-xs text-muted">
+              {sample ? (omUrl ? SAMPLE_OM_FILE_WORDS : SAMPLE_OM_WORDS) : "none uploaded"}
+            </span>
           )}
         </li>
         {actuals?.rentRoll && (

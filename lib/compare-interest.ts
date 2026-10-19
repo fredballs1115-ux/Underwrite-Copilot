@@ -387,16 +387,34 @@ export function goingInCapFigure(
   ex: ExtractionResult | null | undefined,
   statedCap: string | null,
   asOf: Date = new Date(),
-): { label: string; value: string | null; title?: string } {
+): { label: string; value: string | null; title?: string; provenance: CapSlotProvenance } {
   const own = noteCapSlot(ex, asOf);
   if (!own) {
     return capSlotWithheld(ex) === "share"
-      ? { label: "Going-in cap", value: SHARE_CAP_WORDS.na, title: SHARE_CAP_WORDS.title }
-      : { label: "Going-in cap", value: statedCap };
+      ? { label: "Going-in cap", value: SHARE_CAP_WORDS.na, title: SHARE_CAP_WORDS.title, provenance: "share" }
+      : { label: "Going-in cap", value: statedCap, provenance: "stated" };
   }
-  if (own.underWater) return { label: UNDER_WATER_WORDS.label, value: UNDER_WATER_WORDS.na, title: UNDER_WATER_WORDS.title };
+  if (own.underWater) {
+    return { label: UNDER_WATER_WORDS.label, value: UNDER_WATER_WORDS.na, title: UNDER_WATER_WORDS.title, provenance: "under_water" };
+  }
   const words = OWN_YIELD_WORDS[own.of];
   return own.ytmPct != null
-    ? { label: words.label, value: ownYieldText(own.ytmPct) }
-    : { label: "Going-in cap", value: words.na };
+    ? { label: words.label, value: ownYieldText(own.ytmPct), provenance: own.of === "note" ? "note_yield" : "position_yield" }
+    : { label: "Going-in cap", value: words.na, provenance: own.of === "note" ? "note_withheld" : "position_withheld" };
 }
+
+/**
+ * Where the header's cap slot came from (`goingInCapFigure`), so the slot's
+ * "how this is read" says it without reading the slot again (lib/hero-how):
+ * the cap as handed in ("stated" — the memorandum's row, else the first
+ * read's, else none); a note's or a position's own yield at its price, or
+ * that none stands; a note under water; a share whose cap is withheld.
+ */
+export type CapSlotProvenance =
+  | "stated"
+  | "note_yield"
+  | "position_yield"
+  | "note_withheld"
+  | "position_withheld"
+  | "under_water"
+  | "share";

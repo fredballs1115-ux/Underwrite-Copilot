@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { MarketNavEntry } from "@/lib/market-match";
 import { asksServer, paletteCall, paletteMoreLine, uniqueById, type PaletteRun } from "@/lib/palette-search";
 import { DealAvatar } from "./deal-avatar";
+import { SHORTCUTS, SHORTCUT_SEARCH } from "@/lib/shortcuts";
 
 /** How long typing rests before the server is asked for every deal whose
  *  name holds the query. */
@@ -32,7 +33,33 @@ type Item = {
   group: "deals" | "actions";
   /** extra matchable text (address, document filenames) beyond label+hint */
   search?: string;
+  /** done in place of going to `href` (the shortcuts sheet opens over the
+   *  page the reader is on) */
+  run?: () => void;
 };
+
+/** The shortcuts sheet's row in the palette: every shortcut's words are its
+ *  search text (lib/shortcuts), so "next deal" finds it. */
+function shortcutsItem(run: () => void): Item {
+  return {
+    key: "a-shortcuts",
+    label: "Keyboard shortcuts",
+    // The one-key shortcuts themselves: "? / n j k [ ]".
+    hint: SHORTCUTS.map((s) => s.keys.join(""))
+      .filter((k) => k.length === 1)
+      .join(" "),
+    href: "#",
+    group: "actions",
+    search: SHORTCUT_SEARCH,
+    run,
+    icon: (
+      <ActionIcon>
+        <rect x="2" y="6" width="20" height="12" rx="2" />
+        <path d="M6 10h0M10 10h0M14 10h0M18 10h0M8 14h8" />
+      </ActionIcon>
+    ),
+  };
+}
 
 function ActionIcon({ children }: { children: React.ReactNode }) {
   return (
@@ -234,11 +261,15 @@ export function CommandPalette({
   open,
   onOpenChange,
   markets = [],
+  onShowShortcuts,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** slim covered-market list, built server-side (lib/market-match) */
   markets?: MarketNavEntry[];
+  /** opens the keyboard shortcuts sheet (the app shell's); the palette
+   *  lists it among the actions where it is given */
+  onShowShortcuts?: () => void;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -372,12 +403,13 @@ export function CommandPalette({
         </ActionIcon>
       ),
     }));
-    const all = [...dealItems, ...ACTIONS, ...marketItems];
+    const shortcuts = onShowShortcuts ? [shortcutsItem(onShowShortcuts)] : [];
+    const all = [...dealItems, ...ACTIONS, ...shortcuts, ...marketItems];
     if (!q) return all;
     return all.filter((i) =>
       (i.search ?? `${i.label} ${i.hint}`).toLowerCase().includes(q),
     );
-  }, [deals, found, markets, query]);
+  }, [deals, found, markets, query, onShowShortcuts]);
 
   // Clamp instead of a state-syncing effect: as the filter narrows, the
   // highlighted row is derived from the raw index, never reset via setState.
@@ -386,6 +418,10 @@ export function CommandPalette({
 
   function go(item: Item) {
     onOpenChange(false);
+    if (item.run) {
+      item.run();
+      return;
+    }
     // "New deal…" carries a fresh nonce each time so re-selecting it re-opens
     // the form even when ?new= is already in the URL.
     router.push(item.key === "a-new" ? `/deals?new=${Date.now()}` : item.href);
@@ -564,6 +600,12 @@ export function CommandPalette({
             <kbd className="rounded border border-line bg-surface px-1">esc</kbd>{" "}
             close
           </span>
+          {onShowShortcuts ? (
+            <span className="ml-auto">
+              <kbd className="rounded border border-line bg-surface px-1">?</kbd>{" "}
+              shortcuts
+            </span>
+          ) : null}
         </div>
       </div>
     </div>

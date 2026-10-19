@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { HeroFigure } from "@/lib/hero-figure";
+import { HeroFigureTile } from "./figure-how";
 import { ToolRow } from "./tool-row";
 
 // The figure a tile holds, and the price slot's reader, live in
@@ -112,36 +113,17 @@ export function DealHero({
               turns on, and one truncated line cut it off at every width —
               and a row's figures stay on one line with each other, each at
               the foot of its tile. */}
-          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line @2xl/facts:grid-cols-4">
-            {figures.map((f) => (
-              <div key={f.label} className="flex min-w-0 flex-col justify-between bg-surface px-3.5 py-2.5">
-                <dt className="line-clamp-2 text-[11px] uppercase tracking-wide text-muted">{f.label}</dt>
-                <dd
-                  className={`mt-0.5 text-base font-semibold @xs/facts:text-lg ${
-                    f.figure ? "whitespace-nowrap font-mono tabular-nums" : "break-words"
-                  }`}
-                  title={f.title}
-                >
-                  {f.value ??
-                    (reading ? (
-                      // Not read yet, rather than not stated: a quiet
-                      // shimmer (still under prefers-reduced-motion — the
-                      // .skeleton sweep only runs where motion is welcome).
-                      // A picture with a name, not a live region: four
-                      // figures announcing themselves at once is noise.
-                      <span
-                        role="img"
-                        aria-label="Reading the memorandum"
-                        data-qa="figure-reading"
-                        className="skeleton inline-block h-[1.1em] w-20 max-w-full rounded align-middle"
-                      />
-                    ) : (
-                      "—"
-                    ))}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          {/* The wrapper is the box a figure's "how this is read" opens in
+              (HeroFigureTile): under the tiles, the grid's whole width, out
+              of reach of the grid's clip — the tiles and the grid stay
+              unpositioned so the popover's box is this one. */}
+          <div className="relative">
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line @2xl/facts:grid-cols-4">
+              {figures.map((f) => (
+                <HeroFigureTile key={f.label} figure={f} reading={reading} />
+              ))}
+            </dl>
+          </div>
           {/* The building's own facts the memorandum states — the year
               built, today's occupancy — on one short line under the tiles,
               never as tiles of their own: six tiles had run a phone's

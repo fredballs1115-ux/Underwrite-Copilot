@@ -22,6 +22,7 @@ import { SKYLINES } from "./skyline";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { VERDICT_PILL, headerFacts, sampleHeader } from "./sample-header";
 import { buildingFacts } from "./hero-figure";
+import { fitHow } from "./hero-how";
 import { yearBuiltRow } from "./criteria";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -55,9 +56,15 @@ describe("the sample's header is the deal page's", () => {
     const h = sampleHeader(AS_OF);
     expect(h.title).toBe(SAMPLE_DEAL.name);
     expect(h.pill).toEqual(VERDICT_PILL[SAMPLE_DEAL.verdict.verdict]);
-    expect(h.fit).toEqual({ label: buyBoxChipText(box.chip), cls: BUY_BOX_CHIP_CLS[box.chip.tone], note: box.chip.note });
+    // Each figure and the fit carry their "how this is read" (lib/hero-how),
+    // held to the deal page's own call below and to its words in
+    // lib/hero-how.render.test.ts.
+    const { how: fitHowOf, ...fit } = h.fit!;
+    expect(fit).toEqual({ label: buyBoxChipText(box.chip), cls: BUY_BOX_CHIP_CLS[box.chip.tone], note: box.chip.note });
+    expect(fitHowOf).toEqual(fitHow(box));
     expect(h.subtitle).toBe(`${extraction.address || SAMPLE_DEAL.address.label} · ${assetClassLabel(shownClass)}`);
-    expect(h.figures).toEqual([
+    for (const f of h.figures) expect(f.how?.source, f.label).toBeTruthy();
+    expect(h.figures.map(({ how: _how, ...f }) => f)).toEqual([
       priceFigureOf(`Price${tag ? ` · ${tag}` : ""}`, price),
       { label: "Size", value: size, figure: true },
       { ...goingInCapFigure(extraction, cap, AS_OF), figure: true },
@@ -218,10 +225,18 @@ describe("the deal page still builds its header from the readers this module cal
     // Each pair: the page's expression, then this module's. A page that
     // changes a reader fails here until this module follows it.
     const pairs: [string, string][] = [
-      ["findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(firstSignal)", "findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(firstSignal)"],
-      ["buildingSfRow(metrics)?.value ?? null", "buildingSfRow(metrics)?.value ?? null"],
+      ["const priceRow = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));", "const priceRow = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));"],
+      ["const summaryPrice = priceRow?.value ?? signalAskPrice(firstSignal);", "const summaryPrice = priceRow?.value ?? signalAskPrice(firstSignal);"],
+      ["const sizeSfRow = buildingSfRow(metrics);", "const sizeSfRow = buildingSfRow(metrics);"],
+      ["const sizeSf = sizeSfRow?.value ?? null;", "const sizeSf = sizeSfRow?.value ?? null;"],
       ["countNoun(sizeUnitsRow?.label, shownClass)", "countNoun(sizeUnitsRow?.label, shownClass)"],
-      ["findGoingInCap(metrics)?.value ?? signalGoingInCap(firstSignal)?.text ?? null", "findGoingInCap(metrics)?.value ?? signalGoingInCap(firstSignal)?.text ?? null"],
+      ["const capRow = plan ? null : findGoingInCap(metrics);", "const capRow = plan ? null : findGoingInCap(metrics);"],
+      ["capRow?.value ?? signalGoingInCap(firstSignal)?.text ?? null", "capRow?.value ?? signalGoingInCap(firstSignal)?.text ?? null"],
+      [
+        "price: { row: priceRow, stated: summaryPrice ?? null, figure: priceFigure, tag: priceTag }, size: { sfRow: sizeSfRow, unitsRow: sizeUnitsRow, value: summarySize ?? null }, cap: capFigure ? { row: capRow, figure: capFigure } : null, dealType: summaryStrategy ?? null,",
+        "price: { row: priceRow, stated: summaryPrice ?? null, figure: priceFigure, tag: priceTag }, size: { sfRow: sizeSfRow, unitsRow: sizeUnitsRow, value: summarySize ?? null }, cap: capFigure ? { row: capRow, figure: capFigure } : null, dealType: summaryStrategy ?? null,",
+      ],
+      ["<HowChip how={fitHow(boxRead)}", "how: fitHow(boxRead),"],
       ["goingInCapFigure(extraction, summaryCap ?? null, readerNoon)", "goingInCapFigure(extraction, summaryCap ?? null, asOf)"],
       ['plan?.priceLabel === "Land cost" ? "Land cost" : "Price"', 'plan?.priceLabel === "Land cost" ? "Land cost" : "Price"'],
       ["interestTag(extraction, readerNoon)", "interestTag(extraction, asOf)"],
@@ -247,6 +262,8 @@ describe("the deal page still builds its header from the readers this module cal
     const at = fold(PAGE).indexOf("figures={[");
     expect(at).toBeGreaterThan(-1);
     const list = fold(PAGE).slice(at, fold(PAGE).indexOf("]}", at));
-    expect(list).toMatch(/priceFigure, \{ label: "Size", value: summarySize \?\? null, figure: true \}, returnFigure, \{ label: "Deal type", value: summaryStrategy \?\? null, title: strategy\.summary \|\| undefined \},?/);
+    expect(list).toMatch(
+      /\{ \.\.\.priceFigure, how: how\.price \}, \{ label: "Size", value: summarySize \?\? null, figure: true, how: how\.size \}, \{ \.\.\.returnFigure, how: how\.ret \}, \{ label: "Deal type", value: summaryStrategy \?\? null, title: strategy\.summary \|\| undefined, how: how\.dealType \},?/,
+    );
   });
 });

@@ -19,6 +19,8 @@ import type { RecordComp } from "@/lib/public-comps/core";
 import {
   SALES_SORTS,
   SALES_SORT_PARAM,
+  compsCsv,
+  compsCsvFileName,
   perSfBars,
   perSfSortOffered,
   perSqftOf,
@@ -26,11 +28,12 @@ import {
   readSalesSort,
   salesHeading,
   salesOrder,
+  type CompsCsvSource,
   type PerSfBars,
   type SalesSort,
 } from "@/lib/public-comps/picture";
 import { ScrollRegion } from "@/app/scroll-region";
-import { CopySalesButton } from "./record-sales-map";
+import { CopySalesButton, DownloadSalesButton } from "./record-sales-map";
 
 /** The list shows this many sales; the rest fold behind "Show all". */
 export const SALES_SHOWN = 12;
@@ -110,6 +113,7 @@ export function SalesList({
   showUnits,
   medianPerSqft,
   copyText,
+  provenance = null,
   mapped = false,
   keepSortInUrl = false,
   sortParam = null,
@@ -125,6 +129,10 @@ export function SalesList({
   medianPerSqft: number | null;
   /** the tab-delimited table "Copy as table" writes (nearest first) */
   copyText: string;
+  /** the dataset, the day it was retrieved and the address searched, for
+   *  the "Download CSV" beside the copy (every sale, in the list's order,
+   *  lib/public-comps/picture `compsCsv`); none draws no download */
+  provenance?: Omit<CompsCsvSource, "comps"> | null;
   /** the sales are drawn as numbered pins on a map beside the list (the
    *  comps page): each number says it is its pin */
   mapped?: boolean;
@@ -176,6 +184,9 @@ export function SalesList({
             </div>
           )}
           <CopySalesButton text={copyText} />
+          {provenance && comps.length > 0 && (
+            <DownloadSalesButton fileName={compsCsvFileName(provenance)} csv={() => compsCsv({ ...provenance, comps }, order)} />
+          )}
         </div>
       </div>
       {by === "perSf" && noArea > 0 && (

@@ -239,3 +239,30 @@ export function CopySalesButton({ text }: { text: string }) {
     </button>
   );
 }
+
+/**
+ * Downloads the sales as a CSV file, built at the click so it is the list's
+ * order then (lib/public-comps/picture `compsCsv`). A byte-order mark leads
+ * it, as the pipeline's CSV does, so Excel on Windows reads an accented
+ * address as UTF-8.
+ */
+export function DownloadSalesButton({ fileName, csv }: { fileName: string; csv: () => string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const url = URL.createObjectURL(new Blob(["\uFEFF" + csv()], { type: "text/csv;charset=utf-8" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }}
+      className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-brand hover:text-brand print:hidden"
+      data-qa="comps-download-csv"
+      title={`Every sale listed, in the order shown, as ${fileName}`}
+    >
+      Download CSV
+    </button>
+  );
+}

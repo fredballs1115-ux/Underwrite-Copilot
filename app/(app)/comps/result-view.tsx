@@ -254,6 +254,7 @@ export function CompsResultView({
         showUnits={showUnits}
         medianPerSqft={sfPhrase ? s.medianPerSqft : null}
         copyText={compsTableText(result)}
+        provenance={{ providerName: result.providerName, datasetUrl: result.datasetUrl, retrievedAt: result.retrievedAt, subject: result.subject }}
         mapped={showMap && !!result.subject}
         keepSortInUrl={sortParam !== undefined && !onDeal}
         sortParam={sortParam ?? null}

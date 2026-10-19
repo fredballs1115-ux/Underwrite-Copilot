@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import type { SampleLegal } from "@/lib/sample-legal";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
 import type { SampleBuyBoxData } from "./sample-buy-box";
@@ -339,7 +340,8 @@ function FinancialsView({ financials }: { financials?: SampleFinancials }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="[&_section>.grid]:grid-cols-2 sm:[&_section>.grid]:grid-cols-3">
-        <w.TermsView result={RESULTS.extraction} />
+        {/* Each term's page opens the sample's fictional memorandum there. */}
+        <w.TermsView result={RESULTS.extraction} omUrl={SAMPLE_OM_HREF} />
       </div>
       {financials && (
         <w.DebtSizer
@@ -419,7 +421,8 @@ export function DemoPanel({
 
 /** The deal page's Documents tab on the sample (deal-view's
  *  DocumentsPanel, through the same SourceDocumentsView the signed-in
- *  sample draws): the memorandum's row saying the sample's is fictional,
+ *  sample draws): the memorandum's row opening the sample's fictional
+ *  memorandum (app/api/demo/om), said to be fictional,
  *  the rent roll and the T-12 the sample was read with, each with its own
  *  date and no file to open, and the memo the verdict makes — the public
  *  sample's (audit C10, M4). Never a file name it has not. Drawn once its
@@ -438,7 +441,8 @@ function DocumentsTab() {
       data={{
         dealId: "sample",
         hasOm: false,
-        omUrl: null,
+        // The sample's fictional memorandum, the file every page chip opens.
+        omUrl: SAMPLE_OM_HREF,
         sample: true,
         typedFacts: false,
         documents: [],

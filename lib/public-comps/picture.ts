@@ -1,7 +1,7 @@
 // What a recorded-sales pull looks like as pictures (the comps page and the
 // deal page's panel): each sale on one price track, the sales by quarter
 // across the search's window, and the tab-delimited table a "Copy" puts on
-// the clipboard. Pure — no I/O, no React — so every position is tested.
+// the clipboard (and the CSV file "Download CSV" writes). Pure — no I/O, no React — so every position is tested.
 //
 // Three rules, each the comps readout's own:
 //   - the middle is drawn only where it is one (MEDIAN_FLOOR): a single
@@ -14,6 +14,7 @@
 //     but the largest into its first tenth.
 
 import { compactUsd } from "@/lib/money";
+import { csvNumber, csvText } from "@/lib/csv-cell";
 import { MAX_COMPS } from "@/lib/tools/comp-grid";
 import { compEvidence, MEDIAN_FLOOR, sharedDeedCounts, type RecordComp, type RecordCompsResult } from "./core";
 
@@ -238,6 +239,101 @@ export function compsTableText(r: Pick<RecordCompsResult, "comps">): string {
     ].join("\t"),
   );
   return [head, ...rows].join("\n");
+}
+
+/** The provenance and the sales a "Download CSV" writes. */
+export type CompsCsvSource = Pick<RecordCompsResult, "comps" | "providerName" | "datasetUrl" | "retrievedAt" | "subject">;
+
+/** A UTC day, yyyy-mm-dd, off a stored timestamp, or "" where it is none. */
+const isoDay = (iso: string | null | undefined): string => {
+  const m = /^\d{4}-\d{2}-\d{2}/.exec(iso ?? "");
+  return m ? m[0] : "";
+};
+
+/**
+ * The recorded sales as a CSV file (the "Download CSV" beside "Copy as
+ * table"): a header row, then one row a sale in the order given — the list's
+ * current order, as indexes into the nearest-first list (`salesOrder`), each
+ * row keeping its pin number — and nothing else, since a CSV is a table and a
+ * note above or below it is a row a spreadsheet reads as data. The table's
+ * columns, then the record's link, a flag on a row that may be one deed
+ * across parcels (`sharedDeedCounts`: how many rows share its day, buyer and
+ * price; blank where none does), and the dataset with the day it was
+ * retrieved (its UTC day, the header says so), on every row so a filtered or
+ * pasted row keeps its source. The numbers are raw (no $, no commas: a
+ * price, a distance in miles to two places) and every text cell goes
+ * through lib/csv-cell's escaper, the pipeline CSV's own, so a deed's buyer
+ * that opens on "=" never runs.
+ */
+export function compsCsv(r: CompsCsvSource, order: ReadonlyArray<number> = r.comps.map((_, i) => i)): string {
+  const head = [
+    "#",
+    "Sold",
+    "Address",
+    "Price",
+    "$/SF",
+    "Units",
+    "$/unit",
+    "Type",
+    "Buyer",
+    "Seller",
+    "Deed type",
+    "Miles",
+    "Record",
+    "Possibly one deed across parcels (rows sharing its day, buyer and price)",
+    "Dataset",
+    "Dataset URL",
+    "Retrieved (UTC)",
+  ];
+  const shared = sharedDeedCounts(r.comps);
+  const retrieved = isoDay(r.retrievedAt);
+  const rows = order
+    .filter((at) => Number.isInteger(at) && at >= 0 && at < r.comps.length)
+    .map((at) => {
+      const c = r.comps[at];
+      return [
+        csvNumber(at + 1),
+        csvText(c.saleDate ?? ""),
+        csvText(c.address ?? ""),
+        csvNumber(Math.round(c.price)),
+        csvNumber(perSqftOf(c)),
+        csvNumber(c.units),
+        csvNumber(perUnitOf(c)),
+        csvText(c.propertyType ?? ""),
+        csvText(c.buyer ?? ""),
+        csvText(c.seller ?? ""),
+        csvText(c.deedType ?? ""),
+        csvNumber(Number((c.distanceKm / 1.609344).toFixed(2))),
+        csvText(c.sourceUrl ?? ""),
+        csvNumber(shared[at] >= 2 ? shared[at] : null),
+        csvText(r.providerName ?? ""),
+        csvText(r.datasetUrl ?? ""),
+        csvText(retrieved),
+      ].join(",");
+    });
+  return [head.map(csvText).join(","), ...rows].join("\n");
+}
+
+/** The address as a file name's words: lowercase letters and digits, a
+ *  hyphen between, accents dropped, at most 60 characters; "address" where
+ *  nothing is left. */
+export function addressSlug(label: string | null | undefined): string {
+  const slug = (label ?? "")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  return slug || "address";
+}
+
+/** The download's name: the address searched and the UTC day the sales were
+ *  retrieved — "recorded-sales-1500-walnut-st-philadelphia-pa-2026-10-08.csv". */
+export function compsCsvFileName(r: Pick<RecordCompsResult, "subject" | "retrievedAt">): string {
+  const day = isoDay(r.retrievedAt);
+  return `recorded-sales-${addressSlug(r.subject?.label)}${day ? `-${day}` : ""}.csv`;
 }
 
 /** The orders the sales table offers. Nearest first is the search's own

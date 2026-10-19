@@ -5,6 +5,7 @@
 // is reached for, so the homepage's first load carries the Overview's
 // components alone.
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import { assetWords } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
 import { condoUnitsOffered } from "@/lib/condo-units";
@@ -57,13 +58,14 @@ export const COMP_SUBJECT = subjectBasis(
 export const COMP_NOUN = assetWords(extraction.assetClass).noun?.one;
 
 /** The comps' map context as the deal page hands it on the sample
- *  (deal-view's `mapContext`): the street address, the market, no stored
- *  memorandum to link (the sample's is fictional), its page count, and the
- *  sample's mark — its comps are fictional, so none is geocoded or pinned. */
+ *  (deal-view's `mapContext`): the street address, the market, the
+ *  sample's fictional memorandum to link each comp's page to
+ *  (app/api/demo/om), its page count, and the sample's mark — its comps are
+ *  fictional, so none is geocoded or pinned. */
 export const COMP_MAP_CONTEXT = {
   subjectLabel: extraction.address || "",
   market: extraction.market ?? "",
-  omUrl: null,
+  omUrl: SAMPLE_OM_HREF,
   totalPages: extraction.totalPages ?? null,
   subjectPoint: null,
   sample: true,

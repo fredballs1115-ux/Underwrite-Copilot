@@ -23,10 +23,14 @@ import { PropertyVisual } from "./property-visual";
 import { HeroCover } from "./hero-cover";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
+import { HowChip } from "./figure-how";
+import { fitHow, heroHow } from "@/lib/hero-how";
+import { typedByHand } from "@/lib/manual-deal";
 import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor, pictureIsCheckedMarket } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
+import { DealStepKeys } from "./deal-step-keys";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
@@ -1143,11 +1147,13 @@ export default async function DealPage({
   // or site cost is what is being bought. Before the extraction lands the
   // first signal's ask fills the slot — only when it is a figure, never an
   // "unpriced" or a "call for offers" printed where a price goes.
-  const summaryPrice =
-    findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(firstSignal);
+  // The row is kept: the header's "how this is read" cites it (lib/hero-how).
+  const priceRow = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
+  const summaryPrice = priceRow?.value ?? signalAskPrice(firstSignal);
   // The shared size reader: the building's row, never the land's or a
   // unit's.
-  const sizeSf = buildingSfRow(metrics)?.value ?? null;
+  const sizeSfRow = buildingSfRow(metrics);
+  const sizeSf = sizeSfRow?.value ?? null;
   // The shared count reader: the row that counts the units, never a "Unit
   // mix" row ahead of it.
   const sizeUnits = unitCountRow(metrics)?.value ?? null;
@@ -1172,9 +1178,8 @@ export default async function DealPage({
   // The shared going-in cap reader — the same call the buy box, the mandate
   // and the memories make. A plan deal has no going-in cap (the pipeline
   // row's rule, `pickSlots`): its slot carries the yield on total cost.
-  const summaryCap = plan
-    ? null
-    : (findGoingInCap(metrics)?.value ?? signalGoingInCap(firstSignal)?.text ?? null);
+  const capRow = plan ? null : findGoingInCap(metrics);
+  const summaryCap = plan ? null : (capRow?.value ?? signalGoingInCap(firstSignal)?.text ?? null);
   const summaryYoc = plan?.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : null;
 
   // The model's assumptions against the published figures (lib/model-vs-market):
@@ -1392,11 +1397,25 @@ export default async function DealPage({
   // redemption, never a slice of the building.
   // A yield no project earns is refused: "n/a", the plan's sentence why in
   // its title and under the plan's facts (research pass 38).
+  const capFigure = plan ? null : { ...goingInCapFigure(extraction, summaryCap ?? null, readerNoon), figure: true };
   const returnFigure: HeroFigure = plan
     ? plan.yieldWithheld && summaryYoc == null
       ? { label: "Yield on cost", value: "n/a", figure: true, title: plan.yieldWithheld }
       : { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
-    : { ...goingInCapFigure(extraction, summaryCap ?? null, readerNoon), figure: true };
+    : capFigure!;
+  // How each figure is read, quoted from the readers above (lib/hero-how):
+  // the row and its validated page, the first read, or what it is derived
+  // from — opened from the tile's label.
+  const how = heroHow({
+    extraction,
+    strategy,
+    plan,
+    price: { row: priceRow, stated: summaryPrice ?? null, figure: priceFigure, tag: priceTag },
+    size: { sfRow: sizeSfRow, unitsRow: sizeUnitsRow, value: summarySize ?? null },
+    cap: capFigure ? { row: capRow, figure: capFigure } : null,
+    dealType: summaryStrategy ?? null,
+    byHand: typedByHand(extraction),
+  });
   const capWithheld = capSlotWithheld(extraction);
 
   return (
@@ -1462,10 +1481,12 @@ export default async function DealPage({
                 {pill.note ? <span className="sr-only">, the previous screen&apos;s call</span> : null}
               </span>
             )}
-            {buyBoxChip && (
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`} title={buyBoxChip.note}>
-                {buyBoxChip.label}
-              </span>
+            {buyBoxChip && boxRead && (
+              <HowChip how={fitHow(boxRead)} label={buyBoxChip.label}>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`} title={buyBoxChip.note}>
+                  {buyBoxChip.label}
+                </span>
+              </HowChip>
             )}
           </>
         }
@@ -1479,10 +1500,10 @@ export default async function DealPage({
           </>
         }
         figures={[
-          priceFigure,
-          { label: "Size", value: summarySize ?? null, figure: true },
-          returnFigure,
-          { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
+          { ...priceFigure, how: how.price },
+          { label: "Size", value: summarySize ?? null, figure: true, how: how.size },
+          { ...returnFigure, how: how.ret },
+          { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined, how: how.dealType },
         ]}
         // The year built and today's occupancy, only where the memorandum
         // states them, on a line under the tiles (lib/hero-figure).
@@ -1846,6 +1867,9 @@ export default async function DealPage({
         chip={pill ?? null}
         figures={[priceFigure, returnFigure].flatMap((f) => (f.value ? [{ label: f.label, value: f.value, title: f.title }] : []))}
       />
+      {/* "[" and "]": the previous and next deal in the pipeline's last
+          shown order, kept in the tab's session — no read of its own. */}
+      <DealStepKeys dealId={id} viewerId={user?.id ?? null} />
 
       {/* A portfolio OM's properties, one row each (lib/portfolio): absent
           for a single-property memorandum. */}

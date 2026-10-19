@@ -38,8 +38,10 @@ import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
-import { PIPELINE_CARD_GRID, PIPELINE_VIEW_COOKIE, filtersFoldLabel, remembersView, type PipelineView } from "@/lib/pipeline-view";
+import { PipelineBoard } from "./pipeline-board";
+import { PIPELINE_CARD_GRID, PIPELINE_VIEW_COOKIE, boardColumns, filtersFoldLabel, remembersView, type PipelineView } from "@/lib/pipeline-view";
 import { ManualDealForm } from "./manual-deal-form";
+import { useKeepShownOrder, usePipelineKeys } from "./pipeline-keys";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
@@ -56,10 +58,19 @@ import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-dea
 // extraction lands — the deal page's buy-box panel says the same, and the
 // CSV and the meeting workbook mark the figure with the same words.
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import { csvText } from "@/lib/csv-cell";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
 import { checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone } from "@/lib/fit-label";
-import { fitFilterKey, fitFilterOptions, normalizeFitFilter } from "@/lib/fit-filter";
+import { fitFilterKey, fitFilterOptions } from "@/lib/fit-filter";
+import {
+  filterQueryFrom,
+  readFilterQuery,
+  sessionFilterQuery,
+  type FilterOptions,
+  type PipelineFilters,
+} from "@/lib/pipeline-filters";
+import { useFilterQuery } from "./pipeline-filter-store";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { DEAL_NAME_MAX, nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import { COMPARE_MAX } from "@/lib/link-limits";
@@ -249,6 +260,23 @@ const SHORT_STAGE: Record<Stage, string> = {
 
 const PERSIST_KEY = "uc-pipeline-view";
 
+/** Merges into what the tab's session keeps for the pipeline (its filters,
+ *  the folded stages); a browser that keeps no storage keeps it per visit. */
+function saveView(patch: Record<string, unknown>) {
+  try {
+    const prev: unknown = JSON.parse(sessionStorage.getItem(PERSIST_KEY) ?? "null");
+    const base = prev && typeof prev === "object" && !Array.isArray(prev) ? prev : {};
+    sessionStorage.setItem(PERSIST_KEY, JSON.stringify({ ...base, ...patch }));
+  } catch {
+    // storage unavailable — view state is per-visit only
+  }
+}
+
+/** The filters under the names the session has always kept them by. */
+function sessionFields(f: PipelineFilters): Record<string, unknown> {
+  return { verdict: f.verdict, stage: f.stage, asset: f.asset, market: f.market, mfit: f.fit, sharing: f.sharing, showDead: f.dead };
+}
+
 type BillingInfo = {
   isPro: boolean;
   canCreateDeal: boolean;
@@ -281,7 +309,12 @@ export function Pipeline({
   readNote = null,
   sampleCard = null,
   filterBar = null,
+  filterQuery: filterQueryProp = "",
 }: {
+  /** the filters the page's address asks for, as the page read them from
+   *  its searchParams (lib/pipeline-filters `filterQueryOf`): the server's
+   *  render and the browser's first open on them; "" for a bare link */
+  filterQuery?: string;
   deals: DealCard[];
   errorMessage: string | null;
   notice?: string | null;
@@ -327,7 +360,8 @@ export function Pipeline({
   const [view, setViewState] = useState<PipelineView>(initialView);
   const setView = useCallback((v: PipelineView) => {
     setViewState(v);
-    // Only the cards or the list is remembered: the map is for this visit.
+    // The cards, the list or the board is remembered: the map is for this
+    // visit (lib/pipeline-view `remembersView`).
     if (!remembersView(v)) return;
     try {
       document.cookie = `${PIPELINE_VIEW_COOKIE}=${v}; path=/; max-age=31536000; samesite=lax`;
@@ -335,27 +369,78 @@ export function Pipeline({
       // cookies unavailable — the choice lasts this visit
     }
   }, []);
-  const [verdict, setVerdict] = useState("all");
-  const [stage, setStage] = useState("all");
-  const [asset, setAsset] = useState("all");
-  const [market, setMarket] = useState("all");
-  // The fit filter, in the card's own words (lib/fit-filter): a score band,
-  // "Outside box", or "2 of 4 checked" — a deal files where its chip says.
-  const [mfit, setMfit] = useState("all");
-  // On a team: the shared pipeline's deals, or the reader's own the team
-  // does not see (lib/personal-deal).
-  const [sharing, setSharing] = useState("all");
+  // The filters live in the page's address (lib/pipeline-filters, through
+  // pipeline-filter-store): a link with them opens on them — the server's
+  // HTML included — and a value the list cannot show is dropped. The
+  // verdict, the stage, the asset class, the market; the fit, in the card's
+  // own words (lib/fit-filter: a score band, "Outside box", or "2 of 4
+  // checked" — a deal files where its chip says); on a team, the shared
+  // pipeline's deals or the reader's own the team does not see
+  // (lib/personal-deal); and whether dead deals, kept out of the pipeline
+  // until asked for (or filtered to), are shown. Never the view: the cards,
+  // the list, the board or the map is the reader's cookie.
+  const [filterQuery, setFilterQuery] = useFilterQuery(filterQueryProp);
+  const filterOptions = useMemo<FilterOptions>(
+    () => ({
+      assets: deals.map((d) => d.assetClass).filter(Boolean),
+      markets: deals.map((d) => d.market).filter(Boolean),
+      fits: fitFilterOptions(deals).slice(1).map(([k]) => k),
+      onTeam,
+    }),
+    [deals, onTeam],
+  );
+  const filters = useMemo(() => readFilterQuery(filterQuery, filterOptions), [filterQuery, filterOptions]);
+  const { verdict, stage, asset, market, fit: mfit, sharing, dead: showDead } = filters;
+  const setFilters = useCallback(
+    (patch: Partial<PipelineFilters>) =>
+      setFilterQuery((prev) => {
+        const next = { ...readFilterQuery(prev, filterOptions), ...patch };
+        // Kept in the tab's session at once, so a bare address read after
+        // this (a cleared list, a way back to /deals) finds what was chosen.
+        saveView(sessionFields(next));
+        return filterQueryFrom(next);
+      }),
+    [setFilterQuery, filterOptions],
+  );
+  const setVerdict = useCallback((v: string) => setFilters({ verdict: v }), [setFilters]);
+  const setStage = useCallback((v: string) => setFilters({ stage: v }), [setFilters]);
+  const setAsset = useCallback((v: string) => setFilters({ asset: v }), [setFilters]);
+  const setMarket = useCallback((v: string) => setFilters({ market: v }), [setFilters]);
+  const setMfit = useCallback((v: string) => setFilters({ fit: v }), [setFilters]);
+  const setSharing = useCallback((v: string) => setFilters({ sharing: v }), [setFilters]);
+  const setShowDead = useCallback((v: boolean) => setFilters({ dead: v }), [setFilters]);
   const [sortKey, setSortKey] = useState<SortKey>("added");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  // Dead deals stay out of the pipeline until asked for (or filtered to).
-  const [showDead, setShowDead] = useState(false);
   // Which stage sections the user has explicitly collapsed/expanded — until
   // touched, a section's default is open-when-populated / collapsed-when-empty.
   const [collapsed, setCollapsed] = useState<Partial<Record<Stage, boolean>>>({});
   const searchRef = useRef<HTMLInputElement>(null);
   const [showForm, setShowForm] = useState(!!errorMessage || !!openNew);
 
-  // Filters and view state persist across navigation (deal page and back)
+  // The address and the tab's session agree. An address with filters is
+  // written back without any value the list cannot show, and kept in the
+  // session; a bare address — a plain link to /deals, the way back from a
+  // deal — opens on what the session kept, as it did before the address
+  // carried the filters. After mount, so the server's render and the
+  // browser's first agree.
+  useEffect(() => {
+    if (filterQuery !== "") {
+      const canonical = filterQueryFrom(filters);
+      if (canonical !== filterQuery) setFilterQuery(canonical);
+      else saveView(sessionFields(filters));
+      return;
+    }
+    let saved: unknown = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(PERSIST_KEY) ?? "null");
+    } catch {
+      // corrupt/absent state — no filters
+    }
+    const restored = filterQueryFrom(readFilterQuery(sessionFilterQuery(saved), filterOptions));
+    if (restored) setFilterQuery(restored);
+  }, [filterQuery, filters, filterOptions, setFilterQuery]);
+
+  // Which stages are folded persists across navigation (deal page and back)
   // within the tab. Restored after mount so server and client first paint
   // identically; saves are gated until the restore has run, otherwise the
   // very first render would overwrite the saved state with defaults.
@@ -365,25 +450,8 @@ export function Pipeline({
       try {
         const saved = sessionStorage.getItem(PERSIST_KEY);
         if (saved) {
-          const v = JSON.parse(saved) as Partial<{
-            verdict: string;
-            stage: string;
-            asset: string;
-            market: string;
-            mfit: string;
-            sharing: string;
-            showDead: boolean;
-            collapsed: Partial<Record<Stage, boolean>>;
-          }>;
-          if (typeof v.verdict === "string") setVerdict(v.verdict);
-          if (typeof v.stage === "string") setStage(v.stage);
-          if (typeof v.asset === "string") setAsset(v.asset);
-          if (typeof v.market === "string") setMarket(v.market);
-          if (typeof v.mfit === "string") setMfit(normalizeFitFilter(v.mfit));
-          if (typeof v.sharing === "string") setSharing(v.sharing);
-          if (typeof v.showDead === "boolean") setShowDead(v.showDead);
-          if (v.collapsed && typeof v.collapsed === "object")
-            setCollapsed(v.collapsed);
+          const v = JSON.parse(saved) as Partial<{ collapsed: Partial<Record<Stage, boolean>> }> | null;
+          if (v?.collapsed && typeof v.collapsed === "object") setCollapsed(v.collapsed);
         }
       } catch {
         // corrupt/absent state — defaults stand
@@ -394,15 +462,8 @@ export function Pipeline({
   }, []);
   useEffect(() => {
     if (!viewRestored.current) return;
-    try {
-      sessionStorage.setItem(
-        PERSIST_KEY,
-        JSON.stringify({ verdict, stage, asset, market, mfit, sharing, showDead, collapsed }),
-      );
-    } catch {
-      // storage unavailable — view state is per-visit only
-    }
-  }, [verdict, stage, asset, market, mfit, sharing, showDead, collapsed]);
+    saveView({ collapsed });
+  }, [collapsed]);
 
   // The ⌘K "New deal…" action lands here as ?new=1 — honor it even when the
   // pipeline is already mounted (client-side navigation keeps state). The
@@ -425,41 +486,18 @@ export function Pipeline({
     return () => clearInterval(t);
   }, [anyRunning, router]);
 
-  // Keyboard shortcuts: "/" jumps to search, "n" opens the new-deal form,
-  // Escape closes it. Ignored while typing in any field.
+  // Keyboard shortcuts (lib/shortcuts, the sheet "?" opens): "/" jumps to
+  // search, "n" opens the new-deal form, Escape closes it, "j" / "k" step
+  // through the deals shown. Ignored while typing in any field — Escape
+  // there is how a browser cancels autofill and clears a search box — inside
+  // a dialog, or once another handler (the palette's Escape) took the key.
   const atLimitRef = !!billing && !billing.canCreateDeal;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Another handler (the ⌘K palette's Escape) already consumed this key,
-      // or focus sits inside an open dialog — the page shortcuts stand down.
-      if (e.defaultPrevented) return;
-      const t = e.target as HTMLElement | null;
-      if (t && t.closest('[role="dialog"]')) return;
-      const typing =
-        t &&
-        (t.tagName === "INPUT" ||
-          t.tagName === "TEXTAREA" ||
-          t.tagName === "SELECT" ||
-          t.isContentEditable);
-      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
-      // Never let Escape nuke the form while the user is in a field — that's
-      // how browsers cancel autofill/IME, and search inputs clear on Escape.
-      if (typing) return;
-      if (e.key === "Escape") {
-        setShowForm(false);
-        return;
-      }
-      if (e.key === "/") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      } else if (e.key === "n" && !atLimitRef) {
-        e.preventDefault();
-        setShowForm(true);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [atLimitRef]);
+  usePipelineKeys({
+    onSearch: () => searchRef.current?.focus(),
+    onNew: () => setShowForm(true),
+    onEscape: () => setShowForm(false),
+    canNew: !atLimitRef,
+  });
 
   // Stable identity so memoized rows don't re-render on unrelated changes.
   const toggleSelected = useCallback((id: string) => {
@@ -572,6 +610,10 @@ export function Pipeline({
     if (s === "dead" && !showDead && stage !== "dead") return false;
     return (groups.get(s)?.length ?? 0) > 0;
   }
+  // The order the list shows, a stage after a stage, kept for the deal
+  // page's "[" and "]" (pipeline-keys).
+  const shownOrder = STAGES.flatMap((s) => (sectionDrawn(s) ? (groups.get(s) ?? []) : [])).map((d) => d.id);
+  useKeepShownOrder(shownOrder, viewerId);
   const cardsOnScreen =
     view === "cards" ? STAGES.flatMap((s) => (sectionDrawn(s) && isOpen(s) ? (groups.get(s) ?? []) : [])) : [];
   const marketPhotoCredits = shownMarketCredits(cardsOnScreen, marketShown);
@@ -604,12 +646,8 @@ export function Pipeline({
 
   function clearFilters() {
     setQuery("");
-    setVerdict("all");
-    setStage("all");
-    setAsset("all");
-    setMarket("all");
-    setMfit("all");
-    setSharing("all");
+    // The dead deals' toggle stays as the reader left it, as it always has.
+    setFilters({ verdict: "all", stage: "all", asset: "all", market: "all", fit: "all", sharing: "all" });
   }
   const filtersActive =
     query.trim() !== "" ||
@@ -637,11 +675,9 @@ export function Pipeline({
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
     // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
-    // text are untrusted and must never execute when the CSV opens in Excel.
-    const esc = (v: string) => {
-      const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
-      return `"${safe.replaceAll('"', '""')}"`;
-    };
+    // text are untrusted and must never execute when the CSV opens in Excel
+    // (lib/csv-cell, the one escaper every download writes through).
+    const esc = csvText;
     // A plan deal's cap cell says "n/a — plan" and its yield on cost sits in
     // its own column — the same two cells the meeting .xlsx writes, in its
     // words (lib/cap-slot `PLAN_CAP_NA`); the cell had been blank, which
@@ -1061,7 +1097,7 @@ export function Pipeline({
               <button
                 type="button"
                 aria-pressed={showDead}
-                onClick={() => setShowDead((v) => !v)}
+                onClick={() => setShowDead(!showDead)}
                 className={`rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors ${
                   showDead
                     ? "border-brand bg-brand/5 text-brand"
@@ -1222,7 +1258,19 @@ export function Pipeline({
               onToggle={toggleSelected}
             />
           )}
-          {view !== "map" && (
+          {view === "board" && (
+            // A column a stage (pipeline-board.tsx), the same rows grouped
+            // as the sections below group them.
+            <PipelineBoard
+              columns={boardColumns({ stageFilter: stage, showDead }).map((s) => ({ stage: s, deals: groups.get(s) ?? [] }))}
+              compareMode={compareMode}
+              selected={selected}
+              onToggle={toggleSelected}
+              todayIso={todayIso}
+              stageControl={tileStage}
+            />
+          )}
+          {(view === "cards" || view === "list") && (
           <div>
             {/* One header row labels the columns for every group — each label
                 is a sort control (sorting applies within each stage group).
@@ -2052,12 +2100,14 @@ const DealRow = memo(function DealRow({
       className={`border-l-[3px] ${d.assetClass ? asset.rail : "border-l-transparent"} ${
         isDead ? "grayscale" : ""
       }`}
+      data-deal-row={d.id}
     >
       {compareMode ? (
         <button
           type="button"
           onClick={() => onToggle(d.id)}
           aria-pressed={checked}
+          data-deal-nav
           className={`group flex w-full items-center gap-3 px-5 py-4 text-left transition-colors ${
             checked ? "bg-brand/5" : "hover:bg-faint"
           }`}
@@ -2071,6 +2121,7 @@ const DealRow = memo(function DealRow({
         <div className="group flex items-center gap-3 px-5 py-4 transition-colors hover:bg-faint">
           <Link
             href={`/deals/${d.id}`}
+            data-deal-nav
             className="flex min-w-0 flex-1 items-center gap-3"
           >
             {inner}
@@ -2096,8 +2147,8 @@ const DealRow = memo(function DealRow({
   );
 });
 
-/** The two views as one control: an icon and a word each, the current one
- *  pressed. */
+/** The views as one control — the cards, the list, the board and the map:
+ *  an icon and a word each, the current one pressed. */
 function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: PipelineView) => void }) {
   const opt = (v: PipelineView, label: string, icon: ReactNode) => (
     <button
@@ -2129,6 +2180,15 @@ function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: Pipe
         "List",
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
           <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+        </svg>,
+      )}
+      {opt(
+        "board",
+        "Board",
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+          <rect x="3" y="3" width="5" height="18" rx="1.5" />
+          <rect x="9.5" y="3" width="5" height="12" rx="1.5" />
+          <rect x="16" y="3" width="5" height="8" rx="1.5" />
         </svg>,
       )}
       {opt(

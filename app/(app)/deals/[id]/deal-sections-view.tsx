@@ -142,12 +142,32 @@ export function TermsView({
           <SourceChip fact={fact} omUrl={omUrl} />
         </p>
       ) : (
-        // Deals screened before citations (migration 0018) keep a plain page
-        // — only where it parses and falls inside the deck's own length
-        // (lib/facts' absolute rule): an unvalidated page is no page.
+        // A term with no stored citation (a deal screened before citations,
+        // migration 0018) keeps its own page — only where it parses and
+        // falls inside the deck's own length (lib/facts' absolute rule): an
+        // unvalidated page is no page. Wherever the page has a memorandum to
+        // open — every signed-in deal with an OM, and the public sample's
+        // fictional one (lib/sample-om-link) — the validated "p. N" links to
+        // it at that page; with none, it is plain text.
         (() => {
           const n = locatedPage(m.page, result.totalPages);
-          return n != null ? <p className="mt-2 text-[10px] text-muted">{`p. ${n}`}</p> : null;
+          if (n == null) return null;
+          return omUrl ? (
+            <p className="mt-2 leading-none">
+              <a
+                href={`${omUrl}#page=${n}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-muted underline-offset-2 hover:text-ink hover:underline"
+                title={`Open the OM at p. ${n}`}
+                data-qa="term-page"
+              >
+                {`p. ${n}`}
+              </a>
+            </p>
+          ) : (
+            <p className="mt-2 text-[10px] text-muted">{`p. ${n}`}</p>
+          );
         })()
       )}
     </div>

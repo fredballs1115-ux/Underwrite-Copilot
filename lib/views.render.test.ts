@@ -58,6 +58,9 @@ import { dealAllowance } from "@/lib/deal-allowance";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { SAMPLE_OM_HREF, SAMPLE_OM_VERSION } from "@/lib/sample-om-link";
+import { SAMPLE_OM_FILE_WORDS } from "@/app/(app)/deals/[id]/source-documents";
+import { existsSync } from "node:fs";
 import { DemoSections } from "@/app/demo/sections";
 import { loadWalkthrough } from "@/app/landing-interactive";
 import { AnalysisTabs, DealSectionTabs } from "@/app/(app)/deals/[id]/section-tabs";
@@ -1539,14 +1542,43 @@ describe("ModelView — the sample model renders every panel", () => {
       const cited = SAMPLE_DEAL.comps.saleComps.find((c) => c.page);
       expect(cited).toBeTruthy();
       expect(visibleText(html)).toMatch(new RegExp(`p\\.\\s*${String(cited!.page).replace(/\D/g, "")}\\b`));
+      // Each comp's page opens the sample's fictional memorandum there.
+      for (const c of SAMPLE_DEAL.comps.saleComps) {
+        expect(html).toContain(`href="${SAMPLE_OM_HREF}#page=${String(c.page).replace(/\D/g, "")}"`);
+      }
+    });
+
+    it("links every page chip on the Financials tab's terms to the sample's fictional memorandum, at its page", () => {
+      const html = section("financials");
+      // The terms the tab shows before "show all": the flagged first, eight.
+      const ms = SAMPLE_DEAL.extraction.metrics;
+      const shown = [...ms.filter((m) => m.flagged), ...ms.filter((m) => !m.flagged)].slice(0, 8);
+      const cited = shown.filter((m) => m.page);
+      expect(cited.length).toBeGreaterThan(5);
+      // Every page the tab draws is a link to the memorandum, none plain.
+      const pages = [...html.matchAll(/data-qa="term-page"/g)].length;
+      expect(pages).toBe(cited.length);
+      for (const m of cited) {
+        const n = String(m.page).replace(/\D/g, "");
+        expect(html, m.label).toMatch(
+          new RegExp(`<a href="${SAMPLE_OM_HREF.replace(/[?]/g, "\\?")}#page=${n}"[^>]*>p\\. ${n}</a>`),
+        );
+      }
+      // The route is the one app/api/demo/om serves, under its version.
+      expect(SAMPLE_OM_HREF).toBe(`/api/demo/om?v=${SAMPLE_OM_VERSION}`);
+      expect(existsSync("app/api/demo/om/route.ts")).toBe(true);
+      expect(a11yIssues(html)).toEqual([]);
     });
 
     it("draws the Documents tab as the sample's: its fictional memorandum, the rent roll and T-12 it was read with, the memo the verdict makes", () => {
       const text = visibleText(section("documents"));
       expect(text).toContain("Offering memorandum");
       // Audit C10, M4: the signed-in sample's card, never "none uploaded"
-      // beside an Overview that draws the rent roll and the T-12.
-      expect(text).toContain("none — the sample's memorandum is fictional");
+      // beside an Overview that draws the rent roll and the T-12. On a
+      // public page its memorandum is the fictional file the chips open.
+      expect(text).toContain(SAMPLE_OM_FILE_WORDS);
+      expect(text).not.toContain("none — the sample's memorandum is fictional");
+      expect(section("documents")).toContain(`href="${SAMPLE_OM_HREF}"`);
       expect(text).not.toContain("none uploaded");
       expect(text.match(/read into the sample — no file to open/g)?.length).toBe(2);
       // The deal page's Documents tab has no deliverables card: the memo is
