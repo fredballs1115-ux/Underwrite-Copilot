@@ -41,7 +41,7 @@ export const SITE_CARD = {
   url: "/opengraph-image",
   width: 1200,
   height: 630,
-  alt: "Underwrite Copilot: every CRE deal through the same disciplined screen",
+  alt: "Underwrite Copilot: the OM's assumptions, tested",
 };
 
 /** The site's plain card (app/api/og/plain, lib/plain-card): the mark and

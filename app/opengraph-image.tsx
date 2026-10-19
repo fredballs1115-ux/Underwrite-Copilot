@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 // Branded card shown when the site is shared (iMessage, Slack, X, LinkedIn…).
 export const alt =
-  "Underwrite Copilot — stop underwriting like a coin flip. Every CRE deal through the same disciplined screen.";
+  "Underwrite Copilot — the OM's assumptions, tested. Each assumption the memorandum makes, set against the evidence with its date and source.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -121,7 +121,7 @@ export default function Image() {
                 maxWidth: 1000,
               }}
             >
-              Stop underwriting like a coin flip.
+              The OM&apos;s assumptions, tested.
             </div>
             <div
               style={{
@@ -131,9 +131,8 @@ export default function Image() {
                 maxWidth: 920,
               }}
             >
-              Every CRE deal through the same disciplined screen — sourced
-              ranges, the three deal-killers first, a Go / No-go that shows
-              its work.
+              Each assumption the memorandum makes, set against the evidence
+              with its date and source. The model is included.
             </div>
           </div>
 
