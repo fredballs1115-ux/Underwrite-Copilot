@@ -173,6 +173,18 @@ describe("DealView — the sample deal renders every section without a runtime e
     });
   }
 
+  it("an extracted term's label wraps on a phone rather than truncating, its whole text in its title (the 2026-10-19 sweep)", () => {
+    const html = render(sampleProps("financials"));
+    const labels = [...html.matchAll(/<p class="([^"]*)" data-qa="term-label"><span class="([^"]*)" title="([^"]*)">/g)];
+    expect(labels.length).toBeGreaterThan(4);
+    for (const [, row, span, title] of labels) {
+      expect(row).toMatch(/\bflex-wrap\b/);
+      expect(span.split(" ")).not.toContain("truncate");
+      expect(span.split(" ")).toContain("sm:truncate");
+      expect(title.length).toBeGreaterThan(0);
+    }
+  });
+
   it("the sample's reading guide opens each section it names, never a card that does nothing (research pass 32)", () => {
     const html = render(sampleProps("overview"));
     expect(textOf(html)).toContain("How to read this screen");

@@ -103,8 +103,15 @@ export function TermsView({
           : "border border-line"
       }`}
     >
-      <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-        <span className="truncate">{m.label}</span>
+      {/* Below `sm` the label wraps and its marks follow it: a phone's
+          two-column card had cut "Pro forma cap rate" to "PRO FOR…" beside
+          its own "pro forma" badge (the visual sweep of 2026-10-19). From
+          `sm` it keeps one line, its whole text in the title. */}
+      <p
+        className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] font-medium uppercase tracking-wide text-muted sm:flex-nowrap"
+        data-qa="term-label"
+      >
+        <span className="min-w-0 break-words sm:truncate" title={m.label}>{m.label}</span>
         {/* The property's reality vs the sponsor's story, on the card
             itself — on a plan deal the difference between a $21M stabilized
             pro forma and today's income is the whole deal. */}
