@@ -16,23 +16,15 @@ import { getBilling } from "@/lib/billing";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
+import { LEAVING_KEEPS } from "@/lib/team-leaving";
 import { cookies } from "next/headers";
 import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
 import { SEAT_SYNC, renewsOn } from "@/lib/billing-view";
 
 export const metadata: Metadata = { title: "Team" };
 
-/** What a member who leaves, or is removed, keeps of the deals they added:
- *  the deals stay in the team's pipeline under their name (removeMember and
- *  leaveTeam move nothing), and row-level security reads a deal by its
- *  creator — so they still open it, mint a share link to it and delete it
- *  (0007's read and delete policies, 0017's share links). An edit to the
- *  deal itself is refused while it stays in a team they are not on (0007's
- *  update check). */
-const LEAVING_KEEPS = {
-  them: "The deals they added stay in the team pipeline, and they keep access to them: they can still open them, share them by link and delete them.",
-  you: "You'll stop seeing your teammates' deals. The deals you added stay in the team pipeline, and you keep access to them: you can still open them, share them by link and delete them.",
-};
+// What a departing member keeps of the deals they added: lib/team-leaving,
+// shared with the billing page's roster.
 
 const TEAM_UNAVAILABLE = { cls: "bg-kill/10 text-kill", text: "Team checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you set up." };
 const MESSAGES: Record<string, { cls: string; text: string }> = {

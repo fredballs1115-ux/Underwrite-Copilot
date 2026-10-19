@@ -17,6 +17,8 @@ import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
+import { ConfirmSubmit } from "../team/team-client";
+import { LEAVING_KEEPS } from "@/lib/team-leaving";
 import { personName } from "@/lib/person";
 import { SEAT_SYNC, SEAT_SYNC_REMOVE, planShownOf, renewsOn } from "@/lib/billing-view";
 import { cookies } from "next/headers";
@@ -392,12 +394,12 @@ export default async function BillingPage({
                   {team.role === "owner" && m.role !== "owner" && (
                     <form action={removeMember}>
                       <input type="hidden" name="memberId" value={m.userId} />
-                      <button
-                        type="submit"
-                        className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-kill transition-colors hover:bg-kill/5"
-                      >
-                        Remove
-                      </button>
+                      {/* The team page's own confirmation (lib/team-leaving). */}
+                      <ConfirmSubmit
+                        label="Remove"
+                        confirmText={`Remove ${personName(m.fullName, m.email)} from ${team.name}? ${LEAVING_KEEPS.them}`}
+                        danger
+                      />
                     </form>
                   )}
                 </li>

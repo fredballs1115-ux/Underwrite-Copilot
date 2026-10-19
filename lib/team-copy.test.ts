@@ -120,10 +120,12 @@ describe("leaving or removing a member says what they keep", () => {
     const page = flat("app/(app)/team/page.tsx");
     expect(page).toContain("confirmText={`Remove ${memberLabel(m)} from ${team.name}? ${LEAVING_KEEPS.them}`}");
     expect(page).toContain("confirmText={`Leave ${team.name}? ${LEAVING_KEEPS.you}`}");
-    expect(page).toContain(
+    const keeps = flat("lib/team-leaving.ts");
+    expect(page).toContain('import { LEAVING_KEEPS } from "@/lib/team-leaving";');
+    expect(keeps).toContain(
       'them: "The deals they added stay in the team pipeline, and they keep access to them: they can still open them, share them by link and delete them."',
     );
-    expect(page).toContain(
+    expect(keeps).toContain(
       "you: \"You'll stop seeing your teammates' deals. The deals you added stay in the team pipeline, and you keep access to them: you can still open them, share them by link and delete them.\"",
     );
     expect(page).not.toMatch(/editing|edit them/);

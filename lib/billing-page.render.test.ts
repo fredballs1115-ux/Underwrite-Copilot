@@ -35,7 +35,18 @@ vi.mock("next/headers", () => ({
 vi.mock("@/app/(app)/billing/actions", () => ({ startCheckout: async () => {}, openPortal: async () => {} }));
 vi.mock("@/app/(app)/team/actions", () => ({ removeMember: async () => {}, openTeamPortal: async () => {} }));
 
+// The confirmation is a browser dialog; the fake carries its words where
+// the markup can show them.
+vi.mock("@/app/(app)/team/team-client", async () => {
+  const { createElement } = await import("react");
+  return {
+    ConfirmSubmit: ({ label, confirmText }: { label: string; confirmText: string }) =>
+      createElement("button", { type: "submit", "data-confirm": confirmText }, label),
+  };
+});
+
 import BillingPage from "@/app/(app)/billing/page";
+import { LEAVING_KEEPS } from "./team-leaving";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const billing = (over: Partial<Billing> = {}): Billing => ({
@@ -169,6 +180,18 @@ describe("a reader's own subscription", () => {
     expect(text).toContain("One subscription, 2 seats. Adding or removing a member updates Stripe's seat count right after, and Stripe prorates the difference.");
     expect(text).toContain("Removing a member updates Stripe's seat count right after, and Stripe prorates the difference on the next invoice.");
     expect(text).not.toMatch(/immediately|in the same action/);
+  });
+
+  it("removing a member asks first, in the team page's words", async () => {
+    state.billing = billing({ isPro: true, team: { id: "t-1", name: "Meridian Acquisitions", active: true, dealCount: 4 } });
+    state.team = teamInfo({ role: "owner" });
+    const { html } = await page();
+    const confirms = [...html.matchAll(/data-confirm="([^"]*)"/g)].map((m) =>
+      m[1].replace(/&#x27;/g, "'").replace(/&amp;/g, "&"),
+    );
+    // One a member, none for the owner.
+    expect(confirms).toEqual([`Remove Sam Member from Meridian Acquisitions? ${LEAVING_KEEPS.them}`]);
+    expect(readFileSync("app/(app)/team/page.tsx", "utf8")).toContain("${LEAVING_KEEPS.them}");
   });
 
   it("personal Pro on a team keeps its own plan and portal", async () => {
