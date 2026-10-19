@@ -57,7 +57,7 @@ const OWN_COOKIES: { cookie: string; file: string; writes: number; privacy: stri
     cookie: PIPELINE_VIEW_COOKIE,
     file: "app/(app)/deals/pipeline.tsx",
     writes: 1,
-    privacy: "the view of your pipeline you left on (cards or list)",
+    privacy: "the view of your pipeline you left on (cards, list or board)",
     // Its write spells the max-age out: read off the source below.
     maxAge: "in the write",
   },

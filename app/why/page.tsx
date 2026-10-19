@@ -45,8 +45,8 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "What it does",
     body: [
-      "Upload an OM. The app reads it and returns a screen: the key terms, a red-team of the assumptions, the comps inside the deck, a reconciliation across your documents, a market check, and a verdict.",
-      "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call, or says which criteria it could not check. On Pro, it exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
+      "Upload an OM. The app reads it and returns a screen: the key terms, a red-team of the assumptions, the comps inside the deck, a market check, and a verdict — and, once you add a rent roll, a T-12 or your own model, a reconciliation across them.",
+      "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call (Outside box where it misses outright), or says which criteria it could not check. On Pro, it exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
     ],
   },
   {
@@ -59,7 +59,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "It shows its work",
     body: [
-      "Every extracted number carries the page it came from. Click a figure to open the OM at that page and confirm it against the source.",
+      "Every extracted number carries the page it came from, or says it could not be located. Click a figure to open the OM at that page and confirm it against the source.",
       "When a figure cannot be located in the document, the app says so. It does not invent a citation, a page, or a number.",
     ],
   },

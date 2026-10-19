@@ -72,7 +72,7 @@ describe("the homepage, as a screen reader hears it", () => {
     const html = await renderHome();
     const text = html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "");
     expect(text).toContain("Excel model, live formulas Pro");
-    expect(text).toContain("One-page IC memo Pro");
+    expect(text).toContain("IC memo Pro");
     expect(text).not.toMatch(/formulasPro|memoPro/);
   }, 60_000);
 
@@ -334,7 +334,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
   // names and grades.
   it("the memo tile draws the memo it downloads, and the comps tile the sample's own comps", async () => {
     const html = await renderHome();
-    const at = html.indexOf("One-page IC memo");
+    const at = html.indexOf("IC memo<");
     expect(at).toBeGreaterThan(-1);
     const tile = words(html.slice(at, html.indexOf("/api/demo/memo", at)));
     const memo = sampleMemoData();

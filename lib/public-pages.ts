@@ -136,7 +136,7 @@ export function marketMeta(metro: MarketPage | null, sector: SectorPage | null):
   if (metro) {
     const figures = listed(figuresDrawn(metro.id));
     return {
-      title: `${metro.name} market data: rents, vacancy, jobs and supply`,
+      title: `${metro.name} market data: rents, vacancy, jobs${figures.includes("building permits") ? " and supply" : ""}`,
       description: metro.briefed
         ? `${metro.name}: the research brief, and the published figures the site reads for the market — ${figures} — each published figure dated and linked to its source.`
         : `${metro.name}: the published figures the site reads for the metro area — ${figures} — each dated and linked to its source.`,

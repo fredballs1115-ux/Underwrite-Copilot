@@ -5,7 +5,7 @@
       "date": "2026-10-19",
       "title": "Open the sample's memorandum, and see how a figure is read",
       "href": "/demo",
-      "blurb": "The sample deal's page citations now open its memorandum, a 48-page fictional PDF stamped on every page, at the page each figure cites. On a deal's header, each figure and the fit chip open a small note saying where the figure comes from: the memorandum's row and page, the first read, or what it is derived from. The pipeline has a Board view with a column for each stage, keyboard shortcuts (press ? for the list), and filters that live in the address so a filtered view can be shared as a link. The comps page downloads its recorded sales as a CSV."
+      "blurb": "The sample deal's term and comp citations now open its memorandum, a 48-page fictional PDF stamped on every page, at the page each figure cites. On a deal's header, each figure and the fit chip open a small note saying where the figure comes from: the memorandum's row and page, the first read, or what it is derived from. The pipeline has a Board view with a column for each live stage, keyboard shortcuts (press ? for the list), and filters that live in the address so a filtered view can be shared as a link. The comps page downloads its recorded sales as a CSV."
     },
     {
       "date": "2026-10-19",

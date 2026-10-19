@@ -84,8 +84,9 @@ describe("the outside services a user's data reaches, one list held to the code"
       expect(text).not.toMatch(/receives only the address text you type/i);
       // Each page dated by its own last change: both print the list, which
       // named the buy box, the typed facts and the support inbox on
-      // October 5 (research pass 39).
-      expect(text).toContain("Last updated: October 5, 2026");
+      // October 5 (research pass 39); the privacy page's storage list
+      // changed again on October 19 (the board view and the deal order).
+      expect(text).toMatch(name === "privacy" ? /Last updated: October 19, 2026/ : /Last updated: October 5, 2026/);
       expect(a11yIssues(html), name).toEqual([]);
       expect(gluedWords(text), name).toEqual([]);
     }

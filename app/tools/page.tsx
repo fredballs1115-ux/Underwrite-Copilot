@@ -83,9 +83,8 @@ export default async function ToolsPage() {
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-muted">
           These take numbers you already have. Upload the offering memorandum
-          and the same engine reads them out of it, argues with them, checks the
-          broker&apos;s comps against the market, and reconciles it all against your
-          own model.
+          and the screen reads them out of it, argues with them, grades the
+          broker&apos;s comps, and runs the same engine on what it finds.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <Link

@@ -41,8 +41,8 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "Cookies and browser storage",
     body: [
-      "Signing in sets the session cookies that keep you signed in; they last up to 400 days unless you sign out. Three cookies of our own last a year: the view of your pipeline you left on (cards or list), the regulatory alerts you dismissed, kept under your account's name, and your browser's time zone, so a due date counts from your own calendar day.",
-      "Your browser also keeps a few things on this device only: a deal you started adding but did not submit (its name and address), that you closed the getting-started list, and, for the visit, your pipeline's filters, the map's looked-up places and, on the public pages, that a newer version of the page was already loaded once. There are no advertising or cross-site tracking cookies.",
+      "Signing in sets the session cookies that keep you signed in; they last up to 400 days unless you sign out. Three cookies of our own last a year: the view of your pipeline you left on (cards, list or board), the regulatory alerts you dismissed, kept under your account's name, and your browser's time zone, so a due date counts from your own calendar day.",
+      "Your browser also keeps a few things on this device only: a deal you started adding but did not submit (its name and address), that you closed the getting-started list, and, for the visit, your pipeline's filters, the order of its deals (so the [ and ] keys can step through them), the map's looked-up places and, on the public pages, that a newer version of the page was already loaded once. There are no advertising or cross-site tracking cookies.",
     ],
   },
   {
@@ -96,7 +96,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Privacy policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: October 5, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: October 19, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Deal documents are sensitive — most OMs travel under confidentiality
           terms. This page says exactly what we collect, where it goes, and
