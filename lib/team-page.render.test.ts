@@ -85,3 +85,11 @@ describe("the team's renewal", () => {
     expect((await page()).text).toContain("renews November 1, 2026.");
   });
 });
+
+describe("the seat count", () => {
+  it("is said to follow right after a roster change, as syncTeamSeats runs after the response", async () => {
+    const { text } = await page();
+    expect(text).toContain("Adding or removing a member updates Stripe's seat count right after, and Stripe prorates the difference.");
+    expect(text).not.toMatch(/immediately|in the same action/);
+  });
+});

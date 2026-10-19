@@ -5,6 +5,7 @@
 // to ?error=nocustomer, which told them to Upgrade on a page that showed no
 // Upgrade button. The page reads a database no test can reach; its reads
 // are faked here and its markup is linted.
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Billing } from "./billing";
@@ -156,6 +157,18 @@ describe("a reader's own subscription", () => {
     state.billing = billing({ isPro: true, team: { id: "t-1", name: "Meridian Acquisitions", active: true, dealCount: 4 } });
     state.team = teamInfo({ role: "owner" });
     expect((await page()).text).toContain("Renews October 31, 2026.");
+  });
+
+  it("the seat count is said to follow right after, never immediately or in the same action", async () => {
+    // syncTeamSeats runs after the team action's response, best effort.
+    const actions = readFileSync("app/(app)/team/actions.ts", "utf8");
+    expect(actions.match(/after\(\(\) => syncTeamSeats\(/g)?.length).toBeGreaterThanOrEqual(3);
+    state.billing = billing({ isPro: true, team: { id: "t-1", name: "Meridian Acquisitions", active: true, dealCount: 4 } });
+    state.team = teamInfo({ role: "owner" });
+    const { text } = await page();
+    expect(text).toContain("One subscription, 2 seats. Adding or removing a member updates Stripe's seat count right after, and Stripe prorates the difference.");
+    expect(text).toContain("Removing a member updates Stripe's seat count right after, and Stripe prorates the difference on the next invoice.");
+    expect(text).not.toMatch(/immediately|in the same action/);
   });
 
   it("personal Pro on a team keeps its own plan and portal", async () => {

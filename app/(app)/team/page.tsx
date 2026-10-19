@@ -18,7 +18,7 @@ import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
 import { cookies } from "next/headers";
 import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
-import { renewsOn } from "@/lib/billing-view";
+import { SEAT_SYNC, renewsOn } from "@/lib/billing-view";
 
 export const metadata: Metadata = { title: "Team" };
 
@@ -354,8 +354,7 @@ export default async function TeamPage({
                   {team.currentPeriodEnd
                     ? ` · renews ${renewsOn(team.currentPeriodEnd, timeZone)}`
                     : ""}
-                  . Adding or removing a member updates the seat count and
-                  Stripe prorates automatically.
+                  . {SEAT_SYNC}
                 </p>
                 {team.role === "owner" && (
                   <form action={openTeamPortal} className="mt-4">

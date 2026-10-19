@@ -18,7 +18,7 @@ import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
 import { PersonBadge } from "../person-badge";
 import { personName } from "@/lib/person";
-import { planShownOf, renewsOn } from "@/lib/billing-view";
+import { SEAT_SYNC, SEAT_SYNC_REMOVE, planShownOf, renewsOn } from "@/lib/billing-view";
 import { cookies } from "next/headers";
 import { TZ_COOKIE, readerTimeZone } from "@/lib/reader-day";
 
@@ -351,7 +351,7 @@ export default async function BillingPage({
           </div>
           <p className="mt-2 text-xs text-muted">
             {team.planActive
-              ? `One subscription, ${team.seatCount} ${team.seatCount === 1 ? "seat" : "seats"} — adding or removing a member updates the seat count immediately and Stripe prorates the difference automatically.${
+              ? `One subscription, ${team.seatCount} ${team.seatCount === 1 ? "seat" : "seats"}. ${SEAT_SYNC}${
                   team.currentPeriodEnd
                     ? ` Renews ${renewsOn(team.currentPeriodEnd, timeZone)}.`
                     : ""
@@ -405,8 +405,7 @@ export default async function BillingPage({
             </ul>
             {team.role === "owner" && team.planActive && (
               <p className="mt-2 text-xs text-muted">
-                Removing a member drops the seat count — and the invoice — in
-                the same action.
+                {SEAT_SYNC_REMOVE}
               </p>
             )}
           </div>

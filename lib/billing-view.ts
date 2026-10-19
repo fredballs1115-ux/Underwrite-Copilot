@@ -39,6 +39,18 @@ export function planShownOf(billing: PlanBillingLike | null): PlanShown {
 }
 
 /**
+ * What a change to the roster does to the bill. The team actions sync
+ * Stripe's seat count after their response (`after(() =>
+ * syncTeamSeats(…))` in app/(app)/team/actions.ts), best effort, and the
+ * webhook syncs again on a membership change — so the pages say "right
+ * after", never "immediately" or "in the same action".
+ */
+export const SEAT_SYNC =
+  "Adding or removing a member updates Stripe's seat count right after, and Stripe prorates the difference.";
+export const SEAT_SYNC_REMOVE =
+  "Removing a member updates Stripe's seat count right after, and Stripe prorates the difference on the next invoice.";
+
+/**
  * The day a subscription renews, on the reader's own calendar —
  * "November 1, 2026". Stripe stamps the period's end as an instant; the
  * server's clock runs UTC, so a period ending at 2 am UTC had read a day
