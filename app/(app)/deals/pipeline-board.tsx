@@ -28,6 +28,9 @@ import type { DealCard } from "./pipeline";
 
 export type BoardColumn = { stage: Stage; deals: DealCard[] };
 
+/** Select mode's checkbox for a card, handed in as the stage select is. */
+type SelectControl = (d: DealCard, checked: boolean, onToggle: (id: string) => void) => ReactNode;
+
 /** The figure a pipeline reads a deal by, beside its price: the cap, else a
  *  plan deal's yield on cost, else a note's or a position's own yield, else
  *  why none is struck — the list row's cap cell, in its words. */
@@ -76,6 +79,7 @@ const BoardCard = memo(function BoardCard({
   onToggle,
   todayIso,
   stageControl,
+  selectControl,
 }: {
   d: DealCard;
   compareMode: boolean;
@@ -83,6 +87,7 @@ const BoardCard = memo(function BoardCard({
   onToggle: (id: string) => void;
   todayIso: string;
   stageControl: (d: DealCard) => ReactNode;
+  selectControl?: SelectControl;
 }) {
   const isDead = normalizeStage(d.stage) === "dead";
   const asset = assetMeta(d.assetClass ?? "");
@@ -118,7 +123,7 @@ const BoardCard = memo(function BoardCard({
       // never faded (research pass 33).
       className={`rounded-xl border border-l-[3px] border-line bg-surface shadow-card ${
         d.assetClass ? asset.rail : ""
-      } ${isDead ? "grayscale" : ""}`}
+      } ${isDead ? "grayscale" : ""} ${selectControl && checked ? "ring-2 ring-brand/40" : ""}`}
     >
       {compareMode ? (
         <button
@@ -147,7 +152,11 @@ const BoardCard = memo(function BoardCard({
         <span className="flex shrink-0">
           <TileCall d={d} />
         </span>
-        {!compareMode && <span className="ml-auto block w-36 shrink-0">{stageControl(d)}</span>}
+        {selectControl ? (
+          <span className="ml-auto flex shrink-0">{selectControl(d, checked, onToggle)}</span>
+        ) : !compareMode ? (
+          <span className="ml-auto block w-36 shrink-0">{stageControl(d)}</span>
+        ) : null}
       </div>
     </li>
   );
@@ -165,6 +174,7 @@ export function PipelineBoard({
   onToggle,
   todayIso,
   stageControl,
+  selectControl,
 }: {
   columns: BoardColumn[];
   compareMode: boolean;
@@ -174,6 +184,10 @@ export function PipelineBoard({
   todayIso: string;
   /** a card's stage select, handed in as the cards' is */
   stageControl: (d: DealCard) => ReactNode;
+  /** select mode's checkbox, in the stage select's place while the mode is
+   *  on (pipeline-select `selectBoxFor`); `selected` and `onToggle` are then
+   *  the selection's */
+  selectControl?: SelectControl;
 }) {
   return (
     <ScrollRegion label="The pipeline as a board, a column a stage" className="pb-2" data-view="board">
@@ -207,6 +221,7 @@ export function PipelineBoard({
                       onToggle={onToggle}
                       todayIso={todayIso}
                       stageControl={stageControl}
+                      selectControl={selectControl}
                     />
                   ))}
                 </ul>

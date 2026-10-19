@@ -17,6 +17,7 @@ import { compactUsd } from "@/lib/money";
 import { csvNumber, csvText } from "@/lib/csv-cell";
 import { MAX_COMPS } from "@/lib/tools/comp-grid";
 import { compEvidence, MEDIAN_FLOOR, sharedDeedCounts, type RecordComp, type RecordCompsResult } from "./core";
+import { leaveOutLabel, type SalesOut } from "./kept";
 
 /** The readout's own band for comparing the subject with the middle. */
 export const SUBJECT_BAND: Readonly<{ low: number; high: number }> = { low: 0.25, high: 4 };
@@ -217,10 +218,12 @@ const cell = (v: string) => v.replace(/[\t\r\n]+/g, " ").trim();
 /**
  * The sales as a spreadsheet takes them: a header, then one row a sale,
  * tab-delimited, the numbers raw (a price, a distance in miles to two
- * places) so they paste as numbers, never "$1.2M".
+ * places) so they paste as numbers, never "$1.2M". A sale the reader left
+ * out of the readout (lib/public-comps/kept) stays a row, its reason in the
+ * last column; a kept sale's is blank.
  */
-export function compsTableText(r: Pick<RecordCompsResult, "comps">): string {
-  const head = ["#", "Sold", "Address", "Price", "$/SF", "Units", "$/unit", "Type", "Buyer", "Seller", "Deed type", "Miles", "Source"].join("\t");
+export function compsTableText(r: Pick<RecordCompsResult, "comps">, out: SalesOut = new Map()): string {
+  const head = ["#", "Sold", "Address", "Price", "$/SF", "Units", "$/unit", "Type", "Buyer", "Seller", "Deed type", "Miles", "Source", "Left out of the readout"].join("\t");
   const rows = r.comps.map((c, i) =>
     [
       String(i + 1),
@@ -236,9 +239,17 @@ export function compsTableText(r: Pick<RecordCompsResult, "comps">): string {
       cell(c.deedType ?? ""),
       (c.distanceKm / 1.609344).toFixed(2),
       cell(c.sourceUrl),
+      outCell(out, i),
     ].join("\t"),
   );
   return [head, ...rows].join("\n");
+}
+
+/** A sale's reason for being left out of the readout, or "" where it is
+ *  kept. */
+function outCell(out: SalesOut, at: number): string {
+  const reason = out.get(at);
+  return reason ? leaveOutLabel(reason) : "";
 }
 
 /** The provenance and the sales a "Download CSV" writes. */
@@ -260,12 +271,18 @@ const isoDay = (iso: string | null | undefined): string => {
  * across parcels (`sharedDeedCounts`: how many rows share its day, buyer and
  * price; blank where none does), and the dataset with the day it was
  * retrieved (its UTC day, the header says so), on every row so a filtered or
- * pasted row keeps its source. The numbers are raw (no $, no commas: a
+ * pasted row keeps its source; and last the reason a sale was left out of
+ * the readout (lib/public-comps/kept) — the row stays, marked, never
+ * dropped, and a kept sale's cell is blank. The numbers are raw (no $, no commas: a
  * price, a distance in miles to two places) and every text cell goes
  * through lib/csv-cell's escaper, the pipeline CSV's own, so a deed's buyer
  * that opens on "=" never runs.
  */
-export function compsCsv(r: CompsCsvSource, order: ReadonlyArray<number> = r.comps.map((_, i) => i)): string {
+export function compsCsv(
+  r: CompsCsvSource,
+  order: ReadonlyArray<number> = r.comps.map((_, i) => i),
+  out: SalesOut = new Map(),
+): string {
   const head = [
     "#",
     "Sold",
@@ -284,6 +301,7 @@ export function compsCsv(r: CompsCsvSource, order: ReadonlyArray<number> = r.com
     "Dataset",
     "Dataset URL",
     "Retrieved (UTC)",
+    "Left out of the readout",
   ];
   const shared = sharedDeedCounts(r.comps);
   const retrieved = isoDay(r.retrievedAt);
@@ -309,6 +327,7 @@ export function compsCsv(r: CompsCsvSource, order: ReadonlyArray<number> = r.com
         csvText(r.providerName ?? ""),
         csvText(r.datasetUrl ?? ""),
         csvText(retrieved),
+        csvText(outCell(out, at)),
       ].join(",");
     });
   return [head.map(csvText).join(","), ...rows].join("\n");

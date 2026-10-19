@@ -799,10 +799,15 @@ export function sharedDeedCounts(comps: Pick<RecordComp, "saleDate" | "buyer" | 
  * deed may convey parcels outside the radius or the class the search kept —
  * the same rows the $/SF bars leave out (lib/public-comps/picture
  * `perSfBars`), so the bars and the median's tick are of one set.
+ *
+ * `shared` (indexed as `comps`) overrides the flags read off `comps` alone:
+ * the readout of a set some rows were left out of passes the flags read on
+ * the FULL list, so a deed's row stays a deed's (no area) when its other
+ * rows are left out — leaving one row out never re-admits the deed's $/SF.
  */
-export function compStats(comps: RecordComp[]): RecordCompsStats | undefined {
+export function compStats(comps: RecordComp[], sharedOverride?: readonly number[]): RecordCompsStats | undefined {
   if (comps.length === 0) return undefined;
-  const shared = sharedDeedCounts(comps);
+  const shared = sharedOverride ?? sharedDeedCounts(comps);
   const seen = new Set<string>();
   const sales: { price: number; sqft: number | null }[] = [];
   let sharedRows = 0;

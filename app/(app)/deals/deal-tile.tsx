@@ -163,6 +163,7 @@ export const DealTile = memo(function DealTile({
   todayIso,
   preview,
   stageControl,
+  selectControl,
   lazy = false,
 }: {
   d: DealCard;
@@ -183,6 +184,11 @@ export const DealTile = memo(function DealTile({
    *  a server action's form): this module imports none, so a page that
    *  draws only the preview — the homepage — loads no server action */
   stageControl?: (d: DealCard) => ReactNode;
+  /** select mode's checkbox (pipeline-select `selectBoxFor`), drawn at the
+   *  foot in the stage control's place while the mode is on — `checked`
+   *  and `onToggle` are then the selection's; handed in like the stage
+   *  control, so this module loads none of the mode */
+  selectControl?: (d: DealCard, checked: boolean, onToggle: (id: string) => void) => ReactNode;
   /** asked for as it nears the screen, whatever its place: a card far down
    *  a page (the homepage's) is no first picture */
   lazy?: boolean;
@@ -552,7 +558,7 @@ export const DealTile = memo(function DealTile({
                 <span className="sr-only">added by {displayName(d.addedBy)}</span>
               </span>
             ) : null}
-            <span className="ml-auto">{stageControl?.(d)}</span>
+            <span className="ml-auto">{selectControl ? selectControl(d, checked, onToggle) : stageControl?.(d)}</span>
           </div>
         </>
       )}

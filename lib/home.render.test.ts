@@ -72,7 +72,7 @@ describe("the homepage, as a screen reader hears it", () => {
     const html = await renderHome();
     const text = html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "");
     expect(text).toContain("Excel model, live formulas Pro");
-    expect(text).toContain("One-page IC memo Pro");
+    expect(text).toContain("IC memo Pro");
     expect(text).not.toMatch(/formulasPro|memoPro/);
   }, 60_000);
 
@@ -334,7 +334,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
   // names and grades.
   it("the memo tile draws the memo it downloads, and the comps tile the sample's own comps", async () => {
     const html = await renderHome();
-    const at = html.indexOf("One-page IC memo");
+    const at = html.indexOf("IC memo<");
     expect(at).toBeGreaterThan(-1);
     const tile = words(html.slice(at, html.indexOf("/api/demo/memo", at)));
     const memo = sampleMemoData();
@@ -737,5 +737,16 @@ describe("the hero's photograph is downloaded once", () => {
     expect(skylineSrcSetOf(`/api/imagery/skyline/philadelphia?w=1600&v=${tag}`)).toBe(skylineSrcSet("philadelphia"));
     expect(skylineSrcSetOf("/api/deals/abc/picture?size=card")).toBeNull();
     expect(skylineSrcSetOf("https://example.com/api/imagery/skyline/philadelphia?w=1600&v=x")).toBeNull();
+  });
+});
+
+describe("the homepage footer's steward line", () => {
+  // The steward's run is stamped in UTC (lib/utc-day): both the verified line
+  // and the overdue one say so; the overdue one had printed a bare day.
+  it("says UTC after every day it prints of the steward's last run", () => {
+    const src = readFileSync("app/page.tsx", "utf8");
+    const days = [...src.matchAll(/\{fmt\(verifiedAt\)\}(.{0,4})/g)].map((m) => m[1]);
+    expect(days.length).toBe(2);
+    for (const after of days) expect(after.startsWith(" UTC")).toBe(true);
   });
 });

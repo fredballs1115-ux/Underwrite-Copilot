@@ -77,7 +77,8 @@ function legalToday() {
 // Deliberately FOCUSED coverage (per direction): FIFTEEN markets, full stop
 // — the DMV core (one market, four jurisdiction entries) + the rest of the
 // Mid-Atlantic + the biggest US markets. Research and website coverage stop
-// at this list; outside it the screener says "unscreened", never guesses.
+// at this list; outside it the screen runs on the statewide rules and the
+// state's published figures, and says "unscreened" where no rule is on file.
 const MAJOR_MARKETS = (metrosSeed.metros ?? []).filter(
   (m) => (m as { region?: string }).region === "Major US markets"
 );
@@ -231,7 +232,7 @@ const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Your pipeline as photo cards, a list or a map",
+    label: "Your pipeline as photo cards, a list, a board or a map",
     icon: (
       <Icon>
         <rect x="3" y="3" width="8" height="8" rx="1.5" />
@@ -795,7 +796,7 @@ export default function Home() {
                     </span>
                   </h1>
                   <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                    Upload the OM. Every figure labelled with where it came from, the three deal-killers stressed, a Go / Caution / No-go.
+                    Upload the OM. Every figure labelled with its page, or marked where none was found, the three deal-killers stressed, a Go / Caution / No-go.
                   </p>
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link
@@ -1107,7 +1108,7 @@ export default function Home() {
                 {/* Memo */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                    One-page IC memo{" "}
+                    IC memo{" "}
                     <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
                   </h3>
                   {/* The memo it downloads: its own title, call and key
@@ -1532,8 +1533,10 @@ async function FooterTrustLine() {
     // table absent — render without the marker
   }
   const overdue = verifiedAt !== null && hoursSince(verifiedAt) > 48;
+  // A job's bare day says UTC, with its year (CLAUDE.md's rule for a day
+  // read off a timestamp).
   const fmt = (t: string | Date) =>
-    new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
   // Same checked-in changelog the app's What's-new card renders — the
   // homepage can never claim an improvement the app doesn't ship.
   const latest = latestChange();
@@ -1567,12 +1570,12 @@ async function FooterTrustLine() {
           ({fmt(`${latest.date}T00:00:00Z`)})
         </>
       )}
-      {verifiedAt && !overdue && <> · research data last verified {fmt(verifiedAt)} by the nightly steward</>}
+      {verifiedAt && !overdue && <> · research data last verified {fmt(verifiedAt)} UTC by the nightly steward</>}
       {verifiedAt && overdue && (
         <>
           {" · "}
           <span className="text-caution">
-            research data verification overdue (last ran {fmt(verifiedAt)})
+            research data verification overdue (last ran {fmt(verifiedAt)} UTC)
           </span>
         </>
       )}

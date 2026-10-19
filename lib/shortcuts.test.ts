@@ -19,6 +19,7 @@ import {
   SHORTCUT_SEARCH,
   dealStepOf,
   isTypingTarget,
+  KEYS_PASS_ATTR,
   neighbourIn,
   opensShortcuts,
   orderJson,
@@ -67,6 +68,36 @@ describe("the keys stand down where a reader is typing or a dialog is open", () 
       expect(pipelineKeyAction(key("Escape", { target: t }), { canNew: true })).toBeNull();
     }
     expect(isTypingTarget(el("BUTTON"))).toBe(false);
+  });
+
+  it("goes on working from an input marked to pass the keys — the pipeline's select-mode checkbox — so Escape leaves the mode from it", () => {
+    const marked = (type: string) => ({ ...el("INPUT"), type, hasAttribute: (n: string) => n === KEYS_PASS_ATTR });
+    for (const type of ["checkbox", "radio", "CHECKBOX", "submit", "button", "reset"]) {
+      const t = marked(type);
+      expect(isTypingTarget(t), type).toBe(false);
+      expect(pipelineKeyAction(key("Escape", { target: t }), { canNew: true }), type).toBe("escape");
+      expect(pipelineKeyAction(key("j", { target: t }), { canNew: true }), type).toBe("next");
+    }
+    // A text field of any kind still stands the keys down, marked or not.
+    for (const type of ["text", "search", "email", "number", "date", ""]) {
+      expect(isTypingTarget({ ...el("INPUT"), type }), type).toBe(true);
+      expect(isTypingTarget(marked(type)), type).toBe(true);
+    }
+    // The select-mode checkbox carries the mark.
+    expect(readFileSync("app/(app)/deals/pipeline-select.tsx", "utf8")).toMatch(/type="checkbox"\s+data-keys-pass\b/);
+    expect(KEYS_PASS_ATTR).toBe("data-keys-pass");
+    // The pipeline leaves select mode on the pipeline's Escape.
+    const pipeline = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
+    expect(pipeline).toMatch(/onEscape: \(\) => \{\s*setShowForm\(false\);\s*if \(select\.on\) select\.leave\(\);/);
+  });
+
+  it("stands down on any other checkbox or radio: the letter of intent's \"Financing contingency\" keeps \"]\" from leaving the page and its draft", () => {
+    for (const type of ["checkbox", "radio", "submit", "button"]) {
+      const plain = { ...el("INPUT"), type, hasAttribute: () => false };
+      expect(isTypingTarget(plain), type).toBe(true);
+      expect(isTypingTarget({ ...el("INPUT"), type }), type).toBe(true);
+      expect(shortcutsStandDown(key("]", { target: plain })), type).toBe(true);
+    }
   });
 
   it("stands down inside a dialog, and with a modal open wherever the focus is", () => {

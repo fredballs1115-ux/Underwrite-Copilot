@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CompsResultView } from "../app/(app)/comps/result-view";
 import type { RecordComp, RecordCompsResult } from "./public-comps/core";
 import { compStats } from "./public-comps/core";
+import { saleKey } from "./public-comps/kept";
 import type { SubjectForCall } from "./public-comps/vs-median";
 import { DB_MARKETS, marketNames } from "./public-comps/db-markets";
 import { CoverageChips } from "../app/(app)/comps/coverage-chips";
@@ -365,5 +366,105 @@ describe("the comps readout as pictures", () => {
     expect(count(two, "comps-psf")).toBe(4);
     expect(count(two, "comps-psf-median")).toBe(0);
     expect(visibleText(two)).not.toContain("the tick is the median");
+  });
+});
+
+describe("a sale left out of the readout", () => {
+  const comps = Array.from({ length: 6 }, (_, i) => sale(i));
+  const onComps = (outParam: string | null, onDeal = false, cs = comps) =>
+    renderToStaticMarkup(React.createElement(CompsResultView, { result: result(cs), showMap: false, sortParam: null, outParam, onDeal }));
+  /** A link naming sales by their pins here ("6nc,2"), written as the page
+   *  writes it: each sale by its identity (lib/public-comps/kept `saleKey`). */
+  const byPin = (pinsText: string, cs = comps) =>
+    pinsText
+      .split(",")
+      .map((t) => /^(\d+)([a-z]{2})?$/.exec(t)!)
+      .map((m) => `${saleKey(cs[Number(m[1]) - 1])}${m[2] ? `-${m[2]}` : ""}`)
+      .join(",");
+
+  it("stays listed, dimmed and struck through with its reason, and the readout says how many were kept", () => {
+    // pin 6, the dearest ($525,000), left out as not comparable
+    const html = onComps(byPin("6nc"));
+    dumpView("comps-left-out", `<section class="rounded-xl border border-line bg-surface p-4">${html}</section>`);
+    const text = visibleText(html).replace(/\s+/g, " ");
+    // its card and its table row, both marked, both still listed
+    expect(html.split('data-left-out="true"').length - 1).toBe(2);
+    expect(text.split("105 Walnut St").length - 1).toBe(2);
+    expect(html.split('data-qa="comps-left-out"').length - 1).toBe(2);
+    expect(text).toContain("Left out of the readout: not comparable");
+    expect(html).toMatch(/line-through[^"]*">\$525,000</);
+    // the readout reads the five kept: their count, their range
+    expect(text).toContain("5 recorded sales");
+    expect(text).toContain("range $400,000–$500,000");
+    expect(text).toMatch(/5 of 6 sales kept ?; the figures above are the kept sales' — left out: not comparable \(1\)\./);
+    expect(text).toContain("Keep all");
+    // the price track draws the five kept, each on its own pin
+    expect(count(html, "comps-sale")).toBe(5);
+    expect(html).not.toMatch(/title="6\. \$525,000"/);
+    // the control on each sale says which: one "Out", the rest "Kept"
+    expect(html.split('data-qa="comps-keep"').length - 1).toBe(12);
+    expect(html.match(/<option value="not_comparable" selected="">/g)?.length).toBe(2);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("holds the floors to the kept count, and draws no $/SF bar for a sale left out", () => {
+    // four of six left out: two kept, no median, the midpoint said as one
+    const html = onComps(byPin("1nc,2wc,3sd,4ot"));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toContain("2 recorded sales");
+    expect(text).toContain("midpoint of the two");
+    expect(text).toContain("Two sales cannot establish a middle.");
+    expect(count(html, "comps-median")).toBe(0);
+    expect(text).toContain("2 of 6 sales kept");
+    expect(text).toContain("not comparable (1), wrong class (1), possible shared deed (1), other (1)");
+    // sales 1, 3, 5 state an area; with pins 2 and 4 left out only pin 6 is
+    // kept among them, so no bars at all (one bar is scaled to nothing)
+    expect(count(html, "comps-psf")).toBe(0);
+    // one left out of the six: its bar goes, the rest stay
+    const one = onComps(byPin("4wc")); // pin 4 is sale 3, which states an area
+    expect(count(one, "comps-psf")).toBe(4);
+    expect(visibleText(one).replace(/\s+/g, " ")).toMatch(/Bars: the price a square foot that 2 of the 5 kept sales state/);
+  });
+
+  it("keeps a deed's row a deed's when its other row is left out: its $/SF never comes back", () => {
+    const deed = { buyer: "Acme LLC", saleDate: "2026-01-15", price: 9_000_000, sqft: 2_000 };
+    const set = [sale(0, deed), sale(1, deed), sale(2, { sqft: 2_000 }), sale(3, { sqft: 2_000 }), sale(4, { sqft: 2_000 })];
+    // pin 2, the deed's second row, left out as a possible shared deed
+    const html = onComps(byPin("2sd", set), false, set);
+    const text = visibleText(html).replace(/\s+/g, " ");
+    // pin 1 is still the deed's: no area in the $/SF median ($225, $238, $250)
+    expect(text).toContain("$238/SF on 3 of 4 sales");
+    // the kept line counts the list's rows, and says so
+    expect(text).toContain("4 of 5 rows kept");
+    // and no bar: three drawn (a card and a table row each), the deed's row
+    // named as drawing none
+    expect(count(html, "comps-psf")).toBe(6);
+    expect(text).toContain("One row possibly of one deed across parcels draws no bar");
+  });
+
+  it("reads no figures where every sale is left out, and keeps the list to bring one back", () => {
+    const html = onComps(byPin("1,2,3,4,5,6"));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toContain("every one left out of the readout, so it reads no figures");
+    expect(text).toContain("0 of 6 sales kept — left out: other (6).");
+    expect(count(html, "comps-sale")).toBe(0);
+    expect(html.split('data-left-out="true"').length - 1).toBe(12);
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("drops what the link cannot mean, and says nothing where every sale is kept", () => {
+    // an old link's pin numbers, a key no sale bears, junk
+    const html = onComps("6nc,9nc,0wc,x,zzzzzzz-nc");
+    expect(html).not.toContain('data-left-out="true"');
+    expect(visibleText(html)).not.toContain("sales kept");
+    expect(visibleText(html)).toContain("6 recorded sales");
+  });
+
+  it("keeps the set for the visit on a deal's panel, never from the page's address", () => {
+    const html = onComps(byPin("6nc"), true);
+    expect(html).not.toContain('data-left-out="true"');
+    expect(html.split('data-qa="comps-keep"').length - 1).toBe(12);
+    expect(a11yIssues(html)).toEqual([]);
   });
 });

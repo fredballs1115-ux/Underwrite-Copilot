@@ -24,6 +24,8 @@ describe("public pages — every market and sector page, named for itself (#430)
     expect(dc.description).toContain("research brief");
     const pitt = marketMeta(marketPageFor("pittsburgh"), null);
     expect(pitt.title).toContain("Pittsburgh PA");
+    // A metro with no permit series claims no supply in its title.
+    expect(marketMeta(marketPageFor("cleveland"), null).title).toBe("Cleveland OH market data: rents, vacancy, jobs");
     expect(pitt.description).not.toContain("brief");
     // The metro wins when a link carries both.
     expect(marketMeta(marketPageFor("dc"), sectorPageFor("office")).canonical).toBe("/market?metro=dc");

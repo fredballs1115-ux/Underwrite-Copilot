@@ -111,6 +111,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { Metadata } from "next";
 import { dealTitle } from "@/lib/deal-title";
 import { omLinkFor } from "@/lib/om-link";
+import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { isPro } from "@/lib/billing";
 import { sampleExportsFree } from "@/lib/sample-exports";
@@ -591,7 +592,10 @@ export default async function DealPage({
   // The link to the OM the user uploaded, and the base of every "p. N"
   // chip: a route that signs the file when it is clicked (lib/om-link), so
   // a page left open past the signed URL's hour still opens it.
-  const omUrl = omLinkFor(id, deal.om_storage_path);
+  // The sample stores no memorandum: its chips open the fictional one the
+  // public pages open (lib/sample-om), so the signed-in sample's citations
+  // keep the same promise.
+  const omUrl = (deal as { is_sample?: boolean }).is_sample && !deal.om_storage_path ? SAMPLE_OM_HREF : omLinkFor(id, deal.om_storage_path);
   // The building's own photograph — the cover of its memorandum, lifted out
   // on the first view and stored — leads the visual below. Null means the
   // overhead leads, as before.

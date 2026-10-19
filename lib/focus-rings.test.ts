@@ -55,6 +55,20 @@ describe("the focus ring, wherever a keyboard reaches", () => {
     expect(pipeline).toMatch(/data-flip-step=\{step\}[\s\S]{0,200}focus-on-photo/);
   });
 
+  it("is the page's own round a select-mode checkbox, drawn at a card's foot where the card's clip leaves it room", () => {
+    // A native input with no outline of its own to take the ring away: the
+    // unlayered :focus-visible rule draws it.
+    const select = src("app/(app)/deals/pipeline-select.tsx");
+    const input = select.match(/<input\s+type="checkbox"[\s\S]*?\/>/)?.[0] ?? "";
+    expect(input).toMatch(/data-select-deal=\{id\}/);
+    expect(input).not.toMatch(/outline-none|focus-visible:|focus:/);
+    // On a card it sits in the footer, outside the link and the picture the
+    // card clips (`overflow-hidden`), with the footer's padding round it.
+    const tile = src("app/(app)/deals/deal-tile.tsx");
+    const footer = tile.slice(tile.indexOf('<div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">', tile.indexOf("data-deal-nav className=\"row-span-4")));
+    expect(footer).toMatch(/^[\s\S]{0,1600}selectControl\(d, checked, onToggle\)/);
+  });
+
   it("is never asked of a Tailwind focus-visible outline utility, which the unlayered rule overrides", () => {
     // Such a utility never applies (its colour, width or offset): a ring a
     // context needs is an unlayered rule above, keyed on the context.

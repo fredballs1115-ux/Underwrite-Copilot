@@ -25,7 +25,7 @@ export const DEAL_TOOL_LABEL: Record<DealToolKind, string> = {
 
 /** What each tool is, said in its tooltip. */
 export const DEAL_TOOL_TITLE: Record<Exclude<DealToolKind, "bridge">, string> = {
-  memo: "One-page IC screening memo — verdict, buy-box fit, flags, next steps",
+  memo: "IC screening memo, one page where it fits — verdict, buy-box fit, flags, next steps",
   report: "The full screening report — memo plus every term, challenge, comp, and market check",
   model: "Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates",
   rentRoll: "Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model",
@@ -34,7 +34,7 @@ export const DEAL_TOOL_TITLE: Record<Exclude<DealToolKind, "bridge">, string> = 
 
 /** A download's tooltip where the reader's plan does not include it. */
 export const DEAL_TOOL_PRO_TITLE: Record<"memo" | "report" | "model", string> = {
-  memo: "One-page IC screening memo — part of Pro",
+  memo: "IC screening memo — part of Pro",
   report: "The full screening report — part of Pro",
   model: "Institutional acquisition model (Excel) — part of Pro",
 };

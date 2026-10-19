@@ -27,7 +27,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { keys: ["j"], does: "Move to the next deal", where: "pipeline" },
   { keys: ["k"], does: "Move to the previous deal", where: "pipeline" },
   { keys: ["Enter"], does: "Open the deal in focus", where: "pipeline" },
-  { keys: ["Esc"], does: "Close the new-deal form", where: "pipeline" },
+  { keys: ["Esc"], does: "Close the new-deal form, or leave select mode", where: "pipeline" },
   { keys: ["["], does: "Open the previous deal in the pipeline's order", where: "deal" },
   { keys: ["]"], does: "Open the next deal in the pipeline's order", where: "deal" },
 ];
@@ -71,6 +71,12 @@ export function typedWithAltGraph(e: KeyLike): boolean {
 
 type TargetLike = {
   tagName?: string;
+  /** an input's type: a checkbox, a radio or a button is pressed, never
+   *  typed into */
+  type?: string;
+  /** whether it carries an attribute — `KEYS_PASS_ATTR` marks an input the
+   *  page's keys go on working from */
+  hasAttribute?: (name: string) => boolean;
   isContentEditable?: boolean;
   closest?: (selector: string) => unknown;
 };
@@ -83,12 +89,33 @@ export const DIALOG_SELECTOR = '[role="dialog"],[role="alertdialog"]';
  *  down under it as they do inside it. */
 export const MODAL_SELECTOR = '[aria-modal="true"]';
 
-/** Whether the focus is in a field a reader types into. */
+/** The attribute that hands the page's keys an input a reader presses
+ *  rather than types into: the pipeline's select-mode checkboxes carry it,
+ *  so Escape leaves the mode from one and "j" and "k" step on from it. Any
+ *  other input — a checkbox on a form included (the letter of intent's
+ *  "Financing contingency", where "]" would leave the page and its draft) —
+ *  stands the keys down. */
+export const KEYS_PASS_ATTR = "data-keys-pass";
+
+/** The inputs the mark is honoured on: a text field stands the keys down
+ *  whatever it carries. */
+const PRESSED_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset"]);
+
+/** Whether the focus is in a field a reader types into: every input,
+ *  textarea, select and editable element, but a pressed input marked with
+ *  `KEYS_PASS_ATTR`. */
 export function isTypingTarget(target: unknown): boolean {
   const t = target as TargetLike | null;
   if (!t || typeof t !== "object") return false;
   const tag = (t.tagName ?? "").toUpperCase();
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable === true;
+  if (tag === "INPUT") {
+    const passes =
+      PRESSED_INPUTS.has(String(t.type ?? "").toLowerCase()) &&
+      typeof t.hasAttribute === "function" &&
+      t.hasAttribute(KEYS_PASS_ATTR) === true;
+    return !passes;
+  }
+  return tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable === true;
 }
 
 /**

@@ -51,6 +51,7 @@ import { deadlineDay } from "@/lib/deadline-day";
 import { currentOutcome, readOutcomeForm, withOutcome } from "@/lib/deal-outcome";
 import { personName } from "@/lib/person";
 import { writeStageGuarded } from "@/lib/stage-write";
+import { readBulkStageForm, type BulkStageResult } from "@/lib/bulk-stage";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -793,6 +794,79 @@ export async function setStage(formData: FormData) {
   revalidatePath("/deals");
   redirect(backTo);
 }
+
+/** Move several deals to one stage — the pipeline's select mode, "Move to
+ *  stage…" and "Mark dead". The single change's own rules, deal by deal:
+ *  the reader's session client, so row-level security decides who may see
+ *  and write each deal (its creator, or any teammate); the same guarded
+ *  write (lib/stage-write), each change appended to the deal's history with
+ *  its date; never the sample deal. A deal the reader cannot see, the
+ *  sample, and a write that did not land are counted as refused, never
+ *  written around. `BULK_STAGE_MAX` deals at most (lib/bulk-stage). */
+export async function bulkSetStage(formData: FormData): Promise<BulkStageResult> {
+  const form = readBulkStageForm(formData);
+  if (!form.ok) return form;
+  const { stage, ids } = form;
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "auth" };
+
+  // Which of them the reader may read at all, and which is a sample: a row
+  // RLS hides is not in the answer, and is refused without a write.
+  const { data: rows, error: readError } = await supabase
+    .from("deals")
+    .select("id, is_sample")
+    .in("id", ids);
+  if (readError) return { ok: true, stage, changed: 0, unchanged: 0, refused: ids.length, settled: [] };
+  const writable = new Set(
+    ((rows ?? []) as { id: string; is_sample?: boolean | null }[])
+      .filter((r) => !r.is_sample)
+      .map((r) => String(r.id).toLowerCase()),
+  );
+  const targets = ids.filter((id) => writable.has(id));
+
+  let changed = 0;
+  let unchanged = 0;
+  const moved: string[] = [];
+  const settled: string[] = [];
+  const now = new Date().toISOString();
+  // A few at a time: fifty deals one after another is a long wait, fifty at
+  // once a burst the database need not take.
+  for (let at = 0; at < targets.length; at += BULK_STAGE_BATCH) {
+    const results = await Promise.all(
+      targets.slice(at, at + BULK_STAGE_BATCH).map(async (dealId) => {
+        const written = await writeStageGuarded(supabase, dealId, (current) => {
+          if (normalizeStage(current.stage as string) === stage) return { skip: "unchanged" };
+          const history = [...parseStageHistory(current.stage_history), { stage, at: now }];
+          return { patch: { stage, stage_history: history, updated_at: now } };
+        });
+        return { dealId, written };
+      }),
+    );
+    for (const { dealId, written } of results) {
+      if (written.ok) {
+        changed++;
+        moved.push(dealId);
+        settled.push(dealId);
+      } else if (written.why === "unchanged") {
+        unchanged++;
+        settled.push(dealId);
+      }
+    }
+  }
+
+  for (const dealId of moved) revalidatePath(`/deals/${dealId}`);
+  // A deal already at the stage means the reader's list was behind the
+  // database (another tab, a teammate): the list is read again for it too.
+  if (moved.length > 0 || unchanged > 0) revalidatePath("/deals");
+  return { ok: true, stage, changed, unchanged, refused: ids.length - changed - unchanged, settled };
+}
+
+/** How many deals a bulk change writes at once. */
+const BULK_STAGE_BATCH = 5;
 
 /** Why a dead deal died, and what it — or a closed one — traded at
  *  (research pass 24, B4): stored on the stage-history entry that ended the

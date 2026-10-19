@@ -9,13 +9,26 @@
 // one scale with the median's tick where the readout names one
 // (lib/public-comps/picture `perSfBars`). On /comps the order is kept in the
 // page's address (`?sort=`), so a reload or a shared link opens on it; the
-// deal page's panel keeps it for the visit only.
+// deal page's panel keeps it for the visit only. Where the readout hands it
+// the control (./comps-readout), each sale can be left out of the readout
+// with a reason, the way an appraiser's grid does: it stays listed, dimmed
+// and struck through, says why, draws no $/SF bar, and is marked in the CSV
+// (lib/public-comps/kept).
 
-import { useCallback, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { compactUsd } from "@/lib/money";
 import { fmtMiles } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import type { RecordComp } from "@/lib/public-comps/core";
+import {
+  LEAVE_OUT_REASONS,
+  barsOnList,
+  isLeaveOutReason,
+  keptSales,
+  leaveOutLabel,
+  type LeaveOutReason,
+  type SalesOut,
+} from "@/lib/public-comps/kept";
 import {
   SALES_SORTS,
   SALES_SORT_PARAM,
@@ -34,6 +47,7 @@ import {
 } from "@/lib/public-comps/picture";
 import { ScrollRegion } from "@/app/scroll-region";
 import { CopySalesButton, DownloadSalesButton } from "./record-sales-map";
+import { addressParam, useAddressParam } from "./address-param";
 
 /** The list shows this many sales; the rest fold behind "Show all". */
 export const SALES_SHOWN = 12;
@@ -48,57 +62,14 @@ const fmtDate = (iso: string) => {
 };
 
 /**
- * The order in the page's address, the way /tools keeps its fields
- * (app/tools/deal-math-tools `useShared`): `history.replaceState`, never the
- * router — no navigation, nothing re-rendered on the server, and Back still
- * leaves the page — debounced, and every other parameter the page carries
- * (the address, the radius, the window, the class) kept as it is.
- *
- * Read through useSyncExternalStore, whose server snapshot is the value the
- * page handed down from its own searchParams: the server's HTML and the
- * browser's first render agree, and window.location is never read while
- * rendering on the server. A choice not yet written is held here until the
- * write, which then hands the truth back to the address.
+ * The order in the page's address (./address-param: replaceState, debounced,
+ * read through useSyncExternalStore with the page's own searchParams as the
+ * server snapshot). Nearest first is the bare link.
  */
-let pendingSort: SalesSort | undefined;
-let sortTimer: ReturnType<typeof setTimeout> | null = null;
-const sortListeners = new Set<() => void>();
+const SORT_IN_ADDRESS = addressParam(SALES_SORT_PARAM);
+const setSortInAddress = (by: SalesSort) => SORT_IN_ADDRESS.set(by === "nearest" ? null : by);
 
-function subscribeSort(fn: () => void): () => void {
-  sortListeners.add(fn);
-  return () => {
-    sortListeners.delete(fn);
-  };
-}
-
-function sortInAddress(): string | null {
-  if (pendingSort !== undefined) return pendingSort;
-  return new URLSearchParams(window.location.search).get(SALES_SORT_PARAM);
-}
-
-function writeSort() {
-  sortTimer = null;
-  if (pendingSort === undefined) return;
-  const q = new URLSearchParams(window.location.search);
-  // Nearest first is the bare link.
-  if (pendingSort === "nearest") q.delete(SALES_SORT_PARAM);
-  else q.set(SALES_SORT_PARAM, pendingSort);
-  const query = q.toString();
-  window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
-  pendingSort = undefined;
-}
-
-function useSortInAddress(fromServer: string | null): [string | null, (by: SalesSort) => void] {
-  const raw = useSyncExternalStore(subscribeSort, sortInAddress, () => fromServer);
-  const set = useCallback((by: SalesSort) => {
-    pendingSort = by;
-    for (const fn of sortListeners) fn();
-    if (sortTimer) clearTimeout(sortTimer);
-    // Debounced: a reader clicking through the orders writes the last one.
-    sortTimer = setTimeout(writeSort, 400);
-  }, []);
-  return [raw, set];
-}
+const NONE_OUT: SalesOut = new Map();
 
 const SORT_ARIA: Record<SalesSort, "ascending" | "descending"> = {
   nearest: "ascending",
@@ -118,6 +89,8 @@ export function SalesList({
   keepSortInUrl = false,
   sortParam = null,
   children,
+  out = NONE_OUT,
+  onOut,
 }: {
   /** the sales nearest first — each one's place is its pin number */
   comps: RecordComp[];
@@ -145,20 +118,34 @@ export function SalesList({
   sortParam?: string | null;
   /** set between the heading and the list (the comp grid's hand-off) */
   children?: ReactNode;
+  /** the sales the reader left out of the readout, by their place in the
+   *  nearest-first list (lib/public-comps/kept): each stays listed, dimmed
+   *  and struck through with its reason, draws no $/SF bar, and is marked
+   *  in the CSV */
+  out?: SalesOut;
+  /** keep a sale again (null) or leave it out for a reason; given, each
+   *  sale gets the control that does it */
+  onOut?: (at: number, reason: LeaveOutReason | null) => void;
 }) {
   const [local, setLocal] = useState<SalesSort>("nearest");
-  const [inAddress, setInAddress] = useSortInAddress(sortParam);
+  const [inAddress] = useAddressParam(SORT_IN_ADDRESS, sortParam);
   // $/SF is offered as an order only where two sales or more state an area.
   const perSfOffered = perSfSortOffered(comps);
   const by = keepSortInUrl ? readSalesSort(inAddress, perSfOffered) : local;
-  const setBy = keepSortInUrl ? setInAddress : setLocal;
+  const setBy = keepSortInUrl ? setSortInAddress : setLocal;
   const order = salesOrder(comps, by);
-  // A row possibly of one deed across parcels sets no scale and draws no bar.
-  const bars = perSfBars(comps, medianPerSqft, shared);
+  // The bars are the kept sales' (the readout's own set), drawn through the
+  // one function on that set and put back on their pins. A row possibly of
+  // one deed across parcels — flagged on the FULL list, so a deed whose other
+  // rows are left out is still one — sets no scale and draws no bar.
+  const kept = keptSales(comps, out);
+  const bars = barsOnList(perSfBars(kept.comps, medianPerSqft, kept.at.map((i) => shared[i] ?? 0)), kept.at, comps.length);
   const first = order.slice(0, SALES_SHOWN);
   const rest = order.slice(SALES_SHOWN);
   const noArea = comps.filter((c) => perSqftOf(c) === null).length;
   const sorts = SALES_SORTS.filter((s) => s.key !== "perSf" || perSfOffered);
+  const anyOut = out.size > 0;
+  const rowsOf = { comps, shared, showUnits, bars, sortedBy: by, mapped, out, onOut };
   return (
     <>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -185,7 +172,7 @@ export function SalesList({
           )}
           <CopySalesButton text={copyText} />
           {provenance && comps.length > 0 && (
-            <DownloadSalesButton fileName={compsCsvFileName(provenance)} csv={() => compsCsv({ ...provenance, comps }, order)} />
+            <DownloadSalesButton fileName={compsCsvFileName(provenance)} csv={() => compsCsv({ ...provenance, comps }, order, out)} />
           )}
         </div>
       </div>
@@ -195,26 +182,27 @@ export function SalesList({
         </p>
       )}
       {children}
-      <SalesRows comps={comps} order={first} shared={shared} showUnits={showUnits} bars={bars} sortedBy={by} mapped={mapped} label="Recorded sales" />
+      <SalesRows {...rowsOf} order={first} label="Recorded sales" />
       {rest.length > 0 && (
         <details className="group mt-1.5">
           <summary className="cursor-pointer text-xs font-medium text-brand hover:text-brand-strong">
             Show all {comps.length}
           </summary>
-          <SalesRows comps={comps} order={rest} shared={shared} showUnits={showUnits} bars={bars} sortedBy={by} mapped={mapped} label="More recorded sales" />
+          <SalesRows {...rowsOf} order={rest} label="More recorded sales" />
         </details>
       )}
       {bars && (
         <p className="mt-1.5 text-[11px] text-muted" data-qa="comps-psf-caption">
           {/* Where rows may be one deed across parcels, the caption counts
-              rows, as the readout does ("2 rows of one deed counted once"). */}
-          {`Bars: the price a square foot that ${bars.drawn + bars.leftOut === comps.length ? `all ${comps.length} ${bars.leftOut > 0 ? "rows" : "sales"} state` : `${bars.drawn + bars.leftOut} of the ${comps.length} ${bars.leftOut > 0 ? "rows" : "sales"} state`}, from zero to the highest, ${fmtPsf(bars.max)}${
+              rows, as the readout does ("2 rows of one deed counted once");
+              where the reader left sales out, it counts the kept. */}
+          {`Bars: the price a square foot that ${psfCount(bars, kept.comps.length, anyOut)}, from zero to the highest, ${fmtPsf(bars.max)}${
             bars.medianShare !== null && medianPerSqft !== null ? `; the tick is the median, ${fmtPsf(medianPerSqft)}` : ""
           }.${
             bars.leftOut > 0
               ? ` ${bars.leftOut === 1 ? "One row" : `${bars.leftOut} rows`} possibly of one deed across parcels ${bars.leftOut === 1 ? "draws" : "draw"} no bar, and the median leaves ${bars.leftOut === 1 ? "it" : "them"} out.`
               : ""
-          }`}
+          }${anyOut ? " A sale left out draws none." : ""}`}
         </p>
       )}
     </>
@@ -222,6 +210,57 @@ export function SalesList({
 }
 
 const fmtPsf = (n: number) => `$${Math.round(n).toLocaleString("en-US")}/SF`;
+
+/** Whose areas the bars are: "all 6 sales state", "3 of the 6 sales state",
+ *  "3 of the 4 kept sales state" — rows where a deed may span parcels. */
+function psfCount(bars: PerSfBars, total: number, anyOut: boolean): string {
+  const noun = `${anyOut ? "kept " : ""}${bars.leftOut > 0 ? "rows" : "sales"}`;
+  const n = bars.drawn + bars.leftOut;
+  return n === total ? `all ${total} ${noun} state` : `${n} of the ${total} ${noun} state`;
+}
+
+/**
+ * A sale's place in the readout: kept, or left out for one of the reasons
+ * (lib/public-comps/kept). A select, so one control both toggles the sale and
+ * says why, named for its pin for a screen reader.
+ */
+function KeepControl({
+  at,
+  reason,
+  onOut,
+}: {
+  at: number;
+  reason: LeaveOutReason | undefined;
+  onOut: (at: number, reason: LeaveOutReason | null) => void;
+}) {
+  return (
+    <select
+      aria-label={`Sale ${at + 1} in the readout: kept, or left out with a reason`}
+      value={reason ?? ""}
+      onChange={(e) => onOut(at, isLeaveOutReason(e.target.value) ? e.target.value : null)}
+      className={`max-w-full rounded-md border px-1 py-0.5 text-[11px] print:hidden ${
+        reason ? "border-caution/50 text-caution" : "border-line text-muted"
+      }`}
+      data-qa="comps-keep"
+    >
+      <option value="">Kept</option>
+      {LEAVE_OUT_REASONS.map((r) => (
+        <option key={r.key} value={r.key}>
+          {`Out: ${r.label.toLowerCase()}`}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** What a left-out row says under its address. */
+function OutLine({ reason }: { reason: LeaveOutReason }) {
+  return (
+    <span className="mt-0.5 block text-[11px] font-medium text-caution no-underline" data-qa="comps-left-out">
+      {`Left out of the readout: ${leaveOutLabel(reason).toLowerCase()}`}
+    </span>
+  );
+}
 
 /** A sale's $/SF on the set's one scale, the median's tick over it. */
 function PerSfBar({ bars, at }: { bars: PerSfBars; at: number }) {
@@ -255,16 +294,25 @@ function sharedLine(group: number): string {
 }
 
 /** A sale's address, linked to its record where the link is a web page. */
-function AddressLink({ c }: { c: RecordComp }) {
+function AddressLink({ c, out = false }: { c: RecordComp; out?: boolean }) {
   const href = safeHttpUrl(c.sourceUrl);
+  // A sale left out of the readout is struck through, its link kept.
   return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className="break-words underline decoration-dotted underline-offset-2 hover:text-brand">
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={`break-words hover:text-brand ${out ? "text-muted line-through" : "underline decoration-dotted underline-offset-2"}`}
+    >
       {c.address}
     </a>
   ) : (
-    <span className="break-words">{c.address}</span>
+    <span className={`break-words ${out ? "text-muted line-through" : ""}`}>{c.address}</span>
   );
 }
+
+/** A left-out sale's figures: dimmed and struck through. */
+const STRUCK = "text-muted line-through";
 
 /** A sale's place nearest first — its pin's number where a map draws the
  *  sales — kept whatever order the list is in. */
@@ -289,6 +337,8 @@ function SalesRows({
   sortedBy,
   mapped,
   label,
+  out,
+  onOut,
 }: {
   comps: RecordComp[];
   /** the indexes (nearest-first places) to draw, in the order to draw them */
@@ -300,6 +350,8 @@ function SalesRows({
   mapped: boolean;
   /** what the table (and its phone cards) are called to a screen reader */
   label: string;
+  out: SalesOut;
+  onOut?: (at: number, reason: LeaveOutReason | null) => void;
 }) {
   const sortOf = (col: SalesSort) => (sortedBy === col ? SORT_ARIA[col] : undefined);
   return (
@@ -313,20 +365,25 @@ function SalesRows({
           const perUnit = perUnitOf(c);
           const group = shared[at] ?? 0;
           const parties = partiesOf(c);
+          const reason = out.get(at);
           return (
-            <li key={`${c.address}|${c.saleDate}|${at}`} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
+            <li
+              key={`${c.address}|${c.saleDate}|${at}`}
+              className={`rounded-xl border p-3 shadow-sm ${reason ? "border-dashed border-line bg-faint/40" : "border-line bg-surface"}`}
+              data-left-out={reason ? "true" : undefined}
+            >
               <div className="flex items-start gap-2">
                 <PinNumber n={at + 1} mapped={mapped} />
                 <p className="min-w-0 flex-1 text-sm font-medium">
-                  <AddressLink c={c} />
+                  <AddressLink c={c} out={!!reason} />
                 </p>
-                <p className="shrink-0 text-right font-mono text-sm font-semibold tabular-nums">{fmtMoney(c.price)}</p>
+                <p className={`shrink-0 text-right font-mono text-sm font-semibold tabular-nums ${reason ? STRUCK : ""}`}>{fmtMoney(c.price)}</p>
               </div>
               <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 pl-7 text-xs text-muted">
                 <span>{`Sold ${fmtDate(c.saleDate)}`}</span>
                 <span className="tabular-nums">{fmtMiles(c.distanceKm)}</span>
                 <span>{c.propertyType.toLowerCase()}</span>
-                {psf !== null && <span className="font-mono tabular-nums">{`$${psf.toLocaleString("en-US")}/SF`}</span>}
+                {psf !== null && <span className={`font-mono tabular-nums ${reason ? "line-through" : ""}`}>{`$${psf.toLocaleString("en-US")}/SF`}</span>}
                 {showUnits && c.units != null && (
                   <span className="tabular-nums">
                     {`${c.units.toLocaleString("en-US")} ${c.units === 1 ? "unit" : "units"}`}
@@ -334,19 +391,25 @@ function SalesRows({
                   </span>
                 )}
               </p>
-              {bars && psf !== null && (
+              {bars && bars.shares[at] != null && (
                 <div className="pl-7">
                   <PerSfBar bars={bars} at={at} />
                 </div>
               )}
               {parties.length > 0 && <p className="mt-1 pl-7 text-[11px] text-muted">{parties.join(" · ")}</p>}
               {group >= 2 && <p className="mt-1 pl-7 text-[11px] text-caution">{sharedLine(group)}</p>}
+              {(reason || onOut) && (
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pl-7">
+                  {reason ? <OutLine reason={reason} /> : <span />}
+                  {onOut && <KeepControl at={at} reason={reason} onOut={onOut} />}
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
       <ScrollRegion label={label} className="mt-1.5 hidden sm:block">
-        <table className="w-full min-w-[600px] text-left text-sm">
+        <table className={`w-full text-left text-sm ${onOut ? "min-w-[720px]" : "min-w-[600px]"}`}>
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
               <th className="w-8 py-1.5 pr-2 font-medium">
@@ -363,7 +426,8 @@ function SalesRows({
                 </>
               )}
               <th className="py-1.5 pr-3 font-medium">Type</th>
-              <th className="py-1.5 text-right font-medium" aria-sort={sortOf("nearest")}>Dist.</th>
+              <th className={`py-1.5 text-right font-medium ${onOut ? "pr-3" : ""}`} aria-sort={sortOf("nearest")}>Dist.</th>
+              {onOut && <th className="py-1.5 font-medium">Readout</th>}
             </tr>
           </thead>
           <tbody>
@@ -373,14 +437,20 @@ function SalesRows({
               const perUnit = perUnitOf(c);
               const group = shared[at] ?? 0;
               const parties = partiesOf(c);
+              const reason = out.get(at);
               return (
-                <tr key={`${c.address}|${c.saleDate}|${at}`} className="border-b border-line/60 align-top">
+                <tr
+                  key={`${c.address}|${c.saleDate}|${at}`}
+                  className={`border-b border-line/60 align-top ${reason ? "bg-faint/40" : ""}`}
+                  data-left-out={reason ? "true" : undefined}
+                >
                   <td className="py-1.5 pr-2">
                     <PinNumber n={at + 1} mapped={mapped} />
                   </td>
                   <td className="whitespace-nowrap py-1.5 pr-3 text-muted">{fmtDate(c.saleDate)}</td>
                   <td className="py-1.5 pr-3">
-                    <AddressLink c={c} />
+                    <AddressLink c={c} out={!!reason} />
+                    {reason && <OutLine reason={reason} />}
                     {parties.length > 0 && (
                       <span className="mt-0.5 block text-[11px] text-muted" data-qa="comps-parties">
                         {parties.join(" · ")}
@@ -392,8 +462,8 @@ function SalesRows({
                       </span>
                     )}
                   </td>
-                  <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{fmtMoney(c.price)}</td>
-                  <td className="py-1.5 pr-3 text-right font-mono tabular-nums">
+                  <td className={`py-1.5 pr-3 text-right font-mono tabular-nums ${reason ? STRUCK : ""}`}>{fmtMoney(c.price)}</td>
+                  <td className={`py-1.5 pr-3 text-right font-mono tabular-nums ${reason && psf !== null ? STRUCK : ""}`}>
                     {psf !== null ? `$${psf.toLocaleString("en-US")}` : "—"}
                     {bars && <PerSfBar bars={bars} at={at} />}
                   </td>
@@ -404,7 +474,12 @@ function SalesRows({
                     </>
                   )}
                   <td className="py-1.5 pr-3 text-xs text-muted">{c.propertyType.toLowerCase()}</td>
-                  <td className="py-1.5 text-right font-mono text-xs tabular-nums text-muted">{fmtMiles(c.distanceKm)}</td>
+                  <td className={`py-1.5 text-right font-mono text-xs tabular-nums text-muted ${onOut ? "pr-3" : ""}`}>{fmtMiles(c.distanceKm)}</td>
+                  {onOut && (
+                    <td className="py-1 text-right">
+                      <KeepControl at={at} reason={reason} onOut={onOut} />
+                    </td>
+                  )}
                 </tr>
               );
             })}
