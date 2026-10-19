@@ -44,6 +44,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 });
 
 import { PhotoFlip, Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
+import { triageChip } from "@/app/(app)/deals/batch-upload";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { DownloadRow, ModelBody } from "@/app/(app)/deals/[id]/model-body";
 import { MarketCheck } from "@/app/(app)/deals/[id]/deal-sections-view";
@@ -762,6 +763,18 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(field).not.toMatch(/readonly|disabled/i);
     expect(html).toContain('accept="application/pdf"');
     expect(html).toContain('data-qa="batch-upload"');
+    // The batch names the sort the select offers (there is no "Buy box"
+    // sort), in the select's own words (the audit of 2026-10-19).
+    const batch = visibleText(html.slice(html.indexOf('data-qa="batch-upload"'))).replace(/\s+/g, " ");
+    expect(batch).toContain("sort the deals by “Mandate fit: high to low”");
+    expect(html).toContain("Mandate fit: high to low</option>");
+    expect(batch).not.toMatch(/by Buy box/);
+  });
+
+  it("marks a batch deal's first-read fit as every surface does, never with a bare ~", () => {
+    expect(triageChip({ fit: "near", provisional: true })?.label).toBe("Near box (first read)");
+    expect(triageChip({ fit: "fits", provisional: false })?.label).toBe("Fits box");
+    expect(triageChip({ fit: "nope", provisional: true })).toBeNull();
   });
 
   it("folds a phone's filters behind one row that says how many are set, the row unchanged from sm up (research pass 29)", () => {
