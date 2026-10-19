@@ -45,8 +45,9 @@ export interface StressEvidence {
   asOf: string | null;
   /** "Census Bureau", "Zillow Research", "the deal's rent roll", "a rule of thumb" */
   publisher: string;
-  /** whose figure it is */
-  scope: "deal" | "metro" | "state" | "nation" | "class";
+  /** whose figure it is — a Census region's (the survey's regional vacancy,
+   *  which every metro borrows) is the region's, never the metro's */
+  scope: "deal" | "metro" | "region" | "state" | "nation" | "class";
   /** a link to the source where one exists */
   href?: string | null;
 }

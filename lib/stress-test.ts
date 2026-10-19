@@ -196,6 +196,9 @@ function publishedScope(check: ModelCheck, fig: PublishedFigure, grain: ModelVsM
   // primary residence is published for the metro (BLS, via FRED or its own
   // API) and stays the metro's.
   if (check.scope === "national" || /\bnational\b|\(cpi, all items\)|^core cpi\b|breakeven|10-year treasury/i.test(fig.label)) return "nation";
+  // The survey's regional vacancy is the Census region's, borrowed by every
+  // metro in it (lib/live-rates `regionSeries`): said as the region's.
+  if (/census region/i.test(fig.label)) return "region";
   if (/research tracker/i.test(fig.label)) return "metro";
   return grain === "state" ? "state" : "metro";
 }
