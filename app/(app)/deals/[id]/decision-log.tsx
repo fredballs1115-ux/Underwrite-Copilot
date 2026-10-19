@@ -9,6 +9,8 @@ import { displayName } from "@/lib/person";
 import { mayRemoveNote } from "@/lib/note-remove";
 import { PersonBadge } from "../../person-badge";
 import { EMPTY_GLYPH, EmptyNote } from "@/app/empty-pictures";
+import { Key, KeyItem } from "@/app/panel-parts";
+import { spanDaysWords, stageTimeline, type StageSpan } from "@/lib/stage-days";
 
 // Module-level cached formatter (creating one per render is measurable).
 // UTC-pinned, date-only: the server and the browser must render the SAME
@@ -56,6 +58,68 @@ function SaveButton() {
   );
 }
 
+/** A UTC ISO day as the log prints its dates. */
+const dayWords = (iso: string) => safeWhen(`${iso}T12:00:00Z`);
+
+/**
+ * A span's tone, the pipeline funnel's own (one hue, brand): the stage the
+ * deal is in is the funnel's picked rung, solid; a stage it passed through
+ * the funnel's lit rung, the tint ringed; Dead, which the funnel leaves out,
+ * its hollow rung.
+ */
+function spanTone(s: StageSpan): string {
+  if (s.stage === "dead") return "bg-surface ring-1 ring-inset ring-line";
+  return s.current ? "bg-brand" : "bg-brand/10 ring-1 ring-inset ring-brand/40";
+}
+
+/**
+ * The stage moves as one picture: a bar a stage, each as long as the days
+ * the deal sat in it, oldest first, and under it each stage's days in
+ * words. The log below keeps every move with its date and what became of
+ * the deal; this says how long, which the list cannot. Nothing is drawn
+ * without a recorded move to measure from.
+ */
+function StageDays({ history, today }: { history: StageChange[]; today: string | null }) {
+  const { spans, end } = stageTimeline(history, today);
+  if (spans.length === 0) return null;
+  const total = spans.reduce((n, s) => n + s.days, 0);
+  return (
+    <div className="mt-3" data-qa="stage-days">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Days in each stage</p>
+      <div aria-hidden className="mt-1.5 flex h-3 gap-0.5 overflow-hidden rounded-full">
+        {spans.map((s, i) => (
+          <span
+            key={`${s.from}-${i}`}
+            data-bar="stage-days"
+            title={`${s.label}: ${spanDaysWords(s)}, ${dayWords(s.from)} to ${dayWords(s.to)}`}
+            className={`block h-full min-w-1.5 ${spanTone(s)}`}
+            // A stage a day or less still shows as a sliver.
+            style={{ flexGrow: total > 0 ? Math.max(s.days, total / 100) : 1, flexBasis: 0 }}
+          />
+        ))}
+      </div>
+      <Key stack>
+        {spans.map((s, i) => (
+          <KeyItem key={`${s.from}-${i}`} mark="swatch" tone={spanTone(s)}>
+            <span>
+              <span className="font-medium text-ink">{s.label}</span>
+              {`, ${spanDaysWords(s)} — from ${dayWords(s.from)}`}
+            </span>
+          </KeyItem>
+        ))}
+        {end && (
+          <KeyItem>
+            <span>
+              <span className="font-medium text-ink">{end.label}</span>
+              {` on ${dayWords(end.on)}`}
+            </span>
+          </KeyItem>
+        )}
+      </Key>
+    </div>
+  );
+}
+
 /**
  * The decision log: the analyst's notes and the deal's stage moves in one
  * timeline, newest first. This is the deal's memory — "passed at $68M,
@@ -69,8 +133,12 @@ export function DecisionLog({
   userId,
   names = null,
   isSample = false,
+  today = null,
 }: {
   dealId: string;
+  /** the reader's day (ISO), which the stage the deal is in counts its
+   *  days to; without it that stage is left off the timeline */
+  today?: string | null;
   /** the sample deal, whose own seeded note its reader may remove
    *  (lib/note-remove, the delete action's rule too) */
   isSample?: boolean;
@@ -101,6 +169,7 @@ export function DecisionLog({
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">Decision log</h2>
       <p className="mt-0.5 text-xs text-muted">Notes and stage moves, newest first.</p>
+      <StageDays history={stageHistory} today={today} />
 
       <form action={addDealNote} className="mt-3">
         {/* On a phone the note box takes the card's whole width, the button

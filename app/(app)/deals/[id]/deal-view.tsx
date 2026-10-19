@@ -845,6 +845,7 @@ export function DealView({
               userId={userId}
               names={askerNames}
               isSample={isSample}
+              today={todayIso || null}
             />
           </div>
         )}
