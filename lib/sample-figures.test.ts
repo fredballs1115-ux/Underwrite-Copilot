@@ -49,8 +49,12 @@ describe("the sample's stress test", () => {
     expect(irr("basis")).toEqual([9.3, 13.6]);
     expect(irr("exit_cap")).toEqual([10.8, 9.3]);
     expect(irr("noi")).toEqual([11.7, 9.3]);
-    // At the rent roll's 9.3% by count (225 of 248 doors).
+    // At the rent roll's 9.3% by count (225 of 248 doors): with no published
+    // figure read, the documents decide the stabilized assumption, said so.
     expect(irr("vacancy")).toEqual([12.4, 9.1]);
+    expect(row("vacancy").gap?.text).toBe(
+      "The OM's 6.0% is 3.3 points under the evidence's 9.3%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide.",
+    );
     expect(irr("taxes")).toEqual([9.3, 5.9]);
     expect(irr("insurance")).toEqual([9.3, 8.2]);
     // The premium is in none of the model's inputs: a gap, no re-run.

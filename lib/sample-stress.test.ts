@@ -140,6 +140,15 @@ describe("the sample's stress test, one build on every surface", () => {
     const row = (k: string) => page.rows.find((r) => r.key === k)!;
     expect(row("rent_growth").verdict).not.toBe("unchecked");
     expect(row("vacancy").evidence.map((e) => e.label)).toContain("Rental vacancy, metro area");
+    // The sample's 6.0% pro forma vacancy is a stabilized assumption on a
+    // stabilized deal: held to the metro's 5.8% ±1.9 survey, its rent roll's
+    // 9.3% shown beside it as today's. With no Zillow figure in this read,
+    // its 4.0% rent growth is held to the CPI rent's +5.0%.
+    expect(row("vacancy")).toMatchObject({ verdict: "holds", gap: { value: -0.2, unit: "pts" } });
+    expect(row("vacancy").evidence[0].label).toBe("Rental vacancy, metro area");
+    expect(row("vacancy").gap!.text).toContain("Today the deal's rent roll runs 9.3% vacant, 3.3 points over the assumption — the gap a lease-up has to close.");
+    expect(row("rent_growth")).toMatchObject({ verdict: "holds", gap: { value: -1, unit: "pts" } });
+    expect(row("rent_growth").gap!.text).toMatch(/^Held to the rent sitting tenants pay \(CPI rent\)/);
     expect(row("exit_cap").evidence.map((e) => e.label)).toContain("10-year Treasury");
     expect(page.rows.some((r) => r.key === "expense_growth")).toBe(true);
   });
