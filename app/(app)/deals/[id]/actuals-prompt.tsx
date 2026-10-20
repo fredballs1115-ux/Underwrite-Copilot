@@ -7,33 +7,48 @@ import { RetryForm } from "./deal-sections";
 export type ActualsSlotState = "missing" | "uploaded" | "done";
 
 /**
- * The post-OM prompt (Feature 1): "Add rent roll or T-12 for deeper analysis
- * (optional)." Up to two additional documents, tagged by type. Each slot walks
- * missing → uploaded (re-screen to fold it in) → done (in the analysis); the
- * parent hides the whole card once both are done or while a screen is running.
- * OM-only deals keep working exactly as before — this is purely additive.
+ * The post-OM prompt (Feature 1), directly under the stress test on the
+ * Overview: the deal's own rent roll and T-12, up to two documents tagged by
+ * type. Each slot walks missing → uploaded (re-screen to fold it in) → done
+ * (in the analysis); the parent hides the whole card once both are done or
+ * while a screen is running. OM-only deals keep working exactly as before —
+ * this is purely additive.
+ *
+ * Its words say what the documents do to the stress test, and only that
+ * (lib/stress-test): a T-12 is the evidence the NOI, vacancy and insurance
+ * rows are judged on (its NOI, its vacancy loss over its rent line, its
+ * insurance line), a rent roll the vacancy row's (the occupancy it runs at).
+ * The T-12's tax line is shown beside the taxes row and judges nothing, so
+ * taxes are not named. And a document uploaded after the screen's verdict is
+ * what the track record scores the screen's challenges against
+ * (lib/track-record).
  */
 export function ActualsPrompt({
   dealId,
   rentRoll,
   t12,
+  onReconcile = null,
 }: {
   dealId: string;
   rentRoll: ActualsSlotState;
   t12: ActualsSlotState;
+  /** opens the Reconciler, where the page offers one; null leaves the link
+   *  out */
+  onReconcile?: (() => void) | null;
 }) {
   const anyUploaded = rentRoll === "uploaded" || t12 === "uploaded";
 
   return (
-    <section className="rounded-2xl border border-dashed border-brand/40 bg-brand/[0.03] p-5">
+    <section className="rounded-2xl border border-dashed border-brand/40 bg-brand/[0.03] p-5" data-qa="actuals-prompt">
       <h2 className="text-sm font-semibold tracking-tight">
-        Add rent roll or T-12 for deeper analysis{" "}
+        Test the OM against the building&apos;s own figures{" "}
         <span className="font-normal text-muted">(optional)</span>
       </h2>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        Real occupancy, in-place rents, and actual expenses replace the OM&apos;s
-        narrative in the model — the returns and verdict re-base on what the
-        property actually produced.
+        A T-12 tests the OM&apos;s NOI, vacancy and insurance against the
+        building&apos;s own year; a rent roll tests its vacancy against the
+        occupancy it runs at. Added after this screen, either one lets the
+        track record score its challenges.
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -45,10 +60,27 @@ export function ActualsPrompt({
         <div className="mt-1">
           <RetryForm dealId={dealId} label="Re-screen with the actuals" />
           <p className="mt-1.5 text-[11px] text-muted">
-            The next screen reads the document, rebuilds the model on the
-            actuals, and updates the verdict.
+            The next screen reads the document into the stress test and the
+            model, and makes the call again.
           </p>
         </div>
+      )}
+
+      {onReconcile && (
+        <p className="mt-3 text-xs">
+          <a
+            href={`/deals/${dealId}?tab=analyses&a=reconciler`}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+              e.preventDefault();
+              onReconcile();
+            }}
+            className="font-medium text-brand hover:underline"
+            data-qa="actuals-reconcile"
+          >
+            Reconcile your own model against the OM
+          </a>
+        </p>
       )}
     </section>
   );

@@ -12,6 +12,7 @@ import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";
 import { SampleDealHero } from "@/app/sample-hero";
 import { DemoSections } from "./sections";
 import { sampleDemoData } from "./demo-data";
+import { verdictCounts } from "@/lib/stress-test-words";
 import { PlaceBand } from "@/app/place-band";
 import { DataNotices } from "@/app/data-notices";
 
@@ -118,7 +119,11 @@ export default async function DemoPage() {
           {/* The deal page's own header on the sample (lib/sample-header,
               app/sample-hero): its market photograph, the name, the call,
               the fit, the four figures and the tool row. */}
-          <SampleDealHero header={sampleHeader(new Date(`${today}T12:00:00Z`))} titleAs="h2" />
+          <SampleDealHero
+            header={sampleHeader(new Date(`${today}T12:00:00Z`))}
+            titleAs="h2"
+            stress={data.stressTest && data.stressTest.rows.length > 0 ? verdictCounts(data.stressTest) : null}
+          />
 
           <DemoSections data={data} />
 

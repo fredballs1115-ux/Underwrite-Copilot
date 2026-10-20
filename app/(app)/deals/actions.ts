@@ -52,12 +52,14 @@ import { currentOutcome, readOutcomeForm, withOutcome } from "@/lib/deal-outcome
 import { personName } from "@/lib/person";
 import { writeStageGuarded } from "@/lib/stage-write";
 import { readBulkStageForm, type BulkStageResult } from "@/lib/bulk-stage";
+import { UPLOAD_MAX_BYTES } from "@/lib/upload-limit";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
 // Files API and is referenced by id (lib/anthropic/om-source.ts), so the full
 // 32MB — roughly 600 pages — is actually usable.
-const MAX_BYTES = 32 * 1024 * 1024;
+// The pipeline's oversized-file message reads the same constant.
+const MAX_BYTES = UPLOAD_MAX_BYTES;
 
 // Accepted formats for the buyer's own underwriting model (Phase 5 reconciler).
 const MODEL_EXT = /\.(xlsx|xls|csv|pdf)$/i;

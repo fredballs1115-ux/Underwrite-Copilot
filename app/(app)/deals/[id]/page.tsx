@@ -97,6 +97,8 @@ import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import { MEDIAN_FLOOR, lastGoodOf, type RecordCompsResult } from "@/lib/public-comps/core";
 import { buildStressTest, type PastScreensEvidence, type RecordedSalesEvidence } from "@/lib/stress-test";
+import { verdictCounts } from "@/lib/stress-test-words";
+import { StressChip } from "./stress-chip";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { VENDORED_LEGEND, ensureFloodFrame, floodLegend } from "@/lib/flood-map";
@@ -1456,6 +1458,9 @@ export default async function DealPage({
     pastScreens: isSampleDeal ? null : pastScreens,
     readOn: todayIso,
   });
+  // The test at a glance beside the call, and in the bar that keeps the deal
+  // in view: the panel's own counts (lib/stress-test-words), linking to it.
+  const stressCounts = stressTest && stressTest.rows.length > 0 ? verdictCounts(stressTest) : null;
 
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
@@ -1575,6 +1580,7 @@ export default async function DealPage({
                 </span>
               </HowChip>
             )}
+            <StressChip counts={stressCounts} />
           </>
         }
         subtitle={
@@ -1952,6 +1958,7 @@ export default async function DealPage({
         dealId={id}
         name={deal.name as string}
         chip={pill ?? null}
+        stress={stressCounts}
         figures={[priceFigure, returnFigure].flatMap((f) => (f.value ? [{ label: f.label, value: f.value, title: f.title }] : []))}
       />
       {/* "[" and "]": the previous and next deal in the pipeline's last

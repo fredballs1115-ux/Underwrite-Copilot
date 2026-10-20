@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DealAvatar } from "@/app/(app)/deal-avatar";
+import { StressChip, type StressCounts } from "./stress-chip";
 
 /**
  * The deal, kept in view (#437). Once the header's name, call and figures
@@ -27,6 +28,7 @@ export function DealStickyBar({
   dealId,
   name,
   chip,
+  stress = null,
   figures,
 }: {
   dealId: string;
@@ -34,6 +36,10 @@ export function DealStickyBar({
   /** the call, in the header's own colours; `note` where it is the
    *  previous screen's (a re-screen running, or one that failed first) */
   chip?: { label: string; cls: string; note?: string } | null;
+  /** the stress test's counts, as the header's chip has them; drawn from
+   *  `lg`, compact (a dot and a count a verdict), where the bar has room
+   *  for it beside the name, the call and the two figures */
+  stress?: StressCounts | null;
   /** the price and the cap (or a plan deal's yield on cost), as the header
    *  prints them — a price range drawn short, the range as stated in its
    *  title (`priceFigureOf`) */
@@ -97,6 +103,11 @@ export function DealStickyBar({
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.cls}`} title={chip.note}>
             {chip.label}
             {chip.note ? <span className="sr-only">, the previous screen&apos;s call</span> : null}
+          </span>
+        ) : null}
+        {stress ? (
+          <span className="hidden lg:contents">
+            <StressChip counts={stress} compact />
           </span>
         ) : null}
         {figures.map((f) => (

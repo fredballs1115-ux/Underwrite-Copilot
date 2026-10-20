@@ -14,6 +14,7 @@ import { incomeGapShare } from "@/lib/gap-detail";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { EmptyGlyph, StageRailGhost } from "@/app/empty-pictures";
 import { StressTestPanel } from "@/app/stress-test-panel";
+import { STRESS_TEST_ANCHOR } from "./stress-chip";
 import type { StressTest } from "@/lib/stress-test-types";
 import type {
   ExtractionResult,
@@ -387,6 +388,7 @@ export function OverviewView({
   staleWhy = "failed",
   stopped = false,
   stressTest = null,
+  afterStress = null,
 }: {
   results: Results;
   active: boolean;
@@ -395,6 +397,11 @@ export function OverviewView({
    *  risk digest, since the test is what the call rests on; null draws
    *  nothing */
   stressTest?: StressTest | null;
+  /** what the deal page sets directly under the stress test: the prompt for
+   *  the deal's own rent roll and T-12, which turn its rows into tests
+   *  against the building's figures (never on the sample; /demo and the
+   *  homepage pass nothing) */
+  afterStress?: ReactNode;
   /** a screen (not a side job) is running: the progress rail above counts
    *  its six steps, so the meter's own count of five results stands down —
    *  "0/5" under "Step 2 of 6" read as two answers to one question */
@@ -460,18 +467,23 @@ export function OverviewView({
       )}
 
       {/* The OM's assumptions, tested (app/stress-test-panel): the product
-          leads with it, right after the call. */}
-      <StressTestPanel test={stressTest} />
-      {/* The whole method, one link under the panel wherever it is drawn —
-          the deal page, /demo and the homepage's walkthrough; each row's
-          own link lands on its section. */}
+          leads with it, right after the call. The header's chip and the bar
+          that keeps the deal in view link here (`STRESS_TEST_ANCHOR`); the
+          wrapper takes the focus a jump to it moves (deal-view). */}
       {stressTest && stressTest.rows.length > 0 && (
-        <p className="-mt-3 px-1 text-xs" data-qa="how-we-test-link">
-          <Link href="/how-we-test" className="font-medium text-brand hover:underline">
-            How each assumption is tested
-          </Link>
-        </p>
+        <div id={STRESS_TEST_ANCHOR} tabIndex={-1} className="focus:outline-none">
+          <StressTestPanel test={stressTest} />
+          {/* The whole method, one link under the panel wherever it is
+              drawn — the deal page, /demo and the homepage's walkthrough;
+              each row's own link lands on its section. */}
+          <p className="mt-2 px-1 text-xs" data-qa="how-we-test-link">
+            <Link href="/how-we-test" className="font-medium text-brand hover:underline">
+              How each assumption is tested
+            </Link>
+          </p>
+        </div>
       )}
+      {afterStress}
 
       {/* Completeness meter — a card while results are missing or a side job
           runs; a single quiet line once everything is done (it earns no card
