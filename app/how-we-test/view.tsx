@@ -7,11 +7,14 @@ import {
   KIND_LABEL,
   PUBLISHERS,
   STRESS_METHODS,
+  TRACK_RECORD,
+  VERDICT_RULES,
+  VERDICT_WORDS,
   WHO_DOES_WHAT,
   engineReruns,
   evidenceKindOf,
 } from "@/lib/how-we-test";
-import type { StressMethod } from "@/lib/stress-test-types";
+import type { StressMethod, StressVerdict } from "@/lib/stress-test-types";
 
 /**
  * The methodology page, pure (2026-10-19): one section an assumption the
@@ -26,11 +29,21 @@ import type { StressMethod } from "@/lib/stress-test-types";
  * will do, no paragraph past a line.
  */
 
+// The stress-test panel's own tones a kind and a verdict
+// (app/stress-test-panel `KIND`, `VERDICT`), so the page and the panel mark
+// one kind of evidence, and one verdict, alike.
 const KIND_TONE: Record<string, string> = {
-  published: "bg-brand/10 text-brand",
-  document: "bg-amber-100 text-amber-800",
+  published: "bg-pass/10 text-pass",
+  document: "bg-brand/10 text-brand",
   rule_of_thumb: "bg-faint text-muted",
-  om_internal: "bg-faint text-muted",
+  om_internal: "bg-caution/10 text-caution",
+};
+
+const VERDICT_TONE: Record<StressVerdict, string> = {
+  unsupported: "bg-kill/10 text-kill",
+  stretched: "bg-caution/10 text-caution",
+  holds: "bg-pass/10 text-pass",
+  unchecked: "bg-faint text-muted",
 };
 
 /**
@@ -120,6 +133,10 @@ function MethodSection({ method, index }: { method: StressMethod; index: number 
           </li>
         ))}
       </ul>
+      <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">How the verdict is struck</h3>
+      <p className="mt-1.5 text-sm leading-relaxed" data-qa="verdict-rule">
+        {VERDICT_RULES[method.key]}
+      </p>
       <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">What the engine does</h3>
       <p className="mt-1.5 text-sm leading-relaxed">{method.engine}</p>
       <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">Not checked</h3>
@@ -167,6 +184,20 @@ export function HowWeTestView() {
           </section>
         ))}
       </div>
+
+      <section className="mt-8" id="verdicts" data-qa="verdict-words">
+        <h2 className="text-lg font-semibold tracking-tight">The four verdict words</h2>
+        <ul className="mt-3 space-y-2 text-sm leading-relaxed">
+          {VERDICT_WORDS.map((v) => (
+            <li key={v.word} className="flex items-start gap-3">
+              <span className={`mt-0.5 inline-block w-24 shrink-0 rounded px-1.5 py-0.5 text-center text-[11px] font-medium ${VERDICT_TONE[v.word]}`}>
+                {v.word}
+              </span>
+              <span className="text-muted">{v.line}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <nav aria-label="The assumptions tested" className="mt-8">
         <ul className="flex flex-wrap gap-2 text-xs">
@@ -225,6 +256,18 @@ export function HowWeTestView() {
         </div>
       </section>
 
+      <section className="mt-12" id="track-record" data-qa="track-record">
+        <h2 className="text-lg font-semibold tracking-tight">{TRACK_RECORD.heading}</h2>
+        <ul className="mt-3 space-y-1.5 rounded-2xl border border-line bg-surface p-4 text-sm leading-relaxed text-muted">
+          {TRACK_RECORD.lines.map((line) => (
+            <li key={line} className="flex items-start gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section className="mt-12" id="limits" data-qa="cannot">
         <h2 className="text-lg font-semibold tracking-tight">What a stress test cannot do</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -238,7 +281,7 @@ export function HowWeTestView() {
       </section>
 
       <div className="mt-12 rounded-2xl border border-line bg-surface p-6">
-        <h2 className="text-lg font-semibold tracking-tight">See it on a real deal</h2>
+        <h2 className="text-lg font-semibold tracking-tight">See it on the sample deal</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">Start with a fully worked sample, or upload an OM and get a verdict.</p>
         <div className="mt-4 flex flex-wrap gap-2.5">
           <Link href="/demo" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong">

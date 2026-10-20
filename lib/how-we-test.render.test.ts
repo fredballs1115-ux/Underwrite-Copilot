@@ -24,10 +24,23 @@ import {
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
   PUBLISHERS,
+  TRACK_RECORD,
+  VERDICT_RULES,
+  VERDICT_WORDS,
   WHO_DOES_WHAT,
   engineReruns,
   evidenceKindOf,
 } from "./how-we-test";
+import {
+  BASIS_STRETCH_PCT,
+  BASIS_UNSUPPORTED_PCT,
+  EXIT_CAP_UNSUPPORTED_BPS,
+  EXPENSE_GROWTH_UNSUPPORTED_PTS,
+  IRR_MOVE_STRETCH_BPS,
+  RENT_GROWTH_UNSUPPORTED_PTS,
+  VACANCY_UNSUPPORTED_PTS,
+} from "./stress-test";
+import { RECORD_FLOOR } from "./track-record";
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
 import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -90,18 +103,24 @@ describe("/how-we-test draws every method from the table", () => {
     expect(byKey).toEqual({
       // The reader's past screens are other memoranda's asks — asks, not
       // trades, nobody's publication — filed as a rule of thumb.
-      basis: ["document", "published", "rule_of_thumb"],
-      exit_cap: ["document", "published", "published"],
+      // The memorandum's own figures are the OM against itself, as the
+      // stress test files them and the panel marks them; the rent roll and
+      // the T-12 are the deal's own documents.
+      basis: ["om_internal", "published", "rule_of_thumb"],
+      exit_cap: ["om_internal", "published", "published"],
       debt: ["published", null, null],
-      noi: ["document", "document", "document"],
+      noi: ["document", "document", "om_internal"],
       vacancy: ["document", "published", "published", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published"],
       expense_growth: ["published", "published", "published"],
-      taxes: ["document", "document"],
+      taxes: ["om_internal", "om_internal"],
       insurance: ["published", "document"],
-      renovation_premium: ["document", "document", null],
+      renovation_premium: ["om_internal", "om_internal", null],
       other: [null],
     });
+    // The page's words for a kind are the panel's own.
+    const panel = readFileSync("app/stress-test-panel.tsx", "utf8");
+    for (const word of Object.values(KIND_LABEL)) expect(panel, word).toContain(`word: "${word}"`);
     // Every item the table names a rule of thumb is marked one, and no other.
     for (const m of STRESS_METHODS) {
       for (const item of m.against) {
@@ -147,8 +166,11 @@ describe("/how-we-test draws every method from the table", () => {
       "No return is re-run on a plan",
       "No return is re-run on a figure nobody stated",
       "A metro figure is the metro's",
-      "Licensed data is not read",
+      "Licensed databases are not read",
     ]);
+    // Published broker research is read (the tracker's cap ranges), so the
+    // page never says broker research goes unread.
+    expect(text).not.toMatch(/broker cap-rate surveys? (?:are|is) (?:licensed|never read)/i);
     // The plan's limit names every kind lib/deal-strategy's isPlanDeal
     // calls a plan, and the stress test withholds the re-run on each.
     const plan = CANNOT.find((c) => c.heading === "No return is re-run on a plan")!.line;
@@ -160,6 +182,40 @@ describe("/how-we-test draws every method from the table", () => {
     // The published-figure line claims a link only where the evidence
     // carries one: recorded sales.
     expect(CADENCE_RULE.lines.join(" ")).not.toContain("a link to its source");
+  });
+
+  it("defines the four verdict words, each row's rule with the reader's own thresholds, and how the record is scored", () => {
+    expect(VERDICT_WORDS.map((v) => v.word)).toEqual(["holds", "stretched", "unsupported", "unchecked"]);
+    for (const v of VERDICT_WORDS) {
+      expect(text).toContain(v.word);
+      expect(text).toContain(v.line);
+    }
+    expect(text).toContain(`${IRR_MOVE_STRETCH_BPS} bps or more`);
+    // One rule a method, printed in its section, every threshold the
+    // constant lib/stress-test reads.
+    expect(Object.keys(VERDICT_RULES).sort()).toEqual([...STRESS_KEYS].sort());
+    expect((html.match(/data-qa="verdict-rule"/g) ?? []).length).toBe(STRESS_METHODS.length);
+    for (const m of STRESS_METHODS) expect(text, m.key).toContain(VERDICT_RULES[m.key]);
+    expect(VERDICT_RULES.vacancy).toContain(`${VACANCY_UNSUPPORTED_PTS} points`);
+    expect(VERDICT_RULES.vacancy).toMatch(/the deal's documents where they state a figure/);
+    expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the highest trailing published figure/);
+    expect(VERDICT_RULES.rent_growth).toContain(`${RENT_GROWTH_UNSUPPORTED_PTS} points`);
+    expect(VERDICT_RULES.expense_growth).toMatch(/^Held to the lowest price index/);
+    expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);
+    expect(VERDICT_RULES.exit_cap).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
+    expect(VERDICT_RULES.exit_cap).toMatch(/compression is stretched at worst/);
+    expect(VERDICT_RULES.basis).toContain(`${BASIS_STRETCH_PCT}%`);
+    expect(VERDICT_RULES.basis).toContain(`${BASIS_UNSUPPORTED_PCT}%`);
+    // The record: its heading, its lines, and its floor the reader's own.
+    expect(text).toContain(TRACK_RECORD.heading);
+    for (const line of TRACK_RECORD.lines) expect(text).toContain(line);
+    expect(TRACK_RECORD.lines.join(" ")).toContain(`under ${RECORD_FLOOR} scored rows`);
+    // The marker keeps the sentence live-verify greps, whole.
+    expect(HOW_WE_TEST_MARKER).toContain("The arithmetic is run in code, never by the AI.");
+    expect(readFileSync(".github/workflows/live-verify.yml", "utf8")).toContain("The arithmetic is run in code, never by the AI.");
+    // The closing card names the sample for what it is.
+    expect(text).toContain("See it on the sample deal");
+    expect(text).not.toContain("real deal");
   });
 
   it("reads clean: no glued words, no accessibility faults, no article typed before a value", () => {

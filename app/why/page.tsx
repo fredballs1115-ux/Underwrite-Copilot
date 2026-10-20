@@ -146,7 +146,7 @@ export default function WhyPage() {
 
           <div className="mt-12 rounded-2xl border border-line bg-surface p-6">
             <h2 className="text-lg font-semibold tracking-tight">
-              See it on a real deal
+              See it on the sample deal
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               Start with a fully worked sample, or upload an OM and get its
