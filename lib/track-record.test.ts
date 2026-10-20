@@ -2,6 +2,8 @@
 // evidence that arrived AFTER the screen, never against a document the
 // screen read; the account's counts under the site's floor.
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { StageChange } from "@/lib/stages";
@@ -338,6 +340,14 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
       expect(r.evidence).toEqual([]);
       expect(r.notScored).toEqual(plain.notScored);
     }
+  });
+
+  it("a manual deal's facts edit snapshots the challenges it replaces, as the pipeline's own re-screen does", () => {
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/actions.ts"), "utf8");
+    const at = src.indexOf("export async function updateManualFacts");
+    const body = src.slice(at, src.indexOf("\nexport async function", at + 10));
+    expect(body).toMatch(/\.select\("[^"]*\bchallenges\b[^"]*"\)/);
+    expect(body).toMatch(/prior_screen: \{[^}]*challenges: deal\.challenges \?\? null/);
   });
 
   it("the account's record counts a prior screen's scored row as the deal's", () => {
