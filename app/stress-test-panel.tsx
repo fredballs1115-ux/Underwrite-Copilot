@@ -19,7 +19,7 @@ import {
   modelIrrOf,
   noMoveWhy,
   noiRestSentence,
-  partAgainst,
+  partNote,
   ptsText,
   rerunWords,
   shownHeadline,
@@ -1031,7 +1031,7 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
             <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
           </BarRow>
           {walk.map(({ part, from, to }) => {
-            const against = partAgainst(part);
+            const against = partNote(part);
             return (
               <BarRow
                 key={part.key}
