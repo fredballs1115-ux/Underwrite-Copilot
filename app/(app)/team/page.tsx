@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { appUrl as siteAppUrl } from "@/lib/app-url";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getTeam, memberLabel, INVITE_DAYS, TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { TEAM_PRICE_LABEL, teamMonthlyTotal, fmtUsd } from "@/lib/billing";
@@ -99,7 +100,8 @@ export default async function TeamPage({
   // A renewal day on the reader's own calendar (lib/reader-day).
   const timeZone = readerTimeZone((await cookies()).get(TZ_COOKIE)?.value);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  // The invite links' origin, through the one reader (lib/app-url).
+  const appUrl = siteAppUrl();
   const invites = team && team.role === "owner"
     ? ((
         await supabase
