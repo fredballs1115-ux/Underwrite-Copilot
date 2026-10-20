@@ -6813,8 +6813,16 @@ describe("/demo's market check — the demand card in the deal page's own markup
     expect(html).toContain('data-qa="metro-demand"');
     // The deal page's own MarketCheck with the demand handed in, markup for
     // markup: after the check's summary, before its checks — never a copy
-    // drawn after the whole check.
-    const check = renderToStaticMarkup(React.createElement(MarketCheck, { result: data.market, demand }));
+    // drawn after the whole check. It opens on the market's photograph, as
+    // the deal page's does on the sample (lib/sample-tabs.test.ts).
+    const check = renderToStaticMarkup(
+      React.createElement(MarketCheck, {
+        result: data.market,
+        demand,
+        picture: data.marketPicture,
+        pictureCheckReads: data.marketPictureCheckReads,
+      }),
+    );
     expect(html).toContain(check);
     expect((html.match(/data-qa="metro-demand"/g) ?? []).length).toBe(1);
     expect(html.indexOf("Market plausibility check")).toBeLessThan(html.indexOf('data-qa="metro-demand"'));

@@ -1,9 +1,11 @@
 // The walkthrough's tabs past the Overview (app/landing-interactive.tsx's
 // `loadWalkthrough`): the deal page's own sections, its Buy box tab, its debt
-// sizer and its first-draft model card, with the comps table's subject tick
-// read on the sample. Loaded when the walkthrough nears the screen or a tab
-// is reached for, so the homepage's first load carries the Overview's
-// components alone.
+// sizer, the model's read against today's figures and its first-draft model
+// card, with the comps table's subject tick read on the sample — and the two
+// parts of the Overview that read the deal's figures in the browser, its
+// actuals card and its sensitivity playground. Loaded when the walkthrough
+// nears the screen or a tab is reached for, so the homepage's first load
+// carries the Overview's call and stress test alone.
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import { assetWords } from "@/lib/asset-words";
@@ -26,6 +28,9 @@ export {
 export { SampleBuyBox } from "./sample-buy-box";
 export { SampleModelCard } from "./sample-model-card";
 export { DebtSizer } from "./(app)/deals/[id]/debt-sizer";
+export { ModelVsMarketCard } from "./(app)/deals/[id]/model-vs-market-card";
+export { PropertyActuals } from "./(app)/deals/[id]/property-actuals";
+export { SensitivityPlayground } from "./(app)/deals/[id]/sensitivity-playground";
 export { SourceDocumentsView } from "./(app)/deals/[id]/source-documents";
 
 const extraction = SAMPLE_DEAL.extraction;

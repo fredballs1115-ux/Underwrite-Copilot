@@ -11,8 +11,13 @@ import type { DealRateSeeds } from "@/lib/debt-index";
 import type { DealStrategy } from "@/lib/deal-strategy";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import type { MetroDemand } from "@/lib/metro-demand";
+import type { ModelVsMarket } from "@/lib/model-vs-market";
+import type { MarketPicture } from "@/lib/market-picture";
 import type { StressTest } from "@/lib/stress-test-types";
+import type { ActualsData } from "./(app)/deals/[id]/property-actuals";
+import type { PlaygroundData } from "./(app)/deals/[id]/sensitivity-playground";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
+import { SampleGuide } from "./(app)/deals/[id]/sample-guide";
 import { AnalysisTabs, DealSectionTabs } from "./(app)/deals/[id]/section-tabs";
 import {
   ANALYSES,
@@ -33,9 +38,10 @@ import {
 
 // The tabs past the Overview — the deal page's other sections and the
 // model's returns (deal-sections-view, returns-headline), with the comps'
-// subject tick — are one chunk of their own (./walkthrough-tabs), loaded once
-// the walkthrough nears the screen or a tab is reached for: the homepage's
-// first load carries the Overview alone.
+// subject tick — and the Overview's actuals card and playground are one chunk
+// of their own (./walkthrough-tabs), loaded once the walkthrough nears the
+// screen or a tab is reached for: the homepage's first load carries the
+// Overview's guide, call and stress test alone.
 type Walkthrough = typeof import("./walkthrough-tabs");
 let walkthrough: Walkthrough | null = null;
 let walkthroughLoad: Promise<Walkthrough> | null = null;
@@ -111,17 +117,28 @@ export interface SampleFit {
   criteria: BoxCriterion[];
 }
 
-/** The Financials tab's server reads, made as /demo makes them
- *  (app/demo/demo-data): the derived screening model the debt sizer starts
+/** The Financials tab's server reads, /demo's own (app/demo/demo-data
+ *  `walkthroughData`): the derived screening model the debt sizer starts
  *  from and where its inputs came from, the sizer's rate seeds (none for the
  *  sample, which is never seeded from today's rates: lib/model-market), the
- *  deal's kind, and what the price buys against the model card's returns. */
+ *  deal's kind, the model's assumptions against today's published figures
+ *  (null where nothing was read, and the card is then left out), and what
+ *  the price buys against the model card's returns. */
 export interface SampleFinancials {
   underwrite: UnderwriteInputs;
   underwriteSources: ModelSources | null;
   rateSeeds: DealRateSeeds;
   strategy: DealStrategy;
+  modelVsMarket?: ModelVsMarket | null;
   modelInterest: ModelReturnsRead | null;
+}
+
+/** The Overview's parts past the call, /demo's own (app/demo/demo-data
+ *  `walkthroughData`): the rent roll and the T-12 against the OM, and the
+ *  sensitivity playground's data. */
+export interface SampleOverview {
+  actuals: ActualsData;
+  playground: PlaygroundData;
 }
 
 const CRITERION_MARK: Record<BoxCriterion["status"], [string, string, string]> = {
@@ -254,12 +271,18 @@ function AnalysesView({
   analysis,
   onSelect,
   demand = null,
+  marketPicture = null,
+  marketPictureCheckReads = false,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
   /** the metro area's payrolls by sector, read today, which the market
    *  check draws where the deal page draws it; null where none was read */
   demand?: MetroDemand | null;
+  /** the photograph the market check opens on, as the deal page hands it
+   *  on the sample, and whether it is the market the check read */
+  marketPicture?: MarketPicture | null;
+  marketPictureCheckReads?: boolean;
 }) {
   // The sections, once their chunk has loaded (`loadWalkthrough`).
   const w = useWalkthrough();
@@ -302,20 +325,30 @@ function AnalysesView({
             mapContext={w.COMP_MAP_CONTEXT}
           />
         )}
-        {w && analysis === "market" && <w.MarketCheck result={RESULTS.market} demand={demand} />}
+        {w && analysis === "market" && (
+          // The deal page's market check on the sample: no "since this
+          // screen", since the sample's check stored no figures to compare.
+          <w.MarketCheck
+            result={RESULTS.market}
+            demand={demand}
+            picture={marketPicture}
+            pictureCheckReads={marketPictureCheckReads}
+          />
+        )}
         {w && analysis === "reconciler" && <w.Reconciliation result={RESULTS.reconciliation} />}
       </div>
     </div>
   );
 }
 
-/** The deal page's Financials tab on the sample, in its order: the
- *  extracted terms, the debt sizer, then the first-draft model card
- *  (app/sample-model-card, the card's own body). The model's read against
- *  the published figures, which the deal page draws between the two, is
- *  left out of the walkthrough rather than imitated (/demo draws it). The terms' tiles are held to three across:
- *  four of them in this column left "$68,000,000" wider than its tile.
- *  Drawn once its chunk has loaded (`useWalkthrough`), its shape until then. */
+/** The deal page's Financials tab on the sample, in its order and /demo's
+ *  (lib/sample-tabs.test.ts holds the three to one list): the extracted
+ *  terms, the debt sizer, the model's read against today's published
+ *  figures (nothing where none was read), then the first-draft model card
+ *  (app/sample-model-card, the card's own body). The terms' tiles are held
+ *  to three across: four of them in this column left "$68,000,000" wider
+ *  than its tile. Drawn once its chunk has loaded (`useWalkthrough`), its
+ *  shape until then. */
 function FinancialsView({ financials }: { financials?: SampleFinancials }) {
   const w = useWalkthrough();
   if (!w) {
@@ -351,9 +384,10 @@ function FinancialsView({ financials }: { financials?: SampleFinancials }) {
           strategy={financials.strategy}
         />
       )}
-      {/* The walkthrough's Overview draws no sensitivity playground, so
-          the card's note does not name one (audit C10, L2). */}
-      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} playground={false} />
+      <w.ModelVsMarketCard read={financials?.modelVsMarket ?? null} />
+      {/* The walkthrough's Overview draws the sensitivity playground, as
+          /demo's does, so the card's note names it. */}
+      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} />
     </div>
   );
 }
@@ -373,14 +407,55 @@ function BuyBoxTab({ data }: { data?: SampleBuyBoxData }) {
   return <w.SampleBuyBox data={data} />;
 }
 
+/** A part of the Overview drawn from the walkthrough's chunk, before the
+ *  chunk lands: a block of its shape, hidden from a screen reader (the
+ *  Overview's call and stress test are there to read meanwhile). */
+function PartLoading({ tall = false }: { tall?: boolean }) {
+  return (
+    <div aria-hidden data-qa="walkthrough-part-loading" className="rounded-2xl border border-line bg-surface p-5">
+      <div className="skeleton h-3 w-32 rounded" />
+      <div className={`skeleton mt-4 w-full rounded ${tall ? "h-48" : "h-20"}`} />
+    </div>
+  );
+}
+
+/** The deal page's Overview on the sample, in its order and /demo's
+ *  (lib/sample-tabs.test.ts holds the three to one list): the guide, the
+ *  rent roll and the T-12 against the OM, the call with the OM's assumptions
+ *  tested after it, then the sensitivity playground. The actuals card and
+ *  the playground arrive with the walkthrough's chunk, their shape until
+ *  then; the call and the stress test are the first load's. */
+function OverviewTab({
+  overview,
+  stressTest,
+  onNavigate,
+}: {
+  overview?: SampleOverview;
+  stressTest: StressTest | null;
+  onNavigate: (key: string) => void;
+}) {
+  const w = useWalkthrough();
+  return (
+    <div className="flex flex-col gap-6">
+      <SampleGuide onNavigate={onNavigate} />
+      {overview && (w ? <w.PropertyActuals data={overview.actuals} /> : <PartLoading />)}
+      <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} stressTest={stressTest} />
+      {overview && (w ? <w.SensitivityPlayground data={overview.playground} /> : <PartLoading tall />)}
+    </div>
+  );
+}
+
 /** One tab's panel (exported for the homepage's render test). The
  *  Overview's jump links move the walkthrough as they move the deal page. */
 export function DemoPanel({
   tab,
   buyBox,
   financials,
+  overview,
   stressTest = null,
   demand = null,
+  marketPicture = null,
+  marketPictureCheckReads = false,
   analysis = "verdict",
   onAnalysis = () => {},
   onNavigate = () => {},
@@ -390,12 +465,18 @@ export function DemoPanel({
   buyBox?: SampleBuyBoxData;
   /** the Financials tab's server reads */
   financials?: SampleFinancials;
+  /** the Overview's actuals card and playground, built on the server */
+  overview?: SampleOverview;
   /** the OM's assumptions tested on the sample (lib/sample-stress), built
    *  on the server, which the Overview leads with after the call */
   stressTest?: StressTest | null;
-  /** the market check's demand card's rows, read today (/demo hands them
-   *  in; the homepage's walkthrough draws none) */
+  /** the market check's demand card's rows, read today; null where none
+   *  was read, and the card is then left out */
   demand?: MetroDemand | null;
+  /** the photograph the market check opens on (lib/market-picture), and
+   *  whether it is the market the check read */
+  marketPicture?: MarketPicture | null;
+  marketPictureCheckReads?: boolean;
   /** the Analyses tab's open sub-tab */
   analysis?: AnalysisKey;
   onAnalysis?: (key: AnalysisKey) => void;
@@ -404,7 +485,7 @@ export function DemoPanel({
 }) {
   switch (tab) {
     case "Overview":
-      return <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} stressTest={stressTest} />;
+      return <OverviewTab overview={overview} stressTest={stressTest} onNavigate={onNavigate} />;
     case "Financials":
       return <FinancialsView financials={financials} />;
     case "Buy box":
@@ -412,7 +493,15 @@ export function DemoPanel({
       // said so over it (app/sample-buy-box).
       return <BuyBoxTab data={buyBox} />;
     case "Analyses":
-      return <AnalysesView analysis={analysis} onSelect={onAnalysis} demand={demand} />;
+      return (
+        <AnalysesView
+          analysis={analysis}
+          onSelect={onAnalysis}
+          demand={demand}
+          marketPicture={marketPicture}
+          marketPictureCheckReads={marketPictureCheckReads}
+        />
+      );
     case "Documents":
       return <DocumentsTab />;
   }
@@ -457,12 +546,23 @@ function DocumentsTab() {
 export function DemoTabs({
   buyBox,
   financials,
+  overview,
   stressTest = null,
+  demand = null,
+  marketPicture = null,
+  marketPictureCheckReads = false,
 }: {
   buyBox: SampleBuyBoxData;
   financials: SampleFinancials;
+  /** the Overview's actuals card and playground, built on the server */
+  overview?: SampleOverview;
   /** the OM's assumptions tested on the sample, built on the server */
   stressTest?: StressTest | null;
+  /** the market check's demand card's rows, read today */
+  demand?: MetroDemand | null;
+  /** the photograph the market check opens on */
+  marketPicture?: MarketPicture | null;
+  marketPictureCheckReads?: boolean;
 }) {
   const [section, setSection] = useState<SectionKey>("overview");
   const [analysis, setAnalysis] = useState<AnalysisKey>("verdict");
@@ -548,7 +648,11 @@ export function DemoTabs({
           tab={label(section)}
           buyBox={buyBox}
           financials={financials}
+          overview={overview}
           stressTest={stressTest}
+          demand={demand}
+          marketPicture={marketPicture}
+          marketPictureCheckReads={marketPictureCheckReads}
           analysis={analysis}
           onAnalysis={setAnalysis}
           onNavigate={navigate}

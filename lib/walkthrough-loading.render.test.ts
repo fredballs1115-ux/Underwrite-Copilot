@@ -14,6 +14,8 @@ import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { DemoPanel, loadWalkthrough, type AnalysisKey } from "@/app/landing-interactive";
 import { SamplePipelineCardLazy, loadSampleTile } from "@/app/sample-pipeline-card-lazy";
 import { sampleDealCard } from "./pipeline-card";
+import { sampleDemoData, walkthroughData } from "@/app/demo/demo-data";
+import { NO_DEBT_SEEDS } from "./debt-index";
 
 const readSource = (p: string) => readFileSync(p, "utf8");
 
@@ -65,13 +67,30 @@ describe("a walkthrough tab opened before its chunk has landed", () => {
 
   it("asks for the chunk from the panel itself, so /demo, which never asked, draws its views", () => {
     const src = readSource("app/landing-interactive.tsx");
-    // Overview, Financials, Buy box and Documents each ask for it.
-    expect(src.match(/const w = useWalkthrough\(\);/g)?.length).toBe(4);
+    // The Overview (its actuals card and playground), Financials, Analyses,
+    // Buy box and Documents each ask for it.
+    expect(src.match(/const w = useWalkthrough\(\);/g)?.length).toBe(5);
     expect(src).not.toMatch(/const w = walkthrough;/);
+  });
+
+  it("draws the Overview's guide, call and stress test at once, its actuals card and playground as their shape", () => {
+    const { overview, stressTest } = walkthroughData(sampleDemoData({ today: "2026-09-21", reads: null, debt: NO_DEBT_SEEDS }).data);
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Overview", overview, stressTest }));
+    const text = visibleText(html);
+    expect(text).toContain("How to read this screen");
+    expect(html).toContain('data-qa="stress-test-panel"');
+    expect(text).toContain("Risk digest");
+    expect(html.match(/data-qa="walkthrough-part-loading"/g)?.length).toBe(2);
+    expect(text).not.toContain("Property actuals");
+    expect(a11yIssues(html)).toEqual([]);
   });
 
   it("draws the views, and no skeleton, once the chunk has landed", async () => {
     await loadWalkthrough();
+    const { overview } = walkthroughData(sampleDemoData({ today: "2026-09-21", reads: null, debt: NO_DEBT_SEEDS }).data);
+    const home = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Overview", overview }));
+    expect(home).not.toContain('data-qa="walkthrough-part-loading"');
+    expect(visibleText(home)).toContain("Property actuals");
     const verdict = panel("Analyses", "verdict");
     expect(verdict).not.toContain('data-qa="walkthrough-loading"');
     expect(visibleText(verdict)).toContain("Caution");
