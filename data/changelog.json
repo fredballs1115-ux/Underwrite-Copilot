@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-20",
+      "title": "A smoother first screen",
+      "href": "/login",
+      "blurb": "A confirmation link opened on another device no longer reads as an expired reset, a restart under a running screen says so at once instead of spinning, a failed rent roll or T-12 upload says what happened, the progress rail says the email is coming where it is, the screen-complete email leads with the stress test, and after a re-screen the call and the stress test stay at the top of the deal page."
+    },
+    {
+      "date": "2026-10-20",
       "title": "Cleaner public pages on a phone and a laptop",
       "href": "/",
       "blurb": "Rows and tables that scroll sideways now show a fade and a chevron where there is more, the public footers link the terms, privacy and security pages, /market's research reads in plain sentence case with a key on its whole board and a narrower stock's caveat under its figure, every date reads in words, and the renovation row says its break-even beside the evidence rather than as evidence."
