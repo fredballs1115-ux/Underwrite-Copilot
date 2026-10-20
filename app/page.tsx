@@ -400,7 +400,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Why not just ask ChatGPT?",
-    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, the headline assumptions are sourced ranges, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
+    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, each headline assumption is set against a dated published figure, the deal's own documents or a rule of thumb named as one, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
   },
   {
     q: "Does the test make me more accurate?",
@@ -899,7 +899,7 @@ export default function Home() {
                   />
                 </div>
                 <p className="mt-3 text-center text-xs text-muted">
-                  Same deal. Same afternoon. Same data room. One method narrows it.
+                  Same deal, same data room. The method is shown, the moves are computed, and whether it was right is scored as evidence arrives.
                 </p>
               </div>
             </Reveal>

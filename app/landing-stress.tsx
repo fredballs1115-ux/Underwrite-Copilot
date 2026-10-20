@@ -234,7 +234,7 @@ export function StressBench({
           />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs leading-relaxed text-white/60">
-              The OM&apos;s exit value is one point. Drag the cap for the rest.
+              Each lever starts at the base case. Move one and the engine runs the return again.
             </p>
             {touched && (
               <button
