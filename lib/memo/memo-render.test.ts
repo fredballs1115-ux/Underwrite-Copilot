@@ -1432,11 +1432,14 @@ describe("the memo's wording (research pass 35)", () => {
           React.createElement(MemoDocument, { data: buildMemoData(dealOf(SAMPLE_DEAL.extraction, SAMPLE_DEAL.asset_class), "October 5, 2026", checks) }) as unknown as Parameters<typeof renderToBuffer>[0],
         ),
       )).replace(/\s+/g, " ");
-    // The sample's own mandate: inside, outside and not read yet; no near miss.
+    // The sample's own mandate: inside, outside and not checked — a finished
+    // screen whose memorandum states no IRR, never "not read yet"; no near
+    // miss.
     const sample = await textOf(
       evaluateBuyBox(SAMPLE_DEAL.asset_class, { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics }, SAMPLE_DEMO_BOX),
     );
-    expect(sample).toContain("— Target return + inside · × outside · — not read yet");
+    expect(sample).toContain("— Target return + inside · × outside · — not checked");
+    expect(sample).not.toContain("not read yet");
     expect(sample).not.toContain("near miss");
     const near = await textOf([
       { label: "Price", status: "near", detail: "" },
@@ -1445,7 +1448,7 @@ describe("the memo's wording (research pass 35)", () => {
     expect(near).toContain("+ Units + inside · ± near miss");
     expect(near).not.toContain("outside");
     // No mandate, no row and no key.
-    expect(await textOf([])).not.toContain("not read yet");
+    expect(await textOf([])).not.toContain("not checked");
   }, 30000);
 
   it("costs a value-add per unit, not per planned unit, and a development per planned unit in the memorandum's own noun", () => {

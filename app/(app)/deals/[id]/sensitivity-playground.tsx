@@ -20,6 +20,7 @@ import {
 import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
+import { FIT_ON_MEMORANDUM, fitWithModel } from "@/lib/fit-label";
 import { noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 import {
   MISREAD_WORD,
@@ -622,8 +623,8 @@ export function playgroundFitLine(
 ): string {
   const parts = [
     s.scored.length > 0
-      ? `with the model's ${s.scored.join(" and ")} scored`
-      : "mandate fit on the memorandum's figures",
+      ? `${fitWithModel(s.scored)} scored`
+      : `mandate fit ${FIT_ON_MEMORANDUM}`,
   ];
   if (dirty && s.base != null) {
     // Recomputed on every drag; when it legitimately does not move (the
@@ -636,7 +637,7 @@ export function playgroundFitLine(
     );
   }
   if (s.scored.length > 0 && s.onMemorandum != null) {
-    parts.push(`Fit ${s.onMemorandum} on the memorandum's figures`);
+    parts.push(`Fit ${s.onMemorandum} ${FIT_ON_MEMORANDUM}`);
   }
   return parts.join(" · ");
 }

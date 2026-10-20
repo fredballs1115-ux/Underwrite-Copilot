@@ -454,6 +454,25 @@ function statedPct(rows: Row[], re: RegExp, not?: RegExp): { row: Row; pct: numb
   return row && pct != null && Number.isFinite(pct) ? { row, pct } : null;
 }
 
+/** A loan-to-value row and a loan-to-cost row: two measures, never one —
+ *  a share of the building's value is not a share of what it costs, and
+ *  the model sizes its loan on cost. The rows name the OM's own financing,
+ *  never an assumable, a seller's or a junior loan's, nor an exit's. */
+const LTV_ROW = /\bloan[- ]to[- ]value\b|\bltv\b/i;
+const LTC_ROW = /\bloan[- ]to[- ]cost\b|\bltc\b/i;
+const LEVERAGE_NOT = /assumable|seller|existing|in[- ]place|current|supplemental|mezz|combined|\bcltv\b|exit|refi/i;
+
+/** The leverage the OM states, by its own measure: its loan-to-value first,
+ *  else its loan-to-cost, each read off a row whose label names it (a
+ *  label naming both is neither). */
+function statedLeverage(rows: Row[]): { row: Row; pct: number; measure: "loan-to-value" | "loan-to-cost" } | null {
+  const of = (re: RegExp, other: RegExp, measure: "loan-to-value" | "loan-to-cost") => {
+    const hit = statedPct(rows, re, new RegExp(`${LEVERAGE_NOT.source}|${other.source}`, "i"));
+    return hit && hit.pct > 0 && hit.pct <= 100 ? { ...hit, measure } : null;
+  };
+  return of(LTV_ROW, LTC_ROW, "loan-to-value") ?? of(LTC_ROW, LTV_ROW, "loan-to-cost");
+}
+
 /** A vacancy row that states the building's vacancy TODAY — current, in
  *  place, actual, the T-12's, trailing — never a pro forma allowance: it is
  *  read as today's figure, as a stated occupancy is (audit M6). */
@@ -1194,10 +1213,20 @@ function debtRow(ctx: Ctx): StressRow | null {
     const binding = s.tests.find((t) => t.binding);
     if (s.loan != null && binding) {
       const modelLoan = computeUnderwrite(inputs!).sourcesUses.loanAmount;
+      // The model's loan by its own measure, a share of cost; and the OM's
+      // own leverage by its measure, named as the OM's beside the defaults
+      // — the line had quoted the sizer's 65% LTV with the OM's stated 60%
+      // loan-to-value nowhere in the row.
+      const ltc = Number.isFinite(inputs!.ltc) && inputs!.ltc > 0 ? `, ${Math.round(inputs!.ltc * 1000) / 10}% of cost,` : "";
+      const lev = statedLeverage(ctx.rows);
+      const levPage = lev ? pageOf(lev.row, ctx.ex) : null;
+      const omLeverage = lev
+        ? `, beside the OM's own ${Math.round(lev.pct * 10) / 10}% ${lev.measure}${levPage != null ? ` (p. ${levPage})` : ""}`
+        : "";
       evidence.push({
         kind: "rule_of_thumb",
         label: "Lender tests at screening defaults, the binding one named",
-        text: `${binding.label} (${binding.setAt}) binds at ${money(s.loan)} on the model's year-1 NOI at ${pct2(rate)}; the model's loan is ${money(modelLoan)} — ${SIZER_LENDER_TESTS.maxLtvPct}% LTV, ${SIZER_LENDER_TESTS.minDscr.toFixed(2)}x and ${SIZER_LENDER_TESTS.minDebtYieldPct}% debt yield are screening defaults`,
+        text: `${binding.label} (${binding.setAt}) binds at ${money(s.loan)} on the model's year-1 NOI at ${pct2(rate)}; the model's loan${ltc} is ${money(modelLoan)} — ${SIZER_LENDER_TESTS.maxLtvPct}% LTV, ${SIZER_LENDER_TESTS.minDscr.toFixed(2)}x and ${SIZER_LENDER_TESTS.minDebtYieldPct}% debt yield are screening defaults${omLeverage}`,
         value: null,
         asOf: null,
         publisher: "a rule of thumb",

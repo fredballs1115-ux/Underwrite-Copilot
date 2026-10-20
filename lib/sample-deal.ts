@@ -645,7 +645,10 @@ const verdict: VerdictResult = {
         // sizes the loan at 60% of cost, its default, never 60% of value:
         // the demo report's base case says "Loan … · 60% of cost" beside
         // this line (audit C3a, LOW-13), and a test holds both to the model.
-        read: "60% of cost, the model's default, at 6.0%, amortizing over 30 years.",
+        // The memorandum's own 60% is a loan-to-value (p. 44), a different
+        // measure that happens to share the figure, so the line names each
+        // by its own (the memo's card holds 72 characters).
+        read: "Model: 60% of cost at 6.0%, 30-yr amortizing; the OM: 60% LTV, p. 44.",
         risk: "A soft refi window or higher rate pressures the takeout.",
       },
     ],

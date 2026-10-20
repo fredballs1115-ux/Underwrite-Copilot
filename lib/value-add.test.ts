@@ -113,8 +113,12 @@ describe("the program on every summary", () => {
   it("the model line: what a door is worth at the exit cap, the break-even, and the premium the model does not carry", () => {
     const r = readValueAdd(PROGRAM())!;
     const line = valueAddModelLine(r, { holdMonths: 60, exitCapPct: 0.055, capitalYr1: 2_880_000, rentGrowthPct: 0.03 });
+    // The premium is a claim until a door proves it: beside the $250 the
+    // program is priced on, the $235 the renovated doors achieve values a
+    // door too, by the same arithmetic.
     expect(line).toBe(
-      "At the model's 5.50% exit cap a door's premium is worth $54,545 against its $15,000 cost — $39,545 a door, $7.59M across the 192 doors still to do, and the premium breaks even at $68.75 a month. " +
+      "At the model's 5.50% exit cap a door's premium priced at $250 is worth $54,545 against its $15,000 cost — $39,545 a door, $7.59M across the 192 doors still to do, and the premium breaks even at $68.75 a month. " +
+        "At the $235 achieved on the doors already renovated, a door's premium is worth $51,273 — $36,273 a door, $6.96M across the 192 doors still to do. " +
         "The screening model spends $2.88M of capital in its first year and grows today's rent at 3.0%: the premium is in none of its returns, so its IRR is not the program's.",
     );
     expect(gluedWords(line)).toEqual([]);
@@ -122,6 +126,17 @@ describe("the program on every summary", () => {
     const whole = readValueAdd(PROGRAM([row("Units to renovate", "192"), row("Renovation cost per unit", "$15,000"), row("Renovation premium", "$250")]))!;
     expect(valueAddModelLine(whole, { holdMonths: 60, exitCapPct: 0.055, capitalYr1: 2_880_000, rentGrowthPct: 0.03 })).toContain(
       "$39,545 a door, $7.59M across the program,",
+    );
+    // No achieved premium, or one equal to the priced: one value, as before.
+    const wholeLine = valueAddModelLine(whole, { holdMonths: 60, exitCapPct: 0.055, capitalYr1: 2_880_000, rentGrowthPct: 0.03 });
+    expect(wholeLine).toContain("a door's premium is worth $54,545");
+    expect(wholeLine).not.toContain("achieved");
+    // An achieved premium that loses money a door says so.
+    const thin = readValueAdd(
+      PROGRAM([row("Units to renovate", "192"), row("Renovation cost per unit", "$15,000"), row("Renovation premium", "$250"), row("Achieved renovation premium", "$60")]),
+    )!;
+    expect(valueAddModelLine(thin, { holdMonths: 60, exitCapPct: 0.055, capitalYr1: 2_880_000, rentGrowthPct: 0.03 })).toContain(
+      "At the $60 achieved on renovated units, a door's premium is worth $13,091 — $1,909 a door lost.",
     );
   });
 

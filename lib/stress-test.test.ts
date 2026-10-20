@@ -423,6 +423,36 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(d.impact!.evidenceIndex).toBe(1);
   });
 
+  it("names the OM's own leverage beside the lender tests' screening defaults, by its own measure, and runs nothing on it", () => {
+    // The walkthrough: the row quoted the sizer's 65% LTV while the OM
+    // states its own loan-to-value, which the row named nowhere.
+    const lender = (rows: { label: string; value: string; page: string }[]) => {
+      const ex = { ...APARTMENT, metrics: [...APARTMENT.metrics, ...rows.map((r) => row(r.label, r.value, r.page))] };
+      return rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "debt");
+    };
+    const plain = rowOf(test, "debt");
+    const textOf = (d: typeof plain) => d.evidence.find((e) => e.label.startsWith("Lender tests"))!.text;
+    // The model's loan said by its own measure, a share of cost.
+    expect(textOf(plain)).toMatch(/; the model's loan, 60% of cost, is \$[\d.]+M — 65% LTV, 1\.25x and 8% debt yield are screening defaults$/);
+    const ltv = lender([{ label: "Loan-to-value", value: "60%", page: "p. 44" }]);
+    expect(textOf(ltv)).toMatch(/are screening defaults, beside the OM's own 60% loan-to-value \(p\. 44\)$/);
+    // A loan-to-cost is a loan-to-cost, never a loan-to-value.
+    const ltc = lender([{ label: "Loan-to-cost", value: "70%", page: "p. 31" }]);
+    expect(textOf(ltc)).toMatch(/beside the OM's own 70% loan-to-cost \(p\. 31\)$/);
+    expect(textOf(ltc)).not.toContain("70% loan-to-value");
+    // Both stated: the value measure, the one the defaults' 65% LTV is.
+    expect(textOf(lender([{ label: "LTC", value: "70%", page: "p. 31" }, { label: "LTV", value: "62.5%", page: "p. 32" }]))).toMatch(/the OM's own 62\.5% loan-to-value \(p\. 32\)$/);
+    // An assumable loan's or an exit's leverage is not the OM's financing.
+    expect(textOf(lender([{ label: "Assumable loan LTV", value: "48%", page: "p. 33" }]))).not.toContain("the OM's own");
+    // Words only: the row's figure, gap, verdict and re-run are as before.
+    for (const d of [ltv, ltc]) {
+      expect(d.omSays).toEqual(plain.omSays);
+      expect(d.gap).toEqual(plain.gap);
+      expect(d.verdict).toBe(plain.verdict);
+      expect(d.impact).toEqual(plain.impact);
+    }
+  });
+
   it("reads the index off the DebtIndex where one is handed in, the same as off the note, and reads a rate under the bare index unsupported", () => {
     const given = rowOf(buildStressTest(apartmentArgs({ indexGiven: FIVE })), "debt");
     expect(given.evidence[0]).toEqual(rowOf(test, "debt").evidence[0]);

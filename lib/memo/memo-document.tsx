@@ -118,13 +118,14 @@ export const STATUS_CHIP: Record<
 
 /** The chips' key under the row's "Buy box": each mark in a word or two,
  *  as the deal page's buy-box card has it (inside the mandate, a near
- *  miss, outside it, not determinable yet). */
+ *  miss, outside it, not checked). A criterion the memorandum states no
+ *  figure for is not checked on a finished screen, never "not read yet". */
 const STATUS_ORDER = ["pass", "near", "miss", "unknown"] as const;
 export const STATUS_WORD: Record<(typeof STATUS_ORDER)[number], string> = {
   pass: "inside",
   near: "near miss",
   miss: "outside",
-  unknown: "not read yet",
+  unknown: "not checked",
 };
 
 /**

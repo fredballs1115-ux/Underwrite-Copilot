@@ -284,6 +284,29 @@ function sampleBuyBox() {
 }
 
 describe("the homepage's buy box is the deal page's own panel", () => {
+  it("a finished screen's target return says the memorandum states no IRR, never 'yet', and points to the model's check where the page runs it", async () => {
+    // The walkthrough: "no parseable IRR in the screen yet" on a screen whose
+    // model printed a 9.3% levered IRR against the box's 13%.
+    const { MODEL_RETURN_POINTER, FIT_ON_MEMORANDUM } = await import("./fit-label");
+    const data = sampleBuyBox();
+    const target = data.panel.checks.find((c) => c.label === "Target return")!;
+    expect(target).toMatchObject({ status: "unknown", unstated: true });
+    expect(target.detail).toBe("Mandate targets ≥13% IRR; the memorandum states no IRR, so the screen could not check it.");
+    const bare = visibleText(renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: data.panel }))).replace(/&#x27;/g, "'");
+    expect(bare).not.toMatch(/\byet\b/);
+    expect(bare).not.toContain(MODEL_RETURN_POINTER);
+    // The gauge says whose figures its fit is read on.
+    expect(bare).toContain(`mandate fit ${FIT_ON_MEMORANDUM}`);
+    const withModel = renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: { ...data.panel, modelScored: true } }));
+    expect(withModel).toContain('data-qa="model-return-pointer"');
+    expect(visibleText(withModel).replace(/&#x27;/g, "'")).toContain(MODEL_RETURN_POINTER);
+    // A first read, the memorandum not read yet, may still say so.
+    const { buyBoxCheckSource, evaluateBuyBox } = await import("./criteria");
+    const signal = { assetClass: "multifamily", market: "Philadelphia, PA", askPrice: "$68,000,000", perUnit: "$274k/unit", capRate: "", headline: "" };
+    const first = evaluateBuyBox("multifamily", buyBoxCheckSource(null, signal as never, null), SAMPLE_DEMO_BOX).find((c) => c.label === "Target return")!;
+    expect(first.detail).toBe("Mandate targets ≥13% IRR; the first read states none, and the memorandum is still to be read.");
+  });
+
   it("the Buy box tab draws the deal page's BuyBoxPanel on the sample's read, captioned as the sample's example box", () => {
     const data = sampleBuyBox();
     const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", buyBox: data }));

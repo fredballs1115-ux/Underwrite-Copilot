@@ -2057,6 +2057,9 @@ export default async function DealPage({
           scope: ownership.team_id ? "team" : "personal",
           provisional: !extraction && !!firstSignal,
           hasBox: !!buyBox,
+          // The Overview's sensitivity playground scores the model's own
+          // returns against the box, as /demo's does.
+          modelScored: !!playground,
         }}
         // The sample's Buy box tab is captioned as the sample's example box,
         // the one it is judged against (lib/deal-buy-box), as the homepage

@@ -1258,6 +1258,12 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(textOf(demo).replace("Sign up to set your own box →", "Edit criteria →")).toBe(
       textOf(renderToStaticMarkup(React.createElement(SampleBuyBox, { ...sample, publicDemo: false }))),
     );
+    // The sample's page runs the model, as /demo's does, so its target return
+    // points to the playground's check on all three (page.tsx: `modelScored:
+    // !!playground`).
+    expect(data.buyBox.modelScored).toBe(true);
+    expect(html).toContain('data-qa="model-return-pointer"');
+    expect(readFileSync("app/(app)/deals/[id]/page.tsx", "utf8")).toContain("modelScored: !!playground,");
     // A deal of the reader's own draws the panel bare.
     expect(render(sampleProps("buybox"))).not.toContain('data-qa="sample-box-caption"');
   });

@@ -43,6 +43,7 @@ import {
   NEAR_IRR_PT,
   planKindLabel,
   returnWithheldDetail,
+  irrUnstatedDetail,
   returnWithheldOf,
   screenYearOf,
   unitCountRow,
@@ -158,6 +159,9 @@ interface ExtractionLike {
    *  share of no stated percentage's IRR is never scored, and a tenancy in
    *  common's words name the property's loan */
   shareRead?: ShareRead | null;
+  /** the figures are the first signal's alone (lib/criteria
+   *  `buyBoxCheckSource`) */
+  firstRead?: boolean;
   /** the day the screen read the memorandum — a price label's year is read
    *  against its year (lib/criteria `screenYearOf`) */
   screenedOn?: string | null;
@@ -523,7 +527,7 @@ export function scoreMandateFit(
       s.status === "unknown"
         ? withheld
           ? returnWithheldDetail(box.minIrrPct, withheld, extraction)
-          : `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen.`
+          : irrUnstatedDetail(box.minIrrPct, extraction)
         : s.status === "pass"
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${irr!.toFixed(1)}%. On target (broker figure — verify).`
           : s.status === "partial"

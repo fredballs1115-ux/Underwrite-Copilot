@@ -112,6 +112,10 @@ export interface BuyBoxCheck {
    *  unknown, and a fit judged without it is no green light
    *  (`buyBoxCoverage`) */
   onPrice?: boolean;
+  /** the documents read state no figure for the criterion (the target
+   *  return where the memorandum states no IRR): a page that runs the model
+   *  can point to where the model's own figure is scored against it */
+  unstated?: boolean;
 }
 
 // Near-miss tolerances, per criterion kind. Exported because the mandate-fit
@@ -757,6 +761,9 @@ interface ExtractionLike {
   /** the day the screen read the memorandum (ExtractionResult.screenedOn) —
    *  the year a price label's year is judged against (`screenYearOf`) */
   screenedOn?: string | null;
+  /** the figures are the first signal's, the memorandum not yet read
+   *  (`buyBoxCheckSource`): a figure missing from them may yet be stated */
+  firstRead?: boolean;
 }
 
 /** What a partial interest holds, where its words say: an undivided
@@ -1603,6 +1610,10 @@ export function buyBoxCheckSource(
     // the mandate's ceiling read a label's year against it, as the page's
     // price slot does.
     screenedOn: extraction?.screenedOn ?? null,
+    // Whether the figures are the first signal's alone: a criterion they
+    // state nothing for may yet be read, where a memorandum read whole that
+    // states none never will be.
+    ...(!stated && firstSignal ? { firstRead: true } : {}),
   };
 }
 
@@ -1765,6 +1776,19 @@ export interface BoxFigures {
   price: { value: number; range: { low: number; high: number } | null } | null;
   basis: { value: number; noun: string } | null;
   cap: number | null;
+}
+
+/**
+ * The target return where the figures read state no IRR. A finished screen
+ * says the memorandum states none, which is why the box could not check it
+ * from the screen; it had said "no parseable IRR in the screen yet" on a
+ * finished screen whose model printed a levered IRR. Only a first read,
+ * the memorandum not yet read, says the figure may yet come.
+ */
+export function irrUnstatedDetail(minIrrPct: number, source: Pick<ExtractionLike, "firstRead"> | null): string {
+  return source?.firstRead
+    ? `Mandate targets ≥${minIrrPct}% IRR; the first read states none, and the memorandum is still to be read.`
+    : `Mandate targets ≥${minIrrPct}% IRR; the memorandum states no IRR, so the screen could not check it.`;
 }
 
 /** A deal's figures on the box's bands (`BoxFigures`): the buy box page's
@@ -2131,7 +2155,8 @@ export function evaluateBuyBox(
         label: "Target return",
         onPrice: true,
         status: "unknown",
-        detail: `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen yet.`,
+        detail: irrUnstatedDetail(box.minIrrPct, extraction),
+        unstated: true,
       });
     } else if (pct >= box.minIrrPct) {
       checks.push({

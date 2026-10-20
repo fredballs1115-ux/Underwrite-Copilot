@@ -216,7 +216,8 @@ describe("the sample's stress test, one build on every surface", () => {
       modelLine: shown?.meta.valueAdd?.read ?? "",
     };
     expect(page.program).not.toBeNull();
-    expect(page.modelLine).toMatch(/exit cap a door's premium is worth/);
+    // The door valued at the premium priced and at the one achieved.
+    expect(page.modelLine).toMatch(/exit cap a door's premium priced at \$200 is worth .* At the \$140 achieved on the doors already renovated, a door's premium is worth /);
     const { data } = sampleDemoData({ today: TODAY, reads: READS, debt: NO_DEBT_SEEDS });
     expect(data.valueAdd).toEqual(page);
     // The deal page hands the panel those three, /demo draws it under the

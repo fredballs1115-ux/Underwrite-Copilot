@@ -308,17 +308,43 @@ export function valueAddModelLine(r: ValueAddRead, m: ValueAddModel): string {
   // Across the doors the program has left: where some are done, said as
   // the doors still to do, as the read says them.
   const across = (r.renovated ?? 0) > 0 ? (doorsLeftText(r) ?? "the program") : "the program";
+  // THE PREMIUM IS A CLAIM UNTIL A DOOR PROVES IT: where the renovated
+  // doors' achieved premium is stated beside the one the program is priced
+  // on, and the two differ, a door is valued at each by the same arithmetic
+  // (a premium a year over the exit cap, less a door's cost) — the priced
+  // premium alone had valued a door at $44,037 beside an achieved premium
+  // 30% under it.
+  const achieved =
+    r.achievedPremium != null && Math.abs(r.achievedPremium - r.premium) >= 1 ? r.achievedPremium : null;
+  const priced = achieved != null ? ` priced at ${dollars(Math.round(r.premium * 100) / 100)}` : "";
   const value =
     r.doors != null
-      ? `At the model's ${(cap * 100).toFixed(2)}% exit cap a door's premium is worth ${money((r.premium * 12) / cap)} against its ${money(r.costPerDoor)} cost — ${
+      ? `At the model's ${(cap * 100).toFixed(2)}% exit cap a door's premium${priced} is worth ${money((r.premium * 12) / cap)} against its ${money(r.costPerDoor)} cost — ${
           perDoor >= 0 ? `${money(perDoor)} a door, ${money(perDoor * r.doors)} across ${across},` : `${money(-perDoor)} a door lost,`
         } and the premium breaks even at ${dollars(Math.round(breakEven * 100) / 100)} a month.`
       : `At the model's ${(cap * 100).toFixed(2)}% exit cap the premium breaks even at ${dollars(Math.round(breakEven * 100) / 100)} a month.`;
+  const proven = achieved != null ? achievedValueText(achieved, r, cap, across) : "";
   const model =
     m.capitalYr1 > 0
       ? ` The screening model spends ${money(m.capitalYr1)} of capital in its first year and grows today's rent at ${(m.rentGrowthPct * 100).toFixed(1)}%: the premium is in none of its returns, so its IRR is not the program's.`
       : ` The screening model grows today's rent at ${(m.rentGrowthPct * 100).toFixed(1)}% and carries no renovation capital: the program is in none of its returns.`;
-  return `${value}${model}`;
+  return `${value}${proven}${model}`;
+}
+
+/** A door valued at the premium the renovated doors achieve, as stated:
+ *  " At the $140 achieved on the doors already renovated, a door's premium
+ *  is worth $30,826 — $X a door, $Y across the …". */
+function achievedValueText(achieved: number, r: ValueAddRead, cap: number, across: string): string {
+  const worth = (achieved * 12) / cap;
+  const perDoor = worth - r.costPerDoor!;
+  const done = r.renovated != null && r.renovated > 0 ? "on the doors already renovated" : "on renovated units";
+  const net =
+    perDoor >= 0
+      ? r.doors != null
+        ? `${money(perDoor)} a door, ${money(perDoor * r.doors)} across ${across}`
+        : `${money(perDoor)} a door`
+      : `${money(-perDoor)} a door lost`;
+  return ` At the ${dollars(Math.round(achieved * 100) / 100)} achieved ${done}, a door's premium is worth ${money(worth)} — ${net}.`;
 }
 
 /** The pipeline row's tag: "Reno $250/mo, 20% on cost", "Reno $250/mo". */

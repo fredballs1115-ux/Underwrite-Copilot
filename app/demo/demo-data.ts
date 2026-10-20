@@ -107,7 +107,7 @@ export function sampleDemoData({
       noiNote: null,
       assetClass: shownClass || null,
     },
-    buyBox: { checks: boxRead.checks, mandate: boxRead.mandate, scope: "personal", provisional: false, hasBox: true },
+    buyBox: { checks: boxRead.checks, mandate: boxRead.mandate, scope: "personal", provisional: false, hasBox: true, modelScored: true },
     boxLines: buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }),
     playground: {
       inputs: derived.inputs,

@@ -316,7 +316,10 @@ describe("ReportDocument (full report)", () => {
     expect(derived.sources.ltc?.provenance).toBe("assumption");
     expect(derived.inputs.allInRatePct).toBe(0.06);
     expect(derived.inputs.amortMonths).toBe(360);
-    expect(flat).toContain("60% of cost, the model's default, at 6.0%, amortizing over 30 years.");
+    // The model's 60% is of cost and the memorandum's 60% of value: the
+    // line names each by its own measure, never one for the other.
+    expect(flat).toContain("Model: 60% of cost at 6.0%, 30-yr amortizing; the OM: 60% LTV, p. 44.");
+    expect(flat).not.toContain("of cost, the model's default");
     expect(flat).not.toContain("60% LTV at 6.0%");
     expect(flat).toContain("amortizing over 30 years; and a 6.00% all-in rate");
     expect(flat).not.toMatch(/year of IO/);
