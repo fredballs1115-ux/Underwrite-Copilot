@@ -454,11 +454,18 @@ function statedPct(rows: Row[], re: RegExp, not?: RegExp): { row: Row; pct: numb
   return row && pct != null && Number.isFinite(pct) ? { row, pct } : null;
 }
 
+/** A vacancy row that states the building's vacancy TODAY — current, in
+ *  place, actual, the T-12's, trailing — never a pro forma allowance: it is
+ *  read as today's figure, as a stated occupancy is (audit M6). */
+const VACANCY_TODAY = /\b(?:current|in[- ]place|actual|t-?12|ttm|trailing|today)\b/i;
+
 /** The OM's stabilized vacancy, as a vacancy row (a stabilized or pro forma
- *  one first) or as what its stated occupancy leaves. */
-function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occupancy" } | null {
+ *  one first) or as what its stated occupancy leaves; else a vacancy the OM
+ *  states for today, read as today's figure (`from: "today"`). */
+function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occupancy" | "today" } | null {
   const vacancyRows = rows.filter((m) => VACANCY_ROW.test(m.label) && !VACANCY_NOT.test(m.label) && !VACANCY_VALUE_NOT.test(m.value) && parsePct(m.value) != null);
-  const row = vacancyRows.find((m) => VACANCY_PLAN.test(m.label)) ?? vacancyRows[0] ?? null;
+  const assumed = vacancyRows.filter((m) => !VACANCY_TODAY.test(m.label));
+  const row = assumed.find((m) => VACANCY_PLAN.test(m.label)) ?? assumed[0] ?? null;
   if (row) {
     const pct = parsePct(row.value)!;
     if (pct >= 0 && pct <= 100) return { row, pct, from: "vacancy" };
@@ -466,6 +473,9 @@ function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occ
   const occ = occupancyRow(rows) as Row | null;
   const occPct = occ ? parsePct(occ.value) : null;
   if (occ && occPct != null && occPct >= 0 && occPct <= 100) return { row: occ, pct: Math.round((100 - occPct) * 10) / 10, from: "occupancy" };
+  const today = vacancyRows.find((m) => VACANCY_TODAY.test(m.label)) ?? null;
+  const todayPct = today ? parsePct(today.value) : null;
+  if (today && todayPct != null && todayPct >= 0 && todayPct <= 100) return { row: today, pct: todayPct, from: "today" };
   return null;
 }
 
@@ -736,13 +746,15 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // Where the OM states no vacancy allowance, the figure is its occupancy
   // TODAY, not a pro forma assumption: the row is titled and worded so, and
   // the documents — today's figures too — decide it.
-  const title = om?.from === "occupancy" ? OCCUPANCY_TITLE : undefined;
+  const title = om && om.from !== "vacancy" ? OCCUPANCY_TITLE : undefined;
   const omSays: StressRow["omSays"] = om
     ? {
         text:
           om.from === "vacancy"
             ? `${om.row.label}: ${om.row.value}`
-            : `${om.row.label}: ${om.row.value} as stated — today's occupancy, not a pro forma assumption — which leaves ${pct1(om.pct)} vacant`,
+            : om.from === "today"
+              ? `${om.row.label}: ${om.row.value} as stated — today's vacancy, not a pro forma assumption`
+              : `${om.row.label}: ${om.row.value} as stated — today's occupancy, not a pro forma assumption — which leaves ${pct1(om.pct)} vacant`,
         value: om.pct,
         page: pageOf(om.row, ctx.ex),
       }

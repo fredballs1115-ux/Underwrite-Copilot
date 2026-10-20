@@ -681,6 +681,22 @@ describe("the rent growth is held to the figure for the deal's own kind of rent"
     expect(g.verdict).toBe("stretched");
   });
 
+  it("reads a current, in-place, actual or T-12 vacancy as today's figure, never as a stabilized assumption held to the market (audit M6)", () => {
+    for (const label of ["Current vacancy", "In-place vacancy", "Actual vacancy", "T-12 vacancy", "Vacancy today"]) {
+      const ex = { ...APARTMENT, metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Occupancy"), row("Units", "153"), row(label, "9.0%", "p. 8")] };
+      expect(stabilizedVacancyStated(ex), label).toBe(false);
+      const v = rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "vacancy");
+      expect(v.title, label).toBe("Occupancy today");
+      expect(v.omSays.text, label).toBe(`${label}: 9.0% as stated — today's vacancy, not a pro forma assumption`);
+      // Today's documents decide, never the market's survey.
+      expect(v.evidence[0].kind, label).toBe("document");
+    }
+    // Beside a stabilized allowance, the stabilized one is the assumption.
+    const both = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Current vacancy", "9.0%", "p. 8"), row("Stabilized vacancy", "5.0%", "p. 21")] };
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: both })), "vacancy").omSays.text).toBe("Stabilized vacancy: 5.0%");
+    expect(stabilizedVacancyStated(both)).toBe(true);
+  });
+
   it("is held to the same figure the model's rent-growth check is held to, so the card never reads inside where the row reads unsupported (audit H1)", () => {
     // The OM's 3.0% and the model's 3.0% against apartments' +0.8%: the
     // CPI's +5.0% had let the card read "inside the published range".
