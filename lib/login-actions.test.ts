@@ -185,6 +185,16 @@ describe("the form keeps the address it was sent with (research pass 32)", () =>
     expect(created?.notice).toContain("to new@firm.example");
     expect(created?.notice).toContain("in this browser");
   });
+
+  it("says any device confirms, and only this browser also signs in", () => {
+    // Opening the link anywhere confirms the address; the automatic sign-in
+    // needs the sign-up's code verifier, which only this browser holds.
+    for (const words of [accountCreatedNotice("new@firm.example"), CONFIRMATION_RESENT]) {
+      expect(words).toContain("Open it on any device to confirm your email");
+      expect(words).toContain("open it in this browser and you're signed in too");
+      expect(words).not.toMatch(/in this browser to confirm/);
+    }
+  });
 });
 
 describe("a sign-in goes where the person was headed", () => {
