@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
@@ -18,19 +18,23 @@ import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, 
  *
  *   - THE OM'S FIGURE, with its page as a chip, and the verdict code gave
  *     the row;
- *   - THE TRACK: the OM's figure as a dark tick, each piece of evidence that
- *     carries a figure as a mark keyed by its kind — a dot for the deal's
- *     own document and a published figure, a hollow dot for the memorandum
- *     contradicting itself, a dashed tick for a rule of thumb — and the
- *     survey's margin as a whisker where the evidence states one;
- *   - THE EVIDENCE, each item with its kind, its publisher, its date and
- *     whose figure it is (a metro's figure is the metro's, never the
- *     building's);
+ *   - THE TRACK: the OM's figure as a dark tick labelled over the track
+ *     ("OM 6.0%"), each piece of evidence that carries a figure as a mark
+ *     shaped by its kind — a dot for the deal's own document, a diamond for
+ *     a published figure, a hollow dot for the memorandum contradicting
+ *     itself, a dashed tick for a rule of thumb — the survey's margin as a
+ *     whisker where the evidence states one, and under the track a bracket
+ *     over the evidence's span labelled with its figures;
+ *   - THE EVIDENCE, each item led by its kind's glyph (the track's own
+ *     mark), with its kind, its publisher, its date and whose figure it is
+ *     (a metro's figure is the metro's, never the building's);
  *   - THE GAP in words, and THE IMPACT: the levered IRR with the OM's figure
  *     and with the evidence's, the engine run again with that one input
- *     swapped (`StressImpact`), as a pair and a small track — or "no return
- *     struck", the reason said once at the top where the model's reads are
- *     withheld;
+ *     swapped (`StressImpact`), as a pair and two bars on one scale — or "no
+ *     return struck", the reason said once at the top where the model's
+ *     reads are withheld. The gap and the impact sit in a card of their own,
+ *     beside the evidence where the row is wide enough and under it on a
+ *     phone;
  *   - THE CHALLENGE, the challenger's own words and its question for the
  *     broker, folded;
  *   - HOW THIS WAS TESTED: the row's method sentence, linking to the
@@ -61,12 +65,25 @@ const VERDICT: Record<StressVerdict, { rank: number; label: string; chip: string
   unchecked: { rank: 3, label: "Unchecked", chip: "bg-faint text-muted" },
 };
 
-const KIND: Record<EvidenceKind, { word: string; chip: string; mark: string }> = {
-  document: { word: "The deal's own document", chip: "bg-brand/10 text-brand", mark: "bg-brand" },
-  published: { word: "A published figure", chip: "bg-pass/10 text-pass", mark: "bg-pass" },
-  rule_of_thumb: { word: "A rule of thumb", chip: "bg-faint text-muted", mark: "border-ink/50" },
-  om_internal: { word: "The OM against itself", chip: "bg-caution/10 text-caution", mark: "border-2 border-caution bg-surface" },
+// Each kind has its own SHAPE as well as its tone — a dot for the deal's
+// document, a diamond for a published figure, a hollow dot for the OM
+// against itself, a dashed tick for a rule of thumb — and the same glyph
+// leads the kind's line in the evidence list and its entry in the key, so a
+// mark on the track is read off the line beside it, never off a colour.
+const KIND: Record<EvidenceKind, { word: string; chip: string; shape: string; mark: string }> = {
+  document: { word: "The deal's own document", chip: "bg-brand/10 text-brand", shape: "size-2.5 rounded-full", mark: "bg-brand" },
+  published: { word: "A published figure", chip: "bg-pass/10 text-pass", shape: "size-2 rotate-45 rounded-[1px]", mark: "bg-pass" },
+  rule_of_thumb: { word: "A rule of thumb", chip: "bg-faint text-muted", shape: "h-3 w-0 border-l-2 border-dashed", mark: "border-ink/50" },
+  om_internal: { word: "The OM against itself", chip: "bg-caution/10 text-caution", shape: "size-2.5 rounded-full", mark: "border-2 border-caution bg-surface" },
 };
+
+/** The verdicts' fills for the tally under the heading and the read line's
+ *  dots, in the chips' own hues. */
+const FILL: Record<StressVerdict, string> = { unsupported: "bg-kill", stretched: "bg-caution", holds: "bg-pass", unchecked: "bg-ink/15" };
+
+/** A link's hit area a thumb's height on a touch screen, its line box
+ *  unchanged (the padding and the negative margin cancel). */
+const TAP = "pointer-coarse:inline-block pointer-coarse:-my-2.5 pointer-coarse:py-2.5";
 
 const SCOPE: Record<StressEvidence["scope"], string> = {
   deal: "the deal's own figure",
@@ -211,84 +228,179 @@ function trackScale(row: StressRow): ((v: number) => string) | null {
   return (v: number) => `${Math.max(0, Math.min(100, ((v - from) / (to - from)) * 100)).toFixed(1)}%`;
 }
 
+/** A label over or under the track, kept inside it: centred on its value
+ *  in the middle of the track, and run from (or to) the value near an end,
+ *  so a figure never hangs past the panel's edge on a phone. Never wraps. */
+function TrackLabel({ at, children, className = "", qa }: { at: number; children: ReactNode; className?: string; qa?: string }) {
+  const style = at < 30 ? { left: `${at.toFixed(1)}%` } : at > 70 ? { right: `${(100 - at).toFixed(1)}%` } : { left: `${at.toFixed(1)}%` };
+  const pull = at < 30 ? "-translate-x-1" : at > 70 ? "translate-x-1" : "-translate-x-1/2";
+  return (
+    <span className={`absolute whitespace-nowrap tabular-nums ${pull} ${className}`} data-qa={qa} style={style}>
+      {children}
+    </span>
+  );
+}
+
+/** A text with each ISO day in it kept whole on its line: a phone broke
+ *  "2026-05-31" at its hyphen. A `<time>` adds nothing to the words. */
+function Dated({ text }: { text: string }) {
+  const parts = text.split(/(\d{4}-\d{2}-\d{2})/);
+  if (parts.length === 1) return text;
+  return parts.map((p, i) =>
+    i % 2 === 1 ? (
+      <time key={i} dateTime={p} className="whitespace-nowrap">
+        {p}
+      </time>
+    ) : (
+      p
+    ),
+  );
+}
+
+/** The kind's glyph, the one the track draws, at the head of its line in
+ *  the list and in the key. */
+function EvidenceGlyph({ kind }: { kind: EvidenceKind }) {
+  return <span aria-hidden className={`block shrink-0 ${KIND[kind].shape} ${KIND[kind].mark}`} />;
+}
+
+/**
+ * The track: the OM's figure as a dark tick LABELLED over the track ("OM
+ * 6.0%"), each piece of evidence that carries a figure as its kind's glyph,
+ * and under the track a bracket over the evidence's span labelled with its
+ * figures ("Evidence 4.6%–9.3%"), so the two sides of the comparison are
+ * named where they are drawn. The labels sit in rows of their own above and
+ * below, and never collide with each other.
+ */
 function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string }) {
   const om = row.omSays.value!;
+  const pos = (v: number) => parseFloat(at(v));
+  const figures = row.evidence.flatMap((e) => (e.value == null ? [] : [e.value]));
+  const lo = Math.min(...figures);
+  const hi = Math.max(...figures);
+  const span = lo === hi ? figureText(row.key, lo) : `${figureText(row.key, lo)}–${figureText(row.key, hi)}`;
   return (
-    <BarRows className="mt-2 text-[11px]" qa="stress-track">
-      <BarRow label="The OM against the evidence" figure={figureText(row.key, om)}>
+    <div className="mt-3 text-[11px] leading-4" data-qa="stress-track">
+      <p className="text-muted">The OM against the evidence</p>
+      <div className="relative mt-1 h-4">
+        <TrackLabel at={pos(om)} className="font-semibold text-ink" qa="stress-om-label">{`OM ${figureText(row.key, om)}`}</TrackLabel>
+      </div>
+      <div className="relative mt-1 h-2 rounded-full bg-faint" aria-hidden>
         {row.evidence.map((e, i) => {
           if (e.value == null) return null;
           const moe = marginOf(e);
           if (e.kind === "rule_of_thumb") {
             return <Tick key={i} at={at(e.value)} bar="stress-evidence" tone={KIND.rule_of_thumb.mark} dashed track="secondary" />;
           }
-          const left = at(e.value);
           return (
             <Fragment key={i}>
               {moe != null && (
                 <div
                   className="absolute top-1/2 h-px -translate-y-1/2 bg-pass/60"
                   data-qa="stress-whisker"
-                  style={{ left: at(e.value - moe), width: `${(parseFloat(at(e.value + moe)) - parseFloat(at(e.value - moe))).toFixed(1)}%` }}
+                  style={{ left: at(e.value - moe), width: `${(pos(e.value + moe) - pos(e.value - moe)).toFixed(1)}%` }}
                 />
               )}
               <div
-                className={`absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full ${KIND[e.kind].mark}`}
+                className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ring-1 ring-surface ${KIND[e.kind].shape} ${KIND[e.kind].mark}`}
                 data-bar="stress-evidence"
                 data-kind={e.kind}
-                style={{ left }}
+                style={{ left: at(e.value) }}
               />
             </Fragment>
           );
         })}
-        <Tick at={at(om)} bar="stress-om" tone="bg-ink" track="secondary" />
-      </BarRow>
-    </BarRows>
+        <Tick at={at(om)} bar="stress-om" tone="bg-ink" />
+      </div>
+      <div className={`relative ${lo === hi ? "h-6" : "h-8"}`}>
+        {/* A bracket over the evidence's span; one figure needs none. */}
+        {lo !== hi && (
+          <div
+            aria-hidden
+            className="absolute top-1 h-2 rounded-b-sm border-x border-b border-ink/30"
+            data-qa="stress-span"
+            style={{ left: at(lo), width: `${(pos(hi) - pos(lo)).toFixed(1)}%` }}
+          />
+        )}
+        <TrackLabel at={(pos(lo) + pos(hi)) / 2} className={`${lo === hi ? "top-1.5" : "top-3.5"} font-medium text-ink/80`} qa="stress-evidence-label">{`Evidence ${span}`}</TrackLabel>
+      </div>
+    </div>
   );
 }
 
+/** The return's move: the pair in words, then the two runs as bars on one
+ *  scale — the OM's figure, then the evidence's — each labelled with the
+ *  input it ran on. Where the two runs are one, one bar. */
 function ImpactView({ impact }: { impact: StressImpact }) {
   const base = impact.baseIrrPct;
   const alt = impact.altIrrPct;
   const top = Math.max(base ?? 0, alt ?? 0, 1) * 1.15;
-  const width = alt == null ? "0%" : `${Math.max(0, Math.min(100, (alt / top) * 100)).toFixed(1)}%`;
+  const widthOf = (v: number | null) => (v == null ? "0%" : `${Math.max(0, Math.min(100, (v / top) * 100)).toFixed(1)}%`);
   // The two runs are one where the OM's figure IS the evidence's: one
   // figure, not "9.3% → 9.3%". Read off the values the engine was run on,
   // as lib/stress-test-words does, never off the note's words.
   const same = Math.abs(impact.altValue - impact.omValue) < 1e-9;
   return (
-    <div className="mt-2" data-qa="stress-impact">
-      <p className="text-xs font-medium tabular-nums text-ink" data-qa="stress-impact-pair">
+    <div className="mt-2.5" data-qa="stress-impact">
+      <p className="text-sm font-semibold tabular-nums text-ink" data-qa="stress-impact-pair">
         {same ? `Levered IRR ${pctText(base)}, run at the evidence's figure` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
       </p>
-      <BarRows className="mt-1 text-[11px]">
+      <BarRows className="mt-1.5 space-y-1 text-[11px]">
+        {!same && (
+          <BarRow label="At the OM's figure" figure={pctText(base)}>
+            <div className="h-full rounded-full bg-ink/35" data-bar="stress-impact-om" style={{ width: widthOf(base) }} />
+          </BarRow>
+        )}
         <BarRow label="At the evidence's figure" figure={pctText(alt)}>
-          <div className="h-full rounded-full bg-caution/60" data-bar="stress-impact" style={{ width }} />
-          {base != null && base > 0 && <Tick at={`${Math.min(100, (base / top) * 100).toFixed(1)}%`} tone="bg-ink" track="secondary" />}
+          <div className="h-full rounded-full bg-caution/70" data-bar="stress-impact" style={{ width: widthOf(alt) }} />
         </BarRow>
       </BarRows>
-      <p className={`mt-1 ${MEASURE} text-xs leading-relaxed`}>{impact.note}</p>
+      <p className={`mt-1.5 ${MEASURE} text-xs leading-relaxed text-ink/85`}>
+        <Dated text={impact.note} />
+      </p>
     </div>
   );
 }
 
-function EvidenceList({ evidence }: { evidence: readonly StressEvidence[] }) {
+/** Each piece of evidence in one flowing line: the kind's glyph (where the
+ *  track draws it), the kind, the figure in its own words, then whose it is
+ *  and when, muted, and the source. */
+function EvidenceList({ evidence, marks = false }: { evidence: readonly StressEvidence[]; marks?: boolean }) {
   if (evidence.length === 0) return null;
   return (
-    <ul className="mt-1.5 space-y-1 text-[11px] leading-4" data-qa="stress-evidence-list">
+    <ul className="mt-1 space-y-1.5 text-[11px] leading-4" data-qa="stress-evidence-list">
       {evidence.map((e, i) => {
         const kind = KIND[e.kind];
-        const when = e.asOf ? `, ${dayText(e.asOf)}` : e.kind === "rule_of_thumb" ? "" : ", undated";
         return (
-          <li key={i} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5" data-evidence={e.kind}>
-            <span className={`shrink-0 rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${kind.chip}`}>{kind.word}</span>
-            <span className={`${MEASURE} text-ink`}>{`${e.label}: ${e.text}`}</span>
-            <span className="text-muted">{`— ${e.publisher}${when} · ${SCOPE[e.scope]}`}</span>
-            {e.href && (
-              <a href={e.href} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
-                Source
-              </a>
-            )}
+          <li key={i} className="flex gap-2" data-evidence={e.kind}>
+            {marks && <span className="flex h-4 w-2.5 shrink-0 items-center justify-center">{e.value != null && <EvidenceGlyph kind={e.kind} />}</span>}
+            <p className={`min-w-0 ${MEASURE}`}>
+              <span className={`mr-1 inline-block rounded px-1 align-[1px] text-[9.5px] font-semibold uppercase leading-[14px] tracking-wide ${kind.chip}`}>{kind.word}</span>{" "}
+              <span className="text-ink">
+                <Dated text={`${e.label}: ${e.text}`} />
+              </span>{" "}
+              <span className="text-muted">
+                {`— ${e.publisher}`}
+                {e.asOf ? (
+                  <>
+                    {", "}
+                    <time dateTime={e.asOf} className="whitespace-nowrap">
+                      {dayText(e.asOf)}
+                    </time>
+                  </>
+                ) : e.kind === "rule_of_thumb" ? null : (
+                  ", undated"
+                )}
+                {` · ${SCOPE[e.scope]}`}
+              </span>
+              {e.href && (
+                <>
+                  {" "}
+                  <a href={e.href} target="_blank" rel="noopener noreferrer" className={`font-medium text-brand hover:underline ${TAP}`}>
+                    Source
+                  </a>
+                </>
+              )}
+            </p>
           </li>
         );
       })}
@@ -298,7 +410,7 @@ function EvidenceList({ evidence }: { evidence: readonly StressEvidence[] }) {
 
 function PageChip({ page }: { page: number | null }) {
   return (
-    <span className="rounded-full border border-line px-1.5 py-px text-[10px] text-muted" data-qa="stress-page">
+    <span className="whitespace-nowrap rounded-full border border-line bg-surface/70 px-1.5 py-px text-[10px] text-muted" data-qa="stress-page">
       {page != null ? `OM p. ${page}` : "OM"}
     </span>
   );
@@ -306,7 +418,7 @@ function PageChip({ page }: { page: number | null }) {
 
 function ChallengeFold({ challenge }: { challenge: NonNullable<StressRow["challenge"]> }) {
   return (
-    <div className="mt-1.5" data-qa="stress-challenge">
+    <div className="mt-2.5" data-qa="stress-challenge">
       <p className="text-[11px] font-semibold text-muted">{`The challenge · ${SEVERITY[challenge.severity]} severity`}</p>
       <PanelFold rest={[challenge.challenge, `Ask the broker: ${challenge.question}`]} />
     </div>
@@ -315,9 +427,9 @@ function ChallengeFold({ challenge }: { challenge: NonNullable<StressRow["challe
 
 function MethodLine({ row }: { row: StressRow }) {
   return (
-    <p className={`mt-1.5 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-method">
+    <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-method">
       <span>{`How this was tested: ${row.method}`}</span>{" "}
-      <Link href={`/how-we-test#${row.key}`} className="text-brand hover:underline">
+      <Link href={`/how-we-test#${row.key}`} className={`whitespace-nowrap font-medium text-brand hover:underline ${TAP}`}>
         The method
       </Link>
     </p>
@@ -382,37 +494,103 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
   const v = row.ruleOfThumbOnly && row.verdict === "holds" ? { ...VERDICT.holds, chip: VERDICT.unchecked.chip } : VERDICT[row.verdict];
   const at = trackScale(row);
   const hasFigure = row.omSays.value != null;
+  // Two columns once the row itself is wide (a container query, so the
+  // homepage's narrower walkthrough and the deal page each decide by their
+  // own width): what the OM says against the evidence on the left, and on
+  // the right what the gap is and what it does to the return, then the
+  // challenge and the method. One column, in the same order, on a phone.
   return (
-    <li className="py-3 first:pt-2 last:pb-1" data-qa={`stress-row-${row.key}`} data-verdict={row.verdict}>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <li className="@container/row py-4 first:pt-3 last:pb-2" data-qa={`stress-row-${row.key}`} data-verdict={row.verdict}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${v.chip}`}>{v.label}</span>
         <h3 className="text-sm font-semibold text-ink">{row.title}</h3>
         {hasFigure && <PageChip page={row.omSays.page} />}
       </div>
-      <p className={`mt-0.5 ${MEASURE} text-xs text-muted`}>{row.omSays.text}</p>
+      <p className={`mt-1 ${MEASURE} text-xs text-muted`}>
+        <Dated text={row.omSays.text} />
+      </p>
 
-      {at && <EvidenceTrack row={row} at={at} />}
-      <EvidenceList evidence={row.evidence} />
+      <div className="@2xl/row:grid @2xl/row:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] @2xl/row:gap-x-6">
+        <div className="min-w-0">
+          {at && <EvidenceTrack row={row} at={at} />}
+          <EvidenceList evidence={row.evidence} marks={at != null} />
+        </div>
 
-      {row.gap ? (
-        <p className={`mt-1.5 ${MEASURE} text-xs leading-relaxed text-ink`} data-qa="stress-gap">{row.gap.text}</p>
-      ) : row.unchecked ? (
-        <p className={`mt-1.5 ${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked">{row.unchecked}</p>
-      ) : null}
+        <div className="min-w-0 @2xl/row:pt-3">
+          <div className="mt-3 rounded-lg border border-line/80 bg-surface/80 px-3 py-2.5 @2xl/row:mt-0" data-qa="stress-move">
+            {row.gap ? (
+              <p className={`${MEASURE} text-xs font-medium leading-relaxed text-ink`} data-qa="stress-gap">
+                <Dated text={row.gap.text} />
+              </p>
+            ) : row.unchecked ? (
+              <p className={`${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked">{row.unchecked}</p>
+            ) : null}
 
-      {row.impact ? (
-        <ImpactView impact={row.impact} />
-      ) : (
-        <p className="mt-1.5 text-[11px] text-muted" data-qa="stress-no-impact">
-          {/* One sentence a row: the reason once at the top where the whole
-              test re-runs nothing, else the row's own (lib/stress-test-words). */}
-          {withheld ? "No return is re-run (see the note above)." : noMoveWhy(test, row)}
-        </p>
-      )}
+            {row.impact ? (
+              <ImpactView impact={row.impact} />
+            ) : (
+              <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-impact">
+                {/* One sentence a row: the reason once at the top where the whole
+                    test re-runs nothing, else the row's own (lib/stress-test-words). */}
+                {withheld ? "No return is re-run (see the note above)." : noMoveWhy(test, row)}
+              </p>
+            )}
+          </div>
 
-      {row.challenge && <ChallengeFold challenge={row.challenge} />}
-      <MethodLine row={row} />
+          {row.challenge && <ChallengeFold challenge={row.challenge} />}
+          <MethodLine row={row} />
+        </div>
+      </div>
     </li>
+  );
+}
+
+/** The verdicts' dots in the read line, drawn by the count's own element so
+ *  the line's words stay one run of text. */
+const DOT: Record<string, string> = {
+  unsupported: "before:bg-kill",
+  stretched: "before:bg-caution",
+  hold: "before:bg-pass",
+  holds: "before:bg-pass",
+  "could not be checked": "before:bg-ink/25",
+};
+
+/**
+ * The read line, word for word `stressReadLine`'s, each count kept whole on
+ * its line ("1 holds" never breaks after its figure on a phone) and led by
+ * its verdict's dot. The counts are `<b>`, which the line's weight already
+ * is, so the words stay one run of text for a screen reader and the lints.
+ */
+function ReadLine({ rows }: { rows: readonly StressRow[] }) {
+  const parts = stressReadLine(rows).split(/(\d+ (?:unsupported|stretched|holds?|could not be checked))/);
+  return (
+    <span className="text-sm font-semibold leading-snug" data-qa="stress-read">
+      {parts.map((p, i) => {
+        const m = p.match(/^\d+ (.+)$/);
+        if (i % 2 === 0 || !m) return p;
+        return (
+          <b
+            key={i}
+            className={`whitespace-nowrap font-semibold before:mr-1 before:inline-block before:size-1.5 before:rounded-full before:align-[2px] before:content-[''] ${DOT[m[1]] ?? ""}`}
+          >
+            {p}
+          </b>
+        );
+      })}
+    </span>
+  );
+}
+
+/** The read line as a picture: one segment an assumption, most severe
+ *  first, in its verdict's hue (a "holds" struck on a rule of thumb alone
+ *  in the unchecked hue, as its chip is). */
+function Tally({ rows }: { rows: readonly StressRow[] }) {
+  return (
+    <div aria-hidden className="mt-2 flex h-2 max-w-md gap-0.5" data-bar="stress-tally">
+      {rows.map((r, i) => (
+        <span key={i} className={`flex-1 rounded-full ${r.ruleOfThumbOnly && r.verdict === "holds" ? FILL.unchecked : FILL[r.verdict]}`} />
+      ))}
+    </div>
   );
 }
 
@@ -441,8 +619,9 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       className={`${className ? `${className} ` : ""}rounded-xl border border-l-4 px-4 py-3 ${tone.border}`}
     >
       <PanelHead title="The OM's assumptions, tested" tone={tone.head}>
-        <span className="text-sm font-semibold" data-qa="stress-read">{stressReadLine(test.rows)}</span>
+        <ReadLine rows={test.rows} />
       </PanelHead>
+      <Tally rows={rows} />
       {/* The reason is a whole sentence that already says no return is re-run. */}
       {test.impactsWithheld && <PanelNote>{test.impactsWithheld}</PanelNote>}
 
@@ -455,29 +634,20 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       )}
       <UncheckedGroup rows={unchecked} />
 
-      <Key className="mt-2 border-t border-line pt-2" qa="stress-key">
+      <Key className="mt-3 border-t border-line pt-2" qa="stress-key">
         <KeyItem mark="tick" tone="bg-ink">
           {"The OM's figure"}
         </KeyItem>
-        {kindsShown.has("document") && (
-          <KeyItem mark="swatch" tone={KIND.document.mark}>
-            {KIND.document.word}
-          </KeyItem>
-        )}
-        {kindsShown.has("published") && (
-          <KeyItem mark="swatch" tone={KIND.published.mark}>
-            {KIND.published.word}
-          </KeyItem>
-        )}
-        {kindsShown.has("rule_of_thumb") && (
-          <KeyItem mark="dashed" tone={KIND.rule_of_thumb.mark}>
-            {KIND.rule_of_thumb.word}
-          </KeyItem>
-        )}
-        {kindsShown.has("om_internal") && (
-          <KeyItem mark="swatch" tone={KIND.om_internal.mark}>
-            {KIND.om_internal.word}
-          </KeyItem>
+        {/* Each kind's own glyph, the one the track and the list draw. */}
+        {(["document", "published", "rule_of_thumb", "om_internal"] as const).map((k) =>
+          kindsShown.has(k) ? (
+            <KeyItem key={k}>
+              <span className="flex h-4 w-2.5 shrink-0 items-center justify-center">
+                <EvidenceGlyph kind={k} />
+              </span>
+              {KIND[k].word}
+            </KeyItem>
+          ) : null,
         )}
         {published && (
           <KeyItem>{test.publishedRead ? `Published figures read ${dayText(test.readOn)}` : "Published figures as of the screen's market check"}</KeyItem>

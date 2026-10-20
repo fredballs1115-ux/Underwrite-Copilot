@@ -298,6 +298,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(s.match(/data-qa="stress-impact-pair">([^<]*)</)?.[1]).toBe("Levered IRR 9.3%, run at the evidence&#x27;s figure");
     expect(t).not.toContain("→");
     expect(s).toContain('data-qa="stress-impact"');
+    // One run, one bar: no second bar for the same figure.
+    expect(s).not.toContain('data-bar="stress-impact-om"');
+    expect(t).not.toContain("At the OM's figure");
     expect(t).toContain(same.impact!.note);
     expect(gluedWords(visibleText(s))).toEqual([]);
     // Two figures are a move, whatever the note's words.
@@ -309,29 +312,39 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const row = html.slice(html.indexOf('data-qa="stress-row-vacancy"'), html.indexOf('data-qa="stress-row-exit_cap"'));
     const t = visibleText(row).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(t).toContain("Unsupported Stabilized vacancy OM p. 8 Occupancy: 94% as stated, which leaves 6.0% vacancy");
-    // The track: the OM's figure as a dark tick, the document's and the
-    // published figure's dots, the rule of thumb a dashed tick, drawn with
-    // the panels' own parts on a track of the group's length.
-    expect(row).toContain('class="@container/bars mt-2 text-[11px]" data-qa="stress-track"');
-    expect(row).toMatch(/class="absolute -inset-y-0\.5 -translate-x-1\/2 w-0\.5 rounded-full bg-ink" data-bar="stress-om" style="left:[\d.]+%"/);
+    // The track: the OM's figure as a dark tick (the panels' own Tick, past
+    // the track by a primary tick's 4px), the document's dot and the
+    // published figure's diamond, the rule of thumb a dashed tick.
+    expect(row).toContain('<div class="mt-3 text-[11px] leading-4" data-qa="stress-track">');
+    expect(row).toMatch(/class="absolute -inset-y-1 -translate-x-1\/2 w-0\.5 rounded-full bg-ink" data-bar="stress-om" style="left:[\d.]+%"/);
     expect(row.match(/data-bar="stress-evidence" data-kind="document"/g)).toHaveLength(1);
     expect(row.match(/data-bar="stress-evidence" data-kind="published"/g)).toHaveLength(1);
+    expect(row).toMatch(/rotate-45 rounded-\[1px\] bg-pass" data-bar="stress-evidence" data-kind="published"/);
     expect(row).toMatch(/border-l-2 border-dashed border-ink\/50" data-bar="stress-evidence"/);
     // The survey's margin as a whisker, read off its own text ("±2.2 pts").
     expect(row.match(/data-qa="stress-whisker"/g)).toHaveLength(1);
     expect(row).toMatch(/data-qa="stress-whisker" style="left:[\d.]+%;width:[\d.]+%"/);
-    expect(t).toContain("The OM against the evidence 6.0%");
+    // The ticks are labelled where they are drawn: the OM's figure over the
+    // track at its own tick, the evidence's span under it, from its lowest
+    // figure to its highest, under a bracket over the same span.
+    expect(t).toContain("The OM against the evidence OM 6.0% Evidence 5.0%–9.1%");
+    const omAt = row.match(/data-bar="stress-om" style="left:([\d.]+)%"/)![1];
+    expect(row).toContain(`data-qa="stress-om-label" style="left:${omAt}%"`);
+    expect(row.match(/data-qa="stress-span"/g)).toHaveLength(1);
+    // Each line of the list leads with its kind's glyph, the track's own.
+    expect(row.match(/<li class="flex gap-2" data-evidence="[a-z_]+"><span class="flex h-4 w-2\.5 shrink-0 items-center justify-center"><span aria-hidden="true"/g)).toHaveLength(3);
     // Each piece of evidence: its kind, its publisher, its date, whose figure it is.
     expect(t).toContain("The deal's own document The deal's T-12: vacancy loss over scheduled rent: 9.1% ($400k of $4.4M, TTM to 2026-06-30) — the deal's T-12, Jun 30, 2026 · the deal's own figure");
     expect(t).toContain("A published figure Rental vacancy, metro area: 6.2% ±2.2 pts (Q2 2026) — Census Bureau, Apr 1, 2026 · the metro's figure, not the building's Source");
     expect(row).toContain('href="https://www.census.gov/housing/hvs/"');
     expect(t).toContain("A rule of thumb Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure — a rule of thumb · the class's, not this market's");
-    // The gap in words, then the impact: the pair, the small track with the
-    // base as a tick, and the sentence.
+    // The gap in words, then the impact: the pair, the two runs as bars on
+    // one scale (the OM's figure's, then the evidence's), and the sentence.
     expect(t).toContain("The OM's 6.0% is 3.1 points under the evidence's 9.1%.");
     expect(t).toContain("Levered IRR 9.3% → 7.1%");
     expect(row).toMatch(/data-bar="stress-impact" style="width:[\d.]+%"/);
-    expect(t).toContain("At the evidence's figure 7.1%");
+    expect(row).toMatch(/data-bar="stress-impact-om" style="width:[\d.]+%"/);
+    expect(t).toContain("At the OM's figure 9.3% At the evidence's figure 7.1%");
     expect(t).toContain(VACANCY.impact!.note);
     // The challenger's words, folded whole under the row.
     expect(t).toContain("The challenge · High severity");
@@ -352,7 +365,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const taxes = html.slice(html.indexOf('data-qa="stress-row-taxes"'), html.indexOf('data-qa="stress-unchecked-group"'));
     const t = visibleText(taxes).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(t).toContain("Holds Real estate taxes OM p. 15");
-    expect(t).toContain("The OM against the evidence $532k");
+    // One figure of evidence: its label and no bracket.
+    expect(t).toContain("The OM against the evidence OM $532k Evidence $532k");
+    expect(taxes).not.toContain('data-qa="stress-span"');
     expect(t).toContain("No return is re-run: the model has no input for this figure.");
     expect(taxes).not.toContain('data-qa="stress-impact"');
   });
