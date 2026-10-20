@@ -257,7 +257,7 @@ export function StressBench({
               = the base case
             </p>
           </div>
-          <dl className="mt-4 grid grid-cols-2 content-start gap-x-10 gap-y-5">
+          <dl className="mt-4 grid grid-cols-2 content-start gap-x-6 gap-y-5 sm:gap-x-10">
           <div className="col-span-2 sm:col-span-1 lg:col-span-2">
             <dt className="text-[11px] font-medium uppercase tracking-wider text-white/60">
               Levered IRR
@@ -290,7 +290,7 @@ export function StressBench({
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/60">
+            <dt className="whitespace-nowrap text-[11px] font-medium uppercase tracking-wider text-white/60">
               Cash-on-cash (Yr 1)
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
