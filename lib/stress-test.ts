@@ -513,8 +513,8 @@ const TITLES: Record<StressKey, string> = {
  * held to nothing, words alone. A publisher the label already names is not
  * said twice. None, said so.
  */
-function methodSentence(key: StressKey, evidence: StressEvidence[], compared?: ReadonlySet<number>): string {
-  const what = `The OM's ${lowerFirst(TITLES[key])}`;
+function methodSentence(key: StressKey, evidence: StressEvidence[], compared?: ReadonlySet<number>, title?: string): string {
+  const what = `The OM's ${lowerFirst(title ?? TITLES[key])}`;
   if (evidence.length === 0) return `${what}: no evidence with a figure or words could be read for this deal, so it stands unchecked.`;
   const isCompared = (i: number) => (compared ? compared.has(i) : evidence[i].value != null);
   const name = (e: StressEvidence) => (e.label.toLowerCase().includes(e.publisher.toLowerCase()) ? lowerFirst(e.label) : `${lowerFirst(e.label)} (${e.publisher})`);
@@ -525,13 +525,16 @@ function methodSentence(key: StressKey, evidence: StressEvidence[], compared?: R
   return `${what} against ${first}${rest.length ? `, then ${joinWords(rest)}` : ""}${beside.length ? `; beside ${joinWords(beside)}` : ""}.`;
 }
 
-function unchecked(key: StressKey, omSays: StressRow["omSays"], evidence: StressEvidence[], why: string, compared?: ReadonlySet<number>): StressRow {
-  return { key, title: TITLES[key], omSays, evidence, gap: null, verdict: "unchecked", impact: null, challenge: null, method: methodSentence(key, evidence, compared), unchecked: why };
+function unchecked(key: StressKey, omSays: StressRow["omSays"], evidence: StressEvidence[], why: string, compared?: ReadonlySet<number>, title?: string): StressRow {
+  return { key, title: title ?? TITLES[key], omSays, evidence, gap: null, verdict: "unchecked", impact: null, challenge: null, method: methodSentence(key, evidence, compared, title), unchecked: why };
 }
 
 /** The indexes of the evidence a row's verdict is struck on. */
 const indexesOf = (evidence: StressEvidence[], pick: (e: StressEvidence, i: number) => boolean): Set<number> =>
   new Set(evidence.map((e, i) => (pick(e, i) ? i : -1)).filter((i) => i >= 0));
+
+/** The vacancy row's title where the OM's figure is today's occupancy. */
+const OCCUPANCY_TITLE = "Occupancy today";
 
 const NO_FIGURE = (what: string) => `The OM states no ${what}.`;
 const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
@@ -623,18 +626,22 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     });
   }
   if (!om && evidence.length === 0) return null;
+  // Where the OM states no vacancy allowance, the figure is its occupancy
+  // TODAY, not a pro forma assumption: the row is titled and worded so. The
+  // test against the evidence is unchanged (the method is the owner's).
+  const title = om?.from === "occupancy" ? OCCUPANCY_TITLE : undefined;
   const omSays: StressRow["omSays"] = om
     ? {
         text:
           om.from === "vacancy"
             ? `${om.row.label}: ${om.row.value}`
-            : `${om.row.label}: ${om.row.value} as stated, which leaves ${pct1(om.pct)} vacancy`,
+            : `${om.row.label}: ${om.row.value} as stated — today's occupancy, not a pro forma assumption — which leaves ${pct1(om.pct)} vacant`,
         value: om.pct,
         page: pageOf(om.row, ctx.ex),
       }
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
   if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"), compared);
-  if (comparables.length === 0) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, compared);
+  if (comparables.length === 0) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, compared, title);
   // The verdict is the best kind's: the deal's own document where one
   // states the figure, else the published figures, else the rule of thumb.
   // A rule of thumb never widens the range a document decides (a 5% class
@@ -661,7 +668,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
           model: pct1(ctx.derived.inputs.vacancyPct * 100),
         })
       : null;
-  return { key: "vacancy", title: TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared), ...(best.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
+  return { key: "vacancy", title: title ?? TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared, title), ...(best.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
 }
 
 // — Rent growth —

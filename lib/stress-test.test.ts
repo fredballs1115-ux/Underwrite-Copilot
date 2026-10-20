@@ -155,7 +155,10 @@ describe("a stabilized apartment deal with a T-12", () => {
 
   it("sets the OM's 6% vacancy against the T-12's 9.1% first, and the impact's IRR drops", () => {
     const v = rowOf(test, "vacancy");
-    expect(v.omSays).toEqual({ text: "Occupancy: 94% as stated, which leaves 6.0% vacancy", value: 6, page: 8 });
+    // The OM states no vacancy allowance: its figure is today's occupancy,
+    // titled and worded so, never a pro forma assumption.
+    expect(v.title).toBe("Occupancy today");
+    expect(v.omSays).toEqual({ text: "Occupancy: 94% as stated — today's occupancy, not a pro forma assumption — which leaves 6.0% vacant", value: 6, page: 8 });
     expect(v.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's T-12", scope: "deal", value: 9.1, asOf: "2026-06-30" });
     // The share is over gross potential rent: here the rent line itself,
     // since the statement's stated EGI nets the vacancy from it — and the
@@ -179,7 +182,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(v.impact!.note).toMatch(/^If vacancy is the deal's T-12's 9\.1%, not the OM's 6\.0%, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\.$/);
     // A publisher the label already names is not said twice.
     expect(v.method).toBe(
-      "The OM's stabilized vacancy against the deal's T-12: vacancy loss over gross potential rent, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb.",
+      "The OM's occupancy today against the deal's T-12: vacancy loss over gross potential rent, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb.",
     );
   });
 
@@ -696,7 +699,7 @@ describe("the vacancy the row reads is the OM's allowance", () => {
     expect(rowOf(buildStressTest(apartmentArgs({ extraction: both })), "vacancy").omSays).toEqual({ text: "Vacancy & credit loss: 7.0%", value: 7, page: 21 });
     const dollars = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Vacancy loss", "$400,400", "p. 9")] };
     // Only the dollar line: the stated occupancy stands in, as before.
-    expect(rowOf(buildStressTest(apartmentArgs({ extraction: dollars })), "vacancy").omSays.text).toBe("Occupancy: 94% as stated, which leaves 6.0% vacancy");
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: dollars })), "vacancy").omSays.text).toBe("Occupancy: 94% as stated — today's occupancy, not a pro forma assumption — which leaves 6.0% vacant");
   });
 });
 

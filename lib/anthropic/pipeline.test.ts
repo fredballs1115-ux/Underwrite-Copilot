@@ -2688,7 +2688,8 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
       );
       const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
       const brief = buildBrief(input);
-      expect(brief).toContain("- Stabilized vacancy (vacancy)");
+      // The deal states its occupancy, not a vacancy allowance: today's figure.
+      expect(brief).toContain("- Occupancy today (vacancy)");
       expect(brief).toContain("Rental vacancy, metro area: 6.2% ±2.2 pts (Q2 2026) (Census Bureau");
       // The expense-growth check read consumer prices, topped up once; the
       // survey's figure, in hand from the market step, was never read again.
