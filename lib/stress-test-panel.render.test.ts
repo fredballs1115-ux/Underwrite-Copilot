@@ -11,7 +11,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StressTestPanel, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
-import { STRESS_KEYS, STRESS_METHODS, type StressRow, type StressTest } from "./stress-test-types";
+import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
+import { HEADLINE_WITHHELD } from "./stress-test-words";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const h = React.createElement;
@@ -450,7 +451,58 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(w).toContain('data-bar="stress-om"');
   });
 
+  it("leads with the headline: the OM's case against the evidence's in one line, then the bridge between them", () => {
+    const headline: StressHeadline = {
+      omIrrPct: 16.71,
+      evidenceIrrPct: 12.34,
+      omMultiple: 2.1,
+      evidenceMultiple: 1.76,
+      omKeys: ["exit_cap", "noi", "vacancy", "taxes"],
+      parts: [
+        { key: "vacancy", label: "Stabilized vacancy", pts: -3.25, multiple: -0.25 },
+        { key: "taxes", label: "Real estate taxes", pts: -2.47, multiple: -0.19 },
+        { key: "exit_cap", label: "Exit cap", pts: 1.35, multiple: 0.1 },
+      ],
+      omitted: [{ key: "noi", label: "NOI", why: HEADLINE_NOI_LEFT_OUT }],
+      unsolved: 0,
+    };
+    const hh = render({ ...TEST, headline });
+    const t = visibleText(hh).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(a11yIssues(hh)).toEqual([]);
+    expect(gluedWords(visibleText(hh))).toEqual([]);
+    expect(t).toContain("Levered IRR on the OM's figures 16.7% → 12.3% with the evidence");
+    // Above the rows.
+    expect(hh.indexOf('data-qa="stress-headline"')).toBeLessThan(hh.indexOf('data-qa="stress-rows"'));
+    // A bar for each case, a segment an assumption, each signed and labelled.
+    expect(hh.match(/data-bar="stress-headline-part"/g)).toHaveLength(3);
+    expect(hh.match(/data-bar="stress-headline-om"/g)).toHaveLength(1);
+    expect(hh.match(/data-bar="stress-headline-evidence"/g)).toHaveLength(1);
+    for (const s of ["−3.2 pts", "−2.5 pts", "+1.4 pts", "16.7%", "12.3%", "On the OM's figures", "With the evidence"]) expect(t).toContain(s);
+    // The walk ends where the evidence's case does: the last segment's far
+    // end and the evidence's bar's end are one x.
+    const style = (re: RegExp) => {
+      const m = [...hh.matchAll(re)].pop()!;
+      return { left: parseFloat(m[1]), width: parseFloat(m[2]) };
+    };
+    const last = style(/data-bar="stress-headline-part" data-key="exit_cap" style="left:([\d.]+)%;width:([\d.]+)%"/g);
+    const ev = style(/data-bar="stress-headline-evidence" style="left:([\d.]+)%;width:([\d.]+)%"/g);
+    expect(Math.abs(last.left + last.width - (ev.left + ev.width))).toBeLessThan(0.02);
+    // What is left out is named, its reason folded, and the method linked.
+    expect(t).toContain("Left out: the NOI.");
+    expect(t).toContain(`NOI: ${HEADLINE_NOI_LEFT_OUT}.`);
+    expect(hh).toContain('href="/how-we-test#headline"');
+    // With the re-runs withheld there is no headline, and the note says so.
+    const w = visibleText(render({ ...WITHHELD, headline: null })).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(w).toContain(HEADLINE_WITHHELD.replace(/&#x27;/g, "'"));
+    expect(render({ ...WITHHELD, headline: null })).not.toContain('data-qa="stress-headline"');
+    // A test built before the headline draws none and says nothing of it.
+    expect(html).not.toContain('data-qa="stress-headline"');
+  });
+
   it("its markers are its own: no other source draws them, and every key has a section on the methodology page", () => {
+    const owned = [...sources(join(process.cwd(), "app")), ...sources(join(process.cwd(), "lib"))].filter((f) => /stress-headline-(?:om|part|evidence|zero)"/.test(readFileSync(f, "utf8")));
+    expect(owned.map((f) => f.replace(process.cwd(), ""))).toEqual(["/app/stress-test-panel.tsx"]);
+    expect(readFileSync(join(process.cwd(), "app/how-we-test/view.tsx"), "utf8")).toContain('id="headline"');
     const files = [...sources(join(process.cwd(), "app")), ...sources(join(process.cwd(), "lib"))];
     // A marker is written `data-bar="…"` on a fill and `bar="…"` on a Tick
     // (app/panel-parts); both spellings are the marker.
