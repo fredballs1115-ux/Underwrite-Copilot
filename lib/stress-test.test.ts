@@ -24,7 +24,19 @@ import { basisTag } from "./pipeline-slots";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
 import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./stress-test-types";
-import { CHALLENGE_KEYWORDS, IRR_MOVE_STRETCH_BPS, SHARE_NO_MODEL, buildStressTest, challengeKey, stabilizedVacancyStated, type StressTestArgs } from "./stress-test";
+import {
+  CHALLENGE_KEYWORDS,
+  HEADLINE_NOI_COMPONENTS,
+  IRR_MOVE_STRETCH_BPS,
+  SHARE_NO_MODEL,
+  buildStressTest,
+  challengeKey,
+  stabilizedVacancyStated,
+  stressHeadline,
+  type StressTestArgs,
+} from "./stress-test";
+import { HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT } from "./stress-test-types";
+import { headlineName, headlineSentence } from "./stress-test-words";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -410,11 +422,19 @@ describe("a stabilized apartment deal with a T-12", () => {
     spy.mockClear();
     const t = buildStressTest(args);
     expect(t.rows.some((r) => r.impact)).toBe(true);
-    // Every run the test made is on the model's own inputs or on a copy
-    // with one key swapped — never two: the base run carries the OM's
-    // figure in that key and the alternative the evidence's, so the two
-    // differ in it alone, and in nothing else from the model.
-    const swapped = (spy.mock.calls as [UnderwriteInputs][]).map(([i]) => i).filter((i) => i !== baseInputs);
+    // The headline is struck last, on the finished rows, and runs the two
+    // cases (every figure at once) and the split's mixes: its runs are the
+    // last ones, counted by running it alone, and the rows' are the rest.
+    const all = (spy.mock.calls as [UnderwriteInputs][]).map(([i]) => i);
+    spy.mockClear();
+    stressHeadline(t.rows, baseInputs);
+    const headlineRuns = spy.mock.calls.length;
+    expect(headlineRuns).toBeGreaterThan(0);
+    // Every run a row made is on the model's own inputs or on a copy with
+    // one key swapped — never two: the base run carries the OM's figure in
+    // that key and the alternative the evidence's, so the two differ in it
+    // alone, and in nothing else from the model.
+    const swapped = all.slice(0, all.length - headlineRuns).filter((i) => i !== baseInputs);
     expect(swapped.length).toBeGreaterThan(0);
     const changedKeys = new Set<string>();
     for (const alt of swapped) {
@@ -526,7 +546,7 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     });
     expect(v.verdict).toBe("holds");
     expect(v.method).toBe(
-      "The OM's stabilized vacancy against rental vacancy, metro area (Census Bureau); beside rental vacancy, South Census region (FRED), the deal's T-12: vacancy loss over gross potential rent and multifamily vacancy, a rule of thumb.",
+      "The OM's stabilized vacancy against rental vacancy, metro area (Census Bureau); beside rental vacancy, South Census region (Census Bureau via FRED), the deal's T-12: vacancy loss over gross potential rent and multifamily vacancy, a rule of thumb.",
     );
     // The engine is re-run at the figure that decided.
     expect(v.impact!.evidenceIndex).toBe(0);
@@ -1440,5 +1460,150 @@ describe("the basis row reads the deal as the card, the comps tick and the brief
     const b = basisOf(APARTMENT, { brokerComps: comps("$270,000 per unit"), pastScreensWithheld: "Withheld here: a reason." })!;
     expect(b.evidence.at(-1)).toMatchObject({ label: "Other memoranda's asking prices from past screens: withheld", text: "Withheld here: a reason.", value: null });
     expect(b.verdict).toBe("holds");
+  });
+});
+
+// ── The headline: the OM's case against the evidence's ───────────────────
+
+describe("the headline", () => {
+  const args = apartmentArgs();
+  const model = args.derived!.inputs;
+  const test = buildStressTest(args);
+  const h = test.headline!;
+  /** The rows with every impact but the named rows' struck off, and the
+   *  named rows read stretched where they hold — the test of one or two
+   *  rows past their evidence and nothing else in the OM's case. */
+  const only = (keys: StressKey[], verdicts: Partial<Record<StressKey, StressRow["verdict"]>> = {}): StressRow[] =>
+    test.rows.map((r) =>
+      keys.includes(r.key) ? { ...r, verdict: verdicts[r.key] ?? (r.verdict === "holds" || r.verdict === "unchecked" ? "stretched" : r.verdict) } : { ...r, impact: null, verdict: "holds" },
+    );
+
+  it("runs the OM's case and the evidence's on the apartment deal, the parts summing to the gap", () => {
+    expect(h.omIrrPct).not.toBeNull();
+    expect(h.evidenceIrrPct).not.toBeNull();
+    // Every re-run row is in the OM's case, in the test's order.
+    expect(h.omKeys).toEqual(test.rows.filter((r) => r.impact).map((r) => r.key));
+    // The players are the rows past their evidence (the NOI aside, below);
+    // the rows that hold stay at the OM's figure and carry no part.
+    const passed = test.rows.filter((r) => r.impact && (r.verdict === "stretched" || r.verdict === "unsupported") && r.key !== "noi").map((r) => r.key);
+    expect(h.parts.map((p) => p.key).sort()).toEqual([...passed].sort());
+    // Efficiency: the Shapley parts add up to the gap, in IRR and multiple.
+    const sum = h.parts.reduce((s, p) => s + p.pts, 0);
+    expect(Math.abs(sum - (h.evidenceIrrPct! - h.omIrrPct!))).toBeLessThan(1e-6);
+    const mult = h.parts.reduce((s, p) => s + p.multiple!, 0);
+    expect(Math.abs(mult - (h.evidenceMultiple! - h.omMultiple!))).toBeLessThan(1e-6);
+    // Largest move first.
+    for (let i = 1; i < h.parts.length; i++) expect(Math.abs(h.parts[i - 1].pts)).toBeGreaterThanOrEqual(Math.abs(h.parts[i].pts));
+    expect(h.unsolved).toBe(0);
+  });
+
+  it("with one row past its evidence, is that row's own re-run, for every row that re-runs", () => {
+    const rerun = test.rows.filter((r) => r.impact && Math.abs(r.impact.altValue - r.impact.omValue) > 1e-9);
+    expect(rerun.map((r) => r.key).sort()).toEqual(["debt", "exit_cap", "expense_growth", "insurance", "noi", "rent_growth", "taxes", "vacancy"]);
+    for (const r of rerun) {
+      const one = stressHeadline(only([r.key]), model)!;
+      const i = r.impact!;
+      expect(one.omKeys, r.key).toEqual([r.key]);
+      expect(one.omIrrPct!, r.key).toBeCloseTo(i.baseIrrPct!, 9);
+      expect(one.evidenceIrrPct!, r.key).toBeCloseTo(i.altIrrPct!, 9);
+      expect(one.omMultiple!, r.key).toBeCloseTo(i.baseMultiple!, 9);
+      expect(one.evidenceMultiple!, r.key).toBeCloseTo(i.altMultiple!, 9);
+      expect(one.parts, r.key).toHaveLength(1);
+      expect(one.parts[0].pts, r.key).toBeCloseTo(i.altIrrPct! - i.baseIrrPct!, 9);
+    }
+  });
+
+  it("never counts the NOI and its components twice: the components carry the move and the NOI is named as left out", () => {
+    // The NOI's own swap is the evidence's NOI, which already holds the
+    // vacancy, taxes and insurance: with a component past its evidence too,
+    // the NOI is no part, stays at the OM's figure in both cases, and is
+    // left out in the method's own words.
+    expect(rowOf(test, "noi").verdict).toBe("unsupported");
+    expect(h.parts.map((p) => p.key)).not.toContain("noi");
+    expect(h.omitted).toContainEqual({ key: "noi", label: rowOf(test, "noi").title, why: HEADLINE_NOI_LEFT_OUT });
+    // The evidence's case is the one the NOI holding would make: the NOI at
+    // the OM's figure is the anchor either way, so its verdict moves nothing.
+    const held = stressHeadline(test.rows.map((r) => (r.key === "noi" ? { ...r, verdict: "holds" as const } : r)), model)!;
+    expect(held.evidenceIrrPct!).toBeCloseTo(h.evidenceIrrPct!, 9);
+    expect(held.omitted.map((o) => o.key)).not.toContain("noi");
+    // With each component alone beside the NOI, the NOI is still left out;
+    // with none, the NOI's own swap stands and is a part.
+    for (const c of HEADLINE_NOI_COMPONENTS) {
+      if (!test.rows.some((r) => r.key === c && r.impact)) continue;
+      const pair = stressHeadline(only(["noi", c]), model)!;
+      expect(pair.parts.map((p) => p.key), c).toEqual([c]);
+      expect(pair.omitted.map((o) => o.key), c).toEqual(["noi"]);
+    }
+    const noiAlone = stressHeadline(only(["noi", "exit_cap"]), model)!;
+    expect(noiAlone.parts.map((p) => p.key).sort()).toEqual(["exit_cap", "noi"]);
+    expect(noiAlone.omitted).toEqual([]);
+    // The NOI anchors the OM's case at the OM's own vacancy: year one is the
+    // OM's NOI whether or not the vacancy row is past its evidence.
+    expect(HEADLINE_METHOD.overlap[0]).toContain(HEADLINE_NOI_LEFT_OUT);
+  });
+
+  it("strikes a reset tax bill on the price the case pays, where the price is swapped too", () => {
+    const taxes = rowOf(test, "taxes");
+    const reset = taxes.evidence[taxes.impact!.evidenceIndex];
+    expect(reset.label).toMatch(/^The bill the OM's own figures imply/);
+    const price = model.purchasePrice;
+    const basis: StressRow = {
+      key: "basis",
+      title: "Basis",
+      omSays: { text: "x", value: 274_000, page: null },
+      evidence: [],
+      gap: { value: 10, unit: "pct", text: "" },
+      verdict: "stretched",
+      impact: { input: "purchasePrice", evidenceIndex: 0, omValue: price, altValue: price * 0.9, baseIrrPct: null, altIrrPct: null, baseMultiple: null, altMultiple: null, note: "" },
+      challenge: null,
+      method: "",
+    };
+    const both = stressHeadline([basis, ...only(["taxes"]).filter((r) => r.key !== "basis")], model)!;
+    // By hand: the price 10% under, the tax line moved by the reset struck
+    // on that price less the OM's bill.
+    const delta = reset.value! * 0.9 - taxes.omSays.value!;
+    const byHand = computeUnderwrite({
+      ...model,
+      purchasePrice: price * 0.9,
+      expenseLines: model.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + delta } : l)),
+    }).returns.leveredIrrPct!;
+    expect(both.evidenceIrrPct!).toBeCloseTo(byHand * 100, 9);
+    expect(both.parts.map((p) => p.key).sort()).toEqual(["basis", "taxes"]);
+  });
+
+  it("names a row past its evidence with no model input as left out, and says the headline in the documents' words", () => {
+    const premium: StressRow = { ...rowOf(test, "vacancy"), key: "renovation_premium", title: "Renovation premium", impact: null, verdict: "unsupported" };
+    const withPremium = stressHeadline([...test.rows, premium], model)!;
+    expect(withPremium.omitted.map((o) => o.key)).toContain("renovation_premium");
+    expect(HEADLINE_METHOD.limits[0]).toMatch(/renovation premium/);
+    const sentence = headlineSentence(test)!;
+    expect(sentence).toMatch(/^Levered IRR on the OM's figures [-−]?\d+\.\d% to [-−]?\d+\.\d% with the evidence \(equity multiple \d\.\d\dx to \d\.\d\dx\): /);
+    expect(sentence).toContain("Left out: the NOI (");
+  });
+
+  it("names in the method every assumption the OM's case can hold", () => {
+    for (const k of STRESS_KEYS) {
+      if (k === "renovation_premium" || k === "other") continue;
+      expect(HEADLINE_METHOD.omCase, k).toContain(headlineName(k));
+    }
+    for (const c of HEADLINE_NOI_COMPONENTS) expect(HEADLINE_METHOD.overlap[0], c).toContain(headlineName(c).replace(/^the /, ""));
+  });
+
+  it("is null wherever no return is re-run, the test's reason standing for it", () => {
+    const plan = buildStressTest({ ...apartmentArgs(), extraction: { ...APARTMENT, strategy: { kind: "value_add", summary: "", capitalBudget: "$1,800,000", timeline: "" } } });
+    expect(plan.impactsWithheld).not.toBeNull();
+    expect(plan.headline).toBeNull();
+    expect(headlineSentence(plan)).toBe(`${plan.impactsWithheld} The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.`);
+    const shared = buildStressTest({ ...apartmentArgs(), derived: null, withheldReason: SHARE_NO_MODEL });
+    expect(shared.headline).toBeNull();
+    expect(headlineSentence(shared)).toContain(SHARE_NO_MODEL);
+    // No row re-run at all: no OM's case to strike.
+    expect(stressHeadline(test.rows.map((r) => ({ ...r, impact: null })), model)).toBeNull();
+  });
+
+  it("with nothing past its evidence, the two cases are one run and nothing is split", () => {
+    const calm = stressHeadline(test.rows.map((r) => ({ ...r, verdict: r.impact ? ("holds" as const) : r.verdict })), model)!;
+    expect(calm.parts).toEqual([]);
+    expect(calm.evidenceIrrPct).toBe(calm.omIrrPct);
   });
 });

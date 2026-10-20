@@ -117,7 +117,10 @@ import {
   type StressRow,
   type StressTest,
   type StressVerdict,
+  HEADLINE_NOI_LEFT_OUT,
+  type StressHeadline,
 } from "@/lib/stress-test-types";
+import { attributeOverPlayers } from "@/lib/bridge/attribution";
 
 export const VACANCY_UNSUPPORTED_PTS = 3;
 export const RENT_GROWTH_UNSUPPORTED_PTS = 2;
@@ -2195,5 +2198,214 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     });
   }
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));
-  return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld };
+  // The headline is struck on the rows as finished: a row `finishRow` reads
+  // stretched is swapped in the evidence's case.
+  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs) : null;
+  return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld, headline };
+}
+
+// ── The headline: the OM's case against the evidence's ───────────────────
+
+/** The rows whose figures the NOI already holds: where one of them is swapped
+ *  in the evidence's case, the NOI's own swap is left out of the headline
+ *  (`HEADLINE_NOI_LEFT_OUT`), and the components carry the move. */
+export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance"];
+
+/** The percent and dollar inputs a row's re-run swaps whole, which the two
+ *  cases set directly. */
+const HEADLINE_SCALARS = ["purchasePrice", "exitCapPct", "allInRatePct", "vacancyPct", "rentGrowthPct", "expenseGrowthPct"] as const;
+type HeadlineScalar = (typeof HEADLINE_SCALARS)[number];
+const isHeadlineScalar = (k: string): k is HeadlineScalar => (HEADLINE_SCALARS as readonly string[]).includes(k);
+
+/** The evidence a tax row's re-run swapped in is the reset bill its own
+ *  figures imply on the price (`taxesRow`), not an abatement's stated bill. */
+const isResetBill = (row: StressRow): boolean =>
+  row.key === "taxes" && !!row.impact && (row.evidence[row.impact.evidenceIndex]?.label ?? "").startsWith("The bill the OM's own figures imply");
+
+/** How each row in the OM's case sets the model's inputs, the OM's side or
+ *  the evidence's — the same swap its own re-run makes:
+ *   - a percent or the price: the input itself (`pctImpact`, the basis row);
+ *   - the tax or insurance line: the model's first expense line moved by the
+ *     gap (`expenseImpact`), the gaps of both lines added — a reset tax bill
+ *     struck on the price the case pays;
+ *   - the NOI: the rent line that makes the OM's NOI, or the evidence's, at
+ *     the case's own vacancy and expenses (`rentForNoi`). */
+type HeadlineSwap =
+  | { kind: "scalar"; row: StressRow; input: HeadlineScalar; om: number; alt: number }
+  | { kind: "expense"; row: StressRow; delta: number; reset: { bill: number; reset: number } | null }
+  | { kind: "noi"; row: StressRow; omNoi: number; altNoi: number };
+
+function headlineSwap(row: StressRow): HeadlineSwap | null {
+  const i = row.impact;
+  if (!i) return null;
+  if (isHeadlineScalar(i.input)) return { kind: "scalar", row, input: i.input, om: i.omValue, alt: i.altValue };
+  if (i.input === "expenseLines") {
+    const e = row.evidence[i.evidenceIndex];
+    const reset = isResetBill(row) && row.omSays.value != null && e?.value != null ? { bill: row.omSays.value, reset: e.value } : null;
+    return { kind: "expense", row, delta: i.altValue - i.omValue, reset };
+  }
+  if (row.key === "noi" && i.input === "inPlaceRentAnnual") {
+    const altNoi = row.evidence[i.evidenceIndex]?.value ?? null;
+    if (row.omSays.value == null || altNoi == null) return null;
+    return { kind: "noi", row, omNoi: row.omSays.value, altNoi };
+  }
+  return null;
+}
+
+/** "the renovation premium is no model input" — why a row past its evidence
+ *  carries no swap into the headline. */
+function noSwapWhy(row: StressRow): string {
+  if (row.key === "renovation_premium") return "the premium is no model input: the model grows today's rent at one rate";
+  if (!row.impact) return "no return is re-run on it, so it has no figure to swap";
+  return "its re-run moves an input the two cases cannot combine";
+}
+
+const swaps = (s: HeadlineSwap) => s.kind !== "scalar" || Math.abs(s.alt - s.om) > 1e-12;
+const passed = (r: StressRow) => r.verdict === "stretched" || r.verdict === "unsupported";
+
+/**
+ * The stress test's headline (lib/stress-test-types `StressHeadline`): the
+ * derived model run once with every re-run row at the OM's figure (the OM's
+ * case) and once with every row read stretched or unsupported at its
+ * evidence's (the evidence's case), each row's swap the same one its own
+ * re-run makes, and the gap split by assumption with Shapley values through
+ * the Assumption Bridge's walk (lib/bridge/attribution
+ * `attributeOverPlayers`): a player an assumption past its evidence, the
+ * scenario at each coalition the OM's case with that coalition's swaps made.
+ *
+ * THE OVERLAP RULE. The NOI's swap re-strikes the rent line so the year-one
+ * NOI is the evidence's, and that NOI already holds the building's vacancy,
+ * taxes and insurance — which the vacancy, tax and insurance rows swap on
+ * their own. Where any of those three is a player, the NOI is no player: it
+ * stays at the OM's figure in both cases (the rent that makes the OM's NOI
+ * at the OM's vacancy and expenses, held there), the component swaps move
+ * the NOI from it, and the headline names the NOI as left out
+ * (`HEADLINE_NOI_LEFT_OUT`). Where none of the three is, the NOI's own swap
+ * stands. Every other row swaps an input no other row touches: the exit
+ * cap, the loan rate, the growth rates and the price are one input each,
+ * and the tax and insurance lines add their gaps to the one expense line.
+ * The one figure that rides on another row's is a reset tax bill, struck on
+ * the price: where the price is swapped too, it is struck on the case's
+ * price (the reset scaled by the price's own ratio), never on the ask.
+ *
+ * With one row past its evidence and no other re-run in the OM's case, the
+ * headline is that row's own re-run, to the figure: the OM's case IS its
+ * base run and the evidence's case its alternative. Null where no row
+ * carries a re-run (there is no OM's case to strike).
+ */
+export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInputs): StressHeadline | null {
+  // The rows in the OM's case: each re-run row whose swap the cases can make,
+  // the first row to swap an input (no two rows swap one input; a second
+  // would be left out, said so).
+  const inCase: HeadlineSwap[] = [];
+  const omitted: StressHeadline["omitted"] = [];
+  const taken = new Set<string>();
+  for (const row of rows) {
+    const s = headlineSwap(row);
+    if (!s) {
+      if (passed(row)) omitted.push({ key: row.key, label: row.title, why: noSwapWhy(row) });
+      continue;
+    }
+    const slot = s.kind === "scalar" ? s.input : s.kind === "noi" ? "inPlaceRentAnnual" : `expense:${row.key}`;
+    if (taken.has(slot) || taken.has(`key:${row.key}`)) {
+      if (passed(row)) omitted.push({ key: row.key, label: row.title, why: "another row already swaps the same input" });
+      continue;
+    }
+    taken.add(slot);
+    taken.add(`key:${row.key}`);
+    inCase.push(s);
+  }
+  if (inCase.length === 0) return null;
+
+  // The players: the rows past their evidence whose swap moves a figure.
+  let players = inCase.filter((s) => passed(s.row) && swaps(s));
+  const noi = players.find((s) => s.kind === "noi");
+  if (noi && players.some((s) => HEADLINE_NOI_COMPONENTS.includes(s.row.key))) {
+    players = players.filter((s) => s !== noi);
+    omitted.push({ key: noi.row.key, label: noi.row.title, why: HEADLINE_NOI_LEFT_OUT });
+  }
+
+  // The OM's case before its NOI: every swap at the OM's side.
+  const scalarsAt = (alt: (s: HeadlineSwap) => boolean): UnderwriteInputs => {
+    const out: UnderwriteInputs = { ...model };
+    for (const s of inCase) if (s.kind === "scalar") out[s.input] = alt(s) ? s.alt : s.om;
+    return out;
+  };
+  const omBase = scalarsAt(() => false);
+  const noiSwap = inCase.find((s): s is Extract<HeadlineSwap, { kind: "noi" }> => s.kind === "noi") ?? null;
+  // The rent that makes the OM's NOI at the OM's vacancy and expenses: the
+  // NOI's anchor in both cases unless the NOI is itself a player.
+  const anchorRent = noiSwap ? rentForNoi(omBase, noiSwap.omNoi) : null;
+  if (noiSwap && anchorRent == null) {
+    // No rent makes the OM's NOI on the OM's own vacancy and expenses (a
+    // building run fully vacant): the NOI cannot anchor the case.
+    const at = inCase.indexOf(noiSwap);
+    inCase.splice(at, 1);
+    if (players.includes(noiSwap)) players = players.filter((s) => s !== noiSwap);
+    if (passed(noiSwap.row)) omitted.push({ key: "noi", label: noiSwap.row.title, why: "no rent line makes the OM's NOI at the OM's own vacancy and expenses" });
+  }
+  const noiIn = noiSwap && anchorRent != null ? noiSwap : null;
+
+  /** The model with the swaps `alt` answers true for at the evidence's
+   *  figure and every other swap in the OM's case at the OM's. */
+  const scenario = (alt: (s: HeadlineSwap) => boolean): UnderwriteInputs => {
+    const inputs = scalarsAt(alt);
+    // The price the case pays against the OM's, for a reset tax bill.
+    const priceRatio = omBase.purchasePrice > 0 ? inputs.purchasePrice / omBase.purchasePrice : 1;
+    let delta = 0;
+    for (const s of inCase) {
+      if (s.kind !== "expense") continue;
+      // A reset bill is struck on the case's price on the evidence's side;
+      // the OM's side is the OM's bill, which the model's lines carry.
+      if (alt(s)) delta += s.reset ? s.reset.reset * priceRatio - s.reset.bill : s.delta;
+    }
+    if (delta !== 0 && inputs.expenseLines.length > 0) {
+      inputs.expenseLines = inputs.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + delta } : l));
+    }
+    if (noiIn) {
+      const rent = alt(noiIn) ? rentForNoi(inputs, noiIn.altNoi) : anchorRent;
+      if (rent != null) inputs.inPlaceRentAnnual = rent;
+    }
+    return inputs;
+  };
+
+  const omCase = scenario(() => false);
+  const evidenceCase = scenario((s) => players.includes(s));
+  const om = computeUnderwrite(omCase).returns;
+  const ev = computeUnderwrite(evidenceCase).returns;
+  const omIrrPct = om.leveredIrrPct == null ? null : om.leveredIrrPct * 100;
+  const evidenceIrrPct = ev.leveredIrrPct == null ? null : ev.leveredIrrPct * 100;
+  const multipleOf = (m: number | null | undefined) => (m != null && Number.isFinite(m) ? m : null);
+  const omMultiple = multipleOf(om.leveredEquityMultiple);
+  const evidenceMultiple = multipleOf(ev.leveredEquityMultiple);
+
+  let parts: StressHeadline["parts"] = [];
+  let unsolved = 0;
+  if (players.length > 0 && omIrrPct != null && evidenceIrrPct != null) {
+    const split = attributeOverPlayers(
+      players.map((s) => s.row.key),
+      (inCoalition) => scenario((s) => players.indexOf(s) >= 0 && inCoalition(players.indexOf(s))),
+      { exactLimit: STRESS_KEYS.length },
+    );
+    unsolved = split.flooredScenarios;
+    parts = players
+      .map((s, i) => ({
+        key: s.row.key,
+        label: s.row.title,
+        pts: split.shares[i].leveredIrr * 100,
+        multiple: omMultiple != null && evidenceMultiple != null ? split.shares[i].leveredEquityMultiple : null,
+      }))
+      .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
+  }
+  const order = (k: StressKey) => STRESS_KEYS.indexOf(k);
+  return {
+    omIrrPct,
+    evidenceIrrPct,
+    omMultiple,
+    evidenceMultiple,
+    omKeys: inCase.map((s) => s.row.key).sort((a, b) => order(a) - order(b)),
+    parts,
+    omitted: omitted.sort((a, b) => order(a.key) - order(b.key)),
+    unsolved,
+  };
 }

@@ -137,7 +137,79 @@ export interface StressTest {
    *  sentence that says so and why ("No return is re-run: …"), printed as it
    *  stands on every surface */
   impactsWithheld: string | null;
+  /** the headline: the OM's case against the evidence's, the gap split by
+   *  assumption (lib/stress-test `stressHeadline`). Null wherever no return
+   *  is re-run (`impactsWithheld` says why, and the headline is withheld
+   *  with it) or where no row carries a re-run; absent on a test built
+   *  before the headline was struck */
+  headline?: StressHeadline | null;
 }
+
+/** One assumption's share of the move from the OM's case to the
+ *  evidence's: its Shapley value, in levered-IRR points and equity
+ *  multiple. */
+export interface StressHeadlinePart {
+  key: StressKey;
+  /** the row's own title */
+  label: string;
+  /** levered-IRR points, signed: negative where the evidence lowers the return */
+  pts: number;
+  /** the equity multiple's share, signed; null where a case's multiple is none */
+  multiple: number | null;
+}
+
+/**
+ * The stress test's headline: the derived model run ONCE on every tested
+ * figure of the OM's (the OM's case) and ONCE with every figure read
+ * stretched or unsupported swapped for its evidence (the evidence's case),
+ * the gap between the two levered IRRs split by assumption with Shapley
+ * values (lib/bridge/attribution), so the parts sum to the gap.
+ */
+export interface StressHeadline {
+  /** levered IRR in percent; null where that case's cash flows have no root */
+  omIrrPct: number | null;
+  evidenceIrrPct: number | null;
+  omMultiple: number | null;
+  evidenceMultiple: number | null;
+  /** the rows whose OM figure the OM's case runs on, in the test's order */
+  omKeys: StressKey[];
+  /** the evidence's swaps, largest move first; empty where nothing is past
+   *  its evidence, or where either case does not solve */
+  parts: StressHeadlinePart[];
+  /** a row past its evidence that the headline leaves out, with why */
+  omitted: { key: StressKey; label: string; why: string }[];
+  /** mixes of the swaps (coalitions) whose levered IRR had no root, each
+   *  counted at the engine's floor in the split; 0 in the normal case */
+  unsolved: number;
+}
+
+/** Why the NOI's own swap is left out of the headline where a component
+ *  of it is swapped too: one clause, the omitted row's `why` and the
+ *  method's own words. */
+export const HEADLINE_NOI_LEFT_OUT =
+  "the NOI already holds the vacancy, the taxes and the insurance, and one of those is swapped on its own here, so swapping the NOI too would count those lines twice";
+
+/** The headline's method, as /how-we-test prints it and
+ *  lib/stress-test.test.ts holds it to `stressHeadline`. */
+export const HEADLINE_METHOD = {
+  title: "The headline: the OM's case against the evidence's",
+  claim: "The return the memorandum's figures make, all of them at once.",
+  omCase:
+    "The OM's case is the deal's derived model with every assumption whose return is re-run set to the OM's own figure at once: the price, the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, insurance and the NOI, the last struck as the rent that makes the OM's year-one NOI at the OM's vacancy and expenses. An assumption with no re-run keeps the model's own figure.",
+  evidenceCase:
+    "The evidence's case is the same model with every assumption read stretched or unsupported set to the figure its own row re-runs on; one that holds or is unchecked stays at the OM's figure.",
+  split:
+    "The gap between the two levered IRRs is split by assumption with Shapley values, the Assumption Bridge's own arithmetic: each swap's move is averaged over every order the swaps could be made in, so the parts add up to the gap and no order is favoured. With one assumption past its evidence, the headline is that row's own re-run.",
+  overlap: [
+    `The NOI is left out of the split where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}. The NOI then stays at the OM's figure in both cases, and the component swaps move it; where none of the three is past its evidence, the NOI's own swap stands.`,
+    "A reset tax bill is struck on the price: where the price is swapped too, the bill is struck on the evidence's price.",
+  ],
+  limits: [
+    "An assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",
+    "No headline on a plan deal, a placeholder price, an assumed NOI or a price that buys no building: no return is re-run there, and the headline is withheld with the reason.",
+    "Neither case is a forecast: each is the model run once on one set of figures.",
+  ],
+} as const;
 
 /**
  * What each assumption is set against, as the methodology page says it and
