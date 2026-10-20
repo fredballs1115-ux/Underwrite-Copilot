@@ -13,6 +13,7 @@ import { TrackRecordCard } from "@/app/(app)/deals/[id]/track-record-card";
 import { TrackRecordSection } from "@/app/(app)/analytics/track-record";
 import { ACCOUNT_VACANCY_NOTE, CARD_SCOPE, DOCUMENT_DATE_RULE, RECORD_NONE_LINE, TAX_INSURANCE_NOT_SCORED, accountRecord, scoreDeal, type DealRecord } from "./track-record";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { STRESS_SNAPSHOT_V, snapshotThreshold, type StressSnapshot, type StressSnapshotRow } from "./stress-snapshot";
 
 const T = "2026-10-01T12:00:00Z";
 const AFTER = "2026-11-05T09:00:00Z";
@@ -42,6 +43,39 @@ const withLater = (): DealRecord =>
   });
 
 const html = (el: React.ReactElement) => renderToStaticMarkup(el);
+
+// The stress test as it stood at a verdict (lib/stress-snapshot): a vacancy
+// read stretched against a rule of thumb, and an NOI that held.
+const vacancyRow: StressSnapshotRow = {
+  key: "vacancy",
+  title: "Stabilized vacancy",
+  verdict: "stretched",
+  om: 6,
+  page: 12,
+  evidence: { value: 9, label: "Apartment occupancy, a rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" },
+  per: null,
+  threshold: snapshotThreshold("vacancy"),
+  worse: "higher",
+};
+const noiRow: StressSnapshotRow = {
+  key: "noi",
+  title: "NOI",
+  verdict: "holds",
+  om: 4_000_000,
+  page: 5,
+  evidence: { value: 3_950_000, label: "The OM's own in-place NOI", asOf: null, kind: "om_internal", publisher: "the memorandum" },
+  per: null,
+  threshold: snapshotThreshold("noi"),
+  worse: "lower",
+};
+const snapshot = (rows: StressSnapshotRow[]): StressSnapshot => ({ v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows });
+const snapDeal = (opts: { only?: "vacancy" } = {}): DealRecord =>
+  scoreDeal({
+    screenedAt: T,
+    stressSnapshot: snapshot(opts.only ? [vacancyRow] : [vacancyRow, noiRow]),
+    challenges: [vacancy, noi],
+    t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
+  });
 
 describe("TrackRecordCard — what came after the screen, on the deal page", () => {
   it("draws the evidence, a row a scored challenge with its three figures and its landing, and folds the unscored", () => {
@@ -75,6 +109,38 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     // …and no tax or insurance line is said where no such challenge is.
     const noTax = html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } }) }));
     expect(noTax).not.toContain('data-qa="track-record-tax-insurance"');
+  });
+
+  it("draws the stress test's rows: the test's verdict, the evidence figure, the outcome in words, and the deal's counts with no share under five", () => {
+    const out = html(React.createElement(TrackRecordCard, { record: snapDeal() }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out).replace(/&#x27;/g, "'");
+    expect(gluedWords(text)).toEqual([]);
+    expect(out).toContain('data-landing="right"');
+    expect(out).toContain('data-outcome="flag_right"');
+    expect(out).toContain('data-landing="wrong"');
+    expect(out).toContain('data-outcome="false_hold"');
+    expect(text).toContain("Right: the flag stood");
+    expect(text).toContain("Wrong: a false hold");
+    expect(text).toContain("· the test's verdict: stretched");
+    expect(text).toContain("· the test's verdict: holds");
+    // The middle column is the evidence's figure, not the challenger's.
+    expect(text).toContain("Evidence");
+    expect(text).not.toContain("Screen's side");
+    expect(text).toContain("$3.95M");
+    expect(text).toContain("2 stress-test rows scored on this deal: 1 right, 1 wrong, 1 of them a false hold. No share is printed under 5 scored rows.");
+    expect(out).toContain('data-qa="track-record-summary"');
+    expect(out).not.toContain('data-qa="track-record-not-snapshotted"');
+  });
+
+  it("says a screen's rows were not snapshotted where its verdict kept none, and scores its challenges", () => {
+    const out = html(React.createElement(TrackRecordCard, { record: withLater() }));
+    const text = visibleText(out).replace(/&#x27;/g, "'");
+    expect(out).toContain('data-qa="track-record-not-snapshotted"');
+    expect(text).toContain(
+      "This screen (Oct 1, 2026) was made before the stress test was kept with its verdict, so its rows were not snapshotted: its challenges are scored on the challenger's own figures instead.",
+    );
+    expect(out).not.toContain('data-qa="track-record-summary"');
   });
 
   it("draws the refusal where a document uploaded after the screen is dated before it: history, only uploaded later", () => {
@@ -132,41 +198,60 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(gluedWords(text)).toEqual([]);
     expect(few).toContain('data-state="start"');
     expect(text).toContain("1 deal tested · 1 with later evidence · 2 rows scored");
-    expect(text).toContain("2 scored rows are a start, not a record.");
+    expect(text).toContain("2 challenges scored from screens whose stress test was not kept are a start, not a record: no share is printed under 5.");
     expect(text).not.toMatch(/\d+%/);
     expect(few).toContain('data-bar="record-screen"');
     expect(few).toContain('data-bar="record-between"');
     expect(few).not.toContain('data-bar="record-om"');
-    expect(text).toContain("No share is printed under three scored rows.");
+    expect(text).toContain("No share is printed under 5 scored rows.");
     // A decision is no scored row: withLater's basis row is the Dead
     // decision, counted apart, so its deal alone is two scored rows.
     const decided = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
     expect(decided).toContain('data-state="start"');
     expect(visibleText(decided)).toContain("1 deal tested · 1 with later evidence · 3 rows answered, 1 of them a decision · 2 scored");
-    // Three scored rows — vacancy (screen) twice, NOI (between) — is
-    // the floor, and the shares are said.
-    const atFloor = html(
+    // Four scored rows is still under the floor: no share.
+    const four = html(
       React.createElement(TrackRecordSection, {
-        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]),
+        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy, noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]),
       }),
     );
-    expect(atFloor).toContain('data-state="record"');
-    expect(visibleText(atFloor)).toContain("2 deals tested · 2 with later evidence · 4 rows answered, 1 of them a decision · 3 scored");
+    expect(four).toContain('data-state="start"');
+    expect(visibleText(four)).not.toMatch(/\d+%/);
   });
 
-  it("enough: the shares, said once in the line", () => {
-    const record = accountRecord([withLater(), withLater()]);
+  it("enough: the shares, said once in the line, each with its count", () => {
+    const record = accountRecord([withLater(), withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]);
     const out = html(React.createElement(TrackRecordSection, { record }));
     expect(a11yIssues(out)).toEqual([]);
     const text = visibleText(out);
     expect(gluedWords(text)).toEqual([]);
     expect(out).toContain('data-state="record"');
     // The two Dead decisions are said apart, never in the shares.
-    expect(text).toContain(
-      "Of 4 scored rows, 2 landed on the screen's side (50%), 0 on the OM's (0%) and 2 between (50%). 2 more rows were decisions (Dead, and why), counted apart and in no share.",
+    expect(text.replace(/&#x27;/g, "'")).toContain(
+      "5 challenges scored from screens whose stress test was not kept: 3 of 5 challenges on the screen's side (60%), 0 of 5 challenges on the OM's (0%), 2 of 5 challenges between (40%). 2 more rows were decisions (Dead, and why), counted apart and in no share.",
     );
-    expect(text).toContain("2 screen · 0 OM");
+    expect(text).toContain("3 screen · 0 OM");
     expect(text).toContain("0 screen · 0 OM · 2 between");
+  });
+
+  it("the stress test's rows: right and wrong in words beside the bar, a share only from five, with its count", () => {
+    const four = accountRecord([snapDeal(), snapDeal()]);
+    expect(four).toMatchObject({ scored: 4, right: 2, wrong: 2, falseHolds: 2, shares: null });
+    const few = html(React.createElement(TrackRecordSection, { record: four }));
+    expect(few).toContain('data-state="start"');
+    expect(visibleText(few)).toContain("4 scored stress-test rows are a start, not a record: no share is printed under 5.");
+    expect(visibleText(few)).not.toMatch(/\d+%/);
+    const five = accountRecord([snapDeal(), snapDeal(), snapDeal({ only: "vacancy" })]);
+    const out = html(React.createElement(TrackRecordSection, { record: five }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out);
+    expect(gluedWords(text)).toEqual([]);
+    expect(out).toContain('data-state="record"');
+    expect(text).toContain("5 stress-test rows scored: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%), 2 of them false holds.");
+    expect(out).toContain('data-bar="record-right"');
+    expect(out).toContain('data-bar="record-wrong"');
+    expect(text).toContain("3 right · 0 wrong");
+    expect(text).toContain("0 right · 2 wrong");
   });
 
   it("its bar markers are its own across the app's sources", () => {
@@ -179,7 +264,7 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
       }
     };
     walk(join(process.cwd(), "app"));
-    for (const marker of ["record-screen", "record-between", "record-om"]) {
+    for (const marker of ["record-right", "record-wrong", "record-screen", "record-between", "record-om"]) {
       const holders = files.filter((f) => readFileSync(f, "utf8").includes(`data-bar="${marker}"`));
       expect(holders.map((f) => f.replace(process.cwd(), "")), marker).toEqual(["/app/(app)/analytics/track-record.tsx"]);
     }

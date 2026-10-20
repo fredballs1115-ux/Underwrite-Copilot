@@ -239,6 +239,9 @@ export default async function AnalyticsPage() {
       const t12Summary = t12SummaryOf(t12Row?.summary);
       return scoreDeal({
         screenedAt: (r.verdict as { generatedAt?: string } | null)?.generatedAt ?? null,
+        // The stress test as it stood at the verdict: its rows, holds
+        // included, are scored; a verdict that kept none scores its challenges.
+        stressSnapshot: (r.verdict as { stressSnapshot?: unknown } | null)?.stressSnapshot,
         challenges: (r.challenges as { challenges?: Challenge[] } | null)?.challenges,
         priorScreen: (r.prior_screen as PriorScreenLike | null | undefined) ?? null,
         rentRoll: roll?.summary ? { arrivedAt: arrivalOf(roll, docs), dated: roll.as_of_date ?? null, summary: roll.summary as RentRollSummary } : null,
@@ -417,8 +420,9 @@ export default async function AnalyticsPage() {
         </>
       )}
 
-      {/* The track record stands whatever the count: under three screened
-          deals it says, in its own words, that none is claimed. */}
+      {/* The track record stands whatever the count: with nothing scored it
+          says, in its own words, that none is claimed, and under
+          RECORD_FLOOR scored rows that it is a start, with no share. */}
       <TrackRecordSection record={trackRecord} />
     </div>
   );

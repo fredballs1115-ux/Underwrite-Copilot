@@ -2583,6 +2583,27 @@ describe("runAnalysis — a re-screen snapshots the challenges it replaces besid
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
   });
 
+  it("carries the previous verdict's stress-test snapshot into prior_screen, and stamps the new verdict with its own", async () => {
+    const { readStressSnapshot } = await import("@/lib/stress-snapshot");
+    const previousSnapshot = {
+      v: 1,
+      readOn: "2026-09-10",
+      rows: [{ key: "vacancy", title: "Stabilized vacancy", verdict: "holds", om: 5, page: 4, evidence: { value: 5.2, label: "Rental vacancy, metro area", asOf: "2026-04-01", kind: "published", publisher: "Census Bureau" }, per: null, threshold: { value: 0.05, unit: "pts" }, worse: "higher" }],
+    };
+    state.deals.d1.verdict = { ...VERDICT, generatedAt: "2026-09-10T12:00:00Z", stressSnapshot: previousSnapshot };
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const prior = state.deals.d1.prior_screen as { verdict: { generatedAt?: string; stressSnapshot?: unknown } | null };
+    expect(prior.verdict?.generatedAt).toBe("2026-09-10T12:00:00Z");
+    expect(prior.verdict?.stressSnapshot).toEqual(previousSnapshot);
+    expect(readStressSnapshot(prior.verdict?.stressSnapshot)?.rows[0]).toMatchObject({ key: "vacancy", verdict: "holds" });
+    // The new verdict carries this run's own snapshot, never the old one.
+    const now = state.deals.d1.verdict as { generatedAt?: string; stressSnapshot?: unknown };
+    expect(now.generatedAt).not.toBe("2026-09-10T12:00:00Z");
+    expect(now).toHaveProperty("stressSnapshot");
+    expect(now.stressSnapshot).not.toEqual(previousSnapshot);
+  });
+
   it("a deal with no challenges yet snapshots none, and a resumed attempt never re-snapshots", async () => {
     state.deals.d1.challenges = null;
     await runAnalysis("d1");
@@ -2641,8 +2662,23 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
     expect(brief).toMatch(/The levered IRR: [^\n]*\d+\.\d%/);
     expect(brief).toContain("The IRR moves above are the engine's own");
     expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
-    // Nothing new is stored on the verdict: the test is rebuilt on read.
+    // The test is rebuilt on read; the verdict keeps only its snapshot
+    // (lib/stress-snapshot): each row's verdict, the OM's figure and page,
+    // and the evidence that decided it — the rows the track record scores.
     expect(state.deals.d1.verdict).not.toHaveProperty("stressTest");
+    const { readStressSnapshot, stressSnapshotOf } = await import("@/lib/stress-snapshot");
+    const stored = (state.deals.d1.verdict as { stressSnapshot?: unknown }).stressSnapshot;
+    expect(stored).toEqual(stressSnapshotOf(test));
+    const kept = readStressSnapshot(stored)!;
+    expect(kept.rows.map((r) => r.key)).toEqual(test!.rows.map((r) => r.key));
+    expect(kept.rows.find((r) => r.key === "noi")).toMatchObject({
+      verdict: "unsupported",
+      om: 1_200_000,
+      page: 5,
+      evidence: { kind: "document", publisher: "the deal's T-12", asOf: "2026-06-30", value: 1_000_000 },
+      threshold: { value: 0.05, unit: "share" },
+      worse: "lower",
+    });
   });
 
   // The worker has no Next cache, so the first cut handed the test

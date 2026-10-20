@@ -32,6 +32,7 @@ import {
   engineReruns,
   evidenceKindOf,
 } from "./how-we-test";
+import { snapshotThreshold } from "./stress-snapshot";
 import {
   BASIS_STRETCH_PCT,
   BASIS_UNSUPPORTED_PCT,
@@ -216,6 +217,19 @@ describe("/how-we-test draws every method from the table", () => {
     expect(text).toContain(TRACK_RECORD.heading);
     for (const line of TRACK_RECORD.lines) expect(text).toContain(line);
     expect(TRACK_RECORD.lines.join(" ")).toContain(`under ${RECORD_FLOOR} scored rows`);
+    expect(RECORD_FLOOR).toBe(5);
+    // Every row scored, holds included, each outcome said, and the margins
+    // the snapshot keeps (lib/stress-snapshot) printed as the reader's own.
+    const record = TRACK_RECORD.lines.join(" ");
+    expect(record).toContain("Every row of the stress test is scored, holds included");
+    expect(record).toContain("a false hold");
+    expect(record).toContain("An unchecked row is not scored.");
+    expect(record).toContain('"3 of 5 rows"');
+    expect(record).toContain("0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    expect(snapshotThreshold("vacancy")).toEqual({ value: 0.05, unit: "pts" });
+    expect(snapshotThreshold("noi")).toEqual({ value: 0.05, unit: "share" });
+    expect(snapshotThreshold("basis")).toEqual({ value: 0.05, unit: "share" });
+    for (const line of TRACK_RECORD.lines) expect(line.length, line).toBeLessThanOrEqual(260);
     // A stabilized vacancy the market decided is not scored by a later document (audit L5).
     expect(TRACK_RECORD.lines).toContain("A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.");
     // The marker keeps the sentence live-verify greps, whole.

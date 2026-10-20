@@ -28,7 +28,8 @@ import {
   VACANCY_UNSUPPORTED_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { RECORD_FLOOR } from "@/lib/track-record";
+import { RECORD_FLOOR, marginWords } from "@/lib/track-record";
+import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 
 export { STRESS_METHODS };
@@ -265,16 +266,26 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
 
 /** Whether the screen was right: scored, never claimed (lib/track-record's
  *  rules, its floor imported). */
+const margin = (key: StressKey) => {
+  const t = snapshotThreshold(key);
+  return t ? marginWords(t).replace("-point", " points") : "";
+};
+
 export const TRACK_RECORD = {
   heading: "Whether it is right",
   lines: [
-    "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 uploaded after it and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    "Every row of the stress test is scored, holds included: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
+    "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands at or better than the OM's.",
+    "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
+    `The margin is the one the row's own verdict draws: ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
     "A document the screen itself read is never scored: the challenger was handed it. Nor is one whose year ended before the verdict, only uploaded later.",
     "Taxes and insurance are never scored by a document: a seller's T-12 cannot show a new owner's tax bill or premium.",
     "On a plan deal a T-12 or rent roll is the building before the plan is done, so it scores neither the OM's NOI nor its stated vacancy.",
     "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
     "A decision is a direction, not a figure: it is counted apart and in no share.",
-    `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record.`,
+    `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record. A share is always printed with its count beside it ("3 of 5 rows").`,
     "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",
   ],
 } as const;

@@ -592,6 +592,11 @@ export interface ScreenResult {
 export interface VerdictResult {
   /** ISO timestamp stamped when this verdict generation landed */
   generatedAt?: string;
+  /** the stress test as it stood at this verdict (lib/stress-snapshot
+   *  `StressSnapshot`), written by the pipeline beside the stamp so the track
+   *  record scores the rows the call was reached on; read back only through
+   *  `readStressSnapshot`. Absent on a verdict written before it was kept. */
+  stressSnapshot?: unknown;
   verdict: VerdictCall;
   reason: string;
   topRisks: string[];
