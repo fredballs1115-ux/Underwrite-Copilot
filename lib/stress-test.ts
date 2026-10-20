@@ -1496,11 +1496,14 @@ function basisRow(ctx: Ctx): StressRow | null {
   // implies (lib/comp-detail's own rule), said so rather than the share's
   // price over every unit.
   const whole = interest.sharePct != null ? buildingPriceOf(ctx.ex, askingPriceOf(ctx.ex)) : null;
-  const over = per === "unit" ? `over ${unitCountFromMetrics(ctx.rows)?.toLocaleString("en-US") ?? "?"} ${words.noun?.many ?? "units"}` : `over ${buildingSfFromMetrics(ctx.rows)?.toLocaleString("en-US") ?? "?"} SF`;
+  // The count the basis divides by, where the memorandum states one; never
+  // a "?" in its place.
+  const count = per === "unit" ? unitCountFromMetrics(ctx.rows) : buildingSfFromMetrics(ctx.rows);
+  const over = count == null ? "" : per === "unit" ? ` over ${count.toLocaleString("en-US")} ${words.noun?.many ?? "units"}` : ` over ${count.toLocaleString("en-US")} SF`;
   const priced = priceRow
     ? whole != null
-      ? ` (the whole the ${interest.sharePct}% share's ${priceRow.value} price implies, ${money(whole)}, ${over})`
-      : ` (${priceRow.label} ${priceRow.value} ${over})`
+      ? ` (the whole the ${interest.sharePct}% share's ${priceRow.value} price implies, ${money(whole)}${over ? `,${over}` : ""})`
+      : ` (${priceRow.label} ${priceRow.value}${over})`
     : "";
   const omSays: StressRow["omSays"] =
     om != null
@@ -1531,9 +1534,9 @@ function basisRow(ctx: Ctx): StressRow | null {
   // The verdict is read in percent of the best figure, so the gap's unit is
   // a share, not a dollar: struck again here on the best figure.
   const sharePct = ((om - best.value!) / best.value!) * 100;
-  // Past the nearest of the deciding medians, the generous reading of them.
-  const past = Math.min(...comparables.map((e) => ((om - e.value!) / e.value!) * 100));
-  const verdict: StressVerdict = past <= BASIS_STRETCH_PCT ? "holds" : past > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
+  // The verdict, the sentence and the re-run are all against the one best
+  // median, so the row never prints "18% over" beside "Holds".
+  const verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
   const gap = { value: Math.round(sharePct * 10) / 10, unit: "pct" as const, text: judged.gap.text };
   const evidenceIndex = evidence.indexOf(best);
   // The price is a direct input: re-run at the evidence's basis — only

@@ -1088,6 +1088,21 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(asksOnly.gap!.text).toBe("The ask's $275k/unit is 8.5% under the median of your past screens' asking prices in Washington DC, $300k/unit — the conservative side. Against a rule of thumb only.");
   });
 
+  it("strikes the basis verdict against the same median its sentence names, and prints no count it does not have", () => {
+    // The comps' median $232k: the ask 18.3% over it. Recorded sales at
+    // $290k would read it under — but the sentence names the comps, so the
+    // verdict does too.
+    const comps = { saleComps: [{ name: "The Ellery", detail: "$232,000 per unit", support: "supports" as const, note: "" }], leaseComps: [], redFlags: [], summary: "" };
+    const recordedSales = { count: 6, medianPerSqft: null, medianPerUnit: 290_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" };
+    const b = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps, recordedSales })), "basis");
+    expect(b.gap!.text).toBe("The ask's $275k/unit is 18.3% over the median of the memorandum's sale comps, $232k/unit.");
+    expect(b.verdict).toBe("unsupported");
+    // No unit count stated: the price is said without a "?" for it.
+    const noCount: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.filter((m) => m.label !== "Units") };
+    const t = buildStressTest(apartmentArgs({ extraction: noCount, brokerComps: comps }));
+    for (const r of t.rows) expect(r.omSays.text).not.toContain("?");
+  });
+
   it("the office deal's vacancy and exit read the tracker as published figures, the metro's", () => {
     const v = rowOf(officeTest, "vacancy");
     expect(v.evidence.some((e) => /vacancy \(research tracker\)/.test(e.label) && e.kind === "published" && e.scope === "metro")).toBe(true);
