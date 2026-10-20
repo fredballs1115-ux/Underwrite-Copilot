@@ -1504,14 +1504,20 @@ export function deriveUnderwriteInputs(
       hotelRead?.pipPage || undefined,
     );
   } else {
+    // A deal read as stabilized whose memorandum still states a program a
+    // door at a time: the program is upside the model does not run, and the
+    // note says it is there rather than that there is none.
+    const unchargedProgram = strategy.kind === "stabilized" ? renovationProgramBudget(metrics, statedPrice, !priceIsLand) : null;
     mark(
       "capitalImprovementsYr1",
       "assumption",
-      strategy.kind === "stabilized" || strategy.kind === "unknown"
-        ? "No capital plan in the OM — enter one if the PCA finds work"
-        : forwardDeal
-          ? "No construction budget is the buyer's: on a forward purchase the developer funds the works and the price is all-in at delivery"
-          : `${withArticle(strategy.label.toLowerCase(), true)} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
+      unchargedProgram
+        ? `Not charged — the OM states a renovation program (${unchargedProgram.label}), but the deal is read as stabilized, so the model runs today's income and none of the program; enter its cost to charge it`
+        : strategy.kind === "stabilized" || strategy.kind === "unknown"
+          ? "No capital plan in the OM — enter one if the PCA finds work"
+          : forwardDeal
+            ? "No construction budget is the buyer's: on a forward purchase the developer funds the works and the price is all-in at delivery"
+            : `${withArticle(strategy.label.toLowerCase(), true)} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
     );
   }
   mark("amFeePctEquity", "assumption", "Default 0.5% of equity/yr");
