@@ -110,7 +110,9 @@ describe("/how-we-test draws every method from the table", () => {
       exit_cap: ["om_internal", "published", "published"],
       debt: ["published", null, null],
       noi: ["document", "document", "om_internal"],
-      vacancy: ["document", "published", "published", "rule_of_thumb"],
+      // A stabilized assumption is the market's to judge first; the
+      // documents' vacancy is today's.
+      vacancy: ["published", "published", "document", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published"],
       expense_growth: ["published", "published", "published"],
       taxes: ["om_internal", "om_internal"],

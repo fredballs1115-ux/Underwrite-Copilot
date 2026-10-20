@@ -42,8 +42,12 @@
 //
 // The thresholds, each named here and read nowhere else:
 //   vacancy          VACANCY_UNSUPPORTED_PTS   3 pts past the best evidence
+//                    (a stabilized assumption on a stabilized deal: the
+//                    market's figure, past the survey's margin; else the
+//                    deal's documents)
 //   rent growth      RENT_GROWTH_UNSUPPORTED_PTS 2 pts (200 bps) over the
-//                    trailing year's highest market figure
+//                    trailing year's figure for the deal's own kind of rent
+//                    (`RENT_GROWTH_DECIDERS`)
 //   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under the lowest
 //                    price index
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
@@ -573,19 +577,51 @@ const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
 
 // — Vacancy —
 
+/**
+ * Whether the OM's vacancy is a stabilized assumption on a deal read as
+ * stabilized — the case the vacancy row holds to the market's published
+ * figures before the deal's documents, whose vacancy is today's. A stated
+ * vacancy allowance (a stabilized or pro forma row first, `omVacancy`), on a
+ * deal no plan deal: an occupancy the OM states is today's, and a lease-up,
+ * value-add, conversion or development is judged on what the documents say
+ * the building runs at today (its plan is the gap). The track record reads
+ * it too (lib/track-record `vacancyHeldToMarket`), so a later rent roll's
+ * vacancy — today's again — never scores a challenge the stress test holds
+ * to the market.
+ */
+export function stabilizedVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
+  const om = omVacancy(rowsOf(extraction));
+  return om?.from === "vacancy" && !isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+}
+
+/**
+ * Where a published vacancy figure stands in the order a stabilized
+ * assumption is held to them — the order lib/model-vs-market's vacancy check
+ * anchors in: the metro area's survey, inside its own margin; for a
+ * commercial class, the research tracker's band (where the read holds the
+ * model to it); the Census region's; the state's annual figure. The first
+ * present decides and the rest are shown beside it. Read off the figure's
+ * label, never its picture's marks, which a withheld read drops.
+ */
+function marketVacancyRank(label: string): number {
+  if (/research tracker/i.test(label)) return 1;
+  if (/metro area/i.test(label)) return 0;
+  if (/census region/i.test(label)) return 2;
+  return 3;
+}
+
 function vacancyRow(ctx: Ctx): StressRow | null {
   const om = omVacancy(ctx.rows);
-  const evidence: StressEvidence[] = [];
-  const comparables: { value: number; tolerance: number; kind: StressEvidence["kind"] }[] = [];
-  const compared = new Set<number>();
-  const push = (e: StressEvidence, tolerance = SAME) => {
-    evidence.push(e);
-    if (e.value != null) {
-      comparables.push({ value: e.value, tolerance, kind: e.kind });
-      compared.add(evidence.length - 1);
-    }
-  };
-  // The deal's own documents first: the rent roll's occupancy, the T-12's
+  // Each piece is gathered apart and set in order once the row knows which
+  // kind decides: the deal's documents, the published figures (each with its
+  // own tolerance — the survey's margin reaches the survey's figure, never
+  // the region's or the state's beside it), the class's rule of thumb.
+  type Piece = { e: StressEvidence; tolerance: number; compare: boolean; rank: number };
+  const docs: Piece[] = [];
+  const market: Piece[] = [];
+  let rot: Piece | null = null;
+  const piece = (e: StressEvidence, tolerance = SAME, compare = true, rank = 0): Piece => ({ e, tolerance, compare: compare && e.value != null, rank });
+  // The deal's own documents: the rent roll's occupancy, the T-12's
   // vacancy loss over gross potential rent — whether its rent line already
   // nets the vacancy is the statement's own EGI to say (lib/actuals/analyze
   // `t12Vacancy`, the track record's one reading), and the sentence says
@@ -605,7 +641,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       const v = Math.round((1 - occ) * 1000) / 10;
       const asOf = rr.asOf ?? s.asOfUsed ?? null;
       const noun = assetWords(ctx.assetClass).noun?.many ?? "units";
-      push({
+      docs.push(piece({
         kind: "document",
         label: "The deal's rent roll: the occupancy it runs at",
         text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${asOf}` : ", no stated as-of"})`,
@@ -613,13 +649,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
         asOf,
         publisher: "the deal's rent roll",
         scope: "deal",
-      });
+      }));
     }
   }
   const t12 = ctx.actuals?.t12;
   const tv = t12 ? t12Vacancy(t12.summary) : null;
   if (t12 && tv) {
-    push({
+    docs.push(piece({
       kind: "document",
       label: "The deal's T-12: vacancy loss over gross potential rent",
       text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${t12.periodEnd}` : "; period not stated"})`,
@@ -627,7 +663,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       asOf: t12.periodEnd,
       publisher: "the deal's T-12",
       scope: "deal",
-    });
+    }));
   }
   // The published figures the model-vs-market read already carries: the
   // survey (with its margin as the tolerance), the region's, the state's,
@@ -640,14 +676,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       const tracker = /research tracker/i.test(f.label);
       const e = published(check, f, ctx.mvm?.grain ?? null);
       const compare = tracker ? held && !assetWords(ctx.assetClass).residential : !(check.marks?.[i]?.role === "apart");
-      if (compare) push(e, moeOf(f) ?? SAME);
-      else evidence.push(e);
+      market.push(piece(e, moeOf(f) ?? SAME, compare, marketVacancyRank(f.label)));
     });
   }
   // The class's norm, a rule of thumb named as one.
   const cd = classVacancyDefault(ctx.ex?.assetClass ?? ctx.assetClass);
   if (assetWords(ctx.assetClass).operating) {
-    push({
+    rot = piece({
       kind: "rule_of_thumb",
       label: `${cd.classWord[0].toUpperCase()}${cd.classWord.slice(1)} vacancy, a rule of thumb`,
       text: `${pct1(cd.pct)} — the class's screening default, a rule of thumb, not this market's figure`,
@@ -657,10 +692,44 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       scope: "class",
     });
   }
-  if (!om && evidence.length === 0) return null;
+  if (!om && docs.length + market.length === 0 && !rot) return null;
+  // A stabilized assumption on a deal read as stabilized is the market's to
+  // judge (`stabilizedVacancyStated`): the published figure first in
+  // `marketVacancyRank`'s order decides, inside its own margin, and the
+  // documents' vacancy is today's — shown beside it as the gap a lease-up
+  // has to close, or as support where the building already runs at or under
+  // the assumption. Where no published figure is fresh, the documents decide
+  // as on every other deal, and the row says so.
+  const stabilized = om?.from === "vacancy" && !ctx.plan;
+  const heldTo = stabilized ? market.filter((m) => m.compare) : [];
+  const topRank = heldTo.length > 0 ? Math.min(...heldTo.map((m) => m.rank)) : null;
+  const deciding = topRank == null ? [] : heldTo.filter((m) => m.rank === topRank);
+  const marketDecides = deciding.length > 0;
+  // The documents' vacancy against the stabilized assumption, said as
+  // today's: the gap a lease-up has to close, or support for the figure.
+  const todayWords = (docPct: number, omPct: number, what: string): string => {
+    const diff = docPct - omPct;
+    return diff > SAME
+      ? `${pts(diff)} over ${what} — the gap a lease-up has to close`
+      : `${diff < -SAME ? `${pts(diff)} under` : "at"} ${what} — support for it`;
+  };
+  if (marketDecides && om) {
+    for (const d of docs) {
+      d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
+      d.compare = false;
+    }
+    for (const m of market) if (!deciding.includes(m)) m.compare = false;
+    if (rot) rot.compare = false;
+  }
+  // The row prints the kind that decides first.
+  const ordered: Piece[] = marketDecides
+    ? [...deciding, ...market.filter((m) => !deciding.includes(m)), ...docs, ...(rot ? [rot] : [])]
+    : [...docs, ...market, ...(rot ? [rot] : [])];
+  const evidence = ordered.map((p) => p.e);
+  const compared = indexesOf(evidence, (_, i) => ordered[i].compare);
   // Where the OM states no vacancy allowance, the figure is its occupancy
-  // TODAY, not a pro forma assumption: the row is titled and worded so. The
-  // test against the evidence is unchanged (the method is the owner's).
+  // TODAY, not a pro forma assumption: the row is titled and worded so, and
+  // the documents — today's figures too — decide it.
   const title = om?.from === "occupancy" ? OCCUPANCY_TITLE : undefined;
   const omSays: StressRow["omSays"] = om
     ? {
@@ -673,81 +742,156 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       }
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
   if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"), compared);
+  const comparables = ordered.filter((p) => p.compare);
   if (comparables.length === 0) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, compared, title);
-  // The verdict is the best kind's: the deal's own document where one
-  // states the figure, else the published figures, else the rule of thumb.
-  // A rule of thumb never widens the range a document decides (a 5% class
-  // default beside a T-12's 9.1% had read the OM's 6% as "inside").
+  // The verdict is the best kind's: the published figure that decides a
+  // stabilized assumption; else the deal's own document where one states
+  // the figure, else the published figures, else the rule of thumb. A rule
+  // of thumb never widens the range a document decides (a 5% class default
+  // beside a T-12's 9.1% had read the OM's 6% as "inside").
   const best = comparables[0];
-  const decisive = comparables.filter((c) => c.kind === best.kind);
+  const bestValue = best.e.value!;
+  const decisive = marketDecides ? deciding : comparables.filter((c) => c.e.kind === best.e.kind);
   // Each figure carries its own tolerance: the survey's margin reaches the
   // survey's figure, never the region's or the state's beside it.
-  const judged = judge(om.pct, decisive.map((c) => ({ value: c.value, tolerance: c.tolerance })), "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) =>
-    Math.abs(gap) < SAME
-      ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(best.value)}.`
-      : gap > 0
-        ? `The OM's ${pct1(om.pct)} is ${pts(gap)} under the evidence's ${pct1(best.value)}.`
-        : `The OM's ${pct1(om.pct)} is ${pts(gap)} over the evidence's ${pct1(best.value)} — the conservative side.`,
-  );
-  const evidenceIndex = evidence.findIndex((e) => e.value === best.value);
+  const figures = decisive.map((c) => ({ value: c.e.value!, tolerance: c.tolerance }));
+  let judged: Judged;
+  if (marketDecides) {
+    // Said by the figure that decided — its margin, or its band — and why
+    // it decides: the assumption is the building stabilized, which the
+    // market's own vacancy speaks to and today's documents do not.
+    const band = figures.length > 1 ? { lo: Math.min(...figures.map((f) => f.value)), hi: Math.max(...figures.map((f) => f.value)) } : null;
+    const moe = band || best.tolerance === SAME ? null : best.tolerance;
+    const said = `${lowerFirst(best.e.label.replace(/, low read$/, ""))} (${best.e.publisher}), ${band ? `${pct1(band.lo)}–${pct1(band.hi)}` : `${pct1(bestValue)}${moe != null ? ` ±${moe} pts` : ""}`}`;
+    const edge = band ? band.lo - SAME : bestValue - (moe ?? SAME);
+    const doc = docs[0];
+    const docLine = doc
+      ? ` ${doc === docs.find((d) => d.e.publisher === "the deal's rent roll") ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.`
+      : "";
+    judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) => {
+      const where =
+        om.pct < edge
+          ? `${pts(gap)} under it${moe != null ? `, ${pts(edge - om.pct)} past its margin` : ""}`
+          : band && om.pct <= band.hi + SAME
+            ? "inside its band"
+            : Math.abs(gap) < SAME
+              ? "at it"
+              : gap > 0
+                ? `${pts(gap)} under it, inside its margin`
+                : `${pts(gap)} over it — the conservative side`;
+      return `The OM's ${pct1(om.pct)} is a stabilized assumption, so it is held to the market's published figure: ${said}. The OM is ${where}.${docLine}`;
+    });
+  } else {
+    // A stabilized assumption with no fresh published figure to hold it to:
+    // the documents decide, said so.
+    const noMarket = stabilized && best.e.kind === "document" ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide." : "";
+    judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) =>
+      Math.abs(gap) < SAME
+        ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(bestValue)}.${noMarket}`
+        : gap > 0
+          ? `The OM's ${pct1(om.pct)} is ${pts(gap)} under the evidence's ${pct1(bestValue)}.${noMarket}`
+          : `The OM's ${pct1(om.pct)} is ${pts(gap)} over the evidence's ${pct1(bestValue)} — the conservative side.${noMarket}`,
+    );
+  }
+  // The engine is re-run at the figure that decided.
+  const evidenceIndex = ordered.indexOf(best);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? pctImpact(ctx.derived, "vacancyPct", evidenceIndex, om.pct, best.value, {
+      ? pctImpact(ctx.derived, "vacancyPct", evidenceIndex, om.pct, bestValue, {
           what: "vacancy",
           om: pct1(om.pct),
-          alt: pct1(best.value),
-          evidence: evidence[evidenceIndex].publisher,
+          alt: pct1(bestValue),
+          evidence: best.e.publisher,
           model: pct1(ctx.derived.inputs.vacancyPct * 100),
         })
       : null;
-  return { key: "vacancy", title: title ?? TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared, title), ...(best.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
+  return { key: "vacancy", title: title ?? TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared, title), ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
 }
 
 // — Rent growth —
 
+/**
+ * The published figures a rent growth may be held to, in the order the
+ * first present decides — the one that speaks to the deal's own kind of
+ * rent (the read hands a residential class Zillow's and the CPI's figures,
+ * a commercial class its lessors' index, never both):
+ *   - an apartment building: Zillow's asking rents over multifamily
+ *     listings alone, else over all home types (the nearest Zillow reads
+ *     where its apartment index has no figure for the month), else the rent
+ *     sitting tenants pay (the CPI's rent of primary residence), which
+ *     averages every lease in place and lags the rents new leases sign at;
+ *   - a commercial class: the national index of rents its kind of lessor
+ *     charges (lib/live-market-brief `rentIndexFor`), the nation's.
+ * Each figure is the trailing year's, and every other figure the read
+ * carries stays shown beside the one that decides, never in its place.
+ */
+const RENT_GROWTH_DECIDERS: readonly { re: RegExp; name: (label: string) => string; why: string }[] = [
+  { re: /^Asking rent, apartments$/, name: () => "Zillow's apartment asking rents", why: "the figure for this kind of rent" },
+  {
+    re: /^Asking rent, all home types$/,
+    name: () => "Zillow's asking rents across all home types",
+    why: "the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month",
+  },
+  {
+    re: /\(CPI rent\)$/,
+    name: () => "the rent sitting tenants pay (CPI rent)",
+    why: "the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at",
+  },
+  {
+    re: /^Rents charged by .+, national \(PPI\)$/,
+    name: (label) => `the national index of ${lowerFirst(label.replace(/, national \(PPI\)$/, ""))}`,
+    why: "the figure for this kind of rent, the nation's lessors of this kind of building rather than the metro's",
+  },
+];
+
 function rentGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, RENT_GROWTH_ROW, RENT_GROWTH_NOT);
-  const evidence: StressEvidence[] = [];
-  const comparables: number[] = [];
-  const compared = new Set<number>();
+  // A regulation's allowance is the regime's, for the units it regulates —
+  // shown first and never in the market's range (the read's own rule), so
+  // never the figure that decides.
   const check = checkOf(ctx.mvm, "rent_growth");
-  if (check) {
-    check.published.forEach((f, i) => {
-      const e = published(check, f, ctx.mvm?.grain ?? null);
-      evidence.push(e);
-      // An allowance is the regime's, for the units it regulates — shown
-      // first and never in the market's range (the read's own rule).
-      if (check.marks?.[i]?.role !== "apart") {
-        comparables.push(f.value);
-        compared.add(evidence.length - 1);
-      }
-    });
-  }
-  if (!om && evidence.length === 0) return null;
+  const apart: StressEvidence[] = [];
+  const market: StressEvidence[] = [];
+  check?.published.forEach((f, i) => {
+    const e = published(check, f, ctx.mvm?.grain ?? null);
+    if (check.marks?.[i]?.role === "apart" || /allowance on the regulated units/i.test(f.label)) apart.push(e);
+    else market.push(e);
+  });
+  if (!om && apart.length + market.length === 0) return null;
+  // The one figure that decides, the first of RENT_GROWTH_DECIDERS present,
+  // printed first among the market's; the rest beside it.
+  const found = RENT_GROWTH_DECIDERS.flatMap((d) => {
+    const e = market.find((m) => d.re.test(m.label));
+    return e ? [{ e, d }] : [];
+  })[0];
+  const evidence = [...apart, ...(found ? [found.e] : []), ...market.filter((m) => m !== found?.e)];
+  const pick = found ? { i: apart.length, d: found.d } : null;
+  const compared = new Set<number>(pick ? [pick.i] : []);
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("rent growth rate"), value: null, page: null };
   if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"), compared);
-  if (comparables.length === 0) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE, compared);
-  // The best figure is the highest market figure — the generous side of the
-  // trailing year, which the assumption is asked to beat.
-  const bestValue = Math.max(...comparables);
-  const ordered = [bestValue, ...comparables.filter((v) => v !== bestValue)];
-  const judged = judge(om.pct, ordered, "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
+  if (!pick) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE, compared);
+  const decider = evidence[pick.i];
+  const bestValue = decider.value!;
+  const name = pick.d.name(decider.label);
+  // "Held to Zillow's apartment asking rents, the figure for this kind of
+  // rent: +1.6% over the year to Aug 2026 (Zillow Research)."
+  const held = `Held to ${name}, ${pick.d.why}: ${decider.text} (${decider.publisher}).`;
+  const judged = judge(om.pct, [bestValue], "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `The OM's ${pct1(om.pct)}/yr is at the trailing year's ${pct1(bestValue)}.`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.`
       : gap > 0
-        ? `The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over the trailing year's highest published figure, ${pct1(bestValue)}.`
-        : `The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under the trailing year's ${pct1(bestValue)} — the conservative side.`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it.`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side.`,
   );
-  const evidenceIndex = evidence.findIndex((e) => e.value === bestValue);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? pctImpact(ctx.derived, "rentGrowthPct", evidenceIndex, om.pct, bestValue, {
+      ? pctImpact(ctx.derived, "rentGrowthPct", pick.i, om.pct, bestValue, {
           what: "rent growth",
           om: `${pct1(om.pct)}/yr`,
           alt: `${pct1(bestValue)}/yr`,
-          evidence: evidence[evidenceIndex].publisher,
+          evidence: decider.publisher,
           model: `${pct1(ctx.derived.inputs.rentGrowthPct * 100)}/yr`,
         })
       : null;
